@@ -1,0 +1,42 @@
+.popconfirm {
+  padding: $popconfirm-padding;
+  background-color: $popconfirm-background-color;
+  border-radius: $popconfirm-border-radius;
+  opacity: 0;
+
+  &.show {
+    opacity: 1;
+  }
+}
+
+.popconfirm-popover {
+  z-index: $zindex-popconfirm;
+  width: $popconfirm-popover-width;
+}
+
+.popconfirm-modal {
+  z-index: $zindex-popconfirm;
+  width: $popconfirm-modal-width;
+  position: absolute;
+}
+
+.popconfirm-buttons-container {
+  display: flex;
+  justify-content: flex-end;
+  .btn {
+    margin-left: $popconfirm-buttons-container-btn-ml;
+  }
+}
+
+.popconfirm-backdrop {
+  height: 100%;
+  width: 100%;
+  z-index: $zindex-popconfirm-backdrop;
+  position: fixed;
+  top: 0;
+  left: 0;
+  background-color: $popconfirm-backdrop-background-color;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

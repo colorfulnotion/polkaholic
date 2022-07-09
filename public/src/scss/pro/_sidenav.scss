@@ -1,0 +1,162 @@
+.sidenav {
+  top: 0;
+  left: 0;
+  transform: $sidenav-transform;
+  position: fixed;
+  z-index: $zindex-sidenav;
+  background-color: $sidenav-background-color;
+  overflow: hidden;
+  width: $sidenav-width;
+  height: $sidenav-height;
+  box-shadow: $sidenav-box-shadow;
+
+  &[data-mdb-hidden='false'] {
+    transform: $sidenav-data-hidden-false-transform;
+  }
+
+  &[data-mdb-color='light'] {
+    color: $sidenav-data-color-light-color;
+  }
+
+  &[data-mdb-right='true'] {
+    right: 0;
+    left: unset;
+    transform: $sidenav-data-right-true-transform;
+  }
+
+  &[data-mdb-position='absolute'] {
+    position: absolute;
+    height: 100%;
+  }
+
+  &[data-mdb-position='relative'] {
+    position: relative;
+    height: 100%;
+  }
+
+  [data-mdb-slim='true'] {
+    display: none;
+  }
+
+  &[data-mdb-slim-collapsed='true'] {
+    width: $sidenav-data-slim-collapsed-true-width;
+
+    [data-mdb-slim='false'] {
+      display: none;
+    }
+
+    [data-mdb-slim='true'] {
+      display: unset;
+    }
+  }
+}
+
+.sidenav-menu,
+.sidenav-collapse {
+  list-style: none;
+  position: relative;
+  padding: 0 $sidenav-menu-padding;
+  margin: 0;
+}
+
+.sidenav-collapse {
+  display: none;
+  padding: 0;
+
+  &.show,
+  &.collapsing {
+    display: block;
+  }
+
+  .sidenav-link {
+    font-size: $sidenav-collapse-sidenav-link-font-size;
+    height: $sidenav-collapse-sidenav-link-height;
+    padding-left: $sidenav-collapse-sidenav-link-padding-left;
+  }
+}
+
+.sidenav-item {
+  position: relative;
+}
+
+.sidenav-link {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: $sidenav-link-font-size;
+  padding: $sidenav-link-padding-y $sidenav-link-padding-x;
+  height: $sidenav-link-height;
+  color: unset;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: $sidenav-link-border-radius;
+  transition: $sidenav-link-transition;
+
+  &:hover {
+    color: $sidenav-link-hover-color;
+    background-color: $sidenav-link-hover-background-color;
+    outline: none;
+  }
+
+  &:active,
+  &:focus {
+    color: $sidenav-link-active-focus-color;
+    background-color: $sidenav-link-active-focus-background-color;
+    outline: none;
+  }
+
+  &.active {
+    color: $sidenav-link-active-color;
+  }
+}
+
+.rotate-icon {
+  position: absolute;
+  right: 0;
+  margin-left: auto;
+  margin-right: $sidenav-rotate-icon-margin-right;
+  transition: $sidenav-rotate-icon-transition;
+}
+
+.sidenav-backdrop {
+  z-index: $zindex-sidenav-backdrop;
+  top: 0;
+  left: 0;
+  background-color: $sidenav-backdrop-background-color;
+}
+
+.sidenav-light {
+  color: $sidenav-light-color;
+}
+
+// Color options
+
+@each $color, $value in $theme-colors {
+  $red: red($value);
+  $green: green($value);
+  $blue: blue($value);
+
+  .sidenav-#{$color} {
+    .sidenav-item {
+      .sidenav-link {
+        &:hover {
+          color: $value;
+          background-color: rgba($red, $green, $blue, 0.05);
+        }
+      }
+    }
+
+    .sidenav-link {
+      &:active,
+      &:focus {
+        color: $value;
+        background-color: rgba($red, $green, $blue, 0.05);
+      }
+
+      &.active {
+        color: $value;
+      }
+    }
+  }
+}

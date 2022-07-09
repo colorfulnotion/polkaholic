@@ -1,0 +1,20 @@
+@mixin mdb-alert-theme($theme) {
+  $primary: map-get($theme, primary);
+  $secondary: map-get($theme, secondary);
+
+  .alert-primary {
+    @include alert-variant(
+      shift-color($primary, $alert-bg-scale),
+      shift-color($primary, $alert-border-scale),
+      shift-color($primary, $alert-color-scale)
+    );
+  }
+
+  .alert-secondary {
+    @include alert-variant(
+      shift-color($secondary, $alert-bg-scale),
+      shift-color($secondary, $alert-border-scale),
+      shift-color($secondary, $alert-color-scale)
+    );
+  }
+}

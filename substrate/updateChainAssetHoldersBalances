@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+ // Usage: while true; do ./indexChain 10; done
+var Crawler = require("./crawler");
+/*
+./updateChainAssetHoldersBalances 2004  // moonbeam
+./updateChainAssetHoldersBalances 2006  // astar
+./updateChainAssetHoldersBalances 2002  // clover
+./updateChainAssetHoldersBalances 22007 // shiden
+./updateChainAssetHoldersBalances 22023 // moonriver
+*/
+async function main() {
+    let chainID = 2004;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+    });
+    let crawler = new Crawler();
+    await crawler.assetManagerInit();
+    let chain = await crawler.getChain(chainID);
+    await crawler.updateChainAssetHoldersBalances(chain, 7200);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

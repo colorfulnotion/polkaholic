@@ -1,0 +1,51 @@
+<%- include('header', {chainInfo: chainInfo}); %>
+<%
+  let prevBlockUrl = `/block/${id}/${blockNumber - 1}`;
+  let nextBlockUrl = `/block/${id}/${blockNumber + 1}`;
+%>
+<%- include('chainheader', { chain: chain, title: `Block ${blockNumber}` }); %>
+
+<% for ( let i = 0 ; i < traces.length; i++ ) {
+     let t = traces[i].trace;
+     let finalized = false;
+     let traceType = traces[i].traceType;
+     if ( traces[i].finalized != undefined ) finalized = traces[i].finalized;
+     %>
+<table class="table table-hover table-bordered">
+<tr><td>Blockhash:</td><td> <%= traces[i].blockHash %></td></tr>
+<tr><td>Finalized:</td><td> <%- include("finalized", {finalized: finalized}); %></td></tr>
+<tr><td>Source:</td><td><%= traceType; %></td></tr>
+</table>
+
+<table class="table table-hover table-bordered">
+ <tr><th>Section:Storage</th><th>Storage Key</th><th>Storage Value</th></tr>
+   <% for ( let j = 0; j < t.length; j++ ) {
+      let k = t[j].k;
+      let v = t[j].v;
+   %>
+     <tr><td>
+<% let sectionStorage = "";
+   if ( t[j].section != undefined && t[j].storage != undefined ) {
+      sectionStorage = `${t[j].section}:${t[j].storage}`;
+   }
+   if ( sectionStorage.length > 0 ) { %>
+      <button type="button" class="btn btn-outline-secondary text-capitalize"><%= sectionStorage; %></button>
+<% } %>
+</td>
+<td><code><%- uiTool.getShortHash(k,false) %></code></td>
+<td><code><%- uiTool.getShortHash(v,false) %></code></td>
+</tr>
+   <% } %>
+</table>
+<% } %>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script>
+  let chainID = <%= chainID %> ;
+  let id = '<%- id; %>';
+  let blockNumber = <%= blockNumber %> ;
+
+$(document).ready(function() {
+    setupapidocs("trace", "", `${chainID}/${blockNumber}`);
+});
+</script>

@@ -1,0 +1,48 @@
+#!/usr/bin/env node
+ // Usage:  crawlTraces [chainID]
+
+var Crawler = require("./crawler");
+async function main() {
+    var chainID = -1;
+    let n = 0;
+    let m = 1;
+    let lookback = ( Math.random() < .01 ) ? 1000 : 1;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = parseInt(val, 10);
+        }
+        if (index == 3 && val.length > 0) {
+            n = parseInt(val, 10);
+        }
+        if (index == 4 && val.length > 0) {
+            m = parseInt(val, 10);
+        }
+        if (index == 5 && val.length > 0) {
+            lookback = parseInt(val, 10);
+        }
+    });
+    if (chainID >= 0) {
+	var crawler = new Crawler();
+	crawler.exitOnDisconnect = true;
+	await crawler.assetManagerInit();
+        await crawler.crawlTraces(chainID, ["mod", n, m], lookback);
+	await crawler.release(5000);
+    } else {
+        do {
+	    var crawler = new Crawler();
+	    crawler.exitOnDisconnect = true;
+	    await crawler.assetManagerInit();
+            await crawler.crawlTracesRandom();
+            await crawler.release(5000);
+        } while (true);
+    }
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

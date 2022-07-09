@@ -1,0 +1,134 @@
+.multi-range-slider {
+  width: 100%;
+  height: 100%;
+  position: relative;
+
+  &:focus {
+    outline: none;
+    box-shadow: $form-range-thumb-focus-box-shadow;
+  }
+
+  &::-moz-focus-outer {
+    border: 0;
+  }
+
+  &-connects {
+    overflow: hidden;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    // touch-action: none;
+    // user-select: none;
+  }
+
+  &-horizontal {
+    height: 0.25rem;
+  }
+
+  &-hand {
+    width: $form-range-thumb-width;
+    height: $form-range-thumb-height;
+    margin-top: ($form-range-track-height - $form-range-thumb-height) * 0.5; // Webkit specific
+    @include gradient-bg($form-range-thumb-bg);
+    border: $form-range-thumb-border;
+    @include border-radius($form-range-thumb-border-radius);
+    @include box-shadow($form-range-thumb-box-shadow);
+    @include transition($form-range-thumb-transition);
+    appearance: none;
+    z-index: 5;
+    cursor: pointer;
+    will-change: transform;
+    position: absolute;
+    top: 50%;
+    transform-origin: 0 0;
+    transform-style: flat;
+    transform: translateY(-25%);
+
+    &:active,
+    &.active {
+      z-index: 6;
+      @include gradient-bg($form-range-thumb-active-bg);
+    }
+  }
+
+  &-connect {
+    background-color: $form-range-track-bg;
+    height: 100%;
+    width: 100%;
+    will-change: transform;
+    z-index: 1;
+  }
+
+  position: relative;
+  width: 100%;
+  padding: 0;
+  margin: auto;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+
+  // Firefox
+  border: 1px solid $white;
+  outline: none;
+
+  // Webkit
+  appearance: none;
+
+  &:focus {
+    outline: none;
+  }
+
+  + .thumb {
+    position: absolute;
+    top: 20;
+    width: 0;
+    height: 0;
+
+    background-color: $primary;
+    border: none;
+    border-radius: 25%;
+    transform: 0.3s ease all;
+    transform-origin: 0 0;
+
+    .value {
+      display: block;
+      width: 20px;
+      font-size: 0;
+      color: $primary;
+      text-align: center;
+    }
+
+    &.active {
+      border-radius: 25% 25% 25% 0;
+    }
+  }
+
+  &-tooltip {
+    position: absolute;
+    top: -18px;
+    background-color: $primary;
+    transform-origin: 50% 50%;
+    border: none;
+    transition: top 0.2s, transform 0.2s, border-radius 0.2s;
+    color: $white;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg) translate(-5px, -4px) scale(0);
+
+    &-value {
+      transform: rotate(45deg) translateY(25%);
+      color: #fff;
+      height: 30px;
+      font-size: 10px;
+      display: block;
+      width: 30px;
+      text-align: center;
+    }
+
+    &.active {
+      border-radius: 50% 50% 50% 0;
+      top: -38px;
+      transform: rotate(-45deg) translate(-5px, -4px) scale(1);
+    }
+  }
+}

@@ -1,0 +1,126 @@
+// Modal pro styles
+
+.modal {
+  .modal-dialog {
+    @media (min-width: 768px) {
+      &.modal-top {
+        top: 0;
+      }
+      &.modal-left {
+        left: 0;
+      }
+      &.modal-right {
+        right: 0;
+      }
+      &.modal-bottom {
+        bottom: 0;
+      }
+      &.modal-top-left {
+        top: 10px;
+        left: 10px;
+      }
+      &.modal-top-right {
+        top: 10px;
+        right: 10px;
+      }
+      &.modal-bottom-left {
+        bottom: 10px;
+        left: 10px;
+      }
+      &.modal-bottom-right {
+        right: 10px;
+        bottom: 10px;
+      }
+    }
+  }
+  &.fade {
+    &.top:not(.show) .modal-dialog {
+      transform: translate3d(0, -25%, 0);
+    }
+    &.right:not(.show) .modal-dialog {
+      transform: translate3d(25%, 0, 0);
+    }
+    &.bottom:not(.show) .modal-dialog {
+      transform: translate3d(0, 25%, 0);
+    }
+    &.left:not(.show) .modal-dialog {
+      transform: translate3d(-25%, 0, 0);
+    }
+  }
+  @media (min-width: 992px) {
+    .modal-side {
+      position: absolute;
+      width: 100%;
+      right: 10px;
+      bottom: 10px;
+      margin: 0;
+    }
+    .modal-frame {
+      position: absolute;
+      max-width: 100%;
+      width: 100%;
+      margin: 0;
+    }
+  }
+}
+
+.modal-open {
+  .modal {
+    &.frame {
+      overflow-y: hidden;
+    }
+  }
+}
+
+.modal-non-invasive-open {
+  overflow-y: auto;
+  .modal.modal-non-invasive-show {
+    display: table;
+    @media (min-width: 992px) {
+      .modal-dialog.modal-bottom-right {
+        bottom: 0;
+      }
+      .modal-dialog.modal-bottom-left {
+        bottom: 0;
+      }
+      .modal-side {
+        bottom: 0;
+      }
+      &.modal.frame {
+        &.bottom {
+          box-shadow: $box-shadow-3-top;
+          .modal-content {
+            box-shadow: $box-shadow-3-top;
+          }
+        }
+        &.top {
+          box-shadow: $box-shadow-3;
+        }
+      }
+      .modal-side {
+        &.modal-bottom-right {
+          .modal-content {
+            box-shadow: $box-shadow-3-top;
+          }
+        }
+        &.modal-bottom-left {
+          .modal-content {
+            box-shadow: $box-shadow-3-top;
+          }
+        }
+      }
+    }
+    .modal-dialog.modal-bottom-right {
+      right: 0;
+    }
+    .modal-dialog.modal-bottom-left {
+      left: 0;
+    }
+    .modal-dialog.modal-top-left {
+      left: 0;
+    }
+    .modal-side {
+      right: 0;
+    }
+  }
+}

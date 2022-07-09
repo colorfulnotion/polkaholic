@@ -1,0 +1,59 @@
+[
+  {
+    "mode": "REQUIRED",
+    "name": "c",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "bn",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "id",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "h",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "p",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "m",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "f",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "ts",
+    "type": "TIMESTAMP"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "r",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "s",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "v",
+    "type": "FLOAT"
+  }
+]
+
+

@@ -1,0 +1,18 @@
+// CORE FUNCTIONS
+@import '../../bootstrap-rtl-fix/functions';
+@import '../../free/functions';
+
+// CORE VARIABLES
+@import '../../custom/variables';
+@import '../../free/variables';
+@import '../../bootstrap-rtl-fix/variables';
+
+// BOOTSTRAP CORE
+@import '../../bootstrap-rtl-fix/mixins';
+@import '../../bootstrap-rtl-fix/utilities';
+
+// MDB CORE
+@import '../../free/mixins';
+
+// MDB CORE
+@import '../variables';

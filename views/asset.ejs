@@ -1,0 +1,101 @@
+<%- include('header', {chainInfo: chainInfo}); %>
+<h4>Asset</h4>
+<div id="container" class="chart"></div>
+
+<div class="row">
+<%
+let symbol = false;
+for ( let k = 0; k < asset.length ; k++) {
+  let a = asset[k];
+  if ( ! symbol ) symbol = a.symbol;
+%>
+  <div class="col-sm-3">
+   <%- include("assetstats", { asset: a }); %>
+  </div>
+<%
+}
+
+if ( asset.length > 0 && ( asset[0].assetType == "ERC20LP" || asset[0].assetType == "LiquidityPair" ) ) {
+   let a = asset[0];
+%>
+  <div class="col-sm-2">
+   <%- include("assetpair", { chainID: a.chainID, asset: a.token0, symbol: a.token0Symbol, decimals: a.token0Decimals, supply: a.token0Supply }); %>
+  </div>
+  <div class="col-sm-2">
+   <%- include("assetpair", { chainID: a.chainID, asset: a.token1, symbol: a.token1Symbol, decimals: a.token1Decimals, supply: a.token1Supply }); %>
+  </div>
+  <div class="col-sm-1">
+    <div class="card text-white bg-info" style="width: 18rem;">
+      <div class="card-body">
+        <h6 class="card-title"><%- uiTool.presentAssetPairChart(assetChain); %></h6>
+      </div>
+    </div>
+  </div>
+<%
+}
+%>
+
+</div>
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" id="assetTab" role="tablist">
+<%
+let tabs = [
+  { title: "Top 1K Holders", target: "assetholders" },
+  { title: "Related", target: "assetsrelated" }
+];
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
+
+<!-- Tab panes -->
+<div class="tab-content">
+  <div class="tab-pane" id="assetholders" role="tabpanel" aria-labelledby="assetholders-tab">
+    <table id="tableassetholders" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th># (State)</th>
+          <th>Balance (USD)</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="assetsrelated" role="tabpanel" aria-labelledby="assetsrelated-tab">
+    <table id="tableassetsrelated" class="display" style='width: 100%'>
+    <thead>
+    <tr>
+      <th scope="col">Asset</th>
+      <th scope="col">Decimals</th>
+      <th scope="col">AssetType</th>
+      <th scope="col"># Holders</th>
+      <th scope="col">Current Price (USD)</th>
+      <th scope="col">Total Free</th>
+      <th scope="col">TVL</th>
+      <th scope="col">Your # Tokens</th>
+      <th scope="col">Your Balance USD</th>
+    </tr>
+    </thead>
+    </table>
+  </div>
+</div>
+
+<script>
+var assetChain = '<%- assetChain; %>';
+var address = '<%- address; %>';
+let tabs = <%- JSON.stringify(tabs); %>;
+</script>
+<%- include('assethistorychart', {assetChain: assetChain, symbol}); %>
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script src="/asset.js"></script>

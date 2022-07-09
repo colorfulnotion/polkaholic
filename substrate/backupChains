@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+ // Usage: backupChains
+var Manager = require("./manager");
+
+async function main() {
+    var manager = new Manager();
+    await manager.backupChains(manager.GC_BIGTABLE_INSTANCE, manager.GC_BIGTABLE_CLUSTER);
+}
+
+main()
+    .then(() => process.exit(0))
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

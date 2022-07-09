@@ -1,0 +1,11 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: copy service_files to hosts
+      copy: src={{item}} dest=/etc/systemd/system/
+      with_fileglob: /root/scripts/services/*.service
+    - name: Run command
+      command: "{{ item }}"
+      with_items:
+      - systemctl daemon-reload

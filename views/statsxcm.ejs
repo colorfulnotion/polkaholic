@@ -1,0 +1,18 @@
+<div class="card" style="width: 18rem;">
+  <div class="card-body">
+    <h5 class="card-title"><%= name; %></h5>
+    <b>7d</b>: <%= uiTool.presentNumber(num7d); %> (<%= uiTool.currencyFormat(valUSD7d, 0); %>)<br>
+    <b>30d</b>: <%= uiTool.presentNumber(num30d); %> (<%= uiTool.currencyFormat(valUSD30d, 0); %>)<br>
+    <b>Total</b>: <%= uiTool.presentNumber(numTot); %> (<%= uiTool.currencyFormat(valUSDTot, 0); %>)
+
+    <% if ( name == "XCM Incoming" ) { %>
+      <br><a class="btn-outline-info btn-sm" href="/xcmtransfers/<%= id; %>/all">Search</a>
+      <br><a class="btn-outline-secondary btn-sm" href="/xcmmessages/<%= id; %>/all">Search&nbsp;Messages</a>
+    <% } else if ( name == "XCM Outgoing" ) { %>
+      <br><a class="btn-outline-info btn-sm" href="/xcmtransfers/all/<%= id; %>">Search</a>
+      <br><a class="btn-outline-secondary btn-sm" href="/xcmmessages/all/<%= id; %>">Search&nbsp;Messages</a>
+    <% } else if ( name == "Transfers" ) { %>
+      <br><a class="btn-outline-info btn-sm" href="/transfers/<%= id; %>">Search</a>
+    <% } %>
+  </div>
+</div>

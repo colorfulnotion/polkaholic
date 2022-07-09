@@ -1,0 +1,157 @@
+<%- include('header', {chainInfo: chainInfo}); %>
+<%- include('chainheader', { chain: chain, title: `Summary` }); %>
+
+<% if ( chain.crawlingStatus.length > 0 ) { %>
+<div class="alert" role="alert" data-mdb-color="warning">
+  <i class="fas fa-exclamation-triangle"></i> Warning: <%= chain.crawlingStatus; %>
+</div>
+<% } %>
+
+<%- include('chainstats', {chain: chain}); %>
+
+<ul class="nav nav-tabs" id="chainTab" role="tablist">
+<%
+let tabs = [
+{ title: "Recent Blocks", target: "recentblocks" },
+{ title: "Top Assets", target: "assets" },
+{ title: "Spec Versions", target: "specversions" },
+{ title: "Chain Info", target: "chaininfo" }
+];
+
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
+
+<div class="tab-content">
+
+<div class="tab-pane active" id="recentblocks" role="tabpanel" aria-labelledby="recentblocks-tab">
+<table id="tablerecentblocks" class="display" style='width: 100%'>
+  <thead>
+    <tr>
+      <th scope="col">Block #</th>
+      <th scope="col">Block Hash</th>
+      <th scope="col">Time</th>
+      <th scope="col"># Extrinsics</th>
+      <th scope="col"># Signed</th>
+      <th scole="col"># Events</th>
+      <th scope="col"># Transfers</th>
+      <th scole="col">Value Transfers (USD)</th>
+    </tr>
+  </thead>
+</table>
+</div>
+
+<div class="tab-pane" id="assets" role="tabpanel" aria-labelledby="assets-tab">
+<table id="tableassets" class="display" style='width: 100%'>
+  <thead>
+    <tr>
+      <th scope="col">Asset</th>
+      <th scope="col">Decimals</th>
+      <th scope="col">AssetType</th>
+      <th scope="col"># Holders</th>
+      <th scope="col">Price</th>
+      <th scope="col">Total Free</th>
+      <th scope="col">TVL</th>
+      <th scope="col">Your # Tokens</th>
+      <th scope="col">Your Balance USD</th>
+    </tr>
+  </thead>
+</table>
+</div>
+
+<div class="tab-pane" id="chainpending" role="tabpanel" aria-labelledby="chainpending-tab">
+  <table>
+    <thead>
+        <tr>
+          <th>ExtrinsicHash</th>
+          <th>Action</th>
+          <th>Result</th>
+          <th>From</th>
+          <th>Params</th>
+        </tr>
+    </thead>
+  </table>
+</div>
+
+<div class="tab-pane" id="specversions" role="tabpanel" aria-labelledby="specversions-tab">
+  <table id="tablespecversions" class="display" style='width: 100%'>
+    <thead>
+        <tr>
+          <th>Spec Version</th>
+          <th>Block Number</th>
+          <th>Block Hash</th>
+          <th>First Seen</th>
+        </tr>
+    </thead>
+  </table>
+</div>
+
+<div class="tab-pane" id="chaininfo" role="tabpanel" aria-labelledby="chaininfo-tab">
+  <table>
+   <tr>
+    <th scope="col">ChainID</th><td><%= chain.chainID %></td>
+   </tr>
+   <tr>
+    <th scope="col">ID</th><td><%= chain.id %></td>
+   </tr>
+   <tr>
+    <th scope="col">Latest Block</th><td><%= chain.blocksCovered %> <%- uiTool.presentTS(chain.lastCrawlTS); %></td>
+   </tr>
+   <tr>
+    <th scope="col">Blocks Finalized</th><td><%= chain.blocksFinalized %> <%- uiTool.presentTS(chain.lastFinalizedTS); %></td>
+   </tr>
+   <tr>
+    <th scope="col">WS Endpoint(s)</th>
+    <td>
+   <%
+   let traceCoverage = ( chain.blocksFinalized > 0 ) ? 100.0 * chain.numTraces / chain.blocksFinalized : 0;
+    let endpoints = [];
+   if ( chain.WSEndpoint && chain.WSEndpoint.length > 0 && ! chain.WSEndpoint.includes("polkaholic.io") ) {
+     endpoints.push(chain.WSEndpoint);
+   }
+   if ( chain.WSEndpoint2 && chain.WSEndpoint2.length > 0 && ! chain.WSEndpoint2.includes("polkaholic.io")  ) {
+     endpoints.push(chain.WSEndpoint2);
+   }
+   if ( chain.WSEndpoint3 && chain.WSEndpoint3.length > 0  && ! chain.WSEndpoint3.includes("polkaholic.io") ) {
+     endpoints.push(chain.WSEndpoint3);
+   }
+   %>
+   <%= endpoints.join(", ") %>
+    </td>
+   </tr>
+   <tr>
+    <th scope="col">Trace Coverage</th><td><%= chain.numTraces %> traces (<%= traceCoverage; %>%)</td>
+   </tr>
+   <tr>
+    <th scope="col">SS58 Prefix</th><td><%= chain.ss58Format %></td>
+   </tr>
+   <tr>
+    <th scope="col">EVM</th><td><%= chain.isEVM; %></td>
+   </tr>
+   <tr>
+    <th scope="col">Asset Symbol</th><td><%= chain.symbol; %></td>
+   </tr>
+  </table>
+</div>
+</div>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script>
+var chainID = '<%- chainID; %>';
+var id = '<%- id; %>';
+var address = '<%- address; %>';
+let tabs = <%- JSON.stringify(tabs); %>;
+
+</script>
+<script src="/chain.js"></script>

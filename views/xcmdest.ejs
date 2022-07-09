@@ -1,0 +1,19 @@
+<%
+let symbol = ( xcmdest.symbol ) ? xcmdest.symbol : "";
+%>
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">Cross Chain Transfer</h5>
+    <b>Destination</b>: <%- uiTool.presentChain(xcmdest.chainIDDest, xcmdest.chainIDDestName); %><br>
+    <% if (xcmdest.destAddress){  %>
+      <b>Dest Addr</b>: <img src="/identicon/<%= xcmdest.destAddress; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+      <a href='/account/<%= xcmdest.destAddress; %>'>
+        <code><%= xcmdest.destAddress; %></code>
+      </a><br>
+    <% } %>
+    <b>Amount Sent</b>: <%= uiTool.presentNumber(xcmdest.amountSent); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountSentUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
+    <b>Amount Received</b>: <%= uiTool.presentNumber(xcmdest.amountReceived); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountReceivedUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
+    <b>Confirmed at Block</b>: <%- uiTool.presentBlock(xcmdest.chainIDDest, xcmdest.blockNumberDest); %> (<%- uiTool.presentSecondsAgoTS(xcmdest.destTS); %>)<br/>
+    <b>Time</b>: <%= uiTool.presentTS(xcmdest.destTS); %>
+  </div>
+</div>

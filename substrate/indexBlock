@@ -1,0 +1,29 @@
+#!/usr/bin/env node
+ // Usage: while true; do ./indexChain 10; done
+var Crawler = require("./crawler");
+
+async function main() {
+    let chainID = 2012;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+    });
+    let crawler = new Crawler();
+    crawler.exitOnDisconnect = true;
+    let chain = await crawler.getChain(chainID);
+    await crawler.setupAPI(chain);
+    await crawler.assetManagerInit();
+    let blockNumber = 1037398;
+    let blockHash = "0x1a5636904ad7930989aaca0572b7fda3ab89dae96687c384099bfb99a0ed3087";
+    await crawler.index_block(chain, blockNumber, blockHash);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

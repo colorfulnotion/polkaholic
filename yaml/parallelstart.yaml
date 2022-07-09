@@ -1,0 +1,35 @@
+---
+- hosts: all
+  vars:
+    ansible_python_interpreter: auto_legacy_silent
+  become: true
+  tasks:
+          #    - name: remove polkaholic
+          #      file: path=/root/go/src/github.com/colorfulnotion/polkaholic/ state=absent
+    - name: pull from github
+      become: yes
+      git:
+         repo: 'git@github.com:colorfulnotion/polkaholic.git'
+         dest: '/root/go/src/github.com/colorfulnotion/polkaholic/'
+         update: yes
+    - name: Run command
+      command: "{{ item }}"
+      with_items:
+      - systemctl start indexer.service
+      - systemctl start crawler0.service
+      - systemctl start crawler2000.service
+      - systemctl start crawler2011.service
+      - systemctl start crawler2019.service
+      - systemctl start crawler2035.service
+      - systemctl start crawler2037.service
+      - systemctl start crawler2043.service
+      - systemctl start crawler21000.service
+      - systemctl start crawler22004.service
+      - systemctl start crawler22015.service
+      - systemctl start crawler22084.service
+      - systemctl start crawler22087.service
+      - systemctl start crawler22101.service
+      - systemctl start crawler22110.service
+      - systemctl start tracer2012.service
+
+

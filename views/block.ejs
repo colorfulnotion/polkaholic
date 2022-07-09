@@ -1,0 +1,117 @@
+<%- include('header', {chainInfo: chainInfo}); %>
+<%
+  let prevBlockUrl = `/block/${id}/${blockNumber - 1}`;
+  let nextBlockUrl = `/block/${id}/${blockNumber + 1}`;
+%>
+<%- include('chainheader', { chain: chain, title: `Block ${blockNumber}` }); %>
+
+<table class="table table-hover table-bordered">
+  <tr>
+    <td>Block</td>
+    <td>
+      <a href='<%= prevBlockUrl; %>' class="btn btn-link btn-sm">&lt;</a>
+      <span class="font-weight-bold"><%= b.number %></span>
+      <a href='<%= nextBlockUrl; %>' class="btn btn-link btn-sm">&gt;</a>
+    </td>
+  </tr>
+  <tr>
+    <td>Finalized</td>
+    <td><span id="status"><%- include("finalized", {finalized: b.finalized}); %></span></td>
+  </tr>
+  <tr>
+    <td>Hash</td>
+    <td>
+      <%- uiTool.getFullHash(b.hash); %>
+    </td>
+  </tr>
+  <tr>
+    <td>Parent Hash</td>
+    <td>
+      <%- uiTool.getFullHash(b.header.parentHash); %>
+    </td>
+  </tr>
+  <tr>
+    <td>State Root</td>
+    <td>
+      <%- uiTool.getFullHash(b.header.stateRoot); %>
+    </td>
+  </tr>
+  <tr>
+    <td>Timestamp</td>
+    <td class='date'><%= uiTool.presentTS(b.blockTS); %></td>
+  </tr>
+  <tr>
+    <td>Block Time</td>
+    <td class='date'><%= uiTool.presentSecondsAgoTS(b.blockTS); %></td>
+  </tr>
+  <tr>
+    <td>Spec Version</td>
+    <td>
+      <%- uiTool.presentSpecVersion(id, b.specVersion); %>
+    </td>
+  </tr>
+  <tr>
+    <td>Trace</td>
+    <td>
+      <%- uiTool.presentTrace(id, blockNumber, b.hash); %>
+    </td>
+  </tr>
+</table>
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" id="blockTab" role="tablist">
+  <%
+let tabs = [
+{ title: "Extrinsics", target: "extrinsics" },
+{ title: "Events", target: "events" }
+]
+if ( b.evmBlock ) {
+   let evmtabs = [
+    { title: "EVM Transactions", target: "evmtxs" },
+    { title: "EVM Header", target: "evmheader" }
+   ];
+   tabs = evmtabs.concat(tabs);
+}
+
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+  <%
+}
+
+%>
+</ul>
+
+<div class="tab-content">
+  <%
+  let defHash = "extrinsics";
+  if ( b.evmBlock ) {
+        defHash = "evmtxs";   %>
+  <%- include("evmBlock", {block: b.evmBlock}); %>
+  <% } %>
+  <%- include("blockextrinsics", {chainID: chainID, id:id, extrinsics: b.extrinsics }); %>
+  <%- include("blockevents", {chainID: chainID, id: id, extrinsics: b.extrinsics }); %>
+</div>
+
+<script src="/block.js"></script>
+<script>
+  let chainID = <%= chainID %> ;
+  let id = '<%- id; %>';
+  let blockNumber = <%= blockNumber %>;
+  let tabs = <%- JSON.stringify(tabs); %> ;
+  <% if ( ! b.finalized ) { %>
+    let blockHash = '<%= blockHash %>';
+    showblockstatus("<%= b.hash; %>");
+  <% } else { %>
+    let blockHash = '';
+  <% } %>
+</script>
+
+<%- include('footer', {apiUrl: apiUrl}); %>

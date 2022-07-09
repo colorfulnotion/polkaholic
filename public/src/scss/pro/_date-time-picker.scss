@@ -1,0 +1,50 @@
+.buttons-container {
+  display: flex;
+  justify-content: space-evenly;
+  align-items: flex-end;
+  background-color: #2979ff;
+}
+
+.datepicker-button-toggle,
+.timepicker-button-toggle {
+  outline: none;
+  border: none;
+  background-color: transparent;
+  width: 50%;
+  color: white;
+  font-size: 23px;
+  border-radius: 10px;
+  min-height: 40px;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.15);
+    outline: none;
+  }
+
+  i {
+    pointer-events: none;
+  }
+}
+
+.datetimepicker-toggle-button {
+  position: absolute;
+  outline: none;
+  border: none;
+  background-color: transparent;
+  right: $datepicker-toggle-right;
+  top: $datepicker-toggle-top;
+  transform: translate(-50%, -50%);
+
+  &:focus {
+    color: $datepicker-toggle-focus-color;
+  }
+
+  &:hover {
+    color: $datepicker-toggle-focus-color;
+  }
+}
+
+.dateTimepicker-open {
+  overflow: hidden;
+  padding-right: 15px;
+}

@@ -1,0 +1,27 @@
+.navbar {
+  &.navbar-scroll {
+    transition: background 0.5s ease-in-out, padding 0.5s ease-in-out;
+    &.navbar-scrolled {
+      padding-top: 5px;
+      padding-bottom: 5px;
+    }
+  }
+}
+
+.navbar-scroll {
+  .nav-link,
+  .fa-bars {
+    color: #fff;
+  }
+}
+
+.navbar-scrolled {
+  .nav-link,
+  .fa-bars {
+    color: #4f4f4f;
+  }
+}
+
+.navbar-scrolled {
+  background-color: #fff;
+}

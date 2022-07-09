@@ -1,0 +1,26 @@
+#!/usr/bin/env node
+ // Usage:  updateAddressBalances
+var Manager = require("./manager");
+async function main() {
+    var manager = new Manager();
+
+    await manager.updateAddressBalances()
+/*
+    await manager.computeAddressColumnsBQ("transfersIn");
+    await manager.computeAddressColumnsBQ("extrinsics");
+    await manager.computeAddressColumnsBQ("crowdloans");
+    await manager.computeAddressColumnsBQ("rewards");
+    await manager.computeAddressColumnsBQ("transfersOut"); 
+*/
+    await manager.updateAddressTopN();
+
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

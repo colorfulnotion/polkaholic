@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+var Crawler = require("./crawler");
+
+async function main() {
+    let crawler = new Crawler();
+    let logDT = crawler.currentDateAsString();
+    let chainID = -1;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+    });
+    // TODO: THIS causes problems on large writes
+    // crawler.exitOnDisconnect = true;
+    await crawler.assetManagerInit();
+    if (chainID >= 0) {
+        await crawler.crawlTokenURI(chainID);
+    }
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

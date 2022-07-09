@@ -1,0 +1,82 @@
+[
+  {
+    "mode": "REQUIRED",
+    "name": "c",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "bn",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "id",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "h",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "p",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "m",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "ts",
+    "type": "TIMESTAMP"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "t",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "asset",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "rawAsset",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "symbol",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "d",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "a",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "ra",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "priceUSD",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "v",
+    "type": "FLOAT"
+  }
+]

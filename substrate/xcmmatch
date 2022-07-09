@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+ // Usage:  xcmmatch [lookbackDays]
+
+var Crawler = require("./crawler");
+async function main() {
+    var crawler = new Crawler();
+    let lookbackDays = 2;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            lookbackDays = parseInt(val, 10);
+        }
+    });
+
+    let ratMin = .99;
+    let lastAUSDUpdateTS = 0;
+    await crawler.assetManagerInit(); // TODO: how to refresh this?
+    do {
+        let currentTS = crawler.currentTS();
+        await crawler.xcmMatch(currentTS - 86400 * lookbackDays, currentTS, ratMin);
+        ratMin = ratMin - .01;
+        await crawler.sleep(5000)
+        let lastAUSDUpdateAgo = currentTS - lastAUSDUpdateTS
+        console.log(`[${currentTS}] xcmAUSDUpdate Last Update ${lastAUSDUpdateAgo}s Ago`)
+        if (lastAUSDUpdateAgo > 600){
+          //update once every 600s
+          console.log(`[${currentTS}] xcmAUSDUpdate now`)
+          await crawler.xcmAUSDUpdate();
+          lastAUSDUpdateTS = currentTS
+        }
+        if (ratMin < .97) ratMin = .99;
+    } while (true);
+}
+
+main()
+    .then(() => {
+        console.log("finishing...")
+
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+
+var Crawler = require("./crawler");
+var paraTool = require("./paraTool");
+
+async function main() {
+    let chainID = paraTool.chainIDKarura;
+    let crawler = new Crawler();
+    //crawler.setDebugLevel(paraTool.debugNoLog)
+    crawler.setDebugLevel(paraTool.debugErrorOnly)
+    //crawler.setDebugLevel(paraTool.debugInfo)
+    //crawler.setDebugLevel(paraTool.debugVerbose)
+    //crawler.setDebugLevel(paraTool.debugTracing)
+    await crawler.assetManagerInit();
+    let logDT = "2021-11-18";
+    let hrs = [10];
+    let write_bq_log = true;
+
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+        if (index == 3 && val.length > 0) {
+            logDT = val;
+        }
+        if (index == 4 && val.length > 0) {
+            hrs = val.split(",").map(hr => parseInt(hr, 10));
+        }
+    });
+
+    for (const hr of hrs) {
+        await crawler.indexPeriod(chainID, logDT, hr, write_bq_log);
+    }
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

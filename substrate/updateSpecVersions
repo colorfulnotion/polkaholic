@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+ // Usage:  updateSpecVersions [chainID]
+const endpoints = require("./summary/endpoints");
+
+var Indexer = require("./indexer");
+async function main() {
+    let chainID = -1;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+    });
+    if (chainID >= 0) {
+        var indexer = new Indexer();
+        let chain = await indexer.getChain(chainID)
+        await indexer.setupAPI(chain);
+        await indexer.updateSpecVersions(chain)
+    }
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

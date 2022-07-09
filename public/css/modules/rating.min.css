@@ -1,0 +1,1 @@
+.rating{display:flex;margin:0;padding:0}.rating li{list-style:none}.rating i{padding:.25rem}.rating:not([data-mdb-readonly=true]) li{cursor:pointer}

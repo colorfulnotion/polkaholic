@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+// Usage:  crawlParachains
+var Crawler = require("./crawler");
+async function main() {
+    var crawler = new Crawler();
+    await crawler.crawlParachains();
+}
+
+main()
+    .then(() => {
+	process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

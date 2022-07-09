@@ -1,0 +1,22 @@
+#!/usr/bin/env node
+ // Usage:  updateEndpoints
+const endpoints = require("./summary/endpoints");
+
+var Manager = require("./manager");
+async function main() {
+    var manager = new Manager();
+    await manager.mapChains((c) => {
+        let chainID = c.chainID;
+        console.log(`./auditChain ${chainID};`)
+        console.log(`./crawlBackfill ${chainID};`)
+    });
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

@@ -1,0 +1,16 @@
+<%- include('header', {chainInfo: chainInfo}); %>
+
+<% let canvasid = "canvas"; %>
+<h4>QR Code</h4>
+
+<h6><%- uiTool.getShortHash(address, false); %></h6>
+<script src="/qrcode.js"></script>
+<canvas width="512" height="512" id="<%= canvasid; %>"></canvas>
+<script>
+  QRCode.toCanvas(document.getElementById('<%= canvasid; %>'), '<%= address; %>', function (error) {
+    if (error) console.error(error)
+    console.log('success!');
+  })
+</script>
+
+<%- include('footer', {apiUrl: apiUrl}); %>

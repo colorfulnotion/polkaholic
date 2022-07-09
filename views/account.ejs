@@ -1,0 +1,359 @@
+<%- include('header', {chainInfo: chainInfo}); %>
+<% let canClaim = false; %>
+
+
+
+<div class="card mb-3">
+  <div class="row g-0">
+    <div class="col-md-2  text-center">
+      <img src="/identicon/<%= account.address; %>"  class="rounded-start"  width="128"  loading="lazy" class="card-img-center"/>
+    </div>
+    <div class="col-md-8">
+      <div class="card-body">
+        <h5 class="card-title"><%- account.requestedChainAddress;%> (Prefix: <b><%=account.requestedChainPrefix%></b>)</h5>
+        <h5 class="card-title"><B>Account Balance: <%= uiTool.currencyFormat(account.balanceUSD) %></B></h5>
+        <p class="card-text">
+	<% if ( account.nickname ) { %>
+	  <B><%= account.nickname %></B><br/>
+	<% } else if ( account.subName ) { %>
+	  <B><%= account.subName %></B>
+	  <% if ( account.parent ) { %>
+	  (<a href='/account/<%= account.parent; %>'>parent identity</a>)<br/>
+	  <% } %>
+        <% } %>
+
+	<% if ( account.info != null ) {
+        let isVerified = '';
+        let verificationStatus = 'unverified';
+        if ( account.judgements != undefined ) {
+          for ( let j = 0 ; j < account.judgements.length; j++ ){
+            let g = account.judgements[j];
+            let registrarIndex = g.registrarIndex;
+            let status = g.status;
+            if (status == "reasonable" || status == "knownGood"){
+              isVerified = '✅'
+              verificationStatus = 'verified'
+            }
+            if (status == "feePaid"){
+              if (isVerified == '✅'){
+                break;
+              }
+              isVerified = '➖'
+              verificationStatus = 'pending'
+            }
+            if (status == "lowQuality" || status == "erroneous"){
+              isVerified = '❌️';
+              verificationStatus = `unverified - ${status}`
+              break;
+            }
+          }
+        }
+        %>
+  	    <% if  ( account.info.display != undefined && account.subName == undefined) { %>
+    	       <B><%= account.info.display %></B>  <%= isVerified%><br/>
+   	    <% } %>
+        <% if  ( account.info.display != undefined && account.subName != undefined) {
+            //let extraS = (account.address == account.parent)? '' : `(subidentity, <a href='/account/${account.parent};'>parent</a>)`
+        %>
+             <B><%= account.subName %></B>
+             <% if ( account.address != account.parent ) { %>
+            (<a href='/account/<%= account.parent; %>'>parent identity</a>)<br/>
+            <% } %>
+              <%= isVerified%><br/>
+        <% } %>
+  	    <% if  ( account.info.legal != undefined ) { %>
+    	       <B>Legal:</B> <%= account.info.legal %><br/>
+   	    <% } %>
+  	    <% if  ( account.info.email != undefined ) { %>
+    	       <B>Email:</B> <%= account.info.email %><br/>
+   	    <% } %>
+  	    <% if  ( account.info.web != undefined ) { %>
+    	       <B>Web:</B> <%= account.info.web %><br/>
+   	    <% } %>
+  	    <% if  ( account.info.twitter != undefined ) { %>
+    	       <B>Twitter:</B> <%= account.info.twitter %><br/>
+   	    <% } %>
+        <i>(source: Polkadot On-chain Identity, <%= verificationStatus %>)</i><br/>
+	<% } %>
+	<% if ( account.related != null ) {
+	     for ( let k = 0; k < account.related.length; k++) {
+	        let r = account.related[k];
+		if ( r.accountType == "proxyDelegateOf" ) { %>
+	          <B> Proxy Delegate Of: </B> <a href="/account/<%= r.delegateOf; %>"><%- uiTool.getShortHash( r.delegateOf ); %></a> (Chain ID: <%= r.chainID; %>, Type: <%= r.proxyType %>) <br>
+		<% } else if ( r.accountType == "multisig" ) { %>
+		  <B> Multisig: </B> <%= r.threshold; %> / <%= r.signatorycnt %> <br/>
+	     <% } %>
+	  <% } %>
+	<% } %>
+  <% if ( account.info == null && account.infoKSM != null) {
+        let isVerified = '';
+        let verificationStatus = 'unverified';
+        if ( account.judgementsKSM != undefined ) {
+          for ( let j = 0 ; j < account.judgementsKSM.length; j++ ){
+            let g = account.judgementsKSM[j];
+            let registrarIndex = g.registrarIndex;
+            let status = g.status;
+            if (status == "reasonable" || status == "knownGood"){
+              isVerified = '✅'
+              verificationStatus = 'verified'
+            }
+            if (status == "feePaid"){
+              if (isVerified == '✅'){
+                break;
+              }
+              isVerified = '➖'
+              verificationStatus = 'pending'
+            }
+            if (status == "lowQuality" || status == "erroneous"){
+              isVerified = '❌️';
+              verificationStatus = `unverified - ${status}`
+              break;
+            }
+        }
+    }
+    %>
+        <% if  ( account.infoKSM.display != undefined && account.subNameKSM == undefined) { %>
+          <B><%= account.infoKSM.display %></B>  <%= isVerified%><br/>
+        <% } %>
+        <% if  ( account.infoKSM.display != undefined && account.subNameKSM != undefined) {
+            let extraS = (account.address == account.parentKSM)? '' : `(Subidentity)`
+            %>
+            <B><%= account.subNameKSM %></B>  <%= extraS%><%= isVerified%><br/>
+        <% } %>
+        <% if  ( account.infoKSM.legal != undefined ) { %>
+             <B>Legal:</B> <%= account.infoKSM.legal %><br/>
+        <% } %>
+        <% if  ( account.infoKSM.email != undefined ) { %>
+             <B>Email:</B> <%= account.infoKSM.email %><br/>
+        <% } %>
+        <% if  ( account.infoKSM.web != undefined ) { %>
+             <B>Web:</B> <%= account.infoKSM.web %><br/>
+        <% } %>
+        <% if  ( account.infoKSM.twitter != undefined ) { %>
+             <B>Twitter:</B> <%= account.infoKSM.twitter %><br/>
+        <% } %>
+        <i>(source: Kusama On-chain Identity, <%= verificationStatus %>)</i><br/>
+  <% } %>
+	  <b>Public Key:</b> <code><%- account.address; %></code> <a href='/qrcode/<%= account.address; %>'><i class="fa-solid fa-qrcode"></i></a>
+        </p>
+	<% if ( account.numFollowers > 0 || account.numFollowing > 0 ) { %>
+	   <a href='/followers/<%= account.address %>'><b><%= account.numFollowers %></b> followers</a> | <a href='/following/<%= account.address %>'><b><%= account.numFollowing %></b> following</a>
+	<% } %>
+      </div>
+    </div>
+    <div class="col-md-2  text-center">
+      <div class="card-body">
+      <% if ( paraTool.sameAddress(account.address, fromAddress) ) { %>
+        <% if ( claimed == false && false ) {
+            canClaim = true; %>
+          <button id="btnClaim" type="button" class="btn btn-secondary">Claim</button>
+        <% } else { %>
+          <button id="btnHome" type="button" class="btn btn-outline-secondary">Home</button>
+        <% } %>
+      <% } else if ( account.isFollowing ) { %>
+        <a href="/unfollow/<%= account.address; %>" class="btn btn-outline-secondary">Unfollow</a>
+      <% } else { %>
+        <a href="/follow/<%= account.address; %>" class="btn btn-secondary">Follow</a>
+      <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="unfinalized">
+</div>
+
+<div class="card mb-3">
+  <div class="row g-0">
+    <div class="col-md-12  text-center">
+<% for ( let i = 0; i < account.chains.length; i++ ) { %>
+<%- include('accountchainassets', {chainassets: account.chains[i], expanded: ( i == 0 ) }); %>
+<% } %>
+    </div>
+  </div>
+</div>
+
+
+<div id="container" class="chart"></div>
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" style="font-size:1rem" id="accountTab" role="tablist">
+<%
+let tabs = [
+{ title: "Extrinsics", target: "extrinsics" },
+{ title: "Transfers", target: "transfers" },
+{ title: "XCM Transfers", target: "xcmtransfers" },
+{ title: "Rewards", target: "rewards" },
+{ title: "Crowdloans", target: "crowdloans" },
+{ title: "Feeds", target: "feed" },
+{ title: "Multisig/Proxy/Related", target: "related" },
+{ title: "SS58 Address", target: "ss58h160" },
+//{ title: "Offers", target: "offers" },
+];
+
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
+
+<!-- Tab panes -->
+<div class="tab-content">
+  <div class="tab-pane" id="extrinsics" role="tabpanel" aria-labelledby="extrinsics-tab">
+    <table id="tableextrinsics" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Extrinsic ID</th>
+          <th>Section/Method</th>
+          <th>Params</th>
+          <th>Result</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="transfers" role="tabpanel" aria-labelledby="transfers-tab">
+    <table id="tabletransfers" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Event ID</th>
+          <th>From</th>
+          <th>To</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Amount (USD)</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="history" role="tabpanel" aria-labelledby="history-tab">
+    <table id="tablehistory" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Chain</th>
+          <th>Assets</th>
+          <th>History</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="nfts" role="tabpanel" aria-labelledby="nfts-tab">
+    <table id="tablenfts" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>TxHash</th>
+          <th>NFT</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
+    <table id="tablexcmtransfers" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Extrinsic</th>
+          <th>Amount Sent</th>
+          <th>Value (USD)</th>
+          <th>Sender</th>
+          <th>Beneficiary</th>
+          <th>From Chain</th>
+          <th>To Chain</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="rewards" role="tabpanel" aria-labelledby="rewards-tab">
+    <table id="tablerewards" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Asset</th>
+          <th>Amount</th>
+          <th>Amount (USD)</th>
+          <th>Extrinsic Hash</th>
+          <th>Action</th>
+          <th>Date</th>
+          <th>Era</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="crowdloans" role="tabpanel" aria-labelledby="crowdloans-tab">
+    <table id="tablecrowdloans" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Parachain</th>
+          <th>Contributed</th>
+          <th>Amount</th>
+          <th>Amount (USD)</th>
+          <th>Extrinsic Hash</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="feed" role="tabpanel" aria-labelledby="feed-tab">
+    <table id="tablefeed" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th>Block Number</th>
+          <th>Date</th>
+          <th>Result</th>
+          <th>Module</th>
+          <th>Tx/Params</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="related" role="tabpanel" aria-labelledby="related-tab">
+    <table id="tablerelated" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Related</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="ss58h160" role="tabpanel" aria-labelledby="ss58h160-tab">
+    <table id="tabless58h160" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>SS58/H160</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="offers" role="tabpanel" aria-labelledby="offers-tab">
+    <table id="tableoffers" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Offer</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+</div>
+<script>
+let address = '<%= account.address; %>';
+let requestedChainAddress = '<%= account.requestedChainAddress; %>';
+let tabs = <%- JSON.stringify(tabs); %>;
+<% if ( canClaim ) { %>
+$('#btnClaim').on('click', function(e) {
+  var message = new Date().getTime() + "|" + account.address;
+  signMessageWithAccount(message);
+});
+<% } %>
+</script>
+<%- include('accountbalanceschart', {address: account.address}); %>
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script src="/account.js"></script>

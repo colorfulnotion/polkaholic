@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+
+// Usage:  updateDocs [chainID]
+const endpoints = require("./summary/endpoints");
+
+var Manager = require("./manager");
+async function main() {
+    let chainID = -1;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+    });
+    var manager = new Manager();
+    await manager.updateDocs(chainID)
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+ // Usage:  updateEndpoints
+const endpoints = require("./summary/endpoints");
+
+var Manager = require("./manager");
+async function main() {
+    var manager = new Manager();
+    let kusamaEndpoints = endpoints.getKusamaEndpoints();
+    let polkadotEndpoints = endpoints.getPolkadotEndpoints();
+    await manager.updateEndpoints(kusamaEndpoints, polkadotEndpoints);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Polkaholic - Substrate Defi Explorer</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Polkaholic Style / UI Helpers -->
+    <link rel="stylesheet" type="text/css" href="/polkaholic.css" />
+    <!-- JQuery + DataTables -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.4/css/jquery.dataTables.css" />
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.4/js/jquery.dataTables.js"></script>
+    <!-- MBS Bootstrap Icons -->
+    <link rel="stylesheet" href="/css/mdb.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap"/>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+    <!-- json5-to-table -->
+    <script src="https://github.com/yetrun/json5-to-table/releases/download/0.1.8/json5-to-table.js"></script>
+    <script src="/uihelper.js"></script>
+    <script src="/polkadot.min.js"></script>
+    <script src="/extension.min.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4Z3SY9LJJS"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-4Z3SY9LJJS');
+    </script>
+</head>
+<body>
+
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <!-- Container wrapper -->
+  <div class="container-fluid">
+    <!-- Toggle button -->
+    <button
+      class="navbar-toggler"
+      type="button"
+      data-mdb-toggle="collapse"
+      data-mdb-target="#navbarSupportedContent"
+      aria-controls="navbarSupportedContent"
+      aria-expanded="false"
+      aria-label="Toggle navigation"
+    >
+      <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Collapsible wrapper -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <!-- Navbar brand -->
+      <a href="/chains" class="nav-link  mt-2 mt-lg-0"><img src="/browser_icon.png"/></a>
+      <!-- Left links -->
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a href="/chains" class="nav-link"><B>Polkaholic</B></a>
+        </li>
+	<li>
+          <a class="nav-link" href="javascript:home();">Home</a>
+        </li>
+        <li class="nav-item">
+          <img
+	    id="identicon"
+            class="rounded-circle"
+            height="25"
+            loading="lazy"
+          />
+        </li>
+        <li class="nav-item">
+          <a href="javascript:selectWalletAccount();" class="nav-link">
+	    <span id="walletHome">-</span><i class="bi bi-pencil-square"></i>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/chains/polkadot">Polkadot</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/chains/kusama">Kusama</a>
+        </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/features">Why Polkaholic?</a>
+          </li>
+          <li class="nav-item">
+             <a class="nav-link" href="https://docs.polkaholic.io">Docs</a>
+          </li>
+          <li class="nav-item">
+  	         <a class="nav-link" href="/apikeys">API Keys</a>
+          </li>
+        <% if ( req.session.email ) { %>
+          <li class="nav-item">
+            <a class="nav-link" href="/logout">Logout</a>
+          </li>
+        <% } else { %>
+          <li class="nav-item">
+            <a class="nav-link" href="/login">Login</a>
+          </li>
+        <% } %>
+
+  <%  if ( uiTool.validAdmin(req.session.email) ) { %>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/chains">Admin</a>
+          </li>
+  <%  } %>
+        </ul>
+      </div>
+
+
+      <div class="dropdown">
+         <a class="text-reset me-3 dropdown-toggle hidden-arrow"
+          href="/chain/<%= chainInfo.chainID; %>"
+          id="navbarDropdownMenuLink"
+          role="button"
+          data-mdb-toggle="dropdown"
+          aria-expanded="false">
+            <%= chainInfo.symbol; %>
+            <%= uiTool.currencyFormat(chainInfo.priceUSD); %>
+            (<%= uiTool.presentPercentChange(chainInfo.priceUSDPercentChange); %>)
+            <i class="bi bi-graph-up"></i>
+         </a>
+       </div>
+       <!-- Left links -->
+    </div>
+
+  </div>
+  <!-- Container wrapper -->
+</nav>
+
+<!--maintenance
+<div class="alert" role="alert" data-mdb-color="secondary">
+  Polkaholic.io is undergoing a maintenance update between 8pm-10pm PDT.
+</div>
+-->
+
+<script>
+var baseURL = '<%= config.baseURL; %>'
+</script>
+<% if ( locals.skipSearch ) { %>
+<% } else { %>
+<form class="form" action="/search/" method="post" >
+   <div class="input-group rounded">
+      <input type="search" class="form-control rounded" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="search" />
+      <span class="input-group-text border-0" id="search-addon">
+      <i class="bi bi-search"></i>
+      </span>
+   </div>
+</form>
+<% } %>
+
+<!-- walletModal -->
+<div class="modal fade" id="walletModal" tabindex="-1" role="dialog" aria-labelledby="walletModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="walletModalLabel">Choose account</h5>
+        <button type="button" id="walletModalClose" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+      </div>
+      <button type="button" id="walletClear" data-dismiss="modal" class="btn btn-link" aria-label="Clear">
+        Clear
+      </button>
+    </div>
+  </div>
+</div>
+<script src="/wallet.js"></script>

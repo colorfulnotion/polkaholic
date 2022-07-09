@@ -1,0 +1,71 @@
+[
+  {
+    "mode": "REQUIRED",
+    "name": "c",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "bn",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "h",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "f",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "t",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "s",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "m",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "r",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "cr",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "substrate",
+    "type": "RECORD",
+    "fields": [
+            {
+                "name": "extrinsicID",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "extrinsicHash",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            }
+    ]
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "ts",
+    "type": "TIMESTAMP"
+  }
+]
+
+

@@ -1,0 +1,145 @@
+<%- include('header', {chainInfo: chainInfo}); %>
+<h4>Transaction #<%=`${tx.extrinsicID}`%></h4>
+<%
+let f = tx;
+let txResult = (f.result != undefined)? f.result == 1: true //by default tx result is true (until we back fill it)
+let errStr = (f.result != undefined)? f.err: false //by default tx result is true (until we back fill it)
+if (txResult){
+    if (typeof txResult === 'object') {
+      txResult = JSON.stringify(txResult)
+    }
+}
+let fee = (f.fee != undefined)? f.fee: '-'
+let feeUSD = (f.feeUSD != undefined)? `($${f.feeUSD})`: ''
+let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
+%>
+<script src="/tx.js"></script>
+<table class="table table-hover table-bordered">
+  <tbody>
+
+    <tr>
+      <td>Timestamp</td>
+      <td class='date'>
+        <%= uiTool.presentTS(f.ts); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Block Time</td>
+      <td>
+        <%= uiTool.presentSecondsAgoTS(f.ts); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Hash</td>
+      <td>
+        <code><%= f.extrinsicHash; %></code>
+      </td>
+    </tr>
+
+    <% if ( f.evm !== undefined ) { %>
+        <tr>
+          <td>EVM Transaction</td>
+          <td><%- include("extrinsicevmlink", {evm: f.evm}); %></td>
+        </tr>
+    <% } %>
+
+    <tr>
+      <td>Finalized</td>
+      <td><span id="status"><%- include("finalized", {finalized: (f.status=="finalized" || f.status == "finalizeddest")}); %></span></td>
+    </tr>
+    <% if ( f.lifetime ) { %>
+    <tr>
+      <td>Life Time</td>
+      <td>
+        <% if ( f.lifetime.isImmortal > 0 ) { %>
+     Immortal
+        <% } else { %>
+           <%- include("blockNumber", {chainID: f.id, blockNumber: f.lifetime.birth}); %> -
+           <%- include("blockNumber", {chainID: f.id, blockNumber: f.lifetime.death}); %>
+        <% } %>
+      </td>
+    </tr>
+    <% } %>
+    <tr>
+      <td>Chain</td>
+      <td>
+        <a href='/chain/<%= f.id; %>'><%= f.chainName; %></a>
+      </td>
+    </tr>
+    <tr>
+      <td>Block</td>
+      <td>
+        <%- include("blockNumber", {chainID: f.id, blockNumber: f.blockNumber}); %>
+      </td>
+    </tr>
+
+
+
+    <tr>
+      <td>Account</td>
+      <td>
+        <% if (f.signer){  %>
+          <img src="/identicon/<%= f.signer; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+          <a href='/account/<%= paraTool.getPubKey(f.signer) %>'>
+            <code><%= f.signer; %></code>
+          </a>
+	         <%- uiTool.showAccountInfo(f, "fromAddress") %>
+        <% } else {%>
+          <%- `-`; %>
+        <% } %>
+      </td>
+    </tr>
+    <tr>
+      <td>Nonce</td>
+      <td><%= f.nonce; %></td>
+    </tr>
+    <tr>
+      <td>Fee</td>
+      <td><%- tx.fee; %> <%- tx.chainSymbol; %>
+      <% if (tx.feeUSD){  %>
+        (<%- uiTool.currencyFormat(tx.feeUSD, tx.priceUSD, tx.priceUSDCurrent); %> )
+     <% } %>
+
+      </td>
+    </tr>
+    <tr>
+      <td>Result</td>
+      <td><%- include("txResult", {success: txResult, errorMsg: errStr}); %></td>
+    </tr>
+<% if ( f.xcmdest ) { %>
+    <tr>
+      <td>Destination Status</td>
+      <td><%- include("xcmdest", {xcmdest: f.xcmdest}); %></td>
+    </tr>
+<% } %>
+      <td>Spec Version</td>
+      <td>
+        <%- uiTool.presentSpecVersion(f.id, f.specVersion); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Module</td>
+      <td><%- include("module", {chainID: f.id, section: f.section, method: f.method}); %></td>
+    </tr>
+    <tr>
+      <td>Params</td>
+      <td><%- include("txparams", {section: f.section, method: f.method, params: f.params, id: txHash}); %></td>
+    </tr>
+    <tr>
+      <td>Events</td>
+      <td>
+        <% if ( f.events ) { %>
+        <%- include("events", {events: f.events, chainID: f.chainID}); %>
+        <% } else { %>
+        None
+        <% } %>
+      </td>
+    </tr>
+</table>
+
+<script>
+showtxstatus("<%= tx.extrinsicHash %>");
+</script>
+
+<%- include('footer', {apiUrl: apiUrl}); %>

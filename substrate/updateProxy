@@ -1,0 +1,34 @@
+#!/usr/bin/env node
+ // Usage:  getAccount account dataGroup
+const IdentityManager = require("./identityManager");
+const Query = require("./query");
+const paraTool = require("./paraTool");
+
+async function main() {
+    let debugLevel = 0
+    var query = new Query(debugLevel);
+    await query.init();
+    var identityManager = new IdentityManager(debugLevel);
+    let chainID = paraTool.chainIDPolkadot
+    let queryLimit = 20000
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = parseInt(val);
+        }
+        if (index == 3 && val.length > 0) {
+            queryLimit = parseInt(val);
+        }
+    });
+
+    let proxyAddrs = await identityManager.getKnownProxyList(chainID);
+    console.log(`mysql res - proxyAddrs[${proxyAddrs.length}]`, proxyAddrs)
+    await identityManager.updateOnChainProxy(chainID, proxyAddrs)
+    await identityManager.updateOnChainProxyFull(chainID)
+}
+
+main()
+    .then(() => process.exit(0))
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

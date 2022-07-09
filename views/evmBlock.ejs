@@ -1,0 +1,89 @@
+<div class="tab-pane" id="evmheader" role="tabpanel" aria-labelledby="evmheader-tab">
+  <table class="table table-hover table-bordered">
+    <tr>
+      <td>Block Hash</td>
+      <td><%- uiTool.getFullHash(block.hash); %></td>
+    </tr>
+    <tr>
+      <td>Parent Hash</td>
+      <td><%- uiTool.getFullHash(block.parentHash); %></td>
+    </tr>
+    <tr>
+      <td>State Root</td>
+      <td>
+        <%- uiTool.getFullHash(block.stateRoot); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Gas Used</td>
+      <td>
+        <%= uiTool.presentNumber(block.gasUsed); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Gas Limit</td>
+      <td>
+        <%= uiTool.presentNumber(block.gasLimit); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Collator</td>
+      <td>
+        <%- uiTool.presentID(block.miner); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Block Reward</td>
+      <td>
+        -
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="tab-pane" id="evmtxs" role="tabpanel" aria-labelledby="evmtxs-tab">
+  <table class="table table-striped table-hover">
+    <tr>
+      <th>Transaction Hash</th>
+      <th>Action</th>
+      <th>Result</th>
+      <th>From</th>
+      <th>To</th>
+      <th>Value</th>
+      <th>Fee</th>
+    </tr>
+    <%  for ( var i = 0; i < block.transactions.length ; i++) {
+       let tx = block.transactions[i];
+       let txValue = (tx.value / 10**18)
+       let txFeeMax = (tx.gas * tx.gasPrice/ 10**18)
+%>
+    <tr>
+      <td>
+        <code><%- uiTool.presentTx(tx.transactionHash); %></code>
+      </td>
+      <td>
+        <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: false}) %>
+      </td>
+      <td><%- include("isSuccess", {success: tx.status, errorMsg: false}); %></td>
+      <td>
+        <code><%- uiTool.presentID(tx.from); %></code>
+      </td>
+      <td>
+        <code><%- uiTool.presentID(tx.to); %></code>
+      </td>
+      <td>
+        <%- uiTool.presentFloat(tx.value, 6); %>
+      </td>
+      <td>
+        <%- uiTool.presentFloat(tx.fee, 6); %>
+      </td>
+    </tr>
+    <%  } %>
+  </table>
+</div>
+
+<script type="text/javascript">
+<% if (block.transactions.length > 0) {  %>
+  document.getElementById('evmtxs-tab').innerHTML = '<%- `EVM Transactions (${block.transactions.length})` %>'
+<% } %>
+</script>

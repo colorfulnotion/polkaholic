@@ -1,0 +1,63 @@
+<div class="tab-pane" id="events" role="tabpanel" aria-labelledby="events-tab">
+  <table class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>Event ID</th>
+        <th>Extrinsic ID (Event Index#)</th>
+        <th>Action</th>
+        <th>Params</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <% if ( extrinsics !== undefined && extrinsics.length > 0 ) {
+    // technically we are passing in extrinsicss..
+    let totalEvents = 0
+    for (const extrinsic of extrinsics){
+      let extrinsicEventIndex = 0 //this is the eventIndex within the extrinsic
+      for (const e of extrinsic.events){
+        e.extrinsicID = extrinsic.extrinsicID
+        e.extrinsicHash = extrinsic.extrinsicHash
+        e.extrinsicEventIndex = extrinsicEventIndex
+        let pieces = e.eventID.split('-') //2-12039596-1-1
+        let rawEventID = `${pieces[1]}-${pieces[3]}`
+        extrinsicEventIndex++
+        totalEvents++
+        %>
+      <tr>
+        <td>
+          <a href='/tx/<%= e.extrinsicHash %>'><%= rawEventID %></a>
+        </td>
+        <td>
+          <a href='/tx/<%= e.extrinsicHash %>'><%= `${e.extrinsicID} (#${e.extrinsicEventIndex})` %></a>
+        </td>
+        <td>
+          <%- include("eventmodule", {chainID: id, palletName: e.section, moduleName: e.method}); %>
+        </td>
+
+        <td>
+          <%- include("eventparams", {event: e}); %>
+        </td>
+      </tr>
+      <% } %>
+      <% } %>
+
+
+      <% } %>
+
+    </tbody>
+  </table>
+</div>
+
+<script type="text/javascript">
+<%
+  let totalEventsCnt = 0
+  for (const extrinsic of extrinsics){
+    for (const e of extrinsic.events){
+      totalEventsCnt++
+    }
+  }
+  if (extrinsics.length > 0) { %>
+  document.getElementById('events-tab').innerHTML = '<%- `Events (${totalEventsCnt})` %>'
+<% } %>
+</script>

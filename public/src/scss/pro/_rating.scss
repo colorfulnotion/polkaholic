@@ -1,0 +1,14 @@
+.rating {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  li {
+    list-style: none;
+  }
+  i {
+    padding: $rating-icon-padding;
+  }
+}
+.rating:not([data-mdb-readonly='true']) li {
+  cursor: pointer;
+}

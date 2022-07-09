@@ -1,0 +1,30 @@
+#!/usr/bin/env node
+ // Usage: while true; do ./indexChain 10; done
+var Crawler = require("./crawler");
+/*
+./updateERC20TokenSupply 2004  // moonbeam
+./updateERC20TokenSupply 2006  // astar
+./updateERC20TokenSupply 2002  // clover
+./updateERC20TokenSupply 22007 // shiden
+./updateERC20TokenSupply 22023 // moonriver
+*/
+async function main() {
+    let chainID = -1;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+    });
+    let crawler = new Crawler();
+    let chain = await crawler.getChain(chainID);
+    await crawler.updateERC20TokenSupply(chain, 7200);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

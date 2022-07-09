@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+ // Usage:  crawlBlocks [chainID]
+
+var Crawler = require("./crawler");
+async function main() {
+    var chainID = -1;
+    var crawler = new Crawler();
+    await crawler.assetManagerInit();
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = parseInt(val, 10);
+        }
+    });
+    if ( chainID < 0 ) {
+	console.log("chainID not specified");
+	process.exit(0);
+    }
+    let [unsubscribeFinalizedHeads, unsubscribeStorage, unsubscribeRuntimeVersion] = await crawler.crawlBlocks(chainID);
+    // never unsubscribe
+}
+
+main()
+    .then(() => {})
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

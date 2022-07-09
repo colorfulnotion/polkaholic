@@ -1,0 +1,98 @@
+<%- include('header', {chainInfo: chainInfo}); %>
+
+<div style='float:right; width: 200px'>
+<select name="relaychain" id="relaychain" class="select" data-mdb-option-height="44">
+  <option value="all" data-mdb-secondary-text="All Parachains" <%=  ( relaychain == "" ) ? "SELECTED": ""; %>>All</option>
+  <option value="polkadot" data-mdb-secondary-text="Polkadot Parachains" <%=  ( relaychain == "polkadot" ) ? "SELECTED": ""; %>>Polkadot</option>
+  <option value="kusama" data-mdb-secondary-text="Kusama Parachains" <%=  ( relaychain == "kusama" ) ? "SELECTED": ""; %>>Kusama</option>
+</select>
+</div>
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" id="chainsTab" role="tablist">
+<%
+let tabs = [
+{ title: "Chains", target: "chains", func: "showchains", stopfunc: "stopxcmtransfers" },
+{ title: "XCM Transfers", target: "xcmtransfers", func: "showxcmtransfers", stopfunc: "stopchains" },
+{ title: "Top Accounts", target: "addresstopn", func: "showaddresstopn" }
+];
+
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
+
+<!-- Tab panes -->
+<div class="tab-content">
+  <div class="tab-pane" id="chains" role="tabpanel" aria-labelledby="chains-tab">
+    <table id="tablechains" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Chain</th>
+          <th>Latest Block</th>
+          <th>Latest Finalized</th>
+          <th>Signed Ext (7d)</th>
+          <th># Events (7d)</th>
+          <th># Transfers (7d)</th>
+          <th>Value Transfers USD (7d)</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
+    <table id="tablexcmtransfers" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Section:Method</th>
+          <th>Amount Sent</th>
+          <th>Value (USD)</th>
+          <th>Sender</th>
+          <th>Beneficiary</th>
+          <th>From Chain/Extrinsic ID</th>
+          <th>To Chain</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="addresstopn" role="tabpanel" aria-labelledby="addresstopn-tab">
+    <select class="select" id="topN">
+        <% for ( const f of topNfilters ) { 
+	   let sel = ( f.filter == topN ) ? " SELECTED" : ""; %>
+	     <option value="<%= f.filter %>"<%= sel; %>><%= f.display; %></option>
+	<% } %>
+    </select>
+    <table id="tableaddresstopn" class="display" style="width: 100%">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Address</th>
+          <th>Account Balance (USD)</th>
+          <th id="topnhdr">Value</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+</div>
+
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script>
+var relaychainfilter = "";
+var topNfilters = <%- JSON.stringify(topNfilters) %>;
+let tabs = <%- JSON.stringify(tabs); %>;
+$(document).ready(function() {
+//    setchainfilter("<%= relaychain %>");
+});
+</script>
+<script src="/chains.js"></script>

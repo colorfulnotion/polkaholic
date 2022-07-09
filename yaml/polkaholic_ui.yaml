@@ -1,0 +1,19 @@
+---
+- hosts: all
+  become: true
+  tasks:
+          #    - name: remove polkaholic
+          #      file: path=/root/go/src/github.com/colorfulnotion/polkaholic/ state=absent
+    - name: pull from github
+      become: yes
+      git:
+         repo: 'git@github.com:colorfulnotion/polkaholic.git'
+         dest: '/root/go/src/github.com/colorfulnotion/polkaholic'
+         update: yes
+    - name: Run command
+      command: "{{ item }}"
+      with_items:
+      - systemctl restart nginx.service
+      - systemctl restart polkaholic.service
+      - systemctl restart api_polkaholic.service
+

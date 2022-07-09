@@ -1,0 +1,24 @@
+<% let id = event.eventID; %>
+
+<a class="btn  btn-light btn-sm text-capitalize" data-mdb-toggle="modal" data-mdb-target="#collapse<%= id; %>">Details</a>
+<!-- Modal -->
+<div class="modal fade" id="collapse<%= id; %>" data-mdb-backdrop="static" data-mdb-keyboard="false" tabindex="-1" aria-labelledby="collapseLabel<%= id; %>" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="collapseLabel<%= id; %>">Event</h5>
+        <button type="button" class="btn btn-light btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="overflow-x: auto;">
+        <div id="ev<%= id; %>" class="renderjson"></div> 
+        <script type="text/javascript">
+          document.getElementById("ev<%= id; %>").appendChild(renderjson.set_show_to_level(2)(<%- JSON.stringify(event) %>));
+        </script>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-mdb-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

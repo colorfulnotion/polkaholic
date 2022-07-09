@@ -1,0 +1,106 @@
+.rowhidden {
+  display: none;
+}
+.rowvisible {
+}
+
+.blockvisible {
+  display: none;
+}
+.datevisible {
+  display: block;
+}
+
+.numberHeader {
+    text-align: right;
+}
+.chart {   height: 400px;   min-width: 310px;}
+.chain  { background: #e6007a;}
+.chain0 { background: #e6007a;}
+.chain22000 { background: #f83a44;}
+.chain2000 { background: #ec1e51;}
+.chain2 { background: #e6007a;}
+.chain1000 { background: #86e62a;}
+.chain21000 { background: #113911;}
+.chain2006 { background: #1b6dc1d9;}
+.chain2004 { background: #53cbc9;}
+
+
+.chain38 { background: #8c145a;}
+.chain32 { background: #2949d3;}
+.chain49 { background: #FF8500;}
+.chain78 { background: #ffb700;}
+.chain110 { background: #ef18ac;}
+.chain128 { background: #7cc773;}
+.chain136 { background: #ffb700;}
+.chain172 { background: #ef18ac;}
+.chain255 { background: #FF4D6A;}
+.chain1001 { background: #0000cc;}
+.chain1285 { background: #0E132E;}
+.chain22004 { background: #03f3f3;}
+.chain2007 { background: #5923B2;}
+.chain2015 { background: #6822fb;}
+.chain2019 { background: #861660;}
+.chain2021 { background: #496ddb;}
+.chain2026 { background: #1ab394;}
+.chain2031 { background: #fcc367;}
+.chain2032 { background: #3E96FF;}
+.chain2034 { background: #9eec1b;}
+.chain2090 { background: #9eec1b;}
+.chain2092 { background: #1a0a2d;}
+.chain2096 { background: #191a2e;}
+.chain2100 { background: #b9018c;}
+.chain2101 { background: #658ea9;}
+.chain2105 { background: #7C30DD;}
+.chain2107 { background: #29B58D;}
+
+.cookie-consent {
+    position: fixed;
+    bottom: 0px;
+    width: 100%;
+    height: 45px;
+    color: #fff;
+    line-height: 20px;
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 14px;
+    background: #292929;
+    z-index: 120;
+    cursor: pointer;
+    border-radius: 0px;
+    display: flex;
+    align-items: center;
+    justify-content: center
+}
+
+.allow-button {
+    height: 20px;
+    width: 104px;
+    color: #fff;
+    font-size: 12px;
+    line-height: 10px;
+    border-radius: 3px;
+    border: 1px solid green;
+    background-color: green;
+    padding: 3px;
+    margin: 3px;
+}
+.renderjson                { font-size: 8pt; }
+.renderjson a              { text-decoration: none; }
+.renderjson .disclosure    { color: plum; font-size: 175%; }
+.renderjson .syntax        { color: grey; }
+.renderjson .string        { color: black; }
+.renderjson .number        { color: black; }
+.renderjson .boolean       { color: black; }
+.renderjson .key           { color: blue; }
+.renderjson .keyword       { color: red; }
+.renderjson .object.syntax { color: black; }
+.renderjson .array.syntax  { color: plum; }
+
+.transfer {
+    width: 100px;
+}
+
+table.dataTable tbody td {
+  vertical-align: top;
+}

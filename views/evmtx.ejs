@@ -1,0 +1,173 @@
+<%- include('header', {chainInfo: chainInfo}); %>
+<script src="/tx.js"></script>
+<h4>Transaction Details</h4>
+<%
+let f = tx;
+let newDate = new Date();
+newDate.setTime(f.timestamp*1000);
+let dateString = newDate.toUTCString();
+let txResult = (f.result != undefined)? f.result == 1: true //by default tx result is true (until we back fill it)
+let errStr = (f.err != undefined)? f.err: false //by default tx result is true (until we back fill it)
+%>
+<table class="table table-hover table-bordered">
+  <tbody>
+    <tr>
+      <td>Transaction Hash</td>
+      <td>
+        <code><%= f.transactionHash; %></code>
+      </td>
+    </tr>
+    <% if ( tx.substrate !== undefined ) { %>
+    <tr>
+      <td>Substrate Tx</td>
+      <td><%- uiTool.presentFullTx(tx.substrate.extrinsicHash); %></td>
+    </tr>
+    <tr>
+      <td>Substrate Extrinsic ID</td>
+      <td><%- tx.substrate.extrinsicID; %></td>
+    </tr>
+    <% } %>
+    <tr>
+      <td>Finalized</td>
+      <td><span id="status"><%- include("finalized", {finalized: (f.status=="finalized")}); %></span></td>
+    </tr>
+    <tr>
+      <td>Result</td>
+      <td><%- include("txResult", {success: txResult, errorMsg: errStr}); %></td>
+    </tr>
+    <tr>
+      <td>Chain</td>
+      <td>
+        <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
+      </td>
+    </tr>
+    <tr>
+      <td>Block</td>
+      <td>
+        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.blockNumber}); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Date</td>
+      <td class='date'><%= dateString; %></td>
+    </tr>
+
+
+    <tr>
+      <td>From</td>
+      <td>
+	<%- uiTool.presentID(f.from) %>
+      </td>
+    </tr>
+    <tr>
+      <td>Interacted With (To)</td>
+      <td>
+	<%- uiTool.presentID(f.to) %>
+	<% if ( f.assetInfo !== undefined ) {
+	   } %>
+      </td>
+    </tr>
+<% if ( tx.transfers.length > 0 ) { %>
+    <tr>
+      <td>Tokens Transferred</td>
+      <td>
+        <table>
+	  <tr>
+	    <th>From</td>
+	    <th>To</td>
+      <th>Token</td>
+      <th>Value</td>
+	  </tr>
+	  <% for (let t = 0 ; t < tx.transfers.length; t++) {
+	    let tok = tx.transfers[t];
+	  %>
+	    <tr>
+	      <td><%- uiTool.presentID(tok.from); %></td>
+	      <td><%- uiTool.presentID(tok.to); %></td>
+	      <td><%- uiTool.presentERCToken(tok.tokenAddress, tok.assetInfo); %> <%- ; %></td>
+        <td><%- tok.value; %> (<%- uiTool.currencyFormat(tok.valueUSD, tok.priceUSD, tok.priceUSDCurrent); %> )</td>
+	    </tr>
+	  <% } %>
+	</table>
+      </td>
+    </tr>
+<% } %>
+    <tr>
+      <td>Input Data</td>
+      <td>
+        <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
+      </td>
+    </tr>
+    <tr>
+      <td>Value</td>
+      <td><%- tx.value; %> <%- tx.symbol %> (<%- uiTool.currencyFormat(tx.valueUSD, tx.priceUSD, tx.priceUSDCurrent);%> ) <% %> </td>
+    </tr>
+
+    <tr>
+      <td>Gas Limit</td>
+      <td><%- tx.gasLimit; %></td>
+    </tr>
+
+    <tr>
+      <td>Gas Used</td>
+      <td><%- tx.gasUsed; %><%- ` (${uiTool.presentPercentage(tx.gasUsed/tx.gasLimit)})` %></td>
+    </tr>
+
+    <tr>
+      <td>Gas Price</td>
+      <td><%- tx.gasPrice; %></td>
+    </tr>
+
+    <tr>
+      <td>Fee</td>
+      <td><%- tx.fee; %> <%- tx.symbol; %> (<%- uiTool.currencyFormat(tx.feeUSD, tx.priceUSD, tx.priceUSDCurrent); %> ) <% %> </td>
+    </tr>
+
+    <tr>
+      <td>Nonce</td>
+      <td><%= f.nonce; %></td>
+    </tr>
+
+    <tr>
+      <td><%- tx.symbol; %> Price</td>
+      <td><%- uiTool.currencyFormat(tx.priceUSD); %> </td>
+    </tr>
+
+
+
+</table>
+
+<h4>Logs (<%- tx.decodedLogs.length %>)</h4>
+<table class="table table-striped table-hover">
+   <tr>
+     <th>#</th>
+     <th>Address</th>
+     <th>Log</th>
+     <th>Data/Topics</th>
+   </tr>
+   <% for ( let i = 0; i < tx.decodedLogs.length; i++) {
+        let log = tx.decodedLogs[i];
+      %>
+       <tr>
+        <td>
+	 <%- i %>
+	</td>
+        <td>
+	 <%- uiTool.presentID(log.address); %>
+	</td>
+        <td>
+	 <%- include("evmtxlogevents.ejs", { log }); %>
+	</td>
+        <td>
+	 <%- include("evmtxlogtopics.ejs", { log }); %>
+	</td>
+	</tr>
+      <% } %>
+      </table>
+      </td>
+    </tr>
+
+<script>
+showtxstatus("<%= tx.transactionHash %>"); //setupcurrency inside of txstatus
+</script>
+<%- include('footer', {apiUrl: apiUrl}); %>

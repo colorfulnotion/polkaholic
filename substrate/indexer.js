@@ -1,0 +1,6387 @@
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
+const path = require("path");
+const AssetManager = require("./assetManager");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
+const Endpoints = require("./summary/endpoints");
+const mysql = require("mysql2");
+
+const {
+    hexToU8a,
+    compactStripLength,
+    hexToBn
+} = require("@polkadot/util");
+const {
+    StorageKey
+} = require('@polkadot/types');
+const fs = require('fs');
+
+module.exports = class Indexer extends AssetManager {
+    debugLevel = paraTool.debugNoLog;
+    writeData = true; // true = production level write, false = debug SKIPs
+
+    readyForIndexing = {};
+    readyToCrawlParachains = false;
+
+    hashesRowsToInsert = [];
+    blockRowsToInsert = [];
+    addressStorage = {};
+    historyMap = {};
+    addressExtrinsicMap = {};
+    pendingExtrinsic = {};
+
+    nonCompliantLP = {};
+    unhandledTraceMap = {};
+
+    relatedMap = {};
+    extrinsicEvmMap = {};
+
+    currentPeriodKey = false;
+
+    numUpdated = 0
+    tallyAsset = {};
+    xcmtransfer = {};
+    xcmtransferdestcandidate = {};
+
+    multisigMap = {};
+    proxyMap = {};
+    crowdloan = {};
+    assetholder = {};
+    api = false;
+    web3Api = false;
+    contractABIs = false;
+    contractABISignatures = {};
+    chainID = false;
+    relayChain = "";
+    metadata = {};
+    specVersion = -1;
+    xcmeventsMap = {};
+    xcmmsgMap = {};
+    xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove trailing
+    recentXcmMsgs = []; //will flush from here.
+    // bqlog
+    extrinsicsfn = false;
+    transfersfn = false;
+    eventsfn = false;
+    evmtxsfn = false;
+    xcmfn = false;
+    bqlogindexTS = 0;
+    recentExtrinsics = [];
+    recentTransfers = [];
+    recentXCMMessages = [];
+
+
+    context = {};
+    stat = {
+        hashesRows: {
+            substrateBlk: 0,
+            evmBlk: 0,
+            substrateTx: 0,
+            evmTx: 0,
+            evmTxPerBlk: [],
+            substrateTxPerBlk: [],
+        },
+        addressRows: {
+            uniqueAddr: 0,
+            uniqueEVMAddr: 0,
+            uniqueSubstrateAddr: 0,
+            realtime: 0,
+            history: 0,
+            feed: 0,
+            feedunfinalized: 0,
+            feedtransfer: 0,
+            feedreward: 0,
+            feedcrowdloan: 0,
+            xcmsend: 0,
+            xcmreceive: 0
+        },
+        addressStorage: {
+            uniqueAddr: 0
+        },
+        assetholder: {
+            unique: 0,
+            read: 0,
+            write: 0,
+            update: 0,
+        }
+    }
+
+    timeStat = {}
+    /*
+    timeStat = {
+        getRows: 0,
+        getRuntimeVersion: 0,
+        immediateFlush: 0,
+        indexJmp: 0,
+        getRowsTS: 0,
+        processExtrinsic: 0,
+        buildBlockFromRow: 0,
+        indexChainBlockRow: 0,
+        decodeRawBlock: 0,
+        processBlockEvents: 0,
+        processTrace: 0,
+        getRuntimeVersionTS: 0,
+        processExtrinsicTS: 0,
+        buildBlockFromRowTS: 0,
+        decodeRawBlockTS: 0,
+        processBlockEventsTS: 0,
+        processTraceTS: 0,
+        indexChainBlockRowTS: 0,
+        immediateFlushTS: 0,
+        indexJmpTS: 0,
+        flush_a_TS: 0,
+        flush_b_TS: 0,
+        flush_c_TS: 0,
+        flush_d_TS: 0,
+        flush_e_TS: 0,
+        flush_f_TS: 0,
+        processERC20LPTS: 0,
+        processERC20TS: 0,
+    }
+    */
+
+    assetStat = {}
+    assetChainMap = {}
+    /*
+      assetTypeERC20: [],
+      assetTypeToken: [],
+      assetTypeLoan: [],
+      assetTypeLiquidityPair: [],
+      assetTypeERC20LiquidityPair: [],
+      assetTypeNFTToken: [],
+      assetTypeNFT: [],
+      assetTypeERC721: [],
+      assetTypeERC721Token: [],
+      assetTypeERC1155: [],
+      assetTypeERC1155Token: [],
+      assetTypeContract: [],
+    */
+
+    debugParseTraces = {}
+    failedParseTraces = []
+
+    /* DebugLevel
+    debugNoLog: 0,
+    debugErrorOnly: 1,
+    debugInfo: 2,
+    debugVerbose: 3,
+    debugTracing: 4,
+    */
+
+    setDebugLevel(debugLevel = paraTool.debugNoLog) {
+        this.debugLevel = debugLevel
+    }
+
+    constructor(serviceName = "indexer") {
+        super(serviceName)
+    }
+
+    setLoggingContext(ctx) {
+        this.context = ctx;
+    }
+
+    log_indexing_error(err, op, obj = {}, showOnConsole = true) {
+        this.numIndexingErrors++;
+        if (showOnConsole) {
+            console.log("ERROR", "op", op, obj, this.context, err);
+        }
+        obj.chainID = this.chainID;
+        obj.context = this.context;
+        obj.op = op;
+        obj.err = err;
+        this.logger.error(obj);
+    }
+
+    log_indexing_warn(err, op, obj = {}, showOnConsole = true) {
+        this.numIndexingWarns++;
+        if (showOnConsole) {
+            console.log("WARNING", "op", op, obj, this.context, err);
+        }
+        obj.chainID = this.chainID;
+        obj.context = this.context;
+        obj.op = op;
+        obj.err = err;
+        this.logger.warn(obj);
+    }
+
+    validAddress(addr) {
+        if (!addr) return (false);
+        if (!((addr.length == 66) || (addr.length == 42))) return (false);
+        if (addr.substr(0, 2) != "0x") return (false);
+        if (addr == "0x0000000000000000000000000000000000000000000000000000000000000000") return (false);
+        if (addr == "0x0000000000000000000000000000000000000000") return (false);
+        return (true);
+    }
+
+    updateAssetLoanDebitExchangeRate(asset, debitExchangeRate) {
+        if (this.init_asset(asset, paraTool.assetTypeLoan, paraTool.assetSourceOnChain, "updateAssetLoanDebitExchangeRate")) {
+            this.tallyAsset[asset].debitExchangeRate = debitExchangeRate;
+        }
+    }
+
+    updateAssetLoanExchangeRate(asset, exchangeRate, rateType = 'supply') {
+        if (rateType == 'borrow') {
+            if (this.init_asset(asset, paraTool.assetTypeCDP, paraTool.assetSourceOnChain, "updateAssetLoanExchangeRate")) {
+                this.tallyAsset[asset].borrowExchangeRate = exchangeRate;
+            }
+        } else if (rateType == 'supply') {
+            if (this.init_asset(asset, paraTool.assetTypeCDP, paraTool.assetSourceOnChain, "updateAssetLoanExchangeRate")) {
+                this.tallyAsset[asset].supplyExchangeRate = exchangeRate;
+            }
+        }
+    }
+
+    updateAssetPrice(asset, price, assetType = paraTool.assetTypeToken, assetSource = paraTool.assetSourceOracle) {
+        if (this.init_asset(asset, assetType, assetSource, "updateAssetPrice")) {
+            //console.log(`updateAssetIssuance`, asset, assetType, issuance)
+            this.tallyAsset[asset].price = price;
+            this.tallyAsset[asset].assetSourceMap[assetSource] = 1 // mark as used
+        }
+    }
+
+    getAssetSyntheticRate(asset, assetType = paraTool.assetTypeToken, assetSource = paraTool.assetSourceOracle) {
+        if (this.init_asset(asset, assetType, assetSource, "assetSyntheticRate")) {
+            //console.log(`getAssetSyntheticRate`, asset, assetType, issuance)
+            return this.tallyAsset[asset].syntheticRate
+        }
+    }
+
+    // update liquidStaking exhcange between dot / sDOT
+    updateAssetSyntheticRate(asset, price, rate, assetType = paraTool.assetTypeToken, assetSource = paraTool.assetSourceOracle) {
+        if (this.init_asset(asset, assetType, assetSource, "assetSyntheticRate")) {
+            this.tallyAsset[asset].price = price;
+            this.tallyAsset[asset].syntheticRate = rate;
+            this.tallyAsset[asset].assetSourceMap[assetSource] = 1 // mark as used
+        }
+    }
+
+    updateAssetIssuance(asset, issuance, assetType = paraTool.assetTypeLiquidityPair, assetSource = paraTool.assetSourceOnChain) {
+        if (this.init_asset(asset, assetType, assetSource, "updateAssetIssuance")) {
+            //console.log(`updateAssetIssuance`, asset, assetType, issuance)
+            this.tallyAsset[asset].issuance = issuance;
+            this.tallyAsset[asset].assetSourceMap[assetSource] = 1
+        }
+    }
+
+    isValidLiquidityPair(asset) {
+        // return if acala LP is found `[{"Token":"KAR"},{"Token":"KSM"}]#8`
+        if (this.assetInfo[asset] != undefined) {
+            return true
+        }
+        return false
+    }
+
+    isCachedNonCompliantLP(tokenAddr) {
+        let addr = tokenAddr.toLowerCase()
+        if (this.nonCompliantLP[addr] != undefined) {
+            return true
+        }
+        return false
+    }
+
+    cacheNonCompliantLP(tokenAddr) {
+        let addr = tokenAddr.toLowerCase()
+        console.log(`cached NonCompliantLP ${addr}`)
+        this.nonCompliantLP[addr] = true
+    }
+
+
+    updateAssetLiquidityPairPool(asset, lp0, lp1, rat) {
+        if (this.init_asset(asset, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain, "updateAssetLiquidityPairPool")) {
+            //console.log(`*** updateAssetLiquidityPairPool`, asset, lp0, lp1)
+            this.tallyAsset[asset].lp0.push(lp0)
+            this.tallyAsset[asset].lp1.push(lp1)
+            this.tallyAsset[asset].rat.push(rat)
+        }
+    }
+
+    updateAssetLiquidityPairTradingVolume(asset, token0In, token1In, token0Out, token1Out) {
+        if (this.init_asset(asset, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain, "updateAssetLiquidityPairTradingVolume")) {
+            //console.log(`updateAssetLiquidityPairTradingVolume`, asset)
+            this.tallyAsset[asset].token0In += !isNaN(token0In) ? token0In : 0
+            this.tallyAsset[asset].token1In += !isNaN(token1In) ? token1In : 0
+            this.tallyAsset[asset].token0Out += !isNaN(token0Out) ? token0Out : 0
+            this.tallyAsset[asset].token1Out += !isNaN(token1Out) ? token1Out : 0
+        }
+    }
+
+    updateAssetERC20LiquidityPair(asset, lp0, lp1, rat, pair = false) {
+        if (this.init_asset(asset, paraTool.assetTypeERC20LiquidityPair, paraTool.assetSourceOnChain, "updateAssetERC20LiquidityPair")) {
+            this.tallyAsset[asset].lp0.push(lp0)
+            this.tallyAsset[asset].lp1.push(lp1)
+            this.tallyAsset[asset].rat.push(rat)
+        }
+    }
+
+    updateAssetERC20SwapTradingVolume(asset, token0In, token1In, token0Out, token1Out, pair = false) {
+        if (this.init_asset(asset, paraTool.assetTypeERC20LiquidityPair, paraTool.assetSourceOnChain, "updateAssetERC20SwapTradingVolume")) {
+            this.tallyAsset[asset].token0In += !isNaN(token0In) ? token0In : 0
+            this.tallyAsset[asset].token1In += !isNaN(token1In) ? token1In : 0
+            this.tallyAsset[asset].token0Out += !isNaN(token0Out) ? token0Out : 0
+            this.tallyAsset[asset].token1Out += !isNaN(token1Out) ? token1Out : 0
+        }
+    }
+
+    updateAssetERC20LiquidityPairIssuance(asset, issuance) {
+        if (this.init_asset(asset, paraTool.assetTypeERC20LiquidityPair, paraTool.assetSourceOnChain, "updateAssetERC20LiquidityPairIssuance")) {
+            this.tallyAsset[asset].issuance = issuance;
+        }
+    }
+
+    updateAssetMetadata(asset, metadata) {
+        if (this.init_asset(asset, paraTool.assetTypeToken, paraTool.assetSourceOnChain, "updateAssetMetadata")) { // add currencyID ? // not sure about the source type..
+            this.tallyAsset[asset].metadata = metadata;
+        }
+    }
+
+    updateAssetNFTTokenMetadata(asset, nftClass, tokenID, holder, free, metadata, tokenURI = "") {
+        if (this.init_asset(asset, paraTool.assetTypeNFTToken, paraTool.assetSourceOnChain, "updateAssetNFTTokenMetadata")) {
+            this.tallyAsset[asset].nftClass = nftClass;
+            this.tallyAsset[asset].tokenID = tokenID;
+            this.tallyAsset[asset].holder = holder;
+            this.tallyAsset[asset].free = free;
+            this.tallyAsset[asset].tokenURI = tokenURI;
+            this.tallyAsset[asset].metadata = metadata;
+        }
+    }
+
+    updateAssetNFTClassMetadata(asset, metadata, creator, deposit) {
+        if (this.init_asset(asset, paraTool.assetTypeNFT, paraTool.assetSourceOnChain, "updateAssetNFTClassMetadata")) {
+            this.tallyAsset[asset].metadata = metadata;
+            this.tallyAsset[asset].creator = creator;
+            this.tallyAsset[asset].deposit = deposit;
+        }
+    }
+
+    updateAssetLiquidityPairIssuance(asset, issuance) {
+        if (this.init_asset(asset, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain, "updateAssetLiquidityPairIssuance")) {
+            this.tallyAsset[asset].issuance = issuance;
+        }
+    }
+
+
+    updateAddressExtrinsicStorage(address, extrinsicID, extrinsicHash, family, rec, ts, finalized) {
+        if (address == undefined || typeof address != "string") {
+            console.log("updateAddressExtrinsicStorage FAIL", address, extrinsicID, extrinsicHash, family, rec, ts, finalized);
+        }
+        //feed:extrinsicHash#chainID-extrinsicID
+        //feedxcm:extrinsicHash#chainID-extrinsicID-transferIndex
+        //feedtransfer:extrinsicHash#eventID
+        //feedreward:extrinsicHash#eventID
+        //feedcrowdloan:extrinsicHash#eventID
+        if (extrinsicID == undefined) return //safety check
+        let k = `${address}#${extrinsicHash}`;
+        let x = JSON.stringify(rec);
+        if (x.length > 65535) {
+            let prevLen = x.length
+            if (rec.events) {
+                rec.events = []
+            }
+            x = JSON.stringify(rec);
+            console.log(`[${extrinsicID}] ${k}, ${family} too long!(length=${prevLen}, withoutEventlen=${x.length}, finalized=${finalized})`)
+            if (x.length > 65535) return;
+        }
+
+        let eventID = (rec.eventID != undefined) ? rec.eventID : `${this.chainID}-${extrinsicID}`
+        let columnfamily = family;
+        switch (family) {
+            case "feed":
+            case "feedtransfer":
+                if (!finalized) {
+                    columnfamily = family + "unfinalized";
+                }
+                break;
+            case "feedxcm":
+                let transferIndex = (rec.transferIndex != undefined) ? rec.transferIndex : 0
+                eventID = `${this.chainID}-${extrinsicID}-${transferIndex}` // to support multi-transfer case
+                break;
+            case "feedcrowdloan":
+            case "feedreward":
+                if (!finalized) {
+                    return;
+                }
+                break;
+        }
+        if (this.addressExtrinsicMap[k] == undefined) {
+            this.addressExtrinsicMap[k] = {
+                address,
+                ts,
+                extrinsicID,
+                extrinsicHash,
+                data: {}
+            }
+        }
+        if (this.addressExtrinsicMap[k].data[columnfamily] == undefined) {
+            this.addressExtrinsicMap[k].data[columnfamily] = {}
+        }
+        this.addressExtrinsicMap[k].data[columnfamily][eventID] = x
+        //console.log(`this.addressExtrinsicMap[${k}] dataLen=${Object.keys(this.addressExtrinsicMap[k].data).length}`, `[${columnfamily}]`,this.addressExtrinsicMap[k].data[columnfamily]);
+    }
+
+    validAssetState(s, max = 1000000000) {
+        if (s == undefined) {
+            return (false);
+        }
+        if (!s) {
+            return (false);
+        }
+        if (s.free !== undefined && (s.free > max)) {
+            return (false);
+        }
+        if (s.miscFrozen !== undefined && (s.miscFrozen > max)) {
+            return (false);
+        }
+        if (s.frozen !== undefined && (s.frozen > max)) {
+            return (false);
+        }
+        if (s.reserved !== undefined && (s.reserved > max)) {
+            return (false);
+        }
+        return (true);
+    }
+
+    updateAddressStorage(account, assetChain, section, newState, ts = false, bn = false) {
+        if (!ts) {
+            console.log("WARNING: updateAddressStorage-MISSING TS", account, assetChain, section);
+            return;
+        }
+        if (!typeof assetChain == 'string') {
+            console.log("WARNING: updateAddressStorage-assetChain is not string", account, assetChain, section);
+            return;
+        }
+
+        let [asset, chainID] = paraTool.parseAssetChain(assetChain);
+        if (chainID == undefined) {
+            console.log("WARNING: updateAddressStorage-MISSING chainID", account, assetChain, section);
+            return;
+        }
+        if (!this.validAddress(account)) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log("invalid acct!!!", asset, account, section, newState, `update=${this.numUpdated}`)
+            return (false);
+        }
+
+        if (!this.validAssetState(newState)) {
+            return (false);
+        }
+        // add blocktime (presumed correct) + bn for debugging (chainID is in assetChain)
+        if (ts && newState.ts == undefined) {
+            newState.ts = ts;
+        }
+        if (bn && newState.bn == undefined) {
+            newState.bn = bn;
+        }
+        // add index source for debugging
+        newState.source = this.hostname;
+        newState.genTS = this.getCurrentTS();
+
+        let accKey = account.toLowerCase();
+        if (!this.addressStorage[accKey]) {
+            this.addressStorage[accKey] = {}
+            this.stat.addressStorage.uniqueAddr++
+        }
+        this.numUpdated++;
+
+        // record the assetholder
+        this.updateAssetHolder(assetChain, accKey, bn, newState);
+        let rec = {
+            value: JSON.stringify(newState),
+            timestamp: ts * 1000000
+        }
+        // encodeAssetChain turns : into ~~
+        let assetChainEncoded = paraTool.encodeAssetChain(assetChain)
+        this.addressStorage[accKey][assetChainEncoded] = rec
+
+        // ex: {"Token":"KSM"}#2#0x000b3563
+        let historyKey = paraTool.make_addressHistory_rowKey(accKey, ts)
+        if (this.historyMap[historyKey] == undefined) {
+            this.historyMap[historyKey] = {};
+        }
+        this.historyMap[historyKey][assetChainEncoded] = rec
+        // The above enables access to an account history for all assets like this:
+        // 1. For all assetChains, get "realtime" columns -- each column will have the LATEST state of the account's holding of assetChain, eg {"Token":"KSM"}#2
+        // 2. For each assetChain, HISTORICAL info can be obtained with a prefix read  ${address}#{"Token":"KSM"}#2#0x12344321 ...
+        //  where each cell will be specific time and it is in reverse chronilogical order
+        return (true);
+    }
+    // getSpecVersionMetadata returns a cached metadata object OR fetches from SQL table OR does a RPC call
+    // and updates this.storageKeys using the "pallets"
+    async getSpecVersionMetadata(chain, specVersion, blockHash = false, bn = 0) {
+        let chainID = chain.chainID;
+        let updateChainPalletStorage = (this.getCurrentTS() - chain.lastUpdateStorageKeysTS > 86400 * 3);
+        if (this.metadata[specVersion]) return (this.metadata[specVersion]);
+        let sql = `select metadata, specVersion from specVersions where chainID = '${chainID}' and specVersion = ${specVersion} limit 1`;
+        var metadataRecs = await this.poolREADONLY.query(sql)
+        let metadata = false;
+        if (metadataRecs.length == 0 || !(metadataRecs[0].metadata.length > 0)) {
+            let chainID = chain.chainID;
+            let metadataRaw = blockHash ? await this.api.rpc.state.getMetadata(blockHash) : await this.api.rpc.state.getMetadata();
+            metadata = metadataRaw.asV14.toJSON();
+            let metadataString = JSON.stringify(metadata);
+            console.log("getSpecVersionMetadata: fetch metadata from rpc", "chainID", chainID, "specVersion", specVersion, "len(metadataString)", metadataString.length);
+            if (await this.update_spec_version(chainID, specVersion)) {}
+            await this.upsertSQL({
+                "table": "specVersions",
+                "keys": ["chainID", "specVersion"],
+                "vals": ["metadata"],
+                "data": [`('${chainID}', '${specVersion}', ${mysql.escape(metadataString)} )`],
+                "replace": ["metadata"]
+            });
+            this.metadata[specVersion] = metadata;
+        } else {
+            console.log("getSpecVersionMetadata: fetch metadata from db", sql);
+            metadata = JSON.parse(metadataRecs[0].metadata);
+            this.metadata[specVersion] = metadata;
+        }
+
+        var pallets = metadata.pallets;
+        /*  Example: {
+          name: 'Balances',
+          storage: { prefix: 'Balances', items: [Array] },
+          calls: { type: '210' },
+          events: { type: '41' },
+          constants: [ [Object], [Object], [Object] ],
+          errors: { type: '343' },
+          index: '10'
+        }, */
+        this.storageKeys = {};
+        let sks = [];
+        for (const pallet of pallets) {
+            var palletName = pallet.name; // Tokens
+            var calls = pallet.calls;
+            var events = pallet.events;
+            var constants = pallet.constants;
+            var errors = pallet.errors;
+            var storage = pallet.storage;
+            var prefix = pallet.prefix;
+            if (storage && storage.items) {
+                for (const item of storage.items) {
+                    /* Example: {
+                      name: 'TotalIssuance',
+                      modifier: 'Default',
+                      type: { map: { hashers: [Array], key: '44', value: '6' } },
+                      fallback: '0x00000000000000000000000000000000',
+                      docs: [ ' The total issuance of a token type.' ]
+                      }		*/
+                    let type0 = JSON.stringify(item.type);
+                    let modifier = item.modifier;
+                    let fallback = item.fallback;
+                    let storageName = item.name;
+                    let docs = item.docs.join(" ").trim();
+                    let storageKey = paraTool.twox_128(palletName) + paraTool.twox_128(storageName);
+                    this.storageKeys[storageKey] = {
+                        palletName,
+                        storageName
+                    };
+                    if (updateChainPalletStorage) {
+                        sks.push(`('${palletName}', '${storageName}', '${chainID}', '${storageKey}', ${mysql.escape(modifier)}, ${mysql.escape(type0)}, ${mysql.escape(fallback)}, ${mysql.escape(docs)}, Now())`)
+                    }
+                }
+            }
+        }
+        if (sks.length > 0) {
+            // add potentially new chainPalletStorage records and record that we have done so
+            await this.upsertSQL({
+                "table": `chainPalletStorage`,
+                "keys": ["palletName", "storageName"],
+                "vals": ["chainID", "storageKey", "modifier", "type", "fallback", "docs", "lastUpdateDT"],
+                "data": sks,
+                "replace": ["chainID", "storageKey", "modifier", "type", "fallback", "docs", "lastUpdateDT"]
+            });
+            let sql = `update chain set lastUpdateStorageKeysTS = UNIX_TIMESTAMP(Now()) where chainID = '${chainID}'`
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL()
+        }
+        return (this.metadata[specVersion]);
+
+    }
+
+    resetTimeUsage() {
+        let newTimeStat = {
+            getRows: 0,
+            getRuntimeVersion: 0,
+            immediateFlush: 0,
+            indexJmp: 0,
+            getRowsTS: 0,
+            buildBlockFromRow: 0,
+            indexChainBlockRow: 0,
+            decodeRawBlockApiAt: 0,
+            decodeRawBlockSignedBlock: 0,
+            decodeRawBlock: 0,
+            processBlockEvents: 0,
+            processExtrinsic: 0,
+            processBlockAndReceipt: 0,
+            processEVMFullBlock: 0,
+            processTrace: 0,
+            getRuntimeVersionTS: 0,
+            decodeRawBlockApiAtTS: 0,
+            decodeRawBlockSignedBlockTS: 0,
+            placeholder0c: '---- ---- ---- ---- ---- ---',
+            processTransasctionTS: 0,
+            processReceiptTS: 0,
+            decorateTxnTS: 0,
+            placeholder0a: '---- processBlockEvents- ---',
+            processExtrinsicTS: 0,
+            processBlockAndReceiptTS: 0,
+            processEVMFullBlockTS: 0,
+            placeholder0b: '---- ---- ---- ---- ---- ---',
+            placeholder1a: '---- indexChainBlockRow ----',
+            buildBlockFromRowTS: 0,
+            decodeRawBlockTS: 0,
+            processBlockEventsTS: 0,
+            processTraceTS: 0,
+            indexChainBlockRowTS: 0,
+            placeholder1b: '---- ---- ---- ---- ---- ---',
+            immediateFlushTS: 0,
+            indexJmpTS: 0,
+            flush_a_TS: 0,
+            flush_b_TS: 0,
+            flush_c_TS: 0,
+            flush_d_TS: 0,
+            flush_e_TS: 0,
+            flush_f_TS: 0,
+            processERC20LPTS: 0,
+            processERC20TS: 0,
+        }
+        this.timeStat = newTimeStat
+    }
+
+    showTimeUsage() {
+        if (this.debugLevel >= paraTool.debugTracing) console.log(this.timeStat)
+    }
+
+    showCurrentMemoryUsage() {
+        const used = process.memoryUsage().heapUsed / 1024 / 1024;
+        if (this.debugLevel >= paraTool.debugVerbose) {
+            console.log(`USED: [${used}MB]`, "hashesRowsToInsert.length", this.hashesRowsToInsert.length, "blockRowsToInsert.length", this.blockRowsToInsert.length);
+            console.log(this.stat);
+        }
+    }
+
+    async immediateFlushBlockAndAddressExtrinsics() {
+        //flush table that are not dependent on each other and can be promised immediately ()
+        var statusesPromise = Promise.allSettled([
+            this.flushHashesRows(),
+            this.flushBlockRows(),
+            this.flush_addressExtrinsicMap(),
+            this.flushProxy(),
+            await this.flushXCM()
+        ])
+        await statusesPromise
+        this.resetHashRowStat()
+    }
+
+    async flush(ts = false, lastBlockNumber = 1, isFullPeriod = false, isTip = false) {
+        if (ts == false) {
+            console.log("FLUSHSHORT FAILURE: MISSING ts")
+        }
+        this.showCurrentMemoryUsage()
+
+        let immediateFlushStartTS = new Date().getTime();
+        await this.immediateFlushBlockAndAddressExtrinsics()
+        let immediateFlushTS = (new Date().getTime() - immediateFlushStartTS) / 1000
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(f): immediate Flush Block&AddressExtrinsics", immediateFlushTS);
+        this.timeStat.flush_f_TS += immediateFlushTS
+        this.timeStat.immediateFlushTS += immediateFlushTS
+
+        let addressStorageStartTS = new Date().getTime();
+        try {
+            await Promise.all([this.flush_historyMap(), this.flush_addressStorage(), this.flushCrowdloans()]);
+        } catch (err) {
+            this.log_indexing_error(err, "flush");
+        }
+        let addressStorageTS = (new Date().getTime() - addressStorageStartTS) / 1000
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(a): AddressStorage", addressStorageTS);
+        this.timeStat.flush_a_TS += addressStorageTS
+
+        let assetStartTS = new Date().getTime();
+        await this.flush_assets(ts, lastBlockNumber, isFullPeriod, isTip);
+
+        let assetTS = (new Date().getTime() - assetStartTS) / 1000
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(b): Assets", assetTS);
+        this.timeStat.flush_b_TS += assetTS
+
+        let multisigListStartTS = new Date().getTime();
+        await this.flushMultisig();
+        let multisigListTS = (new Date().getTime() - multisigListStartTS) / 1000
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(+): Multisig", multisigListTS);
+
+        let assetHolderStartTS = new Date().getTime();
+        await this.flushAssetHolder();
+        let assetHolderTS = (new Date().getTime() - assetHolderStartTS) / 1000
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(c): Assets Holder", assetHolderTS);
+        this.timeStat.flush_c_TS += assetHolderTS
+
+        let batchedSQLStartTS = new Date().getTime();
+        await this.update_batchedSQL()
+        let batchedSQLTS = (new Date().getTime() - batchedSQLStartTS) / 1000
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(e): update_batchedSQL", batchedSQLTS);
+
+        await this.dump_xcm_messages()
+        await this.dump_recent_activity()
+        await this.dump_failed_traces()
+
+        if (isFullPeriod || lastBlockNumber % 3000 == 2998) {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`unhandledTraceMap`, this.unhandledTraceMap)
+            this.unhandledTraceMap = {}
+        }
+        //removes address state after flushing
+        this.resetAddressStats()
+    }
+
+    // write this.addressStorage [filled in updateAddressStorage] to tblRealtime
+    async flush_addressStorage() {
+        let batchSize = 512;
+        try {
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            let rows = [];
+            for (const address of Object.keys(this.addressStorage)) {
+                let r = this.addressStorage[address];
+                let rowKey = address.toLowerCase()
+                rows.push({
+                    key: rowKey,
+                    data: {
+                        realtime: r
+                    }
+                });
+                if (rows.length > batchSize) {
+                    await this.insertBTRows(tblRealtime, rows, tblName);
+                    rows = [];
+                }
+            }
+            if (rows.length > 0) {
+                await this.insertBTRows(tblRealtime, rows, tblName);
+                rows = [];
+            }
+            this.addressStorage = {}
+            //console.log("writing addressStorage DONE");
+        } catch (err) {
+            this.log_indexing_error(err, "flush_addressStorage");
+        }
+    }
+
+    async flushMultisig() {
+        let multisigAccounts = []
+        for (const k of Object.keys(this.multisigMap)) {
+            let m = this.multisigMap[k]
+            let r = `('${m.multisigAddress}','${m.threshold}', '${m.signatories.join('|')}', '${m.signatorycnt}')`
+            multisigAccounts.push(r)
+        }
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`flushMultisig recs`, multisigAccounts)
+        this.multisigMap = {};
+        // --- multiaccount no update
+        await this.upsertSQL({
+            "table": `multisigaccount`,
+            "keys": ["address"],
+            "vals": ["threshold", "signatories", "signatorycnt"],
+            "data": multisigAccounts,
+            "replace": ["threshold", "signatories", "signatorycnt"],
+        });
+    }
+
+    async flushProxy() {
+        let proxyAccounts = []
+        for (const k of Object.keys(this.proxyMap)) {
+            let p = this.proxyMap[k]
+            let isRemoved = (p.status == 'removed') ? 1 : 0
+            let r = `('${p.chainID}', '${p.address}', '${p.delegate}', '${p.proxyType}', '${p.delay}', '${isRemoved}', '${p.blockNumber}', '${p.blockNumber}')`
+            proxyAccounts.push(r)
+        }
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`flushProxy recs`, proxyAccounts)
+        this.proxyMap = {};
+        // --- multiaccount no update
+        await this.upsertSQL({
+            "table": `proxyaccount`,
+            "keys": ["chainID", "address", "delegate"],
+            "vals": ["proxyType", "delay", "removed", "lastUpdateBN", "lastCrawlBN"],
+            "data": proxyAccounts,
+            "lastUpdateBN": ["proxyType", "delay", "removed", "lastUpdateBN", "lastCrawlBN"]
+        }, true);
+    }
+
+    async flushAssetHolder() {
+        // flush assetholders
+        let assetholderKeys = Object.keys(this.assetholder)
+        let assetholders = [];
+        let assetholderscrawl = [];
+        for (let i = 0; i < assetholderKeys.length; i++) {
+            let assetChainHolder = assetholderKeys[i];
+            let [blockNumber, lastState] = this.assetholder[assetChainHolder];
+            let [asset, chainID, holder] = this.parseAssetChainHolder(assetChainHolder);
+            let accKey = holder.toLowerCase();
+            if (this.validAssetState(lastState)) {
+                let free = lastState.free ? lastState.free : 0;
+                let reserved = lastState.reserved ? lastState.reserved : 0;
+                let miscFrozen = lastState.miscFrozen ? lastState.miscFrozen : 0;
+                let frozen = lastState.frozen ? lastState.frozen : 0;
+
+                let t = "(" + [`'${asset}'`, `'${this.chainID}'`, `'${accKey}'`, `'${blockNumber}'`, `'${blockNumber}'`, mysql.escape(JSON.stringify(lastState)), `'${free}'`, `'${reserved}'`, `'${miscFrozen}'`, `'${frozen}'`].join(",") + ")";
+                if (this.validAsset(asset, this.chainID, "assetholder", t)) {
+                    assetholders.push(t);
+                }
+            } else {
+                // if lastState == false that means we are (a) in a EVM chain  (b) with isTip = false  (c) with an ERC20 asset and (d) we know it should be updated, but we are not going to get the state.
+                // However, we would like to record in assetholder${chainID} that this asset-holder combination SHOULD be covered
+                let t = "(" + [`'${asset}'`, `'${this.chainID}'`, `'${accKey}'`, `'${blockNumber}'`].join(",") + ")";
+                assetholderscrawl.push(t);
+            }
+        }
+        this.assetholder = {};
+        // --- assetholder
+        await this.upsertSQL({
+            "table": `assetholder${this.chainID}`,
+            "keys": ["asset", "chainID"],
+            "vals": ["holder", "lastUpdateBN", "lastCrawlBN", "lastState", "free", "reserved", "miscFrozen", "frozen"],
+            "data": assetholders,
+            "lastUpdateBN": ["free", "reserved", "miscFrozen", "frozen", "lastUpdateBN", "lastCrawlBN", "lastState"]
+        });
+
+        // --- assetholder
+        if (assetholderscrawl.length > 0) {
+            await this.upsertSQL({
+                "table": `assetholder${this.chainID}`,
+                "keys": ["asset", "chainID"],
+                "vals": ["holder", "lastUpdateBN"],
+                "data": assetholderscrawl,
+                "lastUpdateBN": ["lastUpdateBN"]
+            });
+        }
+
+    }
+
+    async insertBTRows(tbl, rows, tableName = "") {
+        if (rows.length == 0) return (true);
+        try {
+            await tbl.insert(rows);
+            return (true);
+        } catch (err) {
+            let succ = true;
+            for (let a = 0; a < rows.length; a++) {
+                try {
+                    let r = rows[a];
+                    if (r.key !== undefined && r.key) {
+                        await tbl.insert([r]);
+                    }
+                } catch (err) {
+                    let tries = 0;
+                    while (tries < 10) {
+                        try {
+                            tries++;
+                            await tbl.insert([rows[a]]);
+                            await this.sleep(100);
+                        } catch (err) {
+                            //console.log(err);
+                        }
+                    }
+                    if (tries >= 10) {
+                        this.log_indexing_warn(err, tableName, rows[a]);
+                        succ = false;
+                    }
+                }
+            }
+            return (succ);
+        }
+    }
+
+    // write this.addressExtrinsicMap [filled in updateAddressExtrinsicStorage] to btAddressExtrinsic
+    async flush_addressExtrinsicMap() {
+        let batchSize = 8;
+        try {
+            //console.log("writing addressExtrinsicMap");
+            let rows = [];
+            for (const k of Object.keys(this.addressExtrinsicMap)) {
+                let r = this.addressExtrinsicMap[k];
+                //k = address#extrinsicHash
+                // TODO: figure out how to manage contention between 2 concurrent calls to this with locks?
+                if (r !== undefined && r.extrinsicHash !== undefined) {
+                    let extrinsicHash = r.extrinsicHash
+                    //console.log(`k=${k}`, r)
+                    // prepare cells
+
+                    let rowKey = paraTool.make_addressExtrinsic_rowKey(r.address, r.extrinsicHash, r.ts);
+                    //console.log("flush_addressExtrinsicMap", rowKey);
+                    let rec = {};
+                    for (const feedType of Object.keys(r.data)) {
+                        rec[feedType] = {}
+                        for (const eventID of Object.keys(r.data[feedType])) {
+                            let extrinsicHashEventID = `${extrinsicHash}#${eventID}`
+                            //feed:extrinsicHash#chainID-extrinsicID
+                            //feedxcm:extrinsicHash#chainID-extrinsicID-tranferIdx
+                            //feedtransfer:extrinsicHash#eventID
+                            //feedreward:extrinsicHash#eventID
+                            //feedcrowdloan:extrinsicHash#eventID
+                            //console.log(rowKey, rows.length, "feedType", feedType, "length", r.data[feedType][eventID].length);
+                            rec[feedType][extrinsicHashEventID] = {
+                                value: r.data[feedType][eventID], // already in string form
+                                timestamp: r.ts * 1000000
+                            }
+                        }
+
+                    }
+                    let row = {
+                        key: rowKey,
+                        data: rec
+                    }
+                    //console.log(`rkey=${row.key}`, row.data)
+                    rows.push(row);
+                    if (rows.length > batchSize) {
+                        await this.insertBTRows(this.btAddressExtrinsic, rows, "addressextrinsic");
+                        rows = [];
+                    }
+                }
+            }
+            if (rows.length > 0) {
+                await this.insertBTRows(this.btAddressExtrinsic, rows, "addressextrinsic");
+                rows = [];
+            }
+            //console.log("writing addressExtrinsicMap DONE");
+            this.addressExtrinsicMap = {}
+        } catch (err) {
+            this.log_indexing_error(err, "flush_addressExtrinsicMap");
+        }
+    }
+
+    // write historyMap to tblHistory
+    async flush_historyMap() {
+        let batchSize = 512;
+        try {
+            let [tblName, tblHistory] = this.get_btTableHistory()
+            let rows = [];
+            for (const historyKey of Object.keys(this.historyMap)) {
+                let r = {
+                    key: historyKey,
+                    data: {
+                        history: this.historyMap[historyKey] // already in string form
+                    }
+                }
+                rows.push(r);
+                if (rows.length > batchSize) {
+                    await this.insertBTRows(tblHistory, rows, tblName);
+                    rows = [];
+                }
+            }
+            if (rows.length > 0) {
+                await this.insertBTRows(tblHistory, rows, tblName);
+            }
+            this.historyMap = {}
+            // console.log("writing historyMap DONE");
+        } catch (err) {
+            this.log_indexing_error(err, "flush_historyMap");
+        }
+    }
+
+    clip_string(inp, maxLen = 64) {
+        if (inp == undefined) {
+            return "";
+        }
+        if (inp.length < maxLen) {
+            return (inp);
+        }
+        return (inp.substring(0, maxLen));
+    }
+
+    validAsset(assetKey, chainID, ctx, o) {
+        if (typeof assetKey == "string" && assetKey.includes("0x") && (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala)) {
+            this.log_indexing_error(err, "validAsset", {
+                "ctx": ctx,
+                "o": o
+            })
+            return (false);
+        } else {
+            return true
+        }
+    }
+
+    updateMultisigMap(m, caller = false) {
+        let multisigAddr = m.multisigAddress
+        if (multisigAddr != undefined) {
+            this.multisigMap[multisigAddr] = m
+        }
+        if (caller) {
+            console.log(`${caller} add multisig`, this.multisigMap[multisigAddr]);
+        }
+    }
+
+    updateProxyMap(p, caller = false) {
+        let pKey = `${p.chainID}_${p.address}_${p.delegate}`
+        if (p.address != undefined && p.delegate != undefined) {
+            this.proxyMap[pKey] = p
+        }
+        if (caller) {
+            console.log(`${caller} update proxyRec`, this.proxyMap[pKey]);
+        }
+    }
+
+
+    /*
+    CREATE TABLE `xcmtransfer` (
+    `extrinsicHash` varchar(67) NOT NULL,
+    `extrinsicID` varchar(32) NOT NULL,
+    `chainID` int(11) NOT NULL,
+    `chainIDDest` int(11) NOT NULL,
+    `blockNumber` varchar(67) NOT NULL,
+    `fromAddress` varchar(67),
+    `asset` varchar(80),
+    `blockNumberDest` int,
+    `sourceTS` int,
+    `destTS` int,
+    `amountSent` int(11) NOT NULL,
+    `valueSentUSD` float,
+    `amountReceived` int(11),
+    `valueReceivedUSD` float,
+    `priceUSD` float DEFAULT NULL,
+    PRIMARY KEY (`extrinsicHash`)
+    );
+    */
+    async flushXCM() {
+        // flush xcmtransfer
+        let xcmtransferKeys = Object.keys(this.xcmtransfer)
+        if (xcmtransferKeys.length > 0) {
+            let xcmtransfers = [];
+            for (let i = 0; i < xcmtransferKeys.length; i++) {
+                let r = this.xcmtransfer[xcmtransferKeys[i]];
+                let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`, `'${r.chainID}'`, `'${r.chainIDDest}'`,
+                    `'${r.blockNumber}'`, `'${r.fromAddress}'`, `'${r.asset}'`, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.rawAsset}'`
+                ].join(",") + ")";
+                if (r.asset !== undefined && this.validAsset(r.asset, r.chainID, "xcmtransfer", t)) {
+                    xcmtransfers.push(t);
+                } else {
+                    console.log(`invalid asset`, r.asset, r.chainID, "xcmtransfer")
+                }
+            }
+            this.xcmtransfer = {};
+            // alter table xcmtransfer change column txHash extrinsicHash varchar(67)
+            await this.upsertSQL({
+                "table": "xcmtransfer",
+                "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset"],
+                "data": xcmtransfers,
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset"]
+            });
+        }
+
+        let xcmtransferdestcandidateKeys = Object.keys(this.xcmtransferdestcandidate)
+        //console.log(`xcmtransferdestcandidateKeys`, xcmtransferdestcandidateKeys)
+        if (xcmtransferdestcandidateKeys.length > 0) {
+            let xcmtransferdestcandidates = [];
+            for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
+                let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
+                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.asset}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.paraIDs}'`, `'${r.rawAsset}'`].join(",") + ")";
+                if (this.validAsset(r.asset, r.chainIDDest, "xcmtransfer", t)) {
+                    xcmtransferdestcandidates.push(t);
+                } else {
+                    console.log("--INVALID", t);
+                }
+            }
+            this.xcmtransferdestcandidate = {};
+            try {
+                // these events we can't say for sure without matching to recent sends
+                if (xcmtransferdestcandidates.length > 0) {
+                    await this.upsertSQL({
+                        "table": "xcmtransferdestcandidate",
+                        "keys": ["chainIDDest", "eventID"],
+                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "paraIDs", "rawAsset"],
+                        "data": xcmtransferdestcandidates,
+                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "paraIDs", "rawAsset"]
+                    });
+                }
+            } catch (err0) {
+                console.log(err0);
+            }
+
+        }
+    }
+
+    //the new one for now..
+    updateXCMMsg(xcmMsg) {
+        let direction = (xcmMsg.isIncoming) ? 'i' : 'o'
+        let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${direction}`
+        if (this.xcmTrailingKeyMap[xcmKey] == undefined) {
+            this.xcmTrailingKeyMap[xcmKey] = xcmMsg.blockNumber
+            this.xcmmsgMap[xcmKey] = xcmMsg
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
+        } else {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
+        }
+    }
+
+    updateXCMChannelMsg(xcmChannelMsg, blockNumber, blockTS) {
+        let xcmID = xcmChannelMsg.msgIndex
+        if (this.xcmeventsMap[xcmID] == undefined) {
+            xcmChannelMsg.blockNumber = blockNumber
+            xcmChannelMsg.blockTS = blockTS
+            this.xcmeventsMap[xcmID] = xcmChannelMsg
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMChannelMsg add ${xcmID}`, xcmChannelMsg)
+        } else {
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMChannelMsg skip ${xcmID}`, xcmChannelMsg)
+        }
+    }
+
+    updateXCMTransferStorage(xcmtransfer) {
+        this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
+    }
+
+    // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
+    updateXCMTransferDestCandidate(candidate, caller = false) {
+        let eventID = candidate.eventID
+        if (eventID != undefined) {
+            this.xcmtransferdestcandidate[eventID] = candidate
+        }
+        if (caller) {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} candidate`, this.xcmtransferdestcandidate[eventID]);
+        }
+    }
+
+    /*
+        updateXCMTransferDestCandidate(bn, blockTS, extrinsicID, eventIndex, pallet, method, fromAddress, asset, amountReceived, paraIDs, caller = false) {
+            let eventID = `${this.chainID}-${extrinsicID}-${eventIndex}`;
+            this.xcmtransferdestcandidate[eventID] = {
+                chainIDDest: this.chainID,
+                eventID,
+                pallet,
+                method,
+                fromAddress,
+                blockNumberDest: bn,
+                asset,
+                destTS: blockTS,
+                amountReceived,
+                paraIDs: JSON.stringify(Object.keys(paraIDs))
+            }
+            if (caller) {
+                console.log(`${caller} candidate`, this.xcmtransferdestcandidate[eventID]);
+            }
+        }
+    */
+
+    /*
+    xcmMatch matches cross transfers between SENDING events held in "xcmtransfer"
+        mysql> desc xcmtransfer;
+        +-----------------+---------------------------------------------------------------------------------+------+-----+----------------------+-------+
+        | Field           | Type                                                                            | Null | Key | Default              | Extra |
+        +-----------------+---------------------------------------------------------------------------------+------+-----+----------------------+-------+
+        | extrinsicHash   | varchar(67)                                                                     | NO   | PRI | NULL                 |       |
+        | extrinsicID     | varchar(32)                                                                     | NO   |     | NULL                 |       |
+        | chainID         | int(11)                                                                         | NO   |     | NULL                 |       |
+        | chainIDDest     | int(11)                                                                         | NO   |     | NULL                 |       |
+        | blockNumber     | varchar(67)                                                                     | NO   |     | NULL                 |       |
+        | fromAddress     | varchar(67)                                                                     | YES  |     | NULL                 |       |
+        | asset           | varchar(80)                                                                     | YES  |     | NULL                 |       |
+        | blockNumberDest | int(11)                                                                         | YES  |     | NULL                 |       |
+        | sourceTS        | int(11)                                                                         | YES  |     | NULL                 |       |
+        | destTS          | int(11)                                                                         | YES  |     | NULL                 |       |
+        | amountSent      | decimal(36,18)                                                                  | YES  |     | NULL                 |       |
+        | amountReceived  | decimal(36,18)                                                                  | YES  |     | 0.000000000000000000 |       |
+        | status          | enum('NonFinalizedSource','FinalizedSource','NonFinalizedDest','FinalizedDest') | YES  |     | NonFinalizedSource   |       |
+        +-----------------+---------------------------------------------------------------------------------+------+-----+----------------------+-------+
+        13 rows in set (0.00 sec)
+
+    and CANDIDATE destination events (from various xcm received messages on a destination chain) that are stored here:
+
+        mysql> desc xcmtransferdestcandidate;
+        +-----------------+----------------+------+-----+---------+-------+
+        | Field           | Type           | Null | Key | Default | Extra |
+        +-----------------+----------------+------+-----+---------+-------+
+        | eventID         | varchar(67)    | NO   | PRI | NULL    |       |
+        | chainIDDest     | int(11)        | NO   |     | NULL    |       |
+        | fromAddress     | varchar(67)    | YES  |     | NULL    |       |
+        | blockNumberDest | int(11)        | YES  |     | NULL    |       |
+        | asset           | varchar(80)    | YES  |     | NULL    |       |
+        | destTS          | int(11)        | YES  |     | NULL    |       |
+        | amountReceived  | decimal(36,18) | YES  |     | NULL    |       |
+        | paraIDs         | blob           | YES  |     | NULL    |       |
+        +-----------------+----------------+------+-----+---------+-------+
+    */
+
+    async xcmAUSDUpdate() {
+        let kUSDTransferSql = `update xcmtransfer set nativeAssetChain = '{"Token":"KUSD"}~22000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and relaychain = 'kusama' and nativeAssetChain is null;`
+        let kUSDCandidateSql = `update xcmtransferdestcandidate set nativeAssetChain = '{"Token":"KUSD"}~22000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and (chainIDDest = 2 or chainIDDest > 20000) and nativeAssetChain is null;`
+        let aUSDTransferSql = `update xcmtransfer set nativeAssetChain = '{"Token":"AUSD"}~2000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and relaychain = 'polkadot' and nativeAssetChain is null;`
+        let aUSDCandidateSql = `update xcmtransferdestcandidate set nativeAssetChain = '{"Token":"AUSD"}~2000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and (chainIDDest !=2 and chainIDDest < 10000) and nativeAssetChain is null;`
+        this.batchedSQL.push(kUSDTransferSql);
+        this.batchedSQL.push(kUSDCandidateSql);
+        this.batchedSQL.push(aUSDTransferSql);
+        this.batchedSQL.push(aUSDCandidateSql);
+        await this.update_batchedSQL();
+    }
+
+    async xcmMatch(startTS = 1626145851, endTS = false, ratMin = .99) {
+        if (!endTS) endTS = this.currentTS();
+        for (let ts = startTS; ts < endTS; ts += 86400) {
+            await this.write_feedxcmdest(ts, ts + 86400, ratMin)
+        }
+    }
+
+    // This is the key workhorse that matches events on the destination chain (stored in xcmtransferdestcandidate) in some time interval
+    async write_feedxcmdest(startTS, endTS, ratMin = .99, lookbackSeconds = 7200) {
+        // match xcmtransferdestcandidate of the last 2 hours
+        //   (a) > 95% amountReceived / amountSent
+        //   (b) asset match
+        //   (c) time difference matching has to be less than 7200 (and greater than 0)
+        //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
+        // In case of ties, the FIRST one ( "order by diffTS" ) covers this
+        let sql = `select
+          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, xcmtransfer.asset, d.paraIDs,
+          (d.destts - xcmtransfer.sourceTS) as diffTS,
+          xcmtransfer.extrinsicID,
+          xcmtransfer.amountSent,
+          xcmtransfer.transferIndex,
+          xcmtransfer.sourceTS,
+          xcmtransfer.destAddress,
+          d.eventID,
+          d.extrinsicID as destExtrinsicID,
+          d.blockNumberDest,
+          d.amountReceived,
+          d.destTS,
+          d.amountReceived / xcmtransfer.amountSent as rat
+        from xcmtransfer, xcmtransferdestcandidate as d
+ where  d.fromAddress = xcmtransfer.destAddress and
+        d.chainIDDest = xcmtransfer.chainIDDest and
+        ((d.asset = xcmtransfer.asset) or (d.nativeAssetChain = xcmtransfer.nativeAssetChain and d.nativeAssetChain is not null)) and
+        xcmtransfer.sourceTS >= ${startTS} and
+        xcmtransfer.sourceTS < ${endTS} and
+        d.destTS >= ${startTS} and
+        d.destTS < ${endTS+lookbackSeconds} and
+        xcmtransfer.matched = 0 and
+        d.matched = 0 and
+        xcmtransfer.incomplete = 0 and
+        d.destTS - xcmtransfer.sourceTS >= 0 and
+        d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
+        length(xcmtransfer.extrinsicID) > 0 and
+        xcmtransfer.amountSent >= d.amountReceived
+having ( ( rat > ${ratMin} and rat <= 1.0 ) or
+(asset = '{"Token":"DOT"}' and amountSent - amountReceived < 500000000) or
+(asset = '{"Token":"KSM"}' and amountSent - amountReceived < 1000000000) or
+(asset = '{"Token":"KAR"}' and amountSent - amountReceived < 10000000000 ) )
+order by chainID, extrinsicHash, diffTS`
+        //console.log("match_xcm", sql)
+        try {
+            let xcmmatches = await this.poolREADONLY.query(sql);
+            let addressextrinsic = []
+            let hashes = []
+            let matched = {}
+            let matches = 0;
+            if (xcmmatches.length > 0) {
+                console.log("[Found] match_xcm", sql)
+            } else {
+                //enable this for debugging
+                //console.log("[Empty] match_xcm", sql)
+            }
+            for (let i = 0; i < xcmmatches.length; i++) {
+                let d = xcmmatches[i];
+                if (matched[d.extrinsicHash] == undefined && matched[d.eventID] == undefined) {
+                    let priceUSD = 0;
+                    let amountSentUSD = 0;
+                    let amountReceivedUSD = 0;
+                    let decimals = this.getAssetDecimal(d.asset, d.chainID)
+                    if (!decimals) {
+                        decimals = this.getAssetDecimal(d.asset, d.chainIDDest)
+                    }
+                    if (decimals) {
+                        let [_, __, priceUSDsourceTS] = await this.computeUSD(1.0, d.asset, d.chainID, d.sourceTS);
+                        if (priceUSDsourceTS > 0) {
+                            priceUSD = priceUSDsourceTS;
+                            let amountSent = parseFloat(d.amountSent) / 10 ** decimals;
+                            let amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
+                            amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
+                            amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                        }
+                    }
+                    let sql = `update xcmtransfer
+            set blockNumberDest = ${d.blockNumberDest},
+                destTS = ${d.destTS},
+                amountSentUSD = '${amountSentUSD}',
+                amountReceived = '${d.amountReceived}',
+                amountReceivedUSD = '${amountReceivedUSD}',
+                priceUSD = '${priceUSD}',
+                matched = 1,
+                matchedExtrinsicID = '${d.destExtrinsicID}',
+                matchedEventID = '${d.eventID}'
+            where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
+                    this.batchedSQL.push(sql);
+                    matches++;
+                    // (a) with extrinsicID, we get both the fee (rat << 1) ANDthe transferred item for when one is isFeeItem=0 and another is isFeeItem=1; ... otherwise we get (b) with just the eventID
+                    let w = d.destExtrinsicID && (d.destExtrinsicID.length > 0) ? `extrinsicID = '${d.destExtrinsicID}'` : `eventID = '${d.eventID}'`;
+                    let sql2 = `update xcmtransferdestcandidate set matched = 1, matchedExtrinsicHash = '${d.extrinsicHash}' where ${w}`
+                    console.log(sql2);
+                    this.batchedSQL.push(sql2);
+                    // never match more than once, by marking both the sending record and the receiving record
+                    matched[d.extrinsicHash] = true;
+                    matched[d.eventID] = true;
+
+                    // problem: this does not store the "dust" fee (which has rat << 1) in bigtable
+                    let match = {
+                        chainID: d.chainID,
+                        chainIDDest: d.chainIDDest,
+                        blockNumberDest: d.blockNumberDest,
+                        asset: d.asset,
+                        amountSent: d.amountSent,
+                        amountReceived: d.amountReceived,
+                        fromAddress: d.fromAddress,
+                        extrinsicHash: d.extrinsicHash,
+                        extrinsicID: d.extrinsicID,
+                        destExtrinsicID: d.destExtrinsicID,
+                        eventID: d.eventID,
+                        sourceTS: d.sourceTS,
+                        destTS: d.destTS
+                    }
+
+                    // 1. write "addressExtrinsic" feedxcmdest with row key address-extrinsicHash and column extrinsicHash#chainID-extrinsicID-transferIndex
+                    //    * we use the SENDING chainID + the sender extrinsicID as the column for the "feedxcmdest" column family
+                    let rowKey = `${d.fromAddress.toLowerCase()}#${d.extrinsicHash}` // NOTE: this matches "feed"
+                    let cres = {
+                        key: rowKey,
+                        data: {
+                            feedxcmdest: {},
+                        }
+                    };
+                    let extrinsicHashEventID = `${d.extrinsicHash}#${d.chainID}-${d.extrinsicID}-${d.transferIndex}`
+                    cres['data']['feedxcmdest'][extrinsicHashEventID] = {
+                        value: JSON.stringify(match),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    addressextrinsic.push(cres);
+
+                    // 2. write "hashes" feedxcmdest with row key extrinsicHash and column extrinsicHash#chainID-extrinsicID (same as 1)
+                    let hres = {
+                        key: d.extrinsicHash,
+                        data: {
+                            feedxcmdest: {}
+                        }
+                    }
+                    hres['data']['feedxcmdest'][extrinsicHashEventID] = {
+                        value: JSON.stringify(match),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
+                    hashes.push(hres)
+                } else {
+                    //console.log("SKIP", matched[d.extrinsicHash], matched[d.eventID]);
+                }
+            }
+            if (addressextrinsic.length > 0) {
+                await this.insertBTRows(this.btAddressExtrinsic, addressextrinsic, "addressextrinsic")
+            }
+            if (hashes.length > 0) {
+                await this.insertBTRows(this.btHashes, hashes, "addressextrinsic")
+            }
+            if (addressextrinsic.length > 0 || hashes.length > 0) {
+                await this.update_batchedSQL();
+            }
+        } catch (err) {
+            console.log("WRITE_FEEDXCMDEST", err)
+        }
+        let logDT = new Date(startTS * 1000)
+        console.log(`match_xcm ${startTS} covered ${logDT}`)
+    }
+
+    knownParaID(paraID) {
+        return this.paraIDs.includes(paraID);
+    }
+    /*
+    CREATE TABLE `crowdloan` (
+    `extrinsicHash` varchar(67) NOT NULL,
+    `extrinsicID` varchar(32) NOT NULL,
+    `chainID` int(11) NOT NULL,
+    `blockNumber` varchar(67) NOT NULL,
+    `ts` int,
+    `action` varchar(80),
+    `fromAddress` varchar(67),
+    `amount` float,
+    `memo` varchar(4096),
+    `remark` varchar(4096),
+    PRIMARY KEY (`extrinsicHash`)
+    );
+    */
+    async flushCrowdloans() {
+        // flush this.crowdloan into "crowdloan"
+        let crowdloanKeys = Object.keys(this.crowdloan)
+        if (crowdloanKeys.length == 0) return;
+        let crowdloans = [];
+
+        for (let i = 0; i < crowdloanKeys.length; i++) {
+            let r = this.crowdloan[crowdloanKeys[i]];
+            let fromAddress = paraTool.getPubKey(r.account);
+            let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.chainID}'`,
+                `'${r.blockNumber}'`, `'${r.ts}'`, `'${r.action}'`, `'${fromAddress}'`, `'${r.paraID}'`, `'${r.amount}'`, `${mysql.escape(r.memo)}`, `${mysql.escape(r.remark)}`
+            ].join(",") + ")";
+            if (!this.knownParaID(r.paraID)) {
+                this.readyToCrawlParachains = true;
+                console.log("UNKNOWN paraID", r.paraID, "this.paraIDs", this.paraIDs);
+                this.logger.warn({
+                    "op": "flushCrowdloans-unknown",
+                    "newParaID": r.paraID,
+                    "chainID": this.chainID
+                })
+            }
+            crowdloans.push(t);
+        }
+        this.crowdloan = {};
+        // --- crowdloan
+        await this.upsertSQL({
+            "table": "crowdloan",
+            "keys": ["extrinsicHash"],
+            "vals": ["extrinsicID", "chainID", "blockNumber", "ts", "action", "fromAddress", "paraID", "amount", "memo", "remark"],
+            "data": crowdloans,
+            "replace": ["extrinsicID", "chainID", "blockNumber", "ts", "action", "fromAddress", "paraID", "amount", "memo", "remark"]
+        });
+    }
+
+    updateCrowdloanStorage(crowdloan) {
+        this.crowdloan[crowdloan.extrinsicHash] = crowdloan;
+    }
+
+
+
+    async processAssetTypeERC20LiquidityPair(web3Api, chainID, assetChain, ts = false, blockNumber = false, isFullPeriod = false) {
+        let [asset, _] = paraTool.parseAssetChain(assetChain);
+        let assetInfo = this.tallyAsset[assetChain];
+        if (isFullPeriod) {
+            let r = {
+                low: 0,
+                high: 0,
+                open: 0,
+                close: 0,
+                lp0: 0,
+                lp1: 0,
+                token0In: 0,
+                token1In: 0,
+                token0Out: 0,
+                token1Out: 0,
+                token0Volume: 0,
+                token1Volume: 0,
+                token0Fee: 0,
+                token1Fee: 0,
+                issuance: 0
+            };
+            let upd = false;
+            let isIncomplete = false;
+            if (assetInfo.lpAddress) {
+                r.lpAddress = assetInfo.lpAddress // shouldn't be missing here
+            }
+            let lpAddress = r.lpAddress
+
+            if (assetInfo.issuance !== undefined) {
+                r.issuance = assetInfo.issuance;
+            }
+            if (assetInfo.rat && assetInfo.rat.length > 0) {
+                let low = Math.min(...assetInfo.rat);
+                let high = Math.max(...assetInfo.rat);
+                let open = assetInfo.rat[0];
+                let close = assetInfo.rat[assetInfo.rat.length - 1];
+                if (!isNaN(low) && !isNaN(high) && !isNaN(open) && !isNaN(close)) {
+                    r.low = low
+                    r.high = high
+                    r.open = open
+                    r.close = close
+                } else {
+                    isIncomplete = true
+                    console.log(`${lpAddress} low/high/open/close NOT OK`)
+                }
+                upd = true;
+            }
+            if (assetInfo.lp0 && assetInfo.lp0.length > 0) {
+                let lp0 = assetInfo.lp0[assetInfo.lp0.length - 1];
+                let lp1 = assetInfo.lp1[assetInfo.lp1.length - 1];
+                if (!isNaN(lp0) && !isNaN(lp1)) {
+                    r.lp0 = lp0
+                    r.lp1 = lp1
+                } else {
+                    isIncomplete = true
+                    console.log(`${lpAddress} LP0/LP1 NOT OK`)
+                }
+                upd = true;
+            }
+            if (assetInfo.token0In > 0 || assetInfo.token1In > 0) {
+                r.token0In = assetInfo.token0In
+                r.token1In = assetInfo.token1In
+                r.token0Out = assetInfo.token0Out
+                r.token1Out = assetInfo.token1Out
+                r.token0Volume = assetInfo.token0In
+                r.token1Volume = assetInfo.token1In
+                r.token0Fee = assetInfo.token0In - assetInfo.token0Out
+                r.token1Fee = assetInfo.token1In - assetInfo.token1Out
+                upd = true;
+            }
+            //do a lookup here to fetch total supply of lp issuance
+            if (upd && !isIncomplete) {
+                let queryBN = (blockNumber) ? blockNumber : 'latest'
+                // ethTool rpccall (3)
+                var [tokenTotalSupply, lastUpdateBN] = await ethTool.getTokenTotalSupply(web3Api, r.lpAddress, queryBN)
+                if (tokenTotalSupply) {
+                    r.issuance = tokenTotalSupply
+                    r.lastUpdateBN = lastUpdateBN
+                }
+                this.tallyAsset[assetChain].lp0 = [];
+                this.tallyAsset[assetChain].lp1 = [];
+                this.tallyAsset[assetChain].rat = [];
+
+                // clear volume tally
+                this.tallyAsset[assetChain].token0In = 0;
+                this.tallyAsset[assetChain].token1In = 0;
+                this.tallyAsset[assetChain].token0Out = 0;
+                this.tallyAsset[assetChain].token1Out = 0;
+                let state = JSON.stringify(r)
+                //(asset, chainID, indexTS, source, open, close, low, high, lp0, lp1, issuance, token0Volume, token1Volume, state )
+                let s = `('${r.lpAddress.toLowerCase()}', '${this.chainID}', '${ts}', '${paraTool.assetSourceOnChain}', '${r.open}', '${r.close}', '${r.low}', '${r.high}', '${r.lp0}', '${r.lp1}', '${r.issuance}', '${r.token0Volume}', '${r.token1Volume}', ` + mysql.escape(state) + `)`
+                if (this.validAsset(r.lpAddress.toLowerCase(), this.chainID, assetInfo.assetType, s)) {
+                    //assetlogLiquidityPairs.push(s)
+                    return s
+                }
+            }
+        }
+        return false
+    }
+
+    async fetchAssetHolderBalances(web3Api, chainID, tokenAddress, tokenDecimal, blockNumber, ts = false) {
+        //tokenAddress is checkSumAddr
+        let assetChain = this.getErcTokenAssetChain(tokenAddress, chainID)
+        let assetholderKeys = Object.keys(this.assetholder)
+        let holders = []
+        for (let i = 0; i < assetholderKeys.length; i++) {
+            let assetChainHolder = assetholderKeys[i];
+            let [asset, chainID, holder] = this.parseAssetChainHolder(assetChainHolder);
+            if (tokenAddress.toLowerCase() == asset.toLowerCase()) {
+                holders.push(holder)
+            }
+        }
+        if (holders.length == 0) return;
+        console.log(`fetchAssetHolderBalances [${tokenAddress}] [${blockNumber}] holders=${JSON.stringify(holders)}`)
+        let i = 0;
+        let n = 0
+        let batchSize = 50; // safety check
+        while (i < holders.length) {
+            let currBatchHolders = holders.slice(i, i + batchSize);
+            //console.log(`currBatchHolders#${n}`, currBatchHolders)
+            if (currBatchHolders.length > 0) {
+                let holderBalances = await ethTool.getTokenHoldersRawBalances(web3Api, tokenAddress, currBatchHolders, tokenDecimal, blockNumber)
+                //console.log(`fetchAssetHolderBalances [${tokenAddress}] [${blockNumber}] holderBalances`, holderBalances)
+                if (holderBalances && holderBalances.holders) {
+                    for (const h of holderBalances.holders) {
+                        let newState = {
+                            free: h.balance
+                        }
+                        this.updateAddressStorage(h.holderAddress, assetChain, "fetchAssetHolderBalances", newState, ts, blockNumber)
+                    }
+                }
+                i += batchSize;
+                n++
+            }
+        }
+    }
+
+    async processAssetTypeERC20(web3Api, chainID, assetChain, ts = false, blockNumber = false, isFullPeriod = false, isTip = false) {
+        //console.log(`processAssetTypeERC20 called [${blockNumber}], assetChain=${assetChain}, isFullPeriod=${isFullPeriod}, isTip=${isTip}`)
+        //let web3Api = this.web3Api
+        //let chainID = this.chainID;
+
+        // we will update total supply once per index_period
+        if (!isTip) {
+            return false; // hourly update by other process
+        }
+        console.log(`processAssetTypeERC20 tip update [${blockNumber}], assetChain=${assetChain}`);
+        let [asset, _] = paraTool.parseAssetChain(assetChain);
+        let assetInfo = this.tallyAsset[assetChain];
+        var totalSupplyUpdated = false
+        if (blockNumber && assetInfo.blockNumber !== undefined && (assetInfo.blockNumber != blockNumber)) {
+            // fetch tokensupply update
+            // ethTool rpccall (1)
+            let [currentTokenSupply, currBN] = await ethTool.getTokenTotalSupply(web3Api, assetInfo.tokenAddress, blockNumber)
+            if (currentTokenSupply && blockNumber == currBN) {
+                totalSupplyUpdated = true
+                assetInfo.totalSupply = currentTokenSupply
+                assetInfo.blockNumber = currBN
+            }
+        }
+
+        let assetKey = assetInfo.tokenAddress.toLowerCase();
+        let tokenAddress = assetInfo.tokenAddress
+        await this.fetchAssetHolderBalances(web3Api, chainID, tokenAddress, assetInfo.decimal, blockNumber, ts)
+
+
+        let totalSupply = ethTool.validate_bigint(assetInfo.totalSupply);
+        let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
+        let createdAtTx = assetInfo.createdAtTx ? assetInfo.createdAtTx : "";
+        let lastState = JSON.stringify(assetInfo)
+        let isLPToken = (assetInfo.lpInfo != undefined && assetInfo.lpInfo.tokenType == paraTool.assetTypeERC20LiquidityPair) ? true : false
+
+        if (isLPToken) {
+            // erc20lp token
+            // we update total supply once per index_period
+            let lp20TokenInfo = assetInfo.lpInfo
+            if (totalSupplyUpdated) {
+                let token0Decimals = lp20TokenInfo.token0Decimals
+                let token1Decimals = lp20TokenInfo.token1Decimals
+                // ethTool rpccall (2)
+                var [reserve0, reserve1, blockTimestampLast] = await ethTool.getERC20LiquidityPairRawReserve(web3Api, assetInfo.tokenAddress, blockNumber)
+                //update lp0, lp1 issuance once every block
+                if (reserve0 && reserve1) {
+                    lp20TokenInfo.token0Supply = reserve0 / 10 ** token0Decimals
+                    lp20TokenInfo.token1Supply = reserve1 / 10 ** token1Decimals
+                    lp20TokenInfo.blockNumber = blockNumber
+                    assetInfo.lpInfo = lp20TokenInfo
+                    lastState = JSON.stringify(assetInfo)
+                }
+            }
+            let token0 = lp20TokenInfo.token0.toLowerCase();
+            let token1 = lp20TokenInfo.token1.toLowerCase();
+            var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20LiquidityPair}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}', '${token0}', '${token1}', ${lp20TokenInfo.token0Decimals}, ${lp20TokenInfo.token1Decimals}, ${lp20TokenInfo.token0Supply}, ${lp20TokenInfo.token1Supply}, '${lp20TokenInfo.token0Symbol}', '${lp20TokenInfo.token1Symbol}')`;
+            if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
+                console.log(`erc20 LP`, o)
+                return o
+                //erc20s.push(o);
+            }
+        } else {
+            // normal erc20 (non-lp token)
+            // we will update total supply once per index_period
+            //(asset, chainID, assetType, assetName, symbol, lastState, decimals, totalSupply, lastUpdateDT, lastUpdateBN, createDT, creator, createdAtTx, token0, token1, token0Decimals, token1Decimals, token0Supply, token1Supply, token0Symbol, token1Symbol) [token0, token1, token0Decimals, token1Decimals, token0Supply, token1Supply, token0Symbol, token1Symbol] all NULL
+            var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}', Null, Null, Null, Null, Null, Null, Null, Null)`;
+            console.log(`erc20 nonLP`, o)
+            if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
+                return o
+            }
+        }
+        return false
+    }
+
+    resetTipAssetTally() {
+        let newTallyAsset = {}
+        for (const assetChain of Object.keys(this.tallyAsset)) {
+            let assetInfoType = this.tallyAsset[assetChain].assetType;
+            if (assetInfoType != 'ERC20') {
+                newTallyAsset[assetChain] = this.tallyAsset[assetChain]
+            }
+        }
+        this.tallyAsset = newTallyAsset
+    }
+
+    async flush_assets(ts = false, blockNumber = false, isFullPeriod = false, isTip = false) {
+        if (!ts) ts = Math.floor(Date.now() / 1000)
+        let ats = ts * 1000000;
+
+        // for all this.assetList, write to asset; mysql address table
+        if (isTip) {
+            console.log(`flush_assets [${blockNumber}], ts=${ts}, isFullPeriod=${isFullPeriod}, isTip=${isTip}`)
+        }
+        let chainID = this.chainID;
+        let web3Api = this.web3Api;
+
+        var erc20s = [];
+        var tokens = [];
+
+        var erc721classes = [];
+        var erc721tokens = [];
+        var erc1155classes = [];
+        var erc1155tokens = [];
+        var contracts = [];
+        let assetlogLiquidityPairs = [];
+        let assetlogTokensIssuance = [];
+        let assetlogTokensPrice = [];
+        let assetlogLoans = [];
+        let assetlogCDPs = [];
+
+        for (const assetChain of Object.keys(this.tallyAsset)) {
+            let assetInfoType = this.tallyAsset[assetChain].assetType;
+            let lastTouchedBn = this.tallyAsset[assetChain].blockNumber
+            if (this.assetChainMap[assetInfoType] == undefined) {
+                this.assetChainMap[assetInfoType] = []
+                this.assetStat[assetInfoType] = 0
+            }
+            this.assetChainMap[assetInfoType].push(assetChain)
+            this.assetStat[assetInfoType]++
+        }
+
+        // console.log(`assetStat`, this.assetStat, `assetChainMap`, this.assetChainMap)
+
+        let erc20LPPromise = false,
+            erc20Promise = false
+
+        for (const assetType of Object.keys(this.assetChainMap)) {
+            //potential batch all erc call parallel
+            let assetChains = this.assetChainMap[assetType]
+            //console.log(`${assetType} len=${assetChains.length}`, assetChains)
+            //console.log(`${assetChains}`)
+            switch (assetType) {
+                case paraTool.assetTypeERC20:
+                    if (isTip) {
+                        console.log(`${assetType} len=${assetChains.length}`, assetChains)
+                    }
+                    erc20Promise = await assetChains.map(async (assetChain) => {
+                        try {
+                            return this.processAssetTypeERC20(web3Api, chainID, assetChain, ts, blockNumber, isFullPeriod, isTip)
+                        } catch (err) {
+                            console.log(`processAssetTypeERC20 ${assetChain}`, err)
+                            return false
+                        }
+                    });
+                    break;
+                case paraTool.assetTypeToken:
+                    break;
+                case paraTool.assetTypeLoan:
+                    break;
+                case paraTool.assetTypeLiquidityPair:
+                    break;
+                case paraTool.assetTypeERC20LiquidityPair:
+                    erc20LPPromise = await assetChains.map(async (assetChain) => {
+                        try {
+                            return this.processAssetTypeERC20LiquidityPair(web3Api, chainID, assetChain, ts, blockNumber, isFullPeriod)
+                        } catch (err) {
+                            console.log(`processAssetTypeERC20LiquidityPair ${assetChain}`, err)
+                            return false
+                        }
+                    });
+                    break;
+                case paraTool.assetTypeNFTToken:
+                    break;
+                case paraTool.assetTypeNFT:
+                    break;
+                case paraTool.assetTypeERC721:
+                    break;
+                case paraTool.assetTypeERC721Token:
+                    break;
+                case paraTool.assetTypeERC1155:
+                    break;
+                case paraTool.assetTypeERC1155Token:
+                    break;
+                case paraTool.assetTypeContract:
+                    break;
+                default:
+                    console.log("TODO: flush - unknown assetType", assetType);
+                    break;
+            }
+        }
+
+        if (erc20LPPromise) {
+            let erc20LPPromiseStartTS = new Date().getTime();
+            var erc20LPList = await Promise.allSettled(erc20LPPromise)
+            let erc20LPPromisTS = (new Date().getTime() - erc20LPPromiseStartTS) / 1000
+            if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(b) - erc20LP", erc20LPPromisTS);
+            this.timeStat.processERC20LPTS += erc20LPPromisTS
+            for (const erc20LPRes of erc20LPList) {
+                if (erc20LPRes['status'] == 'fulfilled') {
+                    if (erc20LPRes['value']) {
+                        assetlogLiquidityPairs.push(erc20LPRes['value'])
+                    }
+                } else {
+                    console.log(`error`, erc20LPRes)
+                }
+            }
+        }
+
+        if (erc20Promise) {
+            let erc20PromiseStartTS = new Date().getTime();
+            var erc20List = await Promise.allSettled(erc20Promise)
+            let erc20PromisTS = (new Date().getTime() - erc20PromiseStartTS) / 1000
+            if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(b) - erc20", erc20PromisTS);
+            this.timeStat.processERC20TS += erc20PromisTS
+
+            for (const erc20Res of erc20List) {
+                if (erc20Res['status'] == 'fulfilled') {
+                    if (erc20Res['value']) {
+                        erc20s.push(erc20Res['value'])
+                    }
+                } else {
+                    console.log(`error`, erc20Res)
+                }
+            }
+
+            if (isTip) {
+                // reset tip here so we don't wastefully calling the total supply in next block
+                this.resetTipAssetTally()
+            }
+        }
+
+        for (const assetChain of Object.keys(this.tallyAsset)) {
+            //need to generate revered pairKey in order to final volume
+            let [asset, _] = paraTool.parseAssetChain(assetChain);
+            let assetInfo = this.tallyAsset[assetChain];
+
+            switch (assetInfo.assetType) {
+                // process both normal erc20 (non-lp token) and erc20LP token info
+                case paraTool.assetTypeERC20:
+                    break;
+
+                case paraTool.assetTypeToken: {
+                    let issuance = assetInfo.issuance;
+                    tokens.push(`('${asset}', '${chainID}', '${assetInfo.assetType}', '${issuance}', FROM_UNIXTIME('${ts}'), '${blockNumber}' )`); // TODO: add currencyID
+                    if (isFullPeriod) {
+                        let updIssuance = false
+                        let updPrice = false
+                        let r = {
+                            issuance: 0,
+                            price: 0,
+                            source: null,
+                        };
+                        if (assetInfo.issuance) {
+                            r.issuance = assetInfo.issuance;
+                            assetInfo.issuance = 0;
+                            updIssuance = true;
+                        }
+                        if (assetInfo.price) {
+                            r.price = assetInfo.price;
+                            updPrice = true;
+                        }
+                        if (updIssuance) {
+                            let o1 = `('${asset}', '${this.chainID}', '${ts}', '${paraTool.assetSourceOnChain}','${r.issuance}')`
+                            if (this.debugLevel >= paraTool.debugInfo) console.log(`paraTool.assetTypeToken[${paraTool.assetSourceOnChain}] ${assetChain}`, o1)
+                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o1)) {
+                                assetlogTokensIssuance.push(o1)
+                            }
+                        }
+                        if (updPrice) {
+                            let o2 = `('${asset}', '${this.chainID}', '${ts}', '${paraTool.assetSourceOracle}','${r.price}')`
+                            if (this.debugLevel >= paraTool.debugInfo) console.log(`paraTool.assetTypeToken[${paraTool.assetSourceOracle}] ${assetChain}`, o2)
+                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o2)) {
+                                assetlogTokensPrice.push(o2)
+                            }
+                        }
+                    }
+                }
+                break;
+
+                case paraTool.assetTypeLoan:
+                    if (isFullPeriod) {
+                        let r = {
+                            issuance: 0,
+                            debitExchangeRate: 0,
+                            source: assetInfo.assetSource,
+                        };
+                        let upd = false;
+                        if (assetInfo.issuance) {
+                            r.issuance = assetInfo.issuance;
+                            assetInfo.issuance = 0;
+                            upd = true;
+                        }
+                        if (assetInfo.debitExchangeRate) {
+                            r.debitExchangeRate = assetInfo.debitExchangeRate;
+                            assetInfo.debitExchangeRate = 0;
+                            upd = true;
+                        }
+                        if (upd) {
+                            let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.issuance}', '${r.debitExchangeRate}')`
+                            if (this.debugLevel >= paraTool.debugInfo) console.log(`Loan`, o)
+                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o)) {
+                                assetlogLoans.push(o);
+                            }
+                        }
+                    }
+                    break;
+                case paraTool.assetTypeCDP:
+                    if (isFullPeriod) {
+                        let r = {
+                            //issuance: 0,
+                            supplyExchangeRate: 0,
+                            borrowExchangeRate: 0,
+                            source: assetInfo.assetSource,
+                        };
+                        let upd = false;
+                        /*
+                        if (assetInfo.issuance) {
+                            r.issuance = assetInfo.issuance;
+                            upd = true;
+                        }
+                        */
+                        if (assetInfo.supplyExchangeRate && assetInfo.borrowExchangeRate) {
+                            r.supplyExchangeRate = assetInfo.supplyExchangeRate;
+                            r.borrowExchangeRate = assetInfo.borrowExchangeRate;
+                            assetInfo.supplyExchangeRate = 0;
+                            assetInfo.borrowExchangeRate = 0;
+                            upd = true;
+                        }
+                        if (upd) {
+                            let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.supplyExchangeRate}', '${r.borrowExchangeRate}')`
+                            console.log(`CDP`, o)
+                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o)) {
+                                assetlogCDPs.push(o);
+                            }
+                        }
+                    }
+                    break;
+                case paraTool.assetTypeLiquidityPair:
+                    if (isFullPeriod) {
+                        let r = {
+                            low: 0,
+                            high: 0,
+                            open: 0,
+                            close: 0,
+                            lp0: 0,
+                            lp1: 0,
+                            token0In: 0,
+                            token1In: 0,
+                            token0Out: 0,
+                            token1Out: 0,
+                            token0Volume: 0,
+                            token1Volume: 0,
+                            token0Fee: 0,
+                            token1Fee: 0,
+                            issuance: 0,
+                            source: assetInfo.assetSource,
+                        };
+                        let upd = false;
+
+                        if (assetInfo.rat !== undefined && assetInfo.rat.length > 0) {
+                            r.low = Math.min(...assetInfo.rat);
+                            r.high = Math.max(...assetInfo.rat);
+                            r.open = assetInfo.rat[0];
+                            r.close = assetInfo.rat[assetInfo.rat.length - 1];
+                            upd = true;
+                        }
+                        if (assetInfo.lp0 !== undefined && assetInfo.lp1 !== undefined && assetInfo.lp0.length > 0 && assetInfo.lp1.length > 0) {
+                            r.lp0 = assetInfo.lp0[assetInfo.lp0.length - 1];
+                            r.lp1 = assetInfo.lp1[assetInfo.lp1.length - 1];
+                            upd = true;
+                        }
+                        if (assetInfo.issuance !== undefined) {
+                            r.issuance = assetInfo.issuance;
+                            assetInfo.issuance = 0;
+                        }
+                        if (assetInfo.token0In > 0 || assetInfo.token1In > 0) {
+                            r.token0In = assetInfo.token0In
+                            r.token1In = assetInfo.token1In
+                            r.token0Out = assetInfo.token0Out
+                            r.token1Out = assetInfo.token1Out
+                            r.token0Volume = assetInfo.token0In
+                            r.token1Volume = assetInfo.token1In
+                            r.token0Fee = assetInfo.token0In - assetInfo.token0Out
+                            r.token1Fee = assetInfo.token1In - assetInfo.token1Out
+                            upd = true;
+                        }
+
+                        if (upd) {
+                            this.tallyAsset[assetChain].lp0 = [];
+                            this.tallyAsset[assetChain].lp1 = [];
+                            this.tallyAsset[assetChain].rat = [];
+
+
+                            // clear volume tally
+                            this.tallyAsset[assetChain].token0In = 0;
+                            this.tallyAsset[assetChain].token1In = 0;
+                            this.tallyAsset[assetChain].token0Out = 0;
+                            this.tallyAsset[assetChain].token1Out = 0;
+
+                            //(asset, chainID, indexTS, source, open, close, low, high, lp0, lp1, issuance, token0Volume, token1Volume, state )
+                            let state = JSON.stringify(r)
+                            let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.open}', '${r.close}', '${r.low}', '${r.high}', '${r.lp0}', '${r.lp1}', '${r.issuance}', '${r.token0Volume}', '${r.token1Volume}', '${state}')`
+                            if (this.debugLevel >= paraTool.debugInfo) console.log(`LP update`, o)
+                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o)) {
+                                assetlogLiquidityPairs.push(o);
+                            }
+                        }
+                    }
+                    break;
+                case paraTool.assetTypeERC20LiquidityPair:
+                    /*
+                        let res = await this.processAssetTypeERC20LiquidityPair(web3Api, chainID, assetChain, ts, blockNumber, isFullPeriod)
+                        if (res) {
+                            assetlogLiquidityPairs.push(res)
+                        }
+                    */
+                    break;
+                case paraTool.assetTypeNFTToken: {
+                    let sqlAssetKey = assetInfo.nftClass; // String eg {"NFTClass":3}
+                    let tokenID = assetInfo.tokenID; // String eg {"NFTToken":0}
+                    let holder = assetInfo.holder;
+                    let tokenURI = assetInfo.tokenURI;
+                    let free = assetInfo.free;
+                    let meta = (assetInfo.metadata !== undefined) ? assetInfo.metadata : "";
+
+                    /*
+                      {
+                      assetType: 'NFTToken',
+                      metadata: {
+                      metadata: '0x62616679626569646a6e737675366b62776c6f6b646b636b7670626d6c32696369736f793778776e6d6a346d717062776268676d677635336b7375',
+                      owner: '21t2T25Mc3XxTsqZSz4EyqhsM7LJiKrUKBE26ajwvNGq94w1',
+                      data: { deposit: 235400000000, attributes: {} }
+                      }
+                      }
+                    */
+                    let sql1 = `('${sqlAssetKey}', '${chainID}', '${tokenID}', '${holder}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(meta)}, '${tokenURI}', '${free}')`;
+                    if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql1)) {
+                        erc721tokens.push(sql1);
+                    }
+                }
+                break;
+
+                case paraTool.assetTypeNFT:
+                    /*
+                      {
+                      assetType: 'NFT',
+                      metadata: {
+                      metadata: '0x62616679626569646a6e737675366b62776c6f6b646b636b7670626d6c32696369736f793778776e6d6a346d717062776268676d677635336b7375',
+                      totalIssuance: 1,
+                      owner: '23M5ttkmR6KcnsARyoGv5Ymnr1YYkFMkN6rNMD8Df8BUHcQe',
+                      data: { deposit: 50035400000000, properties: 15, attributes: {} }
+                      }
+                      }
+                    */
+                    var sql = ''; //(asset, chainID, assetType, totalSupply, lastUpdateDT, lastUpdateBN, metadata, lastState, erc721isMetadata, erc721isEnumerable, tokenBaseURI)
+                    if (assetInfo.metadata != undefined) {
+                        //acala nft format unified with erc721
+                        let deposit = assetInfo.deposit ? assetInfo.deposit : 0;
+                        let sqlAssetKey = asset;
+                        let creator = (assetInfo.creator !== undefined) ? assetInfo.creator : "";
+                        let createdAtTx = (assetInfo.createdAtTx !== undefined) ? assetInfo.createdAtTx : "";
+                        let isEnumerable = (assetInfo.isEnumerable !== undefined && assetInfo.isEnumerable) ? 1 : 0;
+                        let isMetadataSupported = (assetInfo.isMetadataSupported !== undefined && assetInfo.isMetadataSupported) ? 1 : 0;
+                        let metadata = assetInfo.metadata;
+                        let baseURI = (assetInfo.baseURI !== undefined) ? assetInfo.baseURI : "";
+                        let ipfsUrl = (assetInfo.ipfsUrl !== undefined) ? assetInfo.ipfsUrl : "";
+                        let imageUrl = (assetInfo.imageUrl !== undefined) ? assetInfo.imageUrl : "";
+                        let totalSupply = ethTool.validate_bigint(assetInfo.totalIssuance);
+                        // sql will continue using contract address as asset key
+                        let sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.assetType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                        if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql)) {
+                            erc721classes.push(sql);
+                        }
+                    }
+                    break;
+                case paraTool.assetTypeERC721:
+                    /*
+                      {
+                      blockNumber: 575292,
+                      tokenAddress: '...',
+                      tokenType: 'ERC721',
+                      isMetadataSupported: true,
+                      isEnumerable: true,
+                      metadata: { name: 'Moon Monkeys', symbol: 'MM', baseURI: null },
+                      totalSupply: '7353',
+                      numHolders: 0
+                      }
+                    */
+                    if (assetInfo.tokenAddress != undefined) {
+                        let sql = '';
+                        //erc721
+                        let sqlAssetKey = assetInfo.tokenAddress.toLowerCase();
+                        let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
+                        let createdAtTx = assetInfo.createdAtTx ? assetInfo.createdAtTx : "";
+                        let isEnumerable = (assetInfo.isEnumerable) ? 1 : 0
+                        let isMetadataSupported = (assetInfo.isMetadataSupported) ? 1 : 0
+                        let metadata = assetInfo.metadata
+                        let baseURI = 'Null'
+                        let ipfsUrl = 'Null'
+                        let imageUrl = 'Null'
+                        let totalSupply = ethTool.validate_bigint(assetInfo.totalSupply);
+                        if (isMetadataSupported) {
+                            if (metadata.baseURI != undefined) baseURI = `${metadata.baseURI}`
+                            if (metadata.ipfsUrl != undefined) ipfsUrl = `${metadata.ipfsUrl}`
+                            if (metadata.imageUrl != undefined) imageUrl = `${metadata.imageUrl}`
+                        }
+                        // sql will continue using contract address as asset key
+                        if (isMetadataSupported) {
+                            //(asset, chainID, assetType, assetName, symbol, totalSupply, lastUpdateDT, lastUpdateBN, metadata, erc721isMetadata, erc721isEnumerable, tokenBaseURI, ipfsUrl, imageUrl, createDT, creator, createdAtTx)
+                            sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', ${mysql.escape(this.clip_string(metadata.name))}, ${mysql.escape(this.clip_string(metadata.symbol))}, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(JSON.stringify(metadata))},  '${isMetadataSupported}', '${isEnumerable}', '${baseURI}', '${ipfsUrl}', '${imageUrl}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                        } else {
+                            sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                        }
+                        if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql)) {
+                            erc721classes.push(sql);
+                        }
+                    }
+                    break;
+
+                case paraTool.assetTypeERC721Token: {
+                    /*
+                      {
+                      blockNumber: 576837,
+                      tokenAddress: '...',
+                      tokenType: 'ERC721Token',
+                      isMetadataSupported: true,
+                      tokenID: '14700877701539379516299095288040297463165322513409438848687442933988920671445',
+                      tokenURI: 'https://app.domainchain.network/api/nftdomains/metadata/lending.moon',
+                      owner: '0x53Fc1bf99217d981721a52eAbe1A2F39A049aBfb'
+                      }
+                    */
+                    let sqlAssetKey = assetInfo.tokenAddress.toLowerCase();
+                    let erc721TokenID = assetInfo.tokenID
+                    let holder = assetInfo.owner
+                    let tokenURI = assetInfo.tokenURI
+                    let free = 0;
+                    let meta = (assetInfo.metadata != undefined) ? JSON.stringify(assetInfo.metadata) : "";
+                    let sql1 = `('${sqlAssetKey}', '${chainID}', '${erc721TokenID}', '${holder}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(meta)}, '${tokenURI}', '${free}')`;
+                    if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql1)) {
+                        erc721tokens.push(sql1);
+                    }
+                }
+                break;
+                case paraTool.assetTypeERC1155:
+                    break;
+                case paraTool.assetTypeERC1155Token:
+                    break;
+                case paraTool.assetTypeContract:
+                //{"blockNumber":534657,"tokenAddress":"...","tokenType":"ERC20","name":"Stella LP","symbol":"STELLA LP","decimal":"18","totalSupply":142192.4834495356}
+                {
+                    let assetKey = assetInfo.tokenAddress.toLowerCase();
+                    let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
+                    let createdAtTx = assetInfo.createdAtTx ? assetInfo.createdAtTx : "";
+                    let o = `('${assetKey}', '${chainID}', '${assetInfo.assetType}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                    if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
+                        contracts.push(o);
+                    }
+                }
+                break;
+                default:
+                    console.log("TODO: flush - unknown assetType", assetInfo.assetType);
+                    break;
+            }
+        }
+
+        // ---- asset: erc20s,
+        await this.upsertSQL({
+            "table": "asset",
+            "keys": ["asset", "chainID"],
+            "vals": ["assetType", "assetName", "symbol", "lastState", "decimals", "totalSupply", "lastUpdateDT", "lastUpdateBN", "createDT", "creator", "createdAtTx",
+                "token0", "token1", "token0Decimals", "token1Decimals", "token0Supply", "token1Supply", "token0Symbol", "token1Symbol"
+            ], // add currencyID
+            "data": erc20s,
+            "replace": ["assetType", "assetName", "symbol", "decimals", "token0", "token1", "token0Decimals", "token1Decimals", "token0Symbol", "token1Symbol"],
+            "lastUpdateBN": ["lastUpdateBN", "lastUpdateDT", "totalSupply", "token0Supply", "token1Supply", "lastState"],
+            "replaceIfNull": ["createDT", "creator", "createdAtTx"] // add currencyID
+        });
+
+
+        await this.upsertSQL({
+            "table": "asset",
+            "keys": ["asset", "chainID"],
+            "vals": ["assetType", "totalSupply", "lastUpdateDT", "lastUpdateBN"], // add currencyID
+            "data": tokens,
+            "replace": ["assetType"], // add currencyID
+            "lastUpdateBN": ["lastUpdateBN", "lastUpdateDT", "totalSupply"]
+        });
+
+        await this.upsertSQL({
+            "table": "asset",
+            "keys": ["asset", "chainID"],
+            "vals": ["assetType", "assetName", "symbol", "totalSupply", "lastUpdateDT", "lastUpdateBN", "metadata", "erc721isMetadata", "erc721isEnumerable", "tokenBaseURI", "ipfsUrl", "imageUrl", "createDT", "creator", "createdAtTx"],
+            "data": erc721classes,
+            "replace": ["assetType", "assetName", "symbol", "erc721isMetadata", "erc721isMetadata"],
+            "lastUpdateBN": ["totalSupply", "lastUpdateBN", "lastUpdateDT", "metadata", "tokenBaseURI", "ipfsUrl", "imageUrl"],
+            "replaceIfNull": ["createDT", "creator", "createdAtTx"]
+        });
+        await this.upsertSQL({
+            "table": "asset",
+            "keys": ["asset", "chainID"],
+            "vals": ["assetType", "lastUpdateDT", "lastUpdateBN", "createDT", "creator", "createdAtTx"],
+            "data": contracts,
+            "lastUpdateBN": ["lastUpdateBN", "lastUpdateDT"],
+            "replace": ["assetType"],
+            "replaceIfNull": ["createDT", "creator", "createdAtTx"]
+        });
+        // TODO: need new case for loans here to set asset for acala/parallel ... but how are they getting into "asset" now?
+
+        // ---- assetlog
+        await this.upsertSQL({
+            "table": "assetlog",
+            "keys": ["asset", "chainID", "indexTS", "source"],
+            "vals": ["issuance"],
+            "data": assetlogTokensIssuance,
+            "replace": ["issuance"]
+        })
+
+        await this.upsertSQL({
+            "table": "assetlog",
+            "keys": ["asset", "chainID", "indexTS", "source"],
+            "vals": ["priceUSD"],
+            "data": assetlogTokensPrice,
+            "replace": ["priceUSD"]
+        })
+
+        await this.upsertSQL({
+            "table": "assetlog",
+            "keys": ["asset", "chainID", "indexTS", "source"],
+            "vals": ["open", "close", "low", "high", "lp0", "lp1", "issuance", "token0Volume", "token1Volume", "state"],
+            "data": assetlogLiquidityPairs,
+            "replace": ["open", "close", "low", "high", "lp0", "lp1", "issuance", "token0Volume", "token1Volume", "state"]
+        })
+
+        await this.upsertSQL({
+            "table": "assetlog",
+            "keys": ["asset", "chainID", "indexTS", "source"],
+            "vals": ["issuance", "debitExchangeRate"],
+            "data": assetlogLoans,
+            "replace": ["issuance", "debitExchangeRate"]
+        })
+
+        await this.upsertSQL({
+            "table": "assetlog",
+            "keys": ["asset", "chainID", "indexTS", "source"],
+            "vals": ["supplyExchangeRate", "borrowExchangeRate"],
+            "data": assetlogCDPs,
+            "replace": ["supplyExchangeRate", "borrowExchangeRate"]
+        })
+
+        // --- tokenholder
+        await this.upsertSQL({
+            "table": "tokenholder",
+            "keys": ["asset", "chainID", "tokenID"],
+            "vals": ["holder", "lastUpdateDT", "lastUpdateBN", "meta", "tokenURI", "free"],
+            "data": erc721tokens,
+            "lastUpdateBN": ["holder", "free", "meta", "tokenURI", "lastUpdateBN", "lastUpdateDT"]
+        })
+
+        // reset assetChainMap after we have finised processing
+        this.resetAssetChainMap()
+    }
+
+    parseAssetChainHolder(assetChainHolder) {
+        let words = assetChainHolder.split('-');
+        let holder = words[0];
+        let assetChain = words[1];
+        let [asset, chainID] = paraTool.parseAssetChain(assetChain);
+        return [asset, chainID, holder];
+    }
+
+
+    computeTargetBatchSize(batchSize, total) {
+        if (total <= batchSize) return batchSize;
+        let numBatches = (Math.ceil(total / batchSize));
+        return Math.ceil(total / numBatches);
+    }
+
+    async flushHashesRows() {
+        if (this.hashesRowsToInsert && this.hashesRowsToInsert.length > 0) {
+            if (this.writeData) {
+                let i = 0;
+                let batchSize = this.computeTargetBatchSize(1024, this.hashesRowsToInsert.length);
+                while (i < this.hashesRowsToInsert.length) {
+                    let currBatch = this.hashesRowsToInsert.slice(i, i + batchSize);
+                    //console.log(`currBatch#${n}`, currBatch)
+                    if (currBatch.length > 0) {
+                        await this.insertBTRows(this.btHashes, currBatch, "hashes");
+                        if (currBatch.length > 50) console.log(`flush: flushHashesRows btHashes=${currBatch.length}`);
+                        i += batchSize;
+                    }
+                }
+            } else {
+                console.log("SKIP wrote hashes");
+            }
+            this.hashesRowsToInsert = [];
+            this.relatedMap = {}
+            this.extrinsicEvmMap = {}
+        }
+    }
+
+    async flushBlockRows() {
+        const tableChain = this.getTableChain(this.chainID);
+        if (this.blockRowsToInsert && this.blockRowsToInsert.length > 0) {
+            if (this.writeData) {
+                var i = 0,
+                    batchSize = 256;
+                while (i < this.blockRowsToInsert.length) {
+                    let currBatch = this.blockRowsToInsert.slice(i, i + batchSize);
+                    //console.log(`currBatch#${n}`, currBatch)
+                    if (currBatch.length > 0) {
+                        await this.insertBTRows(tableChain, currBatch, `chain${this.chainID}`);
+                        i += batchSize;
+                    }
+                }
+            } else {
+                console.log("SKIP wrote block");
+            }
+            this.blockRowsToInsert = [];
+        }
+    }
+
+    get_asset(asset) {
+        let a = this.tallyAsset[asset];
+        if (a) {
+            return a;
+        } else {
+            return false
+        }
+    }
+
+    async computeTraceType(chain, bn) {
+        let trace = false;
+        let chainID = chain.chainID;
+        const filter = {
+            filter: [{
+                family: ["trace"],
+                cellLimit: 100
+            }]
+        };
+
+        const tableChain = this.getTableChain(chainID);
+        const [row] = await tableChain.row(paraTool.blockNumberToHex(bn)).get(filter);
+        try {
+            let rowData = row.data;
+            let traceData = rowData["trace"];
+            if (traceData) {
+                for (const hash of Object.keys(traceData)) {
+                    let trace = JSON.parse(traceData[hash][0].value);
+                    let traceType = this.compute_trace_type(trace);
+                    return (traceType)
+                }
+            }
+        } catch (e) {
+            console.log(e)
+        }
+    }
+
+    compute_trace_type(trace, defaultTraceType) {
+        let pass = 0;
+        let fail = 0;
+        for (let i = 0; i < trace.length; i++) {
+            let valRaw = trace[i].v;
+            if (valRaw && valRaw.length > 10) {
+                let val = valRaw.substr(2);
+                let b0 = parseInt(val.substr(0, 2), 16);
+                switch (b0 & 3) {
+                    case 0: // single-byte mode: upper six bits are the LE encoding of the value
+                        let el0 = (b0 >> 2) & 63;
+                        if (el0 == (val.substr(2).length) / 2) {
+                            pass++;
+                        } else {
+                            fail++;
+                        }
+                        break;
+                    case 1: // two-byte mode: upper six bits and the following byte is the LE encoding of the value
+                        var b1 = parseInt(val.substr(2, 2), 16);
+                        var el1 = ((b0 >> 2) & 63) + (b1 << 6);
+                        // console.log("twobyte", el1, "b1", b1,  "len", (val.substr(2).length-2)/2);
+                        if (el1 == (val.substr(2).length - 2) / 2) {
+                            pass++;
+                        } else {
+                            fail++;
+                        }
+                        break;
+                }
+            }
+        }
+        if (pass + fail < 3) return (defaultTraceType);
+        if (pass / (pass + fail) > .9) {
+            return "subscribeStorage"
+        }
+        return "state_traceBlock"
+    }
+
+    async testParseTraces(chainID) {
+        let chain = await this.setupChainAndAPI(chainID);
+        let traces = await this.poolREADONLY.query(`select * from testParseTraces where chainID = '${chainID}' and pass is Null limit 10000`)
+        for (let i = 0; i < traces.length; i++) {
+            let e = traces[i];
+            await this.initApiAtStorageKeys(chain, e.blockHash, e.bn);
+            let traceType = await this.computeTraceType(chain, e.bn);
+            let [o, parsev] = this.parse_trace(e, traceType, e.bn, e.blockHash);
+            let sql = false;
+            if (o && parsev) {
+                sql = `update testParseTraces set pass = 1 where chainID = '${e.chainID}' and bn = '${e.bn}' and s = '${e.s}' and k = '${e.k}'`;
+            } else {
+                sql = `update testParseTraces set pass = 0 where chainID = '${e.chainID}' and bn = '${e.bn}' and s = '${e.s}' and k = '${e.k}'`;
+            }
+            console.log(sql);
+            this.batchedSQL.push(sql);
+        }
+        await this.update_batchedSQL();
+    }
+
+    parse_trace(e, traceType, bn, blockHash, api) {
+        let o = {}
+        o.bn = e.bn;
+        o.blockHash = e.blockHash;
+        // o.ts = e.ts; //not sure if we are still using this?
+
+        let key = e.k.slice()
+        var query = api.query;
+
+        if (key.substr(0, 2) == "0x") key = key.substr(2)
+        let val = "0x"; // this is essential to cover "0" balance situations where e.v is null ... we cannot return otherwise we never zero out balances
+        if (e.v) {
+            val = e.v.slice()
+            if (val.substr(0, 2) == "0x") val = val.substr(2)
+        }
+        let k = key.slice();
+        if (k.length > 64) k = k.substr(0, 64);
+        let sk = this.storageKeys[k];
+
+        if (!sk) return ([false, false]);
+        if (this.skipStorageKeys[k]) {
+            return ([false, false]);
+        }
+        // add the palletName + storageName to the object, if found
+        o.p = sk.palletName;
+        o.s = sk.storageName;
+        if (!o.p || !o.s) {
+            console.log(`k=${k} not found (${key},${val})`)
+            return ([false, false]);
+        }
+
+
+        let parsev = false;
+        let p = paraTool.firstCharLowerCase(o.p);
+        let s = paraTool.firstCharLowerCase(o.s);
+        let kk = ''
+        let vv = ''
+        let pk = ''
+        let pv = ''
+        let pv2 = ''
+        let debugCode = 0
+        let palletSection = `${o.p}:${o.s}` //firstChar toUpperCase to match the testParseTraces tbl
+
+        if (!query[p]) return ([false, false]);
+        if (!query[p][s]) return ([false, false]);
+        if (!query[p][s].meta) return ([false, false]);
+        let queryMeta = query[p][s].meta;
+        let handParseKey = false;
+        // parse key
+        try {
+            kk = key;
+
+            var skey = new StorageKey(api.registry, '0x' + key); // ???
+            skey.setMeta(api.query[p][s].meta); // ????
+            var parsek = skey.toHuman();
+            var decoratedKey = JSON.stringify(parsek)
+            if (handParseKey = this.chainParser.parseStorageKey(this, p, s, key, decoratedKey)) {
+                if (handParseKey.mpType) {
+                    //this is the dmp case
+                    if (handParseKey.mpType == 'dmp' && handParseKey.paraIDDest != undefined && handParseKey.chainIDDest != undefined) {
+                        o.paraIDDest = handParseKey.paraIDDest
+                        o.chainIDDest = handParseKey.chainIDDest
+                        o.mpType = handParseKey.mpType
+                    }
+                    if (handParseKey.mpType == 'ump') {
+                        o.mpType = handParseKey.mpType
+                        o.chainID = handParseKey.chainID
+                        o.chainIDDest = handParseKey.chainIDDest
+                    }
+                    if (handParseKey.mpType == 'hrmp') {
+                        o.mpType = handParseKey.mpType
+                        o.chainID = handParseKey.chainID
+                    }
+                }
+
+                if (handParseKey.lp0 != undefined && handParseKey.lp1 != undefined) {
+                    o.lp0 = handParseKey.lp0
+                    o.lp1 = handParseKey.lp1
+                }
+                if (handParseKey.decoratedAsset) {
+                    o.decoratedAsset = handParseKey.decoratedAsset
+                }
+                if (handParseKey.decimals != undefined) {
+                    o.decimals = handParseKey.decimals
+                }
+                if (handParseKey.asset && handParseKey.asset.DexShare) {
+                    handParseKey.asset = handParseKey.asset.DexShare;
+                }
+                if (handParseKey.accountID != undefined && handParseKey.asset != undefined) {
+                    // this is usually a key by acct, assetType
+                    o.accountID = handParseKey.accountID
+                    o.asset = JSON.stringify(handParseKey.asset)
+                    //console.log("OK", o.accountID, o.asset);
+                    //kk = ''
+                } else if (handParseKey.accountID == undefined && handParseKey.asset != undefined) {
+                    // this is usally a key by assetType
+                    o.asset = JSON.stringify(handParseKey.asset)
+                } else if (handParseKey.isEVM != undefined) {
+                    if (handParseKey.blockNumber != undefined) {
+                        o.blockNumber = handParseKey.blockNumber
+                    }
+                    o.isEVM = handParseKey.isEVM
+                    // pk = handParseKey;
+                } else {
+                    // unknowny for now
+                    pk = handParseKey;
+                }
+            } else {
+                if (parsek) {
+                    //kk = ''
+                    pk = JSON.stringify(parsek);
+                }
+            }
+        } catch (err) {
+            o.pk = "err";
+            pk = "err"
+            this.numIndexingErrors++;
+        }
+
+        // parse value
+        try {
+            let valueType = (queryMeta.type.isMap) ? queryMeta.type.asMap.value.toJSON() : queryMeta.type.asPlain.toJSON();
+            let valueTypeDef = api.registry.metadata.lookup.getTypeDef(valueType).type;
+            let v = (val.length >= 2) ? val.substr(2).slice() : "";
+            if (valueTypeDef == "u128" || valueTypeDef == "u64" || valueTypeDef == "u32" || valueTypeDef == "u64" || valueTypeDef == "Balance") {
+                parsev = hexToBn(v, {
+                    isLe: true
+                }).toString();
+            } else {
+                switch (traceType) {
+                    case "state_traceBlock":
+                        if (api.createType != undefined) {
+                            parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // assume 01 "Some"/"None" is
+                        } else if (api.registry != undefined && this.apiAt.registry.createType != undefined) {
+                            parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                        }
+                        break;
+                    case "subscribeStorage":
+                    default: // skip over compact encoding bytes in Vec<u8>, see https://github.com/polkadot-js/api/issues/4445
+                        let b0 = parseInt(val.substr(0, 2), 16);
+                        switch (b0 & 3) {
+                            case 0: // single-byte mode: upper six bits are the LE encoding of the value
+                                let el0 = (b0 >> 2) & 63;
+                                if (el0 == (val.substr(2).length) / 2) {
+                                    if (api.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
+                                    }
+                                } else {
+                                    // MYSTERY: why should this work?
+                                    // console.log("0 BYTE FAIL - el0", el0, "!=", (val.substr(2).length) / 2);
+                                    if (api.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                    }
+                                }
+                                break;
+                            case 1: // two-byte mode: upper six bits and the following byte is the LE encoding of the value
+                                var b1 = parseInt(val.substr(2, 2), 16);
+                                var el1 = ((b0 >> 2) & 63) + (b1 << 6);
+                                if (el1 == (val.substr(2).length - 2) / 2) {
+                                    if (api.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
+                                    }
+                                } else {
+                                    // MYSTERY: why should this work?
+                                    // console.log("2 BYTE FAIL el1=", el1, "!=", (val.substr(2).length - 2) / 2, "b0", b0, "b1", b1, "len", (val.substr(2).length - 2) / 2, "val", val);
+                                    if (this.apiAt.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                    }
+                                }
+                                break;
+                            case 2: // four-byte mode: upper six bits and the following three bytes are the LE encoding of the value
+                                /*var b1 = parseInt(val.substr(2, 2), 16);
+                                    var b2 = parseInt(val.substr(4, 2), 16);
+                                    var b3 = parseInt(val.substr(6, 2), 16);
+                                    var el2 = (b0 >> 2) & 63 + (b1 << 6) + (b2 << 14) + (b3 << 22);
+                                    if (el2 == (val.substr(2).length - 6) / 2) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(8)).toString(); // 4 bytes
+                                    } else {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // assume 01 "Some" is the first byte
+                                    } */
+                                break;
+                            case 3: // Big-integer mode: The upper six bits are the number of bytes following, plus four.
+                                //let numBytes = ( b0 >> 2 ) & 63 + 4;
+                                //parsev = api.createType(valueTypeDef, "0x" + val.substr(2 + numBytes*2)).toString(); // check?
+                                break;
+                        }
+                }
+            }
+            vv = val;
+
+            if (parsev) {
+                if (parsev.substr(0, 2) == "0x") {
+                    // can't do anything
+                    pv = parsev;
+                } else {
+                    let handParseVal = false;
+                    if (handParseVal = this.chainParser.parseStorageVal(this, p, s, val, parsev, o)) {
+                        if (handParseVal.extra != undefined) {
+                            //added any extra field here
+                            for (let f in handParseVal.extra) {
+                                o[f] = handParseVal.extra[f]
+                            }
+                        }
+                        //use the remaining as pv
+                        if (handParseVal.pv != "") pv = handParseVal.pv
+                        if (handParseVal.pv2 != "") pv2 = handParseVal.pv2 // load raw xcm here
+                    } else {
+                        try {
+                            //uncategorized type
+                            let parsedStruct = JSON.parse(parsev)
+                            pv = parsedStruct;
+                            debugCode = 2
+                        } catch {
+                            console.log(p, s, parsev);
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.log("SOURCE: pv", err);
+            this.numIndexingWarns++;
+        }
+        if (kk != '') o.k = kk
+        if (vv != '') o.v = vv
+        if (pk != '') o.pk = JSON.stringify(pk)
+        if (pv != '') o.pv = JSON.stringify(pv)
+        if (pv2 != '') o.pv2 = JSON.stringify(pv2)
+        if (debugCode > 0) o.debug = debugCode
+
+        return [o, parsev];
+    }
+
+    // clean traling xcm
+    cleanTrailingXcmMap(blockNumber) {
+        let trailingBlk = 25 // goal: keep xcmKey that's less than n block old so we don't write duplicate xcm from undispated queue
+        let trailingBN = blockNumber - trailingBlk
+        let updatedTrailingKeyMap = {}
+        let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
+        for (const tk of trailingKeys) {
+            let firstSeenBN = this.xcmTrailingKeyMap[tk]
+            if (firstSeenBN >= trailingBN) {
+                updatedTrailingKeyMap[tk] = this.xcmTrailingKeyMap[tk]
+            }
+        }
+        this.xcmTrailingKeyMap = updatedTrailingKeyMap
+    }
+
+    // this is the "new" xcm table
+    async dump_xcm_messages() {
+        if (this.recentXcmMsgs.length > 0) {
+            let rows = this.recentXcmMsgs
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`dump_xcm_messages rowsLen=${rows.length}`, rows)
+            let i = 0;
+            let vals = ["chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "sentAt", "relayChain", "version", "path"];
+            for (i = 0; i < rows.length; i += 10000) {
+                let j = i + 10000;
+                if (j > rows.length) j = rows.length;
+                await this.upsertSQL({
+                    "table": `xcmmessages`,
+                    "keys": ["msgHash", "incoming"],
+                    "vals": vals,
+                    "data": rows.slice(i, j),
+                    "replace": vals
+                });
+            }
+            this.recentXcmMsgs = []
+        }
+    }
+
+    async dump_recent_activity() {
+        if (this.recentExtrinsics.length > 0) {
+            let rows = this.recentExtrinsics
+            let i = 0;
+            for (i = 0; i < rows.length; i += 10000) {
+                let j = i + 10000;
+                if (j > rows.length) j = rows.length;
+                await this.upsertSQL({
+                    "table": `extrinsicsrecent`,
+                    "keys": ["extrinsicID", "chainID"],
+                    "vals": ["logDT", "hr", "blockNumber", "extrinsicHash", "section", "method", "fromAddress", "ts", "result", "signed"],
+                    "data": rows.slice(i, j),
+                    "replace": ["logDT", "hr", "blockNumber", "extrinsicHash", "section", "method", "fromAddress", "ts", "result", "signed"]
+                });
+            }
+            this.recentExtrinsics = []
+        }
+
+        if (this.recentTransfers.length > 0) {
+            let rows = this.recentTransfers
+            let i = 0;
+            for (i = 0; i < rows.length; i += 10000) {
+                let j = i + 10000;
+                if (j > rows.length) j = rows.length;
+                await this.upsertSQL({
+                    "table": `transfersrecent`,
+                    "keys": ["extrinsicID", "chainID"],
+                    "vals": ["logDT", "hr", "blockNumber", "extrinsicHash", "section", "method", "fromAddress", "toAddress", "asset", "symbol", "amount", "priceUSD", "amountUSD", "ts", "rawAsset", "rawAmount", "decimals"],
+                    "data": rows.slice(i, j),
+                    "replace": ["logDT", "hr", "blockNumber", "extrinsicHash", "section", "method", "fromAddress", "toAddress", "asset", "symbol", "amount", "priceUSD", "amountUSD", "ts", "rawAsset", "rawAmount", "decimals"]
+                });
+            }
+            this.recentTransfers = []
+        }
+
+        if (this.recentXCMMessages.length > 0) {
+            let rows = this.recentXCMMessages
+            let i = 0;
+            let vals = ["chainIDDest", "chainID", "msgType", "incoming", "msgHex", "msgHash", "msgstr", "blockTS", "blockNumber", "sentAt", "relayChain"];
+            for (i = 0; i < rows.length; i += 10000) {
+                let j = i + 10000;
+                if (j > rows.length) j = rows.length;
+                await this.upsertSQL({
+                    "table": `xcmmessagesrecent`,
+                    "keys": ["xcmID"],
+                    "vals": vals,
+                    "data": rows.slice(i, j),
+                    "replace": vals
+                });
+            }
+            this.recentXCMMessages = []
+        }
+    }
+
+    async dump_failed_traces() {
+        let traceRows = this.failedParseTraces
+        let i = 0;
+        for (i = 0; i < traceRows.length; i += 10000) {
+            let j = i + 10000;
+            if (j > traceRows.length) j = traceRows.length;
+            await this.upsertSQL({
+                "table": `testParseTraces`,
+                "keys": ["chainID", "bn", "s", "k"],
+                "vals": ["blockHash", "p", "v", "traceType", "subscribeStorageParseV", "testGroup"],
+                "data": traceRows.slice(i, j),
+                "replace": ["blockHash", "p", "v", "traceType", "subscribeStorageParseV", "testGroup"]
+            });
+        }
+        if (traceRows.length > 0) {
+            console.log(`[chain${this.chainID}] added ${traceRows.length} recs to testParseTraces`)
+            console.log(`(failed) debugParseTraces summary`, this.debugParseTraces)
+            this.failedParseTraces = []
+            this.debugParseTraces = {}
+        }
+    }
+
+    parseEvent(evt, eventID, api = false) {
+        if (!api) return (false);
+        if (!api.events) return (false);
+        var section = evt.method.pallet;
+        var method = evt.method.method;
+        if (!api.events[section]) return (false);
+
+        var e = api.events[section][method];
+        if (!e) return (false);
+        var data = evt.data;
+        var fields = e.meta.fields;
+
+        var dType = [];
+        let dEvent = {}
+        dEvent.eventID = eventID
+        dEvent.docs = e.meta.docs.toString()
+        //dEvent.method = evt.method
+        dEvent.section = section
+        dEvent.method = method
+        //dEvent.data = evt.data
+
+
+        //store metaError while we decorate it
+        /*
+        [
+            {
+              "module": {
+                  "index": 4,
+                  "error": 1,
+                  "msg": 'generate msg here'
+                }
+            },
+            {
+              "err": {
+                "module": {
+                  "index": 23,
+                  "error": 0,
+                  "msg": 'generate msg here'
+                }
+              }
+            }
+          ]
+        */
+        let dData = evt.data
+        for (var i = 0; i < dData.length; i++) {
+            let dData_i = dData[i]
+            try {
+                if (dData_i != undefined) {
+                    if (dEvent.section == "system" && dEvent.method == "ExtrinsicFailed" && dData_i.module != undefined) {
+                        dData_i.module.msg = this.getErrorDoc(dData_i.module, api)
+                        dData[i] = dData_i
+                    } else if (dData_i.err != undefined && dData_i.err.module != undefined) {
+                        dData_i.err.module.msg = this.getErrorDoc(dData_i.err.module, api)
+                        dData[i] = dData_i
+                    }
+                }
+            } catch (e) {
+                console.log(`parseEvent error`, e, `dData`, dData)
+            }
+        }
+        dEvent.data = dData
+
+        for (var i = 0; i < fields.length; i++) {
+            var fld = fields[i]
+            var valueType = fld.type.toJSON();
+            var typeDef = api.registry.metadata.lookup.getTypeDef(valueType).type
+            //var parsedEvent = this.api.createType(typeDef, data[i]);
+            var name = fld.name.toString();
+            var typeName = fld.typeName.toString();
+            dType.push({
+                typeDef: typeDef,
+                name: name
+            })
+        }
+        dEvent.dataType = dType
+        return dEvent
+    }
+
+    decode_s_internal_raw(call_s, apiAt) {
+        //fetch method, section when human is not set
+        let callIndex = call_s.callIndex
+        let [method, section] = this.getMethodSection(callIndex, apiAt)
+        let f = {
+            callIndex: callIndex,
+            section: section,
+            method: method,
+            args: call_s.args
+        }
+        return f
+    }
+
+    getMethodSection(callIndex, apiAt) {
+        try {
+            var {
+                method,
+                section
+            } = apiAt.registry.findMetaCall(paraTool.hexAsU8(callIndex))
+            return [method, section]
+        } catch (e) {
+            console.log(`getMethodSection unable to decode ${callIndex}`)
+        }
+        return [null, null]
+    }
+
+    recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = {}) {
+        if (call_s && call_s.args.calls != undefined) {
+            for (let i = 0; i < call_s.args.calls.length; i++) {
+                let callIndex = call_s.args.calls[i].callIndex
+                let [method, section] = this.getMethodSection(callIndex, apiAt)
+                let ff = {
+                    callIndex: callIndex,
+                    section: section,
+                    method: method,
+                    args: call_s.args.calls[i].args
+                }
+                let pallet_method = `${ff.section}:${ff.method}`
+                if (pallet_method == 'system:remarkWithEvent' || pallet_method == 'system:remark') {
+                    if (ff.args.remark != undefined) {
+                        remarks[ff.args.remark] = 1
+                    }
+                }
+                let o = `call ${lvl}-${i}`
+                // console.log(`\t${o} - ${pallet_method}`)
+                if (ff.args.call != undefined) {
+                    //recursively decode opaque call
+                    let s = " ".repeat()
+                    //console.log(`\t${" ".repeat(o.length+2)} - additional 'call' argument found`)
+                    this.decode_opaque_call(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks)
+                }
+                this.recursive_batch_all(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks)
+                call_s.args.calls[i] = ff
+            }
+            //console.log("recursive_batch_all done")
+        } else {
+            //sudo:sudoAs case
+            if (call_s && call_s.args.call != undefined) {
+                //console.log(`${extrinsicHash}`, 'call only', innerexs)
+                this.decode_opaque_call(call_s, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks)
+            } else {
+                //console.log("recursive_batch_all no more loop")
+            }
+        }
+    }
+
+    //this is right the level above args
+    decode_opaque_call(f, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = []) {
+        //console.log(`${extrinsicHash}`, 'decode_opaque_call', f)
+        if (f.args.call != undefined) {
+            let opaqueCall = f.args.call
+            let extrinsicCall = false;
+            let isHexEncoded = (typeof opaqueCall === 'object') ? false : true
+            //console.log(`d opaqueCall(hexEncoded=${isHexEncoded})`, opaqueCall)
+            if (isHexEncoded) {
+                try {
+                    // cater for an extrinsic input...
+                    extrinsicCall = apiAt.registry.createType('Call', opaqueCall);
+                    //console.log("d decoded opaqueCall", extrinsicCall.toString())
+
+                    let innerexs = JSON.parse(extrinsicCall.toString());
+                    let innerOutput = {}
+                    try {
+                        // only utility batch will have struct like this
+                        if (innerexs && innerexs.args.calls != undefined) {
+                            this.recursive_batch_all(innerexs, apiAt, extrinsicHash, extrinsicID, lvl, remarks)
+                        }
+                        if (innerexs && innerexs.args.call != undefined) {
+                            //console.log(`${extrinsicHash}`, 'call only', innerexs)
+                            this.decode_opaque_call(innerexs, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks)
+                        }
+                        innerOutput = this.decode_s_internal_raw(innerexs, apiAt)
+                        //console.log(`${extrinsicHash}`, 'innerexs', innerexs)
+                        let innerOutputPV = `${innerOutput.section}:${innerOutput.method}`
+                        //console.log(`${extrinsicHash}`, 'innerOutput', innerOutput)
+                        if (innerOutputPV == 'system:remarkWithEvent' || innerOutputPV == 'system:remark') {
+                            if (innerOutput.args.remark != undefined) {
+                                remarks[innerOutput.args.remark] = 1
+                            }
+                        }
+                    } catch (err1) {
+                        console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, err1)
+                    }
+
+                    //console.log("innerexs", JSON.stringify(innerexs))
+
+                    f.args.call = innerOutput //this line update the f
+                    //console.log("innerOutput", JSON.stringify(innerOutput))
+
+                } catch (e) {
+                    console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, e, f)
+                }
+            } else {
+                //This is the proxy:proxy case - where api has automatically decoded the "call"
+                if (f.args.call.callIndex != undefined) {
+                    let call_ss = f.args.call
+                    let call_s = this.decode_s_internal_raw(call_ss, apiAt)
+                    let call_sPV = `${call_s.section}:${call_s.method}`
+                    //console.log(`call_sPV`, call_sPV)
+                    if (call_sPV == 'system:remarkWithEvent' || call_sPV == 'system:remark') {
+                        if (call_s.args.remark != undefined) {
+                            remarks[call_s.args.remark] = 1
+                        }
+                    }
+                    this.recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl, remarks)
+                    f.args.call = call_s
+                }
+                //console.log(`* [${extrinsicID}] ${extrinsicHash} already decoded opaqueCall`, extrinsicCall.toString())
+            }
+        }
+    }
+
+    decode_s_extrinsic(extrinsic, blockNumber, index = 'pending', apiAt) {
+        let exos = JSON.parse(extrinsic.toString());
+
+        let extrinsicHash = extrinsic.hash.toHex()
+        let extrinsicID = (index == 'pending') ? `${extrinsicHash}-pending` : blockNumber + "-" + index
+        let callIndex = exos.method.callIndex
+        let [method, section] = this.getMethodSection(callIndex, apiAt)
+        let remarks = {} // add all remarks here
+        let pv = `${section}:${method}`
+        if (pv == 'system:remarkWithEvent' || pv == 'system:remark') {
+            if (exos.method.args.remark != undefined) {
+                remarks[exos.method.args.remark] = 1
+            }
+        }
+
+
+        //console.log(`[${extrinsicID}] ${extrinsicHash}   |  ${section}:${method}`)
+        // console.log("exos", exos)
+
+        try {
+            // this is picking up utility batch with "calls" array
+            if (exos && exos.method.args.calls != undefined && Array.isArray(exos.method.args.calls)) {
+                this.recursive_batch_all(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks)
+                let exosArgsCall = exos.method.args.calls
+                for (let i = 0; i < exosArgsCall.length; i++) {
+                    let f = exosArgsCall[i]
+                    exosArgsCall[i] = f
+                }
+                exos.method.args.calls = exosArgsCall
+            }
+        } catch (err1) {
+            /// TODO: ....
+            console.log(`[${extrinsicID}] ${extrinsicHash} error at err1`, err1)
+        }
+
+        if (exos.method.args.call != undefined) {
+            this.decode_opaque_call(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks)
+        }
+
+        let sig = exos.signature
+        let sigTest = extrinsic.signature.toString()
+        if (sigTest == '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000' || sigTest == '0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000') {
+            sig.isSigned = false
+        } else {
+            sig.isSigned = true
+        }
+
+        let lifetime = {
+            isImmortal: 0
+        }
+        if (sig.era != undefined) {
+            // either mortal or immortal
+            if (sig.era.immortalEra != undefined) {
+                //usually unsined tx here
+                lifetime.isImmortal = 1
+            } else if (sig.era.mortalEra != undefined) {
+                try {
+                    var r = apiAt.registry.createType('MortalEra', paraTool.hexAsU8(sig.era.mortalEra))
+                    let [birth, death] = paraTool.getLifetime(blockNumber, r)
+                    lifetime.birth = birth
+                    lifetime.death = death
+                    sig.era = r.toHuman()
+                } catch (e) {
+                    console.log(`[${extrinsicID}] ${extrinsicHash} error computing lifetime + era`, e)
+                }
+            }
+        }
+        let remarkStrs = []
+        for (const remark of Object.keys(remarks)) {
+            remarkStrs.push(remark)
+        }
+
+        let out = {
+            method: {
+                //todo: figure out method section
+                callIndex: callIndex,
+                pallet: section,
+                method: method,
+            },
+            args: exos.method.args,
+            remarks: remarkStrs,
+            signature: sig,
+            lifetime: lifetime
+        }
+        return (out)
+    }
+
+    getErrorDoc(errModule, apiAt) {
+        //console.log(`errModule`, errModule)
+        let errModuleIdx = errModule.index
+        let errModuleErrorEnum = errModule.error
+
+        let errMsg = ''
+        if (errModuleIdx == undefined || errModuleErrorEnum == undefined) {
+            return `Failed (Generic)` //no further information available
+        }
+        let errModuleErrorEnum0 = errModule.error
+        if (!paraTool.isInt(errModuleErrorEnum0)) {
+            errModuleErrorEnum0 = hexToU8a(errModule.error)[0]
+        }
+
+        let indexLookup = new Uint8Array([errModuleIdx, errModuleErrorEnum0]);
+
+        try {
+            var decoded = apiAt.registry.findMetaError(indexLookup)
+            //console.log(`decoded`, decoded)
+            let errorID = `${errModule.index}-${errModule.error}`
+            //console.log(`getErrorDoc`, errorID, errModule)
+            errMsg = `Failed(${decoded.method}) ${decoded.docs.join('  ')}`
+        } catch (e) {
+            console.log(`findMetaError unable to decode`, errModuleIdx, errModuleErrorEnum, indexLookup)
+            let errorID = `${errModule.index}-${errModule.errModuleErrorEnum0}`
+            errMsg = `Failed(errorID:${errorID}) `
+        }
+        return errMsg
+    }
+
+    checkExtrinsicStatusAndFee(apiAt, extrinsic, extrinsicHash, extrinsicID, isSigned) {
+        let res = {
+            fee: 0,
+            success: 1,
+            err: null,
+            isEVM: false
+        }
+        let evmStatus = {
+            from: null,
+            to: null,
+            transactionHash: null,
+        }
+        let withdrawFee = 0 // if set, transaction is paid in native currency
+        let totalDepositFee = 0 // if set, should equal to withdrawTxFee, including the 20% deposit to treasury
+        let treasuryFee = 0 // usaullly 20% of the withdrawTxFee
+        let parsedEvents = extrinsic.events
+        let errorSet = false
+        for (const evt of parsedEvents) {
+            let data = JSON.parse(JSON.stringify(evt.data))
+            let dataType = evt.dataType
+            let decodedData = evt.decodedData
+            //let method = evt.method
+            //let [pallet, method] = this.parseSectionMethod(evt)
+            let pallet_method;
+            if (evt.section != undefined && evt.method != undefined) {
+                pallet_method = `${evt.section}:${evt.method}`
+            }
+            //if (extrinsicHash == '0xd50a05196fcc5794b44b19502dcb4aaa573fea0a510120fb1966fdd5ad76f119') console.log('events', data, dataType, decodedData)
+            if (dataType != undefined && Array.isArray(dataType)) {
+                if (pallet_method == 'balances:Withdraw') {
+                    //this is normal case for txfees
+                    if (data != undefined && Array.isArray(data)) {
+                        try {
+                            let withdrawTxFee = paraTool.dechexToInt(data[1])
+                            withdrawFee = withdrawTxFee
+                            //console.log('withdrawFee', withdrawTxFee)
+                            res.fee = withdrawFee
+                        } catch (e) {
+                            console.log('unable to compute Withdraw fees!!', data, e)
+                        }
+                    }
+                }
+                if (pallet_method == 'balances:Deposit') {
+                    if (data != undefined && Array.isArray(data)) {
+                        try {
+                            let depositfee = paraTool.dechexToInt(data[1])
+                            //console.log('depositfee', depositfee)
+                            totalDepositFee += depositfee
+                        } catch (e) {
+                            console.log('unable to compute Deposit fees!!', data, e)
+                        }
+                    }
+                }
+                if (pallet_method == 'treasury:Deposit') {
+                    if (data != undefined && Array.isArray(data)) {
+                        try {
+                            let tFee = paraTool.dechexToInt(data[0])
+                            //console.log('treasuryFee', tFee)
+                            treasuryFee += tFee
+                        } catch (e) {
+                            console.log('unable to compute treasury fees!!', data, e)
+                        }
+                    }
+                }
+                if (pallet_method == 'ethereum:Executed') {
+                    //from, to, txhash
+                    // data[3] is enum: {succeed/error/revert/fatal}
+                    /*
+                    { "succeed": "Returned"}
+                    { "revert": "Reverted"}
+                    { "error": ???}
+                    { "fatal": ???}
+                    */
+                    if (data != undefined && Array.isArray(data)) {
+                        try {
+                            evmStatus.from = data[0]
+                            evmStatus.to = data[1]
+                            evmStatus.transactionHash = data[2]
+                            let executionEnum = Object.keys(data[3])[0]
+                            if (executionEnum == 'succeed') {
+                                res.success = 1
+                                res.err = null
+                            } else {
+                                // error/revert/fatal
+                                res.success = 0
+                                res.err = `Failed(${paraTool.firstCharUpperCase(executionEnum)})`
+                            }
+                            res.isEVM = evmStatus
+                        } catch (e) {
+                            console.log('unable to extra ethereum:Executed info!!', data, e)
+                        }
+                    }
+                }
+                for (let i = 0; i < dataType.length; i++) {
+                    let dataType_i = dataType[i]
+                    let data_i = data[i]
+                    //if (extrinsicHash == '0xd50a05196fcc5794b44b19502dcb4aaa573fea0a510120fb1966fdd5ad76f119') console.log('dataType_i', dataType_i, 'data_i', data_i)
+                    if (dataType_i.typeDef != undefined && dataType_i.typeDef == 'Result<Null, SpRuntimeDispatchError>') {
+                        // SpRuntimeDispatchError can potentially return "ok" - exclude this case
+                        if (!Object.keys(data_i).includes('ok')) {
+                            //error detected
+                            res.success = 0
+                            let dataErr = data_i.err
+                            if (dataErr != undefined) {
+                                //console.log('error detected 1!!', res)
+                                if (dataErr.module != undefined) {
+                                    //error module here
+                                    res.err = this.getErrorDoc(dataErr.module, apiAt)
+                                } else {
+                                    res.err = `Failed(Generic) ${JSON.stringify(dataErr)}`
+                                }
+                            }
+                        }
+                    }
+                    //need to handle evm error..
+                    if (pallet_method == 'system:ExtrinsicFailed') {
+                        if (data_i.module != undefined && !errorSet) {
+                            errorSet = true
+                            res.success = 0
+                            res.err = this.getErrorDoc(data_i.module, apiAt)
+                            //console.log('error detected 2!!', res)
+                        } else if (!errorSet) {
+                            res.success = 0
+                            res.err = `Failed(Generic) ${JSON.stringify(data_i)}`
+                        }
+                    }
+                }
+            }
+        }
+        if (withdrawFee == 0) {
+            // unusual extrinsic - (1) not paid by native token? (2) xcmPallet (3) partially paid?
+            // use the highest fee computed
+            res.fee = Math.max(withdrawFee, totalDepositFee, treasuryFee)
+            if (isSigned && res.fee == 0) {
+                // not sure if those are paid at all...
+                //console.log(`unusual signed extrinsic [${extrinsicID}] ${extrinsicHash} - fee=${res.fee}, withdraw=${withdrawFee}, deposit=${totalDepositFee}, treasury=${treasuryFee}`)
+            } else if (treasuryFee > 0) {
+                // not sure if this case exist but will log and see what happens
+                //console.log(`unusual unsined extrinsic [${extrinsicID}] ${extrinsicHash} - fee=${res.fee}, withdraw=${withdrawFee}, deposit=${totalDepositFee}, treasury=${treasuryFee}`)
+            }
+        }
+        return res
+    }
+
+    async processRawFeedRewards(feed, rawFeedRewards, blockTS) {
+        let feedRewards = []
+        let era = false
+
+        for (const rawFeedReward of rawFeedRewards) {
+            if (rawFeedReward.section == "staking" && rawFeedReward.method == "PayoutStarted") {
+                era = rawFeedReward.era
+                continue
+            } else if (rawFeedReward.section == "dappsStaking" && rawFeedReward.method == "Reward") {
+                era = rawFeedReward.era
+            }
+            // skip the "zero" payout here
+            if (rawFeedReward?.value > 0) {
+                let feedReward = await this.decorateFeedReward(feed, rawFeedReward, blockTS, era)
+                feedRewards.push(feedReward)
+                // console.log(feedReward)
+            }
+        }
+        return feedRewards
+    }
+
+    async decorateFeedReward(feed, rawFeedReward, blockTS, era) {
+        let feedReward = {}
+        feedReward["chainID"] = this.chainID
+        feedReward["blockNumber"] = feed.blockNumber
+        feedReward["blockHash"] = feed.blockHash
+        feedReward["ts"] = blockTS
+        feedReward["eventID"] = rawFeedReward.eventID
+        feedReward["extrinsicID"] = feed.extrinsicID
+        feedReward["extrinsicHash"] = feed.extrinsicHash
+        feedReward["section"] = rawFeedReward.section
+        feedReward["method"] = rawFeedReward.method
+        feedReward["account"] = rawFeedReward.account
+        let accountAddress = paraTool.getPubKey(rawFeedReward.account)
+        if (accountAddress) {
+            feedReward["accountAddress"] = accountAddress
+        }
+        feedReward["amount"] = rawFeedReward.value
+        if (era) {
+            feedReward['era'] = era
+        }
+        let symbol = this.getChainSymbol(feed.chainID)
+        let asset = `{"Token":"${symbol}"}`
+        let decimals = this.getChainDecimal(feed.chainID)
+        if (symbol && decimals) {
+            feedReward["rawAmount"] = feedReward["amount"];
+            feedReward["amount"] = feedReward["amount"] / 10 ** decimals;
+            var [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(feedReward["amount"], asset, this.chainID, blockTS)
+            feedReward["asset"] = asset
+            feedReward["symbol"] = symbol
+            feedReward["decimals"] = decimals
+            feedReward["amountUSD"] = balanceUSD
+            feedReward["priceUSD"] = priceUSD
+        } else if (feedReward["amount"] != undefined) {
+            feedReward["rawAmount"] = feedReward["amount"]
+            feedReward["amount"] = null
+            feedReward["asset"] = null
+            feedReward["symbol"] = null
+            feedReward["decimals"] = null
+        }
+        feedReward["genTS"] = this.currentTS();
+        feedReward["source"] = this.hostname // add index source for debugging
+        return feedReward
+    }
+
+    processRawFeedCrowdLoans(feed, rawFeedCrowdloans, blockTS, remarks) {
+        let feedcrowdloans = []
+        let feedcrowdloansMap = {}
+        let era = false
+
+        //let's assume crowdloan events come in pairs of Contributed+MemoUpdated or Contributed+remarks
+        for (const rawFeedCrowdloan of rawFeedCrowdloans) {
+            if (rawFeedCrowdloan.action == "crowdloan(Contributed)") {
+                let accountParaID = `${rawFeedCrowdloan.account}${rawFeedCrowdloan.paraID}`
+                let crowdloanrec = this.decorateFeedCrowdLoan(feed, rawFeedCrowdloan, blockTS)
+                if (feedcrowdloansMap[accountParaID] != undefined) {
+                    delete crowdloanrec.remark
+                    feedcrowdloansMap[accountParaID].amount = crowdloanrec.amount
+                } else {
+                    feedcrowdloansMap[accountParaID] = crowdloanrec
+                }
+            } else if (rawFeedCrowdloan.action == "crowdloan(MemoUpdated)") {
+                let accountParaID = `${rawFeedCrowdloan.account}${rawFeedCrowdloan.paraID}`
+                let crowdloanrec = this.decorateFeedCrowdLoan(feed, rawFeedCrowdloan, blockTS)
+                if (feedcrowdloansMap[accountParaID] != undefined) {
+                    feedcrowdloansMap[accountParaID].memo = crowdloanrec.memo
+                } else {
+                    feedcrowdloansMap[accountParaID] = crowdloanrec
+                }
+            }
+        }
+
+        let remarkIndex = 0
+        for (const accountParaID of Object.keys(feedcrowdloansMap)) {
+            let feedcrowdloan = feedcrowdloansMap[accountParaID]
+            if (feedcrowdloan.memo == null) {
+                //maybe it's a remark contribution...
+                if (remarks[remarkIndex] != undefined) {
+                    feedcrowdloan.remark = remarks[remarkIndex]
+                    remarkIndex++
+                } else {
+                    delete feedcrowdloan.remark
+                }
+                delete feedcrowdloan.memo
+            }
+            //console.log(feedcrowdloan)
+            feedcrowdloans.push(feedcrowdloan)
+        }
+        return feedcrowdloans
+    }
+
+    decorateFeedCrowdLoan(feed, rawFeedCrowdloan, blockTS) {
+        let feedcrowdloan = {}
+        feedcrowdloan["chainID"] = this.chainID
+        feedcrowdloan["blockNumber"] = feed.blockNumber
+        feedcrowdloan["blockHash"] = feed.blockHash
+        feedcrowdloan["ts"] = blockTS
+        feedcrowdloan["eventID"] = rawFeedCrowdloan.eventID
+        feedcrowdloan["extrinsicID"] = feed.extrinsicID
+        feedcrowdloan["extrinsicHash"] = feed.extrinsicHash
+        feedcrowdloan["action"] = rawFeedCrowdloan.action
+        feedcrowdloan["account"] = rawFeedCrowdloan.account
+        feedcrowdloan["paraID"] = rawFeedCrowdloan.paraID
+        if (rawFeedCrowdloan.value) {
+            feedcrowdloan["amount"] = rawFeedCrowdloan.value
+            feedcrowdloan["memo"] = null
+            feedcrowdloan["remark"] = null
+        }
+        if (rawFeedCrowdloan.memo) {
+            feedcrowdloan["amount"] = 0
+            feedcrowdloan["memo"] = rawFeedCrowdloan.memo
+        }
+
+        //feedReward["data"] = rawFeedReward
+        feedcrowdloan["genTS"] = this.currentTS();
+        feedcrowdloan["source"] = this.hostname // add index source for debugging
+        return feedcrowdloan
+    }
+
+    process_reverse_evmlink(evmAddr) {
+        // 0xb554B9856DFdbf52B98E0e4D2b981C34E20e1dAB -> 0xe37c9c4ba2e1409aecb4dcb992b3a1fac2b2585e2c759e25ab875b0fca8a10af (possible to derive h160SS58Pubkey using h160)
+        // 0xe37c9c4ba2e1409aecb4dcb992b3a1fac2b2585e2c759e25ab875b0fca8a10af -> 0xb554B9856DFdbf52B98E0e4D2b981C34E20e1dAB (impossible to covert h160SS58Pubkey into h160)
+        // if we observe 0xb554B9856DFdbf52B98E0e4D2b981C34E20e1dAB
+        // want to establish related links for ss58Pubkey (af) -> owned H160 (AB)
+        if (this.relatedMap[evmAddr] == undefined) {
+            this.relatedMap[evmAddr] = true // write link only once
+            let h160SS58Pubkey = paraTool.h160ToPubkey(evmAddr)
+            let related = {}
+            let metadata = {
+                chainID: this.chainID,
+                H160SS58Pubkey: h160SS58Pubkey,
+                H160: evmAddr
+            }
+            related[evmAddr] = {
+                value: JSON.stringify({
+                    url: "/account/" + h160SS58Pubkey,
+                    title: `${evmAddr}`,
+                    description: `Reversed H160 Address`,
+                    linktype: "address",
+                    metadata: metadata
+                }),
+                timestamp: 1 * 1000000 // DO NOT update this
+            }
+            let reversedH160REec = {
+                key: h160SS58Pubkey,
+                data: {
+                    related: related
+                }
+            }
+            //console.log(`reserved link`, JSON.stringify(reversedH160REec))
+            //this.hashesRowsToInsert.push(reversedH160REec)
+
+        }
+    }
+
+    process_pending_extrinsic(api, extrinsicRaw, lastestBlockNumber) {
+        //eventsRaw, block, index, not available
+        let currTS = Math.floor(Date.now() / 1000)
+
+        // must do extrinsicHash, isSigned here. information is lost after decode_s_extrinsic
+        let extrinsicHash = extrinsicRaw.hash.toHex();
+        if (this.pendingExtrinsic[extrinsicHash] !== undefined) return (false);
+        this.pendingExtrinsic[extrinsicHash] = 1;
+
+        let extrinsicID = `${extrinsicHash}-pending`
+        let extrinsic = this.decode_s_extrinsic(extrinsicRaw, lastestBlockNumber, 'pending', api); //lastestBlockNumber is used to compute lifetime
+
+        if (!extrinsic.method) {
+            // TODO: onInitialize, onFinalize
+            return (extrinsic);
+        }
+        let isSigned = this.isExtrinsicSigned(extrinsic)
+        //console.log('hash!!', extrinsicHash, `isSigned=${isSigned}`, `${JSON.stringify(extrinsic.signature)}`, extrinsic.signature.signer)
+
+        let success = false;
+        let chainDecimal = this.getChainDecimal(this.chainID)
+        if (isSigned) {
+            extrinsic.signature.tip = extrinsic.signature.tip / 10 ** chainDecimal
+        }
+        if (!(extrinsic.signature)) {
+            return (extrinsic);
+        }
+
+        //(ed25519 and sr25519 do not have id?)
+        let signer = false
+        if (extrinsic.signature.signer.id != undefined) {
+            signer = extrinsic.signature.signer.id
+        } else if (extrinsic.signature.signer != undefined) {
+            signer = extrinsic.signature.signer
+        }
+
+        // fromAddress is pubkey representation common to ALL substrate chains
+        //let fromAddress = isSigned ? paraTool.getPubKey(signer) : "NONE";
+        let fromAddress = "NONE"
+        try {
+            fromAddress = isSigned ? paraTool.getPubKey(signer) : "NONE";
+        } catch (e) {
+            console.log("getPubKey error", e)
+        }
+
+        let params = extrinsic.args;
+
+        let nonce = isSigned ? extrinsic.signature.nonce : 0 //non-signed extrinsic has by default 0 nonce
+
+        let tip = isSigned ? extrinsic.signature.tip : 0 //non-signed extrinsic has by default 0 tip
+
+        let txLifetime = (extrinsic.lifetime != undefined) ? extrinsic.lifetime : false
+
+
+        extrinsic.extrinsicHash = isSigned ? extrinsicHash : extrinsicHash; //todo: should unsigned extrinsic have extrinsicHash?
+        extrinsic.extrinsicID = extrinsicID
+        extrinsic.fromAddress = fromAddress; // this is the pubkey
+
+        let sigs = extrinsic.signature
+        //sigs.fee = extrinsic.fee (fee can't be computed)
+
+        let rExtrinsic = {
+            chainID: this.chainID,
+            ts: currTS,
+            extrinsicHash: extrinsicHash,
+            extrinsicID: extrinsicID,
+            //fromAddress: isSigned ? fromAddress : null,
+            signer: isSigned ? signer : null,
+            signature: isSigned ? extrinsic.signature.signature : null,
+            lifetime: txLifetime,
+            nonce: nonce,
+            tip: tip,
+            section: extrinsic.method.pallet,
+            method: extrinsic.method.method, //replacing the original method object format
+            params: extrinsic.args,
+        }
+
+        try {
+
+            // feed is used for {feed, feedTransfer, feedRewards}
+            var feed = {};
+            feed = rExtrinsic
+            feed["txstatus"] = 'pending'
+            feed["genTS"] = this.currentTS();
+            feed["source"] = this.hostname
+
+            /*
+            if (this.validAddress(fromAddress)) {
+                // (4) txn (can be processed immediately)
+                this.stat.addressRows.feed++
+                this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feed", feed, blockTS, "PENDING");
+            }
+            */
+            // (1) hashesRowsToInsert: extrinsicHash -> tx
+            let hashrec = {};
+            hashrec["tx"] = {
+                value: JSON.stringify(feed),
+                timestamp: 0 //this is nondeterministic
+            };
+            this.stat.hashesRows.substrateTx++
+            let extrinsicHashRec = {
+                key: extrinsicHash,
+                data: {}, //feed/feedunfinalized
+            }
+            extrinsicHashRec.data["feedpending"] = hashrec
+            this.hashesRowsToInsert.push(extrinsicHashRec)
+            //console.log(`processed pendingTX ${extrinsicHash} (signer:${signer}, nonce:${nonce})`)
+            //console.log(feed)
+        } catch (err) {
+            this.log_indexing_error(err, "process_pending_extrinsic")
+        }
+
+        return (rExtrinsic);
+    }
+
+    //support both formats
+    parseEventSectionMethod(e) {
+        if (e.method != undefined && e.method.pallet != undefined) {
+            return [e.method.pallet, e.method.method]
+        } else {
+            return [e.section, e.method]
+        }
+    }
+
+    //support both formats
+    parseExtrinsicSectionMethod(e) {
+        if (e.method != undefined && e.method.pallet != undefined) {
+            return [e.method.pallet, e.method.method]
+        } else {
+            return [e.section, e.method]
+        }
+    }
+
+    map_feedTransfers_to_transfers(feedTransfers) {
+        let transfers = [];
+        let covered = {}
+        for (const f of feedTransfers) {
+            let k = `${f.extrinsicHash}-${f.fromAddress}-${f.toAddress}-${f.rawAmount}` // it's nearly impossible to have collision even dropping the asset
+            //let k = `${f.fromAddress}-${f.toAddress}-${f.rawAmount}-${f.asset}`
+            if (covered[k] == undefined) { // PROBLEM: no preference between redundant events
+                covered[k] = 1;
+                // copy key pieces of feedTransfer into transfer (skipping: chainID/extrinsicID/extrinsicHash/...)
+                let t = {
+                    eventID: f.eventID,
+                    section: f.section,
+                    method: f.method,
+                    from: f.from,
+                    to: f.to,
+                    fromAddress: f.fromAddress,
+                    toAddress: f.toAddress,
+                    amount: f.amount,
+                    rawAmount: f.rawAmount,
+                    asset: f.asset,
+                    //symbol: f.symbol,
+                    //decimals: f.decimals
+                }
+                if (f.priceUSD > 0) t.priceUSD = f.priceUSD;
+                if (f.amountUSD > 0) t.amountUSD = f.amountUSD;
+                if (f.rawAsset != undefined) t.rawAsset = f.rawAsset;
+                if (f.symbol != undefined) t.symbol = f.symbol;
+                if (f.decimals != undefined) t.decimals = f.decimals;
+                transfers.push(t);
+            }
+        }
+        return transfers;
+    }
+
+    map_feedRewards_to_rewards(feedRewards) {
+        let rewards = [];
+        for (const f of feedRewards) {
+            let t = {
+                eventID: f.eventID,
+                section: f.section,
+                method: f.method,
+                account: f.account,
+                accountAddress: f.accountAddress,
+                amount: f.amount,
+                rawAmount: f.rawAmount,
+                asset: f.asset
+            }
+            if (f.priceUSD > 0) t.priceUSD = f.priceUSD;
+            if (f.amountUSD > 0) t.amountUSD = f.amountUSD;
+            if (f.rawAsset != undefined) t.rawAsset = f.rawAsset;
+            if (f.symbol != undefined) t.symbol = f.symbol;
+            if (f.decimals != undefined) t.decimals = f.decimals;
+            rewards.push(t);
+        }
+        return rewards;
+    }
+
+    async process_extrinsic(api, extrinsicRaw, eventsRaw, block, index, finalized = false) {
+        let blockNumber = block.header.number;
+        let blockHash = block.hash;
+        let blockTS = block.blockTS;
+        let extrinsicID = blockNumber + "-" + index;
+        // must do extrinsicHash, isSigned here. information is lost after decode_s_extrinsic
+        let extrinsicHash = extrinsicRaw.hash.toHex();
+        if (this.pendingExtrinsic[extrinsicHash] !== undefined && finalized) {
+            // console.log("deleting finalized extrinsic from pending list", extrinsicHash);
+            delete this.pendingExtrinsic[extrinsicHash];
+        }
+
+        let extrinsic = this.decode_s_extrinsic(extrinsicRaw, blockNumber, index, api);
+        if (!extrinsic.method) {
+            // TODO: onInitialize, onFinalize
+            return (extrinsic);
+        }
+        let isSigned = this.isExtrinsicSigned(extrinsic)
+
+
+        let success = false;
+        extrinsic.events = eventsRaw
+
+        let res = this.checkExtrinsicStatusAndFee(api, extrinsic, extrinsicHash, extrinsicID, isSigned)
+        let chainDecimal = this.getChainDecimal(this.chainID)
+        if (isSigned) {
+            extrinsic.signature.tip = extrinsic.signature.tip / 10 ** chainDecimal
+        }
+        let evmTxStatus = false
+        if (res.isEVM) {
+            evmTxStatus = res.isEVM
+            let evmTxHash = evmTxStatus.transactionHash
+            //todo: write related if it's not isH160Native
+            if (!this.isH160Native(this.chainID)) {
+                let evmAddrs = []
+                evmAddrs.push(evmTxStatus.from.toLowerCase())
+                evmAddrs.push(evmTxStatus.to.toLowerCase())
+                evmAddrs.map((evmAddr) => {
+                    return this.process_reverse_evmlink(evmAddr);
+                })
+            }
+            // add extrinsicEvmMap here
+            this.extrinsicEvmMap[evmTxHash] = {
+                extrinsicID: extrinsicID,
+                extrinsicHash: extrinsicHash
+            }
+            //console.log(`this.extrinsicEvmMap[${evmTxHash}]`, this.extrinsicEvmMap[evmTxHash])
+            //console.log(evmTxStatus)
+        }
+
+        extrinsic.fee = res.fee / 10 ** chainDecimal
+        extrinsic.success = res.success
+        if (extrinsic.success == 0) {
+            extrinsic.err = res.err
+            //console.log(`failedTX [${extrinsicID}] ${extrinsicHash}`, JSON.stringify(res))
+            //console.log(JSON.stringify(extrinsic))
+        }
+        if (!(extrinsic.signature)) {
+            return (extrinsic);
+        }
+
+        //(ed25519 and sr25519 do not have id?)
+        let signer = false
+        if (extrinsic.signature.signer.id != undefined) {
+            signer = extrinsic.signature.signer.id
+        } else if (extrinsic.signature.signer != undefined) {
+            signer = extrinsic.signature.signer
+        }
+
+        // fromAddress is pubkey representation common to ALL substrate chains
+        //let fromAddress = isSigned ? paraTool.getPubKey(signer) : "NONE";
+        let fromAddress = "NONE"
+        try {
+            fromAddress = isSigned ? paraTool.getPubKey(signer) : "NONE";
+        } catch (e) {
+            console.log("getPubKey error", e)
+        }
+
+        let params = extrinsic.args;
+
+        let nonce = isSigned ? extrinsic.signature.nonce : 0 //non-signed extrinsic has by default 0 nonce
+
+        let tip = isSigned ? extrinsic.signature.tip : 0 //non-signed extrinsic has by default 0 tip
+        let txFee = extrinsic.fee
+        let txResult = extrinsic.success
+        let txErr = (extrinsic.success == 0) ? extrinsic.err : ''
+
+        let txLifetime = (extrinsic.lifetime != undefined) ? extrinsic.lifetime : false
+
+        let sigs = extrinsic.signature
+        sigs.fee = extrinsic.fee
+        let result = {
+            success: res.success,
+            err: res.err
+        }
+
+        // "rExtrinsic" cleaned output - same output should be used for storing block-extrinsics + feed, and any additional processing (processExtrinsicEvents/processXCMTransfer)
+        let rExtrinsic = {
+            chainID: this.chainID,
+            ts: blockTS,
+            blockHash: blockHash,
+            blockNumber: blockNumber,
+            extrinsicID: extrinsicID,
+            extrinsicHash: extrinsicHash,
+            evm: null,
+            signer: isSigned ? signer : null,
+            signature: isSigned ? extrinsic.signature.signature : null,
+            lifetime: txLifetime,
+            nonce: nonce,
+            tip: tip,
+            fee: txFee,
+            result: txResult,
+            err: null,
+            section: extrinsic.method.pallet,
+            method: extrinsic.method.method, //replacing the original method object format
+            params: extrinsic.args,
+            events: extrinsic.events,
+        }
+        if (evmTxStatus) {
+            rExtrinsic.evm = evmTxStatus;
+        } else {
+            delete rExtrinsic.evm;
+        }
+        if (txResult) {
+            delete rExtrinsic.err;
+        } else {
+            rExtrinsic.err = txErr
+        }
+
+        if (!paraTool.auditHashesTx(rExtrinsic)) {
+            console.log(`Failed Audit!!`, rExtrinsic)
+            //process.exit(0)
+        }
+
+        if (!isSigned) {
+            this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, finalized);
+        }
+        //console.log('hash!!', extrinsicHash, `isSigned=${isSigned}`, `${JSON.stringify(extrinsic.signature)}`, extrinsic.signature.signer)
+
+        //extrinsic.fromAddress = fromAddress; // this is the pubkey
+        try {
+
+            // feed is used for {feed, feedTransfer, feedRewards}
+            var feed = {};
+            feed = rExtrinsic
+            feed["genTS"] = this.currentTS();
+            feed["source"] = this.hostname // add index source for debugging
+
+            this.chainParser.processExtrinsicEvents(this, rExtrinsic.section, rExtrinsic.method, rExtrinsic.events);
+
+            let isSuccess = (rExtrinsic.err == undefined) ? true : false //skip feedtransfer/feedxcm/feedreward/feedcrowdloan processing if is failure case
+
+            if (isSuccess) {
+                /* process feedtransfer:
+                feedtransfer keeps a list of incoming transfers
+                for outgoing transfer, we set isIncoming to 0 and addresss as senderAddress
+                */
+                let feedTransfers = await this.processFeedTransfer(feed, blockTS)
+                let valueExtrinsicUSD = 0;
+                for (const feedTransfer of feedTransfers) {
+                    if (fromAddress != "NONE" && feedTransfer["fromAddress"] != undefined && feedTransfer["amountUSD"] != undefined) {
+                        if (fromAddress == feedTransfer["fromAddress"]) {
+                            let amountUSD = feedTransfer["amountUSD"];
+                            if (amountUSD > valueExtrinsicUSD) {
+                                valueExtrinsicUSD = amountUSD;
+                            }
+                        }
+                    }
+
+                    // incoming transfers (recipient)
+                    let receiptAddress = paraTool.getPubKey(feedTransfer.to)
+                    this.stat.addressRows.feedtransfer++
+                    this.updateAddressExtrinsicStorage(receiptAddress, extrinsicID, extrinsicHash, "feedtransfer", feedTransfer, blockTS, block.finalized);
+
+                    // outgoing transfers (sender)
+                    let senderAddress = paraTool.getPubKey(feedTransfer.from)
+                    let outgoingFeedTransfer = feedTransfer
+                    outgoingFeedTransfer.isIncoming = 0
+
+                    this.stat.addressRows.feedtransfer++
+                    this.updateAddressExtrinsicStorage(senderAddress, extrinsicID, extrinsicHash, "feedtransfer", outgoingFeedTransfer, blockTS, block.finalized);
+                }
+
+                if (valueExtrinsicUSD > 0) {
+                    feed["v"] = valueExtrinsicUSD;
+                }
+                if (feedTransfers.length > 0) {
+                    feed["transfers"] = this.map_feedTransfers_to_transfers(feedTransfers);
+                }
+                // process xcmtransfer
+                //let xcmtransfer = this.chainParser.processXCMTransfer(this, rExtrinsic, feed, fromAddress);
+                this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
+
+                if (rExtrinsic.xcms != undefined && Array.isArray(rExtrinsic.xcms) && rExtrinsic.xcms.length > 0) {
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length}`, rExtrinsic.xcms)
+                    for (const xcmtransfer of rExtrinsic.xcms) {
+                        this.stat.addressRows.xcmsend++;
+                        this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized);
+                        this.updateXCMTransferStorage(xcmtransfer); // store, flushed in flushXCM
+                    }
+                    delete rExtrinsic.xcms
+                }
+
+                // process proxy
+                // step 1 - filter proxy events
+                let proxyEvents = extrinsic.events.filter((ev) => {
+                    return this.chainParser.proxyFilter(`${ev.section}(${ev.method})`);
+                })
+                // step 2 - generate proxy events
+                let rawProxies = proxyEvents.map((pe) => {
+                    return this.chainParser.prepareFeedProxy(this, pe.section, pe.method, pe.data, pe.eventID);
+                })
+                // step 3 - set proxyEvent
+                if (rawProxies.length > 0 && block.finalized) {
+                    for (const rawProxyRec of rawProxies) {
+                        // mostly likely it's array of 1 element
+                        if (rawProxyRec) {
+                            this.updateProxyMap(rawProxyRec)
+                        }
+                    }
+                }
+
+                // process feedrewards
+                // step 1 - filter rewards events
+                let rewardEvents = extrinsic.events.filter((ev) => {
+                    return this.chainParser.rewardFilter(`${ev.section}(${ev.method})`);
+                })
+                // step 2 - generate rewardEvents
+                let rawFeedRewards = rewardEvents.map((re) => {
+                    return this.chainParser.prepareFeedReward(this, re.section, re.method, re.data, re.eventID);
+                })
+
+                // step 3 - decorate RawFeedReward using the "feed" we build
+                if (rawFeedRewards.length > 0 && block.finalized) {
+                    let feedRewards = await this.processRawFeedRewards(feed, rawFeedRewards, blockTS)
+                    //console.log(`feedRewards`, feedRewards)
+                    for (const feedreward of feedRewards) {
+                        // TODO: can a same address get touched twice with an extrinsic?
+                        // claim: it's possible but super rare
+                        let toAddress = paraTool.getPubKey(feedreward.account)
+                        // (3) acct:feedreward -> recFeedreward (can be processed immediately)
+                        this.stat.addressRows.feedreward++
+                        this.updateAddressExtrinsicStorage(toAddress, extrinsicID, extrinsicHash, "feedreward", feedreward, blockTS, block.finalized);
+                    }
+                    if (feedRewards.length > 0) {
+                        feed["rewards"] = this.map_feedRewards_to_rewards(feedRewards);
+                    }
+                }
+
+                // process feedcrowdloan
+                let crowdloanEvents = extrinsic.events.filter((ev) => {
+                    return this.chainParser.crowdloanFilter(`${ev.section}(${ev.method})`);
+                })
+                if (crowdloanEvents.length > 0 && block.finalized) {
+                    //console.log(`crowdloan found ${extrinsicID}!`)
+                    let rawFeedCrowdloans = crowdloanEvents.map((ce) => {
+                        return this.chainParser.prepareFeedcrowdloan(this, ce.section, ce.method, ce.data, ce.eventID);
+                    })
+
+                    if (extrinsic.remarks.length > 0) {
+                        //console.log(`remarks found!`, extrinsic.remarks)
+                    }
+
+                    //console.log(`rawFeedCrowdloans`, rawFeedCrowdloans)
+                    let feedCrowdLoans = this.processRawFeedCrowdLoans(feed, rawFeedCrowdloans, blockTS, extrinsic.remarks)
+
+                    for (const feedcrowdloan of feedCrowdLoans) {
+                        // TODO: can a same address get touched twice with an extrinsic?
+                        // claim: it's possible but super rare
+                        let toAddress = paraTool.getPubKey(feedcrowdloan.account)
+                        //TODO:should the key include event index?
+                        // (3) acct:feedcrowdloan -> recFeedcrowdloan (can be processed immediately)
+                        this.stat.addressRows.feedcrowdloan++
+                        //console.log(`${toAddress} feedcrowdloan`, feedcrowdloan)
+                        this.updateAddressExtrinsicStorage(toAddress, extrinsicID, extrinsicHash, "feedcrowdloan", feedcrowdloan, blockTS, block.finalized);
+                        this.updateCrowdloanStorage(feedcrowdloan);
+                    }
+                }
+
+                let multisigRec = this.chainParser.processMultisig(this, rExtrinsic, feed, fromAddress);
+                if (multisigRec) {
+                    this.updateMultisigMap(multisigRec)
+                }
+
+            }
+
+            if (this.validAddress(fromAddress)) {
+                // (4) txn (can be processed immediately)
+                this.stat.addressRows.feed++
+                this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feed", feed, blockTS, block.finalized);
+            }
+            // (1) hashesRowsToInsert: extrinsicHash -> tx
+            let hashrec = {};
+            hashrec["tx"] = { // TODO: consider storing blockNumber-index instead of "tx" to support edge case of account reaping
+                value: JSON.stringify(feed),
+                timestamp: blockTS * 1000000
+            };
+            this.stat.hashesRows.substrateTx++
+            let extrinsicHashRec = {
+                key: extrinsicHash,
+                data: {}, //feed/feedunfinalized
+            }
+            if (block.finalized) {
+                extrinsicHashRec.data["feed"] = hashrec
+            } else {
+                extrinsicHashRec.data["feedunfinalized"] = hashrec
+            }
+            this.hashesRowsToInsert.push(extrinsicHashRec)
+        } catch (err) {
+            this.log_indexing_error(err, "processBlock")
+        }
+
+        return (rExtrinsic);
+    }
+
+    get_block_timestamp(block) {
+        return (block.blockTS);
+    }
+
+    getBlockStats(block, events, evmBlock = false, evmReceipts = false) {
+        let blockStats = {
+            numExtrinsics: block.extrinsics.length,
+            numSignedExtrinsics: 0,
+            numTransfers: 0,
+            numEvents: events.length,
+            valueTransfersUSD: 0
+        }
+        if (evmBlock) {
+            blockStats.blockHashEVM = evmBlock.hash;
+            blockStats.parentHashEVM = evmBlock.parentHash;
+            blockStats.numTransactionsEVM = evmBlock.transactions.length;
+            blockStats.gasUsed = evmBlock.gasUsed;
+            blockStats.gasLimit = evmBlock.gasLimit;
+        }
+        if (evmReceipts) {
+            blockStats.numReceiptsEVM = ethTool.computeNumEvmlogs(evmReceipts);
+        }
+        block.extrinsics.forEach((extrinsic, index) => {
+            if (this.isExtrinsicSigned(extrinsic)) blockStats.numSignedExtrinsics++;
+            let numTransfers = extrinsic.transfers ? extrinsic.transfers.length : 0;
+            let valueTransfersUSD = 0;
+            if (numTransfers > 0) {
+                for (const t of extrinsic.transfers) {
+                    if (t.amountUSD != undefined) {
+                        valueTransfersUSD += t.amountUSD
+                    }
+                }
+            }
+            blockStats.numTransfers += numTransfers
+            blockStats.valueTransfersUSD += valueTransfersUSD
+        });
+
+        return (blockStats);
+    }
+
+    getErcTokenAssetChain(tokenAddress, chainID) {
+        // Store in lower case
+        let lowerAsset = tokenAddress.toLowerCase()
+        return paraTool.makeAssetChain(lowerAsset, chainID);
+    }
+
+    getErc20LPAssetChain(tokenAddress, chainID) {
+        // Store in lower case
+        let lowerAsset = `${tokenAddress.toLowerCase()}:LP`
+        return paraTool.makeAssetChain(lowerAsset, chainID);
+    }
+
+    getErc721TokenAssetChain(tokenAddress, chainID) {
+        // Store in lower case
+        let lowerAsset = tokenAddress.toLowerCase()
+        let lowerAssetKey = JSON.stringify({
+            ERC721: tokenAddress
+        })
+        return paraTool.makeAssetChain(lowerAssetKey, chainID);
+    }
+
+    getErc721TokenIDAssetChain(tokenAddress, tokenID, chainID) {
+        // Store in lower case
+        let lowerAsset = tokenAddress.toLowerCase()
+        let lowerAssetKey = JSON.stringify({
+            ERC721: tokenAddress,
+            tokenID: ethTool.computeTokenIDHex(tokenID)
+        })
+        return paraTool.makeAssetChain(lowerAssetKey, chainID);
+    }
+
+    getErc1155TokenAssetChain(tokenAddress, chainID) {
+        // Store in lower case
+        let lowerAsset = tokenAddress.toLowerCase()
+        let lowerAssetKey = JSON.stringify({
+            ERC1155: tokenAddress
+        })
+        return paraTool.makeAssetChain(lowerAssetKey, chainID);
+    }
+
+    initERCAssetOnCache(assetChain, tokenInfo) {
+        let assetType = tokenInfo.assetType
+        if (this.tallyAsset[assetChain] == undefined) {
+            this.tallyAsset[assetChain] = tokenInfo
+            //console.log(`${assetChain}`, this.tallyAsset[assetChain])
+            let contractAddress = tokenInfo.tokenAddress.toLowerCase()
+            this.ercTokenList[contractAddress] = tokenInfo;
+            //console.log('CONTRACT Init ON Cache', assetType, assetChain, tokenInfo);
+        }
+    }
+
+    initERCAssetOnMiss(assetChain, tokenInfo, assetType) {
+        tokenInfo.assetType = assetType;
+        if (this.tallyAsset[assetChain] == undefined) {
+            this.tallyAsset[assetChain] = tokenInfo
+            //console.log(`${assetChain}`, this.tallyAsset[assetChain])
+            let contractAddress = tokenInfo.tokenAddress.toLowerCase()
+            this.ercTokenList[contractAddress] = tokenInfo;
+            console.log('CONTRACT FETCH ON MISS', assetType, assetChain, tokenInfo);
+        }
+    }
+
+    initERCAsset(assetChain, tokenInfo, tx, assetType) {
+        tokenInfo.creator = tx.from;
+        tokenInfo.createdAtTx = tx.transactionHash;
+        tokenInfo.assetType = assetType;
+        if (this.tallyAsset[assetChain] == undefined) {
+            this.tallyAsset[assetChain] = tokenInfo
+            let contractAddress = tokenInfo.tokenAddress.toLowerCase()
+            this.ercTokenList[contractAddress] = tokenInfo;
+            console.log('CONTRACT CREATE', assetType, assetChain, tokenInfo);
+        }
+    }
+
+    async process_evm_contract_create(tx, chainID) {
+        // waterfall model: use `getERC20TokenInfo` to categorize ERC20 contract first. if doesn't work, we will try erc720 next, and then erc1155..
+        let web3Api = this.web3Api
+        let bn = tx.blockNumber
+        let contractAddress = tx.creates
+        // ethTool rpccall (4)
+        let erc20TokenInfo = await ethTool.getERC20TokenInfo(web3Api, contractAddress, bn)
+        if (erc20TokenInfo) {
+            // store in ercTokenList + tallyAsset, flushed in flushShort/flusTokens
+            let ercType = paraTool.assetTypeERC20
+
+            // ethTool rpccall (5)
+            let lpTokenInfo = await ethTool.getERC20LiquidityPairTokenInfo(web3Api, contractAddress, bn)
+            if (!lpTokenInfo) {
+                this.cacheNonCompliantLP(contractAddress)
+            }
+            erc20TokenInfo.lpInfo = lpTokenInfo
+            /*
+            if (lpTokenInfo) {
+                ercType = paraTool.assetTypeERC20LiquidityPair
+            }
+            */
+            let assetChain = this.getErcTokenAssetChain(erc20TokenInfo.tokenAddress, chainID)
+            this.initERCAsset(assetChain, erc20TokenInfo, tx, ercType);
+            return (true)
+        }
+        // trying erc721 next
+        // ethTool rpccall (6)
+        let erc721ContractInfo = await ethTool.getERC721ContractInfo(web3Api, contractAddress, bn)
+        if (erc721ContractInfo) {
+            let assetChain = this.getErc721TokenAssetChain(erc721ContractInfo.tokenAddress, chainID)
+            this.initERCAsset(assetChain, erc721ContractInfo, tx, paraTool.assetTypeERC721);
+            return true
+        }
+
+        //trying erc1155 (stub)
+        // ethTool rpccall (7)
+        let erc1155ContractInfo = await ethTool.getERC1155ContractInfo(web3Api, contractAddress, bn)
+        if (erc1155ContractInfo) {
+            let assetChain = this.getErc1155TokenAssetChain(erc1155ContractInfo.tokenAddress, chainID)
+            this.initERCAsset(assetChain, erc1155ContractInfo, tx, paraTool.assetTypeERC1155);
+            return true
+        }
+
+        {
+            let contractInfo = {
+                tokenAddress: contractAddress,
+            };
+            let assetChain = this.getErcTokenAssetChain(contractAddress, chainID);
+            this.initERCAsset(assetChain, contractInfo, tx, paraTool.assetTypeContract);
+        }
+
+        return (false);
+    }
+
+    async process_evmtx_native_transfer(tx, chainID, ts, blockNumber) {
+        let nativeAsset = this.getNativeAsset()
+        let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
+        // mark assetholder as worthy of update
+        // Note: could get internal transfer with evmtraces https://docs.moonbeam.network/builders/build/eth-api/debug-trace/ https://docs.moonbeam.network/builders/build/eth-api/debug-trace/
+        this.updateAssetHolder(nativeAssetChain, tx.from, tx.blockNumber)
+        this.updateAssetHolder(nativeAssetChain, tx.to, tx.blockNumber)
+        return (false);
+    }
+
+    updateAssetHolder(asset, holder, bn, newState = false) {
+        let assetholder = `${holder}-${asset}`
+        this.stat.assetholder.read++
+        let cachedState = this.assetholder[assetholder]
+        if (cachedState == undefined) {
+            this.stat.assetholder.unique++
+            this.stat.assetholder.write++
+            this.assetholder[assetholder] = [bn, newState];
+        } else {
+            var [prevBN, prevState] = cachedState
+            if (prevBN < bn) { // we record newState = false cases even if they are newer
+                this.stat.assetholder.write++
+                this.stat.assetholder.update++
+                this.assetholder[assetholder] = [bn, newState];
+            }
+        }
+    }
+
+    // for all holders get the balances (native or not) and write to BT and mysql ... within 10 mins
+    async updateChainAssetHoldersBalances(chain, limitSeconds = 600) {
+        let batchSize = 128;
+        let bn = chain.blocksFinalized;
+        await this.setupAPI(chain);
+        let chainID = chain.chainID;
+        this.chainID = chainID;
+        let web3Api = this.web3Api
+        let startTS = this.getCurrentTS();
+
+        let nativeAsset = this.getNativeAsset();
+        // temporarily doing 0xbc136d697007f3be0cdf2c8efcd6a6120a20f9e6
+        var sql = `select asset.asset, assetholder.holder, asset.decimals, assetholder.lastUpdateBN, UNIX_TIMESTAMP(assetholder.lastUpdateDT) as lastUpdateTS
+from assetholder${chainID} as assetholder, asset where assetholder.asset = asset.asset and asset.chainID = ${chainID} and assetholder.lastCrawlBN < assetholder.lastUpdateBN and asset.assetType in ( 'ERC20', 'Token' ) limit 100000`;
+        console.log(sql);
+        let ts = this.getCurrentTS();
+        var assetholderRecs = await this.poolREADONLY.query(sql);
+        let assetdecimals = {};
+        let assetholders = {};
+        for (let i = 0; i < assetholderRecs.length; i++) {
+            let a = assetholderRecs[i];
+            let asset = a.asset;
+            let assetChain = paraTool.makeAssetChain(asset, chainID);
+            let holder = a.holder;
+            let decimals = a.decimals;
+            let lastUpdateTS = a.lastUpdateTS;
+            let lastUpdateBN = a.lastUpdateBN;
+            if (!assetdecimals[assetChain]) {
+                assetdecimals[assetChain] = decimals;
+            }
+            if (!assetholders[assetChain]) {
+                assetholders[assetChain] = {};
+            }
+            assetholders[assetChain][holder] = a;
+        }
+        let rows = [];
+        let out = [];
+        let assetsList = []; //for debugging
+        for (const assetChain of Object.keys(assetholders)) {
+            if (this.getCurrentTS() - startTS > limitSeconds) return (true);
+            let a = assetholders[assetChain];
+            let holdersAll = Object.keys(assetholders[assetChain]);
+            let i = 0;
+            let decimals = this.getChainDecimal(chainID);
+            while (i < holdersAll.length) {
+                let holders = holdersAll.slice(i, i + batchSize);
+                let holderBalances = {};
+                let [asset, _] = paraTool.parseAssetChain(assetChain);
+                let tokenDecimal = assetdecimals[asset];
+                try {
+                    console.log("FETCH", asset, holders.length, nativeAsset, this.chainID)
+                    if (asset == nativeAsset && (chainID !== paraTool.chainIDMoonbeam) && (chainID !== paraTool.chainIDMoonriver)) {
+                        holderBalances.blockNumber = chain.blocksFinalized;
+                        holderBalances.holders = [];
+                        for (let h = 0; h < holders.length; h++) {
+                            let account_id = holders[h];
+                            try {
+                                var x = await this.api.query.system.account(account_id);
+                                let d = x.toJSON().data;
+                                d.free = d.free / 10 ** decimals;
+                                d.reserved = d.reserved / 10 ** decimals;
+                                d.miscFrozen = d.miscFrozen / 10 ** decimals;
+                                d.feeFrozen = d.feeFrozen / 10 ** decimals;
+                                holderBalances.holders.push({
+                                    holderAddress: account_id,
+                                    data: d
+                                });
+                            } catch (e) {
+                                console.log(e);
+                            }
+                        }
+                        // holderBalances = await ethTool.getNativeChainBalances(web3Api, holders, bn)
+                    } else {
+                        let tokenAddress = asset;
+                        // ethTool rpccall (8b)
+                        console.log("FETCH", tokenAddress, holders.length)
+                        holderBalances = await ethTool.getTokenHoldersRawBalances(web3Api, tokenAddress, holders, tokenDecimal, bn)
+                        if (holderBalances.holders.length != holders.length) {
+                            console.log("FETCH FAIL", tokenAddress, holders.length, holderBalances.holders.length);
+                        }
+                    }
+                } catch (err) {
+                    this.logger.warn({
+                        "op": "crawlAssetHoldersBalances",
+                        "asset": asset,
+                        err
+                    })
+                }
+                if (holderBalances && holderBalances.holders) {
+                    let lastCrawlBN = holderBalances.blockNumber;
+                    let nwrites = 0;
+                    holderBalances.holders.map((b) => {
+                        let holder = b.holderAddress;
+                        let accKey = b.holderAddress.toLowerCase();
+                        let newState = false;
+                        let free = 0;
+                        let reserved = 0;
+                        let feeFrozen = 0;
+                        let miscFrozen = 0;
+                        if (b.data) {
+                            newState = b.data;
+                            free = newState.free;
+                            reserved = newState.reserved;
+                            feeFrozen = newState.feeFrozen;
+                            miscFrozen = newState.miscFrozen;
+                            console.log(newState);
+                        } else if (b.balance != undefined) {
+                            free = b.balance;
+                            if (b.error != undefined) {
+                                console.log(`crawlAssetHoldersBalances acctError ${holder}, asset=${asset}, errMsg= ${b.error}`)
+                            }
+                            newState = {
+                                free: b.balance
+                            }
+                        }
+
+                        let rec = {};
+                        let lastUpdateTS = assetholders[holder];
+                        rec[assetChain] = {
+                            value: JSON.stringify(newState),
+                            // timestamp could be added from lastUpdateTS
+                            timestamp: ts * 1000000
+                        }
+                        rows.push({
+                            key: accKey,
+                            data: {
+                                realtime: rec
+                            }
+                        });
+                        out.push(`('${asset}', '${chainID}', '${accKey}', '${free}', '${reserved}', '${feeFrozen}', '${miscFrozen}', '${lastCrawlBN}')`);
+                        nwrites++;
+                    });
+                    console.log(" --> ", asset, nwrites);
+                }
+                console.log(out);
+
+                i += batchSize
+                if (out.length > 0) {
+                    await this.upsertSQL({
+                        "table": `assetholder${chainID}`,
+                        "keys": ["asset", "chainID", "holder"],
+                        "vals": ["free", "reserved", "frozen", "miscFrozen", "lastCrawlBN"],
+                        "data": out,
+                        "replace": ["free", "reserved", "frozen", "miscFrozen", "lastCrawlBN"]
+                    });
+                    out = [];
+                }
+                // write addressrealtime
+                if (rows.length > batchSize) { // temp
+                    await this.insertBTRows(this.btAccountRealtime, rows, "accountrealtime");
+                    rows = [];
+                }
+            }
+        }
+
+        if (rows.length > 0) {
+            await this.insertBTRows(this.btAccountRealtime, rows, "accountrealtime");
+            rows = [];
+        }
+
+        if (out.length > 0) {
+            await this.upsertSQL({
+                "table": `assetholder${chainID}`,
+                "keys": ["asset", "chainID", "holder"],
+                "vals": ["free", "reserved", "frozen", "miscFrozen", "lastCrawlBN"],
+                "data": out,
+                "replace": ["free", "reserved", "frozen", "miscFrozen", "lastCrawlBN"]
+            });
+            out = [];
+        }
+        return (true);
+    }
+
+    async process_erc20_token_transfer(tx, t, chainID) {
+        let web3Api = this.web3Api
+        let bn = tx.blockNumber
+        //   1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
+        //   2. mark that the assetholder balancer have to be fetched
+        let assetChain = this.getErcTokenAssetChain(t.tokenAddress, chainID)
+        let tokenInfo = this.tallyAsset[assetChain]
+        // [mint] token send from '0x0000000000000000000000000000000000000000'
+        // [burn] token sent to '0x0000000000000000000000000000000000000000' or '0x000000000000000000000000000000000000dEaD'
+        // we can't distinguish incremtental token mint within a block - so we only should fetch token at most once per block
+        let isMint = t.from == '0x0000000000000000000000000000000000000000'
+        let isBurn = (t.to == '0x0000000000000000000000000000000000000000' || t.to == '0x000000000000000000000000000000000000dEaD')
+        let isMiss = true
+        let isCached = false
+        if (tokenInfo != undefined) {
+            isCached = true
+            isMiss = false
+            /*if ((tokenInfo.blockNumber != tx.blockNumber) && (isMint || isBurn)) {
+                // fetch once per block here
+                isCached = false
+            } */
+        } else {
+            // search ercTokenList first
+            let cAddress = t.tokenAddress.toLowerCase();
+            if (this.ercTokenList[cAddress]) {
+                isCached = true;
+                tokenInfo = this.ercTokenList[cAddress] // note: totalSupply is not accurate here
+
+                // console.log(`[${bn}-${tx.transactionIndex}] ERC20 Cache FOUND  ${t.tokenAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply}`)
+            }
+        }
+        if (isCached) {
+            // console.log(`[${bn}-${tx.transactionIndex}] ERC20 Cached  ${t.tokenAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply}`)
+            this.initERCAssetOnCache(assetChain, tokenInfo)
+        } else {
+            // TODO: search mysql asset first, then do RPC
+            // ethTool rpccall (9)
+            tokenInfo = await ethTool.getERC20TokenInfo(web3Api, t.tokenAddress, bn)
+            let ercType = paraTool.assetTypeERC20
+
+            let lpTokenInfo = false;
+            if (!this.isCachedNonCompliantLP(t.tokenAddress)) {
+                // ethTool rpccall (10)
+                lpTokenInfo = await ethTool.getERC20LiquidityPairTokenInfo(web3Api, t.tokenAddress, bn)
+                if (!lpTokenInfo) {
+                    this.cacheNonCompliantLP(t.tokenAddress)
+                }
+            }
+            /*
+            if (lpTokenInfo) {
+                ercType = paraTool.assetTypeERC20LiquidityPair
+            }
+            */
+            if (tokenInfo) {
+                tokenInfo.lpInfo = lpTokenInfo
+                console.log(`**[${bn}-${tx.transactionIndex}] ${ercType} Fetched ${t.tokenAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply} (Miss: ${isMiss}, Mint: ${isMint}, Burn: ${isBurn})`)
+                this.initERCAssetOnMiss(assetChain, tokenInfo, ercType)
+                //this.tallyAsset[assetChain] = tokenInfo
+            }
+        }
+        // This mark for lookup on isTip = true for processAssetTypeERC20/fetchAssetHolderBalances
+        this.updateAssetHolder(assetChain, t.from, bn)
+        this.updateAssetHolder(assetChain, t.to, bn)
+    }
+
+
+    async fetchMissingERC20(contractAddress, bn) {
+        let web3Api = this.web3Api
+        // ethTool rpccall (11)
+        let tokenInfo = await ethTool.getERC20TokenInfo(web3Api, contractAddress, bn)
+        let ercType = paraTool.assetTypeERC20
+        // ethTool rpccall (12)
+        /*
+        if (lpTokenInfo) {
+            ercType = paraTool.assetTypeERC20LiquidityPair
+        }
+        */
+        if (tokenInfo) {
+            //let lpTokenInfo = await ethTool.getERC20LiquidityPairTokenInfo(web3Api, contractAddress, bn)
+            let lpTokenInfo = false;
+            if (!this.isCachedNonCompliantLP(contractAddress)) {
+                // ethTool rpccall (10)
+                lpTokenInfo = await ethTool.getERC20LiquidityPairTokenInfo(web3Api, contractAddress, bn)
+                if (!lpTokenInfo) {
+                    this.cacheNonCompliantLP(contractAddress)
+                }
+            }
+
+            tokenInfo.lpInfo = lpTokenInfo
+            let assetChain = this.getErcTokenAssetChain(contractAddress, this.chainID)
+            console.log(`**[${bn}] ${ercType} Fetched ${contractAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply}`)
+            this.initERCAssetOnMiss(assetChain, tokenInfo, paraTool.assetTypeERC20)
+            //this.tallyAsset[assetChain] = tokenInfo
+        }
+    }
+
+    async process_erc721_token_transfer(tx, t, chainID) {
+        let web3Api = this.web3Api
+        let bn = tx.blockNumber
+        let tokenID = t.tokenId
+        let contractAddress = t.tokenAddress
+        let sender = t.from
+        let recipient = t.to
+        //   1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
+        //   2. mark that the assetholder balancer have to be fetched
+        let assetChain = this.getErc721TokenIDAssetChain(contractAddress, tokenID, chainID)
+        let erc721TokenIDMeta = this.tallyAsset[assetChain]
+        // [mint] token send from '0x0000000000000000000000000000000000000000'
+        // [burn] token sent to '0x0000000000000000000000000000000000000000' or '0x000000000000000000000000000000000000dEaD'
+        // we can't distinguish incremtental token mint within a block - so we only should fetch token at most once per block
+        let isMint = sender == '0x0000000000000000000000000000000000000000'
+        let isBurn = (recipient == '0x0000000000000000000000000000000000000000' || recipient == '0x000000000000000000000000000000000000dEaD')
+        let isMiss = true
+        let isCached = false
+        if (erc721TokenIDMeta != undefined) {
+            isCached = true
+            isMiss = false
+            if ((erc721TokenIDMeta.blockNumber != tx.blockNumber) && (isMint || isBurn)) {
+                // only fetch for "missed" case
+                // isCached = false
+            }
+        }
+
+        if (isCached) {
+            let prevHolder = erc721TokenIDMeta.owner
+            erc721TokenIDMeta.owner = recipient
+            erc721TokenIDMeta.blockNumber = bn
+            console.log(`[${bn}-${tx.transactionIndex}] ERC721 tokenID Cached  ${contractAddress} [${erc721TokenIDMeta.tokenID}], prevHolder:${prevHolder} -> currHolder:${erc721TokenIDMeta.owner}`)
+
+        } else {
+            // TODO: search btAsset first, then do RPC
+            // ignore burned tokenID on miss
+            if (!isBurn && false) {
+                // ethTool rpccall (13)
+                erc721TokenIDMeta = await ethTool.getERC721NFTMeta(web3Api, contractAddress, tokenID, false, bn)
+                console.log(`**[${bn}-${tx.transactionIndex}] ERC721 tokenID Fetched ${contractAddress} [${erc721TokenIDMeta.tokenID}], currHolder:${erc721TokenIDMeta.owner}, (Miss: ${isMiss}, Mint: ${isMint}, Burn: ${isBurn})`)
+            }
+        }
+        if (erc721TokenIDMeta) {
+            erc721TokenIDMeta.assetType = paraTool.assetTypeERC721Token;
+            this.tallyAsset[assetChain] = erc721TokenIDMeta // TODO
+        }
+    }
+
+    async process_erc1155_token_transfer(tx, t, chainID) {
+        //stub
+    }
+
+    async process_evmtx_token_transfer(tx, chainID) {
+        // TODO: erc721/1151
+        let web3Api = this.web3Api
+        let bn = tx.blockNumber
+        let transfers = tx.transfers
+
+        for (const t of transfers) {
+            //console.log(`Evm transfer [${bn}-${tx.transactionIndex}]`, JSON.stringify(t))
+            if (t.type == "ERC20") {
+                await this.process_erc20_token_transfer(tx, t, chainID)
+            }
+            if (t.type == "ERC721") {
+                await this.process_erc721_token_transfer(tx, t, chainID)
+            }
+            if (t.type == "ERC1155") {
+                await this.process_erc1155_token_transfer(tx, t, chainID)
+            }
+        }
+        return (false);
+    }
+
+
+    //called after erc20 transfers is processed
+    async process_evmtx_swap(tx, chainID) {
+        let web3Api = this.web3Api
+        let bn = tx.blockNumber
+        let swaps = tx.swaps
+
+        for (const s of swaps) {
+            //concole.log(`[${bn}-${tx.transactionIndex}]`, JSON.stringify(t))
+            if (s.type == "swapV2") {
+                await this.process_v2_swap(s, chainID, bn)
+            }
+        }
+        return (false);
+    }
+
+    async process_v2_swap(swapEvent, chainID, bn, retryOnMiss = true) {
+        //console.log(`process_v2_swap`, swapEvent)
+        if (swapEvent.type == "swapV2") {
+            let lpTokenAddress = swapEvent.lpTokenAddress
+            let lpToken = this.getLPToken(lpTokenAddress)
+            if (lpToken && lpToken.lpInfo) {
+                let lpTokenInfo = lpToken.lpInfo
+                //console.log(lpToken)
+                //console.log(lpTokenInfo)
+                let token0In = paraTool.dechexToInt(swapEvent.amount0In) / 10 ** lpTokenInfo.token0Decimals
+                let token1In = paraTool.dechexToInt(swapEvent.amount1In) / 10 ** lpTokenInfo.token1Decimals
+                let token0Out = paraTool.dechexToInt(swapEvent.amount0Out) / 10 ** lpTokenInfo.token0Decimals
+                let token1Out = paraTool.dechexToInt(swapEvent.amount1Out) / 10 ** lpTokenInfo.token1Decimals
+                //trade volume: by definition, it's the inflow (token1In, token0Out)
+                //trade fee: total outflow - total inflow (TODO)
+                let token0Symbol = lpTokenInfo.token0Symbol
+                let token1Symbol = lpTokenInfo.token1Symbol
+                let inFlow = (token0In != 0) ? `${token0In} ${token0Symbol}` : `${token1In} ${token1Symbol}`
+                let outFlow = (token0Out != 0) ? `${token0Out} ${token0Symbol}` : `${token1Out} ${token1Symbol}`
+                //console.log(`[${lpTokenAddress}][${token0Symbol}/${token1Symbol}] - inFlow +${inFlow}, outFlow -${outFlow}`)
+                if (token0Symbol == undefined || token1Symbol == undefined || isNaN(token0In) || isNaN(token1In) || isNaN(token0Out) || isNaN(token1Out)) {
+                    console.log(`[${lpTokenAddress}] missing lpToken !`, lpToken)
+                    console.log(`[${lpTokenAddress}] missing lpInfo  !`, lpTokenInfo)
+                    console.log(`[${lpTokenAddress}] NAN check: 0In=${token0In}, 1In=${token1In}, 0Out=${token0Out}, 1Out=${token1Out}, 0Decimals=${lpTokenInfo.token0Decimals}, 1Decimals=${lpTokenInfo.token1Decimals}`)
+                }
+                let r = {
+                    token0In: token0In,
+                    token1Out: token1Out,
+                    token1In: token1In,
+                    token0Out: token0Out,
+                    lpAddress: lpTokenAddress
+                }
+                //console.log(`swapV2`, r)
+                let assetChainLP = this.getErc20LPAssetChain(lpTokenAddress, chainID)
+                let assetChainLPAsNormal = this.getErcTokenAssetChain(lpTokenAddress, chainID)
+                lpToken.assetType = paraTool.assetTypeERC20 // modify assetType here so it get updated at the tip
+                this.initERCAssetOnCache(assetChainLPAsNormal, lpToken)
+                this.updateAssetERC20SwapTradingVolume(assetChainLP, r.token0In, r.token1In, r.token0Out, r.token1Out) //MK
+            } else if (retryOnMiss) {
+                console.log(`process_v2_swap: fetching unknown lpToken ${lpTokenAddress}`, lpToken)
+                await this.fetchMissingERC20(lpTokenAddress, bn)
+                await this.process_v2_swap(swapEvent, chainID, bn, false)
+            } else {
+                console.log(`process_v2_swap: unknown lpToken ${lpTokenAddress} exit`, lpToken)
+            }
+        } else {
+            console.log(`new swapEvent detected`, swapEvent)
+        }
+    }
+
+    async process_evmtx_syncEvent(syncEvent, chainID, bn, retryOnMiss = true) {
+        if (syncEvent.type == "syncV2") {
+            let lpTokenAddress = syncEvent.lpTokenAddress
+            let lpToken = this.getLPToken(lpTokenAddress)
+            if (lpToken && lpToken.lpInfo) {
+                let lpTokenInfo = lpToken.lpInfo
+                //console.log(lpToken)
+                //console.log(lpTokenInfo)
+                let lp0 = paraTool.dechexToInt(syncEvent.reserve0) / 10 ** lpTokenInfo.token0Decimals
+                let lp1 = paraTool.dechexToInt(syncEvent.reserve1) / 10 ** lpTokenInfo.token1Decimals
+                let rat = lp0 / lp1
+                let token0Symbol = lpTokenInfo.token0Symbol
+                let token1Symbol = lpTokenInfo.token1Symbol
+                //console.log(`[${lpTokenAddress}][${token0Symbol}/${token1Symbol}] - ${lp0}/${lp1} ~ ${rat}`)
+                let r = {
+                    lp0: lp0,
+                    lp1: lp1,
+                    rat: rat,
+                    lpAddress: lpTokenAddress
+                }
+                //console.log(`syncV2`, r)
+                let assetChainLP = this.getErc20LPAssetChain(lpTokenAddress, chainID)
+                let assetChainLPAsNormal = this.getErcTokenAssetChain(lpTokenAddress, chainID)
+                lpToken.assetType = paraTool.assetTypeERC20 // modify assetType here so it get updated at the tip
+                this.initERCAssetOnCache(assetChainLPAsNormal, lpToken)
+                this.updateAssetERC20LiquidityPair(assetChainLP, r.lp0, r.lp1, r.rat) //MK
+            } else if (retryOnMiss) {
+                console.log(`process_evmtx_syncEvent: fetching unknown lpToken ${lpTokenAddress}`)
+                await this.fetchMissingERC20(lpTokenAddress, bn)
+                await this.process_evmtx_syncEvent(syncEvent, chainID, bn, false)
+            } else {
+                console.log(`process_evmtx_syncEvent: unknown lpToken ${lpTokenAddress} exit`)
+            }
+        } else {
+            console.log(`new syncEvent detected`, syncEvent)
+        }
+    }
+
+    getLPToken(lpTokenAddress) {
+        lpTokenAddress = lpTokenAddress.toLowerCase()
+        let lpToken = this.ercTokenList[lpTokenAddress]
+        if (lpToken != undefined) {
+            return lpToken
+        }
+        return false
+    }
+
+
+
+
+    // For all evm txs in evmFullBlock, we wish to be able to at least:
+    //  - /account/0x7aB.. --> get all the ERC20/721/... assets across chains at the tip
+    //    Design: easy to value native assets with coin prices, but very challenging to value ALL assets,
+    //      so how do we provide historical balances for ERC20 assets as assets suddenly acquire USD values?
+    //  - /asset/0x1d3.. --> get the totalSupply, top 1000 asset holders
+    async process_evm_transaction(tx, chainID, finalized = false) {
+        if (tx == undefined) return;
+
+        if (ethTool.isTxContractCreate(tx)) {
+            // Contract Creates
+            await this.process_evm_contract_create(tx, chainID);
+        }
+
+        if (ethTool.isTxNativeTransfer(tx)) {
+            // Native Transfers
+            await this.process_evmtx_native_transfer(tx, chainID);
+        }
+
+        if (ethTool.isTxTokenTransfer(tx)) {
+            // Token Transfers (ERC20/ERC721/1155)
+            await this.process_evmtx_token_transfer(tx, chainID);
+        }
+
+        if (ethTool.isTxSwap(tx)) {
+            // swap detected - aggregate trading volumes
+            await this.process_evmtx_swap(tx, chainID);
+        }
+
+        let syncEvents = ethTool.isTxLPSync(tx) // swap, add/removeLiquidity
+        if (syncEvents) {
+            //LP token lp0, lp1 updates
+            let bn = tx.blockNumber
+            for (const syncEvent of syncEvents) {
+                await this.process_evmtx_syncEvent(syncEvent, chainID, tx)
+            }
+        }
+
+        //console.log("process_evm_transaction", `cbt read hashes prefix=${tx.transactionHash}`, tx);
+        // console.log("process_evm_transaction added hashesRowsToInsert", tx.transactionHash, this.hashesRowsToInsert.length);
+
+
+        //process feedevmtx
+        let evmTxHash = tx.transactionHash
+        let extRes = this.extrinsicEvmMap[evmTxHash]
+        let syntheticExtrinsicID = `${tx.blockNumber}-${tx.transactionIndex}`
+        if (extRes !== undefined) {
+            tx['substrate'] = extRes
+            syntheticExtrinsicID = extRes.extrinsicID
+        }
+        //console.log(`evm tx ${evmTxHash}`, extRes, tx)
+        if (tx.from != undefined) {
+            let fromAddress = tx.from.toLowerCase()
+            //console.log(`[${fromAddress}] [${syntheticExtrinsicID}] [${evmTxHash}], finalized=${finalized}`)
+            this.updateAddressExtrinsicStorage(fromAddress, syntheticExtrinsicID, evmTxHash, "feed", tx, tx.timestamp, finalized);
+        }
+        // (2) hashesRowsToInsert: evmTxHash -> evmTX
+        this.stat.hashesRows.evmTx++
+
+        let rects = tx.timestamp * 1000000;
+        let evmTxHashRec = {
+            key: evmTxHash,
+            data: {}, //feed/feedunfinalized
+        }
+        if (finalized) {
+            evmTxHashRec.data = {
+                feed: {
+                    tx: {
+                        value: JSON.stringify(tx),
+                        timestamp: rects
+                    }
+                }
+            }
+        } else {
+            evmTxHashRec.data = {
+                feedevmunfinalized: {
+                    tx: {
+                        value: JSON.stringify(tx),
+                        timestamp: rects
+                    }
+                }
+            }
+        }
+        this.hashesRowsToInsert.push(evmTxHashRec)
+    }
+
+    async processEVMFullBlock(evmFullBlock, chainID, blockNumber, finalized) {
+        if (!evmFullBlock) return (false)
+        // could this be done with Promise.all?
+        let evmTxnCnt = 0
+        for (const tx of evmFullBlock.transactions) {
+            evmTxnCnt++
+            await this.process_evm_transaction(tx, chainID, finalized);
+        }
+        this.stat.hashesRows.evmTxPerBlk.push(evmTxnCnt)
+    }
+
+    // processEvents organizes events by index, and relays interesting events to
+    processEvents(api, eventsRaw, numExtrinsics, blockNumber) {
+        var events = [];
+        for (let i = 0; i < numExtrinsics; i++) {
+            events[i] = [];
+        }
+
+        for (let j = 0; j < eventsRaw.length; j++) {
+            let e = eventsRaw[j]
+            let index = -1;
+            if (e.phase.applyExtrinsic != undefined) {
+                index = e.phase.applyExtrinsic;
+            }
+            if (e.phase.initialization !== undefined || e.phase.finalization !== undefined) {
+                // index 0 holds { moonbeam/moonriver reward events in e.phase.initialization.
+                ///XCM events actually belongs to extrinsicID-1 (parainherent (enter)): ump + balances+currencies/Deposited https://kusama.subscan.io/block/12039596?tab=event
+                index = 0;
+            }
+            if (index >= 0) {
+                let eventID = `${this.chainID}-${blockNumber}-${index}-${j}`
+                let event = this.parseEvent(e.event, eventID, api); // this is the apiAt
+                if (event) {
+                    events[index].push(event)
+                }
+            }
+        }
+        return events;
+    }
+
+    // processes RAW block and RAW events from BigTable chain into
+    // (0) account - feed: processing each extrinsics, with side effect of tallying asset
+    // (1) hashes: blockhash
+    // (2) block - feed: stored in "feed" column family
+    // (3) returning blockStats on block/events
+
+    async processPendingTransactions(pendingExtrinsics, lastestBlockNumber) {
+        if (pendingExtrinsics && pendingExtrinsics.length > 0) {
+            let api = this.apiAt; // this is always bleeding edge
+            let res = pendingExtrinsics.map((pendingExtrinsicRaw, index) => {
+                return (this.process_pending_extrinsic(api, pendingExtrinsicRaw, lastestBlockNumber));
+            })
+        }
+    }
+
+    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, finalized = false, write_bqlog = false) {
+        //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
+        if (!block) return;
+        if (!block.extrinsics) return;
+        let blockNumber = block.header.number;
+        let blockHash = block.hash;
+        let blockTS = block.blockTS;
+        let recentExtrinsics = [];
+        let recentTransfers = [];
+        let recentXCMMessages = [];
+        let recentXcmMsgs = []; //new xcm here
+        this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash);
+        let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
+        block.finalized = finalized;
+
+        // (0) index events by extrinsicIndex
+        let eventsIndexed = this.processEvents(api, eventsRaw, block.extrinsics.length, blockNumber);
+
+        // NEW REQUIREMENT: must process extrinsics before evmTx
+        // (0) decode block extrinsic (from the raw encoded bytes from crawlBlock)
+        let processExtrinsicStartTS = new Date().getTime()
+        let extrinsics = [];
+        for (let index = 0; index < block.extrinsics.length; index++) {
+            let extrinsicRaw = block.extrinsics[index];
+            let ext = await this.process_extrinsic(api, extrinsicRaw, eventsIndexed[index], block, index, finalized);
+            if (ext) {
+                extrinsics.push(ext);
+                if ((this.currentTS() - blockTS < 86400 * 2) && finalized) { // only save in recentExtrinsic if finalized (otherwise extrinsicID would not be usable as a deduping key)
+                    let [logDT, hr] = paraTool.ts_to_logDT_hr(blockTS)
+                    let fromAddress = null
+                    let signed = (ext.signer != undefined && ext.signer != 'NONE') ? 1 : 0;
+                    if (signed) {
+                        fromAddress = paraTool.getPubKey(ext.signer)
+                        if (fromAddress === false) fromAddress = null;
+                        let recentExtrinsic = `('${ext.extrinsicID}', '${this.chainID}', '${logDT}', '${hr}', '${ext.blockNumber}', '${ext.extrinsicHash}', '${ext.section}', '${ext.method}', '${fromAddress}', '${ext.ts}', '${ext.result}', '${signed}')`
+                        recentExtrinsics.push(recentExtrinsic);
+                        if (ext.transfers && ext.transfers.length > 0) {
+                            for (const t of ext.transfers) {
+                                if (t.fromAddress != undefined && t.toAddress != undefined) {
+                                    // potentially empty fields: amount, priceUSD, amountUSD, decimals, symbol, asset
+                                    let priceUSD = t.priceUSD != undefined ? t.priceUSD : 0;
+                                    let amountUSD = t.amountUSD != undefined ? t.amountUSD : 0;
+                                    // MK TODO transfersrecent
+                                    let tAmount = (t.amount != undefined) ? `'${t.amount}'` : 'Null';
+                                    let tAsset = (t.asset != undefined) ? `'${t.asset}'` : 'Null';
+                                    let tSymbol = (t.symbol != undefined) ? `'${t.symbol}'` : 'Null';
+                                    let tDecimals = (t.decimals != undefined) ? `'${t.decimals}'` : 'Null';
+                                    let tRawAsset = (t.rawAsset != undefined) ? `'${t.rawAsset}'` : 'Null';
+                                    let tRawAmount = (t.rawAmount != undefined) ? `'${t.rawAmount}'` : 'Null';
+                                    let recentTransfer = `('${ext.extrinsicID}', '${this.chainID}', '${logDT}', '${hr}', '${ext.blockNumber}', '${ext.extrinsicHash}', '${t.section}', '${t.method}', '${t.fromAddress}', '${t.toAddress}', ${tAsset}, ${tSymbol}, ${tAmount}, '${priceUSD}', '${amountUSD}', '${ext.ts}', ${tRawAsset}, ${tRawAmount}, ${tDecimals})`
+                                    //console.log(`recentTransfer`, recentTransfer)
+                                    recentTransfers.push(recentTransfer);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        block.extrinsics = extrinsics;
+
+        let processExtrinsicTS = (new Date().getTime() - processExtrinsicStartTS) / 1000
+        this.timeStat.processExtrinsicTS += processExtrinsicTS
+        this.timeStat.processExtrinsic += block.extrinsics.length
+
+        // (1) record blockHash in BT hashes
+        let blockfeed = {
+            chainID: chainID,
+            blockNumber: blockNumber,
+            blockType: 'substrate'
+        }
+
+        // console.log("processBlockEvents added hashesRowsToInsert", blockHash, this.hashesRowsToInsert.length);
+        // (3) hashesRowsToInsert: substrateBlockHash -> substrateBlockBN
+        this.stat.hashesRows.substrateTxPerBlk.push(block.extrinsics.length)
+        this.stat.hashesRows.substrateBlk++
+
+        let substrateBlockHashRec = {
+            key: blockHash,
+            data: {}, //feed/feedunfinalized
+        }
+        if (block.finalized) {
+            substrateBlockHashRec.data = {
+                feed: {
+                    block: {
+                        value: JSON.stringify(blockfeed),
+                        timestamp: blockTS * 1000000
+                    }
+                }
+            }
+        } else {
+            substrateBlockHashRec.data = {
+                feedunfinalized: {
+                    block: {
+                        value: JSON.stringify(blockfeed),
+                        timestamp: blockTS * 1000000
+                    }
+                }
+            }
+        }
+
+        this.hashesRowsToInsert.push(substrateBlockHashRec)
+
+        // (2) record block in BT chain${chainID} feed
+        let cres = {
+            key: paraTool.blockNumberToHex(blockNumber),
+            data: {
+                feed: {},
+                feedevm: {}
+            }
+        };
+        cres['data']['feed'][blockHash] = {
+            value: JSON.stringify(block),
+            timestamp: blockTS * 1000000
+        };
+        // (3) fuse block+receipt for evmchain, if both evmBlock and evmReceipts are available
+        let web3Api = this.web3Api
+        let contractABIs = this.contractABIs
+        let contractABISignatures = this.contractABISignatures
+        let evmFullBlock = false
+        if (evmBlock && evmReceipts) {
+            if (web3Api && contractABIs) {
+                // processBlockEvents is async, so can put await here ...
+                let processBlockAndReceiptStartTS = new Date().getTime();
+
+                // get dTxn, dReceipt, and then do decorateTxn
+                //processBlockAndReceiptTS = processTransasctionTS/processReceiptTS/decorateTxnTS
+
+                let processTransasctionStartTS = new Date().getTime()
+                let processReceiptStartTS = new Date().getTime()
+                var statusesPromise = Promise.all([
+                    ethTool.processTranssctions(evmBlock.transactions, contractABIs, contractABISignatures),
+                    ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                ])
+                let [dTxns, dReceipts] = await statusesPromise
+                //console.log(`[${blockNumber}] dReceipts`, JSON.stringify(dReceipts))
+
+
+                //let dTxns = await ethTool.processTranssctions(evmBlock.transactions, contractABIs, contractABISignatures)
+                let processTransasctionTS = (new Date().getTime() - processTransasctionStartTS) / 1000
+                this.timeStat.processTransasctionTS += processTransasctionTS
+
+
+                //let dReceipts = await ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                let processReceiptTS = (new Date().getTime() - processReceiptStartTS) / 1000
+                this.timeStat.processReceiptTS += processReceiptTS
+
+                let decorateTxnStartTS = new Date().getTime()
+                evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmBlock, dTxns, dReceipts, chainID)
+                let decorateTxnTS = (new Date().getTime() - decorateTxnStartTS) / 1000
+                this.timeStat.decorateTxnTS += decorateTxnTS
+
+                let processBlockAndReceiptTS = (new Date().getTime() - processBlockAndReceiptStartTS) / 1000
+                this.timeStat.processBlockAndReceiptTS += processBlockAndReceiptTS
+                this.timeStat.processBlockAndReceipt++
+
+                let processEVMFullBlockStartTS = new Date().getTime()
+                await this.processEVMFullBlock(evmFullBlock, chainID, blockNumber, block.finalized)
+                let processEVMFullBlockTS = (new Date().getTime() - processEVMFullBlockStartTS) / 1000
+                this.timeStat.processEVMFullBlockTS += processEVMFullBlockTS
+                this.timeStat.processEVMFullBlock++
+
+            } else {
+                console.log(`chainID=${chainID} missing web3Api or contractABIs. web3Api(set? ${!web3Api == false}) contractABIs(set? ${!contractABIs == false})`)
+            }
+        }
+
+        // map xcmevents into recentXCMMessages
+        if (blockTS > this.getCurrentTS() - 10800) {
+            for (const xcmID of Object.keys(this.xcmeventsMap)) {
+                let mp = this.xcmeventsMap[xcmID]
+                let pieces = mp.msgIndex.split('-')
+                recentXCMMessages.push(`('${mp.msgIndex}', '${this.chainID}', '${pieces[4]}', '${pieces[2]}', '${mp.isIncoming}', '${mp.msgHex}', '${mp.msgHash}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.blockNumber}', '${mp.sentAt}', '${mp.relayChain}')`);
+            }
+        }
+
+        // new xcm here
+        if (true) {
+            let xcmKeys = Object.keys(this.xcmmsgMap)
+            if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] xcmKeys=${xcmKeys}`)
+            for (const xcmKey of xcmKeys) {
+                let mp = this.xcmmsgMap[xcmKey]
+                //["msgHash", "incoming", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "sentAt", "relayChain", "version", "path"];
+                recentXcmMsgs.push(`('${mp.msgHash}', '${mp.isIncoming}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.blockNumber}', '${mp.sentAt}', '${mp.relayChain}', '${mp.version}', '${mp.path}')`);
+            }
+            this.xcmmsgMap = {} // remove here...
+            //console.log(`[${blockNumber}] recentXcmMsgs`, recentXcmMsgs)
+        }
+
+        if (blockNumber % 20 == 0) {
+            //TODO: remove this after we are ready to write into bq
+            this.cleanTrailingXcmMap(blockNumber)
+        }
+
+        if (evmFullBlock) {
+
+            let evmBlockfeed = {
+                chainID: chainID,
+                blockNumber: blockNumber,
+                blockType: 'evm'
+            }
+
+            // add 'feedevm'
+            cres['data']['feedevm'][blockHash] = {
+                value: JSON.stringify(evmFullBlock),
+                timestamp: blockTS * 1000000 // CHECK: should we use evmBlockTS instead?
+            };
+
+            if (write_bqlog) {
+                this.write_bqlog_evmblock(evmFullBlock.transactions, blockNumber, blockTS);
+            }
+
+            // add evmblockhash pointer for searchability
+            let evmBlockhash = evmFullBlock.hash
+            // console.log("processBlockEvents added hashesRowsToInsert", evmBlockhash, this.hashesRowsToInsert.length);
+            // (4) hashesRowsToInsert: evmFullBlockHash -> evmBlockBN
+            this.stat.hashesRows.evmBlk++
+
+            let evmBlockHashRec = {
+                key: evmBlockhash,
+                data: {}, //feed/feedunfinalized
+            }
+            if (block.finalized) {
+                evmBlockHashRec.data = {
+                    feed: {
+                        block: {
+                            value: JSON.stringify(evmBlockfeed),
+                            timestamp: blockTS * 1000000
+                        }
+                    }
+                }
+            } else {
+                evmBlockHashRec.data = {
+                    feedevmunfinalized: {
+                        block: {
+                            value: JSON.stringify(evmBlockfeed),
+                            timestamp: blockTS * 1000000
+                        }
+                    }
+                }
+            }
+
+            this.hashesRowsToInsert.push(evmBlockHashRec)
+
+        }
+
+        if (write_bqlog) {
+            this.write_bqlog_block(block.extrinsics, blockNumber, blockTS);
+        }
+        let blockStats = this.getBlockStats(block, eventsRaw, evmBlock, evmReceipts);
+        //console.log(`bn=${blockNumber}`, blockStats)
+        this.blockRowsToInsert.push(cres)
+        if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXCMMessages.length > 0 || recentXcmMsgs.length > 0) {
+            this.add_recent_activity(recentExtrinsics, recentTransfers, recentXCMMessages, recentXcmMsgs)
+        }
+        return (blockStats);
+    }
+
+    add_recent_activity(recentExtrinsics, recentTransfers, recentXCMMessages, recentXcmMsgs) {
+        for (const r of recentExtrinsics) {
+            this.recentExtrinsics.push(r);
+        }
+        for (const r of recentTransfers) {
+            this.recentTransfers.push(r);
+        }
+        for (const r of recentXCMMessages) {
+            this.recentXCMMessages.push(r);
+        }
+        for (const r of recentXcmMsgs) {
+            this.recentXcmMsgs.push(r);
+        }
+    }
+
+    async processFeedTransfer(feed, blockTS) {
+        let events = feed.events
+        let feedTransfers = []
+        for (const e of events) {
+            let eventID = e.eventID
+            let [pallet, method] = this.parseEventSectionMethod(e)
+            let data = e.data
+            let resFeedTransferIn = await this.decorateFeedTransfer(pallet, method, data, feed, eventID, blockTS)
+            if (resFeedTransferIn) {
+                feedTransfers.push(resFeedTransferIn)
+                //let recFeedOut = resFeedTransferIn
+                // make a feedout record (setting)
+                // recFeedOut.isIncoming = 0
+                //feedTransfers.push(recFeedOut)
+
+            }
+        }
+        return feedTransfers
+    }
+    /*
+    {
+      "section": "balances",
+      "method": "Transfer",
+      (from, to, value)
+      "data": [
+        "1qnJN7FViy3HZaxZK9tGAA71zxHSBeUweirKqCaox4t8GT7",
+        "1b8tb8N1Nu3CQzF6fctE3p2es7KoMoiWSABe7e4jw22hngm",
+        504494000000
+      ]
+    }
+    */
+
+
+    //TODO: no good way to catch token:Deposited / assets:Issued
+    // MK
+    async decorateFeedTransfer(pallet, method, data, feed, eventID, blockTS) {
+        let chainID = feed.chainID
+        let pallet_method = `${pallet}:${method}`
+        let asset = null;
+        let rawAsset = null;
+        let rawAssetString = null;
+        // WIP: add additional events using chainParser
+        if (pallet_method == "balances:Transfer" || pallet_method == "currencies:Transferred" || pallet_method == "assets:Transferred") {
+            let feedTransfer = {}
+            let fdata = {}
+            let decimals = null
+            let symbol = null;
+
+            switch (pallet_method) {
+
+                // native asset in the chainID
+                case "balances:Transfer":
+                    fdata = {
+                        from: data[0],
+                        to: data[1],
+                        rawAmount: paraTool.dechexToInt(data[2]),
+                        rawAsset: this.getNativeAsset()
+                    }
+                    symbol = this.getChainSymbol(chainID)
+                    asset = `{"Token":"${symbol}"}`
+                    decimals = this.getChainDecimal(chainID)
+                    break;
+
+                case "currencies:Transferred":
+                    //case "tokens:Transfer":
+                    /*
+                    currencies:Transferred [
+                      { token: 'ACA' },
+                      '23M5ttkmR6KcoUwA7NqBjLuMJFWCvobsD9Zy95MgaAECEhit',
+                      '23M5ttkmR6Kco7bReRDve6bQUSAcwqebatp3fWGJYb4hDSDJ',
+                      1205600000000
+                    ]
+                    tokens:Transfer [
+                      { token: 'AUSD' },
+                      '23M5ttkmR6KcnxentoqchgBdUjzMDSzFoUyf5qMs7FsmRMvV',
+                      '25HAjPN9K398DPRWtw2Ad2mpwUACxmM7vyCeG36QotT7qwpt',
+                      13761866984927
+                    ]
+                    */
+                    let rAsset = data[0]
+
+                    if (rAsset.dexShare != undefined) rAsset = rAsset.dexShare
+                    if (rAsset.dEXShare != undefined) rAsset = rAsset.dEXShare
+
+                    fdata = {
+                        from: data[1],
+                        to: data[2],
+                        rawAmount: paraTool.dechexToInt(data[3]),
+                        rawAsset: JSON.stringify(rAsset)
+                    }
+                    let rawAssetSymbol = null
+                    let rawAssetDecimals = null
+                    let rawAssetString = null
+                    try {
+                        [rawAssetSymbol, rawAssetDecimals, rawAssetString] = this.chainParser.getGenericSymbolAndDecimal(this, rAsset)
+                    } catch (merr) {
+                        console.log("this.chainParser.getGenericSymbolAndDecimal", rAsset, merr)
+                    }
+                    if (rAsset.token != undefined || rAsset.Token != undefined) { // move to chainParser ... this is Acala specific
+                        symbol = rawAssetSymbol
+                        decimals = rawAssetDecimals
+                        asset = `{"Token":"${symbol}"}`
+                    } else if (rawAssetSymbol && rawAssetDecimals) {
+                        //symbol = rawAssetSymbol
+                        //asset = `{"Token":"${symbol}"}`
+                        symbol = rawAssetSymbol
+                        decimals = rawAssetDecimals
+                        asset = rawAssetString
+                        fdata.rawAsset = rawAssetString
+                        //asset = JSON.stringify(rAsset) // keeping liquidCrowdloan for price lookup?
+                        /*
+                        currencies:Transferred [
+                          { liquidCrowdloan: 13 },
+                          '25N6q25h2UMVES4etqQNxtMDWGBwqaKeNBPrwA4Ageyk3Wwi',
+                          '23M5ttkmR6Kco2CnDJLZ9Xf15SfCVqH1EWsvTrw9PkHqUEqE',
+                          2233001
+                        ]
+                        currencies:Transferred [
+                          { stableAssetPoolToken: 0 },
+                          '23zvAPSpwE3Bdr6Cw5L7hPSTjaFuU32KAKtM4VSMmh4cKVZi',
+                          '23M5ttkmR6KcoCvrNZsA97DQMPxQmqktF8DHYZSDW4HLcEDw',
+                          8999378691
+                        ]
+                        */
+                    } else {
+                        // NOT COVERED (dexShare)
+                        /*
+                        currencies:Transferred [
+                          { dexShare: [ [Object], [Object] ] },
+                          '23M5ttkmR6Kco7bReRDve6bQUSAcwqebatp3fWGJYb4hDSDJ',
+                          '24rnopvwiRsVD75PHwLGtZgYKw5NJVQ5EtYPXcu7YCod7vuN',
+                          343010445510480
+                        ]
+                        */
+                        console.log(`decorateFeedTransfer not covered`, pallet_method, data)
+                    }
+                    //console.log(pallet_method, data)
+                    break;
+
+                case "assets:Transferred":
+                    // console.log(pallet_method, data)
+                    // TODO: use currencyID lookup
+                    /* asset_id, from, to, rawAmount
+                    [
+                      "0x1fcacbd218edc0eba20fc2308c778080",
+                      "0xa927E1e1E044CA1D9fe1854585003477331fE2Af",
+                      "0x33597f544AcF67C6C450FBCe1EDD9457640Df58C",
+                      97580439649
+                    ]
+                    */
+                    let assetID = data[0]
+                    //console.log(`assets:Transferred - rawAsset = ${assetID}`)
+                    let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID)
+                    if (assetIDSymbol && assetIDDecimals) {
+                        symbol = assetIDSymbol
+                        decimals = assetIDDecimals
+                        asset = `{"Token":"${symbol}"}`
+                    }
+                    if (this.debugLevel >= paraTool.debugTracing) console.log(`>> symbol=${symbol},decimals=${decimals}, asset=${asset}`)
+                    fdata = {
+                        from: data[1],
+                        to: data[2],
+                        rawAmount: paraTool.dechexToInt(data[3]),
+                        rawAsset: assetID,
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+            if (fdata.from != undefined && fdata.to != undefined) {
+                feedTransfer["chainID"] = chainID
+                feedTransfer["chainName"] = this.getChainName(chainID);
+                feedTransfer["blockNumber"] = feed.blockNumber
+                feedTransfer["blockHash"] = feed.blockHash
+                feedTransfer["ts"] = blockTS
+                feedTransfer["isIncoming"] = 1 // vs outgoing
+                feedTransfer["eventID"] = eventID
+                feedTransfer["section"] = pallet
+                feedTransfer["method"] = method
+                feedTransfer["extrinsicID"] = feed.extrinsicID
+                feedTransfer["extrinsicHash"] = feed.extrinsicHash
+                feedTransfer["from"] = fdata.from
+                feedTransfer["to"] = fdata.to
+                feedTransfer["fromAddress"] = paraTool.getPubKey(fdata.from)
+                feedTransfer["toAddress"] = paraTool.getPubKey(fdata.to)
+                feedTransfer["rawAsset"] = fdata.rawAsset
+                feedTransfer["rawAmount"] = fdata.rawAmount
+
+                // get asset/decimals and computeUSD result for amountUSD
+                /*
+                  rawAmount: the original amount
+                  Amount: rawAmount adjusted by decimals
+                  symbol: asset's symbol
+                  decimals: asset's decimals
+                */
+
+                if (symbol && decimals) {
+                    //asset = `{"Token":"${symbol}"}`
+                    let amount = fdata.rawAmount / 10 ** decimals
+                    let amountUSD = 0;
+                    let [balanceUSD, priceUSD, _unusedPriceUSDCurrent] = await this.computeUSD(amount, asset, chainID, blockTS)
+                    if (!priceUSD) {
+                        //computeUSD failed with asset
+                        //let alternativeAsset = `{"Token":"${fdata.rawAsset}"}`
+                        let alternativeAsset = `${fdata.rawAsset}`
+                        let [balanceUSD2, priceUSD2, _unusedPriceUSDCurrent2] = await this.computeUSD(amount, alternativeAsset, chainID, blockTS)
+                        if (priceUSD2 > 0) {
+                            //console.log(`[sucess] decorateFeedTransfer alternativeAsset=${alternativeAsset}`)
+                            amountUSD = balanceUSD2
+                            priceUSD = priceUSD2
+                        }
+                    } else {
+                        amountUSD = balanceUSD
+                    }
+                    feedTransfer["asset"] = asset
+                    feedTransfer["amount"] = amount
+                    feedTransfer["symbol"] = symbol
+                    feedTransfer["decimals"] = decimals
+                    feedTransfer["amountUSD"] = amountUSD
+                    feedTransfer["priceUSD"] = priceUSD
+                } else if (fdata.rawAmount != undefined) {
+                    feedTransfer["amount"] = null
+                    feedTransfer["asset"] = null
+                    feedTransfer["symbol"] = null
+                    feedTransfer["decimals"] = null
+                    console.log(`symbol, decimals unknown`, fdata);
+                }
+
+                feedTransfer["data"] = data
+                // add index source for debugging
+                feedTransfer["genTS"] = this.currentTS();
+                feedTransfer["source"] = this.hostname
+                //console.log(`feedTransfer`, feedTransfer)
+                return feedTransfer
+            }
+        }
+        return false
+    }
+
+    isExtrinsicSigned(extrinsic) {
+        // we are calling this function with two formats (rExtrinsic(from blockStats) and extrinsic)
+        //cleaned format .. usually called from blockstat
+        if (extrinsic.signer !== undefined) {
+            // unsgined cleaned extrinsics has signer null
+            if (extrinsic.signer != undefined) {
+                return true
+            } else {
+                return false
+            }
+        } else {
+            // raw format ... called within process_extrinsic, process_pending_extrinsic
+            let signature = extrinsic.signature ? extrinsic.signature : false
+            if (signature) {
+                if (signature.isSigned != undefined) {
+                    return signature.isSigned
+                }
+            }
+            return (false);
+        }
+    }
+
+    init_asset(asset, assetType = paraTool.assetTypeToken, assetSource = paraTool.assetSourceOnChain, ctx = false) { // TODO: add currencyID here
+        if (typeof asset !== 'string') {
+            console.log("init_asset:", ctx, asset);
+            return (false);
+        }
+        if (this.tallyAsset[asset] !== undefined) return (true);
+        if (!this.validAsset(asset, this.chainID, "init_asset", asset)) {
+            console.log("CREATING INVALID ASSET", ctx, asset, assetType);
+        }
+        switch (assetType) {
+            case paraTool.assetTypeToken:
+                this.tallyAsset[asset] = {
+                    assetType: assetType,
+                    // TODO: currencyID
+                    assetSource: assetSource,
+                    assetSourceMap: {},
+                    issuance: 0,
+                    price: 0,
+                    syntheticRate: 0,
+                };
+                break;
+            case paraTool.assetTypeLiquidityPair:
+                this.tallyAsset[asset] = {
+                    assetType: assetType,
+                    assetSource: assetSource,
+                    assetSourceMap: {},
+                    lp0: [],
+                    lp1: [],
+                    rat: [],
+                    token0In: 0,
+                    token1In: 0,
+                    token0Out: 0,
+                    token1Out: 0,
+                    issuance: 0
+                };
+                break;
+            case paraTool.assetTypeERC20LiquidityPair:
+                var [assetKey, chainID] = paraTool.parseAssetChain(asset)
+                let lpAddress = assetKey.split(":")[0]
+                this.tallyAsset[asset] = {
+                    assetType: assetType,
+                    assetSource: assetSource,
+                    lpAddress: ethTool.toChecksumAddress(lpAddress),
+                    pair: null,
+                    lp0: [],
+                    lp1: [],
+                    rat: [],
+                    token0In: 0,
+                    token1In: 0,
+                    token0Out: 0,
+                    token1Out: 0,
+                    issuance: 0
+                };
+                break;
+            case paraTool.assetTypeLoan:
+                // TODO: why is asset.assetType not getting set for loans?  How should parallel loans get a same/different assettype?
+                this.tallyAsset[asset] = {
+                    assetType: assetType,
+                    assetSource: assetSource,
+                    issuance: 0,
+                    debitExchangeRate: 0
+                }
+                break;
+            case paraTool.assetTypeCDP:
+                this.tallyAsset[asset] = {
+                    assetType: assetType,
+                    //issuance: 0, //??
+                    assetSource: assetSource,
+                    supplyExchangeRate: 0,
+                    borrowExchangeRate: 0
+                }
+                break;
+            case paraTool.assetTypeNFT:
+                this.tallyAsset[asset] = {
+                    assetType: assetType,
+                    assetSource: assetSource,
+                    metadata: false,
+                }
+                break;
+            case paraTool.assetTypeNFTToken:
+                this.tallyAsset[asset] = {
+                    assetType: assetType,
+                    assetSource: assetSource,
+                    metadata: false,
+                }
+                break;
+            default:
+                console.log("WARNING: init_asset: Unknown type", assetType);
+                return (false);
+                break;
+        }
+        return (true);
+    }
+
+    async processTrace(bn, cellTS, trace, traceType, blockHash, api) {
+        let dedupEvents = {};
+        if (!trace) return;
+        if (!Array.isArray(trace)) {
+            //console.log("prcessTrace", trace);
+            return;
+        }
+        // (s) dedup the events
+        for (const e of trace) {
+            let o = {}
+            o.bn = bn;
+            o.blockHash = blockHash;
+            o.ts = cellTS;
+            o.k = e.k;
+            o.v = e.v;
+            dedupEvents[e.k] = o;
+        }
+        for (const dedupK of Object.keys(dedupEvents)) {
+            let e = dedupEvents[dedupK];
+            let [e2, _] = this.parse_trace(e, traceType, bn, blockHash, api);
+
+            if (!e2) continue;
+            let p = e2.p;
+            let s = e2.s;
+            // TODO: canonicalize e2.asset here
+            let pallet_section = `${p}:${s}`
+
+            //temp local list blacklist for easier debugging
+            if (pallet_section == '...') {
+                continue
+            }
+            //console.log(`processTrace ${pallet_section}`, e2)
+            if (e2.mpType && e2.mpIsSet) {
+                await this.chainParser.processMP(this, p, s, e2)
+            } else if (e2.mpIsEmpty) {
+                // we can safely skip the empty mp here - so that it doens't count towards not handled
+            } else if (e2.accountID && e2.asset) {
+                let chainID = this.chainID
+                let rAssetkey = e2.asset
+                let fromAddress = paraTool.getPubKey(e2.accountID)
+                await this.chainParser.processAccountAsset(this, p, s, e2, rAssetkey, fromAddress)
+            } else if (e2.asset) {
+                await this.chainParser.processAsset(this, p, s, e2)
+            } else if (e2.lptokenID) {
+                // decorate here
+                e2.asset = e2.lptokenID
+                await this.chainParser.processAsset(this, p, s, e2)
+            } else {
+                if (this.unhandledTraceMap[pallet_section] == undefined) {
+                    console.log(`(not handled) ${pallet_section}`);
+                    //console.log(`(not handled) ${pallet_section}`, JSON.stringify(e2));
+                    this.unhandledTraceMap[pallet_section] = 0;
+                }
+                this.unhandledTraceMap[pallet_section]++
+            }
+        }
+    }
+
+    currentHour() {
+        let today = new Date();
+        return today.getUTCHours();
+    }
+
+
+    currentDateAsString() {
+        let today = new Date();
+        let dd = today.getUTCDate().toString().padStart(2, '0');
+        let mm = String(today.getUTCMonth() + 1).padStart(2, '0'); //January is 0!
+        let yyyy = today.getUTCFullYear();
+        let logDT = `${yyyy}-${mm}-${dd}`;
+        return (logDT);
+    }
+
+    date_key(logDT) {
+        let a = logDT;
+        let year = a.getUTCFullYear();
+        let month = (a.getUTCMonth() + 1).toString().padStart(2, '0')
+        let date = a.getUTCDate().toString().padStart(2, '0');
+        let logDTKey = `${year}-${month}-${date}`
+        return logDTKey
+    }
+
+    async decodeRawBlock(r) {
+        let blk = {
+            block: r.block,
+            justifications: null
+        }
+        if (this.apiAt == undefined || this.apiAt.registry == undefined) {
+            this.logger.error({
+                "op": "decodeRawBlock",
+                "msg": "no apiAt"
+            })
+            process.exit(1);
+        }
+        var signedBlock2;
+        try {
+            signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
+        } catch (e) {
+            // try fallback here
+            console.log(`failed with specV=${this.specVersion} [${r.block.number} ${r.block.hash}]`)
+            let chain = await this.setupChainAndAPI(this.chainID); //not sure
+            await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
+            signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
+        }
+        //var z = await this.apiAt.query.session.validators()
+        //console.log(`validators=${z.length}`)
+        // signedBlock2.block.extrinsics.forEach((ex, index) => {  console.log(index, ex.hash.toHex());    });
+        return signedBlock2
+    }
+
+    async setup_chainParser(chain, debugLevel = paraTool.debugNoLog) {
+        await this.chainParserInit(chain.chainID, debugLevel);
+        let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrost]
+        let assetMetaChain = [paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDHeiko, paraTool.chainIDParallel]
+        if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala || this.chainID == paraTool.chainIDBifrost) {
+            //TODO: fetch assetRegistry:assetMetadatas
+            console.log(`Fetch assetRegistry:assetMetadatas`)
+            await this.chainParser.fetchAssetRegistry(this)
+            if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala) {
+                await this.chainParser.updateLiquidityInfo(this)
+            }
+        } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint) {
+            console.log(`fetch asset:metadata`)
+            await this.chainParser.fetchAsset(this)
+        } else if (this.chainID == paraTool.chainIDKico) {
+            console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)
+            await this.chainParser.fetchCurrenciesDicoAssetInfos(this)
+        }
+        await this.get_skipStorageKeys();
+        await this.getChainERCAssets(this.chainID);
+
+        // for any new unknown assets, set them up with names, decimals
+
+        await this.chainParser.getSystemProperties(this, chain);
+    }
+
+    // given a row r fetched with "fetch_block_row", processes the block, events + trace
+    async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false) {
+        // process the block + events + trace
+        //console.log('index_chain_block_row', JSON.stringify(r))
+        if (r.block && r.events) {
+            let decodeRawBlockStartTS = new Date().getTime()
+            if (!signedBlock) {
+                let decodeRawBlockSignedBlockStartTS = new Date().getTime()
+                signedBlock = await this.decodeRawBlock(r)
+                let decodeRawBlockSignedBlockTS = (new Date().getTime() - decodeRawBlockSignedBlockStartTS) / 1000
+                this.timeStat.decodeRawBlockSignedBlockTS += decodeRawBlockSignedBlockTS
+                this.timeStat.decodeRawBlockSignedBlock++
+            }
+            r.block.extrinsics = signedBlock.block.extrinsics
+            let decodeRawBlockTS = (new Date().getTime() - decodeRawBlockStartTS) / 1000
+            this.timeStat.decodeRawBlockTS += decodeRawBlockTS
+            this.timeStat.decodeRawBlock++
+
+            let processBlockEventsStartTS = new Date().getTime()
+            //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
+            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, true, write_bq_log);
+
+            let processBlockEventsTS = (new Date().getTime() - processBlockEventsStartTS) / 1000
+            this.timeStat.processBlockEventsTS += processBlockEventsTS
+            this.timeStat.processBlockEvents++
+        }
+        if (r.trace) {
+            //mkTODO
+            let processTraceStartTS = new Date().getTime()
+            if (r.blockHash == undefined || r.blockHash.length != 66) {
+                this.logger.error({
+                    "op": "index_chain_block_row",
+                    "bn": `${this.chainID}-${r.blockNumber}`,
+                    "msg": 'missing blockHash - check source',
+                })
+            } else {
+                let traceType = this.compute_trace_type(r.trace, r.traceType);
+                let api = (refreshAPI) ? await this.api.at(r.blockHash) : this.apiAt;
+                await this.processTrace(r.blockNumber, r.blockTS, r.trace, traceType, r.blockHash, api);
+                let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
+                //console.log(`index_chain_block_row: processTrace`, processTraceTS);
+                this.timeStat.processTraceTS += processTraceTS
+                this.timeStat.processTrace++
+            }
+        }
+        return r;
+    }
+
+    synthetic_blockTS(chainID, blockNumber) {
+        if (chainID == paraTool.chainIDStatemine || chainID == paraTool.chainIDStatemint || chainID == paraTool.chainIDShiden) {
+            return 1577836800; // placeholder
+        }
+        return (false);
+    }
+
+    isH160Native(chainID) {
+        if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver) {
+            return (true);
+        }
+        return (false);
+    }
+
+    // fetches a SINGLE row r (of block, events + trace) with fetch_block_row and indexes the row with index_chain_block_row
+    async index_block(chain, blockNumber, blockHash) {
+        await this.setup_chainParser(chain, this.debugLevel);
+        await this.initApiAtStorageKeys(chain, blockHash, blockNumber);
+        this.chainID = chain.chainID;
+
+        try {
+            let statRows = [];
+            let rRow = await this.fetch_block_row(chain, blockNumber);
+            let r = await this.index_chain_block_row(rRow);
+            let blockHash = r.blockHash
+            let parentHash = r.block.header && r.block.header.parentHash ? r.block.header.parentHash : false;
+            let blockTS = r.block.blockTS
+            let blockStats = r.blockStats
+            let numExtrinsics = blockStats && blockStats.numExtrinsics ? blockStats.numExtrinsics : 0
+            let numSignedExtrinsics = blockStats && blockStats.numSignedExtrinsics ? blockStats.numSignedExtrinsics : 0
+            let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
+            let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
+            let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
+            let feedTS = Math.floor(Date.now() / 1000)
+            let indexTS = Math.floor(blockTS / 3600) * 3600;
+            if (typeof blockTS === "undefined") {
+                blockTS = this.synthetic_blockTS(this.chainID, blockNumber);
+            }
+            if (!parentHash) {
+                console.log("missing parentHash", blockNumber, r.block.header);
+            } else if (blockTS) {
+                let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', FROM_UNIXTIME('${feedTS}'), 0)`
+                statRows.push(sql);
+            }
+            this.dump_update_block_stats(chain.chainID, statRows, indexTS)
+            await this.flush(indexTS, blockNumber, false, false); //ts, bn, isFullPeriod, isTip
+            return (r);
+        } catch (err) {
+            console.log(err);
+            this.logger.warn({
+                "op": "index_block",
+                "chainID": chain.chainID,
+                blockNumber,
+                err
+            })
+            return (false);
+        }
+    }
+
+    getNativeAsset() {
+        let symbol = this.getChainSymbol(this.chainID);
+        if (symbol) {
+            return JSON.stringify({
+                Token: symbol
+            })
+        } else {
+            return (false);
+        }
+    }
+
+    getNativeAssetChain() {
+        let nativeAsset = this.getNativeAsset();
+        if (!nativeAsset) return (false);
+        let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, this.chainID);
+        return (nativeAssetChain);
+    }
+
+    async genesisAsset(chain) {
+        let nativeAssetChain = this.getNativeAsset();
+        if (!nativeAssetChain) return (false);
+        let totalIssuance = 0;
+        try {
+            totalIssuance = await this.apiAt.query.balances.totalIssuance();
+            let d = this.getChainDecimal(this.chainID);
+            totalIssuance = Math.floor(totalIssuance / (10 ** d));
+        } catch (err) {
+            this.logger.warn({
+                "op": "genesisAsset",
+                "chainID": chain.chainID,
+                err
+            })
+        }
+        let result = {};
+        result[nativeAssetChain] = {
+            issuance: totalIssuance
+        };
+        return result;
+    }
+
+    async update_chain_assets(chain, daysago = 2) {
+        try {
+            let chainID = chain.chainID;
+            let eflds = ", numTransactionsEVM, numReceiptsEVM, gasUsed, gasLimit, numEVMBlocks";
+            let evals = ", 0, 0, 0, 0, 0";
+            let eupds = ", numTransactionsEVM = values(numTransactionsEVM), numReceiptsEVM = values(numReceiptsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit), numEVMBlocks = values(numEVMBlocks)";
+            if (chain.isEVM) {
+                evals = ", sum(numTransactionsEVM), sum(numReceiptsEVM), sum(gasUsed), sum(gasLimit), sum(if(blockHashEVM is Null, 0, 1))";
+            }
+
+            let sql = `insert into blocklog (chainID, logDT, startBN, endBN, numTraces, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD ${eflds} ) (select ${chainID} as chainID, date(blockDT) as logDT, min(blockNumber), max(blockNumber), sum(if(crawlTrace=0, 1, 0)), sum(numExtrinsics), sum(numEvents), sum(numTransfers), sum(numSignedExtrinsics), sum(valueTransfersUSD) ${evals} from block${chainID} where blockDT is Not Null and blockDT >= date(date_sub(now(), INTERVAL ${daysago} DAY))  group by chainID, logDT) on duplicate key update startBN = values(startBN), endBN = values(endBN), numExtrinsics = values(numExtrinsics), numEvents = values(numEvents), numTransfers = values(numTransfers), numSignedExtrinsics = values(numSignedExtrinsics), valueTransfersUSD = values(valueTransfersUSD), numTraces = values(numTraces) ` + eupds;
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL(10.0);
+
+            var tbl = `assetholder${chainID}`;
+            this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree, totalReserved, totalMiscFrozen, totalFrozen) (select asset, chainID, count(*) numHolders, sum(free) as totalFree, sum(reserved) as totalReserved, sum(miscFrozen) as totalMiscFrozen, sum(frozen) as totalFrozen from ${tbl} where chainID = '${chainID}' group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree), totalReserved = values(totalReserved), totalMiscFrozen = values(totalMiscFrozen), totalFrozen = values(totalFrozen)`)
+
+            var tbls = [];
+            if (chain.isEVM) {
+                tbls.push("tokenholder");
+                tbls.push("token1155holder")
+            }
+            for (const tbl of tbls) {
+                this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree) (select asset, chainID, count(*) numHolders, sum(free) as totalFree from ${tbl} where chainID = '${chainID}' group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree)`)
+                await this.update_batchedSQL();
+            }
+
+            var ranges = [7, 30, 99999];
+            for (const range of ranges) {
+                let f = (range > 9999) ? "" : `${range}d`;
+                let sql0 = `select sum(numTraces) as numTraces, sum(numExtrinsics) as numExtrinsics, sum(numEvents) as numEvents, sum(numTransfers) as numTransfers, sum(numSignedExtrinsics) as numSignedExtrinsics, sum(valueTransfersUSD) as valueTransfersUSD, sum(numTransactionsEVM) as numTransactionsEVM, sum(numReceiptsEVM) as numReceiptsEVM, sum(gasUsed) as gasUsed, sum(gasLimit) as gasLimit, sum(numEVMBlocks) as numEVMBlocks from blocklog where logDT >= date_sub(Now(),interval ${range} DAY) and chainID = ${chain.chainID}`
+                let stats = await this.poolREADONLY.query(sql0)
+                let out = [];
+                for (const s of stats) {
+                    out.push([`('${chain.chainID}', ${s.numTraces}, ${s.numExtrinsics}, ${s.numEvents}, ${s.numTransfers}, ${s.numSignedExtrinsics}, ${s.valueTransfersUSD}, ${s.numTransactionsEVM}, ${s.numReceiptsEVM}, ${s.gasUsed}, ${s.gasLimit}, ${s.numEVMBlocks})`])
+                }
+                let vals = [`numTraces${f}`, `numExtrinsics${f}`, `numEvents${f}`, `numTransfers${f}`, `numSignedExtrinsics${f}`, `valueTransfersUSD${f}`, `numTransactionsEVM${f}`, `numReceiptsEVM${f}`, `gasUsed${f}`, `gasLimit${f}`, `numEVMBlocks${f}`]
+                await this.upsertSQL({
+                    "table": "chain",
+                    "keys": ["chainID"],
+                    "vals": vals,
+                    "data": out,
+                    "replace": vals
+                });
+            }
+            var ranges = [7, 30, 99999];
+            for (const range of ranges) {
+                let f = (range > 9999) ? "" : `${range}d`;
+                let out = [];
+                let sql0 = `select chainID, count(*) as cnt, sum(amountSentUSD) as val from xcmtransfer where chainID = ${chain.chainID} and sourceTS >= UNIX_TIMESTAMP(date_sub(Now(),interval ${range} DAY)) and incomplete = 0`
+                let stats0 = await this.poolREADONLY.query(sql0)
+                for (const s of stats0) {
+                    let val = s.val ? s.val : 0;
+                    out.push([`('${chain.chainID}', '${s.cnt}', ${val})`])
+                }
+
+                let vals0 = [`numXCMTransferIncoming${f}`, `valXCMTransferIncomingUSD${f}`]
+                await this.upsertSQL({
+                    "table": "chain",
+                    "keys": ["chainID"],
+                    "vals": vals0,
+                    "data": out,
+                    "replace": vals0
+                });
+
+                let sql1 = `select chainIDDest, count(*) as cnt, sum(amountReceivedUSD) as val from xcmtransfer where chainIDDest = ${chain.chainID} and sourceTS >= UNIX_TIMESTAMP(date_sub(Now(),interval ${range} DAY)) and incomplete = 0`
+                let vals1 = [`numXCMTransferOutgoing${f}`, `valXCMTransferOutgoingUSD${f}`]
+                let stats1 = await this.poolREADONLY.query(sql1)
+                out = [];
+                for (const s of stats1) {
+                    let val = s.val ? s.val : 0;
+                    out.push([`('${chain.chainID}', '${s.cnt}', '${val}')`])
+                }
+                await this.upsertSQL({
+                    "table": "chain",
+                    "keys": ["chainID"],
+                    "vals": vals1,
+                    "data": out,
+                    "replace": vals1
+                });
+            }
+
+            this.batchedSQL.push(`update chain, asset set chain.numHolders = asset.numHolders, chain.lastUpdateChainAssetsTS = FROM_UNIXTIME(Now()) where chain.asset = asset.asset and chain.chainID = asset.chainID`);
+            await this.update_batchedSQL(10.0);
+            return (true);
+        } catch (err) {
+            this.log_indexing_error(err, "update_chain_assets");
+            return (false);
+        }
+    }
+
+    // sets up this.extrinsicsfn/eventsfn/evmtxsfn (deleting old version), creating directories as needed
+    async open_bqlog(chain, indexTS) {
+        const bqDir = "/disk1/"
+        let chainID = chain.chainID;
+        let fn = `${chainID}-${indexTS}.json`
+        let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+        this.bqlogindexTS = indexTS;
+        try {
+            this.xcmeventsMap = {};
+            // create extrinsics directory
+            let extrinsicsdir = path.join(bqDir, "extrinsics", `${logDT}`);
+            if (!fs.existsSync(extrinsicsdir)) {
+                await fs.mkdirSync(extrinsicsdir);
+            }
+            // set up extrinsics log
+            this.extrinsicsfn = path.join(extrinsicsdir, fn);
+            await fs.closeSync(fs.openSync(this.extrinsicsfn, 'w'));
+
+            // create transfers directory
+            let transfersdir = path.join(bqDir, "transfers", `${logDT}`);
+            if (!fs.existsSync(transfersdir)) {
+                await fs.mkdirSync(transfersdir);
+            }
+            // set up transfers log
+            this.transfersfn = path.join(transfersdir, fn);
+            await fs.closeSync(fs.openSync(this.transfersfn, 'w'));
+
+            // create rewards directory
+            let rewardsdir = path.join(bqDir, "rewards", `${logDT}`);
+            if (!fs.existsSync(rewardsdir)) {
+                await fs.mkdirSync(rewardsdir);
+            }
+            // set up rewards log
+            this.rewardsfn = path.join(rewardsdir, fn);
+            await fs.closeSync(fs.openSync(this.rewardsfn, 'w'));
+
+            // create events directory
+            let eventsdir = path.join(bqDir, "events", `${logDT}`);
+            if (!fs.existsSync(eventsdir)) {
+                await fs.mkdirSync(eventsdir);
+            }
+            // set up event log
+            this.eventsfn = path.join(eventsdir, fn);
+            await fs.closeSync(fs.openSync(this.eventsfn, 'w'));
+
+            // create xcm directory
+            let xcmdir = path.join(bqDir, "xcm", `${logDT}`);
+            if (!fs.existsSync(xcmdir)) {
+                await fs.mkdirSync(xcmdir);
+            }
+            // set up xcm log (deleting old file if exists)
+            this.xcmfn = path.join(xcmdir, fn);
+            await fs.closeSync(fs.openSync(this.xcmfn, 'w'));
+
+            if (chain.isEVM > 0) {
+                // create evmtxs directory
+                let evmtxsdir = path.join(bqDir, "evmtxs", `${logDT}`);
+                if (!fs.existsSync(evmtxsdir)) {
+                    await fs.mkdirSync(evmtxsdir);
+                }
+                // set up evmtxs log (deleting old file if exists)
+                this.evmtxsfn = path.join(evmtxsdir, fn);
+                await fs.closeSync(fs.openSync(this.evmtxsfn, 'w'));
+            }
+        } catch (err) {
+            this.log_indexing_error(err, "open_bqlog");
+        }
+    }
+
+    async write_bqlog_evmblock(txs, blockNumber, blockTS) {
+        if (!txs) return;
+        if (!Array.isArray(txs)) return;
+        if (txs.length == 0) return;
+        let evmtxs = [];
+        txs.forEach((tx) => {
+            if (tx !== undefined) {
+                if (tx.creates != null) {
+                    console.log(tx);
+                }
+
+                let section = null;
+                let methodID = null;
+                let result = 0;
+                let from = null
+                let to = null
+                if (tx.from != undefined) {
+                    from = tx.from.toLowerCase();
+                }
+                if (tx.to != undefined) {
+                    to = tx.to.toLowerCase();
+                }
+                if (tx.decodedInput != undefined) {
+                    let inp = tx.decodedInput;
+                    if (inp.signature != undefined) {
+                        let sa = inp.signature.split("(");
+                        if (sa.length > 1 || ((sa.length == 1) && (sa[0] == "nativeTransfer"))) {
+                            section = sa[0];
+                        }
+                    }
+                    if (inp.methodID != undefined) {
+                        methodID = inp.methodID;
+                    }
+                }
+                if (tx.status) {
+                    result = 1
+                }
+                let ltx = {
+                    c: this.chainID,
+                    bn: blockNumber,
+                    ts: blockTS,
+                    h: tx.transactionHash,
+                    f: from,
+                    t: to,
+                    s: section,
+                    m: methodID,
+                    r: result
+                }
+                if (tx.creates != null) {
+                    ltx.cr = tx.creates; // or 1?
+                }
+                if (tx.substrate != undefined) {
+                    ltx.substrate = tx.substrate;
+                }
+                evmtxs.push(JSON.stringify(ltx));
+            }
+        });
+        if (evmtxs.length > 0) {
+            evmtxs.push("");
+            fs.appendFileSync(this.evmtxsfn, evmtxs.join("\n"));
+        }
+    }
+
+    async write_bqlog_block(extrinsics, blockNumber, blockTS) {
+        let outextrinsics = [];
+        let outevents = [];
+        let outtransfers = [];
+        let outrewards = [];
+        let outxcms = [];
+        if (blockTS < this.bqlogindexTS || (blockTS > this.bqlogindexTS + 3600)) {
+            blockTS = this.bqlogindexTS;
+        }
+        for (let i = 0; i < extrinsics.length; i++) {
+            let ex = extrinsics[i];
+            let signed = (ex.signer != undefined && ex.signer != 'NONE') ? 1 : 0;
+            let fromAddress = paraTool.getPubKey(ex.signer)
+            if (fromAddress === false) fromAddress = null;
+            let v = (ex.v != undefined) ? ex.v : 0;
+            let [exp, exm] = this.parseExtrinsicSectionMethod(ex)
+            outextrinsics.push(JSON.stringify({
+                c: this.chainID,
+                id: ex.extrinsicID,
+                h: ex.extrinsicHash,
+                ts: blockTS,
+                bn: blockNumber,
+                f: fromAddress,
+                p: exp,
+                m: exm,
+                r: ex.result,
+                s: signed,
+                v: v
+            }));
+            if (ex.events) {
+                for (const ev of ex.events) {
+                    let eventID = ev.eventID ? ev.eventID : 0;
+                    let [evp, evm] = this.parseEventSectionMethod(ev)
+                    let e = {
+                        c: this.chainID,
+                        id: eventID,
+                        bn: blockNumber,
+                        h: ex.extrinsicHash,
+                        f: fromAddress,
+                        p: evp,
+                        m: evm,
+                        ts: blockTS
+                    }
+                    outevents.push(JSON.stringify(e));
+                }
+            }
+            if (ex.transfers) {
+                for (const t of ex.transfers) {
+                    let fromAddress = paraTool.getPubKey(t.from)
+                    let toAddress = paraTool.getPubKey(t.to)
+                    let e = {
+                        c: this.chainID,
+                        id: ex.extrinsicID,
+                        bn: blockNumber,
+                        h: ex.extrinsicHash,
+                        f: fromAddress,
+                        t: toAddress,
+                        p: t.section,
+                        m: t.method,
+                        //a: t.amount,
+                        //ra: t.rawAmount,
+                        ts: blockTS
+                    }
+                    if (t.asset != null) e.asset = t.asset;
+                    if (t.rawAsset != null) e.rawAsset = t.rawAsset;
+                    if (t.symbol != null) e.symbol = t.symbol;
+                    if (t.decimals != null) e.d = t.decimals;
+                    if (t.priceUSD > 0) e.priceUSD = t.priceUSD;
+                    if (t.amount != null) e.a = t.amount;
+                    if (t.amountUSD > 0) e.v = t.amountUSD;
+                    outtransfers.push(JSON.stringify(e));
+                }
+            }
+            if (ex.rewards) {
+                for (const t of ex.rewards) {
+                    let toAddress = t.accountAddress
+                    let e = {
+                        c: this.chainID,
+                        id: ex.extrinsicID,
+                        bn: blockNumber,
+                        h: ex.extrinsicHash,
+                        t: toAddress,
+                        p: t.section,
+                        m: t.method,
+                        ts: blockTS
+                    }
+                    if (t.asset != null) e.asset = t.asset;
+                    if (t.rawAsset != null) e.rawAsset = t.rawAsset;
+                    if (t.symbol != null) e.symbol = t.symbol;
+                    if (t.decimals != null) e.d = t.decimals;
+                    if (t.priceUSD > 0) e.priceUSD = t.priceUSD;
+                    if (t.amount != null) e.a = t.amount;
+                    if (t.amountUSD > 0) e.v = t.amountUSD;
+                    outrewards.push(JSON.stringify(e));
+                }
+            }
+        }
+        // map xcmevents into outxcms
+        for (const xcmID of Object.keys(this.xcmeventsMap)) {
+            /*
+            //blockNumber[0]-txIdx[1]-mpType[2]-receiverChainID[3]-senderChainID[4]-msgIdx[5]
+            msgIndex: '2007965-1-xcmp-22000-22023-0',
+            sentAt: 12944867,
+            isIncoming: 1,
+            msgHash: '572c1b16ff2bef5ef0a3d4618a175a5f0bb00409bae210b73d4c339626060aa6',
+            msgHex: '0x0210000400000106080081000fb56e4cba873f410a1300000106080081000fb56e4cba873f41010300286bee0d01000400010100ae70debed84304554c2909745a07d44b8ba4b6de8127e0fb08bc92c52797a00b',
+            msgStr: '{"v2":[{"withdrawAsset":[{"id":{"concrete":{"parents":0,"interior":{"x1":{"generalKey":"0x0081"}}}},"fun":{"fungible":"0x000000000000000000413f87ba4c6eb5"}}]},{"clearOrigin":null},{"buyExecution":{"fees":{"id":{"concrete":{"parents":0,"interior":{"x1":{"generalKey":"0x0081"}}}},"fun":{"fungible":"0x000000000000000000413f87ba4c6eb5"}},"weightLimit":{"limited":4000000000}}},{"depositAsset":{"assets":{"wild":{"all":null}},"maxAssets":1,"beneficiary":{"parents":0,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0xae70debed84304554c2909745a07d44b8ba4b6de8127e0fb08bc92c52797a00b"}}}}}}]}'
+            */
+            let mp = this.xcmeventsMap[xcmID]
+            let pieces = mp.msgIndex.split('-')
+            outxcms.push(JSON.stringify({
+                c: this.chainID, // The "receiver" ChainID (xcm chainIDDest)
+                d: pieces[4], // The "sender"   ChainID (xcm chainID)
+                t: pieces[2], // The mptype(Message passing type): xcmp/dmp/ump
+                id: mp.msgIndex, // The identifier: blockNumber-txIdx-mpType-receiverChainID-senderChainID-msgIdx
+                i: mp.isIncoming, // 1:incoming; 2:outgoing
+                h: mp.msgHash, // The blake2_256(msgHex) hash
+                b: mp.msgHex, // The channelmsg byte (xcmp's leading byte is already stripped)
+                s: mp.msgStr, // The decoded channelmsg as XcmVersionedXcm type
+                ts: blockTS,
+                bn: blockNumber,
+                sn: mp.sentAt, // The blockNumber where the channelmsg was received by the relayChain
+                rc: mp.relayChain,
+            }));
+        }
+        this.xcmeventsMap = {};
+
+        //TODO: write the new xcm + clean
+        //this.cleanTrailingXcmMap(blockNumber);
+
+        if (outextrinsics.length > 0) {
+            outextrinsics.push("");
+            await fs.appendFileSync(this.extrinsicsfn, outextrinsics.join("\n"));
+        }
+        if (outevents.length > 0) {
+            outevents.push("");
+            await fs.appendFileSync(this.eventsfn, outevents.join("\n"));
+        }
+        if (outtransfers.length > 0) {
+            outtransfers.push("");
+            await fs.appendFileSync(this.transfersfn, outtransfers.join("\n"));
+        }
+        if (outrewards.length > 0) {
+            outrewards.push("");
+            await fs.appendFileSync(this.rewardsfn, outrewards.join("\n"));
+        }
+        if (outxcms.length > 0) {
+            outxcms.push("");
+            await fs.appendFileSync(this.xcmfn, outxcms.join("\n"));
+        }
+    }
+
+    async close_bqlog() {
+        return (true);
+    }
+
+    getSpecVersionAtBlockNumber(chain, bn) {
+        if (chain.specVersions == undefined) return (null);
+        let result = null;
+        for (let i = 0; i < chain.specVersions.length; i++) {
+            let sv = chain.specVersions[i];
+            if (bn >= sv.blockNumber) {
+                result = sv; // there could be a better one, cannot return it
+            }
+        }
+        return (result);
+    }
+
+    async initApiAtStorageKeys(chain, blockHash = false, bn = 1) {
+        // this.specVersion holdsesent when we call api.rpc.state.getRuntimeVersion / getSpecVersionMetadata
+        // We use chain.specVersions -- an array of [specVersion, blockNumber] ordered by blockNumber -- of when specVersions change.
+        // We look for the first blocknumber in that array >= bn which is the *expected* specVersion at that bn.
+        // If this specVersion is the same as the last
+        if (chain.specVersions !== undefined && Array.isArray(chain.specVersions) && chain.specVersions.length > 0) {
+            let sv = this.getSpecVersionAtBlockNumber(chain, bn);
+            if ((sv != null) && this.specVersion == sv.specVersion) {
+                return (this.specVersion);
+            }
+            if (sv) {
+                // we have a new specVersion, thus we need new metadata!
+                this.specVersion = sv.specVersion;
+            }
+        }
+        try {
+            this.apiAt = await this.api.at(blockHash)
+            var runtimeVersion = await this.api.rpc.state.getRuntimeVersion(blockHash)
+            this.specVersion = runtimeVersion.toJSON().specVersion;
+
+            await this.getSpecVersionMetadata(chain, this.specVersion, blockHash, bn);
+            if (this.debugLevel >= paraTool.debugInfo) console.log("--- ADJUSTED API AT ", blockHash, this.specVersion)
+        } catch (err) {
+            this.apiAt = await this.api;
+            var runtimeVersion = await this.api.rpc.state.getRuntimeVersion();
+            this.specVersion = runtimeVersion.toJSON().specVersion;
+            await this.getSpecVersionMetadata(chain, this.specVersion, false, bn);
+            if (this.debugLevel >= paraTool.debugInfo) console.log("!!! ADJUSTED API AT ", blockHash, this.specVersion)
+        }
+
+        return this.specVersion
+    }
+
+    async index_blocks_period(chain, currPeriod = false, jmp = 720) {
+        if (currPeriod == false) return
+        if (!currPeriod.startBN) return
+        if (!currPeriod.endBN) return
+        let chainID = this.chainID
+        let indexTS = currPeriod.indexTS
+        let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+        let indexStartTS = new Date().getTime();
+        let specVersion = false
+
+        await this.setup_chainParser(chain, this.debugLevel);
+
+        this.numIndexingErrors = 0;
+        this.numIndexingWarns = 0;
+        // NOTE: we do not set this.tallyAsset = {}
+
+        this.currentPeriodKey = indexTS;
+        this.invertedHourKey = paraTool.inverted_ts_key(indexTS);
+        if (currPeriod.eventsperblock > 50 || currPeriod.extrinsicsperblock > 30) {
+            console.log(`WARNING: high usage block [jmp=${jmp}]`, currPeriod);
+        }
+        let nativeAsset = this.getNativeAsset()
+        const tableChain = this.instance.table("chain" + chainID);
+        let batchN = 0
+        let totalBlkCnt = 1 + currPeriod.endBN - currPeriod.startBN
+        let totalBatch = Math.floor(totalBlkCnt / jmp)
+        if (totalBlkCnt % jmp != 0) totalBatch++
+
+        let refreshAPI = false;
+        await this.open_bqlog(chain, indexTS)
+        for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
+            batchN++
+            let jmpStartTS = new Date().getTime();
+            let startBN = bn
+            let endBN = bn + jmp - 1;
+            if (endBN > currPeriod.endBN) endBN = currPeriod.endBN;
+
+            let start = paraTool.blockNumberToHex(startBN);
+            let end = paraTool.blockNumberToHex(endBN);
+
+            console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end}), indexTS=${indexTS} [${logDT} ${hr}] [${batchN}/${totalBatch}]`)
+
+            let families = ["finalized", "trace", "blockraw", "events", "n"]
+            if (chain.isEVM > 0) {
+                families.push("blockrawevm");
+            }
+            let startTS = new Date().getTime();
+            let [rows] = await tableChain.getRows({
+                start,
+                end,
+                cellLimit: 1,
+                family: families
+            });
+            let getRowsTS = (new Date().getTime() - startTS) / 1000;
+            console.log("index_blocks_period: get rows", getRowsTS);
+            this.timeStat.getRowsTS += getRowsTS
+            this.timeStat.getRows++
+
+            startTS = new Date().getTime();
+            let startSpecVersion, endSpecVersion, endSpecVersionStartBN = null,
+                endSpecVersionStartBlockHash = null;
+            if (specVersion == false) {
+                for (let j = 0; j < rows.length; j++) {
+                    let row = rows[j];
+                    let rowData = row.data;
+                    if (rowData["finalized"]) {
+                        this.timeStat.getRuntimeVersion++
+                        for (const blockHash of Object.keys(rowData["finalized"])) {
+                            let _specVersion = await this.initApiAtStorageKeys(chain, blockHash, bn);
+                            if (_specVersion != undefined) {
+                                startSpecVersion = _specVersion;
+                                endSpecVersion = _specVersion;
+                                j = rows.length;
+                                break;
+                            }
+                        }
+                    }
+                }
+                let endSV = this.getSpecVersionAtBlockNumber(chain, currPeriod.endBN);
+                if (endSV != null) {
+                    endSpecVersion = endSV.specVersion;
+                    endSpecVersionStartBN = endSV.blockNumber;
+                    endSpecVersionStartBlockHash = endSV.blockHash;
+                    if (startSpecVersion != endSpecVersion) {
+                        refreshAPI = true; // Note: you could also set this flag more aggressively: on runtime upgrades, not just specVersion changes
+                    }
+                }
+                if (refreshAPI) console.log("**** REFRESHAPI", startSpecVersion, endSpecVersion, currPeriod.endBN, refreshAPI);
+                if (this.apiAt == undefined) {
+                    this.logger.error({
+                        "op": "index_blocks_period",
+                        "msg": "no apiAt",
+                        chainID,
+                        logDT,
+                        hr
+                    })
+                    process.exit(1);
+                }
+            }
+            let getRuntimeVersionTS = (new Date().getTime() - startTS) / 1000
+            if (getRuntimeVersionTS > 1) console.log("index_blocks_period: getRuntimeVersion", getRuntimeVersionTS);
+            this.timeStat.getRuntimeVersionTS += getRuntimeVersionTS
+
+            startTS = new Date().getTime();
+
+            let statRows = [];
+            for (let i = 0; i < rows.length; i++) {
+                try {
+                    let buildBlockFromRowStartTS = new Date().getTime()
+                    let row = rows[i];
+                    let rRow = this.build_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                    let buildBlockFromRowTS = (new Date().getTime() - buildBlockFromRowStartTS) / 1000
+                    this.timeStat.buildBlockFromRowTS += buildBlockFromRowTS
+                    this.timeStat.buildBlockFromRow++
+                    let r = await this.index_chain_block_row(rRow, false, true, refreshAPI);
+
+                    let blockNumber = r.blockNumber
+                    let blockHash = r.blockHash
+                    let parentHash = r.block.header && r.block.header.parentHash ? r.block.header.parentHash : false;
+                    let blockTS = r.block.blockTS
+                    let blockStats = r.blockStats
+                    let numExtrinsics = blockStats && blockStats.numExtrinsics ? blockStats.numExtrinsics : 0
+                    let numSignedExtrinsics = blockStats && blockStats.numSignedExtrinsics ? blockStats.numSignedExtrinsics : 0
+                    let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
+                    let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
+                    let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
+                    this.setLoggingContext({
+                        chainID: chain.chainID,
+                        blockNumber
+                    });
+                    let feedTS = Math.floor(Date.now() / 1000)
+                    if (typeof blockTS === "undefined") {
+                        blockTS = this.synthetic_blockTS(this.chainID, blockNumber);
+                    }
+                    if (!parentHash) {
+                        console.log("missing parentHash", blockNumber, r.block.header);
+                    } else if (blockTS) {
+                        let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', FROM_UNIXTIME('${feedTS}'), 0)`
+                        statRows.push(sql);
+                    }
+                    if (r != undefined) r = null
+                } catch (err) {
+                    this.log_indexing_error(err, `index_blocks_period`);
+                }
+            }
+            let indexChainBlockRowTS = (new Date().getTime() - startTS) / 1000
+            console.log(`index_blocks_period: index_chain_block_row ${rows.length} blocks`, indexChainBlockRowTS);
+            this.timeStat.indexChainBlockRowTS += indexChainBlockRowTS
+            this.timeStat.indexChainBlockRow++
+
+            this.showCurrentMemoryUsage()
+            this.dump_update_block_stats(chainID, statRows, indexTS)
+            if (true) {
+                //flush hashesRows
+                startTS = new Date().getTime();
+                await this.immediateFlushBlockAndAddressExtrinsics()
+                let immediateFlushTS = (new Date().getTime() - startTS) / 1000
+                this.timeStat.immediateFlushTS += immediateFlushTS
+                this.timeStat.immediateFlush++
+                this.timeStat.flush_f_TS += immediateFlushTS
+                console.log(`index_blocks_period(jmp=${jmp}) flush HashesRows + BlockRows`, immediateFlushTS);
+            }
+            if (jmp <= 50 && false) {
+                //todo: no reason to store hashesRows here. should flush immediately
+                startTS = new Date().getTime();
+                await this.flush(indexTS, endBN, false, false); //ts, bn, isFullPeriod, isTip
+                let tinyFlushTS = (new Date().getTime() - startTS) / 1000
+                console.log(`index_blocks_period(jmp=${jmp}): tiny flush`, tinyFlushTS);
+            }
+            let indexJmpTS = (new Date().getTime() - jmpStartTS) / 1000
+            this.timeStat.indexJmpTS += indexJmpTS
+            this.timeStat.indexJmp++
+            this.showTimeUsage()
+        }
+
+        // flush out the hour of data to BT
+        let finalFlushStartTS = new Date().getTime();
+        await this.flush(indexTS, currPeriod.endBN, true, false); //ts, bn, isFullPeriod, isTip
+        let finalFlushTS = (new Date().getTime() - finalFlushStartTS) / 1000
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("index_blocks_period: total flush(a-f)", finalFlushTS);
+        this.showTimeUsage()
+
+        await this.close_bqlog();
+        // record a record in indexlog
+        let numIndexingErrors = this.numIndexingErrors;
+        if (this.chainParser) {
+            numIndexingErrors += this.chainParser.numParserErrors;
+        }
+        let numIndexingWarns = this.numIndexingWarns;
+        let elapsedSeconds = (new Date().getTime() - indexStartTS) / 1000
+        await this.upsertSQL({
+            "table": "indexlog",
+            "keys": ["chainID", "indexTS"],
+            "vals": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns"],
+            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', 1, 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}')`],
+            "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns"]
+        });
+
+        await this.update_batchedSQL();
+        this.logger.info({
+            op: "index_blocks_period",
+            numIndexingErrors: numIndexingErrors,
+            numIndexingWarns: numIndexingWarns,
+            elapsedSeconds: elapsedSeconds,
+            chainID,
+            logDT
+        });
+        console.log(`index_blocks_period(jmp=${jmp}) - Final ElapsedSeconds=${elapsedSeconds}`);
+        this.resetTimeUsage()
+        return elapsedSeconds
+    }
+
+
+    resetHashRowStat() {
+        let newHashesRows = {
+            substrateBlk: 0,
+            evmBlk: 0,
+            substrateTx: 0,
+            evmTx: 0,
+            evmTxPerBlk: [],
+            substrateTxPerBlk: [],
+        }
+        this.stat.hashesRows = newHashesRows
+    }
+
+    resetAddressRowStat() {
+        let newAddressRows = {
+            uniqueAddr: 0,
+            uniqueEVMAddr: 0,
+            uniqueSubstrateAddr: 0,
+            realtime: 0,
+            history: 0,
+            feed: 0,
+            feedunfinalized: 0,
+            feedtransfer: 0,
+            feedreward: 0,
+            feedcrowdloan: 0,
+            xcmsend: 0,
+            xcmreceive: 0,
+        }
+        this.stat.addressRows = newAddressRows
+    }
+
+    resetAddressStorageStat() {
+        let newAddressStorage = {
+            uniqueAddr: 0
+        }
+        this.stat.addressStorage = newAddressStorage
+    }
+
+    resetAssetholderStat() {
+        let newAssetholder = {
+            unique: 0,
+            read: 0,
+            write: 0,
+            update: 0,
+        }
+        this.stat.assetholder = newAssetholder
+    }
+
+    resetAssetChainMap() {
+        this.assetChainMap = {}
+    }
+
+    resetAddressStats() {
+        this.resetAddressRowStat()
+        this.resetAddressStorageStat()
+        this.resetAssetholderStat()
+    }
+
+
+
+    async dump_update_block_stats(chainID, statRows, indexTS) {
+        let i = 0;
+        for (i = 0; i < statRows.length; i += 10000) {
+            let j = i + 10000;
+            if (j > statRows.length) j = statRows.length;
+            await this.upsertSQL({
+                "table": `block${chainID}`,
+                "keys": ["blockNumber"],
+                "vals": ["blockHash", "parentHash", "blockDT", "numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "lastFeedDT", "crawlFeed"],
+                "data": statRows.slice(i, j),
+                "replace": ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "blockHash", "parentHash", "lastFeedDT", "crawlFeed"],
+                "replaceIfNull": ["blockDT"]
+            });
+        }
+        let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+        //console.log(`dump_update_block_stats indexTS=${indexTS} [${logDT} ${hr}] len=${statRows.length}`);
+    }
+
+    // goal: lookup index m which is LESS than el and n which IS element, and return n
+    async specSearch(maxBlockNumber, el, manager, compare_fn) {
+        var m = 1;
+        var n = maxBlockNumber;
+
+        while (n - m > 1) {
+            var k = (n + m) >> 1;
+            var cmp = await compare_fn(el, k, manager);
+            if (cmp == null) {
+                return false;
+            } else if (cmp < 0) { // if ar[k] is < el then move n down
+                m = k;
+            } else { // if ar[k] is >= el then move m up
+                n = k;
+            }
+        }
+        var cmp = await compare_fn(el, n, manager);
+        if (cmp == 0) {
+            return n;
+        }
+        return false;
+    }
+
+    async update_spec_version(chainID, specVersion) {
+        try {
+            let chain = await this.getChain(chainID);
+            let api = this.api;
+            let maxBlockNumber = chain.blocksFinalized;
+            if (maxBlockNumber == null) {
+                console.log("update_spec_version no blocksFinalized! -- skip");
+                return (false);
+            }
+
+            console.log("reading blocks looking for specVersion", specVersion, maxBlockNumber)
+            let r = await this.specSearch(maxBlockNumber, specVersion, this, async function(a, bn, manager) {
+                let sql = `select blockHash from block${chainID} where blockNumber = '${bn}'`
+                let blocks = await manager.poolREADONLY.query(sql);
+                if (blocks.length > 0) {
+                    let blockHash = blocks[0].blockHash;
+                    if (blockHash != undefined && blockHash.length > 10) {
+                        let runtimeVersion = await api.rpc.state.getRuntimeVersion(blocks[0].blockHash);
+                        let specVersion = runtimeVersion.toJSON().specVersion;
+                        return (specVersion - a);
+                    } else {
+                        console.log("MISSING blockHash", sql);
+                        return null
+                    }
+                } else {
+                    console.log("MISSING bn", sql);
+                    return null;
+                }
+            });
+            if (r) {
+                let sql = `select blockNumber, blockHash, from_unixtime(blockDT) as blockTS, blockHash from block${chainID} where blockNumber = '${r}'`
+                let blocks = await this.poolREADONLY.query(sql);
+                if (blocks.length > 0) {
+                    let b = blocks[0];
+                    let blockHash = b.blockHash;
+                    let metadataRaw = blockHash ? await this.api.rpc.state.getMetadata(blockHash) : await this.api.rpc.state.getMetadata();
+                    let metadata = metadataRaw.asV14.toJSON();
+                    await this.upsertSQL({
+                        "table": "specVersions",
+                        "keys": ["chainID", "specVersion"],
+                        "vals": ["blockNumber", "blockHash", "firstSeenDT", "metadata"],
+                        "data": [`('${chainID}', '${specVersion}', '${b.blockNumber}', '${b.blockHash}', Now(), ${mysql.escape(JSON.stringify(metadata))})`],
+                        "replace": ["blockNumber", "blockHash", "firstSeenDT", "metadata"]
+                    });
+                }
+            }
+        } catch (err) {
+            console.log(err)
+        }
+        return false
+    }
+
+    async updateSpecVersions(chain) {
+        let specVersions = await this.poolREADONLY.query(`select specVersion, UNIX_TIMESTAMP(firstSeenDT) as firstSeenTS from specVersions where chainID = ${chain.chainID} and blockNumber is Null order by chainID, specVersion`);
+        for (let i = 0; i < specVersions.length; i++) {
+            let specVersion = specVersions[i].specVersion;
+            // goal: search for the first blockNumber which is the same as specVersion
+            await this.update_spec_version(chain.chainID, specVersion);
+        }
+    }
+
+
+}

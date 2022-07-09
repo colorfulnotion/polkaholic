@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+ // Usage: ./writeCrowdloanRelated chainID
+var Query = require("./query");
+
+async function main() {
+    var chainID = -1;
+    let query = new Query();
+    await query.assetManagerInit();
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = parseInt(val, 10);
+        }
+    });
+    await query.writeCrowdloanRelated(chainID);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

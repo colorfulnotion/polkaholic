@@ -1,0 +1,43 @@
+<div class="card-group">
+
+
+<%- include("stats", { name: "Extrinsics", id: chain.id, numTot: chain.numExtrinsics, num7d: chain.numExtrinsics7d, num30d: chain.numExtrinsics30d }) %>
+
+<%- include("stats", { name: "Signed Ext", numTot: chain.numSignedExtrinsics, num7d: chain.numSignedExtrinsics7d, num30d: chain.numSignedExtrinsics30d }) %>
+
+<%- include("stats", { name: "Events", id: chain.id, numTot: chain.numEvents, num7d: chain.numEvents7d, num30d: chain.numEvents30d }) %>
+<%- include("statsxcm", { name: "Transfers",
+  numTot: chain.numTransfers,
+  valUSDTot: chain.valueTransfersUSD,
+  num7d: chain.numTransfers7d,
+  valUSD7d: chain.valueTransfersUSD7d,
+  num30d: chain.numTransfers30d,
+  valUSD30d: chain.valueTransfersUSD30d
+  }) %>
+
+<% if ( chain.isEVM ) { %>
+<%- include("stats", { name: "# EVM Txs", numTot: chain.numTransactionsEVM, num7d: chain.numTransactionsEVM7d, num30d: chain.numTransactionsEVM30d }) %>
+<%- include("stats", { name: "# EVM Receipts", numTot: chain.numReceiptsEVM, num7d: chain.numReceiptsEVM7d, num30d: chain.numReceiptsEVM30d }) %>
+<%- include("stats", { name: "Gas Used", numTot: chain.gasUsed, num7d: chain.gasUsed7d, num30d: chain.gasUsed }) %>
+<% } %>
+
+<%- include("statsxcm", { name: "XCM Incoming",
+ numTot: chain.numXCMTransferIncoming,
+ valUSDTot: chain.valXCMTransferIncomingUSD,
+ num7d: chain.numXCMTransferIncoming7d,
+ valUSD7d: chain.valXCMTransferIncomingUSD7d,
+ num30d: chain.numXCMTransferIncoming30d,
+ valUSD30d: chain.valXCMTransferIncomingUSD30d
+}) %>
+<%- include("statsxcm", { name: "XCM Outgoing",
+ numTot: chain.numXCMTransferOutgoing,
+ valUSDTot: chain.valXCMTransferOutgoingUSD,
+ num7d: chain.numXCMTransferOutgoing7d,
+ valUSD7d: chain.valXCMTransferOutgoingUSD7d,
+ num30d: chain.numXCMTransferOutgoing30d,
+ valUSD30d: chain.valXCMTransferOutgoingUSD30d,
+}) %>
+
+<%- include("stats0", { name: "# Holders", numHolders: chain.numHolders, totalIssuance: chain.totalIssuance, relayChain: chain.relayChain, paraID: chain.paraID }) %>
+
+</div>

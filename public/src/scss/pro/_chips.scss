@@ -1,0 +1,149 @@
+.chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: $chip-height;
+  padding: 0 $chip-padding-right;
+  margin-right: $chip-margin-right;
+  font-size: $chip-font-size;
+  font-weight: $chip-font-weight;
+  color: $chip-font-color;
+  cursor: pointer;
+  background-color: #eceff1;
+  border-radius: 16px;
+  transition: opacity 0.3s linear;
+  word-wrap: break-word;
+  box-shadow: none;
+  text-transform: none;
+  margin-top: 5px;
+  margin-bottom: 5px;
+
+  &:hover {
+    box-shadow: none;
+  }
+
+  &:active,
+  &.active {
+    background-color: #cacfd1;
+    transition: 0.3s ease all;
+  }
+
+  img {
+    width: inherit;
+    height: inherit;
+    border-radius: 100%;
+    margin: 0 8px 0 -12px;
+  }
+
+  .close {
+    float: right;
+    padding-left: $chip-close-padding-left;
+    font-size: $chip-close-font-size;
+
+    cursor: pointer;
+    transition: opacity 0.15s linear;
+    opacity: 0.53;
+
+    &:hover {
+      color: $dark;
+    }
+  }
+
+  .close-opacity {
+    opacity: 0;
+  }
+
+  &-outline {
+    background: transparent;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  &.chip-md {
+    height: 42px;
+    border-radius: 21px;
+  }
+
+  &.chip-lg {
+    height: 52px;
+    border-radius: 26px;
+  }
+
+  &[contenteditable='true'] {
+    outline: none;
+    border: 3px solid #b2b3b4;
+    background-color: #fff;
+  }
+}
+
+.chips {
+  min-height: $chips-min-height;
+  padding-bottom: $chips-padding-bottom;
+  margin-bottom: $chips-margin-bottom;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  transition: all 0.3s ease;
+
+  &-transition {
+    transition: all 0.3s ease;
+  }
+  &-padding {
+    padding: 5px;
+  }
+
+  &.focus {
+    box-shadow: 0 1px 0 0 red;
+  }
+
+  &:hover {
+    cursor: text;
+  }
+
+  .tag.selected {
+    color: $white;
+    // border-bottom: 1px solid red;
+  }
+
+  .input {
+    display: inline-block;
+    width: $chips-input-width !important;
+    height: $chips-input-height;
+    padding: 0 !important;
+    margin-right: $chips-input-margin-right;
+    font-size: $chips-input-font-size;
+    font-weight: $chips-input-font-weight;
+    line-height: $chips-input-line-height;
+    color: $chips-input-font-color;
+    background: none;
+    border: 0;
+    outline: 0;
+
+    &:focus {
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+  }
+
+  &-placeholder,
+  &-initial {
+    margin-bottom: 0;
+    padding-bottom: 0;
+
+    .chips-input-wrapper {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      transition: all 0.3s ease;
+
+      input {
+        width: 150px;
+      }
+    }
+  }
+}
+
+.chip-opacity {
+  opacity: 0;
+}

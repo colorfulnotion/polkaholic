@@ -1,0 +1,30 @@
+#!/usr/bin/env node
+ // Usage:  auditChain [chainID]
+
+var Crawler = require("./crawler");
+async function main() {
+    var chainID = -1;
+    var crawler = new Crawler();
+    var daysago = 2;
+    await crawler.assetManagerInit();
+    
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = parseInt(val, 10);
+        }
+        if (index == 3 && val.length > 0) {
+            daysago = parseInt(val, 10);
+        }
+    });
+
+    await crawler.updateChainAssets(chainID, daysago);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

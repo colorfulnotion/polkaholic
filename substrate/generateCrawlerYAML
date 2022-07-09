@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+ // Usage: ./generateCrawlerYAML
+var Manager = require("./manager");
+
+async function main() {
+      let manager = new Manager();
+      await manager.generateCrawlerYAML(false);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

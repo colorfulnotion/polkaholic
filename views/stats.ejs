@@ -1,0 +1,20 @@
+<div class="card" style="width: 18rem;">
+  <div class="card-body">
+    <h5 class="card-title"><%= name; %></h5>
+    <b>7d</b>: <%= uiTool.presentNumber(num7d); %>
+    <br>
+
+    <b>30d</b>: <%= uiTool.presentNumber(num30d); %>
+    <br>
+
+    <b>Total</b>: <%= uiTool.presentNumber(numTot); %>
+
+    <% if ( name == "Extrinsics" ) { %>
+      <br><a class="btn-outline-info btn-sm" href="/extrinsics/<%= id; %>">Search</a>
+    <% } else if ( name == "Events" ) { %>
+      <br><a class="btn-outline-info btn-sm" href="/events/<%= id; %>">Search</a>
+    <% } else if ( name == "# EVM Txs" ) { %>
+      <br><a class="btn-outline-info btn-sm" href="/evmtxs/<%= id; %>">Search</a>
+    <% } %>
+  </div>
+</div>
