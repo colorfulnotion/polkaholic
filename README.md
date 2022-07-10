@@ -316,4 +316,4 @@ Other:
 
 ## License
 
-Polkadot is [GPL 3.0 licensed](LICENSE).
+Polkaholic is [GPL 3.0 licensed](LICENSE).

@@ -133,25 +133,6 @@ function computeMultisig(caller, addresses, threshold) {
     }
     allAddrs.sort();
     let multiAddress = createKeyMulti(allAddrs, threshold);
-
-    /*
-      // Address as a byte array.
-      console.log(`[caller:${caller}] ${addresses.length} addresses:[${addresses}] all:[${allAddrs}], threshold=${threshold}`)
-
-      // Convert byte array to SS58 encoding.
-      let ss58MultisigAddress = encodeAddress(multiAddress, chainPrefix);
-
-      console.log(`\nMultisig Address: ${ss58MultisigAddress}`);
-
-      // Take addresses and remove the sender.
-      let otherSignatories = addresses.filter((who) => who !== caller);
-
-      // Sort them by public key.
-      let otherSignatoriesSorted = sortAddresses(otherSignatories, chainPrefix);
-
-      console.log(`\nOther Signatories: ${otherSignatoriesSorted}\n`);
-    */
-
     let m = {
         threshold: threshold,
         multisigAddress: toHex(multiAddress),
@@ -161,6 +142,42 @@ function computeMultisig(caller, addresses, threshold) {
     return m
 }
 
+function pubKey_hex2ascii(str) {
+    if (typeof str != "string") return (null);
+    let inp = (str.substring(0, 2) == "0x") ? str.substring(2) : str.substring(0);
+    if (inp.length < 8) return (null);
+    // 70617261 - para
+    // 7369626c - sibl
+    // 6d6f646c - modl
+    let prefix = inp.substr(0, 8);
+    if (prefix == "70617261" || prefix == "7369626c" || prefix == "6d6f646c") {} else return (null);
+    let done = false;
+    let out = "";
+    let remaining = "";
+    let j = inp.length;
+    for (let i = j; i > 2; i -= 2) {
+        let h = inp.substring(j - 2, j);
+        let charCode = parseInt(h, 16);
+        if (charCode == 0) {
+            j = j - 2;
+        } else {
+            i = 0; // terminate
+        }
+    }
+    for (let i = 0; i < j && (!done); i += 2) {
+        let h = inp.substring(i, i + 2);
+        let charCode = parseInt(h, 16);
+        if ((charCode == 47) || (charCode >= 65 && charCode <= 90) || (charCode >= 97 && charCode <= 122)) {
+            out += String.fromCharCode(charCode);
+        } else {
+            remaining = h + remaining;
+        }
+    }
+    if (remaining.length > 0 && remaining.length <= 4) {
+        out += ":" + parseInt(remaining, 16);
+    }
+    return (out);
+}
 
 //100150022 -> 100,150,022
 function toNumWithComma(numb) {
@@ -963,4 +980,7 @@ module.exports = {
     parseBool: function(input) {
         return parseBool(input);
     },
+    pubKeyHex2ASCII: function(str) {
+        return pubKey_hex2ascii(str)
+    }
 };

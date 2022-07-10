@@ -5,13 +5,11 @@ async function main() {
     var manager = new Manager();
 
     await manager.updateAddressBalances()
-/*
     await manager.computeAddressColumnsBQ("transfersIn");
     await manager.computeAddressColumnsBQ("extrinsics");
     await manager.computeAddressColumnsBQ("crowdloans");
     await manager.computeAddressColumnsBQ("rewards");
     await manager.computeAddressColumnsBQ("transfersOut"); 
-*/
     await manager.updateAddressTopN();
 
 }

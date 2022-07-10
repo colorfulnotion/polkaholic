@@ -74,11 +74,8 @@ function getHostChain(req) {
         let sa = fullhost.split(".");
         if (sa.length > 2) {
             host = sa[0];
-            //console.log(`host=${host}`, host)
-        }
-        if (host.includes('internal')) {
-            // use polkadot for internal test
-            return [chainID, 'polkadot']
+        } else {
+            return [false, false];
         }
         [chainID, id] = query.convertChainID(host)
         if (id) {

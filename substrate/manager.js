@@ -155,7 +155,7 @@ module.exports = class Manager extends AssetManager {
         let gsBucketName = this.GC_STORAGE_BUCKET
         let bqDataset = this.GC_BIGQUERY_DATASET
 
-        let logDTs = await this.poolREADONLY.query(`select logDT, unix_timestamp(logDT) as indexTS, count(*) from indexlog where logDT >= '${minLogDT}' and readyForIndexing = 1 and indexed = 1 and logDT not in (select logDT from bqlog where loaded = 1 and logDT >= '${minLogDT}' and logDT < date(${maxLogDT}) ) group by logDT order by logDT limit 365`);
+        let logDTs = await this.poolREADONLY.query(`select logDT, unix_timestamp(logDT) as indexTS, count(*) from indexlog where logDT >= '${minLogDT}' and logDT <= '${maxLogDT}' readyForIndexing = 1 and indexed = 1 and logDT not in (select logDT from bqlog where loaded = 1 and logDT >= '${minLogDT}' and logDT < date(${maxLogDT}) ) group by logDT order by logDT limit 365`);
 
         for (let i = 0; i < logDTs.length; i++) {
             try {
@@ -740,68 +740,20 @@ module.exports = class Manager extends AssetManager {
         await this.update_batchedSQL();
     }
 
-    audit_hashes_block(b) {
-        //console.log("audit_hashes_block", b);
-        return (false)
-    }
-
-    audit_receipts_evm(receipts) {
-        // check for nulls ... if there are any nulls, we have a problem!
-        if (receipts.length > 0) {
-            for (let i = 0; i < receipts.length; i++) {
-                if (receipts[i] == null) {
-                    console.log("audit_receipts_evm", receipts);
-                    return (true);
-                }
-            }
+    // for any 0x .... 0000 in addresslist without an existing nickname
+    async testNicknames() {
+        // 0x706172 - para:
+        // 0x7369626 - sibl:
+        // 0x6d6f646c - modl
+        // 0x65766d3a - evm:
+        let sql = `select address from address where ((address like '0x706172%000000') or ( address like '0x7369626%0000000') or (address like '0x6d6f646c%000000') ) and address not in ( select address from account where nickname is not null ) and length(address) = 66;`
+        let addressList = await this.poolREADONLY.query(sql)
+        for (let i = 0; i < addressList.length; i++) {
+            let a = addressList[i]
+            let address = a.address;
+            console.log(address, paraTool.pubKeyHex2ASCII(address));
         }
-        return (false)
     }
-
-    // at present this checks for nulls in receiptsevm
-    async auditChainTable(chainID, startBN = 778999) {
-        let nblocks = 0;
-        const tableChain = this.getTableChain(chainID);
-        let res = tableChain.createReadStream({
-            start: paraTool.blockNumberToHex(startBN),
-            families: ["receiptsevm"]
-        });
-        res.on("error", (err) => {
-            console.log(err);
-        });
-        res.on("end", async () => {});
-        res.on("data", async (row) => {
-            try {
-                let rowData = row.data;
-                let audit = false;
-                let blockNumber = paraTool.dechexToInt(row.id);
-                if (rowData["receiptsevm"]) {
-                    let data = rowData["receiptsevm"]
-                    for (const col of Object.keys(data)) {
-                        let receipts = JSON.parse(data[col][0].value);
-                        audit = this.audit_receipts_evm(receipts);
-                        nblocks++;
-                    }
-                }
-                if (nblocks % 1000 == 0) {
-                    console.log("auditChainTable: nblocks", blockNumber, chainID);
-                }
-                if (audit) {
-                    let sql = `update block${chainID} set crawlReceiptsEVM = 1 where blockNumber = ${blockNumber}`
-                    console.log(sql);
-                    this.batchedSQL.push(sql);
-                    await this.update_batchedSQL();
-                }
-            } catch (err) {
-                this.logger.warn({
-                    "op": "auditChainTable",
-                    err
-                })
-            }
-        });
-        await this.finished(res);
-    }
-
 
     async computeAddressColumnsBQ(query = "transfersout", limit = 5000000) {
         let bqDataset = this.GC_BIGQUERY_DATASET
@@ -883,21 +835,6 @@ module.exports = class Manager extends AssetManager {
         }
     }
 
-    async cleanAddressHistory() {
-        await this.assetManagerInit();
-
-        for (let i = 0; i < 256; i++) {
-            // 0x118aa994dad8c37690b086db811314e0ad882db6000000000000000000000000
-            let hs = "0x" + i.toString(16).padStart(2, '0');
-            let he = "0x" + (i + 1).toString(16).padStart(2, '0');
-            if (i == 255) he = "0xgg";
-            // clean the addressrealtime table
-            await this.clean_address_realtime_history(hs, he, "realtime");
-            // clean the addresshistory table
-            await this.clean_address_realtime_history(hs, he, "history");
-
-        }
-    }
 
     async updateAddressBalances() {
         await this.assetManagerInit();
@@ -1373,57 +1310,6 @@ module.exports = class Manager extends AssetManager {
                 "replace": vals
             });
             out = [];
-        }
-    }
-
-    async clean_address_realtime_history(start = "0x2c", end = "0x2d", family = "realtime") {
-        let addressData = [];
-        try {
-            let rows = null;
-            if (family == "realtime") {
-                [rows] = await this.btAccountRealtime.getRows({
-                    start: start,
-                    end: end,
-                });
-            } else if (family == "history") {
-                [rows] = await this.btAccountHistory.getRows({
-                    start: start,
-                    end: end
-                });
-            }
-            let ndeletions = 0;
-            for (const row of rows) {
-                try {
-                    let rowData = row.data;
-                    let columnData = rowData[family];
-                    let deletions = [];
-                    for (const h of Object.keys(columnData)) {
-                        for (const cell of columnData[h]) {
-                            let x = JSON.parse(cell.value);
-                            if (x.source && x.genTS) {
-                                // we are clean
-                            } else if (h.includes("DOT")) {
-                                // TODO: need to escape h here .. the deleteCells doesn't work
-                                let col = `${family}:${h}`;
-                                deletions.push(col)
-                            }
-                        }
-                    }
-                    if (deletions.length > 0) {
-                        console.log("DELETING", row.id, deletions)
-
-                        await row.deleteCells(deletions);
-                        this.sleep(5000);
-                        process.exit(0);
-                        ndeletions += deletions.length;
-                    }
-                } catch (err) {
-                    console.log(err);
-                }
-            }
-            console.log(start, "deletions", ndeletions);
-        } catch (err) {
-            console.log(err);
         }
     }
 
