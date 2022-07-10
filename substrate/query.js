@@ -2331,8 +2331,6 @@ module.exports = class Query extends AssetManager {
         let fromAddress = paraTool.getPubKey(rawFromAddress) // observer
         let address = paraTool.getPubKey(rawAddress)
         let isEVMAddr = paraTool.isValidEVMAddress(address)
-        let requestedChainPrefix = this.getChainPrefix(requestedChainID)
-        let requestedChainAddress = isEVMAddr ? address : paraTool.getAddress(address, requestedChainPrefix)
 
         let assets = null;
         try {
@@ -2417,6 +2415,15 @@ module.exports = class Query extends AssetManager {
             return (a.chainID - b.chainID);
         })
 
+        let requestedChainPrefix = null;
+        if (requestedChainID) {
+            requestedChainPrefix = this.getChainPrefix(requestedChainID);
+        } else if (chains.length > 0) {
+            requestedChainPrefix = chains[0].ss58Format;
+        } else {
+            requestedChainPrefix = 0;
+        }
+        let requestedChainAddress = isEVMAddr ? address : paraTool.getAddress(address, requestedChainPrefix)
         let account = {
             address,
             requestedChainAddress,
@@ -2433,6 +2440,7 @@ module.exports = class Query extends AssetManager {
             judgementsKSM: null,
             related: null
         }
+
         let a = this.lookup_account(address);
         if (a) {
             account.nickname = a.nickname;
