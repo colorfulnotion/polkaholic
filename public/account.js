@@ -244,7 +244,7 @@ function showtransfers(address) {
                             }
                         }
                         let s = presentExtrinsicIDHash(eventID, row.extrinsicHash, false);
-                        return `${presentChain(row.id, row.chainName)} (${s})`
+                        return `${presentChain(row.chainID, row.chainName)} (${s})`
                     }
                     return data;
                 }
