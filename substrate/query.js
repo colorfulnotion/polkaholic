@@ -3611,16 +3611,16 @@ module.exports = class Query extends AssetManager {
                 }
                 if (decorateUSD) {
                     var [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(bal, targetAsset, chainID, ts)
-                    decodedData[idx].symbol = chainSymbol
-                    decodedData[idx].dataRaw = bal
+                    decodedData[2].symbol = chainSymbol
+                    decodedData[2].dataRaw = bal
                     if (balanceUSD) {
-                        decodedData[idx].dataUSD = balanceUSD
-                        decodedData[idx].priceUSD = priceUSD
-                        decodedData[idx].priceUSDCurrent = priceUSDCurrent
+                        decodedData[2].dataUSD = balanceUSD
+                        decodedData[2].priceUSD = priceUSD
+                        decodedData[2].priceUSDCurrent = priceUSDCurrent
                     }
                 } else {
-                    decodedData[idx].symbol = chainSymbol
-                    decodedData[idx].dataRaw = bal
+                    decodedData[2].symbol = chainSymbol
+                    decodedData[2].dataRaw = bal
                 }
 
             }
