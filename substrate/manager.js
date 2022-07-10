@@ -155,7 +155,7 @@ module.exports = class Manager extends AssetManager {
         let gsBucketName = this.GC_STORAGE_BUCKET
         let bqDataset = this.GC_BIGQUERY_DATASET
 
-        let logDTs = await this.poolREADONLY.query(`select logDT, unix_timestamp(logDT) as indexTS, count(*) from indexlog where logDT >= '${minLogDT}' and logDT <= '${maxLogDT}' readyForIndexing = 1 and indexed = 1 and logDT not in (select logDT from bqlog where loaded = 1 and logDT >= '${minLogDT}' and logDT < date(${maxLogDT}) ) group by logDT order by logDT limit 365`);
+        let logDTs = await this.poolREADONLY.query(`select logDT, unix_timestamp(logDT) as indexTS, count(*) from indexlog where logDT >= '${minLogDT}' and logDT <= '${maxLogDT}' and readyForIndexing = 1 and indexed = 1 and logDT not in (select logDT from bqlog where loaded = 1 and logDT >= '${minLogDT}' and logDT < date(${maxLogDT}) ) group by logDT order by logDT limit 365`);
 
         for (let i = 0; i < logDTs.length; i++) {
             try {
@@ -238,8 +238,7 @@ module.exports = class Manager extends AssetManager {
     }
 
     async update_bq_log(tbl, minLogDT, maxLogDT, limit = 20000) {
-
-        let fullTable = `\`${bqDataset}.${tbl}\``;
+        let fullTable = this.getBQTable(tbl);
         const bigqueryClient = new BigQuery();
         let hasValueUSD = (tbl == "extrinsics" || tbl == "rewards" || tbl == "transfers")
         let flds = hasValueUSD ? ", sum(v) as valueUSD" : ""
@@ -756,10 +755,9 @@ module.exports = class Manager extends AssetManager {
     }
 
     async computeAddressColumnsBQ(query = "transfersout", limit = 5000000) {
-        let bqDataset = this.GC_BIGQUERY_DATASET
-        let transfersTable = `\`${bqDataset}.transfers\``;
-        let extrinsicsTable = `\`${bqDataset}.extrinsics\``;
-        let rewardsTable = `\`${bqDataset}.rewards\``;
+        let transfersTable = this.getBQTable("transfers");
+        let extrinsicsTable = this.getBQTable("extrinsics");
+        let rewardsTable = this.getBQTable("rewards");
         const bigqueryClient = new BigQuery();
         let sqlQuery = null
         let vals = [];

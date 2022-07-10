@@ -1060,4 +1060,37 @@ function showunfinalized(address) {
     }, refreshIntervalMS);
 }
 
+function submitSuggestion(address, nickname, submitter) {
+    let endpoint = `${baseURL}/suggest/${address}`
+    let data = {
+        nickname,
+        submitter
+    }
+    console.log("POST", endpoint, data)
+    var req = new Request(endpoint, {
+        method: 'POST',
+        headers: new Headers({
+            "Content-Type": "application/json"
+        }),
+        body: JSON.stringify(data)
+    });
+
+    fetch(req)
+        .then((response) => {
+            if (response.status == 200) {
+                launchToast("Thank you!  If your suggestion is verified as reasonable it will appear within 24 hrs");
+            } else {
+                launchToast("An error has occurred.");
+            }
+            $('#suggestModal').modal('hide');
+        })
+
+}
+
+$('#submitSuggestion').on('click', function(e) {
+    let nickname = document.getElementById("nickname").value;
+    let submitter = document.getElementById("submitter").value;
+    submitSuggestion(address, nickname, submitter);
+});
+
 setuptabs(tabs, address, requestedChainAddress);
