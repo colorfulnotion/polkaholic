@@ -4714,24 +4714,24 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
           if (sessionIndex){
             currSessionIndex = sessionIndex
             this.currentSessionIndex = currSessionIndex
-            console.log(`[${blockNumber}] update currentSession=${currSessionIndex}`)
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] update currentSession=${currSessionIndex}`)
           }else {
             let currIndex = await api.query.session.currentIndex.at(blockHash)
             currSessionIndex = currIndex.toNumber()
             this.currentSessionIndex = currSessionIndex
-            console.log(`*[${blockNumber}] update currentSession=${currSessionIndex}`)
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSession=${currSessionIndex}`)
           }
           currSessionValidators = await api.query.session.validators.at(blockHash)
           currSessionValidators = currSessionValidators.toJSON()
           this.currentSessionValidators = currSessionValidators
-          //console.log(`*[${blockNumber}] update currentSessionValidators (${currSessionIndex}, len=${currSessionValidators.length})`)
+          if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSessionValidators (${currSessionIndex}, len=${currSessionValidators.length})`)
         } catch (e){
-          console.log(`getSessionIndexAndValidators error`, e.toString())
+          if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getSessionIndexAndValidators error`, e.toString())
           return
         }
       }
       let [author, authorPubkey] = paraTool.getAuthor(digest, currSessionValidators)
-      console.log(`[${blockNumber}] ${blockHash}, author:${author}, authorPubkey:${authorPubkey}`)
+      if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] ${blockHash}, author:${author}, authorPubkey:${authorPubkey}`)
       if (author != undefined){
         block.author = author
       }
