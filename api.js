@@ -21,7 +21,7 @@ const paraTool = require('./substrate/paraTool');
 const uiTool = require('./substrate/uiTool');
 const port = 3001
 const Query = require("./substrate/query");
-//const querystring = require('querystring');
+
 const cookieParser = require("cookie-parser");
 
 var debugLevel = paraTool.debugTracing
@@ -56,12 +56,11 @@ function getapikey(req) {
         let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
         ip = ip.substring(7)
         let ipPrefix = ip.split('.').slice(0, -1).join('.')
-        //::ffff:103.163.220.17 -> use sha1(103.163.220) = c88cbdf6f85088bb9df9529d7823c5a3c736bfc5 as key?
+        //::ffff:103.163.220.17 -> use sha1(103.163.220) = c88cbdf6f85088bb9df9529d7823c5a3c736bfc5 as key
         apikey = paraTool.sha1(ipPrefix)
         if (apikey.length > 32) {
             apikey = apikey.substring(0, 32);
         }
-        //console.log(`req IP = ${ip} (${ipPrefix}) ${apikey}`);
     }
     return (apikey);
 }
@@ -224,7 +223,7 @@ app.get('/addresstopn/:topN', async (req, res) => {
     }
 })
 
-// Usage: https://polkaholic.io/specversions/polkadot
+// Usage: https://api.polkaholic.io/specversions/polkadot
 app.get('/specversions/:chainID_or_chainName', async (req, res) => {
     try {
 
@@ -244,7 +243,7 @@ app.get('/specversions/:chainID_or_chainName', async (req, res) => {
     }
 })
 
-// Usage: https://polkaholic.io/specversions/polkadot
+// Usage: https://api.polkaholic.io/specversion/polkadot/100
 app.get('/specversion/:chainID_or_chainName/:specVersion', async (req, res) => {
     try {
         let chainID_or_chainName = req.params["chainID_or_chainName"]
@@ -292,7 +291,6 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
 
 // Usage: https://api.polkaholic.io/chain/assets/10
 // Usage: https://api.polkaholic.io/chain/assets/acala
-
 app.get('/chain/assets/:chainID_or_chainName/:homePubkey?', async (req, res) => {
     try {
         let chainID_or_chainName = req.params["chainID_or_chainName"]
@@ -392,6 +390,14 @@ app.get('/hash/:hash', async (req, res) => {
             error: err.toString()
         });
     }
+})
+
+app.post('/suggest/:address', async (req, res) => {
+    let address = req.params["address"];
+    let nickname = req.body.nickname;
+    let submitter = req.body.submitter; // TODO: require signing?
+    let result = query.submitAddressSuggestion(address, nickname, submitter);
+    res.write(JSON.stringify(result));
 })
 
 // curl -X POST -H "Content-Type: application/json" -d '{"chainID":"polkadot", "startDate": "2022-06-21", "endDate": "2022-06-24"}'  http://moonriver-internal.polkaholic.io:3001/search/xcms/all/polkadot

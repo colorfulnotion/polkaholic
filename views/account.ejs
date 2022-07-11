@@ -1,8 +1,7 @@
 <%- include('header', {chainInfo: chainInfo}); %>
-<% let canClaim = false; %>
-
-
-
+<% let canClaim = false; // disabled for now
+let suggest = false; // disabled for now
+%>
 <div class="card mb-3">
   <div class="row g-0">
     <div class="col-md-2  text-center">
@@ -13,16 +12,17 @@
         <h5 class="card-title"><%- account.requestedChainAddress;%> (Prefix: <b><%=account.requestedChainPrefix%></b>)</h5>
         <h5 class="card-title"><B>Account Balance: <%= uiTool.currencyFormat(account.balanceUSD) %></B></h5>
         <p class="card-text">
-	<% if ( account.nickname ) { %>
+	<% if ( account.nickname ) { suggest = false; %>
 	  <B><%= account.nickname %></B><br/>
-	<% } else if ( account.subName ) { %>
+	<% } else if ( account.subName ) { suggest = false; %>
 	  <B><%= account.subName %></B>
-	  <% if ( account.parent ) { %>
+	  <% if ( account.parent ) { suggest = false; %>
 	  (<a href='/account/<%= account.parent; %>'>parent identity</a>)<br/>
 	  <% } %>
         <% } %>
 
 	<% if ( account.info != null ) {
+        suggest = false;
         let isVerified = '';
         let verificationStatus = 'unverified';
         if ( account.judgements != undefined ) {
@@ -76,16 +76,18 @@
         <i>(source: Polkadot On-chain Identity, <%= verificationStatus %>)</i><br/>
 	<% } %>
 	<% if ( account.related != null ) {
+       suggest = false;
 	     for ( let k = 0; k < account.related.length; k++) {
 	        let r = account.related[k];
-		if ( r.accountType == "proxyDelegateOf" ) { %>
+		if ( r.accountType == "proxyDelegateOf" ) { suggest = false; %>
 	          <B> Proxy Delegate Of: </B> <a href="/account/<%= r.delegateOf; %>"><%- uiTool.getShortHash( r.delegateOf ); %></a> (Chain ID: <%= r.chainID; %>, Type: <%= r.proxyType %>) <br>
-		<% } else if ( r.accountType == "multisig" ) { %>
+		<% } else if ( r.accountType == "multisig" ) { suggest = false; %>
 		  <B> Multisig: </B> <%= r.threshold; %> / <%= r.signatorycnt %> <br/>
 	     <% } %>
 	  <% } %>
 	<% } %>
   <% if ( account.info == null && account.infoKSM != null) {
+        suggest = false;
         let isVerified = '';
         let verificationStatus = 'unverified';
         if ( account.judgementsKSM != undefined ) {
@@ -134,6 +136,40 @@
         <% } %>
         <i>(source: Kusama On-chain Identity, <%= verificationStatus %>)</i><br/>
   <% } %>
+    <% if ( suggest && fromAddress.length == 66 ) { %>
+      <button type="button" class="btn btn-link" data-mdb-toggle="modal" data-mdb-target="#suggestModal">
+        Suggest Nickname
+      </button>
+
+      <div
+        class="modal fade"
+        id="suggestModal"
+        data-mdb-backdrop="static"
+        data-mdb-keyboard="false"
+        tabindex="-1"
+        aria-labelledby="suggestModalLabel"
+        aria-hidden="true"
+      >
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="suggestModalLabel">Suggest Nickname</h5>
+              <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="text" id="nickname" class="form-control" />
+              <label class="form-label" for="nickname">Nickname</label>
+            </div>
+            <input type="hidden" id="submitter"  value="<%= fromAddress %>"/>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-primary" id="submitSuggestion">Submit Suggestion</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <% } %>
 	  <b>Public Key:</b> <code><%- account.address; %></code> <a href='/qrcode/<%= account.address; %>'><i class="fa-solid fa-qrcode"></i></a>
         </p>
 	<% if ( account.numFollowers > 0 || account.numFollowing > 0 ) { %>

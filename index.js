@@ -330,6 +330,7 @@ app.post('/register', async (req, res) => {
     }
 })
 
+
 const downtime = false;
 // Usage: https://polkaholic.io/
 app.get('/', async (req, res) => {
@@ -1069,7 +1070,7 @@ app.get('/account/:address', async (req, res) => {
         let address = req.params["address"];
         let [decorate, decorateExtra] = decorateOptUI(req)
         let [requestedChainID, id] = getHostChain(req);
-        console.log(`getHostChain chainID=${requestedChainID}, id=${id}`)
+        // console.log(`getHostChain chainID=${requestedChainID}, id=${id}`)
         let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, decorate, decorateExtra);
         res.render('account', {
             account: account,
