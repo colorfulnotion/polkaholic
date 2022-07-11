@@ -4747,6 +4747,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let recentTransfers = [];
         let recentXCMMessages = [];
         let recentXcmMsgs = []; //new xcm here
+
+        // setParserContext
         this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash);
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
         block.finalized = finalized;
@@ -5371,7 +5373,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return (true);
     }
 
-    async processTrace(bn, cellTS, trace, traceType, blockHash, api) {
+    async processTrace(blockTS, blockNumber, blockHash, trace, traceType, api) {
+
+        // setParserContext
+        this.chainParser.setParserContext(blockTS, blockNumber, blockHash)
+
         let dedupEvents = {};
         if (!trace) return;
         if (!Array.isArray(trace)) {
@@ -5381,21 +5387,21 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         // (s) dedup the events
         for (const e of trace) {
             let o = {}
-            o.bn = bn;
+            o.bn = blockNumber;
             o.blockHash = blockHash;
-            o.ts = cellTS;
+            o.ts = blockTS;
             o.k = e.k;
             o.v = e.v;
             dedupEvents[e.k] = o;
         }
         for (const dedupK of Object.keys(dedupEvents)) {
             let e = dedupEvents[dedupK];
-            let [e2, _] = this.parse_trace(e, traceType, bn, blockHash, api);
+            let [e2, _] = this.parse_trace(e, traceType, blockNumber, blockHash, api);
 
             if (!e2) continue;
             let p = e2.p;
             let s = e2.s;
-            // TODO: canonicalize e2.asset here
+
             let pallet_section = `${p}:${s}`
 
             //temp local list blacklist for easier debugging
@@ -5507,8 +5513,38 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
     // given a row r fetched with "fetch_block_row", processes the block, events + trace
     async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false) {
-        // process the block + events + trace
+        /* index_chain_block_row shall process trace(if available) + block + events in orders
+        xcm steps:
+        (1a) processTrace: parse outgoing xcmmessages from traces
+        (1b) processBlockEvents: parse xcm transfers + xcm-incoming executed signals(TODO), use result from 1a to link xcmtransfers to xcmmessages
+        > This implies that we MUST do 1a, 1b in seqence UNLESS to push all the flushes to step 2
+        */
         //console.log('index_chain_block_row', JSON.stringify(r))
+
+        if (r.block && r.trace) {
+            // setup ParserContext here
+            let blk = r.block
+            let blockNumber = blk.header.number;
+            let blockHash = blk.hash;
+            let blockTS = blk.blockTS;
+            let processTraceStartTS = new Date().getTime()
+            if (r.blockHash == undefined || r.blockHash.length != 66) {
+                this.logger.error({
+                    "op": "index_chain_block_row",
+                    "bn": `${this.chainID}-${blockNumber}`,
+                    "msg": 'missing blockHash - check source',
+                })
+            } else {
+                let traceType = this.compute_trace_type(r.trace, r.traceType);
+                let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
+                await this.processTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api);
+                let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
+                //console.log(`index_chain_block_row: processTrace`, processTraceTS);
+                this.timeStat.processTraceTS += processTraceTS
+                this.timeStat.processTrace++
+            }
+        }
+
         if (r.block && r.events) {
             let decodeRawBlockStartTS = new Date().getTime()
             if (!signedBlock) {
@@ -5530,25 +5566,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let processBlockEventsTS = (new Date().getTime() - processBlockEventsStartTS) / 1000
             this.timeStat.processBlockEventsTS += processBlockEventsTS
             this.timeStat.processBlockEvents++
-        }
-        if (r.trace) {
-            //mkTODO
-            let processTraceStartTS = new Date().getTime()
-            if (r.blockHash == undefined || r.blockHash.length != 66) {
-                this.logger.error({
-                    "op": "index_chain_block_row",
-                    "bn": `${this.chainID}-${r.blockNumber}`,
-                    "msg": 'missing blockHash - check source',
-                })
-            } else {
-                let traceType = this.compute_trace_type(r.trace, r.traceType);
-                let api = (refreshAPI) ? await this.api.at(r.blockHash) : this.apiAt;
-                await this.processTrace(r.blockNumber, r.blockTS, r.trace, traceType, r.blockHash, api);
-                let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
-                //console.log(`index_chain_block_row: processTrace`, processTraceTS);
-                this.timeStat.processTraceTS += processTraceTS
-                this.timeStat.processTrace++
-            }
         }
         return r;
     }
