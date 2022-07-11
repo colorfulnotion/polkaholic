@@ -4645,4 +4645,36 @@ module.exports = class Query extends AssetManager {
             return [false, false, false, false]
         }
     }
+
+    async submitAddressSuggestion(address, nickname, submitter) {
+        if (address.length != 66) return ({
+            err: "Invalid address"
+        });
+        if (submitter.length != 66) return ({
+            err: "Invalid submitter"
+        });
+        if (nickname.length < 4 || nickname.length > 128) return ({
+            err: "Invalid suggestion (nicknames should be between 4 and 128 characters"
+        });
+        // TODO: check for spamming by submitter
+        try {
+            let vals = ["nickname", "submitDT"];
+            let data = `('${address}', '${submitter}', ${mysql.escape(nickname)}, Now() )`;
+            await this.upsertSQL({
+                "table": "addresssuggestion",
+                "keys": ["address", "submitter"],
+                "vals": vals,
+                "data": [data],
+                "replace": vals
+            });
+            return {
+                status: "Your suggestion has been received."
+            }
+        } catch (err) {
+            return {
+                err: "An error has occurred."
+            }
+        }
+
+    }
 }
