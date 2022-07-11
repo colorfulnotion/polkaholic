@@ -4678,62 +4678,62 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     // detect new session using block event
-    checkNewSession(eventsIndexed = []){
-      let isNewSession = false;
-      let sessionIndex = false;
-      for (const extrinsicIndexEvents of eventsIndexed){
-        for (const ev of extrinsicIndexEvents){
-          let sectionMethod = `${ev.section}:${ev.method}`
-          if (sectionMethod == 'session:NewSession'){
-            isNewSession = true
-            sessionIndex = ev.data[0]
-          }
+    checkNewSession(eventsIndexed = []) {
+        let isNewSession = false;
+        let sessionIndex = false;
+        for (const extrinsicIndexEvents of eventsIndexed) {
+            for (const ev of extrinsicIndexEvents) {
+                let sectionMethod = `${ev.section}:${ev.method}`
+                if (sectionMethod == 'session:NewSession') {
+                    isNewSession = true
+                    sessionIndex = ev.data[0]
+                }
+            }
         }
-      }
-      return [isNewSession, sessionIndex]
+        return [isNewSession, sessionIndex]
     }
 
-    async getBlockAuthor(api, block, isNewSession = false, sessionIndex = false){
-      if (this.chainID == paraTool.moonbeam || this.chainID == paraTool.moonriver) return //moonbeam has different struct. skip for now
+    async getBlockAuthor(api, block, isNewSession = false, sessionIndex = false) {
+        if (this.chainID == paraTool.moonbeam || this.chainID == paraTool.moonriver) return //moonbeam has different struct. skip for now
 
-      let currSessionValidators = this.currentSessionValidators
-      let currSessionIndex = this.currentSessionIndex
+        let currSessionValidators = this.currentSessionValidators
+        let currSessionIndex = this.currentSessionIndex
 
-      var digest = api.registry.createType('Digest', block.header.digest);
-      //let digestHex = digest.toHex()
+        var digest = api.registry.createType('Digest', block.header.digest);
+        //let digestHex = digest.toHex()
 
-      let blockNumber = block.header.number;
-      let blockHash = block.hash;
-      let blockTS = block.blockTS;
+        let blockNumber = block.header.number;
+        let blockHash = block.hash;
+        let blockTS = block.blockTS;
 
-      if (!isNewSession && currSessionIndex > 0 && currSessionValidators.length > 0){
-          // no need to fetch sessionValidators
-      }else{
-        try {
-          if (sessionIndex){
-            currSessionIndex = sessionIndex
-            this.currentSessionIndex = currSessionIndex
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] update currentSession=${currSessionIndex}`)
-          }else {
-            let currIndex = await api.query.session.currentIndex.at(blockHash)
-            currSessionIndex = currIndex.toNumber()
-            this.currentSessionIndex = currSessionIndex
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSession=${currSessionIndex}`)
-          }
-          currSessionValidators = await api.query.session.validators.at(blockHash)
-          currSessionValidators = currSessionValidators.toJSON()
-          this.currentSessionValidators = currSessionValidators
-          if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSessionValidators (${currSessionIndex}, len=${currSessionValidators.length})`)
-        } catch (e){
-          if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getSessionIndexAndValidators error`, e.toString())
-          return
+        if (!isNewSession && currSessionIndex > 0 && currSessionValidators.length > 0) {
+            // no need to fetch sessionValidators
+        } else {
+            try {
+                if (sessionIndex) {
+                    currSessionIndex = sessionIndex
+                    this.currentSessionIndex = currSessionIndex
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] update currentSession=${currSessionIndex}`)
+                } else {
+                    let currIndex = await api.query.session.currentIndex.at(blockHash)
+                    currSessionIndex = currIndex.toNumber()
+                    this.currentSessionIndex = currSessionIndex
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSession=${currSessionIndex}`)
+                }
+                currSessionValidators = await api.query.session.validators.at(blockHash)
+                currSessionValidators = currSessionValidators.toJSON()
+                this.currentSessionValidators = currSessionValidators
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSessionValidators (${currSessionIndex}, len=${currSessionValidators.length})`)
+            } catch (e) {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getSessionIndexAndValidators error`, e.toString())
+                return
+            }
         }
-      }
-      let [author, authorPubkey] = paraTool.getAuthor(digest, currSessionValidators)
-      if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] ${blockHash}, author:${author}, authorPubkey:${authorPubkey}`)
-      if (author != undefined){
-        block.author = author
-      }
+        let [author, authorPubkey] = paraTool.getAuthor(digest, currSessionValidators)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] ${blockHash}, author:${author}, authorPubkey:${authorPubkey}`)
+        if (author != undefined) {
+            block.author = author
+        }
     }
 
     async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, finalized = false, write_bqlog = false) {

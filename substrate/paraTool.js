@@ -146,10 +146,10 @@ function computeMultisig(caller, addresses, threshold) {
     return m
 }
 
-function getAuthor(digest, validators){
-  let author = extractAuthor(digest, validators)
-  let authorPubkey = get_pubkey(author)
-  return [author, authorPubkey]
+function getAuthor(digest, validators) {
+    let author = extractAuthor(digest, validators)
+    let authorPubkey = get_pubkey(author)
+    return [author, authorPubkey]
 }
 
 function pubKey_hex2ascii(str) {

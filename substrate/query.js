@@ -1750,9 +1750,9 @@ module.exports = class Query extends AssetManager {
                 decoratedExts.push(de)
             }
             block.extrinsics = decoratedExts
-            if (decorate && block.author != undefined){
-              block.authorAddress  = paraTool.getPubKey(block.author)
-              this.decorateAddress(block, "authorAddress", decorateAddr, false)
+            if (decorate && block.author != undefined) {
+                block.authorAddress = paraTool.getPubKey(block.author)
+                this.decorateAddress(block, "authorAddress", decorateAddr, false)
             }
             block.specVersion = this.getSpecVersionForBlockNumber(chainID, block.number);
             if (evmBlock) {
