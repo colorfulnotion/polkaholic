@@ -36,6 +36,18 @@
       <%- uiTool.getFullHash(b.header.stateRoot); %>
     </td>
   </tr>
+  <% if (b.author){  %>
+  <tr>
+    <td>Author</td>
+    <td>
+      <img src="/identicon/<%= b.author; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+      <a href='/account/<%= paraTool.getPubKey(b.author) %>'>
+        <code><%= b.author; %></code>
+      </a>
+       <%- uiTool.showAccountInfo(b, "authorAddress") %>
+     </td>
+  </tr>
+<% } %>
   <tr>
     <td>Timestamp</td>
     <td class='date'><%= uiTool.presentTS(b.blockTS); %></td>
