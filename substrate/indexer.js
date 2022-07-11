@@ -2630,25 +2630,25 @@ order by chainID, extrinsicHash, diffTS`
     getMsgHashCandidate(targetBN, destAddress = false){
       let rawDestAddr = destAddress.substr(2) // without the prefix 0x
       if (rawDestAddr.length != 64 && rawDestAddr.length != 40){
-          console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] Invalid destAddress`)
+          if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] Invalid destAddress`)
           return false
       }
       let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
-      console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingKeys`, trailingKeys)
+      if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingKeys`, trailingKeys)
       for (const tk of trailingKeys) {
           let trailingXcm = this.xcmTrailingKeyMap[tk]
-          console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingXcm`, trailingXcm)
+          if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingXcm`, trailingXcm)
           let firstSeenBN = trailingXcm.blockNumber
           let msgHex = trailingXcm.msgHex
           let msgHash = trailingXcm.msgHash
           if (firstSeenBN == targetBN && msgHex.includes(rawDestAddr)){
               //criteria: firstSeen at the block when xcmtransfer is found + recipient match
               //this should give 99% coverage? let's return on first hit for now
-              console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] FOUND candidate=${msgHash}`)
+              if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] FOUND candidate=${msgHash}`)
               return msgHash
           }
       }
-      console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] MISS`)
+      if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] MISS`)
     }
 
     // clean traling xcm
