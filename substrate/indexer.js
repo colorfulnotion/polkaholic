@@ -4683,7 +4683,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
       let sessionIndex = false;
       for (const extrinsicIndexEvents of eventsIndexed){
         for (const ev of extrinsicIndexEvents){
-          let sectionMethod = `${event.section}:${event.method}`
+          let sectionMethod = `${ev.section}:${ev.method}`
           if (sectionMethod == 'session:NewSession'){
             isNewSession = true
             sessionIndex = ev.data[0]
@@ -4699,8 +4699,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
       let currSessionValidators = this.currentSessionValidators
       let currSessionIndex = this.currentSessionIndex
 
-      //var digest = api.registry.createType('Digest', block.header.digest);
-      var digest = block.header.digest
+      var digest = api.registry.createType('Digest', block.header.digest);
       //let digestHex = digest.toHex()
 
       let blockNumber = block.header.number;
@@ -5475,14 +5474,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let chain = await this.setupChainAndAPI(this.chainID); //not sure
             await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
             signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
-        }
-        try {
-          var digest = this.apiAt.registry.createType('Digest', signedBlock2.header.digest);
-          if (digest != undefined){
-            signedBlock2.header.digest = digest
-          }
-        }catch(e){
-          console.log(`failed recovering digest [${r.block.number} ${r.block.hash}]`)
         }
         // signedBlock2.block.extrinsics.forEach((ex, index) => {  console.log(index, ex.hash.toHex());    });
         return signedBlock2
