@@ -1258,9 +1258,12 @@ module.exports = class Query extends AssetManager {
                             xcm.chainIDDestName = this.getChainName(xcm.chainIDDest);
                             let chainIDDestInfo = this.chainInfos[xcm.chainIDDest]
                             if (xcm.chainIDDest != undefined && chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
-                                if (xcm.fromAddress != undefined) {
-                                    if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
-                                    if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
+                                if (xcm.destAddress != undefined) {
+                                  if (xcm.destAddress.length == 42) xcm.destAddress = xcm.destAddress
+                                  if (xcm.destAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.destAddress, chainIDDestInfo.ss58Format)
+                                }else if (xcm.fromAddress != undefined) {
+                                  if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
+                                  if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
                                 }
                             }
                             if (d.signer != undefined) {

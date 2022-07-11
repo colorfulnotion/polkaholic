@@ -1235,6 +1235,7 @@ module.exports = class Indexer extends AssetManager {
           xcmtransfer.amountSent,
           xcmtransfer.transferIndex,
           xcmtransfer.sourceTS,
+          xcmtransfer.fromAddress as senderAddress,
           xcmtransfer.destAddress,
           xcmtransfer.msgHash,
           d.eventID,
@@ -1326,7 +1327,8 @@ order by chainID, extrinsicHash, diffTS`
                         asset: d.asset,
                         amountSent: d.amountSent,
                         amountReceived: d.amountReceived,
-                        fromAddress: d.fromAddress,
+                        fromAddress: d.senderAddress, //from xcmtransfer.fromAddress
+                        destAddress: d.fromAddress,   //from xcmtransferdestcandidate.fromAddress
                         msgHash: (d.msgHash != undefined)? d.msgHash : '0x',
                         extrinsicHash: d.extrinsicHash,
                         extrinsicID: d.extrinsicID,
