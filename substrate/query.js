@@ -1258,9 +1258,12 @@ module.exports = class Query extends AssetManager {
                             xcm.chainIDDestName = this.getChainName(xcm.chainIDDest);
                             let chainIDDestInfo = this.chainInfos[xcm.chainIDDest]
                             if (xcm.chainIDDest != undefined && chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
-                                if (xcm.fromAddress != undefined) {
-                                    if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
-                                    if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
+                                if (xcm.destAddress != undefined) {
+                                  if (xcm.destAddress.length == 42) xcm.destAddress = xcm.destAddress
+                                  if (xcm.destAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.destAddress, chainIDDestInfo.ss58Format)
+                                }else if (xcm.fromAddress != undefined) {
+                                  if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
+                                  if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
                                 }
                             }
                             if (d.signer != undefined) {
@@ -3863,7 +3866,7 @@ module.exports = class Query extends AssetManager {
         if (w.length > 0) {
             wstr = " WHERE " + wstr
         }
-        let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, amountSentUSD, amountReceivedUSD from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
+        let sql = `select msgHash, extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, amountSentUSD, amountReceivedUSD from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
         let xcmtransfers = await this.poolREADONLY.query(sql);
         let out = [];
         for (let i = 0; i < xcmtransfers.length; i++) {
@@ -3889,6 +3892,8 @@ module.exports = class Query extends AssetManager {
                     if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
                         decimals = this.assetInfo[rawassetChain].decimals;
                     }
+
+                    if (x.msgHash == undefined) x.msgHash = '0x'
 
                     if (this.assetInfo[rawassetChain]) {
                         if (decimals) {

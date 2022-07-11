@@ -651,8 +651,8 @@ function showrewards(address) {
                 data: 'extrinsicHash',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        let s = presentTxHash(row.extrinsicHash);
-                        return presentBlockNumber(row.chainID, row.chainName, row.blockNumber) + ": " + s;
+                        let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
+                        return `${presentChain(row.chainID, row.chainName)} (${s})`
                     }
                     return data;
                 }
@@ -797,8 +797,8 @@ function showcrowdloans(address) {
                 data: 'extrinsicHash',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        let s = presentTxHash(row.extrinsicHash);
-                        return presentBlockNumber(row.chainID, row.chainName, row.blockNumber) + ": " + s;
+                        let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
+                        return `${presentChain(row.chainID, row.chainName)} (${s})`
                     }
                     return data;
                 }

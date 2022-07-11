@@ -1390,6 +1390,7 @@ module.exports = class ChainParser {
                             amountSent: amountSent,
                             incomplete: incomplete,
                             isFeeItem: isFeeItem,
+                            msgHash: '0x',
                         }
                         //console.log("processOutgoingXTokens xTokens", r);
                         outgoingXTokens.push(r)
@@ -1754,6 +1755,7 @@ module.exports = class ChainParser {
                                 amountSent: amountSent,
                                 incomplete: incomplete,
                                 isFeeItem: isFeeItem,
+                                msgHash: '0x',
                             }
                             if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingXcmPallet xcmPallet", r);
                             outgoingXcmPallet.push(r)
@@ -1980,6 +1982,7 @@ module.exports = class ChainParser {
                                 amountSent: amountSent,
                                 incomplete: incomplete,
                                 isFeeItem: isFeeItem,
+                                msgHash: '0x',
                             }
                             //if (this.debugLevel >= paraTool.debugVerbose) console.log("processOutgoingXcmPallet xcmPallet", r);
                             extrinsic.xcms.push(r)

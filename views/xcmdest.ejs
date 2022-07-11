@@ -11,6 +11,9 @@ let symbol = ( xcmdest.symbol ) ? xcmdest.symbol : "";
         <code><%= xcmdest.destAddress; %></code>
       </a><br>
     <% } %>
+    <% if (xcmdest.msgHash && xcmdest.msgHash != '0x'){  %>
+      <b>Msg Hash</b>:<%- uiTool.getFullHash(xcmdest.msgHash); %><br>
+    <% } %>
     <b>Amount Sent</b>: <%= uiTool.presentNumber(xcmdest.amountSent); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountSentUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
     <b>Amount Received</b>: <%= uiTool.presentNumber(xcmdest.amountReceived); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountReceivedUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
     <b>Confirmed at Block</b>: <%- uiTool.presentBlock(xcmdest.chainIDDest, xcmdest.blockNumberDest); %> (<%- uiTool.presentSecondsAgoTS(xcmdest.destTS); %>)<br/>
