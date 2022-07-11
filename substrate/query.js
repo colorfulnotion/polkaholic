@@ -3863,7 +3863,7 @@ module.exports = class Query extends AssetManager {
         if (w.length > 0) {
             wstr = " WHERE " + wstr
         }
-        let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, amountSentUSD, amountReceivedUSD from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
+        let sql = `select msgHash, extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, amountSentUSD, amountReceivedUSD from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
         let xcmtransfers = await this.poolREADONLY.query(sql);
         let out = [];
         for (let i = 0; i < xcmtransfers.length; i++) {
@@ -3889,6 +3889,8 @@ module.exports = class Query extends AssetManager {
                     if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
                         decimals = this.assetInfo[rawassetChain].decimals;
                     }
+
+                    if (x.msgHash == undefined) x.msgHash = '0x'
 
                     if (this.assetInfo[rawassetChain]) {
                         if (decimals) {
