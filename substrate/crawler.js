@@ -1821,7 +1821,6 @@ create table talismanEndpoint (
                 [row] = await tableChain.row(paraTool.blockNumberToHex(bn)).get({
                     filter
                 });
-                console.log(row);
             }
         }
         if (row == null) {
@@ -1975,8 +1974,7 @@ create table talismanEndpoint (
                 this.batchedSQL.push(sql);
                 // mark that the PREVIOUS hour is ready for indexing, since this block is FINALIZED, so that continuously running "indexChain" job can index the newly finalized hour
                 this.markFinalizedReadyForIndexing(chainID, blockTS);
-                let sql2 = `update chain set blocksFinalized = '${bn}', lastFinalizedDT = Now() where chainID = '${chainID}'`;
-
+                let sql2 = `insert into chain ( chainID, blocksCovered, blocksFinalized, lastFinalizedDT ) values ( '${chainID}', '${bn}', '${bn}', Now() ) on duplicate key update blocksFinalized = values(blocksFinalized), lastFinalizedDT = values(lastFinalizedDT), blocksCovered = IF( blocksCovered < values(blocksFinalized), values(blocksFinalized), blocksCovered )`
                 this.batchedSQL.push(sql2);
                 if (bn % 5000 == indexUpdateInterval) {
                     // every 5000 blocks, push 24 hours of onto indexlog from blocklog
