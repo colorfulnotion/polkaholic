@@ -44,6 +44,9 @@ module.exports = class Indexer extends AssetManager {
     xcmtransfer = {};
     xcmtransferdestcandidate = {};
 
+    currentSessionValidators = [];
+    currentSessionIndex = -1;
+
     multisigMap = {};
     proxyMap = {};
     crowdloan = {};
@@ -4658,6 +4661,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return events;
     }
 
+
     // processes RAW block and RAW events from BigTable chain into
     // (0) account - feed: processing each extrinsics, with side effect of tallying asset
     // (1) hashes: blockhash
@@ -4671,6 +4675,66 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 return (this.process_pending_extrinsic(api, pendingExtrinsicRaw, lastestBlockNumber));
             })
         }
+    }
+
+    // detect new session using block event
+    checkNewSession(eventsIndexed = []){
+      let isNewSession = false;
+      let sessionIndex = false;
+      for (const extrinsicIndexEvents of eventsIndexed){
+        for (const ev of extrinsicIndexEvents){
+          let sectionMethod = `${event.section}:${event.method}`
+          if (sectionMethod == 'session:NewSession'){
+            isNewSession = true
+            sessionIndex = ev.data[0]
+          }
+        }
+      }
+      return [isNewSession, sessionIndex]
+    }
+
+    async getBlockAuthor(api, block, isNewSession = false, sessionIndex = false){
+      if (this.chainID == paraTool.moonbeam || this.chainID == paraTool.moonriver) return //moonbeam has different struct. skip for now
+
+      let currSessionValidators = this.currentSessionValidators
+      let currSessionIndex = this.currentSessionIndex
+
+      //var digest = api.registry.createType('Digest', block.header.digest);
+      var digest = block.header.digest
+      //let digestHex = digest.toHex()
+
+      let blockNumber = block.header.number;
+      let blockHash = block.hash;
+      let blockTS = block.blockTS;
+
+      if (!isNewSession && currSessionIndex > 0 && currSessionValidators.length > 0){
+          // no need to fetch sessionValidators
+      }else{
+        try {
+          if (sessionIndex){
+            currSessionIndex = sessionIndex
+            this.currentSessionIndex = currSessionIndex
+            console.log(`[${blockNumber}] update currentSession=${currSessionIndex}`)
+          }else {
+            let currIndex = await api.query.session.currentIndex.at(blockHash)
+            currSessionIndex = currIndex.toNumber()
+            this.currentSessionIndex = currSessionIndex
+            console.log(`*[${blockNumber}] update currentSession=${currSessionIndex}`)
+          }
+          currSessionValidators = await api.query.session.validators.at(blockHash)
+          currSessionValidators = currSessionValidators.toJSON()
+          this.currentSessionValidators = currSessionValidators
+          //console.log(`*[${blockNumber}] update currentSessionValidators (${currSessionIndex}, len=${currSessionValidators.length})`)
+        } catch (e){
+          console.log(`getSessionIndexAndValidators error`, e.toString())
+          return
+        }
+      }
+      let [author, authorPubkey] = paraTool.getAuthor(digest, currSessionValidators)
+      console.log(`[${blockNumber}] ${blockHash}, author:${author}, authorPubkey:${authorPubkey}`)
+      if (author != undefined){
+        block.author = author
+      }
     }
 
     async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, finalized = false, write_bqlog = false) {
@@ -4688,11 +4752,17 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
         block.finalized = finalized;
 
-        // (0) index events by extrinsicIndex
+        // (0.a) index events by extrinsicIndex
         let eventsIndexed = this.processEvents(api, eventsRaw, block.extrinsics.length, blockNumber);
 
+        // (0.b) check NewSession signal
+        let [isNewSession, sessionIndex] = this.checkNewSession(eventsIndexed);
+
+        // (0.c) derive/cache session validators - called once every ~ 2400 blocks
+        await this.getBlockAuthor(this.api, block, isNewSession, sessionIndex)
+
         // NEW REQUIREMENT: must process extrinsics before evmTx
-        // (0) decode block extrinsic (from the raw encoded bytes from crawlBlock)
+        // (0.d) decode block extrinsic (from the raw encoded bytes from crawlBlock)
         let processExtrinsicStartTS = new Date().getTime()
         let extrinsics = [];
         for (let index = 0; index < block.extrinsics.length; index++) {
@@ -5406,8 +5476,14 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
             signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
         }
-        //var z = await this.apiAt.query.session.validators()
-        //console.log(`validators=${z.length}`)
+        try {
+          var digest = this.apiAt.registry.createType('Digest', signedBlock2.header.digest);
+          if (digest != undefined){
+            signedBlock2.header.digest = digest
+          }
+        }catch(e){
+          console.log(`failed recovering digest [${r.block.number} ${r.block.hash}]`)
+        }
         // signedBlock2.block.extrinsics.forEach((ex, index) => {  console.log(index, ex.hash.toHex());    });
         return signedBlock2
     }

@@ -59,6 +59,10 @@ const {
     xxhashAsHex
 } = require('@polkadot/util-crypto');
 
+const {
+    extractAuthor
+} = require('@polkadot/api-derive/type/util')
+
 const assetChainSeparator = "~"
 
 function q(inp) {
@@ -140,6 +144,12 @@ function computeMultisig(caller, addresses, threshold) {
         signatorycnt: allAddrs.length
     }
     return m
+}
+
+function getAuthor(digest, validators){
+  let author = extractAuthor(digest, validators)
+  let authorPubkey = get_pubkey(author)
+  return [author, authorPubkey]
 }
 
 function pubKey_hex2ascii(str) {
@@ -982,5 +992,8 @@ module.exports = {
     },
     pubKeyHex2ASCII: function(str) {
         return pubKey_hex2ascii(str)
-    }
+    },
+    getAuthor: function(digest, validatorsList) {
+        return getAuthor(digest, validatorsList);
+    },
 };
