@@ -1739,6 +1739,7 @@ module.exports = class Query extends AssetManager {
     }
 
     async decorateBlock(block, chainID, evmBlock = false, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         try {
             console.log(`decorateBlock (bn=${block.number}, decorate=${decorate}, decorateExtra=${decorateExtra})`)
             let exts = block.extrinsics
@@ -1749,6 +1750,10 @@ module.exports = class Query extends AssetManager {
                 decoratedExts.push(de)
             }
             block.extrinsics = decoratedExts
+            if (decorate && block.author != undefined){
+              block.authorAddress  = paraTool.getPubKey(block.author)
+              this.decorateAddress(block, "authorAddress", decorateAddr, false)
+            }
             block.specVersion = this.getSpecVersionForBlockNumber(chainID, block.number);
             if (evmBlock) {
                 block.evmBlock = evmBlock
