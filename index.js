@@ -35,7 +35,7 @@ app.locals.config = prodConfig;
 
 // For local web/API development, add this to your ~/.bashrc:
 // export NODE_ENV=development
-// export POLKAHOLIC_API_URL=http://{moonriver,composable,...}.polkaholic.io:3001
+// export POLKAHOLIC_API_URL=http://localhost:3001 
 if (process.env.POLKAHOLIC_API_URL != undefined) {
     app.locals.config.baseURL = process.env.POLKAHOLIC_API_URL;
 }
@@ -394,6 +394,49 @@ async function handleChains(req, res) {
 }
 
 app.get('/chains/:relaychain?', handleChains)
+
+app.get('/admin/suggestjudgement/:address/:submitter/:status', async (req, res) => {
+    if (!uiTool.validAdmin(req.session.email)) {
+        res.redirect("/login");
+        return (false);
+    }
+    try {
+        let address = req.params.address ? req.params.address : "";
+        let submitter = req.params.submitter ? req.params.submitter : "";
+        let status = req.params.status ? req.params.status : "Rejected";
+        let judge = req.session.email;
+        if (status == "Accepted" || status == "Rejected") {
+            if (query.updateAddressSuggestionStatus(address, submitter, status, judge)) {
+                // TODO: flash status instead of redirect
+            }
+        }
+        res.redirect("/admin/suggestadmin");
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/admin/suggestadmin/:status?', async (req, res) => {
+    if (!uiTool.validAdmin(req.session.email)) {
+        res.redirect("/login");
+        return (false);
+    }
+    try {
+        let status = req.params.status ? req.params.status : "Submitted";
+        let suggestions = await query.getRecentAddressSuggestions(status);
+
+        res.render('suggestadmin', {
+            suggestions: suggestions,
+            chainInfo: query.getChainInfo(),
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
 
 app.get('/admin/chains/:crawling?', async (req, res) => {
     if (!uiTool.validAdmin(req.session.email)) {

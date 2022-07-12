@@ -1101,10 +1101,10 @@ module.exports = class Indexer extends AssetManager {
         let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${direction}`
         if (this.xcmTrailingKeyMap[xcmKey] == undefined) {
             this.xcmTrailingKeyMap[xcmKey] = {
-              blockNumber: xcmMsg.blockNumber,
-              msgHex: xcmMsg.msgHex,
-              msgHash: xcmMsg.msgHash,
-              isFresh: true,
+                blockNumber: xcmMsg.blockNumber,
+                msgHex: xcmMsg.msgHex,
+                msgHash: xcmMsg.msgHash,
+                isFresh: true,
             }
             this.xcmmsgMap[xcmKey] = xcmMsg
             if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
@@ -1328,8 +1328,8 @@ order by chainID, extrinsicHash, diffTS`
                         amountSent: d.amountSent,
                         amountReceived: d.amountReceived,
                         fromAddress: d.senderAddress, //from xcmtransfer.fromAddress
-                        destAddress: d.fromAddress,   //from xcmtransferdestcandidate.fromAddress
-                        msgHash: (d.msgHash != undefined)? d.msgHash : '0x',
+                        destAddress: d.fromAddress, //from xcmtransferdestcandidate.fromAddress
+                        msgHash: (d.msgHash != undefined) ? d.msgHash : '0x',
                         extrinsicHash: d.extrinsicHash,
                         extrinsicID: d.extrinsicID,
                         destExtrinsicID: d.destExtrinsicID,
@@ -2627,28 +2627,28 @@ order by chainID, extrinsicHash, diffTS`
     }
 
     // find the msgHash given {BN, recipient}
-    getMsgHashCandidate(targetBN, destAddress = false){
-      let rawDestAddr = destAddress.substr(2) // without the prefix 0x
-      if (rawDestAddr.length != 64 && rawDestAddr.length != 40){
-          if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] Invalid destAddress`)
-          return false
-      }
-      let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
-      if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingKeys`, trailingKeys)
-      for (const tk of trailingKeys) {
-          let trailingXcm = this.xcmTrailingKeyMap[tk]
-          if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingXcm`, trailingXcm)
-          let firstSeenBN = trailingXcm.blockNumber
-          let msgHex = trailingXcm.msgHex
-          let msgHash = trailingXcm.msgHash
-          if (firstSeenBN == targetBN && msgHex.includes(rawDestAddr)){
-              //criteria: firstSeen at the block when xcmtransfer is found + recipient match
-              //this should give 99% coverage? let's return on first hit for now
-              if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] FOUND candidate=${msgHash}`)
-              return msgHash
-          }
-      }
-      if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] MISS`)
+    getMsgHashCandidate(targetBN, destAddress = false) {
+        let rawDestAddr = destAddress.substr(2) // without the prefix 0x
+        if (rawDestAddr.length != 64 && rawDestAddr.length != 40) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] Invalid destAddress`)
+            return false
+        }
+        let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingKeys`, trailingKeys)
+        for (const tk of trailingKeys) {
+            let trailingXcm = this.xcmTrailingKeyMap[tk]
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingXcm`, trailingXcm)
+            let firstSeenBN = trailingXcm.blockNumber
+            let msgHex = trailingXcm.msgHex
+            let msgHash = trailingXcm.msgHash
+            if (firstSeenBN == targetBN && msgHex.includes(rawDestAddr)) {
+                //criteria: firstSeen at the block when xcmtransfer is found + recipient match
+                //this should give 99% coverage? let's return on first hit for now
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] FOUND candidate=${msgHash}`)
+                return msgHash
+            }
+        }
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] MISS`)
     }
 
     // clean traling xcm
@@ -4962,15 +4962,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let xcmKeys = Object.keys(this.xcmmsgMap)
             if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] xcmKeys=${xcmKeys}`)
             for (const xcmKey of xcmKeys) {
-              let mpKey = this.xcmTrailingKeyMap[xcmKey]
-              if (mpKey!= undefined && mpKey.isFresh){
-                let mp = this.xcmmsgMap[xcmKey]
-                //["msgHash", "incoming", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "sentAt", "relayChain", "version", "path"];
-                let s = `('${mp.msgHash}', '${mp.isIncoming}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.blockNumber}', '${mp.sentAt}', '${mp.relayChain}', '${mp.version}', '${mp.path}')`
-                recentXcmMsgs.push(s);
-                if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] add ${xcmKey}`, s)
-                this.xcmTrailingKeyMap[xcmKey].isFresh = false // mark the record as processed
-              }
+                let mpKey = this.xcmTrailingKeyMap[xcmKey]
+                if (mpKey != undefined && mpKey.isFresh) {
+                    let mp = this.xcmmsgMap[xcmKey]
+                    //["msgHash", "incoming", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "sentAt", "relayChain", "version", "path"];
+                    let s = `('${mp.msgHash}', '${mp.isIncoming}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.blockNumber}', '${mp.sentAt}', '${mp.relayChain}', '${mp.version}', '${mp.path}')`
+                    recentXcmMsgs.push(s);
+                    if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] add ${xcmKey}`, s)
+                    this.xcmTrailingKeyMap[xcmKey].isFresh = false // mark the record as processed
+                }
             }
             this.xcmmsgMap = {} // remove here...
             if (recentXcmMsgs.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] recentXcmMsgs`, recentXcmMsgs)

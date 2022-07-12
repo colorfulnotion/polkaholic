@@ -1240,7 +1240,6 @@ module.exports = class Query extends AssetManager {
                     for (const evt of d.events) {
                         let dEvent = await this.decorateEvent(evt, d.chainID, d.ts, decorate, decorateExtra)
                         dEvents.push(dEvent)
-                        if (this.debugLevel > 2) console.log("dEvent", dEvent)
                     }
                     d.events = dEvents
                     //await this.decorateFee(d, d.chainID, decorateUSD)
@@ -1259,11 +1258,11 @@ module.exports = class Query extends AssetManager {
                             let chainIDDestInfo = this.chainInfos[xcm.chainIDDest]
                             if (xcm.chainIDDest != undefined && chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
                                 if (xcm.destAddress != undefined) {
-                                  if (xcm.destAddress.length == 42) xcm.destAddress = xcm.destAddress
-                                  if (xcm.destAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.destAddress, chainIDDestInfo.ss58Format)
-                                }else if (xcm.fromAddress != undefined) {
-                                  if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
-                                  if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
+                                    if (xcm.destAddress.length == 42) xcm.destAddress = xcm.destAddress
+                                    if (xcm.destAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.destAddress, chainIDDestInfo.ss58Format)
+                                } else if (xcm.fromAddress != undefined) {
+                                    if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
+                                    if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
                                 }
                             }
                             if (d.signer != undefined) {
@@ -1744,7 +1743,6 @@ module.exports = class Query extends AssetManager {
     async decorateBlock(block, chainID, evmBlock = false, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         try {
-            console.log(`decorateBlock (bn=${block.number}, decorate=${decorate}, decorateExtra=${decorateExtra})`)
             let exts = block.extrinsics
             let decoratedExts = []
             for (const d of exts) {
@@ -1821,7 +1819,6 @@ module.exports = class Query extends AssetManager {
             let row = await this.fetch_block(chainID, blockNumber, families, true, blockHash);
             // TODO: check response
             let block = row.feed;
-            console.log(`getBlock raw`, block)
             block = await this.decorateBlock(row.feed, chainID, row.evmFullBlock, decorate, decorateExtra);
             return block;
         } catch (err) {
@@ -4318,7 +4315,7 @@ module.exports = class Query extends AssetManager {
            WHERE ` + w.join(" and ") + `
            ORDER By ts desc LIMIT ${limit}`;
         }
-        console.log(sqlQuery);
+
         const options = {
             query: sqlQuery,
             // Location must match that of the dataset(s) referenced in the query.
@@ -4651,7 +4648,43 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async submitAddressSuggestion(address, nickname, submitter) {
+    getRewardLevelHOLIC(action) {
+        let rewardAmount = 0;
+        switch (action) {
+            case "addresssuggestion":
+                rewardAmount = 25;
+                break;
+            case "issuereport":
+                rewardAmount = 100;
+                break;
+            case "securityreport":
+                rewardAmount = 2500;
+                break;
+        }
+        return rewardAmount * 1000000000000;
+    }
+
+    async getRecentAddressSuggestions(status = "Submitted", lookbackDays = 7) {
+        let sql = `select address, submitter, nickname, addressType, submitDT, status, judgementDT from addresssuggestion where status = '${status}' and submitDT > date_sub(Now(), INTERVAL ${lookbackDays} DAY) order by submitDT Desc`
+        let suggestions = await this.pool.query(sql)
+        return suggestions;
+    }
+
+    async updateAddressSuggestionStatus(address, submitter, status, judge = "") {
+        if (address.length != 66) return (false)
+        if (submitter.length != 66) return (false);
+        if (!(status == "Accepted" || status == "Rejected")) return (false);
+        let sql = `update addresssuggestion set status = '${status}', judgementDT = Now(), judge = ${mysql.escape(judge)} where address = '${address}' and submitter = '${submitter}'`
+        this.batchedSQL.push(sql);
+        if (status == "Accepted") {
+            let rewardAmount = this.getRewardLevelHOLIC("addresssuggestion");
+            let sql2 = `insert into rewardsholic (address, amount, grantDT, rewardStatus) values ( '${address}',  '${rewardAmount}', Now(), 'Granted' )`
+            this.batchedSQL.push(sql2);
+        }
+        await this.update_batchedSQL();
+    }
+
+    async submitAddressSuggestion(address, nickname, submitter, addressType) {
         if (address.length != 66) return ({
             err: "Invalid address"
         });
@@ -4663,8 +4696,8 @@ module.exports = class Query extends AssetManager {
         });
         // TODO: check for spamming by submitter
         try {
-            let vals = ["nickname", "submitDT"];
-            let data = `('${address}', '${submitter}', ${mysql.escape(nickname)}, Now() )`;
+            let vals = ["nickname", "addressType", "submitDT"];
+            let data = `('${address}', '${submitter}', ${mysql.escape(nickname)}, '${addressType}', Now() )`;
             await this.upsertSQL({
                 "table": "addresssuggestion",
                 "keys": ["address", "submitter"],

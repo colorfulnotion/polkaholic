@@ -1,4 +1,4 @@
-<%- include('header', {chainInfo: chainInfo}); %>
+<%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Trace`}); %>
 <%
   let prevBlockUrl = `/block/${id}/${blockNumber - 1}`;
   let nextBlockUrl = `/block/${id}/${blockNumber + 1}`;

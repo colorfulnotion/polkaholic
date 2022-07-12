@@ -395,8 +395,9 @@ app.get('/hash/:hash', async (req, res) => {
 app.post('/suggest/:address', async (req, res) => {
     let address = req.params["address"];
     let nickname = req.body.nickname;
-    let submitter = req.body.submitter; // TODO: require signing?
-    let result = query.submitAddressSuggestion(address, nickname, submitter);
+    let addressType = req.body.addressType;
+    let submitter = req.body.submitter; 
+    let result = query.submitAddressSuggestion(address, nickname, submitter, addressType);
     res.write(JSON.stringify(result));
 })
 

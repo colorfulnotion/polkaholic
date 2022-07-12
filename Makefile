@@ -99,6 +99,18 @@ cdmain:
 	ssh bifrost-ksm  "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D main; git pull; git checkout main"
 	ssh litentry     "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D main; git pull; git checkout main"
 
+cddev:
+	ssh parallel "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+	ssh acala    "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+	ssh shiden   "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+	ssh astar    "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+	ssh moonbeam "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+	ssh polkadot "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+	ssh karura   "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+	ssh kusama   "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+	ssh bifrost-ksm  "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+	ssh litentry     "cd /root/go/src/github.com/colorfulnotion/polkaholic; git checkout swap; git branch -D dev; git pull; git checkout dev"
+
 indexers:
 	make parallelstop
 	make parallelstart
