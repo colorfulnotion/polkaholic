@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <title>Polkaholic - Substrate Defi Explorer</title>
+    <title><% if ( title != undefined ) { %> <%= title; %><% } %> - Polkaholic.io</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Polkaholic Style / UI Helpers -->
@@ -102,7 +102,10 @@
 
   <%  if ( uiTool.validAdmin(req.session.email) ) { %>
           <li class="nav-item">
-            <a class="nav-link" href="/admin/chains">Admin</a>
+            <a class="nav-link" href="/admin/chains">Chains Admin</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/suggestadmin/">Verify Submissions</a>
           </li>
   <%  } %>
         </ul>

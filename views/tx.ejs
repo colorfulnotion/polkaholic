@@ -1,4 +1,4 @@
-<%- include('header', {chainInfo: chainInfo}); %>
+<%- include('header', {chainInfo: chainInfo, title: `${tx.chainName} Extrinsic`}); %>
 <h4>Transaction #<%=`${tx.extrinsicID}`%></h4>
 <%
 let f = tx;

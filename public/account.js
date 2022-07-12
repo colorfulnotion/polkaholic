@@ -1060,13 +1060,13 @@ function showunfinalized(address) {
     }, refreshIntervalMS);
 }
 
-function submitSuggestion(address, nickname, submitter) {
+function submitSuggestion(address, nickname, submitter, addressType) {
     let endpoint = `${baseURL}/suggest/${address}`
     let data = {
         nickname,
-        submitter
+        submitter,
+        addressType
     }
-    console.log("POST", endpoint, data)
     var req = new Request(endpoint, {
         method: 'POST',
         headers: new Headers({
@@ -1075,22 +1075,30 @@ function submitSuggestion(address, nickname, submitter) {
         body: JSON.stringify(data)
     });
 
-    fetch(req)
-        .then((response) => {
-            if (response.status == 200) {
-                launchToast("Thank you!  If your suggestion is verified as reasonable it will appear within 24 hrs");
-            } else {
-                launchToast("An error has occurred.");
-            }
-            $('#suggestModal').modal('hide');
-        })
+    try {
+        console.log("submitSuggestion", endpoint, data)
+        fetch(req)
+            .then((response) => {
+                console.log(response);
+                if (response.status == 200) {
+                    launchToast("Thank you!  If your suggestion is verified as reasonable it will appear within 24 hrs");
+                } else {
+                    launchToast("An error has occurred.");
+                }
+                console.log("HIDING")
+                $('#suggestModal').modal('hide');
+            })
+    } catch (err) {
+        console.log(err);
+    }
 
 }
 
 $('#submitSuggestion').on('click', function(e) {
     let nickname = document.getElementById("nickname").value;
     let submitter = document.getElementById("submitter").value;
-    submitSuggestion(address, nickname, submitter);
+    let addressType = document.getElementById("addressType").value;
+    submitSuggestion(address, nickname, submitter, addressType);
 });
 
 setuptabs(tabs, address, requestedChainAddress);

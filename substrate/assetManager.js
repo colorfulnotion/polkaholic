@@ -323,7 +323,8 @@ module.exports = class AssetManager extends PolkaholicDB {
         let asciiName = paraTool.pubKeyHex2ASCII(address);
         if (asciiName != null) {
             return ({
-                nickname: asciiName
+                nickname: asciiName,
+                verified: true
             });
         }
         return (null)

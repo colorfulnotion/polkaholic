@@ -1,6 +1,6 @@
-<%- include('header', {chainInfo: chainInfo}); %>
+<%- include('header', {chainInfo: chainInfo, title: "Account"}); %>
 <% let canClaim = false; // disabled for now
-let suggest = false; // disabled for now
+let suggest = true; // disabled for now
 %>
 <div class="card mb-3">
   <div class="row g-0">
@@ -157,10 +157,23 @@ let suggest = false; // disabled for now
               <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              <input type="text" id="nickname" class="form-control" />
+Help others, earn 25 HOLIC for suggesting a public nickname:<br/>
               <label class="form-label" for="nickname">Nickname</label>
-            </div>
+              <input type="text" id="nickname" class="form-control" />
+	      Account Type:
+<select id="addressType" class="select">
+  <option value="exchange">Exchange</option>
+  <option value="defi">Defi / NFT Project</option>
+  <option value="dapp">Dapp</option>
+  <option value="company">Company</option>
+  <option value="person">Person (not eligible for rewards)</option>
+</select>
+<small>
+Rewards granted upon reasonable verification.  Important: PII info (Person) will not be published or be eligible for rewards.
+</small>
             <input type="hidden" id="submitter"  value="<%= fromAddress %>"/>
+            </div>
+
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal">Close</button>
               <button type="button" class="btn btn-primary" id="submitSuggestion">Submit Suggestion</button>

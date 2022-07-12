@@ -1,4 +1,4 @@
-<%- include('header', {chainInfo: chainInfo}); %>
+<%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Chain`}); %>
 <%- include('chainheader', { chain: chain, title: `Summary` }); %>
 
 <% if ( chain.crawlingStatus.length > 0 ) { %>

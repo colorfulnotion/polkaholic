@@ -1,4 +1,4 @@
-<%- include('header', {chainInfo: chainInfo}); %>
+<%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Spec Version`}); %>
 <%- include('chainheader', { chain: chain, title: `Spec Version ${specVersion}` }); %>
 <script>
 function toggleHideExtrinsicsEvents() {

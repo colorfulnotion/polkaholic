@@ -394,8 +394,12 @@ module.exports = {
     presentExtrinsicID: function(extrinsicHash, extrinsicID) {
         return tx_link_with_desc(extrinsicHash, extrinsicID)
     },
-    presentID: function(id) {
-        return account_link_full(id)
+    presentID: function(id, shortHash = false) {
+        if (shortHash) {
+            return account_link(id)
+        } else {
+            return account_link_full(id)
+        }
     },
     presentFullID: function(id) {
         return account_link_full(id)
@@ -417,7 +421,6 @@ module.exports = {
         try {
             if (d.id) {
                 return d.id
-                //return account_link(d.id);
             } else if (d.v0) { // {"v0":{"x1":{"parachain":"2000"}}}
                 if (d.v0.x1 && d.v0.x1.parachain) {
                     return present_parachain(d.v0.x1.parachain);
@@ -564,7 +567,7 @@ module.exports = {
         return out;
     },
     validAdmin: function(email) {
-        return (email == "michael@wolk.com" || email == "sourabh@wolk.com" || email == "sourabh@colorfulnotion.com" || email == "michael@colorfulnotion.com");
+        return (email == "sourabh@colorfulnotion.com" || email == "michael@colorfulnotion.com");
     },
     getEVMMethod: function(sig) {
         let out = sig.split("(");

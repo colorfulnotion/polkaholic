@@ -1029,7 +1029,6 @@ from chain where chainID = '${chainID}' limit 1`);
 
     build_feed_from_row(row, requestedBlockHash = false) {
         let rowData = row.data;
-        console.log(`build_feed_from_row requestedBlockHash=${requestedBlockHash}`, rowData)
         let r = {
             blockHash: false,
             blockNumber: false,
