@@ -199,7 +199,6 @@ module.exports = class Manager extends AssetManager {
         await this.update_batchedSQL();
     }
 
-
     async clean_recent(tbl, minLogDT = '2022-06-12') {
         if (tbl == "transfers" || tbl == "extrinsics") {
             let fullTable = `\`paraholic.${tbl}\``;
@@ -229,12 +228,6 @@ module.exports = class Manager extends AssetManager {
             this.batchedSQL.push(sql)
             await this.update_batchedSQL();
         }
-    }
-
-    async clean_recent(tbl, minLogDT = '2022-06-12') {
-        let sql = `delete from ${tbl}recent where ts < ${ts} and chainID = '${c}'`
-        console.log(c, ts, sql);
-
     }
 
     async update_bq_log(tbl, minLogDT, maxLogDT, limit = 20000) {
