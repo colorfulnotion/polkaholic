@@ -2113,7 +2113,7 @@ module.exports = class ChainParser {
                 //todo: parse reward record here
                 /*
                 "data": [
-                  "16DWzViTodXg48SJzRRcqTQbSvFBxJEQ9Y2F4pNsrXueH4Nz",
+                  "ADDR",
                   "2004",
                   "500000000000"
                 ]

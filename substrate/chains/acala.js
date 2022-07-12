@@ -21,10 +21,6 @@ module.exports = class AcalaParser extends ChainParser {
     }
 
     getLoansPositionsKey(indexer, decoratedKey) { // https://github.com/AcalaNetwork/Acala/blob/master/modules/loans/src/lib.rs
-        //Loans:Positions
-        /*
-        [{"Token":"KSM"},"pJhw2zYqTnW9m2ddvJCE3B2493ibxbRwJ7ksDTLzf5raEpv"]
-        */
         let k = JSON.parse(decoratedKey)
         var out = {};
         out.asset = k[0]; //currencyID

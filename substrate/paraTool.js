@@ -685,7 +685,7 @@ module.exports = {
             // ambiguous type
             idType = "ambiguous";
         } else if (isValidAddressPolkadotAddress(id)) {
-            //the address doesn't follow 0x/1x/2x/3x/4x length68 convention...check if it's valid SS58. i.e (16DWzViTodXg48SJzRRcqTQbSvFBxJEQ9Y2F4pNsrXueH4Nz)
+            //the address doesn't follow 0x/1x/2x/3x/4x length68 convention...check if it's valid SS58. i.e
             var addrHex = decode58(id);
             var chainID = getChainID(id);
             console.log(`${addrHex} (chainID:${chainID})`);
