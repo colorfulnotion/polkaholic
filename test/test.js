@@ -2,9 +2,6 @@
 
 var isProduction = false
 var endpoint = "https://api.polkaholic.io"
-if (isProduction && process.env.POLKAHOLIC_API_URL != undefined) {
-    endpoint = 'http://moonriver-internal.polkaholic.io:3001'
-}
 const request = require("supertest")(endpoint);
 const {
     assert
