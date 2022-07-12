@@ -1484,6 +1484,21 @@ module.exports = class ChainParser {
             }
           ]
         }
+        "asset": {
+          "v1": {
+            "id": {
+              "concrete": {
+                "parents": 1,
+                "interior": {
+                  "here": null
+                }
+              }
+            },
+            "fun": {
+              "fungible": 20469417452
+            }
+          }
+        },
         */
         let targetedAsset = false;
         let rawTargetedAsset = false;
@@ -1495,10 +1510,21 @@ module.exports = class ChainParser {
             //v1_id_concrete
             let v1_id_concrete = fungibleAsset.id.concrete
             if (v1_id_concrete.interior != undefined) {
+
                 let v1_id_concrete_interior = v1_id_concrete.interior
+                let v1_id_concrete_parents = v1_id_concrete.parents
                 if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.here !== undefined) {
-                    targetedAsset = indexer.getNativeAsset()
-                    rawTargetedAsset = indexer.getNativeAsset()
+                    if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 0){
+                        //normal case?
+                        targetedAsset = indexer.getNativeAsset()
+                        rawTargetedAsset = indexer.getNativeAsset()
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processConcreteCurrency targetedAsset parents:0, here`, targetedAsset)
+                    }else if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 1){
+                        //ump
+                        targetedAsset = indexer.getRelayChainAsset()
+                        rawTargetedAsset = indexer.getRelayChainAsset()
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processConcreteCurrency targetedAsset parents:1, here`, targetedAsset)
+                    }
                 } else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
                     let v1_id_concrete_interior_x2 = v1_id_concrete_interior.x2
                     if (v1_id_concrete_interior_x2.length == 2 && v1_id_concrete_interior_x2[1].generalIndex != undefined) {

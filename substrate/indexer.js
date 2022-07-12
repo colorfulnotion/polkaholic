@@ -4731,7 +4731,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     async getBlockAuthor(api, block, isNewSession = false, sessionIndex = false) {
-        if (this.chainID == paraTool.moonbeam || this.chainID == paraTool.moonriver) return //moonbeam has different struct. skip for now
+        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDRobonomics) return //moonbeam has different struct. skip for now
 
         let currSessionValidators = this.currentSessionValidators
         let currSessionIndex = this.currentSessionIndex
@@ -4762,7 +4762,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 this.currentSessionValidators = currSessionValidators
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSessionValidators (${currSessionIndex}, len=${currSessionValidators.length})`)
             } catch (e) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getSessionIndexAndValidators error`, e.toString())
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`*[${blockNumber}] getSessionIndexAndValidators error`, e.toString())
                 return
             }
         }
@@ -5688,6 +5688,19 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (!nativeAsset) return (false);
         let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, this.chainID);
         return (nativeAssetChain);
+    }
+
+    getRelayChainAsset() {
+        let relayChain = this.relayChain
+        let relayChainID = (relayChain == 'polkadot')? 0: 2
+        let symbol = this.getChainSymbol(relayChainID);
+        if (symbol) {
+            return JSON.stringify({
+                Token: symbol
+            })
+        } else {
+            return (false);
+        }
     }
 
     async genesisAsset(chain) {
