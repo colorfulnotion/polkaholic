@@ -713,7 +713,7 @@ function showWalletHome() {
             document.getElementById('identicon').src = "/identicon/" + homeAcct;
         }
     } else {
-        document.getElementById('walletHome').innerHTML = "-please select-";
+        document.getElementById('walletHome').innerHTML = "-Connect Wallet-";
         document.getElementById('identicon').style.visibility = 'hidden';
     }
 }

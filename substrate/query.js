@@ -1754,7 +1754,12 @@ module.exports = class Query extends AssetManager {
             if (decorate && block.author != undefined) {
                 block.authorAddress = paraTool.getPubKey(block.author)
                 this.decorateAddress(block, "authorAddress", decorateAddr, false)
+            }else if (evmBlock && evmBlock.author != undefined){
+              block.author = evmBlock.author
+              block.authorAddress = paraTool.getPubKey(evmBlock.author)
+              this.decorateAddress(block, "authorAddress", decorateAddr, false)
             }
+
             block.specVersion = this.getSpecVersionForBlockNumber(chainID, block.number);
             if (evmBlock) {
                 block.evmBlock = evmBlock
@@ -3937,18 +3942,6 @@ module.exports = class Query extends AssetManager {
 
     async getXCMMessages(query = {}, limit = 1000, decorate = true, decorateExtra = true) {
         return this.bq_query_xcmmessages("xcm", query, limit, decorate, decorateExtra);
-    }
-
-
-    async bq_query_page(tbl = "events") {
-        const bigquery = new BigQuery();
-        let fullTable = this.getBQTable(tbl);
-        let query = `select c as chainID, bn as blockNumber, id as eventID, h as extrinsicHash, p as section, m as method, UNIX_SECONDS(ts) as blockTS from ${fullTable} limit 20000`;
-        const dataset = bigquery.dataset(this.GC_BIGQUERY_DATASET);
-        console.log(query);
-        const [job] = await bigquery.createQueryJob(query);
-        let [rows] = await job.getQueryResults();
-        console.log(rows.length);
     }
 
     async bq_query(tbl = "extrinsics", filters = {}, limit = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
