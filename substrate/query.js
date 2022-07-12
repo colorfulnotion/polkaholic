@@ -101,13 +101,13 @@ module.exports = class Query extends AssetManager {
         return `${yyyy}${mm}${dd}-${hr}${min}`;
     }
 
-    async tallyAPIKey(apikey) {
+    async tallyAPIKey(apikey, cnt = 1) {
         // increment "rate" cell
         try {
             let minkey = this.currentMinuteKey();
             let ratekey = `rate:${minkey}`;
             const row = this.btAPIKeys.row(apikey);
-            await row.increment(ratekey, 1);
+            await row.increment(ratekey, cnt);
             return (true);
         } catch (e) {
             console.log(e);
@@ -3939,6 +3939,18 @@ module.exports = class Query extends AssetManager {
         return this.bq_query_xcmmessages("xcm", query, limit, decorate, decorateExtra);
     }
 
+
+    async bq_query_page(tbl = "events") {
+        const bigquery = new BigQuery();
+        let fullTable = this.getBQTable(tbl);
+        let query = `select c as chainID, bn as blockNumber, id as eventID, h as extrinsicHash, p as section, m as method, UNIX_SECONDS(ts) as blockTS from ${fullTable} limit 20000`;
+        const dataset = bigquery.dataset(this.GC_BIGQUERY_DATASET);
+        console.log(query);
+        const [job] = await bigquery.createQueryJob(query);
+        let [rows] = await job.getQueryResults();
+        console.log(rows.length);
+    }
+
     async bq_query(tbl = "extrinsics", filters = {}, limit = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -4055,8 +4067,16 @@ module.exports = class Query extends AssetManager {
         };
 
         try {
-            // Add rows from bigquery
-            let [rows] = await bigqueryClient.query(options);
+            let rows = null;
+            if (limit <= 1000) {
+                // typical  "simple" case: Add rows from bigquery
+                [rows] = await bigqueryClient.query(options);
+            } else {
+                // Run the query as a job
+                const [job] = await bigqueryClient.createQueryJob(options);
+                await job.getQueryResults();
+                [rows] = await job.getQueryResults();
+            }
             let keys = {}
             if (recent) {
                 for (let i = 0; i < rows.length; i++) {
