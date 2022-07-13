@@ -1,4 +1,7 @@
-
-
-<div style='height: 100px'></div>
-<h4><%= recordtype; %> Not found</h4>
+<%- include('header', {chainInfo: chainInfo, title: "Not found"}); %>
+<div style='margin: 5px'>
+ <div class="alert" role="alert" data-mdb-color="warning">
+  <%= recordtype; %> Not found
+ </div>
+</div>
+<%- include('footer', {apiUrl: ""}); %>

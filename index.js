@@ -356,19 +356,22 @@ app.get('/', async (req, res) => {
                     apiUrl: req.path,
                     docsSection: "get-chain-recent-blocks"
                 });
-            } else {
-                res.render('notfound', {
-                    recordtype: "chain"
-                });
             }
         } else {
             await handleChains(req, res);
         }
     } catch (err) {
-        res.render('error', {
-            chainInfo: query.getChainInfo(),
-            err: err
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
     }
 })
 
@@ -466,7 +469,6 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
     try {
         let [chainID, id] = query.convertChainID(chainID_or_chainName)
         let chain = await query.getChain(chainID);
-
         if (chain) {
             var blocks = await query.getChainRecentBlocks(chainID);
             var homePubkey = getHomePubkey(req);
@@ -480,16 +482,19 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-chain-recent-blocks"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "chain"
-            });
         }
     } catch (err) {
-        res.render('error', {
-            chainInfo: query.getChainInfo(),
-            err: err
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
     }
 })
 
@@ -553,15 +558,18 @@ app.get('/extrinsics/:chainID_or_chainName/:s?/:m?', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-extrinsics"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "chain"
-            });
         }
     } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            return res.status(400).json({
+                error: err.toString()
+            });
+        }
     }
 })
 
@@ -587,15 +595,18 @@ app.get('/events/:chainID_or_chainName/:s?/:m?', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-events"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "chain"
-            });
         }
     } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo(),
+            });
+        } else {
+            return res.status(400).json({
+                error: err.toString()
+            });
+        }
     }
 })
 
@@ -622,15 +633,18 @@ app.get('/transfers/:chainID_or_chainName/:s?/:m?', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-events"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "chain"
-            });
         }
     } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo(),
+            });
+        } else {
+            return res.status(400).json({
+                error: err.toString()
+            });
+        }
     }
 })
 // Usage: https://polkaholic.io/evmtxs/moonbeam
@@ -661,15 +675,18 @@ app.get('/evmtxs/:chainID_or_chainName/:s?/:m?', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-evmtxs"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "chain"
-            });
         }
     } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            return res.status(400).json({
+                error: err.toString()
+            });
+        }
     }
 })
 
@@ -772,15 +789,18 @@ app.get('/specversion/:chainID_or_chainName/:specVersion', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-specversion"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "chain"
-            });
         }
     } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            return res.status(400).json({
+                error: err.toString()
+            });
+        }
     }
 })
 
@@ -837,16 +857,19 @@ app.get('/block/:chainID_or_chainName/:blockNumber', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-block"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "block"
-            });
         }
     } catch (err) {
-        res.render('error', {
-            chainInfo: query.getChainInfo(),
-            err: err
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "block",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
     }
 })
 
@@ -869,15 +892,18 @@ app.get('/blockhash/:blockhash', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-block"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "block"
-            });
         }
     } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "block",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            return res.status(400).json({
+                error: err.toString()
+            });
+        }
     }
 })
 
@@ -901,15 +927,18 @@ app.get('/blockhash/:blockhash', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-block"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "block"
-            });
         }
     } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "block",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            return res.status(400).json({
+                error: err.toString()
+            });
+        }
     }
 })
 
@@ -1018,10 +1047,17 @@ app.get('/account/:address', async (req, res) => {
             docsSection: "get-account"
         });
     } catch (err) {
-        res.render('error', {
-            chainInfo: query.getChainInfo(),
-            err: err
-        });
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "account",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
     }
 })
 
@@ -1068,31 +1104,6 @@ app.post('/search/', async (req, res) => {
     }
 })
 
-/*
-1. Claim Rewards
-https://moonscan.io/tx/0x50db76d1dbfaabd60674c8bacaaf023834c8f5624401b5dbfd057c7dd076adc6
-https://polkaholic.io/tx/0x50db76d1dbfaabd60674c8bacaaf023834c8f5624401b5dbfd057c7dd076adc6
-
-2. StellaSwap operation of 100 GLMR => 100 WGLMR [deposit]
-https://moonscan.io/tx/0x9c677e67856357feaa08e5301702cd8c54c06547257169e2494e10318aba2613
-https://polkaholic.io/tx/0x9c677e67856357feaa08e5301702cd8c54c06547257169e2494e10318aba2613
-
-3A. APPROVE 50 WGLMR => 138 USD
-https://moonscan.io/tx/0x141f00ed19ee6df7e85ea85cb440074f0f05c0141e5c85fe0cd801d578cc3bbc
-https://polkaholic.io/tx/0x141f00ed19ee6df7e85ea85cb440074f0f05c0141e5c85fe0cd801d578cc3bbc
-
-3B. swapExactTokensForToken
-https://moonscan.io/tx/0xa64ba1bb62d967c40792a4cfc6c38a2d0ba5859b896fd16af2834b6662a1ff1b
-https://polkaholic.io/tx/0xa64ba1bb62d967c40792a4cfc6c38a2d0ba5859b896fd16af2834b6662a1ff1b
-
-4A. APPROVE LP Token
-https://moonscan.io/tx/0x29230f2be08e23571648629fd3e73286263d689ca575d6c8151c4836f6b18bfc
-https://polkaholic.io/tx/0x29230f2be08e23571648629fd3e73286263d689ca575d6c8151c4836f6b18bfc
-
-4B. get LP Token
-https://moonscan.io/tx/0x3e1781e64ed29eb8ce460365d6a7a7b22140805997e3ea6f675876d1a35f6550
-https://polkaholic.io/tx/0x3e1781e64ed29eb8ce460365d6a7a7b22140805997e3ea6f675876d1a35f6550
-*/
 app.get('/tx/:txhash', async (req, res) => {
     try {
         let txHash = req.params['txhash'];
@@ -1108,66 +1119,21 @@ app.get('/tx/:txhash', async (req, res) => {
                 apiUrl: req.path,
                 docsSection: "get-transaction"
             });
-        } else {
-            res.render('notfound', {
-                recordtype: "transaction"
-            });
         }
     } catch (err) {
-        res.render('error', {
-            chainInfo: query.getChainInfo(),
-            err: err
-        });
-    }
-})
-
-app.get('/sponsoroffers', async (req, res) => {
-    try {
-        let homePubkey = getHomePubkey(req);
-        let sponsoroffers = await query.getSponsorOffers(homePubkey);
-        if (sponsoroffers) {
-            res.render('sponsoroffers', {
-                sponsoroffers: sponsoroffers,
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "transaction",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
                 chainInfo: query.getChainInfo(),
-                apiUrl: req.path,
-                docsSection: "get-sponsoroffers"
-            });
-        } else {
-            res.render('notfound', {
-                recordtype: "transaction"
+                err: err
             });
         }
-    } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
     }
 })
-
-app.get('/reindex', async (req, res) => {
-    try {
-        let chains = await query.getChainsReindex();
-        if (chains) {
-            res.render('reindex', {
-                chains: chains,
-                chainInfo: query.getChainInfo(),
-                apiUrl: req.path,
-                docsSection: "get-reindex"
-            });
-        } else {
-            res.render('notfound', {
-                recordtype: "transaction"
-            });
-        }
-    } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
-    }
-})
-
-
-
 
 app.get('/about', async (req, res) => {
     res.render('about', {

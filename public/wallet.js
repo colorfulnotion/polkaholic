@@ -212,7 +212,7 @@ $('#walletModal').on('show.bs.modal', async function(event) {
     var modal = $(this)
 
     if (accounts?.length > 0) {
-        accounts?.map(account => console.log(`Address: ${account.address}\t(pubkey: ${getPubkey(account)})`));
+        //accounts?.map(account => console.log(`Address: ${account.address}\t(pubkey: ${getPubkey(account)})`));
         var out = accounts.map((w, idx) => {
             let address = getPolkadotAddress(w)
             //let addr = w.address.substring(0, 20) + "..."; //16DWzV....ueH4Nz
@@ -220,7 +220,7 @@ $('#walletModal').on('show.bs.modal', async function(event) {
             let addr = address
             let name = w.meta.name;
             let walletid = "wallet" + idx;
-            console.log('account', walletid, name, addr);
+            //console.log('account', walletid, name, addr);
             return `<a id="${walletid}" type="button" class="btn btn-lg btn-outline-dark" style="padding-left: 0.25rem; padding-right: 0.25rem; padding-bottom: 0.15rem;padding-bottom: 0.15rem"> <div style='float: left; width: 10%'><img src='/identicon/${address}' width=50/></div><div style='float:right; width: 90%'>${name}<br/><p class="text-capitalize" style="margin-padding:0rem">${addr}</p></div></a>`;
         });
         //btn-group-vertical mx-auto

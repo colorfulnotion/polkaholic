@@ -696,10 +696,12 @@ function getWalletHome() {
 
 function home() {
     let [homeName, homeAcct] = getWalletHome();
-    if (homeAcct != "") {
+
+    if (homeAcct != undefined && homeAcct.length > 0) {
         window.location.href = "/account/" + homeAcct;
     } else {
-        showWalletModal();
+        //showWalletModal();
+        selectWalletAccount();
     }
 }
 
