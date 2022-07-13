@@ -2570,11 +2570,12 @@ order by chainID, extrinsicHash, diffTS`
       if (vv != '') o.v = paddedV
       if (pk != '') o.pkExtra = pk
       if (pv != '') o.pv = pv
+      //o.pv = (pv == undefined)? pv: null
       return [o, parsev];
     }
 
     parse_rawTrace(e, traceType, bn, blockHash, api) {
-        console.log(`e`, e)
+        //console.log(`e`, e)
         let o = {}
         o.bn = e.bn;
         o.blockHash = e.blockHash;
@@ -2630,7 +2631,9 @@ order by chainID, extrinsicHash, diffTS`
             //skey.setMeta(api.query[p][s].meta); // ????
             //var parsek = skey.toHuman();
             //var decoratedKey = JSON.stringify(parsek)
-            var decoratedKey = e.pkExtra
+            let parsek = (e.pkExtra != undefined)? e.pkExtra : JSON.stringify(e.k)
+            var decoratedKey = parsek
+            console.log(`parseStorageKey  key=${key}, decoratedKey=${decoratedKey}`)
             if (handParseKey = this.chainParser.parseStorageKey(this, p, s, key, decoratedKey)) {
                 if (handParseKey.mpType) {
                     //this is the dmp case
@@ -2689,7 +2692,7 @@ order by chainID, extrinsicHash, diffTS`
                 }
             }
         } catch (err) {
-            console.log(`parse_rawTrace error`, err.toString())
+            console.log(`parse_rawTrace error [${decoratedKey}]`, err.toString())
             o.pk = "err";
             pk = "err"
             this.numIndexingErrors++;
