@@ -2386,6 +2386,431 @@ order by chainID, extrinsicHash, diffTS`
         await this.update_batchedSQL();
     }
 
+    // parse trace without any handparse
+    parse_trace_auto(e, traceType, traceIdx, bn, blockHash, api) {
+      let o = {}
+      //o.bn = bn;
+      //o.blockHash = blockHash;
+      //o.ts = e.ts; //not sure if we are still using this?
+      o.traceID = `${bn}-${traceIdx}`
+
+      let decodeFailed = false
+
+      let key = e.k.slice()
+      var query = api.query;
+
+      if (key.substr(0, 2) == "0x") key = key.substr(2)
+      let val = "0x"; // this is essential to cover "0" balance situations where e.v is null ... we cannot return otherwise we never zero out balances
+      if (e.v) {
+          val = e.v.slice()
+          if (val.substr(0, 2) == "0x") val = val.substr(2)
+      }
+      let k = key.slice();
+      if (k.length > 64) k = k.substr(0, 64);
+      let sk = this.storageKeys[k];
+
+      //if (!sk) decodeFailed = true;
+      //if (!sk) return ([false, false]);
+      if (!sk){
+        o.p = 'unknown'
+        o.s = 'unknown'
+        o.k = e.k
+        o.v = e.v
+        return [o, false]
+      }
+
+      // add the palletName + storageName to the object, if found
+      o.p = sk.palletName;
+      o.s = sk.storageName;
+      if (!o.p || !o.s) {
+          console.log(`k=${k} not found (${key},${val})`)
+           decodeFailed = true
+           o.p = 'unknown'
+           o.s = 'unknown'
+           o.k = e.k
+           o.v = e.v
+           return [o, false]
+          //return ([false, false]);
+      }
+
+
+      let parsev = false;
+      let p = paraTool.firstCharLowerCase(o.p);
+      let s = paraTool.firstCharLowerCase(o.s);
+      let kk = ''
+      let vv = ''
+      let pk = ''
+      let pv = ''
+      let debugCode = 0
+      let palletSection = `${o.p}:${o.s}` //firstChar toUpperCase to match the testParseTraces tbl
+
+
+      if (!query[p]) decodeFailed = true;
+      if (!query[p][s]) decodeFailed = true;
+      if (!query[p][s].meta) decodeFailed = true;
+
+      if (decodeFailed){
+        o.p = p
+        o.s = s
+        o.k = e.k
+        o.v = e.v
+        return [o, false]
+      }
+
+
+      //if (!query[p]) return ([false, false]);
+      //if (!query[p][s]) return ([false, false]);
+      //if (!query[p][s].meta) return ([false, false]);
+      let queryMeta = query[p][s].meta;
+      let handParseKey = false;
+      // parse key
+      try {
+          kk = key;
+
+          var skey = new StorageKey(api.registry, '0x' + key); // ???
+          skey.setMeta(api.query[p][s].meta); // ????
+          var parsek = skey.toHuman();
+          var decoratedKey = JSON.stringify(parsek)
+          pk = decoratedKey
+      } catch (err) {
+          o.pk = "err";
+          pk = "err"
+          this.numIndexingErrors++;
+      }
+
+      // parse value
+      try {
+          let valueType = (queryMeta.type.isMap) ? queryMeta.type.asMap.value.toJSON() : queryMeta.type.asPlain.toJSON();
+          let valueTypeDef = api.registry.metadata.lookup.getTypeDef(valueType).type;
+          let v = (val.length >= 2) ? val.substr(2).slice() : "";
+          if (valueTypeDef == "u128" || valueTypeDef == "u64" || valueTypeDef == "u32" || valueTypeDef == "u64" || valueTypeDef == "Balance") {
+              parsev = hexToBn(v, {
+                  isLe: true
+              }).toString();
+          } else {
+              switch (traceType) {
+                  case "state_traceBlock":
+                      if (api.createType != undefined) {
+                          parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // assume 01 "Some"/"None" is
+                      } else if (api.registry != undefined && this.apiAt.registry.createType != undefined) {
+                          parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                      }
+                      break;
+                  case "subscribeStorage":
+                  default: // skip over compact encoding bytes in Vec<u8>, see https://github.com/polkadot-js/api/issues/4445
+                      let b0 = parseInt(val.substr(0, 2), 16);
+                      switch (b0 & 3) {
+                          case 0: // single-byte mode: upper six bits are the LE encoding of the value
+                              let el0 = (b0 >> 2) & 63;
+                              if (el0 == (val.substr(2).length) / 2) {
+                                  if (api.createType != undefined) {
+                                      parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
+                                  } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                      parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
+                                  }
+                              } else {
+                                  // MYSTERY: why should this work?
+                                  // console.log("0 BYTE FAIL - el0", el0, "!=", (val.substr(2).length) / 2);
+                                  if (api.createType != undefined) {
+                                      parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                  } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                      parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                  }
+                              }
+                              break;
+                          case 1: // two-byte mode: upper six bits and the following byte is the LE encoding of the value
+                              var b1 = parseInt(val.substr(2, 2), 16);
+                              var el1 = ((b0 >> 2) & 63) + (b1 << 6);
+                              if (el1 == (val.substr(2).length - 2) / 2) {
+                                  if (api.createType != undefined) {
+                                      parsev = api.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
+                                  } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                      parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
+                                  }
+                              } else {
+                                  // MYSTERY: why should this work?
+                                  // console.log("2 BYTE FAIL el1=", el1, "!=", (val.substr(2).length - 2) / 2, "b0", b0, "b1", b1, "len", (val.substr(2).length - 2) / 2, "val", val);
+                                  if (this.apiAt.createType != undefined) {
+                                      parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                  } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                      parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                  }
+                              }
+                              break;
+                          case 2: // four-byte mode: upper six bits and the following three bytes are the LE encoding of the value
+                              /*var b1 = parseInt(val.substr(2, 2), 16);
+                                  var b2 = parseInt(val.substr(4, 2), 16);
+                                  var b3 = parseInt(val.substr(6, 2), 16);
+                                  var el2 = (b0 >> 2) & 63 + (b1 << 6) + (b2 << 14) + (b3 << 22);
+                                  if (el2 == (val.substr(2).length - 6) / 2) {
+                                      parsev = api.createType(valueTypeDef, "0x" + val.substr(8)).toString(); // 4 bytes
+                                  } else {
+                                      parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // assume 01 "Some" is the first byte
+                                  } */
+                              break;
+                          case 3: // Big-integer mode: The upper six bits are the number of bytes following, plus four.
+                              //let numBytes = ( b0 >> 2 ) & 63 + 4;
+                              //parsev = api.createType(valueTypeDef, "0x" + val.substr(2 + numBytes*2)).toString(); // check?
+                              break;
+                      }
+              }
+          }
+          vv = val;
+          if (parsev) {
+              pv = parsev;
+          }
+      } catch (err) {
+          console.log("SOURCE: pv", err);
+          this.numIndexingWarns++;
+      }
+      let paddedK = (kk.substr(0,2) == '0x') ? kk : '0x' + kk
+      let paddedV = (vv.substr(0,2) == '0x') ? vv : '0x' + vv
+      if (JSON.stringify(paddedK) == pk) pk =''
+      if (kk != '') o.k = paddedK
+      if (vv != '') o.v = paddedV
+      if (pk != '') o.pkExtra = pk
+      if (pv != '') o.pv = pv
+      return [o, parsev];
+    }
+
+    parse_rawTrace(e, traceType, bn, blockHash, api) {
+        console.log(`e`, e)
+        let o = {}
+        o.bn = e.bn;
+        o.blockHash = e.blockHash;
+        // o.ts = e.ts; //not sure if we are still using this?
+
+        let key = e.k.slice()
+        var query = api.query;
+
+        if (key.substr(0, 2) == "0x") key = key.substr(2)
+        let val = "0x"; // this is essential to cover "0" balance situations where e.v is null ... we cannot return otherwise we never zero out balances
+        if (e.v) {
+            val = e.v.slice()
+            if (val.substr(0, 2) == "0x") val = val.substr(2)
+        }
+        let k = key.slice();
+        if (k.length > 64) k = k.substr(0, 64);
+        let sk = this.storageKeys[k];
+
+        if (!sk) return ([false, false]);
+        if (this.skipStorageKeys[k]) {
+            return ([false, false]);
+        }
+        // add the palletName + storageName to the object, if found
+        o.p = sk.palletName;
+        o.s = sk.storageName;
+        if (!o.p || !o.s) {
+            console.log(`k=${k} not found (${key},${val})`)
+            return ([false, false]);
+        }
+
+
+        let parsev = false;
+        let p = paraTool.firstCharLowerCase(o.p);
+        let s = paraTool.firstCharLowerCase(o.s);
+        let kk = ''
+        let vv = ''
+        let pk = ''
+        let pv = ''
+        let pv2 = ''
+        let debugCode = 0
+        let palletSection = `${o.p}:${o.s}` //firstChar toUpperCase to match the testParseTraces tbl
+
+        if (!query[p]) return ([false, false]);
+        if (!query[p][s]) return ([false, false]);
+        if (!query[p][s].meta) return ([false, false]);
+        let queryMeta = query[p][s].meta;
+        let handParseKey = false;
+        // parse key
+        try {
+            kk = key;
+
+            //var skey = new StorageKey(api.registry, '0x' + key); // ???
+            //skey.setMeta(api.query[p][s].meta); // ????
+            //var parsek = skey.toHuman();
+            //var decoratedKey = JSON.stringify(parsek)
+            var decoratedKey = e.pkExtra
+            if (handParseKey = this.chainParser.parseStorageKey(this, p, s, key, decoratedKey)) {
+                if (handParseKey.mpType) {
+                    //this is the dmp case
+                    if (handParseKey.mpType == 'dmp' && handParseKey.paraIDDest != undefined && handParseKey.chainIDDest != undefined) {
+                        o.paraIDDest = handParseKey.paraIDDest
+                        o.chainIDDest = handParseKey.chainIDDest
+                        o.mpType = handParseKey.mpType
+                    }
+                    if (handParseKey.mpType == 'ump') {
+                        o.mpType = handParseKey.mpType
+                        o.chainID = handParseKey.chainID
+                        o.chainIDDest = handParseKey.chainIDDest
+                    }
+                    if (handParseKey.mpType == 'hrmp') {
+                        o.mpType = handParseKey.mpType
+                        o.chainID = handParseKey.chainID
+                    }
+                }
+
+                if (handParseKey.lp0 != undefined && handParseKey.lp1 != undefined) {
+                    o.lp0 = handParseKey.lp0
+                    o.lp1 = handParseKey.lp1
+                }
+                if (handParseKey.decoratedAsset) {
+                    o.decoratedAsset = handParseKey.decoratedAsset
+                }
+                if (handParseKey.decimals != undefined) {
+                    o.decimals = handParseKey.decimals
+                }
+                if (handParseKey.asset && handParseKey.asset.DexShare) {
+                    handParseKey.asset = handParseKey.asset.DexShare;
+                }
+                if (handParseKey.accountID != undefined && handParseKey.asset != undefined) {
+                    // this is usually a key by acct, assetType
+                    o.accountID = handParseKey.accountID
+                    o.asset = JSON.stringify(handParseKey.asset)
+                    //console.log("OK", o.accountID, o.asset);
+                    //kk = ''
+                } else if (handParseKey.accountID == undefined && handParseKey.asset != undefined) {
+                    // this is usally a key by assetType
+                    o.asset = JSON.stringify(handParseKey.asset)
+                } else if (handParseKey.isEVM != undefined) {
+                    if (handParseKey.blockNumber != undefined) {
+                        o.blockNumber = handParseKey.blockNumber
+                    }
+                    o.isEVM = handParseKey.isEVM
+                    // pk = handParseKey;
+                } else {
+                    // unknowny for now
+                    pk = handParseKey;
+                }
+            } else {
+                if (parsek) {
+                    //kk = ''
+                    pk = JSON.stringify(parsek);
+                }
+            }
+        } catch (err) {
+            console.log(`parse_rawTrace error`, err.toString())
+            o.pk = "err";
+            pk = "err"
+            this.numIndexingErrors++;
+        }
+
+        // parse value
+        try {
+          /*
+            let valueType = (queryMeta.type.isMap) ? queryMeta.type.asMap.value.toJSON() : queryMeta.type.asPlain.toJSON();
+            let valueTypeDef = api.registry.metadata.lookup.getTypeDef(valueType).type;
+            let v = (val.length >= 2) ? val.substr(2).slice() : "";
+            if (valueTypeDef == "u128" || valueTypeDef == "u64" || valueTypeDef == "u32" || valueTypeDef == "u64" || valueTypeDef == "Balance") {
+                parsev = hexToBn(v, {
+                    isLe: true
+                }).toString();
+            } else {
+                switch (traceType) {
+                    case "state_traceBlock":
+                        if (api.createType != undefined) {
+                            parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // assume 01 "Some"/"None" is
+                        } else if (api.registry != undefined && this.apiAt.registry.createType != undefined) {
+                            parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                        }
+                        break;
+                    case "subscribeStorage":
+                    default: // skip over compact encoding bytes in Vec<u8>, see https://github.com/polkadot-js/api/issues/4445
+                        let b0 = parseInt(val.substr(0, 2), 16);
+                        switch (b0 & 3) {
+                            case 0: // single-byte mode: upper six bits are the LE encoding of the value
+                                let el0 = (b0 >> 2) & 63;
+                                if (el0 == (val.substr(2).length) / 2) {
+                                    if (api.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
+                                    }
+                                } else {
+                                    // MYSTERY: why should this work?
+                                    // console.log("0 BYTE FAIL - el0", el0, "!=", (val.substr(2).length) / 2);
+                                    if (api.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                    }
+                                }
+                                break;
+                            case 1: // two-byte mode: upper six bits and the following byte is the LE encoding of the value
+                                var b1 = parseInt(val.substr(2, 2), 16);
+                                var el1 = ((b0 >> 2) & 63) + (b1 << 6);
+                                if (el1 == (val.substr(2).length - 2) / 2) {
+                                    if (api.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
+                                    }
+                                } else {
+                                    // MYSTERY: why should this work?
+                                    // console.log("2 BYTE FAIL el1=", el1, "!=", (val.substr(2).length - 2) / 2, "b0", b0, "b1", b1, "len", (val.substr(2).length - 2) / 2, "val", val);
+                                    if (this.apiAt.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                    }
+                                }
+                                break;
+                            case 2: // four-byte mode: upper six bits and the following three bytes are the LE encoding of the value
+
+                                break;
+                            case 3: // Big-integer mode: The upper six bits are the number of bytes following, plus four.
+                                //let numBytes = ( b0 >> 2 ) & 63 + 4;
+                                //parsev = api.createType(valueTypeDef, "0x" + val.substr(2 + numBytes*2)).toString(); // check?
+                                break;
+                        }
+                }
+            }
+            */
+            vv = val;
+            parsev = e.pv
+
+            if (parsev) {
+                if (parsev.substr(0, 2) == "0x") {
+                    // can't do anything
+                    pv = parsev;
+                } else {
+                    let handParseVal = false;
+                    if (handParseVal = this.chainParser.parseStorageVal(this, p, s, val, parsev, o)) {
+                        if (handParseVal.extra != undefined) {
+                            //added any extra field here
+                            for (let f in handParseVal.extra) {
+                                o[f] = handParseVal.extra[f]
+                            }
+                        }
+                        //use the remaining as pv
+                        if (handParseVal.pv != "") pv = handParseVal.pv
+                        if (handParseVal.pv2 != "") pv2 = handParseVal.pv2 // load raw xcm here
+                    } else {
+                        try {
+                            //uncategorized type
+                            let parsedStruct = JSON.parse(parsev)
+                            pv = parsedStruct;
+                            debugCode = 2
+                        } catch {
+                            console.log(p, s, parsev);
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.log("SOURCE: pv", err);
+            this.numIndexingWarns++;
+        }
+        if (kk != '') o.k = kk
+        if (vv != '') o.v = vv
+        if (pk != '') o.pk = JSON.stringify(pk)
+        if (pv != '') o.pv = JSON.stringify(pv)
+        if (pv2 != '') o.pv2 = JSON.stringify(pv2)
+        if (debugCode > 0) o.debug = debugCode
+
+        return [o, parsev];
+    }
+
     parse_trace(e, traceType, bn, blockHash, api) {
         let o = {}
         o.bn = e.bn;
@@ -5416,6 +5841,104 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return (true);
     }
 
+    async processRawTrace(blockTS, blockNumber, blockHash, trace, traceType, api) {
+      // setParserContext
+      this.chainParser.setParserContext(blockTS, blockNumber, blockHash)
+      let rawTraces = [];
+      if (!trace) return;
+      if (!Array.isArray(trace)) {
+          //console.log("prcessTrace", trace);
+          return;
+      }
+      // (s) dedup the events
+      let traceIdx = 0;
+      for (const t of trace) {
+          let [tRaw, _] = this.parse_trace_auto(t, traceType, traceIdx, blockNumber, blockHash, api);
+          rawTraces.push(tRaw)
+          traceIdx++
+      }
+      return rawTraces
+    }
+
+    /*
+    {
+      traceID: '1259126-37',
+      p: 'CdpEngine',
+      s: 'DebitExchangeRate',
+      k: '0x5301bf5ff0298f5c7b93a446709f8e8812d36c1058eccc97dcabba867eab6dc7c483de2de1246ea70002',
+      v: '0x406716b2b8070367010000000000000000',
+      pkExtra: '[{"Token":"DOT"}]',
+      pv: '101052848337458791'
+    }
+    */
+    async processTraceUsingRawTrace(blockTS, blockNumber, blockHash, rawTraces, traceType, api) {
+
+        // setParserContext
+        this.chainParser.setParserContext(blockTS, blockNumber, blockHash)
+
+        let dedupEvents = {};
+        if (!rawTraces) return;
+        if (!Array.isArray(rawTraces)) {
+            //console.log("prcessTrace", trace);
+            return;
+        }
+        // (s) dedup the events
+        for (const e of rawTraces) {
+            let o = {}
+            o.bn = blockNumber;
+            o.blockHash = blockHash;
+            o.ts = blockTS;
+            o.s = e.s
+            o.p = e.p
+            o.k = e.k;
+            o.v = e.v;
+            o.pv = e.pv;
+            o.pkExtra = (e.pkExtra != undefined)? e.pkExtra: null;
+            o.traceID = e.traceID
+            dedupEvents[e.k] = o;
+        }
+
+        for (const dedupK of Object.keys(dedupEvents)) {
+            let e = dedupEvents[dedupK];
+            let [e2, _] = this.parse_rawTrace(e, traceType, blockNumber, blockHash, api);
+
+            if (!e2) continue;
+            let p = e2.p;
+            let s = e2.s;
+
+            let pallet_section = `${p}:${s}`
+
+            //temp local list blacklist for easier debugging
+            if (pallet_section == '...') {
+                continue
+            }
+            //console.log(`processTrace ${pallet_section}`, e2)
+            if (e2.mpType && e2.mpIsSet) {
+                await this.chainParser.processMP(this, p, s, e2)
+            } else if (e2.mpIsEmpty) {
+                // we can safely skip the empty mp here - so that it doens't count towards not handled
+            } else if (e2.accountID && e2.asset) {
+                let chainID = this.chainID
+                let rAssetkey = e2.asset
+                let fromAddress = paraTool.getPubKey(e2.accountID)
+                await this.chainParser.processAccountAsset(this, p, s, e2, rAssetkey, fromAddress)
+            } else if (e2.asset) {
+                await this.chainParser.processAsset(this, p, s, e2)
+            } else if (e2.lptokenID) {
+                // decorate here
+                e2.asset = e2.lptokenID
+                await this.chainParser.processAsset(this, p, s, e2)
+            } else {
+                if (this.unhandledTraceMap[pallet_section] == undefined) {
+                    console.log(`(not handled) ${pallet_section}`);
+                    //console.log(`(not handled) ${pallet_section}`, JSON.stringify(e2));
+                    this.unhandledTraceMap[pallet_section] = 0;
+                }
+                this.unhandledTraceMap[pallet_section]++
+            }
+        }
+    }
+
     async processTrace(blockTS, blockNumber, blockHash, trace, traceType, api) {
 
         // setParserContext
@@ -5437,6 +5960,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             o.v = e.v;
             dedupEvents[e.k] = o;
         }
+
         for (const dedupK of Object.keys(dedupEvents)) {
             let e = dedupEvents[dedupK];
             let [e2, _] = this.parse_trace(e, traceType, blockNumber, blockHash, api);
@@ -5580,7 +6104,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             } else {
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                await this.processTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api);
+                let rawTraces = await this.processRawTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api);
+                for (const t of rawTraces) {
+                    console.log(`[rawTraces ${t.traceID}]`, t)
+                }
+                await this.processTraceUsingRawTrace(blockTS, blockNumber, blockHash, rawTraces, traceType, api); // TODO: use result from rawtrace to decorate
+                //await this.processTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api); // TODO: use result from rawtrace to decorate
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
                 //console.log(`index_chain_block_row: processTrace`, processTraceTS);
                 this.timeStat.processTraceTS += processTraceTS
