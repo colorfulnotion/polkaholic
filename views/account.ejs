@@ -224,6 +224,9 @@ Rewards granted upon reasonable verification.  Important: PII info (Person) will
 
 
 <div id="container" class="chart"></div>
+
+<%- include('chainIDfilter', {accountchains: account.chains }); %>
+
 <!-- Nav tabs -->
 <ul class="nav nav-tabs" style="font-size:1rem" id="accountTab" role="tablist">
 <%
@@ -265,6 +268,7 @@ for (let i=0; i<tabs.length; i++) {
           <th>Params</th>
           <th>Result</th>
           <th>Date</th>
+          <th>Chain</th>
         </tr>
       </thead>
     </table>
@@ -280,6 +284,7 @@ for (let i=0; i<tabs.length; i++) {
           <th>Amount</th>
           <th>Amount (USD)</th>
           <th>Date</th>
+          <th>Chain</th>
         </tr>
       </thead>
     </table>
@@ -291,6 +296,7 @@ for (let i=0; i<tabs.length; i++) {
           <th>Chain</th>
           <th>Assets</th>
           <th>History</th>
+          <th>Chain</th>
         </tr>
       </thead>
     </table>
@@ -317,6 +323,7 @@ for (let i=0; i<tabs.length; i++) {
           <th>From Chain</th>
           <th>To Chain</th>
           <th>Date</th>
+          <th>Chain</th>
         </tr>
       </thead>
     </table>
@@ -332,6 +339,7 @@ for (let i=0; i<tabs.length; i++) {
           <th>Action</th>
           <th>Date</th>
           <th>Era</th>
+          <th>Chain</th>
         </tr>
       </thead>
     </table>
@@ -360,6 +368,7 @@ for (let i=0; i<tabs.length; i++) {
           <th>Result</th>
           <th>Module</th>
           <th>Tx/Params</th>
+          <th>Chain</th>
         </tr>
       </thead>
     </table>
