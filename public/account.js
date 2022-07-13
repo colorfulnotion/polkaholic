@@ -512,11 +512,17 @@ function showxcmtransfers(address) {
     tableXCMTransfers = $(tableName).DataTable({
         columnDefs: [{
                 "className": "dt-right",
-                "targets": [1, 2, 3]
+                "targets": [1, 2, 3],
+                "searchable": false,
             },
             {
-                "targets": [8],
-                "visible": false
+              "targets": [4, 5, 6, 7],
+              "searchable": false,
+            },
+            {
+                "targets": [8, 9],
+                "visible": false,
+                "searchable": true,
             }
         ],
         order: [
@@ -640,6 +646,12 @@ function showxcmtransfers(address) {
             },
             {
                 data: 'id',
+                render: function(data, type, row, meta) {
+                    return data;
+                }
+            },
+            {
+                data: 'idDest',
                 render: function(data, type, row, meta) {
                     return data;
                 }
@@ -1187,7 +1199,7 @@ $('#chainIDfilter').on('change', function() {
     if (tableTransfers) tableTransfers.columns(7).search(filter, true).draw();
     if (tableRewards) tableRewards.columns(7).search(filter, true).draw();
     if (tableFeed) tableFeed.columns(6).search(filter, true).draw();
-    if (tableXCMTransfers) tableXCMTransfers.columns(8).search(filter, true).draw();
+    if (tableXCMTransfers) tableXCMTransfers.search(filter, true).draw();
 });
 
 setuptabs(tabs, address, requestedChainAddress);
