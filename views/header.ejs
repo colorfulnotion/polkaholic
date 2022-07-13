@@ -21,6 +21,7 @@
     <script src="/uihelper.js"></script>
     <script src="/polkadot.min.js"></script>
     <script src="/extension.min.js"></script>
+    <% if ( process.env.NODE_ENV !== "development" ) { %>
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-4Z3SY9LJJS"></script>
     <script>
@@ -29,6 +30,7 @@
     gtag('js', new Date());
     gtag('config', 'G-4Z3SY9LJJS');
     </script>
+    <% } %>
 </head>
 <body>
 
@@ -99,15 +101,6 @@
             <a class="nav-link" href="/login">Login</a>
           </li>
         <% } %>
-
-  <%  if ( uiTool.validAdmin(req.session.email) ) { %>
-          <li class="nav-item">
-            <a class="nav-link" href="/admin/chains">Chains Admin</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="/admin/suggestadmin/">Verify Submissions</a>
-          </li>
-  <%  } %>
         </ul>
       </div>
 

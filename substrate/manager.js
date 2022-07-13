@@ -41,115 +41,58 @@ module.exports = class Manager extends AssetManager {
     parachainID = null;
     concept = null;
 
-    async auditBQLog(logDT) {
+    // fetch session.NewSession from bq events table and store in indexlog.blockNumberNewSession
+    async updateIndexlogBlocknumberNewSession(minLogDT = "2019-01-01", maxLogDT = "2022-07-22") {
+        let fullTable = this.getBQTable("events");
+        const bigqueryClient = new BigQuery();
+        let sqlQuery = `SELECT c, bn as blockNumber, UNIX_SECONDS(ts) as ts FROM ${fullTable} where date(ts) >= '${minLogDT}' and date(ts) <= '${maxLogDT}' and p = 'session' and m = 'NewSession' ORDER BY c, blockNumber`;
+        console.log(sqlQuery);
+        const options = {
+            query: sqlQuery,
+            // Location must match that of the dataset(s) referenced in the query.
+            location: 'US',
+        };
 
-        let sql = `select unix_timestamp('${logDT}') as minTS`;
-        let recs = await this.poolREADONLY.query(sql);
-        let minTS = recs[0].minTS;
-        let maxTS = minTS + 86400;
-        let tbls = ["extrinsics", "events"];
-        for (const tbl of tbls) {
-            let dir = path.join("/disk1", tbl, logDT)
-            let files = await fs.readdirSync(dir);
-            for (const f of files) {
-                let fn = path.join(dir, f);
-                let content = await fs.readFileSync(fn, {
-                    encoding: 'utf8',
-                    flag: 'r'
-                });
-                let lines = content.split("\n");
-                let flag = false;
-                for (const l of lines) {
-                    try {
-                        let j = JSON.parse(l);
-                        if (j.ts !== undefined) {
-                            if (j.ts < minTS || j.ts >= maxTS) {
-                                console.log(l);
-                                flag = true;
-                            }
-                        }
-                    } catch (e) {
+        // Run BigQuery on events 
+        const [rows] = await bigqueryClient.query(options);
+        var out = [];
+        let vals = ["blockNumberNewSession"];
+        for (let i = 0; i < rows.length; i++) {
+            let r = rows[i];
+            let ts = r.ts;
+            let indexTS = Math.floor(ts / 3600) * 3600;
+            let [logDT, hr] = paraTool.ts_to_logDT_hr(ts);
 
-                    }
-                }
-                if (flag) {
-                    console.log(fn);
-                }
-            }
-        }
-    }
-
-    async auditBQLogFull() {
-        let sql = `select chainID, indexTS from indexlog where indexed = 1 and ( bqlogExtrinsics = 0 or bqlogEvents = 0 ) order by chainID, indexTS`;
-        let recs = await this.poolREADONLY.query(sql);
-        console.log(sql, recs.length);
-        let out = [];
-        for (const r of recs) {
-            let indexTS = r.indexTS;
-            let chainID = r.chainID;
-            let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
-            let tbls = ["extrinsics", "events"];
-            let passExtrinsics = 0;
-            let passEvents = 0;
-            for (const tbl of tbls) {
-                let dir = path.join("/disk1", tbl, logDT)
-                let fn = path.join(dir, `${chainID}-${indexTS}.json`);
-                let exists = await fs.existsSync(fn)
-                let pass = 1;
-                if (exists) {
-                    let content = await fs.readFileSync(fn, {
-                        encoding: 'utf8',
-                        flag: 'r'
-                    });
-                    let lines = content.split("\n");
-                    for (const l of lines) {
-                        try {
-                            let j = JSON.parse(l);
-                            if (j.ts !== undefined) {
-                                if (j.ts < minTS || j.ts >= maxTS) {
-                                    console.log("TIME OUT", fn, j.ts);
-                                    pass = 0;
-                                }
-                            }
-                        } catch (e) {
-
-                        }
-                    }
-                } else {
-                    console.log("MISSED", fn, logDT, hr);
-                    pass = 0;
-                }
-                if (tbl == "extrinsics") {
-                    passExtrinsics = pass;
-                } else {
-                    passEvents = pass;
-                }
-            }
-            out.push(`('${chainID}', '${indexTS}', '${logDT}', '${hr}', '${passExtrinsics}', '${passEvents}')`);
+            // prep SQL piece for insertion into indexlog
+            let sqlpiece = `('${r.c}', '${indexTS}', '${logDT}', '${hr}', '${r.blockNumber}')`;
+            out.push(sqlpiece);
             if (out.length > 100) {
+                console.log(out.length, sqlpiece);
                 await this.upsertSQL({
                     "table": "indexlog",
                     "keys": ["chainID", "indexTS", "logDT", "hr"],
-                    "vals": ["bqlogExtrinsics", "bqlogEvents"],
+                    "vals": vals,
                     "data": out,
-                    "replace": ["bqlogExtrinsics", "bqlogEvents"]
+                    "replace": vals
                 });
                 out = [];
             }
         }
         if (out.length > 0) {
+            console.log(out.length);
             await this.upsertSQL({
                 "table": "indexlog",
                 "keys": ["chainID", "indexTS", "logDT", "hr"],
-                "vals": ["bqlogExtrinsics", "bqlogEvents"],
+                "vals": vals,
                 "data": out,
-                "replace": ["bqlogExtrinsics", "bqlogEvents"]
+                "replace": vals
             });
-            out = []
+            out = [];
         }
     }
 
-
+    // move table data (6) from local data into (a) GS buckets (gsBucketName) with gsutil and (b) BQ dataset with "bq load"  -- and record bqlog.loaded = 1
+    // This is done only if indexlog.indexed = 1
     async updateBQLog(minLogDT = '2022-05-01', maxLogDT = '2022-12-31') {
         let tbls = ["extrinsics", "events", "xcm", "evmtxs", "transfers", "rewards"]
         let gsBucketName = this.GC_STORAGE_BUCKET
@@ -583,81 +526,6 @@ module.exports = class Manager extends AssetManager {
         return (ndeletions);
     }
 
-    async generateCrawlerYAML(assign = false) {
-        let crawlerNodes = ["acala", "polkadot", "moonbeam", "astar", "parallel", "shiden", "kusama", "karura"];
-        let N = crawlerNodes.length;
-        let chains = await this.getChains();
-        let servicesstart = {};
-        let servicesstop = {};
-        if (assign) {
-            for (let c = 0; c < chains.length; c++) {
-                let chain = chains[c];
-                if (chain.active > 0) {
-                    let out = [crawlerNodes[(c + 0) % N], crawlerNodes[(c + 1) % N]]
-                    let nEndpoints = 1;
-                    if (chain.WSEndpoint2 != undefined && chain.WSEndpoint2.length > 0) {
-                        nEndpoints = 2;
-                    }
-                    let i = 0;
-                    for (const o of out) {
-                        let endpoint = i % nEndpoints;
-                        i++;
-                        let sql = `insert into chainhostnameendpoint (chainID, hostname, endpoint, createDT, updateDT) values ('${chain.chainID}', '${o}', '${endpoint}', Now(), Now()) on duplicate key update endpoint = values(endpoint), updateDT = values(updateDT)`
-                        this.batchedSQL.push(sql);
-                    }
-                }
-            }
-            await this.update_batchedSQL()
-        }
-        let sql = `select chainID, hostname, endpoint from chainhostnameendpoint where chainID in ( select chainID from chain where active = 1 )`
-        let endpointlist = await this.pool.query(sql)
-        for (let c = 0; c < endpointlist.length; c++) {
-            let r = endpointlist[c];
-            let o = r.hostname;
-            let chainID = r.chainID;
-            if (servicesstart[o] == undefined) {
-                servicesstart[o] = [];
-            }
-            if (servicesstop[o] == undefined) {
-                servicesstop[o] = [];
-            }
-            servicesstart[o].push(`      - systemctl start crawler${chainID}.service`);
-            servicesstop[o].push(`      - systemctl stop crawler${chainID}.service`);
-        }
-        // also add tracer services
-        for (let i = 0; i < chains.length; i++) {
-            let c = chains[i];
-            let chainID = c.chainID;
-            if (crawlerNodes.includes(c.id)) {
-                servicesstart[c.id].push(`      - systemctl start tracer${chainID}.service`);
-                servicesstop[c.id].push(`      - systemctl stop tracer${chainID}.service`);
-            }
-        }
-        servicesstart["moonbeam"].push(`      - systemctl start xcmmatch.service`);
-        servicesstop["moonbeam"].push(`      - systemctl stop xcmmatch.service`);
-
-        let dir = "/root/go/src/github.com/colorfulnotion/polkaholic/yaml";
-        // polkaholic_crawler_start.yaml has SERVICES macro that is replaced with a list of crawler services to be started/stopped
-        let macro = "${SERVICES}"
-        let starttemplate = await fs.readFileSync(path.join(dir, "polkaholic_crawler_start.yaml"), {
-            encoding: 'utf8',
-            flag: 'r'
-        })
-        let stoptemplate = await fs.readFileSync(path.join(dir, "polkaholic_crawler_stop.yaml"), {
-            encoding: 'utf8',
-            flag: 'r'
-        })
-        for (const o of crawlerNodes) {
-            let fn0 = path.join(dir, `${o}start.yaml`)
-            let fn1 = path.join(dir, `${o}stop.yaml`)
-            let startstr = servicesstart[o].join("\n");
-            let stopstr = servicesstop[o].join("\n");
-            console.log(fn0);
-            await fs.writeFileSync(fn0, starttemplate.replace(macro, startstr));
-            console.log(fn1);
-            await fs.writeFileSync(fn1, stoptemplate.replace(macro, stopstr));
-        }
-    }
 
     canonicalize_string(inp) {
         return inp.toLowerCase().replaceAll("_", "").trim()
@@ -966,342 +834,6 @@ module.exports = class Manager extends AssetManager {
             "replace": vals
         }, false, 5);
         return addressData.length;
-    }
-
-    // All instructions with "MultiAsset" type should be decorated with assetChain / symbols / decimals + USD value at the time of message
-    decorateXCM_MultiAsset(c, chainID, chainIDDest, ctx) {
-        if (c.id != undefined) {
-            if (c.id.concrete != undefined) {
-                this.concept[JSON.stringify(c.id.concrete)] = 1;
-                console.log("decorateXCM_MultiAsset", ctx, chainID, chainIDDest, this.concept);
-            } else {
-                // console.log("decorateXCM_MultiAsset NOT CONCRETE:", chainID, chainIDDest, JSON.stringify(c))
-            }
-        } else {
-            //console.log("decorateXCM_MultiAsset!", chainID, chainIDDest, JSON.stringify(c))
-        }
-    }
-
-    decorateXCM_MultiAssetFilter(c, fld, chainID, chainIDDest, ctx) {
-        if (c[fld] == undefined) return;
-        if (c[fld].wild) {} else if (c[fld].definite) {
-            console.log("decorateXCM_MultiAssetFilter", chainID, chainIDDest, JSON.stringify(c[fld]))
-        } else {
-            // decorateXCM_MultiAssetFilter 22085 2 {"definite":[{"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10000000000}}]}
-            console.log("decorateXCM_MultiAssetFilter", ctx, chainID, chainIDDest, JSON.stringify(c[fld]))
-        }
-    }
-
-    // All instructions with "MultiLocation" (parachain, accountID32/ accountID20, here) should be decorated with chain.id, chain.chainName or the "identity" using lookup_account
-    decorateXCM_MultiLocation(c, fld, chainID, chainIDDest, ctx) {
-        if (c[fld] == undefined) return;
-
-        let interior = c[fld].interior;
-        if (interior == undefined) return;
-        let x1 = interior.x1;
-        if (x1 == undefined) return;
-        if (x1.accountId32) {
-            this.xcmAddress = x1.accountId32.id;
-        } else if (x1.accountKey20) {
-            this.xcmAddress = x1.accountKey20.key;
-        } else {
-            console.log("decorateXCM_MultiLocation MISS ", ctx, chainID, chainIDDest, interior);
-            return;
-        }
-        console.log("decorateXCM_MultiLocation ", ctx, chainID, chainIDDest, this.xcmAddress);
-    }
-
-    decorateXCM_Call(c, fld, chainID, chainIDDest, ctx) {
-        if (c[fld] == undefined) return;
-        if (c[fld].encoded != undefined) {
-            // decorateXCM_Call 22000 2 0x1801010006010f23ada31bd3bb06
-            //console.log("decorateXCM_Call", ctx, chainID, chainIDDest, c[fld].encoded)
-            // extrinsicCall = apiAt.registry.createType('Call', opaqueCall);
-            // ISSUE: How do we get the right api since the indexer needs the "receiving chain" api? -- can we do a mini-API call for this?
-        }
-    }
-
-    decorateXCMInstruction(instruction, chainID, chainIDDest, ctx = "") {
-        let instructionSet = {
-            'withdrawAsset': { // Remove the on-chain asset(s) (assets) and accrue them into Holding
-                MultiAssets: ['assets']
-            },
-            'reserveAssetDeposited': { // Accrue into Holding derivative assets to represent the asset(s) (assets) on Origin.
-                MultiAssets: ['assets']
-            },
-            'receiveTeleportedAsset': {
-                MultiAssets: ['assets']
-            },
-            'queryResponse': {},
-            'transferAsset': {
-                MultiAssetFilter: ['assets'],
-                MultiLocation: ['beneficiary'],
-            },
-            'transferReserveAsset': {
-                MultiAsset: ['assets'],
-                MultiLocation: ['destination'],
-                XCM: ['xcm']
-            },
-            'transact': {
-                Call: ['call']
-            },
-            'hrmpNewChannelOpenRequest': {},
-            'hrmpChannelAccepted': {},
-            'hrmpChannelClosing': {},
-            'clearOrigin': {},
-            'descendOrigin': {},
-            'reportError': {},
-            'depositAsset': { // Subtract the asset(s) (assets) from Holding and deposit on-chain equivalent assets under the ownership of beneficiary.
-                MultiAssetFilter: ['assets'],
-                MultiLocation: ['beneficiary']
-            },
-            'depositReserveAsset': {
-                MultiAssetFilter: ['assets'],
-                MultiLocation: ['beneficiary'],
-                XCM: ['xcm']
-            },
-            'exchangeAsset': {
-                MultiAssetFilter: ['give'],
-                MultiAssets: ['receive']
-            },
-            'initiateReserveWithdraw': {
-                MultiAssetFilter: ['assets'],
-                XCM: ['xcm']
-            },
-            'initiateTeleport': {
-                MultiAssetFilter: ['assets'],
-                MultiLocation: ['destination'],
-                XCM: ['xcm']
-            },
-            'queryHolding': {
-                MultiLocation: ['destination'],
-                MultiAssetFilter: ['assets']
-            },
-            'buyExecution': { //Pay for the execution of the current message from Holding.
-                MultiAsset: ['fees']
-            },
-            'refundSurplus': {},
-            'setErrorHandler': {},
-            'setAppendix': {},
-            'clearError': {},
-            'claimAsset': {
-                MultiAsset: ['assets'],
-                MultiLocation: ['ticket']
-            },
-            'trap': {},
-            'subscribeVersion': {},
-            'unsubscribeVersion': {},
-            'burnAsset': {
-                MultiAsset: ['assets']
-            },
-            'expectAsset': {
-                MultiAsset: ['assets']
-            },
-            'expectOrigin': {
-                MultiLocation: ['origin']
-            },
-            'expectError': {},
-        }
-
-        for (const i of Object.keys(instructionSet)) {
-            if (instruction[i] != undefined) {
-                let features = instructionSet[i];
-                if (features.MultiAssets != undefined) {
-                    for (let j = 0; j < instruction[i].length; j++) {
-                        this.decorateXCM_MultiAsset(instruction[i][j], chainID, chainIDDest, i);
-                    }
-                }
-                if (features.MultiAsset != undefined) {
-                    for (const fld of features.MultiAsset) {
-                        if (instruction[i][fld] != undefined) {
-                            this.decorateXCM_MultiAsset(instruction[i][fld], chainID, chainIDDest, i);
-                        }
-                    }
-                }
-
-                if (features.MultiAssetFilter != undefined) {
-                    for (const fld of features.MultiAssetFilter) {
-                        this.decorateXCM_MultiAssetFilter(instruction[i], fld, chainID, chainIDDest, i);
-                    }
-                }
-                if (features.MultiLocation != undefined) {
-                    for (const fld of features.MultiLocation) {
-                        this.decorateXCM_MultiLocation(instruction[i], fld, chainID, chainIDDest, i);
-                    }
-                }
-                if (features.XCM != undefined) {
-                    for (const fld of features.XCM) {
-                        if (instruction[i][fld] != undefined) {
-                            // recursive call
-                            //console.log("RECURSION", instruction, fld, i, instruction[i][fld]);
-                            this.decorateXCMInstructions(instruction[i][fld], chainID, chainIDDest, i);
-                        }
-                    }
-                }
-                if (features.Call != undefined) {
-                    for (const fld of features.Call) {
-                        this.decorateXCM_Call(instruction[i], fld, chainID, chainIDDest, i);
-                    }
-                }
-            }
-        }
-
-    }
-
-    decorateXCMInstructions(instructions, chainID, chainIDDest, ctx) {
-        for (const instruction of instructions) {
-            this.decorateXCMInstruction(instruction, chainID, chainIDDest, ctx)
-        }
-    }
-
-    async getPotentialAssetChains(blockTS, rawAddress = "0xb84e5e92bb92eb4e4b7b2b6c489379e8e86eba082b3c11b48cf497bfe7eecc19", assetFilter = false, chainIDFilter = false) {
-        let maxRows = 1000;
-        let address = paraTool.getPubKey(rawAddress)
-        var hrstart = process.hrtime()
-        let startRow = paraTool.make_addressHistory_rowKey(address, blockTS + 120);
-        let endRow = paraTool.make_addressHistory_rowKey(address, blockTS - 120);
-        let families = ["history"];
-        let assetChainsMap = {};
-
-        try {
-            let [rows] = await this.btAccountHistory.getRows({
-                start: startRow,
-                end: endRow
-            });
-
-            if (rows && rows.length > 0) {
-                for (const row of rows) {
-                    let rowData = row.data
-                    if (rowData["history"]) {
-                        let historyData = rowData["history"];
-                        let [accKey, ts] = paraTool.parse_addressHistory_rowKey(row.id)
-                        for (const assetChainEncoded of Object.keys(historyData)) {
-                            let assetChain = paraTool.decodeAssetChain(assetChainEncoded)
-                            let [asset, chainID] = paraTool.parseAssetChain(assetChain);
-                            for (const cell of historyData[assetChainEncoded]) {
-                                var state = JSON.parse(cell.value);
-                                let indexTS = cell.timestamp / 1000000;
-                                let diff = indexTS - blockTS;
-                                if (diff > -120 && diff < 120) {
-                                    console.log("FOUND", assetChain, JSON.stringify(state));
-                                    assetChainsMap[assetChain] = 1;
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (err) {
-            console.log(`getPotentialAssetChains ERROR`, err)
-        }
-        return Object.keys(assetChainsMap);
-    }
-
-    async learnXCMConcept(chainID, chainIDDest, concepts) {
-        let sql = `select potentialAssetChains from xcmmessages where concept = ${mysql.escape(concepts)} and chainID = '${chainID}' and chainIDDest = '${chainIDDest}'`
-        let data = await this.pool.query(sql);
-        let assetChainsMap = {};
-        for (const d of data) {
-            let potentialAssetChains = JSON.parse(d.potentialAssetChains.toString('utf8'));
-            for (const ac of potentialAssetChains) {
-                if (assetChainsMap[ac] == undefined) {
-                    assetChainsMap[ac] = 1;
-                } else {
-                    assetChainsMap[ac]++;
-                }
-            }
-        }
-        let assetChains = [];
-        for (const assetChain of Object.keys(assetChainsMap)) {
-            let cnt = assetChainsMap[assetChain];
-            assetChains.push({
-                assetChain,
-                cnt
-            });
-        }
-        assetChains.sort(function(a, b) {
-            return (b.cnt - a.cnt);
-        });
-        if (assetChains.length > 3) {
-            assetChains = assetChains.slice(0, 3);
-        }
-        let parsedConcepts = JSON.parse(concepts);
-        let parsedConcept = parsedConcepts[0];
-        let out = [];
-        for (const assetChainCnt of assetChains) {
-            let assetChain = assetChainCnt.assetChain;
-            let cnt = assetChainCnt.cnt;
-            out.push(`('${chainID}', '${chainIDDest}', '${parsedConcept}', '${assetChain}', '${cnt}', Now())`);
-        }
-        let vals = ["cnt", "lastUpdateDT"];
-        await this.upsertSQL({
-            "table": "xcmmap",
-            "keys": ["chainID", "chainIDDest", "concept", "assetChain"],
-            "vals": vals,
-            "data": out,
-            "replace": vals
-        });
-        console.log("learnXCMCConcept", chainID, chainIDDest, parsedConcept, out);
-
-    }
-
-    async xcmMap() {
-        let chainconcepts = await this.pool.query(`select chainID, chainIDDest, concept, count(*) cnt from xcmmessages where concept is not null and concept like '%gen%' group by chainID, chainIDDest, concept having count(*) > 5 order by count(*) desc`);
-        for (const c of chainconcepts) {
-            let concepts = JSON.parse(c.concept);
-            if (concepts.length == 1) {
-                await this.learnXCMConcept(c.chainID, c.chainIDDest, c.concept);
-            }
-        }
-
-    }
-    async xcmAnalytics() {
-        await this.xcmMap();
-        return;
-
-        let ts = this.getCurrentTS() - 86400 * 180;
-        let msgs = await this.pool.query(`select msgHash, incoming, chainID, chainIDDest, msgStr, blockTS from xcmmessages where blockTS > ${ts} order by blockTS desc`);
-        let vals = ["potentialAssetChains", "concept"]
-        let out = [];
-        for (const msg of msgs) {
-            let m = JSON.parse(msg.msgStr);
-            if (m.v2) {
-                this.xcmAddress = null;
-                this.concept = {};
-                this.decorateXCMInstructions(m.v2, msg.chainID, msg.chainIDDest, "TOP")
-                if (this.xcmAddress) {
-                    let potentialAssetChains = await this.getPotentialAssetChains(msg.blockTS, this.xcmAddress);
-                    let p = JSON.stringify(potentialAssetChains);
-                    let concepts = JSON.stringify(Object.keys(this.concept));
-                    console.log("XCMINSTRUCTION", this.xcmAddress, concepts, p);
-                    out.push(`('${msg.msgHash}', '${msg.incoming}', ${mysql.escape(p)}, ${mysql.escape(concepts)})`)
-                    if (out.length > 0) {
-                        await this.upsertSQL({
-                            "table": "xcmmessages",
-                            "keys": ["msgHash", "incoming"],
-                            "vals": vals,
-                            "data": out,
-                            "replace": vals
-                        });
-                        out = [];
-                    }
-                } else {
-                    console.log("XCMINSTRUCTION ADDRESS MISSING", JSON.stringify(m.v2));
-                }
-                console.log("----");
-            }
-        }
-        if (out.length > 10) {
-            await this.upsertSQL({
-                "table": "xcmmessages",
-                "keys": ["xcmHash", "incoming"],
-                "vals": vals,
-                "data": out,
-                "replace": vals
-            });
-            out = [];
-        }
     }
 
 }
