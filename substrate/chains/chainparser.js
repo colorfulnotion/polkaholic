@@ -5,6 +5,7 @@ module.exports = class ChainParser {
     parserTS = false;
     parserBlockNumber = false;
     parserBlockHash = false;
+    parserWatermark = 0;
     numParserErrors = 0;
     umpReceivedFromParaID = {};
     umpReceived = false;
@@ -176,6 +177,16 @@ module.exports = class ChainParser {
         // this is important for new assets that show up
         if (indexer.reloadChainInfo) {
             await indexer.assetManagerInit();
+        }
+    }
+
+    getHrmpWatermarkVal(indexer, decoratedVal) {
+        try {
+          let hrmpWatermark = paraTool.dechexToInt(decoratedVal)
+          this.parserWatermark = hrmpWatermark
+          console.log(`[${this.parserBlockNumber}] Update hrmpWatermark: ${hrmpWatermark}`)
+        } catch (e){
+          console.log(`[${this.parserBlockNumber}] getHrmpWatermarkVal error`, e.toString())
         }
     }
 
@@ -392,6 +403,7 @@ module.exports = class ChainParser {
                         msgHash: msgHash,
                         msgHex: data,
                         msgStr: JSON.stringify(umpMsg),
+                        sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
                         chainID: indexer.chainID,
                         chainIDDest: (relayChain == 'polkadot') ? 0 : 2,
                         relayChain: relayChain,
@@ -450,6 +462,7 @@ module.exports = class ChainParser {
                         msgHash: msgHash,
                         msgHex: data,
                         msgStr: JSON.stringify(hrmpMsg),
+                        sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
                         chainID: indexer.chainID,
                         chainIDDest: hrmp.recipient + paraIDExtra,
                         relayChain: relayChain,
@@ -2224,6 +2237,8 @@ module.exports = class ChainParser {
         } else if (pallet_section == "parachainSystem:upwardMessages") {
             //TODO
             return this.getUpwardMessageseVal(indexer, decoratedVal, 'ump');
+        } else if (pallet_section == "parachainSystem:hrmpWatermark"){
+            return this.getHrmpWatermarkVal(indexer, decoratedVal);
         }
         return (false);
     }
