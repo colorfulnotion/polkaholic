@@ -12,7 +12,7 @@
      if ( traces[i].finalized != undefined ) finalized = traces[i].finalized;
      %>
 <table class="table table-hover table-bordered">
-<tr><td>Blockhash:</td><td> <%= traces[i].blockHash %></td></tr>
+<tr><td>Blockhash:</td><td> <a href='/blockhash/<%= traces[i].blockHash; %>'><code><%= traces[i].blockHash; %></code></a></td></tr>
 <tr><td>Finalized:</td><td> <%- include("finalized", {finalized: finalized}); %></td></tr>
 <tr><td>Source:</td><td><%= traceType; %></td></tr>
 </table>

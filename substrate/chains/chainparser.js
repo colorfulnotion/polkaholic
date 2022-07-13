@@ -184,7 +184,7 @@ module.exports = class ChainParser {
         try {
           let hrmpWatermark = paraTool.dechexToInt(decoratedVal)
           this.parserWatermark = hrmpWatermark
-          console.log(`[${this.parserBlockNumber}] Update hrmpWatermark: ${hrmpWatermark}`)
+          if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark: ${hrmpWatermark}`)
         } catch (e){
           console.log(`[${this.parserBlockNumber}] getHrmpWatermarkVal error`, e.toString())
         }

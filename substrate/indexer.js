@@ -4889,7 +4889,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, finalized = false, write_bqlog = false) {
+    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
         if (!block) return;
         if (!block.extrinsics) return;
@@ -5005,13 +5005,23 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             key: paraTool.blockNumberToHex(blockNumber),
             data: {
                 feed: {},
-                feedevm: {}
+                feedevm: {},
+                autotrace: {},
             }
         };
         cres['data']['feed'][blockHash] = {
             value: JSON.stringify(block),
             timestamp: blockTS * 1000000
         };
+
+        // (2a) record autoTrace in BT chain${chainID} feed, if available
+        if (autoTraces){
+          cres['data']['autotrace'][blockHash] = {
+              value: JSON.stringify(autoTraces),
+              timestamp: blockTS * 1000000
+          };
+        }
+
         // (3) fuse block+receipt for evmchain, if both evmBlock and evmReceipts are available
         let web3Api = this.web3Api
         let contractABIs = this.contractABIs
@@ -5716,6 +5726,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         */
         //console.log('index_chain_block_row', JSON.stringify(r))
 
+        let autoTraces = false
         if (r.block && r.trace) {
             // setup ParserContext here
             let blk = r.block
@@ -5732,9 +5743,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             } else {
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, r.trace, traceType, api);
+                autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, r.trace, traceType, api);
                 for (const t of autoTraces) {
                     if (this.debugLevel >= paraTool.debugTracing) console.log(`[autoTraces ${t.traceID}]`, t)
+                    //TODO: write this to chain table
                 }
                 await this.processTraceFromAuto(blockTS, blockNumber, blockHash, autoTraces, traceType, api); // TODO: use result from rawtrace to decorate
                 //await this.processTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api);
@@ -5761,7 +5773,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
             let processBlockEventsStartTS = new Date().getTime()
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
-            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, true, write_bq_log);
+            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
+            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, autoTraces, true, write_bq_log);
 
             let processBlockEventsTS = (new Date().getTime() - processBlockEventsStartTS) / 1000
             this.timeStat.processBlockEventsTS += processBlockEventsTS
