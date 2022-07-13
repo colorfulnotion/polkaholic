@@ -5692,7 +5692,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
     getRelayChainAsset() {
         let relayChain = this.relayChain
-        let relayChainID = (relayChain == 'polkadot')? 0: 2
+        let relayChainID = (relayChain == 'polkadot') ? 0 : 2
         let symbol = this.getChainSymbol(relayChainID);
         if (symbol) {
             return JSON.stringify({

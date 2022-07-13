@@ -1754,10 +1754,10 @@ module.exports = class Query extends AssetManager {
             if (decorate && block.author != undefined) {
                 block.authorAddress = paraTool.getPubKey(block.author)
                 this.decorateAddress(block, "authorAddress", decorateAddr, false)
-            }else if (evmBlock && evmBlock.author != undefined){
-              block.author = evmBlock.author
-              block.authorAddress = paraTool.getPubKey(evmBlock.author)
-              this.decorateAddress(block, "authorAddress", decorateAddr, false)
+            } else if (evmBlock && evmBlock.author != undefined) {
+                block.author = evmBlock.author
+                block.authorAddress = paraTool.getPubKey(evmBlock.author)
+                this.decorateAddress(block, "authorAddress", decorateAddr, false)
             }
 
             block.specVersion = this.getSpecVersionForBlockNumber(chainID, block.number);
@@ -2180,6 +2180,9 @@ module.exports = class Query extends AssetManager {
                                 t['blockNumber'] = parseInt(t.blockNumber, 10);
                                 t['chainID'] = parseInt(t.chainID, 10);
                                 t['chainName'] = this.getChainName(t["chainID"]);
+
+                                let [__, id] = this.convertChainID(t.chainID);
+                                t['id'] = id
                                 if (t.ts) t['ts'] = parseInt(t.ts, 10);
                                 if (feedTransferItems < maxRows) {
                                     let tt = await this.decorateQueryFeedTransfer(t, t.chainID, decorate, decorateExtra)
@@ -2357,12 +2360,14 @@ module.exports = class Query extends AssetManager {
             if (chainsMap[chainID] == undefined) {
                 let chainInfo = this.chainInfos[chainID];
                 let chainName = this.getChainName(chainID);
+                let id = chainInfo.id;
                 let ss58Format = this.chainInfos[chainID].ss58Format;
                 let ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
                 let iconUrl = this.chainInfos[chainID].iconUrl;
                 chainsMap[chainID] = {
                     chainID,
                     chainName,
+                    id,
                     ss58Format,
                     ss58Address,
                     iconUrl,
@@ -2607,9 +2612,7 @@ module.exports = class Query extends AssetManager {
                 let rowData = row.data
                 if (rowData["feedcrowdloan"]) {
                     let crowdloansData = rowData["feedcrowdloan"];
-                    //console.log(`row.id`, row.id)
                     let [accKey, ts, extrinsicHash] = paraTool.parse_addressExtrinsic_rowKey(row.id)
-                    //console.log(`accKey=${accKey}, ts=${ts}, extrinsicHash=${extrinsicHash}`)
                     for (const extrinsicHashEventID of Object.keys(crowdloansData)) {
                         //feedcrowdloan:extrinsicHash#eventID
                         //feedcrowdloan:0x4d709ef89a0d8b1f9c65b74ca87726cc236a4f1255738f3015944e5a20d712c8#0-7652261-7-47
@@ -2618,7 +2621,7 @@ module.exports = class Query extends AssetManager {
                                 var t = JSON.parse(cell.value);
 
                                 let extrinsicHash = extrinsicHashEventID.split('#')[0]
-                                console.log(`extrinsicHash=${extrinsicHash}`, t)
+
                                 t['blockNumber'] = parseInt(t.blockNumber, 10);
                                 t['chainID'] = parseInt(t.chainID, 10);
                                 t['chainName'] = this.getChainName(t["chainID"]);
@@ -2678,6 +2681,8 @@ module.exports = class Query extends AssetManager {
                                 t['blockNumber'] = parseInt(t.blockNumber, 10);
                                 t['chainID'] = parseInt(t.chainID, 10);
                                 t['chainName'] = this.getChainName(t["chainID"]);
+                                let [__, id] = this.convertChainID(t.chainID);
+                                t['id'] = id
                                 t['asset'] = this.getChainAsset(t["chainID"]);
                                 if (decorateUSD) {
                                     let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(t['amount'], t['asset'], t['chainID'], t['ts']);
@@ -3729,6 +3734,7 @@ module.exports = class Query extends AssetManager {
         let dFeedtransfer = {
             chainID: feedtransfer.chainID,
             chainName: feedtransfer.chainName,
+            id: feedtransfer.id,
             blockNumber: feedtransfer.blockNumber,
             blockHash: feedtransfer.blockHash,
             ts: feedtransfer.ts,

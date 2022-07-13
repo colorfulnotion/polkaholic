@@ -1514,12 +1514,12 @@ module.exports = class ChainParser {
                 let v1_id_concrete_interior = v1_id_concrete.interior
                 let v1_id_concrete_parents = v1_id_concrete.parents
                 if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.here !== undefined) {
-                    if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 0){
+                    if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 0) {
                         //normal case?
                         targetedAsset = indexer.getNativeAsset()
                         rawTargetedAsset = indexer.getNativeAsset()
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`processConcreteCurrency targetedAsset parents:0, here`, targetedAsset)
-                    }else if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 1){
+                    } else if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 1) {
                         //ump
                         targetedAsset = indexer.getRelayChainAsset()
                         rawTargetedAsset = indexer.getRelayChainAsset()

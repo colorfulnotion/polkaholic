@@ -1,3 +1,15 @@
+let tableExtrinsics = null;
+let tableTransfers = null;
+let tableXCMTransfers = null;
+let tableRewards = null;
+let tableFeed = null;
+let tableHistory = null;
+let tableNFTs = null;
+let tableCrowdloans = null;
+let tableSS58H160 = null;
+let tableOffers = null;
+let tableRelated = null;
+
 var initextrinsics = false;
 
 function showextrinsics(address) {
@@ -5,11 +17,16 @@ function showextrinsics(address) {
     else initextrinsics = true;
     let pathParams = `account/${address}?group=extrinsics`
     let tableName = '#tableextrinsics'
-    var table = $(tableName).DataTable({
+    tableExtrinsics = $(tableName).DataTable({
         columnDefs: [{
-            "className": "dt-right",
-            "targets": [3, 4]
-        }],
+                "className": "dt-right",
+                "targets": [3, 4]
+            },
+            {
+                "targets": [5],
+                "visible": false
+            }
+        ],
         order: [
             [4, "desc"]
         ],
@@ -114,6 +131,12 @@ function showextrinsics(address) {
 
                 }
             },
+            {
+                data: 'id',
+                render: function(data, type, row, meta) {
+                    return data;
+                }
+            },
         ]
     });
 
@@ -127,11 +150,16 @@ function showfeed(address) {
     else initfeed = true;
     let pathParams = `account/${address}?group=feed`
     let tableName = '#tablefeed'
-    var table = $(tableName).DataTable({
+    tableFeed = $(tableName).DataTable({
         columnDefs: [{
-            "className": "dt-right",
-            "targets": [3, 4, 5]
-        }],
+                "className": "dt-right",
+                "targets": [3, 4, 5]
+            },
+            {
+                "targets": [6],
+                "visible": false
+            }
+        ],
         order: [
             [2, "desc"]
         ],
@@ -208,6 +236,12 @@ function showfeed(address) {
                     }
                     return data;
                 }
+            },
+            {
+                data: 'id',
+                render: function(data, type, row, meta) {
+                    return data;
+                }
             }
         ]
     });
@@ -223,11 +257,16 @@ function showtransfers(address) {
     } else inittransfers = true;
     let pathParams = `account/${address}?group=transfers`
     let tableName = '#tabletransfers'
-    var table = $(tableName).DataTable({
+    tableTransfers = $(tableName).DataTable({
         columnDefs: [{
-            "className": "dt-right",
-            "targets": [5, 6]
-        }],
+                "className": "dt-right",
+                "targets": [5, 6]
+            },
+            {
+                "targets": [7],
+                "visible": false
+            }
+        ],
         order: [
             [6, "desc"]
         ],
@@ -344,6 +383,12 @@ function showtransfers(address) {
                     }
                     return (data + tinyms);
                 }
+            },
+            {
+                data: 'id',
+                render: function(data, type, row, meta) {
+                    return data;
+                }
             }
         ]
     });
@@ -361,11 +406,16 @@ function showhistory(address) {
     else inithistory = true;
     let pathParams = `account/${address}?group=history`
     let tableName = '#tablehistory'
-    var table = $(tableName).DataTable({
+    tableHistory = $(tableName).DataTable({
         columnDefs: [{
-            "className": "align-top",
-            "targets": [0, 1]
-        }],
+                "className": "align-top",
+                "targets": [0, 1]
+            },
+            {
+                "targets": [5],
+                "visible": false
+            }
+        ],
         columns: [{
                 data: 'chainID',
                 render: function(data, type, row, meta) {
@@ -459,11 +509,16 @@ function showxcmtransfers(address) {
     else initxcmtransfers = true;
     let pathParams = `account/${address}?group=xcmtransfers`
     let tableName = '#tablexcmtransfers'
-    var table = $(tableName).DataTable({
+    tableXCMTransfers = $(tableName).DataTable({
         columnDefs: [{
-            "className": "dt-right",
-            "targets": [1, 2, 3]
-        }],
+                "className": "dt-right",
+                "targets": [1, 2, 3]
+            },
+            {
+                "targets": [8],
+                "visible": false
+            }
+        ],
         order: [
             [4, "desc"]
         ],
@@ -582,6 +637,12 @@ function showxcmtransfers(address) {
                     }
                     return data;
                 }
+            },
+            {
+                data: 'id',
+                render: function(data, type, row, meta) {
+                    return data;
+                }
             }
         ]
     });
@@ -599,7 +660,19 @@ function showrewards(address) {
     else initrewards = true;
     let pathParams = `account/${address}?group=rewards`
     let tableName = '#tablerewards'
-    var table = $(tableName).DataTable({
+    tableRewards = $(tableName).DataTable({
+        columnDefs: [{
+                "className": "dt-right",
+                "targets": [2]
+            },
+            {
+                "targets": [7],
+                "visible": false
+            }
+        ],
+        order: [
+            [4, "desc"]
+        ],
         columns: [{
                 data: 'asset',
                 render: function(data, type, row, meta) {
@@ -701,6 +774,12 @@ function showrewards(address) {
                         }
                     }
                 }
+            },
+            {
+                data: 'id',
+                render: function(data, type, row, meta) {
+                    return data;
+                }
             }
         ]
     });
@@ -720,7 +799,7 @@ function showcrowdloans(address) {
     else initcrowdloans = true;
     let pathParams = `account/${address}?group=crowdloans`
     let tableName = '#tablecrowdloans'
-    var table = $(tableName).DataTable({
+    tableCrowdloans = $(tableName).DataTable({
         columnDefs: [{
             "className": "dt-right",
             "targets": [2, 3]
@@ -834,7 +913,7 @@ function shownfts(address) {
 
     let pathParams = `account/${address}?group=nfts`
     let tableName = '#tablenfts'
-    var table = $(tableName).DataTable({
+    tableNFTs = $(tableName).DataTable({
         columns: [{
             data: 'metadata',
             render: function(data, type, row, meta) {
@@ -855,7 +934,7 @@ function showss58h160(address) {
     else initss58h160 = true;
     let pathParams = `account/${address}?group=ss58h160`
     let tableName = '#tabless58h160'
-    var table = $(tableName).DataTable({
+    tableSS58H160 = $(tableName).DataTable({
         columns: [{
             data: 'title',
             render: function(data, type, row, meta) {
@@ -878,7 +957,7 @@ function showoffers(address) {
     let pathParams = `account/${address}?group=offers`
     let tableName = '#tableoffers'
 
-    var table = $(tableName).DataTable({
+    tableOffers = $(tableName).DataTable({
         columns: [{
             data: 'description',
             render: function(data, type, row, meta) {
@@ -900,7 +979,7 @@ function showrelated(address) {
     else initrelated = true;
     let pathParams = `account/${address}?group=related`
     let tableName = '#tablerelated'
-    var table = $(tableName).DataTable({
+    tableRelated = $(tableName).DataTable({
         columns: [{
             data: 'related',
             render: function(data, type, row, meta) {
@@ -1099,6 +1178,16 @@ $('#submitSuggestion').on('click', function(e) {
     let submitter = document.getElementById("submitter").value;
     let addressType = document.getElementById("addressType").value;
     submitSuggestion(address, nickname, submitter, addressType);
+});
+
+$('#chainIDfilter').on('change', function() {
+    var selectedValues = $('#chainIDfilter').val();
+    let filter = "(" + selectedValues.join("|") + ")";
+    if (tableExtrinsics) tableExtrinsics.columns(5).search(filter, true).draw();
+    if (tableTransfers) tableTransfers.columns(7).search(filter, true).draw();
+    if (tableRewards) tableRewards.columns(7).search(filter, true).draw();
+    if (tableFeed) tableFeed.columns(6).search(filter, true).draw();
+    if (tableXCMTransfers) tableXCMTransfers.columns(8).search(filter, true).draw();
 });
 
 setuptabs(tabs, address, requestedChainAddress);
