@@ -2379,6 +2379,26 @@ module.exports = class Query extends AssetManager {
             o.state = a.state;
             chainsMap[a.assetInfo.chainID].assets.push(o);
         }
+        // if we didn't get any assets at all for the requestedChainID, synthesize a 0 asset record so that the user can see it
+        if (chainsMap[requestedChainID] == undefined && this.chainInfos[requestedChainID] != undefined ) {
+            let chainInfo = this.chainInfos[requestedChainID];
+            let chainName = this.getChainName(requestedChainID);
+            let id = chainInfo.id;
+            let ss58Format = chainInfo.ss58Format;
+            let ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
+            let iconUrl = chainInfo.iconUrl;
+            let zeroAssets = [];
+            chainsMap[requestedChainID] = {
+                chainID: requestedChainID,
+                chainName,
+                id,
+                ss58Format,
+                ss58Address,
+                iconUrl,
+                assets: zeroAssets,
+                balanceUSD: 0
+            }
+        }
         // turn chainsMap into chains array, and compute balanceUSD
         let chains = [];
         let balanceUSD = 0;

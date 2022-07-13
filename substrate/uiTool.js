@@ -566,9 +566,6 @@ module.exports = {
         }
         return out;
     },
-    validAdmin: function(email) {
-        return (email == "sourabh@colorfulnotion.com" || email == "michael@colorfulnotion.com");
-    },
     getEVMMethod: function(sig) {
         let out = sig.split("(");
         return capitalizeFirstLetter(out[0]);

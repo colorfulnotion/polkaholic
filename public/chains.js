@@ -73,7 +73,8 @@ async function show_chains() {
                     data: 'id',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus);
+                            let subexplorerURL = `https://${row.id}.polkaholic.io`;
+                            return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus) + `<div class="explorer"><a href='${subexplorerURL}'>explorer</a></div>`
                         }
                         return row.chainName;
                     }
