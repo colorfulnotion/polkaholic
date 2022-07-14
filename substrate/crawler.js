@@ -2132,8 +2132,8 @@ create table talismanEndpoint (
                                 await this.save_evm_block(chainID, blockNumber, blockHash, evmBlock, evmReceipts, evmTrace)
                             }
                             */
-                            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, finalized = false, write_bqlog = false)
-                            let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts); // finalized, write_bq_log are both false
+                            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
+                            let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts); // autotrace, finalized, write_bq_log are all false
 
                             await this.immediateFlushBlockAndAddressExtrinsics()
 

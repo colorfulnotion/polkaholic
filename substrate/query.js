@@ -1777,11 +1777,35 @@ module.exports = class Query extends AssetManager {
 
     async decorateTrace(trace, chainID, blockNumber) {
         try {
+            let traceIdx = 0
             for (const kv of trace) {
+                kv.traceID = `${blockNumber}-${traceIdx}`
                 let [section, storage] = this.lookup_trace_sectionStorage(kv.k, kv.v);
                 if (section || storage) {
                     kv.section = section;
                     kv.storage = storage;
+                }
+                traceIdx++
+            }
+        } catch (err) {
+            this.logger.error({
+                "op": "decorateTrace",
+                chainID,
+                number: blockNumber,
+                err
+            });
+        }
+        return trace
+    }
+
+    async decorateAutoTrace(trace, chainID, blockNumber) {
+        try {
+            for (const kv of trace) {
+                if (kv.p != undefined || kv.s != undefined) {
+                    kv.section = kv.p;
+                    kv.storage = kv.s;
+                    delete kv.p;
+                    delete kv.s;
                 }
             }
         } catch (err) {
@@ -1854,7 +1878,7 @@ module.exports = class Query extends AssetManager {
         try {
             const filter = {
                 filter: [{
-                    family: ["finalized", "trace", "n"],
+                    family: ["finalized", "trace", "autotrace", "n"],
                     cellLimit: 100
                 }]
             };
@@ -1884,8 +1908,31 @@ module.exports = class Query extends AssetManager {
                         break;
                     }
                 }
+                let autoTraceData = rowData.autotrace;
                 let traceData = rowData.trace;
-                if (traceData) {
+                if (autoTraceData) {
+                    for (const k of Object.keys(autoTraceData)) {
+                        if (k == "raw" || (bh != null && (finalizedHashes[k] != undefined)) || bh == null) {
+                            let t = JSON.parse(autoTraceData[k][0].value);
+                            let out = {};
+                            if (k == "raw" && bh != null && finalized) {
+                                out.blockHash = bh
+                                out.finalized = true;
+                            } else if (k != "raw" && finalized && (k == bh)) {
+                                out.blockHash = k;
+                                out.finalized = true;
+                            } else if (!finalized && ((blockHash == false) || (blockHash == k))) {
+                                out.blockHash = k;
+                            }
+                            if (out.blockHash != undefined) {
+                                out.traceType = traceType;
+                                out.trace = await this.decorateAutoTrace(t, chainID, blockNumber);
+                                traces.push(out);
+                            }
+                            break;
+                        }
+                    }
+                } else if (traceData) {
                     for (const k of Object.keys(traceData)) {
                         if (k == "raw" || (bh != null && (finalizedHashes[k] != undefined)) || bh == null) {
                             let t = JSON.parse(traceData[k][0].value);

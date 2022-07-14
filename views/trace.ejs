@@ -1,50 +1,51 @@
 <%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Trace`}); %>
-<%
-  let prevBlockUrl = `/block/${id}/${blockNumber - 1}`;
-  let nextBlockUrl = `/block/${id}/${blockNumber + 1}`;
-%>
 <%- include('chainheader', { chain: chain, title: `Block ${blockNumber}` }); %>
 
-<% for ( let i = 0 ; i < traces.length; i++ ) {
-     let t = traces[i].trace;
-     let finalized = false;
-     let traceType = traces[i].traceType;
-     if ( traces[i].finalized != undefined ) finalized = traces[i].finalized;
-     %>
-<table class="table table-hover table-bordered">
-<tr><td>Blockhash:</td><td> <%= traces[i].blockHash %></td></tr>
-<tr><td>Finalized:</td><td> <%- include("finalized", {finalized: finalized}); %></td></tr>
-<tr><td>Source:</td><td><%= traceType; %></td></tr>
-</table>
+<ul class="nav nav-tabs" id="tracesTab" role="tablist">
+<%
+let tabs = [
+{ title: "Trace", target: "traces" }
+];
 
-<table class="table table-hover table-bordered">
- <tr><th>Section:Storage</th><th>Storage Key</th><th>Storage Value</th></tr>
-   <% for ( let j = 0; j < t.length; j++ ) {
-      let k = t[j].k;
-      let v = t[j].v;
-   %>
-     <tr><td>
-<% let sectionStorage = "";
-   if ( t[j].section != undefined && t[j].storage != undefined ) {
-      sectionStorage = `${t[j].section}:${t[j].storage}`;
-   }
-   if ( sectionStorage.length > 0 ) { %>
-      <button type="button" class="btn btn-outline-secondary text-capitalize"><%= sectionStorage; %></button>
-<% } %>
-</td>
-<td><code><%- uiTool.getShortHash(k,false) %></code></td>
-<td><code><%- uiTool.getShortHash(v,false) %></code></td>
-</tr>
-   <% } %>
-</table>
-<% } %>
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
 
+<div class="tab-content">
+<div class="tab-pane active" id="recentblocks" role="tabpanel" aria-labelledby="recentblocks-tab">
+<table id="tabletraces" class="display" style='width: 100%'>
+  <thead>
+    <tr>
+      <th>Trace ID</th>
+      <th>Section:Storage</th>
+      <th>Storage Key</th>
+      <th>Storage Value</th>
+    </tr>
+  </thead>
+</table>
+</div>
+</div>
+
+<script src="/trace.js"></script>
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script>
-  let chainID = <%= chainID %> ;
-  let id = '<%- id; %>';
-  let blockNumber = <%= blockNumber %> ;
-
+var chainID = '<%- chainID; %>';
+var id = '<%- id; %>';
+let blockNumber = <%= blockNumber %>;
+let blockHash = '';
+let tabs = <%- JSON.stringify(tabs); %>;
+setuptabs(tabs, id);
 $(document).ready(function() {
     setupapidocs("trace", "", `${chainID}/${blockNumber}`);
 });

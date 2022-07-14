@@ -2373,7 +2373,8 @@ order by chainID, extrinsicHash, diffTS`
             let e = traces[i];
             await this.initApiAtStorageKeys(chain, e.blockHash, e.bn);
             let traceType = await this.computeTraceType(chain, e.bn);
-            let [o, parsev] = this.parse_trace(e, traceType, e.bn, e.blockHash);
+            let [autotrace, _] = this.parse_trace_as_auto(e, traceType, traceIdx, e.bn, e.blockHash, chain.api);
+            let [o, parsev] = this.parse_trace_from_auto(autotrace, traceType, e.bn, e.blockHash, chain.api);
             let sql = false;
             if (o && parsev) {
                 sql = `update testParseTraces set pass = 1 where chainID = '${e.chainID}' and bn = '${e.bn}' and s = '${e.s}' and k = '${e.k}'`;
@@ -2386,11 +2387,15 @@ order by chainID, extrinsicHash, diffTS`
         await this.update_batchedSQL();
     }
 
-    parse_trace(e, traceType, bn, blockHash, api) {
+    // parse trace without any handparse
+    parse_trace_as_auto(e, traceType, traceIdx, bn, blockHash, api) {
         let o = {}
-        o.bn = e.bn;
-        o.blockHash = e.blockHash;
-        // o.ts = e.ts; //not sure if we are still using this?
+        //o.bn = bn;
+        //o.blockHash = blockHash;
+        //o.ts = e.ts; //not sure if we are still using this?
+        o.traceID = `${bn}-${traceIdx}`
+
+        let decodeFailed = false
 
         let key = e.k.slice()
         var query = api.query;
@@ -2405,16 +2410,28 @@ order by chainID, extrinsicHash, diffTS`
         if (k.length > 64) k = k.substr(0, 64);
         let sk = this.storageKeys[k];
 
-        if (!sk) return ([false, false]);
-        if (this.skipStorageKeys[k]) {
-            return ([false, false]);
+        //if (!sk) decodeFailed = true;
+        //if (!sk) return ([false, false]);
+        if (!sk) {
+            o.p = 'unknown'
+            o.s = 'unknown'
+            o.k = e.k
+            o.v = e.v
+            return [o, false]
         }
+
         // add the palletName + storageName to the object, if found
         o.p = sk.palletName;
         o.s = sk.storageName;
         if (!o.p || !o.s) {
             console.log(`k=${k} not found (${key},${val})`)
-            return ([false, false]);
+            decodeFailed = true
+            o.p = 'unknown'
+            o.s = 'unknown'
+            o.k = e.k
+            o.v = e.v
+            return [o, false]
+            //return ([false, false]);
         }
 
 
@@ -2425,13 +2442,26 @@ order by chainID, extrinsicHash, diffTS`
         let vv = ''
         let pk = ''
         let pv = ''
-        let pv2 = ''
         let debugCode = 0
         let palletSection = `${o.p}:${o.s}` //firstChar toUpperCase to match the testParseTraces tbl
 
-        if (!query[p]) return ([false, false]);
-        if (!query[p][s]) return ([false, false]);
-        if (!query[p][s].meta) return ([false, false]);
+
+        if (!query[p]) decodeFailed = true;
+        if (!query[p][s]) decodeFailed = true;
+        if (!query[p][s].meta) decodeFailed = true;
+
+        if (decodeFailed) {
+            o.p = p
+            o.s = s
+            o.k = e.k
+            o.v = e.v
+            return [o, false]
+        }
+
+
+        //if (!query[p]) return ([false, false]);
+        //if (!query[p][s]) return ([false, false]);
+        //if (!query[p][s].meta) return ([false, false]);
         let queryMeta = query[p][s].meta;
         let handParseKey = false;
         // parse key
@@ -2442,63 +2472,7 @@ order by chainID, extrinsicHash, diffTS`
             skey.setMeta(api.query[p][s].meta); // ????
             var parsek = skey.toHuman();
             var decoratedKey = JSON.stringify(parsek)
-            if (handParseKey = this.chainParser.parseStorageKey(this, p, s, key, decoratedKey)) {
-                if (handParseKey.mpType) {
-                    //this is the dmp case
-                    if (handParseKey.mpType == 'dmp' && handParseKey.paraIDDest != undefined && handParseKey.chainIDDest != undefined) {
-                        o.paraIDDest = handParseKey.paraIDDest
-                        o.chainIDDest = handParseKey.chainIDDest
-                        o.mpType = handParseKey.mpType
-                    }
-                    if (handParseKey.mpType == 'ump') {
-                        o.mpType = handParseKey.mpType
-                        o.chainID = handParseKey.chainID
-                        o.chainIDDest = handParseKey.chainIDDest
-                    }
-                    if (handParseKey.mpType == 'hrmp') {
-                        o.mpType = handParseKey.mpType
-                        o.chainID = handParseKey.chainID
-                    }
-                }
-
-                if (handParseKey.lp0 != undefined && handParseKey.lp1 != undefined) {
-                    o.lp0 = handParseKey.lp0
-                    o.lp1 = handParseKey.lp1
-                }
-                if (handParseKey.decoratedAsset) {
-                    o.decoratedAsset = handParseKey.decoratedAsset
-                }
-                if (handParseKey.decimals != undefined) {
-                    o.decimals = handParseKey.decimals
-                }
-                if (handParseKey.asset && handParseKey.asset.DexShare) {
-                    handParseKey.asset = handParseKey.asset.DexShare;
-                }
-                if (handParseKey.accountID != undefined && handParseKey.asset != undefined) {
-                    // this is usually a key by acct, assetType
-                    o.accountID = handParseKey.accountID
-                    o.asset = JSON.stringify(handParseKey.asset)
-                    //console.log("OK", o.accountID, o.asset);
-                    //kk = ''
-                } else if (handParseKey.accountID == undefined && handParseKey.asset != undefined) {
-                    // this is usally a key by assetType
-                    o.asset = JSON.stringify(handParseKey.asset)
-                } else if (handParseKey.isEVM != undefined) {
-                    if (handParseKey.blockNumber != undefined) {
-                        o.blockNumber = handParseKey.blockNumber
-                    }
-                    o.isEVM = handParseKey.isEVM
-                    // pk = handParseKey;
-                } else {
-                    // unknowny for now
-                    pk = handParseKey;
-                }
-            } else {
-                if (parsek) {
-                    //kk = ''
-                    pk = JSON.stringify(parsek);
-                }
-            }
+            pk = decoratedKey
         } catch (err) {
             o.pk = "err";
             pk = "err"
@@ -2583,6 +2557,148 @@ order by chainID, extrinsicHash, diffTS`
                 }
             }
             vv = val;
+            if (parsev) {
+                pv = parsev;
+            }
+        } catch (err) {
+            console.log("SOURCE: pv", err);
+            this.numIndexingWarns++;
+        }
+        let paddedK = (kk.substr(0, 2) == '0x') ? kk : '0x' + kk
+        let paddedV = (vv.substr(0, 2) == '0x') ? vv : '0x' + vv
+        if (JSON.stringify(paddedK) == pk) pk = ''
+        if (kk != '') o.k = paddedK
+        if (vv != '') o.v = paddedV
+        if (pk != '') o.pkExtra = pk
+        if (pv != '') o.pv = pv
+        //o.pv = (pv == undefined)? pv: null
+        return [o, parsev];
+    }
+
+    parse_trace_from_auto(e, traceType, bn, blockHash, api) {
+        //console.log(`e`, e)
+        let o = {}
+        o.bn = e.bn;
+        o.blockHash = e.blockHash;
+        // o.ts = e.ts; //not sure if we are still using this?
+
+        let key = e.k.slice()
+        var query = api.query;
+
+        if (key.substr(0, 2) == "0x") key = key.substr(2)
+        let val = "0x"; // this is essential to cover "0" balance situations where e.v is null ... we cannot return otherwise we never zero out balances
+        if (e.v) {
+            val = e.v.slice()
+            if (val.substr(0, 2) == "0x") val = val.substr(2)
+        }
+        let k = key.slice();
+        if (k.length > 64) k = k.substr(0, 64);
+        let sk = this.storageKeys[k];
+
+        if (!sk) return ([false, false]);
+        if (this.skipStorageKeys[k]) {
+            return ([false, false]);
+        }
+        // add the palletName + storageName to the object, if found
+        o.p = sk.palletName;
+        o.s = sk.storageName;
+        if (!o.p || !o.s) {
+            console.log(`k=${k} not found (${key},${val})`)
+            return ([false, false]);
+        }
+
+
+        let parsev = false;
+        let p = paraTool.firstCharLowerCase(o.p);
+        let s = paraTool.firstCharLowerCase(o.s);
+        let kk = ''
+        let vv = ''
+        let pk = ''
+        let pv = ''
+        let pv2 = ''
+        let debugCode = 0
+        let palletSection = `${o.p}:${o.s}` //firstChar toUpperCase to match the testParseTraces tbl
+
+        if (!query[p]) return ([false, false]);
+        if (!query[p][s]) return ([false, false]);
+        if (!query[p][s].meta) return ([false, false]);
+        let queryMeta = query[p][s].meta;
+        let handParseKey = false;
+        // parse key
+        try {
+            kk = key;
+
+            let parsek = (e.pkExtra != undefined) ? e.pkExtra : JSON.stringify(e.k)
+            var decoratedKey = parsek
+            //console.log(`parseStorageKey  key=${key}, decoratedKey=${decoratedKey}`)
+            if (handParseKey = this.chainParser.parseStorageKey(this, p, s, key, decoratedKey)) {
+                if (handParseKey.mpType) {
+                    //this is the dmp case
+                    if (handParseKey.mpType == 'dmp' && handParseKey.paraIDDest != undefined && handParseKey.chainIDDest != undefined) {
+                        o.paraIDDest = handParseKey.paraIDDest
+                        o.chainIDDest = handParseKey.chainIDDest
+                        o.mpType = handParseKey.mpType
+                    }
+                    if (handParseKey.mpType == 'ump') {
+                        o.mpType = handParseKey.mpType
+                        o.chainID = handParseKey.chainID
+                        o.chainIDDest = handParseKey.chainIDDest
+                    }
+                    if (handParseKey.mpType == 'hrmp') {
+                        o.mpType = handParseKey.mpType
+                        o.chainID = handParseKey.chainID
+                    }
+                }
+
+                if (handParseKey.lp0 != undefined && handParseKey.lp1 != undefined) {
+                    o.lp0 = handParseKey.lp0
+                    o.lp1 = handParseKey.lp1
+                }
+                if (handParseKey.decoratedAsset) {
+                    o.decoratedAsset = handParseKey.decoratedAsset
+                }
+                if (handParseKey.decimals != undefined) {
+                    o.decimals = handParseKey.decimals
+                }
+                if (handParseKey.asset && handParseKey.asset.DexShare) {
+                    handParseKey.asset = handParseKey.asset.DexShare;
+                }
+                if (handParseKey.accountID != undefined && handParseKey.asset != undefined) {
+                    // this is usually a key by acct, assetType
+                    o.accountID = handParseKey.accountID
+                    o.asset = JSON.stringify(handParseKey.asset)
+                    //console.log("OK", o.accountID, o.asset);
+                    //kk = ''
+                } else if (handParseKey.accountID == undefined && handParseKey.asset != undefined) {
+                    // this is usally a key by assetType
+                    o.asset = JSON.stringify(handParseKey.asset)
+                } else if (handParseKey.isEVM != undefined) {
+                    if (handParseKey.blockNumber != undefined) {
+                        o.blockNumber = handParseKey.blockNumber
+                    }
+                    o.isEVM = handParseKey.isEVM
+                    // pk = handParseKey;
+                } else {
+                    // unknowny for now
+                    pk = handParseKey;
+                }
+            } else {
+                if (parsek) {
+                    //kk = ''
+                    pk = JSON.stringify(parsek);
+                }
+            }
+        } catch (err) {
+            console.log(`parse_trace_from_auto error [${decoratedKey}]`, err.toString())
+            o.pk = "err";
+            pk = "err"
+            this.numIndexingErrors++;
+        }
+
+        // parse value
+        try {
+            vv = val;
+            parsev = e.pv
 
             if (parsev) {
                 if (parsev.substr(0, 2) == "0x") {
@@ -4773,7 +4889,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, finalized = false, write_bqlog = false) {
+    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
         if (!block) return;
         if (!block.extrinsics) return;
@@ -4889,13 +5005,23 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             key: paraTool.blockNumberToHex(blockNumber),
             data: {
                 feed: {},
-                feedevm: {}
+                feedevm: {},
+                autotrace: {},
             }
         };
         cres['data']['feed'][blockHash] = {
             value: JSON.stringify(block),
             timestamp: blockTS * 1000000
         };
+
+        // (2a) record autoTrace in BT chain${chainID} feed, if available
+        if (autoTraces) {
+            cres['data']['autotrace'][blockHash] = {
+                value: JSON.stringify(autoTraces),
+                timestamp: blockTS * 1000000
+            };
+        }
+
         // (3) fuse block+receipt for evmchain, if both evmBlock and evmReceipts are available
         let web3Api = this.web3Api
         let contractABIs = this.contractABIs
@@ -5416,34 +5542,70 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return (true);
     }
 
-    async processTrace(blockTS, blockNumber, blockHash, trace, traceType, api) {
-
+    async processTraceAsAuto(blockTS, blockNumber, blockHash, trace, traceType, api) {
         // setParserContext
         this.chainParser.setParserContext(blockTS, blockNumber, blockHash)
-
-        let dedupEvents = {};
+        let rawTraces = [];
         if (!trace) return;
         if (!Array.isArray(trace)) {
             //console.log("prcessTrace", trace);
             return;
         }
         // (s) dedup the events
-        for (const e of trace) {
+        let traceIdx = 0;
+        for (const t of trace) {
+            let [tRaw, _] = this.parse_trace_as_auto(t, traceType, traceIdx, blockNumber, blockHash, api);
+            rawTraces.push(tRaw)
+            traceIdx++
+        }
+        return rawTraces
+    }
+
+    /*
+    {
+      traceID: '1259126-37',
+      p: 'CdpEngine',
+      s: 'DebitExchangeRate',
+      k: '0x5301bf5ff0298f5c7b93a446709f8e8812d36c1058eccc97dcabba867eab6dc7c483de2de1246ea70002',
+      v: '0x406716b2b8070367010000000000000000',
+      pkExtra: '[{"Token":"DOT"}]',
+      pv: '101052848337458791'
+    }
+    */
+    async processTraceFromAuto(blockTS, blockNumber, blockHash, autoTraces, traceType, api) {
+
+        // setParserContext
+        this.chainParser.setParserContext(blockTS, blockNumber, blockHash)
+
+        let dedupEvents = {};
+        if (!autoTraces) return;
+        if (!Array.isArray(autoTraces)) {
+            //console.log("prcessTrace", autoTraces);
+            return;
+        }
+        // (s) dedup the events
+        for (const a of autoTraces) {
             let o = {}
             o.bn = blockNumber;
             o.blockHash = blockHash;
             o.ts = blockTS;
-            o.k = e.k;
-            o.v = e.v;
-            dedupEvents[e.k] = o;
+            o.s = a.s
+            o.p = a.p
+            o.k = a.k;
+            o.v = a.v;
+            o.pv = a.pv;
+            o.pkExtra = (a.pkExtra != undefined) ? a.pkExtra : null;
+            o.traceID = a.traceID
+            dedupEvents[a.k] = o;
         }
-        for (const dedupK of Object.keys(dedupEvents)) {
-            let e = dedupEvents[dedupK];
-            let [e2, _] = this.parse_trace(e, traceType, blockNumber, blockHash, api);
 
-            if (!e2) continue;
-            let p = e2.p;
-            let s = e2.s;
+        for (const dedupK of Object.keys(dedupEvents)) {
+            let a = dedupEvents[dedupK];
+            let [a2, _] = this.parse_trace_from_auto(a, traceType, blockNumber, blockHash, api);
+
+            if (!a2) continue;
+            let p = a2.p;
+            let s = a2.s;
 
             let pallet_section = `${p}:${s}`
 
@@ -5452,21 +5614,21 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 continue
             }
             //console.log(`processTrace ${pallet_section}`, e2)
-            if (e2.mpType && e2.mpIsSet) {
-                await this.chainParser.processMP(this, p, s, e2)
-            } else if (e2.mpIsEmpty) {
+            if (a2.mpType && a2.mpIsSet) {
+                await this.chainParser.processMP(this, p, s, a2)
+            } else if (a2.mpIsEmpty) {
                 // we can safely skip the empty mp here - so that it doens't count towards not handled
-            } else if (e2.accountID && e2.asset) {
+            } else if (a2.accountID && a2.asset) {
                 let chainID = this.chainID
-                let rAssetkey = e2.asset
-                let fromAddress = paraTool.getPubKey(e2.accountID)
-                await this.chainParser.processAccountAsset(this, p, s, e2, rAssetkey, fromAddress)
-            } else if (e2.asset) {
-                await this.chainParser.processAsset(this, p, s, e2)
-            } else if (e2.lptokenID) {
+                let rAssetkey = a2.asset
+                let fromAddress = paraTool.getPubKey(a2.accountID)
+                await this.chainParser.processAccountAsset(this, p, s, a2, rAssetkey, fromAddress)
+            } else if (a2.asset) {
+                await this.chainParser.processAsset(this, p, s, a2)
+            } else if (a2.lptokenID) {
                 // decorate here
-                e2.asset = e2.lptokenID
-                await this.chainParser.processAsset(this, p, s, e2)
+                a2.asset = a2.lptokenID
+                await this.chainParser.processAsset(this, p, s, a2)
             } else {
                 if (this.unhandledTraceMap[pallet_section] == undefined) {
                     console.log(`(not handled) ${pallet_section}`);
@@ -5564,6 +5726,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         */
         //console.log('index_chain_block_row', JSON.stringify(r))
 
+        let autoTraces = false
         if (r.block && r.trace) {
             // setup ParserContext here
             let blk = r.block
@@ -5580,7 +5743,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             } else {
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                await this.processTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api);
+                autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, r.trace, traceType, api);
+                for (const t of autoTraces) {
+                    if (this.debugLevel >= paraTool.debugTracing) console.log(`[autoTraces ${t.traceID}]`, t)
+                    //TODO: write this to chain table
+                }
+                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, autoTraces, traceType, api); // TODO: use result from rawtrace to decorate
+                //await this.processTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api);
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
                 //console.log(`index_chain_block_row: processTrace`, processTraceTS);
                 this.timeStat.processTraceTS += processTraceTS
@@ -5604,7 +5773,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
             let processBlockEventsStartTS = new Date().getTime()
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
-            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, true, write_bq_log);
+            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
+            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, autoTraces, true, write_bq_log);
 
             let processBlockEventsTS = (new Date().getTime() - processBlockEventsStartTS) / 1000
             this.timeStat.processBlockEventsTS += processBlockEventsTS
