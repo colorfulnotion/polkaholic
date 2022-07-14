@@ -182,11 +182,11 @@ module.exports = class ChainParser {
 
     getHrmpWatermarkVal(indexer, decoratedVal) {
         try {
-          let hrmpWatermark = paraTool.dechexToInt(decoratedVal)
-          this.parserWatermark = hrmpWatermark
-          if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark: ${hrmpWatermark}`)
-        } catch (e){
-          console.log(`[${this.parserBlockNumber}] getHrmpWatermarkVal error`, e.toString())
+            let hrmpWatermark = paraTool.dechexToInt(decoratedVal)
+            this.parserWatermark = hrmpWatermark
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark: ${hrmpWatermark}`)
+        } catch (e) {
+            console.log(`[${this.parserBlockNumber}] getHrmpWatermarkVal error`, e.toString())
         }
     }
 
@@ -2237,7 +2237,7 @@ module.exports = class ChainParser {
         } else if (pallet_section == "parachainSystem:upwardMessages") {
             //TODO
             return this.getUpwardMessageseVal(indexer, decoratedVal, 'ump');
-        } else if (pallet_section == "parachainSystem:hrmpWatermark"){
+        } else if (pallet_section == "parachainSystem:hrmpWatermark") {
             return this.getHrmpWatermarkVal(indexer, decoratedVal);
         }
         return (false);
