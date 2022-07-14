@@ -11,7 +11,7 @@ var xcmtransferUpdateIntervalId = false;
 
 
 function filterchains(relaychain = "all") {
-    console.log(`filterchains called=${relaychain}`)
+
     if (relaychain == "kusama" || relaychain == "polkadot") {
         if (chainsTable) chainsTable.column(7).search(relaychain).draw();
         if (xcmTable) xcmTable.column(8).search(relaychain).draw();
@@ -73,7 +73,8 @@ async function show_chains() {
                     data: 'id',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus);
+                            let subexplorerURL = `https://${row.id}.polkaholic.io`;
+                            return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus) + `<div class="explorer"><a href='${subexplorerURL}'>explorer</a></div>`
                         }
                         return row.chainName;
                     }
@@ -504,7 +505,7 @@ function showchainstab(hash) {
 }
 
 function setuptabs(tabs) {
-    console.log("setuptabs", tabs);
+
     for (let i = 0; i < tabs.length; i++) {
         let t = tabs[i];
         let id = "#" + t.target + "-tab";

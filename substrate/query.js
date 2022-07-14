@@ -886,7 +886,7 @@ module.exports = class Query extends AssetManager {
     async getChain(chainID_or_chainName) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         if (chainID === false) {
-            throw new paraTool.InvalidError(`Chain not found: ${chainID_or_chainName}`)
+            throw new paraTool.NotFoundError(`Chain not found: ${chainID_or_chainName}`)
             return (false);
         }
         try {
@@ -1591,7 +1591,7 @@ module.exports = class Query extends AssetManager {
 
     async getChainAssets(chainID_or_chainName, address = false) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
-        if (chainID === false) throw new InvalidError(`Invalid chain: ${chainID_or_chainName}`)
+        if (chainID === false) throw new NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
         let chain = await this.getChain(chainID)
         let assets = [];
         let holdings = null
@@ -1838,7 +1838,7 @@ module.exports = class Query extends AssetManager {
 
     async getBlock(chainID_or_chainName, blockNumber, blockHash = false, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
-        if (chainID === false) throw new paraTool.InvalidError(`Invalid chain: ${chainID_or_chainName}`)
+        if (chainID === false) throw new paraTool.NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
         let chain = await this.getChain(chainID);
         if (blockNumber > chain.blocksCovered) {
             throw new paraTool.InvalidError(`Invalid blockNumber: ${blockNumber} (tip: ${chain.blocksCovered})`)
@@ -1868,7 +1868,7 @@ module.exports = class Query extends AssetManager {
     async getTrace(chainID_or_chainName, blockNumber, blockHash = false) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         if (chainID === false) {
-            throw new paraTool.InvalidError(`Invalid chain: ${chainID_or_chainName}`)
+            throw new paraTool.NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
         }
         let chain = await this.getChain(chainID);
         if (blockNumber > chain.blocksCovered) {
@@ -2425,6 +2425,26 @@ module.exports = class Query extends AssetManager {
             let o = a.assetInfo;
             o.state = a.state;
             chainsMap[a.assetInfo.chainID].assets.push(o);
+        }
+        // if we didn't get any assets at all for the requestedChainID, synthesize a 0 asset record so that the user can see it
+        if (chainsMap[requestedChainID] == undefined && this.chainInfos[requestedChainID] != undefined) {
+            let chainInfo = this.chainInfos[requestedChainID];
+            let chainName = this.getChainName(requestedChainID);
+            let id = chainInfo.id;
+            let ss58Format = chainInfo.ss58Format;
+            let ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
+            let iconUrl = chainInfo.iconUrl;
+            let zeroAssets = [];
+            chainsMap[requestedChainID] = {
+                chainID: requestedChainID,
+                chainName,
+                id,
+                ss58Format,
+                ss58Address,
+                iconUrl,
+                assets: zeroAssets,
+                balanceUSD: 0
+            }
         }
         // turn chainsMap into chains array, and compute balanceUSD
         let chains = [];

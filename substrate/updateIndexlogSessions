@@ -1,10 +1,9 @@
 #!/usr/bin/env node
- // Usage: ./generateCrawlerYAML
+ // Usage:  updateIndexlogBlocknumberNewSession
 var Manager = require("./manager");
-
 async function main() {
-      let manager = new Manager();
-      await manager.generateCrawlerYAML(false);
+    var manager = new Manager();
+    await manager.updateIndexlogBlocknumberNewSession();
 }
 
 main()

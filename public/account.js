@@ -516,8 +516,8 @@ function showxcmtransfers(address) {
                 "searchable": false,
             },
             {
-              "targets": [4, 5, 6, 7],
-              "searchable": false,
+                "targets": [4, 5, 6, 7],
+                "searchable": false,
             },
             {
                 "targets": [8, 9],
