@@ -1,12 +1,20 @@
 <% let id = "collapseExample" + chainassets.chainID;
-let cls = ( expanded ) ? "btn-secondary show" : "btn-outline-secondary";
+let cls = ( expanded ) ? "btn-secondary" : "btn-outline-secondary";
+let cls2 = ( expanded ) ? "show" : "";
 %>
 <div>
-<a class="btn <%= cls; %> btn-block" data-mdb-toggle="collapse" href="#<%= id; %>" role="button" aria-control="<%= id; %>" aria-expanded="<%= expanded; %>">
+<a class="btn <%= cls; %> btn-block" data-mdb-toggle="collapse" href="#<%= id; %>" role="button" aria-control="<%= id; %>" aria-expanded="<%= expanded; %>" style="text-align:left">
  <img width="24" src="<%= chainassets.iconUrl; %>"> <%= chainassets.chainName; %> <%= uiTool.currencyFormat(chainassets.balanceUSD); %>
+  <% 
+  for ( let i = 0; i<chainassets.assets.length; i++) { %> 
+  <%  let a = chainassets.assets[i]; %>
+  <% if ( a.state.transferable ) { %>
+  [<%= uiTool.presentFloat(a.state.transferable) %> <%= a.assetName; %>]
+  <% } %>
+ <% } %>
 </a>
 
-<div class="collapse mt-3" id="<%= id; %>">
+<div class="collapse mt-3 <%= cls2; %>" id="<%= id; %>">
 
 <table width="100%">
 <% if ( chainassets.ss58Address && chainassets.ss58Address.length > 0 ) { %>
