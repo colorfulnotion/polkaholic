@@ -7,12 +7,33 @@ async function main() {
     var query = new Query(debugLevel);
     await query.init();
 
-    let fromAddress = "0xb84e5e92bb92eb4e4b7b2b6c489379e8e86eba082b3c11b48cf497bfe7eecc19";
-    let sourceTS = 1651931994;
-    let assetFilter = '{"Token":"KSM"}'
-    let chainIDFilter = 22000;
-    let timeline = await query.getTimeline(sourceTS, fromAddress, assetFilter, chainIDFilter);
-    console.log(timeline);
+
+
+    let ts = 1657800851; // timepoint
+    let chainIDs = [0, 2000, 2004]; // CSV list of chainIDs to look around timepoint
+    // list of section:method / section:storage for events/traces
+    let filter = [
+        // test cases to check filtering correct, not actually relevant for XCM
+        ["events", "paraInclusion", 'CandidateIncluded'],
+        ["extrinsics", "authorinherent", 'kickoffauthorshipvalidation'],
+
+        //
+        ["trace", 'ParachainSystem', 'LastHrmpMqcHeads'],
+        // UMP
+        ["events", "ump", "UpwardMessagesReceived"],
+        ["extrinsics", "ParachainSystem", "UpwardMessages"],
+        // HRMP
+        ["events", "xcmpQueue", "Success"],
+        ["events", "xcmpQueue", "Fail"],
+        ["extrinsics", "ParachainSystem", "HrmpOutboundMessages"],
+        // DMP
+        ["events", "dmpQueue", "ExecutedDownward"],
+        ["extrinsics", "dmp", "DownwardMessageQueues"],
+    ];
+    let timeline = await query.getTimeline(ts, chainIDs, filter)
+    for (const t of timeline) {
+        console.log(JSON.stringify(t, null, 4));
+    }
 }
 
 main()

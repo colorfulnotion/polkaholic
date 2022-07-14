@@ -936,6 +936,7 @@ from chain where chainID = '${chainID}' limit 1`);
             blockNumber: false,
             events: false,
             trace: false,
+            autotrace: false,
             evmBlock: false,
             finalized: false,
             traceType: false,
@@ -957,10 +958,10 @@ from chain where chainID = '${chainID}' limit 1`);
         // 1. store extrinsics of the block in the address in feed
         if (rowData["blockraw"]) {
             let cell = (r.blockHash && rowData["blockraw"][r.blockHash]) ? rowData["blockraw"][r.blockHash][0] : false;
-            let cellEvents = (r.blockHash && rowData["events"][r.blockHash]) ? rowData["events"][r.blockHash][0] : false;
+            let cellEvents = (r.blockHash && rowData["events"] && rowData["events"][r.blockHash]) ? rowData["events"][r.blockHash][0] : false;
             if (cell) {
                 r.block = JSON.parse(cell.value);
-                r.events = JSON.parse(cellEvents.value);
+                if (cellEvents) r.events = JSON.parse(cellEvents.value);
                 r.blockHash = r.block.hash;
             } else {
                 console.log("no finalized block", r.blockNumber);
@@ -981,6 +982,12 @@ from chain where chainID = '${chainID}' limit 1`);
                             r.traceType = traceTypeCell.value;
                     }
                 }
+            }
+        }
+        if (rowData["autotrace"]) {
+            let cell = (r.blockHash && rowData["autotrace"][r.blockHash]) ? rowData["autotrace"][r.blockHash][0] : false;
+            if (cell) {
+                r.autotrace = JSON.parse(cell.value);
             }
         }
 
@@ -1087,9 +1094,10 @@ from chain where chainID = '${chainID}' limit 1`);
         return this.build_feed_from_row(row, blockHash)
     }
 
-    async fetch_block_row(chain, blockNumber, families = ["blockraw", "trace", "events", "feed", "n", "finalized", "feed"], feedOnly = false, blockHash = false) {
+    async fetch_block_row(chain, blockNumber, families = ["blockraw", "trace", "events", "feed", "n", "finalized", "feed", "autotrace"], feedOnly = false, blockHash = false) {
         let chainID = chain.chainID;
         if (!feedOnly && chain.isEVM > 0) {
+            // OPTIMIZATION: its wasteful to bring in all these columns if the user hasn't asked for them ... however finalized is generally required
             families.push("blockrawevm");
             families.push("receiptsevm");
             families.push("traceevm");
@@ -1102,7 +1110,7 @@ from chain where chainID = '${chainID}' limit 1`);
             }]
         };
 
-        //console.log(`requested families`, families)
+
         const tableChain = this.getTableChain(chainID);
         const [row] = await tableChain.row(paraTool.blockNumberToHex(blockNumber)).get(filter);
 

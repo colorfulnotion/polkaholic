@@ -17,6 +17,7 @@ let symbol = ( xcmdest.symbol ) ? xcmdest.symbol : "";
     <b>Amount Sent</b>: <%= uiTool.presentNumber(xcmdest.amountSent); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountSentUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
     <b>Amount Received</b>: <%= uiTool.presentNumber(xcmdest.amountReceived); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountReceivedUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
     <b>Confirmed at Block</b>: <%- uiTool.presentBlock(xcmdest.chainIDDest, xcmdest.blockNumberDest); %> (<%- uiTool.presentSecondsAgoTS(xcmdest.destTS); %>)<br/>
-    <b>Time</b>: <%= uiTool.presentTS(xcmdest.destTS); %>
+    <b>Time</b>: <%= uiTool.presentTS(xcmdest.destTS); %><br>
+    <a href='/timeline/<%= extrinsicHash; %>'>XCM timeline</a>
   </div>
 </div>

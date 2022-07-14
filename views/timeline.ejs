@@ -1,0 +1,116 @@
+<%- include('header', {chainInfo: chainInfo, title: "XCM Timeline"}); %>
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/">Polkaholic</a></li>
+    <li class="breadcrumb-item">Extrinsic <a href='/tx/<%= txHash; %>'><%- uiTool.getShortHash(txHash, true, false); %></a></li>
+    <li class="breadcrumb-item active" aria-current="page">XCM Timeline</li>
+  </ol>
+</nav>
+
+<h4>XCM Timeline</h4>
+<%
+let timelineRows = uiTool.getTimelineRows(timeline);
+%>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<div id="timeline" style="height: 180px;"></div>
+<div id="xcmmessagesmap">
+ <h6>XCM Instructions</h6>
+ <table  class="table table-striped table-hover">
+    <tr><th>Msg Hash</th><th>XCM Instructions</th></tr>
+   <% for ( const k of Object.keys(xcmmessagesMap) ) {
+    let xcminstructions = xcmmessagesMap[k];  %>
+    <tr>
+     <td><%- uiTool.getShortHash(k); %></td>
+     <td>
+      <div id="typ<%= k; %>" class="renderjson"></div>
+      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(3)(<%- xcminstructions %>));</script>
+     </td>
+    </tr>
+   <% } %>
+  </table>
+</div>
+
+<table id="tableobjects" class="display" style='width: 100%'>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>ID</th>
+      <th>Section:Method</th>
+      <th>Object</th>
+      <th>Key Info</th>
+    </tr>
+  </thead>
+</table>
+
+<style>
+.timelineobject {
+  width: 100%;
+  height: 100px;
+}
+</style>
+<script>
+function showTimelineObjects(chain_id, blockNumber) {
+   let objects = null;
+   for ( let i = 0; i < rowsRaw.length; i++ ) {
+       let t = rowsRaw[i];
+       if ( t[0] == chain_id && t[1] == blockNumber ) {
+         objects = t[4];
+       }
+   }
+   showobjects(objects);
+}
+       
+let rowsRaw = <%- JSON.stringify(timelineRows); %>
+// 0: id, 1: blockNumber
+let rows = rowsRaw.map( (t) => {
+    return [ t[0], t[1], new Date(1000*t[2]), new Date(1000*t[3]) ];
+});
+google.charts.load('current', {
+  'packages': ['timeline']
+});
+google.charts.setOnLoadCallback(drawChart);
+
+function drawChart() {
+  var container = document.getElementById('timeline');
+  var chart = new google.visualization.Timeline(container);
+  var dataTable = new google.visualization.DataTable();
+  dataTable.addColumn({
+    type: 'string',
+    id: 'Chain'
+  });
+  dataTable.addColumn({
+    type: 'string',
+    id: 'Message'
+  });
+  dataTable.addColumn({
+    type: 'date',
+    id: 'Start'
+  });
+  dataTable.addColumn({
+    type: 'date',
+    id: 'End'
+  });
+  dataTable.addRows(rows);
+  var options = {
+    timeline: {
+      colorByRowLabel: true
+    },
+    backgroundColor: '#ffd'
+  };
+  
+  google.visualization.events.addListener(chart, 'select', function () {
+     var selection = chart.getSelection();
+     if (selection.length > 0) {
+        // 0: id, 1: blockNumber
+        showTimelineObjects(dataTable.getValue(selection[0].row, 0), dataTable.getValue(selection[0].row, 1));
+     }
+  });
+  chart.draw(dataTable, options);
+if ( rowsRaw.length > 0 ) {
+   let t = rowsRaw[0];
+   showTimelineObjects(t[0], t[1]);
+}
+}
+</script>
+<script src="/timeline.js"></script>
+<%- include('footer', {apiUrl: "/"}); %>

@@ -8,7 +8,7 @@ async function loadDataTrace(pathParams, tableName) {
             "Accept": "application/json; odata=verbose",
         })
     });
-    
+
     fetch(req)
         .then((response) => response.json())
         .then((data) => {
@@ -32,6 +32,8 @@ function showtraces(id, blockNumber, blockHash) {
     let pathParams = `trace/${id}/${blockNumber}/${blockHash}`
     let tableName = '#tabletraces'
     var table = $(tableName).DataTable({
+        pageLength: -1,
+        lengthMenu: [ [10, 100, 500, -1], [10, 100, 500, "All"] ],
         order: [
             [0, "asc"]
         ],
@@ -96,8 +98,8 @@ function showtraces(id, blockNumber, blockHash) {
 				} catch {
 				    out += "<br><B>" + pv + "</B>";
 				}
-			    } 
-			    return out; 
+			    }
+			    return out;
 			}  else {
 			    return row.pv + pv;
 			}
@@ -144,4 +146,3 @@ function setuptabs(tabs) {
     const triggerEl = document.querySelector('#tracesTab a[href="' + hash + '"]');
     mdb.Tab.getInstance(triggerEl).show();
 }
-
