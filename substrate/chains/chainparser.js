@@ -2292,7 +2292,7 @@ module.exports = class ChainParser {
         let pv = o.pv
         if (pallet_section == 'ParachainSystem:HrmpOutboundMessages' || pallet_section == 'Dmp:DownwardMessageQueues' || pallet_section == 'ParachainSystem:UpwardMessages') {
             if (pv != '[]') {
-                console.log(`decorateAutoTraceXCM found`, `${pallet_section}`, o)
+                //console.log(`decorateAutoTraceXCM found`, `${pallet_section}`, o)
                 //do something
                 switch (pallet_section) {
                     case 'ParachainSystem:HrmpOutboundMessages':
@@ -2307,7 +2307,7 @@ module.exports = class ChainParser {
                     default:
                         break;
                 }
-                console.log(`decorateAutoTraceXCM Processed`, `${pallet_section}`, o)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`decorateAutoTraceXCM Processed`, `${pallet_section}`, o)
                 return
             }
         }
