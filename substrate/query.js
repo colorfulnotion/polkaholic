@@ -5067,6 +5067,9 @@ module.exports = class Query extends AssetManager {
             filter.push(["events", "ump", ""]); //catch all ump events
             filter.push(["events", "dmpQueue", ""]); //catch all dmpQueue events
 
+            filter.push(["extrinsics", "parachainSystem", "setValidationData"]);
+            filter.push(["extrinsics", "paraInherent", "enter"]);
+
             // build list of section:method / section:storage to find in events/autotrace at incoming side
             if (mpType == 'ump') { // ump [para -> relay]
                 // SENDING xcmmessage on para
