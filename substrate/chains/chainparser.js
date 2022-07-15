@@ -2216,6 +2216,105 @@ module.exports = class ChainParser {
         }
     }
 
+    decorateAutoTraceHrmp(indexer, o = false) {
+        let msgHashes = []
+        let xcmMessages = []
+        let decoratedVal = o.pv
+        try {
+            let hrmpOutboundMsgs = JSON.parse(decoratedVal)
+            for (const hrmp of hrmpOutboundMsgs) {
+                if (hrmp.data != undefined) {
+                    let data = '0x' + hrmp.data.slice(4)
+                    let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
+                    var instructions = indexer.apiAt.registry.createType('XcmVersionedXcm', data); //striping first byte, keep the 0x
+                    var hrmpMsg = instructions.toJSON()
+                    xcmMessages.push(JSON.stringify(hrmpMsg))
+                    msgHashes.push(msgHash)
+                }
+            }
+        } catch (err) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceHrmp error`, err.toString())
+        }
+        o.msgHashes = msgHashes
+        o.xcmMessages = xcmMessages
+    }
+
+    decorateAutoTraceUmp(indexer, o = false) {
+        //NOTE: duplicate ump is NOT removed here
+        let msgHashes = []
+        let xcmMessages = []
+        let decoratedVal = o.pv
+        try {
+            let v = decoratedVal.replace('[', '').replace(']', '').replace(' ', '').split(',')
+            for (const ump of v) {
+                let data = ump.replace(' ', '')
+                let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
+                var instructions = indexer.apiAt.registry.createType('XcmVersionedXcm', data); //striping first byte, keep the 0x
+                var umpMsg = instructions.toJSON()
+                xcmMessages.push(JSON.stringify(umpMsg))
+                msgHashes.push(msgHash)
+            }
+        } catch (err) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceUmp error`, err.toString())
+        }
+        o.msgHashes = msgHashes
+        o.xcmMessages = xcmMessages
+    }
+
+    decorateAutoTraceDmp(indexer, o = false) {
+        //NOTE: duplicate dmp is NOT removed here
+        let msgHashes = []
+        let xcmMessages = []
+        let decoratedVal = o.pv
+        try {
+            let v = JSON.parse(decoratedVal)
+            for (const dmp of v) {
+                let data = dmp.msg
+                let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
+                var instructions = indexer.apiAt.registry.createType('XcmVersionedXcm', data); //striping first byte, keep the 0x
+                var dmpMsg = instructions.toJSON()
+                let p = this.getInstructionPath(dmpMsg)
+                xcmMessages.push(JSON.stringify(dmpMsg))
+                msgHashes.push(msgHash)
+            }
+        } catch (err) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceDmp error`, err.toString())
+        }
+        o.msgHashes = msgHashes
+        o.xcmMessages = xcmMessages
+    }
+
+    //ParachainSystem:HrmpOutboundMessages, Dmp:DownwardMessageQueues, ParachainSystem:UpwardMessages
+    decorateAutoTraceXCM(indexer, o = false) {
+        //TODO: pentially update parserWatermark here
+        if (!o) return
+        let pallet_section = `${o.p}:${o.s}`
+        let pv = o.pv
+        if (pallet_section == 'ParachainSystem:HrmpOutboundMessages' || pallet_section == 'Dmp:DownwardMessageQueues' || pallet_section == 'ParachainSystem:UpwardMessages') {
+            if (pv != '[]') {
+                console.log(`decorateAutoTraceXCM found`, `${pallet_section}`, o)
+                //do something
+                switch (pallet_section) {
+                    case 'ParachainSystem:HrmpOutboundMessages':
+                        this.decorateAutoTraceHrmp(indexer, o);
+                        break;
+                    case 'ParachainSystem:UpwardMessages':
+                        this.decorateAutoTraceUmp(indexer, o);
+                        break;
+                    case 'Dmp:DownwardMessageQueues':
+                        this.decorateAutoTraceDmp(indexer, o);
+                        break;
+                    default:
+                        break;
+                }
+                console.log(`decorateAutoTraceXCM Processed`, `${pallet_section}`, o)
+                return
+            }
+        }
+        //console.log(`decorateAutoTraceXCM skip`, `${pallet_section}`, o)
+        return
+    }
+
     parseStorageVal(indexer, p, s, val, decoratedVal, o = false) {
         let pallet_section = `${p}:${s}`
         //console.log(`generic parseStorageVal ${pallet_section}`)
