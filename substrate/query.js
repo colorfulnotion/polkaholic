@@ -4852,7 +4852,7 @@ module.exports = class Query extends AssetManager {
                 let m = `${f.s.toLowerCase()}`
                 let sm = `${s}:${m}`
                 if (matcher["trace"][sm] || matcher["trace"][s] || matcher["trace"][m]) {
-                    // pass the data "f" through the filtering function 
+                    // pass the data "f" through the filtering function
                     let func = (matcher["trace"][sm] != undefined && matcher["trace"][sm] != true) ? matcher["trace"][sm] : null;
                     let pass = true;
                     if (func && func(f) == false) {
@@ -4916,7 +4916,8 @@ module.exports = class Query extends AssetManager {
             });
         }
         // Key idea: if we didn't find any extrinsics/events/messages sent/messages received in this block, don't bother with it ... its noise.
-        if (tallyScore == 0) return [];
+        // MK WIP
+        // if (tallyScore == 0) return [];
 
         return [out, msgHashes];
     }
@@ -4986,6 +4987,8 @@ module.exports = class Query extends AssetManager {
             }
 
             function pvFilter(t) {
+                // MK WIP
+                // return (true);
                 if (t.pv != undefined) {
                     if (t.pv == "[]") {
                         return (false);
@@ -4995,6 +4998,8 @@ module.exports = class Query extends AssetManager {
             }
 
             function requirePKExtraMatch(inp) {
+                // MK WIP
+                // return (true);
                 if (inp.pkExtra != undefined) {
                     let pkExtra = JSON.parse(inp.pkExtra);
                     if (pkExtra.length > 0) {
@@ -5068,12 +5073,12 @@ module.exports = class Query extends AssetManager {
                 filter.push(["trace", 'ParachainSystem', 'UpwardMessages', pvFilter, 'xcmmessage']) // (potentially empty + have duplicates) ... BIZARRE "[0x..]" string
                 // RECEIVING msgHash on relay
                 filter.push(["events", "ump", "ExecutedUpward", null, 'msghash']);
-                filter.push(["events", "ump", "UpwardMessagesReceived"]); // num of msg, not useful but keeping for now 
+                filter.push(["events", "ump", "UpwardMessagesReceived"]); // num of msg, not useful but keeping for now
                 filter.push(["trace", 'Ump', 'NextDispatchRoundStartWith']) // Not sure how it's used
                 filter.push(["trace", 'Ump', 'NeedsDispatch', pvFilter]) // Not sure how it's used
             } else if (mpType == 'dmp') { // dmp [relay -> para]
                 // SENDING RAW MESSAGE on relay
-                filter.push(["trace", 'Dmp', 'DownwardMessageQueues', requirePKExtraMatch, 'xcmmessage']) // ****** RAW MESSAGE in "pv" field "msg" along with "sentAt" 
+                filter.push(["trace", 'Dmp', 'DownwardMessageQueues', requirePKExtraMatch, 'xcmmessage']) // ****** RAW MESSAGE in "pv" field "msg" along with "sentAt"
                 filter.push(["trace", 'Dmp', 'DownwardMessageQueueHeads']) // not useful
                 // RECEIVING msgHash on para
                 filter.push(["events", "dmpQueue", "ExecutedDownward", null, 'msghash']); // RECEIVING msgHash on para
@@ -5113,7 +5118,7 @@ module.exports = class Query extends AssetManager {
                     xcmmessagesMap[x.msgHash] = x.msgStr;
                 }
             }
-            // now that we have a map from msgHash => msgStr, we can reannotate any data in the timeline ... but we just return the map to the caller 
+            // now that we have a map from msgHash => msgStr, we can reannotate any data in the timeline ... but we just return the map to the caller
 
             return [timeline, xcmmessagesMap];
         } catch (err) {
