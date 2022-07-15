@@ -20,10 +20,10 @@ let timelineRows = uiTool.getTimelineRows(timeline);
    <% for ( const k of Object.keys(xcmmessagesMap) ) {
     let xcminstructions = xcmmessagesMap[k];  %>
     <tr>
-     <td><%- uiTool.getShortHash(k); %></td>
+     <td><%- uiTool.getShortHash(k, false); %></td>
      <td>
       <div id="typ<%= k; %>" class="renderjson"></div>
-      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(3)(<%- xcminstructions %>));</script>
+      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(5)(<%- xcminstructions %>));</script>
      </td>
     </tr>
    <% } %>
@@ -59,7 +59,7 @@ function showTimelineObjects(chain_id, blockNumber) {
    }
    showobjects(objects);
 }
-       
+
 let rowsRaw = <%- JSON.stringify(timelineRows); %>
 // 0: id, 1: blockNumber
 let rows = rowsRaw.map( (t) => {
@@ -97,7 +97,7 @@ function drawChart() {
     },
     backgroundColor: '#ffd'
   };
-  
+
   google.visualization.events.addListener(chart, 'select', function () {
      var selection = chart.getSelection();
      if (selection.length > 0) {

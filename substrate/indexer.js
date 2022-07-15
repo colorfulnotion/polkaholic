@@ -2561,7 +2561,8 @@ order by chainID, extrinsicHash, diffTS`
                 pv = parsev;
             }
         } catch (err) {
-            console.log("SOURCE: pv", err);
+            //MK: temporary silent this. will revisit again
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${o.traceID}] SOURCE: pv`, err);
             this.numIndexingWarns++;
         }
         let paddedK = (kk.substr(0, 2) == '0x') ? kk : '0x' + kk
@@ -2572,6 +2573,8 @@ order by chainID, extrinsicHash, diffTS`
         if (pk != '') o.pkExtra = pk
         if (pv != '') o.pv = pv
         //o.pv = (pv == undefined)? pv: null
+        //Need special treatments for `ParachainSystem:HrmpOutboundMessages, Dmp:DownwardMessageQueues, ParachainSystem:UpwardMessages`
+        this.chainParser.decorateAutoTraceXCM(this, o)
         return [o, parsev];
     }
 
