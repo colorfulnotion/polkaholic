@@ -110,7 +110,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
 <% if ( f.xcmdest ) { %>
     <tr>
       <td>Destination Status</td>
-      <td><%- include("xcmdest", {xcmdest: f.xcmdest}); %></td>
+      <td><%- include("xcmdest", {extrinsicHash: f.extrinsicHash, xcmdest: f.xcmdest}); %></td>
     </tr>
 <% } %>
       <td>Spec Version</td>

@@ -596,5 +596,10 @@ module.exports = {
     },
     presentIDRow: function(row, fld) {
         return present_id_row(row, fld)
+    },
+    getTimelineRows: function(timeline) {
+        return timeline.map((t) => {
+            return [t.id, t.blockNumber.toString(), t.blockTS, t.blockTS + 6, t.objects]
+        });
     }
 };

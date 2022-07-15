@@ -602,7 +602,9 @@ function showxcmtransfers(address) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
-                        return `${presentChain(row.id, row.chainName)} (${s})`
+                        let timelineURL = `/timeline/${row.extrinsicHash}`
+                        let timelineLink = `<div class="explorer"><a href="${timelineURL}">timeline</a></div>`
+                        return `${presentChain(row.id, row.chainName)} (${s})` + timelineLink;
                     }
                     return data;
                 }

@@ -35,7 +35,7 @@ app.locals.config = prodConfig;
 
 // For local web/API development, add this to your ~/.bashrc:
 // export NODE_ENV=development
-// export POLKAHOLIC_API_URL=http://localhost:3001 
+// export POLKAHOLIC_API_URL=http://localhost:3001
 if (process.env.POLKAHOLIC_API_URL != undefined) {
     app.locals.config.baseURL = process.env.POLKAHOLIC_API_URL;
 }
@@ -1135,6 +1135,28 @@ app.get('/tx/:txhash', async (req, res) => {
     }
 })
 
+// Sample cases:
+// /timeline/0xb5a24bc52710c0f142b1911ec6313385cb8fd3ce78fe5d36b538311158cd8da4
+// /timeline/0xfae361c0d6716a1e03ea45496d492130e78d24936855ded6e9a2ccc04aabedbb
+// /timeline/0x77a4af790a693be027fdc1cfd671a3bd63941f8abfe0343491c0d50cb7a8171f
+app.get('/timeline/:txhash', async (req, res) => {
+    try {
+        let txHash = req.params['txhash'];
+        let [timeline, xcmmessagesMap] = await query.getXCMTimeline(txHash)
+        res.render('timeline', {
+            timeline: timeline,
+            txHash: txHash,
+            xcmmessagesMap: xcmmessagesMap,
+            apiUrl: "/",
+            chainInfo: query.getChainInfo()
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 app.get('/about', async (req, res) => {
     res.render('about', {
         chainInfo: query.getChainInfo()
@@ -1155,13 +1177,6 @@ app.get('/error', async (req, res) => {
 
 app.get('/features', async (req, res) => {
     res.render('features', {
-        chainInfo: query.getChainInfo()
-    });
-})
-
-app.get('/playground', async (req, res) => {
-    res.render('playground', {
-        apiUrl: "/",
         chainInfo: query.getChainInfo()
     });
 })

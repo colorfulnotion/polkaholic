@@ -2845,20 +2845,23 @@ module.exports = class Query extends AssetManager {
 
     }
 
-    async getBlockNumberByTS(chainID, ts) {
-        let startTS = ts - 30;
-        let endTS = ts + 30;
-        let b0 = 1;
-        let b1 = false;
+    async getBlockNumberByTS(chainID, ts, rangebackward = -1, rangeforward = 60) {
+        let startTS = ts + rangebackward;
+        let endTS = ts + rangeforward;
+        let b0 = null;
+        let b1 = null;
         let sql = `select blockNumber, blockDT, unix_timestamp(blockDT) as blockTS from block${chainID} where blockDT >= from_unixtime(${startTS}) and blockDT <= from_unixtime(${endTS}) order by blockNumber`;
         let blocks = await this.poolREADONLY.query(sql);
         for (let i = 0; i < blocks.length; i++) {
             let block = blocks[i];
-            if (block.blockTS <= ts) b0 = block.blockNumber;
-            if (block.blockTS >= ts && (b1 == false)) b1 = block.blockNumber;
+            if (i == 0) {
+                b0 = block.blockNumber;
+            }
+            if (i == blocks.length - 1) {
+                b1 = block.blockNumber;
+            }
         }
         return [b0, b1];
-
     }
 
     async getAccountRelated(address, decorate = true, decorateExtra = ["data", "address", "usd"]) {
@@ -4799,6 +4802,325 @@ module.exports = class Query extends AssetManager {
                 err: "An error has occurred."
             }
         }
+    }
 
+    score_feature(feat) {
+        if (feat == 'xcmmessage') return (1);
+        if (feat == 'msghash') return (1);
+        return (0);
+    }
+
+    filter_block_row_objects_and_msgHashes(rRow, filter) {
+        let out = [];
+        let msgHashes = [];
+        let matcher = {
+            "trace": {},
+            "events": {},
+            "extrinsics": {}
+        };
+        let features = {}
+        let tallyScore = 0; // non-zero for any { extrinsics (10), events(1), xcmmessage / msghash (1) observed } -- used to filter out uninformative blocks around ts
+        for (let i = 0; i < filter.length; i++) {
+            let f = filter[i]
+            let scope = f[0];
+            let section = `${f[1].toLowerCase()}`
+            let method = `${f[2].toLowerCase()}`
+            let filterfunc = (f.length > 3 && f[3]) ? f[3] : true;
+            if (section == '' && method == '') {
+                //error filter
+            } else if (section == '' && method != '') {
+                //setion not set, method is set, match on method only
+                matcher[scope][method] = filterfunc;
+            } else if (section != '' && method == '') {
+                //setion is set, method not set, method on section only (including all method)
+                let s = `${f[1].toLowerCase()}`
+                matcher[scope][section] = filterfunc;
+            } else {
+                //if section, method is set, match on section:method
+                matcher[scope][`${section}:${method}`] = filterfunc;
+                let feature = (f.length > 4) ? f[4] : false; // xcmmessage (1) or msghash (1) or something (0)
+                if (feature) {
+                    features[`${section}:${method}`] = feature;
+                }
+            }
+        }
+        //console.log(`Filter`, matcher); //JSON.stringify(matcher, null, 2)
+        if (rRow.autotrace) {
+            // trace filtering on matcher["trace"]
+            let traces = rRow.autotrace.filter((f) => {
+                let s = `${f.p.toLowerCase()}`
+                let m = `${f.s.toLowerCase()}`
+                let sm = `${s}:${m}`
+                if (matcher["trace"][sm] || matcher["trace"][s] || matcher["trace"][m]) {
+                    // pass the data "f" through the filtering function 
+                    let func = (matcher["trace"][sm] != undefined && matcher["trace"][sm] != true) ? matcher["trace"][sm] : null;
+                    let pass = true;
+                    if (func && func(f) == false) {
+                        pass = false;
+                    }
+                    if (pass) {
+                        if (features[sm] != undefined) {
+                            tallyScore += this.score_feature(features[sm]);
+                            if (features[sm] == "msghash") {
+                                console.log("MSGHASH FROM TRACE", f);
+                                // TODO: add to msgHashes
+                                // msgHashes.push(msgHash);
+                            }
+                        }
+
+                        out.push({
+                            "type": "trace",
+                            "obj": f
+                        });
+                    }
+                }
+            })
+        }
+        if (rRow.feed) {
+            rRow.feed.extrinsics.forEach((e) => {
+                // extrinsics filtering on matcher["extrinsics"]
+                let s = `${e.section.toLowerCase()}`
+                let m = `${e.method.toLowerCase()}`
+                let sm = `${s}:${m}`
+                if (matcher["extrinsics"][sm] || matcher["extrinsics"][s] || matcher["extrinsics"][m]) {
+                    tallyScore += 10; // MUST HAVE for now
+                    // TODO: use filterfunc?
+                    out.push({
+                        "type": "extrinsic",
+                        "obj": e
+                    });
+                }
+                // add events filtering on matcher["events"]
+                e.events.forEach((ev) => {
+                    let s2 = `${ev.section.toLowerCase()}`
+                    let m2 = `${ev.method.toLowerCase()}`
+                    let sm2 = `${s2}:${m2}`
+                    // TODO: use filterfunc?
+                    if (matcher["events"][sm2] || matcher["events"][s2] || matcher["events"][m2]) {
+                        if (features[sm2] != undefined) {
+                            tallyScore += this.score_feature(features[sm2]);
+                            if (features[sm2] == "msghash") {
+                                if (ev.data != undefined && Array.isArray(ev.data) && ev.data.length > 0) {
+                                    let msgHash = ev.data[0]
+                                    console.log("MSGHASH FROM EVENT", ev, sm2, msgHash);
+                                    msgHashes.push(msgHash);
+                                }
+                            }
+                        }
+                        out.push({
+                            "type": "event",
+                            "obj": ev
+                        });
+                    }
+                });
+            });
+        }
+        // Key idea: if we didn't find any extrinsics/events/messages sent/messages received in this block, don't bother with it ... its noise.
+        if (tallyScore == 0) return [];
+
+        return [out, msgHashes];
+    }
+
+    async get_timeline_chain(chainID, ts, filter, rangebackward = -1, rangeforward = 30) {
+        let chain = await this.getChain(chainID)
+        let [b0, b1] = await this.getBlockNumberByTS(chainID, ts, rangebackward, rangeforward)
+        let timeline = [];
+        if (b0 == null || b1 == null) return (timeline);
+        // TODO: OPTIMIZATION -- get JUST events and autotraces for a prefix range, though probably brute force row keys are better for small range
+        for (let bn = b0; bn <= b1; bn++) {
+            let rRow = await this.fetch_block_row(chain, bn, ["autotrace", "blockraw", "feed", "finalized"]);
+            let [objects, msgHashes] = this.filter_block_row_objects_and_msgHashes(rRow, filter);
+            let blockTS = rRow.feed.blockTS;
+            if (objects && Array.isArray(objects) && objects.length > 0) {
+                timeline.push({
+                    chainID,
+                    blockNumber: bn,
+                    blockTS,
+                    id: chain.id,
+                    objects,
+                    msgHashes
+                });
+            }
+        }
+        return (timeline)
+    }
+
+    async getTimeline(ts, chainIDs, filter, range = 13) {
+        let timeline = [];
+        for (let i = 0; i < chainIDs.length; i++) {
+            // TODO: OPTIMIZATION - do this with promise.all so all N chainIDs done in parallel
+            let rangebackward = -1;
+            let rangeforward = (i == 0) ? range : range * 2;
+            let timeline_chain = await this.get_timeline_chain(chainIDs[i], ts, filter, rangebackward, rangeforward)
+            for (let j = 0; j < timeline_chain.length; j++) {
+                timeline.push(timeline_chain[j])
+            }
+        }
+        return (timeline);
+    }
+
+    // given extrinsic hash
+    async getXCMTimeline(extrinsicHash) {
+        try {
+            // read xcmtransfers table to map into parameters below
+            let sql = `select chainID, chainIDDest, paraID, paraIDDest, relayChain, sourceTS as ts from xcmtransfer where extrinsicHash = '${extrinsicHash}' limit 1`
+            let xcmtransfers = await this.poolREADONLY.query(sql);
+            if (xcmtransfers.length == 0) {
+                throw new paraTool.NotFoundError(`XCM Transfer not found: ${extrinsicHash}`)
+            }
+            let t = xcmtransfers[0];
+            let relayChainID = (t.relayChain == "polkadot") ? 0 : 2;
+            let chainIDs = [t.chainID, t.chainIDDest];
+
+            let ts = t.ts;
+            let filter = [];
+
+            let mpType = 'unknown';
+            if (t.chainID == relayChainID) {
+                mpType = 'dmp'
+            } else if (t.chainIDDest == relayChainID) {
+                mpType = 'ump'
+            } else if ((t.chainID != relayChainID) && (t.chainIDDest != relayChainID)) {
+                mpType = 'hrmp'
+                chainIDs.push(relayChainID);
+            }
+
+            function pvFilter(t) {
+                if (t.pv != undefined) {
+                    if (t.pv == "[]") {
+                        return (false);
+                    }
+                }
+                return (true);
+            }
+
+            function requirePKExtraMatch(inp) {
+                if (inp.pkExtra != undefined) {
+                    let pkExtra = JSON.parse(inp.pkExtra);
+                    if (pkExtra.length > 0) {
+                        let pkparaID = parseInt(pkExtra[0].replace(",", ""), 10);
+                        // never seen more than 1 ... could accept any
+                        return (pkparaID == t.paraID || pkparaID == t.paraIDDest);
+                    }
+                }
+                return (true);
+            }
+
+            console.log(extrinsicHash, ts, chainIDs, mpType);
+            // hrmp [2000->2004] 0xffc0bc017d8b0f0f383e579721fcc4cb434a3589e2f339a98d34a9dab00487aa
+            // dmp  [0->2000] 0x28c5915be3fd9c204881cc5ad9e050d8d0b4597ebc1b45b523a12074056c9142
+            // ump  [2000->0] 0xfa44ca4eb7069ffac0d1a7a7a0ab48771206e78346c80d7ef8f31c7726c0fae8
+            // general filter for all xcm
+            // parachain (outgoing)
+            filter.push(["trace", 'ParachainSystem', 'RelevantMessagingState']) // not sure how this is used yet [but has hrmpMqc] in ingressChannels/egressChannels - check msgCount
+            filter.push(["trace", 'ParachainSystem', 'validationData']) // RelayParent's BN + StorageRoot that is used to build this para block
+
+            filter.push(["trace", 'XcmpQueue', 'InBoundXcmpStatus', pvFilter]) //
+            filter.push(["trace", 'XcmpQueue', 'OutBoundXcmpMessages', pvFilter, 'something']) // check extra key?
+            filter.push(["trace", 'XcmpQueue', 'OutBoundXcmpStatus', pvFilter]) // This is currently empty?
+            filter.push(["trace", 'PolkadotXcm', 'VersionDiscoveryQueue', pvFilter]) // Not sure how it's used
+
+            //relayChain (outgoing)
+            filter.push(["trace", 'XcmPallet', 'VersionDiscoveryQueue', pvFilter]) // Not sure how it's used
+            // filter.push(["trace", 'ParaInclusion', 'PendingAvailability', requirePKExtraMatch])      // not useful / Not sure how it's used
+            //incoming?
+
+            // outgoingXCM extrinsics: a list of known section:method that triggers xcm
+            // TODO: how to get into nested case
+            // TODO: how to match on section only (covering all )
+            filter.push(["events", "xcmPallet", "AssetsTrapped", null, 'something']); // error case?
+            filter.push(["events", "xcmPallet", "Sent", null, 'something']); //?
+
+            //xTokens
+            filter.push(["extrinsics", "xTokens", ""]); //catch unknown case
+            filter.push(["extrinsics", "xTokens", "transfer"]);
+            filter.push(["extrinsics", "xTokens", "transferMulticurrencies"]);
+            filter.push(["extrinsics", "xTokens", "transferMultiasset"]);
+            filter.push(["events", "xTokens", "TransferredMultiAssets"]); //msg
+            filter.push(["events", "xcmpQueue", "XcmpMessageSent", null, 'msghash']); //msgHash
+
+            //xcmPallet
+            filter.push(["extrinsics", "xcmPallet", ""]); //catch unknown case
+            filter.push(["extrinsics", "xcmPallet", "teleportAssets"]);
+            filter.push(["extrinsics", "xcmPallet", "limitedTeleportAssets"]);
+            filter.push(["extrinsics", "xcmPallet", "reserveTransferAssets"]);
+            filter.push(["extrinsics", "xcmPallet", "limitedReserveTransferAssets"]);
+            filter.push(["extrinsics", "xcmPallet", "send"]);
+            filter.push(["events", "xcmPallet", "Attempted", null, 'something']); //not helpful..
+
+            //polkadotXcm //observed on statemine/statemint
+            filter.push(["extrinsics", "polkadotXcm", ""]); //catch unknown case
+            filter.push(["extrinsics", "polkadotXcm", "teleportAssets"]);
+            filter.push(["extrinsics", "polkadotXcm", "limitedTeleportAssets"]);
+            filter.push(["extrinsics", "polkadotXcm", "reserveTransferAssets"]);
+            filter.push(["extrinsics", "polkadotXcm", "limitedReserveTransferAssets"]);
+            filter.push(["extrinsics", "polkadotXcm", "send"]);
+            filter.push(["events", "polkadotXcm", "Attempted"]); //not helpful..
+            filter.push(["events", "polkadotXcm", "Notified"]);
+
+            filter.push(["events", "xcmpQueue", ""]); //catch all xcmpQueue events
+            filter.push(["events", "ump", ""]); //catch all ump events
+            filter.push(["events", "dmpQueue", ""]); //catch all dmpQueue events
+
+            // build list of section:method / section:storage to find in events/autotrace at incoming side
+            if (mpType == 'ump') { // ump [para -> relay]
+                // SENDING xcmmessage on para
+                filter.push(["trace", 'ParachainSystem', 'UpwardMessages', pvFilter, 'xcmmessage']) // (potentially empty + have duplicates) ... BIZARRE "[0x..]" string
+                // RECEIVING msgHash on relay
+                filter.push(["events", "ump", "ExecutedUpward", null, 'msghash']);
+                filter.push(["events", "ump", "UpwardMessagesReceived"]); // num of msg, not useful but keeping for now 
+                filter.push(["trace", 'Ump', 'NextDispatchRoundStartWith']) // Not sure how it's used
+                filter.push(["trace", 'Ump', 'NeedsDispatch', pvFilter]) // Not sure how it's used
+            } else if (mpType == 'dmp') { // dmp [relay -> para]
+                // SENDING RAW MESSAGE on relay
+                filter.push(["trace", 'Dmp', 'DownwardMessageQueues', requirePKExtraMatch, 'xcmmessage']) // ****** RAW MESSAGE in "pv" field "msg" along with "sentAt" 
+                filter.push(["trace", 'Dmp', 'DownwardMessageQueueHeads']) // not useful
+                // RECEIVING msgHash on para
+                filter.push(["events", "dmpQueue", "ExecutedDownward", null, 'msghash']); // RECEIVING msgHash on para
+                filter.push(["events", "ParachainSystem", "DownwardMessagesReceived"]); //num of msg, not useful but keeping for now
+                filter.push(["events", "ParachainSystem", "DownwardMessagesProcessed"]); //head?
+            } else if (mpType == 'hrmp') { // hrmp [para -> para]
+                // SENDING RAW MESSAGE on para
+                filter.push(["trace", 'ParachainSystem', 'HrmpOutboundMessages', pvFilter, 'xcmmessage']) // hrmp outbound (potentially empty + have duplicates)
+                // RECEIVING msgHash on para
+                filter.push(["events", "xcmpQueue", "Success", null, 'msghash']); //msgHash
+                filter.push(["events", "xcmpQueue", "Fail", null, 'msghash']); //msgHash
+                // not useful
+                filter.push(["trace", 'ParachainSystem', 'LastHrmpMqcHeads']) // hrmpMqc per each open channel (paraIDs)
+                filter.push(["trace", 'ParachainSystem', 'HrmpWatermark']) // hrmp get updated for this block
+            }
+            let timeline = await this.getTimeline(ts, chainIDs, filter);
+
+            // for all the msgHashes that have appeared across all blocks in the timeline, collect them and read the msgStr from the "xcmmessages" table
+            let msgHashes = [];
+            for (let i = 0; i < timeline.length; i++) {
+                let t = timeline[i];
+                if (t.msgHashes != undefined && t.msgHashes.length > 0) {
+                    for (let j = 0; j < t.msgHashes.length; j++) {
+                        if (!msgHashes.includes(t.msgHashes[j])) {
+                            msgHashes.push(`'${t.msgHashes[j]}'`);
+                        }
+                    }
+                }
+            }
+            let xcmmessagesMap = {};
+            if (msgHashes.length > 0) {
+                let msgHashesStr = msgHashes.join(",");
+                var sql2 = `select msgHash, msgStr from xcmmessages where msgHash in (${msgHashesStr})`
+                let xcmmessages = await this.poolREADONLY.query(sql2);
+                for (let k = 0; k < xcmmessages.length; k++) {
+                    let x = xcmmessages[k];
+                    xcmmessagesMap[x.msgHash] = x.msgStr;
+                }
+            }
+            // now that we have a map from msgHash => msgStr, we can reannotate any data in the timeline ... but we just return the map to the caller 
+
+            return [timeline, xcmmessagesMap];
+        } catch (err) {
+            console.log(err);
+            return [
+                [], {}
+            ];
+        }
     }
 }
