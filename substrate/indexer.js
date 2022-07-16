@@ -1098,7 +1098,7 @@ module.exports = class Indexer extends AssetManager {
     //the new one for now..
     updateXCMMsg(xcmMsg) {
         let direction = (xcmMsg.isIncoming) ? 'i' : 'o'
-        let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${direction}`
+        let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
         if (this.xcmTrailingKeyMap[xcmKey] == undefined) {
             this.xcmTrailingKeyMap[xcmKey] = {
                 blockNumber: xcmMsg.blockNumber,
@@ -2792,13 +2792,13 @@ order by chainID, extrinsicHash, diffTS`
             let rows = this.recentXcmMsgs
             if (this.debugLevel >= paraTool.debugTracing) console.log(`dump_xcm_messages rowsLen=${rows.length}`, rows)
             let i = 0;
-            let vals = ["chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "sentAt", "relayChain", "version", "path"];
+            let vals = ["chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "relayChain", "version", "path"];
             for (i = 0; i < rows.length; i += 10000) {
                 let j = i + 10000;
                 if (j > rows.length) j = rows.length;
                 await this.upsertSQL({
                     "table": `xcmmessages`,
-                    "keys": ["msgHash", "incoming"],
+                    "keys": ["msgHash", "incoming", "sentAt"],
                     "vals": vals,
                     "data": rows.slice(i, j),
                     "replace": vals
@@ -5095,7 +5095,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 if (mpKey != undefined && mpKey.isFresh) {
                     let mp = this.xcmmsgMap[xcmKey]
                     //["msgHash", "incoming", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "sentAt", "relayChain", "version", "path"];
-                    let s = `('${mp.msgHash}', '${mp.isIncoming}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.blockNumber}', '${mp.sentAt}', '${mp.relayChain}', '${mp.version}', '${mp.path}')`
+                    let s = `('${mp.msgHash}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.blockNumber}', '${mp.relayChain}', '${mp.version}', '${mp.path}')`
                     recentXcmMsgs.push(s);
                     if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] add ${xcmKey}`, s)
                     this.xcmTrailingKeyMap[xcmKey].isFresh = false // mark the record as processed

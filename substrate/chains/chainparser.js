@@ -2284,13 +2284,27 @@ module.exports = class ChainParser {
         o.xcmMessages = xcmMessages
     }
 
+    decorateAutoTraceValidationData(indexer, o = false) {
+        //NOTE: duplicate dmp is NOT removed here
+        let decoratedVal = o.pv
+        try {
+            let v = JSON.parse(decoratedVal)
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`decorateAutoTraceValidationData`, v) //TODO: we can find  the parent's state root here at relayParentStorageRoot
+            let hrmpWatermark = paraTool.dechexToInt(v.relayParentNumber)
+            this.parserWatermark = hrmpWatermark
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark: ${hrmpWatermark}`)
+        } catch (err) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceValidationDats error`, err.toString())
+        }
+    }
+
     //ParachainSystem:HrmpOutboundMessages, Dmp:DownwardMessageQueues, ParachainSystem:UpwardMessages
     decorateAutoTraceXCM(indexer, o = false) {
         //TODO: pentially update parserWatermark here
         if (!o) return
         let pallet_section = `${o.p}:${o.s}`
         let pv = o.pv
-        if (pallet_section == 'ParachainSystem:HrmpOutboundMessages' || pallet_section == 'Dmp:DownwardMessageQueues' || pallet_section == 'ParachainSystem:UpwardMessages') {
+        if (pallet_section == 'ParachainSystem:HrmpOutboundMessages' || pallet_section == 'Dmp:DownwardMessageQueues' || pallet_section == 'ParachainSystem:UpwardMessages' || pallet_section == 'ParachainSystem:ValidationData') {
             if (pv != '[]') {
                 //console.log(`decorateAutoTraceXCM found`, `${pallet_section}`, o)
                 //do something
@@ -2303,6 +2317,9 @@ module.exports = class ChainParser {
                         break;
                     case 'Dmp:DownwardMessageQueues':
                         this.decorateAutoTraceDmp(indexer, o);
+                        break;
+                    case 'ParachainSystem:ValidationData':
+                        this.decorateAutoTraceValidationData(indexer, o);
                         break;
                     default:
                         break;
@@ -2337,7 +2354,7 @@ module.exports = class ChainParser {
             //TODO
             return this.getUpwardMessageseVal(indexer, decoratedVal, 'ump');
         } else if (pallet_section == "parachainSystem:hrmpWatermark") {
-            return this.getHrmpWatermarkVal(indexer, decoratedVal);
+            //return this.getHrmpWatermarkVal(indexer, decoratedVal); // moved this to decorateAutoTraceValidationData
         }
         return (false);
     }
