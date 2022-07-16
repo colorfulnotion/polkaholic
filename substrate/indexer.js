@@ -1415,7 +1415,7 @@ order by chainID, extrinsicHash, diffTS`
             let r = this.crowdloan[crowdloanKeys[i]];
             let fromAddress = paraTool.getPubKey(r.account);
             let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.chainID}'`,
-                `'${r.blockNumber}'`, `'${r.ts}'`, `'${r.action}'`, `'${fromAddress}'`, `'${r.paraID}'`, `'${r.amount}'`, `${mysql.escape(r.memo)}`, `${mysql.escape(r.remark)}`
+			   `'${r.blockNumber}'`, `'${r.ts}'`, `'${r.section}'`, `'${r.method}'`, `'${fromAddress}'`, `'${r.paraID}'`, `'${r.amount}'`, `${mysql.escape(r.memo)}`, `${mysql.escape(r.remark)}`
             ].join(",") + ")";
             if (!this.knownParaID(r.paraID)) {
                 this.readyToCrawlParachains = true;
@@ -1430,12 +1430,13 @@ order by chainID, extrinsicHash, diffTS`
         }
         this.crowdloan = {};
         // --- crowdloan
+	let vals = ["extrinsicID", "chainID", "blockNumber", "ts", "section", "method", "fromAddress", "paraID", "amount", "memo", "remark"];
         await this.upsertSQL({
             "table": "crowdloan",
             "keys": ["extrinsicHash"],
-            "vals": ["extrinsicID", "chainID", "blockNumber", "ts", "action", "fromAddress", "paraID", "amount", "memo", "remark"],
+            "vals": vals,
             "data": crowdloans,
-            "replace": ["extrinsicID", "chainID", "blockNumber", "ts", "action", "fromAddress", "paraID", "amount", "memo", "remark"]
+            "replace": vals
         });
     }
 
@@ -3427,7 +3428,7 @@ order by chainID, extrinsicHash, diffTS`
 
         //let's assume crowdloan events come in pairs of Contributed+MemoUpdated or Contributed+remarks
         for (const rawFeedCrowdloan of rawFeedCrowdloans) {
-            if (rawFeedCrowdloan.action == "crowdloan(Contributed)") {
+            if (rawFeedCrowdloan.method == "Contributed" ){
                 let accountParaID = `${rawFeedCrowdloan.account}${rawFeedCrowdloan.paraID}`
                 let crowdloanrec = this.decorateFeedCrowdLoan(feed, rawFeedCrowdloan, blockTS)
                 if (feedcrowdloansMap[accountParaID] != undefined) {
@@ -3436,7 +3437,7 @@ order by chainID, extrinsicHash, diffTS`
                 } else {
                     feedcrowdloansMap[accountParaID] = crowdloanrec
                 }
-            } else if (rawFeedCrowdloan.action == "crowdloan(MemoUpdated)") {
+            } else if (rawFeedCrowdloan.method == "MemoUpdated") {
                 let accountParaID = `${rawFeedCrowdloan.account}${rawFeedCrowdloan.paraID}`
                 let crowdloanrec = this.decorateFeedCrowdLoan(feed, rawFeedCrowdloan, blockTS)
                 if (feedcrowdloansMap[accountParaID] != undefined) {
@@ -3475,7 +3476,8 @@ order by chainID, extrinsicHash, diffTS`
         feedcrowdloan["eventID"] = rawFeedCrowdloan.eventID
         feedcrowdloan["extrinsicID"] = feed.extrinsicID
         feedcrowdloan["extrinsicHash"] = feed.extrinsicHash
-        feedcrowdloan["action"] = rawFeedCrowdloan.action
+        feedcrowdloan["section"] = rawFeedCrowdloan.section
+        feedcrowdloan["method"] = rawFeedCrowdloan.method
         feedcrowdloan["account"] = rawFeedCrowdloan.account
         feedcrowdloan["paraID"] = rawFeedCrowdloan.paraID
         if (rawFeedCrowdloan.value) {
@@ -3976,7 +3978,6 @@ order by chainID, extrinsicHash, diffTS`
                     return this.chainParser.crowdloanFilter(`${ev.section}(${ev.method})`);
                 })
                 if (crowdloanEvents.length > 0 && block.finalized) {
-                    //console.log(`crowdloan found ${extrinsicID}!`)
                     let rawFeedCrowdloans = crowdloanEvents.map((ce) => {
                         return this.chainParser.prepareFeedcrowdloan(this, ce.section, ce.method, ce.data, ce.eventID);
                     })
@@ -3985,9 +3986,7 @@ order by chainID, extrinsicHash, diffTS`
                         //console.log(`remarks found!`, extrinsic.remarks)
                     }
 
-                    //console.log(`rawFeedCrowdloans`, rawFeedCrowdloans)
                     let feedCrowdLoans = this.processRawFeedCrowdLoans(feed, rawFeedCrowdloans, blockTS, extrinsic.remarks)
-
                     for (const feedcrowdloan of feedCrowdLoans) {
                         // TODO: can a same address get touched twice with an extrinsic?
                         // claim: it's possible but super rare
