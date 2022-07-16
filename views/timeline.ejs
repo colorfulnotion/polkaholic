@@ -2,6 +2,7 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="/">Polkaholic</a></li>
+    <li class="breadcrumb-item"><a href="/chains/polkadot#xcmtransfers">XCM Extrinsics</a></li>
     <li class="breadcrumb-item">Extrinsic <a href='/tx/<%= txHash; %>'><%- uiTool.getShortHash(txHash, true, false); %></a></li>
     <li class="breadcrumb-item active" aria-current="page">XCM Timeline</li>
   </ol>
@@ -37,7 +38,6 @@ let timelineRows = uiTool.getTimelineRows(timeline);
       <th>ID</th>
       <th>Section:Method</th>
       <th>Object</th>
-      <th>Key Info</th>
     </tr>
   </thead>
 </table>
@@ -63,7 +63,11 @@ function showTimelineObjects(chain_id, blockNumber) {
 let rowsRaw = <%- JSON.stringify(timelineRows); %>
 // 0: id, 1: blockNumber
 let rows = rowsRaw.map( (t) => {
-    return [ t[0], t[1], new Date(1000*t[2]), new Date(1000*t[3]) ];
+    // t[4] has the objects, t[5] has the tooltip
+    let extra = ( t[5] == undefined ) ? {} : t[5];
+    let str = JSON.stringify(extra);
+    console.log("TOOLTIP", str);
+    return [ t[0], t[1], str, new Date(1000*t[2]), new Date(1000*t[3]) ];
 });
 google.charts.load('current', {
   'packages': ['timeline']
@@ -81,6 +85,10 @@ function drawChart() {
   dataTable.addColumn({
     type: 'string',
     id: 'Message'
+  });
+  dataTable.addColumn({
+    type: 'string',
+    role: 'tooltip',
   });
   dataTable.addColumn({
     type: 'date',

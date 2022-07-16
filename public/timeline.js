@@ -20,12 +20,17 @@ function showobjects(objects) {
         pageLength: -1,
         lengthMenu: [ [10, 100, 500, -1], [10, 100, 500, "All"] ],
         order: [
-            [0, "asc"]
+            [4, "asc"]
         ],
         columnDefs: [{
             "className": "dt-left",
             "targets": [1, 2, 3]
-        }],
+        },
+		                {
+                "targets": [4],
+                "visible": false
+            }
+],
 
             columns: [
 		{
@@ -96,9 +101,12 @@ function showobjects(objects) {
                 }
             },
             {
-                data: 'objInfo',
+                data: 'idx',
                 render: function(data, type, row, meta) {
-		    return "";
+		    if ( row.idx != undefined ) {
+			return row.idx;
+		    }
+		    return 0;
                 }
             }
         ]

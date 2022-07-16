@@ -599,7 +599,7 @@ module.exports = {
     },
     getTimelineRows: function(timeline) {
         return timeline.map((t) => {
-            return [t.id, t.blockNumber.toString(), t.blockTS, t.blockTS + 6, t.objects]
+            return [t.id, t.blockNumber.toString(), t.blockTS, t.blockTS + 6, t.objects, t.extra]
         });
     }
 };

@@ -20,9 +20,13 @@ async function main() {
     ];
     for (let i = 0; i < extrinsicHashes.length; i++) {
         let extrinsicHash = extrinsicHashes[i];
-        let timeline = await query.getXCMTimeline(extrinsicHash);
+        let [timeline, xcmMessagesMap] = await query.getXCMTimeline(extrinsicHash);
         for (const t of timeline) {
-            console.log(JSON.stringify(t, null, 4));
+            if (debugLevel > 0) {
+                console.log(JSON.stringify(t, null, 4));
+            } else {
+                console.log("timeline for ", extrinsicHash, " includes ", t.chainID, t.blockNumber);
+            }
         }
     }
 }

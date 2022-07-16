@@ -4220,7 +4220,7 @@ module.exports = class Query extends AssetManager {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
 
         const bigqueryClient = new BigQuery();
-        let fullTable = this.getBQDataset(tbl);
+        let fullTable = this.getBQTable(tbl);
 
         let flds = "c as chainID, bn as blockNumber, h as transactionHash, s as method, m as methodID, UNIX_SECONDS(ts) as blockTS, r as result, f as fromAddress, t as toAddress, substrate, cr as creates";
 
@@ -4810,8 +4810,9 @@ module.exports = class Query extends AssetManager {
         return (0);
     }
 
-    filter_block_row_objects_and_msgHashes(rRow, filter) {
+    filter_block_row_objects_and_msgHashes(rRow, filter, chainID, blockNumber, extrinsicHash = null) {
         let out = [];
+        let extra = {}
         let msgHashes = [];
         let matcher = {
             "trace": {},
@@ -4820,6 +4821,7 @@ module.exports = class Query extends AssetManager {
         };
         let features = {}
         let tallyScore = 0; // non-zero for any { extrinsics (10), events(1), xcmmessage / msghash (1) observed } -- used to filter out uninformative blocks around ts
+        let idx = 0;
         for (let i = 0; i < filter.length; i++) {
             let f = filter[i]
             let scope = f[0];
@@ -4829,10 +4831,10 @@ module.exports = class Query extends AssetManager {
             if (section == '' && method == '') {
                 //error filter
             } else if (section == '' && method != '') {
-                //setion not set, method is set, match on method only
+                //section not set, method is set, match on method only
                 matcher[scope][method] = filterfunc;
             } else if (section != '' && method == '') {
-                //setion is set, method not set, method on section only (including all method)
+                //section is set, method not set, match on section only
                 let s = `${f[1].toLowerCase()}`
                 matcher[scope][section] = filterfunc;
             } else {
@@ -4845,37 +4847,6 @@ module.exports = class Query extends AssetManager {
             }
         }
         //console.log(`Filter`, matcher); //JSON.stringify(matcher, null, 2)
-        if (rRow.autotrace) {
-            // trace filtering on matcher["trace"]
-            let traces = rRow.autotrace.filter((f) => {
-                let s = `${f.p.toLowerCase()}`
-                let m = `${f.s.toLowerCase()}`
-                let sm = `${s}:${m}`
-                if (matcher["trace"][sm] || matcher["trace"][s] || matcher["trace"][m]) {
-                    // pass the data "f" through the filtering function
-                    let func = (matcher["trace"][sm] != undefined && matcher["trace"][sm] != true) ? matcher["trace"][sm] : null;
-                    let pass = true;
-                    if (func && func(f) == false) {
-                        pass = false;
-                    }
-                    if (pass) {
-                        if (features[sm] != undefined) {
-                            tallyScore += this.score_feature(features[sm]);
-                            if (features[sm] == "msghash") {
-                                console.log("MSGHASH FROM TRACE", f);
-                                // TODO: add to msgHashes
-                                // msgHashes.push(msgHash);
-                            }
-                        }
-
-                        out.push({
-                            "type": "trace",
-                            "obj": f
-                        });
-                    }
-                }
-            })
-        }
         if (rRow.feed) {
             rRow.feed.extrinsics.forEach((e) => {
                 // extrinsics filtering on matcher["extrinsics"]
@@ -4883,12 +4854,18 @@ module.exports = class Query extends AssetManager {
                 let m = `${e.method.toLowerCase()}`
                 let sm = `${s}:${m}`
                 if (matcher["extrinsics"][sm] || matcher["extrinsics"][s] || matcher["extrinsics"][m]) {
-                    tallyScore += 10; // MUST HAVE for now
+                    let matched = (extrinsicHash) ? (e.extrinsicHash == extrinsicHash) : true;
+                    // if matched, push and tally
                     // TODO: use filterfunc?
-                    out.push({
-                        "type": "extrinsic",
-                        "obj": e
-                    });
+                    if (matched) {
+                        tallyScore += 10;
+                        out.push({
+                            "type": "extrinsic",
+                            "obj": e,
+                            "idx": idx
+                        });
+                        idx++
+                    }
                 }
                 // add events filtering on matcher["events"]
                 e.events.forEach((ev) => {
@@ -4903,34 +4880,95 @@ module.exports = class Query extends AssetManager {
                                 if (ev.data != undefined && Array.isArray(ev.data) && ev.data.length > 0) {
                                     let msgHash = ev.data[0]
                                     console.log("MSGHASH FROM EVENT", ev, sm2, msgHash);
-                                    msgHashes.push(msgHash);
+                                    // extract the msgHash (no xcmmessage available) and push it
+                                    msgHashes.push({
+                                        msgHash,
+                                        chainID,
+                                        blockNumber,
+                                        section: ev.section,
+                                        method: ev.method,
+                                        isIncoming: 1
+                                    });
                                 }
+                            } else if (features[sm2] == "processed") {
+                                extra[ev.method] = ev.data;
+                            } else if (features[sm2] == "count") {
+                                extra[ev.method] = ev.data;
                             }
                         }
                         out.push({
                             "type": "event",
-                            "obj": ev
+                            "obj": ev,
+                            "idx": idx
                         });
+                        idx++;
                     }
                 });
             });
         }
+        if (rRow.autotrace) {
+            // trace filtering on matcher["trace"]
+            let traces = rRow.autotrace.filter((f) => {
+                let s = `${f.p.toLowerCase()}`
+                let m = `${f.s.toLowerCase()}`
+                let sm = `${s}:${m}`
+                if (matcher["trace"][sm] || matcher["trace"][s] || matcher["trace"][m]) {
+                    // pass the data "f" through the filtering function
+                    let func = (matcher["trace"][sm] != undefined && matcher["trace"][sm] != true) ? matcher["trace"][sm] : null;
+                    let pass = (func) ? func(f) : true;
+                    if (pass) {
+                        if (features[sm] != undefined) {
+                            tallyScore += this.score_feature(features[sm]);
+                            if (features[sm] == "xcmmessage" && f.msgHashes != undefined) {
+                                console.log("MSGHASH FROM TRACE", f);
+                                // EXTRACT out the msgHash+xcmMessage from the trace element "f" (set up in parseTrace), so we can match across blocks
+                                for (let m = 0; m < f.msgHashes.length; m++) {
+                                    try {
+                                        let msgHash = f.msgHashes[m];
+                                        let xcmMessage = JSON.parse(f.xcmMessages[m]);
+                                        // add to msgHashes
+                                        msgHashes.push({
+                                            msgHash,
+                                            xcmMessage,
+                                            chainID,
+                                            blockNumber,
+                                            section: f.p,
+                                            method: f.s,
+                                            isIncoming: 0
+                                        });
+                                    } catch (err0) {
+                                        // 
+                                    }
+                                }
+                            } else if (features[sm] == "watermark" && f.pv != undefined) {
+                                extra[f.s] = f.pv;
+                            }
+                        }
+                        out.push({
+                            "type": "trace",
+                            "obj": f,
+                            "idx": idx
+                        });
+                        idx++;
+                    }
+                }
+            })
+        }
         // Key idea: if we didn't find any extrinsics/events/messages sent/messages received in this block, don't bother with it ... its noise.
-        // MK WIP
-        // if (tallyScore == 0) return [];
-
-        return [out, msgHashes];
+        if (tallyScore == 0) return [false, false, false];
+        return [out, msgHashes, extra];
     }
 
-    async get_timeline_chain(chainID, ts, filter, rangebackward = -1, rangeforward = 30) {
+    async get_timeline_chain(chainID, ts, filter, rangebackward = -1, rangeforward = 30, extrinsicHash = null) {
         let chain = await this.getChain(chainID)
+
         let [b0, b1] = await this.getBlockNumberByTS(chainID, ts, rangebackward, rangeforward)
         let timeline = [];
         if (b0 == null || b1 == null) return (timeline);
         // TODO: OPTIMIZATION -- get JUST events and autotraces for a prefix range, though probably brute force row keys are better for small range
         for (let bn = b0; bn <= b1; bn++) {
             let rRow = await this.fetch_block_row(chain, bn, ["autotrace", "blockraw", "feed", "finalized"]);
-            let [objects, msgHashes] = this.filter_block_row_objects_and_msgHashes(rRow, filter);
+            let [objects, msgHashes, extra] = this.filter_block_row_objects_and_msgHashes(rRow, filter, chainID, bn, extrinsicHash);
             let blockTS = rRow.feed.blockTS;
             if (objects && Array.isArray(objects) && objects.length > 0) {
                 timeline.push({
@@ -4939,20 +4977,21 @@ module.exports = class Query extends AssetManager {
                     blockTS,
                     id: chain.id,
                     objects,
-                    msgHashes
+                    msgHashes,
+                    extra
                 });
             }
         }
         return (timeline)
     }
 
-    async getTimeline(ts, chainIDs, filter, range = 13) {
+    async getTimeline(ts, chainIDs, filter, range = 13, extrinsicHash = null) {
         let timeline = [];
         for (let i = 0; i < chainIDs.length; i++) {
             // TODO: OPTIMIZATION - do this with promise.all so all N chainIDs done in parallel
             let rangebackward = -1;
             let rangeforward = (i == 0) ? range : range * 2;
-            let timeline_chain = await this.get_timeline_chain(chainIDs[i], ts, filter, rangebackward, rangeforward)
+            let timeline_chain = await this.get_timeline_chain(chainIDs[i], ts, filter, rangebackward, rangeforward, extrinsicHash)
             for (let j = 0; j < timeline_chain.length; j++) {
                 timeline.push(timeline_chain[j])
             }
@@ -5017,24 +5056,30 @@ module.exports = class Query extends AssetManager {
             // ump  [2000->0] 0xfa44ca4eb7069ffac0d1a7a7a0ab48771206e78346c80d7ef8f31c7726c0fae8
             // general filter for all xcm
             // parachain (outgoing)
-            filter.push(["trace", 'ParachainSystem', 'RelevantMessagingState']) // not sure how this is used yet [but has hrmpMqc] in ingressChannels/egressChannels - check msgCount
-            filter.push(["trace", 'ParachainSystem', 'validationData']) // RelayParent's BN + StorageRoot that is used to build this para block
+            let advanced = false; // set to true to be comprehensive, but if false will still match
+            filter.push(["trace", 'ParachainSystem', 'RelevantMessagingState', null, "mqc"]) // not sure how this is used yet [but has hrmpMqc] in ingressChannels/egressChannels - check msgCount
+            if (advanced) {
+                filter.push(["trace", 'ParachainSystem', 'validationData']) // RelayParent's BN + StorageRoot that is used to build this para block
+            }
 
             filter.push(["trace", 'XcmpQueue', 'InBoundXcmpStatus', pvFilter]) //
-            filter.push(["trace", 'XcmpQueue', 'OutBoundXcmpMessages', pvFilter, 'something']) // check extra key?
+            filter.push(["trace", 'XcmpQueue', 'OutBoundXcmpMessages', pvFilter, 'TBD']) // check extra key?
             filter.push(["trace", 'XcmpQueue', 'OutBoundXcmpStatus', pvFilter]) // This is currently empty?
-            filter.push(["trace", 'PolkadotXcm', 'VersionDiscoveryQueue', pvFilter]) // Not sure how it's used
+            if (advanced) {
+                filter.push(["trace", 'PolkadotXcm', 'VersionDiscoveryQueue', pvFilter, "version"]) // Not sure how it's used
+            }
 
             //relayChain (outgoing)
-            filter.push(["trace", 'XcmPallet', 'VersionDiscoveryQueue', pvFilter]) // Not sure how it's used
-            // filter.push(["trace", 'ParaInclusion', 'PendingAvailability', requirePKExtraMatch])      // not useful / Not sure how it's used
+            if (advanced) {
+                filter.push(["trace", 'XcmPallet', 'VersionDiscoveryQueue', pvFilter, "version"]) // Not sure how it's used
+                filter.push(["trace", 'ParaInclusion', 'PendingAvailability', requirePKExtraMatch, "anchor"]) // not useful / Not sure how it's used
+            }
             //incoming?
 
             // outgoingXCM extrinsics: a list of known section:method that triggers xcm
             // TODO: how to get into nested case
-            // TODO: how to match on section only (covering all )
-            filter.push(["events", "xcmPallet", "AssetsTrapped", null, 'something']); // error case?
-            filter.push(["events", "xcmPallet", "Sent", null, 'something']); //?
+            filter.push(["events", "xcmPallet", "AssetsTrapped", null, 'asset']); // error case?
+            filter.push(["events", "xcmPallet", "Sent", null, 'asset']); //?
 
             //xTokens
             filter.push(["extrinsics", "xTokens", ""]); //catch unknown case
@@ -5067,8 +5112,10 @@ module.exports = class Query extends AssetManager {
             filter.push(["events", "ump", ""]); //catch all ump events
             filter.push(["events", "dmpQueue", ""]); //catch all dmpQueue events
 
-            filter.push(["extrinsics", "parachainSystem", "setValidationData"]);
-            filter.push(["extrinsics", "paraInherent", "enter"]);
+            if (advanced) {
+                filter.push(["extrinsics", "parachainSystem", "setValidationData"]);
+                filter.push(["extrinsics", "paraInherent", "enter"]);
+            }
 
             // build list of section:method / section:storage to find in events/autotrace at incoming side
             if (mpType == 'ump') { // ump [para -> relay]
@@ -5076,52 +5123,90 @@ module.exports = class Query extends AssetManager {
                 filter.push(["trace", 'ParachainSystem', 'UpwardMessages', pvFilter, 'xcmmessage']) // (potentially empty + have duplicates) ... BIZARRE "[0x..]" string
                 // RECEIVING msgHash on relay
                 filter.push(["events", "ump", "ExecutedUpward", null, 'msghash']);
-                filter.push(["events", "ump", "UpwardMessagesReceived"]); // num of msg, not useful but keeping for now
-                filter.push(["trace", 'Ump', 'NextDispatchRoundStartWith']) // Not sure how it's used
-                filter.push(["trace", 'Ump', 'NeedsDispatch', pvFilter]) // Not sure how it's used
+                filter.push(["events", "ump", "UpwardMessagesReceived", null, 'count']); // num of msg, not useful but keeping for now
+                if (advanced) {
+                    filter.push(["trace", 'Ump', 'NextDispatchRoundStartWith']) // Not sure how it's used
+                    filter.push(["trace", 'Ump', 'NeedsDispatch', pvFilter]) // Not sure how it's used
+                }
             } else if (mpType == 'dmp') { // dmp [relay -> para]
                 // SENDING RAW MESSAGE on relay
                 filter.push(["trace", 'Dmp', 'DownwardMessageQueues', requirePKExtraMatch, 'xcmmessage']) // ****** RAW MESSAGE in "pv" field "msg" along with "sentAt"
-                filter.push(["trace", 'Dmp', 'DownwardMessageQueueHeads']) // not useful
+                filter.push(["trace", 'Dmp', 'DownwardMessageQueueHeads', null, "heads"]) // not useful
                 // RECEIVING msgHash on para
                 filter.push(["events", "dmpQueue", "ExecutedDownward", null, 'msghash']); // RECEIVING msgHash on para
-                filter.push(["events", "ParachainSystem", "DownwardMessagesReceived"]); //num of msg, not useful but keeping for now
-                filter.push(["events", "ParachainSystem", "DownwardMessagesProcessed"]); //head?
+                filter.push(["events", "ParachainSystem", "DownwardMessagesReceived", null, "count"]); //num of msg, not useful but keeping for now
+                filter.push(["events", "ParachainSystem", "DownwardMessagesProcessed", null, "processed"]); //head?
             } else if (mpType == 'hrmp') { // hrmp [para -> para]
                 // SENDING RAW MESSAGE on para
                 filter.push(["trace", 'ParachainSystem', 'HrmpOutboundMessages', pvFilter, 'xcmmessage']) // hrmp outbound (potentially empty + have duplicates)
                 // RECEIVING msgHash on para
                 filter.push(["events", "xcmpQueue", "Success", null, 'msghash']); //msgHash
                 filter.push(["events", "xcmpQueue", "Fail", null, 'msghash']); //msgHash
-                // not useful
-                filter.push(["trace", 'ParachainSystem', 'LastHrmpMqcHeads']) // hrmpMqc per each open channel (paraIDs)
-                filter.push(["trace", 'ParachainSystem', 'HrmpWatermark']) // hrmp get updated for this block
+                filter.push(["trace", 'ParachainSystem', 'LastHrmpMqcHeads', null, "mqc"]) // hrmpMqc per each open channel (paraIDs)
+                filter.push(["trace", 'ParachainSystem', 'HrmpWatermark', null, 'watermark']) // hrmp get updated for this block
             }
-            let timeline = await this.getTimeline(ts, chainIDs, filter);
+            let timeline = await this.getTimeline(ts, chainIDs, filter, 13, extrinsicHash);
 
-            // for all the msgHashes that have appeared across all blocks in the timeline, collect them and read the msgStr from the "xcmmessages" table
-            let msgHashes = [];
+            // for all the msgHashes that have appeared across all blocks on different chains in the timeline,
+            // flag them in a "msgIO" with "incoming" or "outgoing"collect them and read the msgStr from the "xcmmessages" table
+            let msgIO = {}
             for (let i = 0; i < timeline.length; i++) {
                 let t = timeline[i];
                 if (t.msgHashes != undefined && t.msgHashes.length > 0) {
+                    //console.log("FINAL TIMELINE msg", t.msgHashes);
                     for (let j = 0; j < t.msgHashes.length; j++) {
-                        if (!msgHashes.includes(t.msgHashes[j])) {
-                            msgHashes.push(`'${t.msgHashes[j]}'`);
+                        let m = t.msgHashes[j];
+                        let msgHash = m.msgHash;
+                        if (msgIO[msgHash] == undefined) {
+                            msgIO[msgHash] = {};
+                        }
+                        if (m.isIncoming == 1) {
+                            msgIO[msgHash].incoming = 1
+                        } else if (m.isIncoming == 0) {
+                            msgIO[msgHash].outgoing = 1;
                         }
                     }
                 }
             }
+
+            // map msgIO into msgHashes + msgHashesMap for the next steps of (a) reading from SQL "xcmmessages" (b) filtering out blocks that have no matching xcm
+            let msgHashes = [];
+            let msgHashesMap = {};
+            let requireMsgHashMatch = true;
+            for (const m of Object.keys(msgIO)) {
+                let include = (requireMsgHashMatch) ? (msgIO[m].incoming && msgIO[m].outgoing) : true;
+                if (!msgHashes.includes(m) && include) {
+                    msgHashes.push(`'${m}'`);
+                    msgHashesMap[m] = 1;
+                }
+            }
+            // (a) read xcm message JSON from  SQL "xcmmessages", storing in xcmmessagesMap
+            // now that we have a map from msgHash => msgStr, we can reannotate any data in the timeline ... but we just return the map to the caller
+            // TODO OPTIMIZATION: this SQL should not be necessary because the msgStr fetched by the SQL is in timeline already
             let xcmmessagesMap = {};
             if (msgHashes.length > 0) {
                 let msgHashesStr = msgHashes.join(",");
                 var sql2 = `select msgHash, msgStr from xcmmessages where msgHash in (${msgHashesStr})`
                 let xcmmessages = await this.poolREADONLY.query(sql2);
                 for (let k = 0; k < xcmmessages.length; k++) {
-                    let x = xcmmessages[k];
-                    xcmmessagesMap[x.msgHash] = x.msgStr;
+                    xcmmessagesMap[xcmmessages[k].msgHash] = xcmmessages[k].msgStr;
                 }
             }
-            // now that we have a map from msgHash => msgStr, we can reannotate any data in the timeline ... but we just return the map to the caller
+
+            // (b) filter out blocks from timeline that have no matching xcm
+            let requireTimelineOnlyHasMatchingXCMMessages = true;
+            if (requireTimelineOnlyHasMatchingXCMMessages) {
+                // only return elements in the timeline where the block has msgHashes that intersect with the those that matched
+                timeline = timeline.filter((t) => {
+                    if (t.msgHashes == undefined) return (false);
+                    for (let m = 0; m < t.msgHashes.length; m++) {
+                        if (msgHashesMap[t.msgHashes[m].msgHash] != undefined) {
+                            return (true);
+                        }
+                    }
+                    return (false);
+                })
+            }
 
             return [timeline, xcmmessagesMap];
         } catch (err) {

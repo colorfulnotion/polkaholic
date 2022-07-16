@@ -1170,6 +1170,8 @@ function submitSuggestion(address, nickname, submitter, addressType) {
 
     try {
         console.log("submitSuggestion", endpoint, data)
+        $('#suggestModal').modal('hide');
+        // TODO: address cross-domain 
         fetch(req)
             .then((response) => {
                 console.log(response);
@@ -1178,8 +1180,6 @@ function submitSuggestion(address, nickname, submitter, addressType) {
                 } else {
                     launchToast("An error has occurred.");
                 }
-                console.log("HIDING")
-                $('#suggestModal').modal('hide');
             })
     } catch (err) {
         console.log(err);
