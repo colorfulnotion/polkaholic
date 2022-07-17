@@ -1415,7 +1415,7 @@ order by chainID, extrinsicHash, diffTS`
             let r = this.crowdloan[crowdloanKeys[i]];
             let fromAddress = paraTool.getPubKey(r.account);
             let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.chainID}'`,
-			   `'${r.blockNumber}'`, `'${r.ts}'`, `'${r.section}'`, `'${r.method}'`, `'${fromAddress}'`, `'${r.paraID}'`, `'${r.amount}'`, `${mysql.escape(r.memo)}`, `${mysql.escape(r.remark)}`
+                `'${r.blockNumber}'`, `'${r.ts}'`, `'${r.section}'`, `'${r.method}'`, `'${fromAddress}'`, `'${r.paraID}'`, `'${r.amount}'`, `${mysql.escape(r.memo)}`, `${mysql.escape(r.remark)}`
             ].join(",") + ")";
             if (!this.knownParaID(r.paraID)) {
                 this.readyToCrawlParachains = true;
@@ -1430,7 +1430,7 @@ order by chainID, extrinsicHash, diffTS`
         }
         this.crowdloan = {};
         // --- crowdloan
-	let vals = ["extrinsicID", "chainID", "blockNumber", "ts", "section", "method", "fromAddress", "paraID", "amount", "memo", "remark"];
+        let vals = ["extrinsicID", "chainID", "blockNumber", "ts", "section", "method", "fromAddress", "paraID", "amount", "memo", "remark"];
         await this.upsertSQL({
             "table": "crowdloan",
             "keys": ["extrinsicHash"],
@@ -3428,7 +3428,7 @@ order by chainID, extrinsicHash, diffTS`
 
         //let's assume crowdloan events come in pairs of Contributed+MemoUpdated or Contributed+remarks
         for (const rawFeedCrowdloan of rawFeedCrowdloans) {
-            if (rawFeedCrowdloan.method == "Contributed" ){
+            if (rawFeedCrowdloan.method == "Contributed") {
                 let accountParaID = `${rawFeedCrowdloan.account}${rawFeedCrowdloan.paraID}`
                 let crowdloanrec = this.decorateFeedCrowdLoan(feed, rawFeedCrowdloan, blockTS)
                 if (feedcrowdloansMap[accountParaID] != undefined) {
