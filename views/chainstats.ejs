@@ -1,6 +1,5 @@
 <div class="card-group">
 
-
 <%- include("stats", { name: "Extrinsics", id: chain.id, numTot: chain.numExtrinsics, num7d: chain.numExtrinsics7d, num30d: chain.numExtrinsics30d }) %>
 
 <%- include("stats", { name: "Signed Ext", numTot: chain.numSignedExtrinsics, num7d: chain.numSignedExtrinsics7d, num30d: chain.numSignedExtrinsics30d }) %>
@@ -39,5 +38,25 @@
 }) %>
 
 <%- include("stats0", { name: "# Holders", numHolders: chain.numHolders, totalIssuance: chain.totalIssuance, relayChain: chain.relayChain, paraID: chain.paraID }) %>
+
+<div class="card" style="width: 18rem;">
+  <div class="card-body">
+<% if ( chain.dappURL ) { %>
+   <a class="btn-lg btn-primary" href="<%= chain.dappURL; %>" target="_new">APP</a>
+<% } %>
+
+  <div style='height:50px'></div>
+
+<% if ( chain.parachainsURL ) { %>
+   <a class="btn-sm btn-outline-secondary" href="<%= chain.parachainsURL; %>" target="_new">parachains.info</a>
+<% } %>
+
+
+<% if ( chain.githubURL ) { %>
+   <a class="btn-sm btn-outline-secondary" href="<%= chain.githubURL; %>" target="_new">github</a>
+<% } %>
+
+  </div>
+</div>
 
 </div>

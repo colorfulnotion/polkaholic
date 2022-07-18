@@ -611,7 +611,7 @@ module.exports = class PolkaholicDB {
     // For internal API call: contains sensitive info
     // TODO: external api should call getChains_external instead
     async getChains(crawling = 1, orderBy = "valueTransfersUSD7d DESC") {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, blocksCovered, blocksFinalized, symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS, unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numHolders, relayChain, totalIssuance, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus from chain where crawling = ${crawling} order by ${orderBy}`);
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, blocksCovered, blocksFinalized, symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS, unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numHolders, relayChain, totalIssuance, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL from chain where crawling = ${crawling} order by ${orderBy}`);
         return (chains);
     }
 
@@ -628,7 +628,7 @@ module.exports = class PolkaholicDB {
 
     // For external API call: senstive info are NOT returned
     async get_chains_external(crawling = 1) {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, CONCAT(UPPER(SUBSTRING(chainName,1,1)),LOWER(SUBSTRING(chainName,2))) AS chainName, upper(symbol) as symbol, unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numHolders, relayChain, totalIssuance, isEVM, blocksCovered, blocksFinalized, crawlingStatus from chain where crawling = ${crawling} order by relayChain, id, chainID;`);
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, CONCAT(UPPER(SUBSTRING(chainName,1,1)),LOWER(SUBSTRING(chainName,2))) AS chainName, upper(symbol) as symbol, unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numHolders, relayChain, totalIssuance, isEVM, blocksCovered, blocksFinalized, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL from chain where crawling = ${crawling} order by relayChain, id, chainID;`);
         return (chains);
     }
 

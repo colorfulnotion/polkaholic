@@ -901,7 +901,7 @@ module.exports = class Query extends AssetManager {
             numXCMTransferOutgoing, numXCMTransferOutgoing7d, numXCMTransferOutgoing30d,
             valXCMTransferIncomingUSD, valXCMTransferIncomingUSD7d, valXCMTransferIncomingUSD30d,
             valXCMTransferOutgoingUSD, valXCMTransferOutgoingUSD7d, valXCMTransferOutgoingUSD30d,
-            isEVM from chain where chainID = ${chainID}`)
+            subscanURL, dappURL, githubURL, parachainsURL, isEVM from chain where chainID = ${chainID}`)
             if (chains.length == 1) {
                 let chainInfo = chains[0]
                 if (chainInfo.isEVM) {
@@ -2411,6 +2411,8 @@ module.exports = class Query extends AssetManager {
                 let ss58Format = this.chainInfos[chainID].ss58Format;
                 let ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
                 let iconUrl = this.chainInfos[chainID].iconUrl;
+                let subscanURL = this.chainInfos[chainID].subscanURL;
+                let dappURL = this.chainInfos[chainID].dappURL;
                 chainsMap[chainID] = {
                     chainID,
                     chainName,
@@ -2418,6 +2420,8 @@ module.exports = class Query extends AssetManager {
                     ss58Format,
                     ss58Address,
                     iconUrl,
+                    subscanURL,
+                    dappURL,
                     assets: [],
                     balanceUSD: 0
                 };
@@ -2701,8 +2705,15 @@ module.exports = class Query extends AssetManager {
                                 }
                                 let relayChain = this.getRelayChainByChainID(parseInt(t['chainID'], 10))
                                 t['chainIDDest'] = this.getChainIDFromParaID(parseInt(t['paraID'], 10), relayChain);
+
                                 if (t['chainIDDest']) {
                                     t['chainDestName'] = this.getChainName(t['chainIDDest']);
+                                    if (this.chainInfos[t['chainIDDest']] != undefined) {
+                                        t['id'] = this.chainInfos[t['chainIDDest']].id;
+                                        t['iconUrl'] = this.chainInfos[t['chainIDDest']].iconUrl;
+                                        t['dappURL'] = this.chainInfos[t['chainIDDest']].dappURL;
+                                        t['parachainsURL'] = this.chainInfos[t['chainIDDest']].parachainsURL;
+                                    }
                                     if (numItems < maxRows) {
                                         crowdloans.push(t);
                                         numItems++;

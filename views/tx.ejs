@@ -124,8 +124,23 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
     </tr>
     <tr>
       <td>Params</td>
-      <td><%- include("txparams", {section: f.section, method: f.method, params: f.params, id: txHash}); %></td>
+      <td>
+        <div id="params" class="renderjson"></div>
+        <script>
+  	 document.getElementById("params").appendChild(renderjson.set_show_to_level(3)(<%- JSON.stringify(f.params) %>));
+	</script>
+      </td>
     </tr>
+  <tr>
+    <td>Compare to</td>
+    <td>
+      <% if ( chain.subscanURL ) {
+         let subscanURL = `${chain.subscanURL}/extrinsic/${f.extrinsicHash}`;
+         %> 
+      <a href="<%= subscanURL; %>" target="_new"><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
+      <% }%>
+    </td>
+  </tr>
     <tr>
       <td>Events</td>
       <td>
