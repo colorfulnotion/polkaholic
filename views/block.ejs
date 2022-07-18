@@ -120,7 +120,7 @@ for (let i=0; i<tabs.length; i++) {
   let defHash = "extrinsics";
   if ( b.evmBlock ) {
         defHash = "evmtxs";   %>
-  <%- include("evmBlock", {block: b.evmBlock}); %>
+  <%- include("evmBlock", {block: b.evmBlock, chainID: chainID}); %>
   <% } %>
   <%- include("blockextrinsics", {chainID: chainID, id:id, extrinsics: b.extrinsics }); %>
   <%- include("blockevents", {chainID: chainID, id: id, extrinsics: b.extrinsics }); %>

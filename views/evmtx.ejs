@@ -134,6 +134,25 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
     </tr>
 
 
+    <tr>
+      <td>Compare to</td>
+      <td>
+        <% if ( f.chainID && (f.chainID == 2004 || f.chainID == 22023)) {
+           let externalURL = (f.chainID == 2004)? `https://moonscan.io` : `https://moonriver.moonscan.io`
+           let imgURL = `${externalURL}/images/svg/brands/main.svg`
+           let txURL = `${externalURL}/tx/${f.transactionHash}`;
+           %>
+        <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>
+        <% }%>
+        <% if ( f.chainID && (f.chainID == 2006 || f.chainID == 22007)) {
+           let externalURL = (f.chainID == 2006)? `https://blockscout.com/astar` : `https://blockscout.com/shiden`
+           let imgURL = `https://blockscout.com/astar/images/favicon-32x32-4ded6db466a407f532e22de62b14fb01.png?vsn=d`
+           let txURL = `${externalURL}/tx/${f.transactionHash}`;
+           %>
+        <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>
+        <% }%>
+      </td>
+    </tr>
 
 </table>
 
