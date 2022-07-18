@@ -134,9 +134,9 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
   <tr>
     <td>Compare to</td>
     <td>
-      <% if ( chain.subscanURL ) {
-         let subscanURL = `${chain.subscanURL}/extrinsic/${f.extrinsicHash}`;
-         %> 
+      <% if ( chain.subscanURL) {
+         let subscanURL = (f.signer)? `${chain.subscanURL}/extrinsic/${f.extrinsicHash}` : `${chain.subscanURL}/extrinsic/${f.extrinsicID}`;
+         %>
       <a href="<%= subscanURL; %>" target="_new"><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
       <% }%>
     </td>
