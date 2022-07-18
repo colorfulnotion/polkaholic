@@ -826,7 +826,16 @@ function showcrowdloans(address) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         if (row.chainDestName !== undefined) {
-                            return presentChain(row.chainIDDest, row.chainDestName);
+                            let subexplorerURL = `https://${row.id}.polkaholic.io`;
+                            let links = [`<a href='${subexplorerURL}'>explorer</a>`];
+                            if (row.dappURL) {
+                                links.push(`<a href='${row.dappURL}'>app</a>`);
+                            }
+                            if (row.parachainsURL) {
+                                links.push(`<a href='${row.parachainsURL}'>parachains.info</a>`);
+                            }
+                            let links_str = "<div class='explorer'>" + links.join(" | ") + "</div>";
+                            return presentChain(row.chainIDDest, row.chainDestName, row.iconUrl) + links_str;
                         } else {
                             return row.chainIDDest;
                         }

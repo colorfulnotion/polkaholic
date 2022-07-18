@@ -7,6 +7,7 @@
 </div>
 <% } %>
 
+
 <%- include('chainstats', {chain: chain}); %>
 
 <ul class="nav nav-tabs" id="chainTab" role="tablist">
@@ -112,22 +113,16 @@ for (let i=0; i<tabs.length; i++) {
     <th scope="col">Blocks Finalized</th><td><%= chain.blocksFinalized %> <%- uiTool.presentTS(chain.lastFinalizedTS); %></td>
    </tr>
    <tr>
-    <th scope="col">WS Endpoint(s)</th>
+    <th scope="col">Public WS Endpoint(s)</th>
     <td>
    <%
    let traceCoverage = ( chain.blocksFinalized > 0 ) ? 100.0 * chain.numTraces / chain.blocksFinalized : 0;
-    let endpoints = [];
-   if ( chain.WSEndpoint && chain.WSEndpoint.length > 0 && ! chain.WSEndpoint.includes("polkaholic.io") ) {
-     endpoints.push(chain.WSEndpoint);
-   }
-   if ( chain.WSEndpoint2 && chain.WSEndpoint2.length > 0 && ! chain.WSEndpoint2.includes("polkaholic.io")  ) {
-     endpoints.push(chain.WSEndpoint2);
-   }
-   if ( chain.WSEndpoint3 && chain.WSEndpoint3.length > 0  && ! chain.WSEndpoint3.includes("polkaholic.io") ) {
-     endpoints.push(chain.WSEndpoint3);
-   }
+    let endpoints = uiTool.getPublicWSEndpoints(chain);
+    let endpointlinks = endpoints.map( (e) => {
+       return  `<a href='https://polkadot.js.org/apps/?rpc=${encodeURIComponent(e)}' target='_new'>${e}</a>`
+   });
    %>
-   <%= endpoints.join(", ") %>
+   <%- endpointlinks.join(" | ") %>
     </td>
    </tr>
    <tr>
@@ -142,6 +137,26 @@ for (let i=0; i<tabs.length; i++) {
    <tr>
     <th scope="col">Asset Symbol</th><td><%= chain.symbol; %></td>
    </tr>
+   <% if ( chain.githubURL ) { %>
+   <tr>
+    <th scope="col">Github URL</th><td><a href="<%= chain.githubURL; %>" target="_new"><%= chain.githubURL; %></a></td>
+   </tr>
+   <% } %>
+   <% if ( chain.parachainsURL ) { %>
+   <tr>
+    <th scope="col">Parachains.info</th><td><a href="<%= chain.parachainsURL; %>" target="_new"><%= chain.parachainsURL; %></a></td>
+   </tr>
+   <% } %>
+   <% if ( chain.substrateURL ) { %>
+   <tr>
+    <th scope="col">Substrate.io Marketplace</th><td><a href="<%= chain.substrateURL; %>" target="_new"><%= chain.substrateURL; %></a></td>
+   </tr>
+   <% } %>
+   <% if ( chain.subscanURL ) { %>
+   <tr>
+    <th scope="col">Subscan URL</th><td><a href="<%= chain.subscanURL; %>" target="_new"><%= chain.subscanURL; %></a></td>
+   </tr>
+   <% } %>
   </table>
 </div>
 </div>

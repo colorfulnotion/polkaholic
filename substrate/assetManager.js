@@ -86,7 +86,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     // reads all the decimals from the chain table and then the asset mysql table
     async init_chainInfos() {
         //TODO: adjust getSystemProperties to handle case where chain that does not have a "asset" specified (or use left join here) will get one
-        var chains = await this.poolREADONLY.query(`select id, chain.chainID, chain.chainName, relayChain, paraID, ss58Format, isEVM, chain.iconUrl, asset.asset, asset.symbol, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange from chain left join asset on chain.chainID = asset.chainID and chain.asset = asset.asset where ( crawling = 1 or paraID > 0 and id is not null);`);
+        var chains = await this.poolREADONLY.query(`select id, chain.chainID, chain.chainName, relayChain, paraID, ss58Format, isEVM, chain.iconUrl, asset.asset, asset.symbol, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange, githubURL, subscanURL, parachainsURL, dappURL from chain left join asset on chain.chainID = asset.chainID and chain.asset = asset.asset where ( crawling = 1 or paraID > 0 and id is not null);`);
         var specVersions = await this.poolREADONLY.query(`select chainID, blockNumber, specVersion from specVersions order by chainID, blockNumber`);
         var assets = await this.poolREADONLY.query(`select asset, chainID, symbol, decimals from asset where decimals is not Null and asset not like '0x%' `);
         // +---------+-----------------------+---------------+-----------------------+----------+-------+----------+-----------------------+
@@ -113,7 +113,11 @@ module.exports = class AssetManager extends PolkaholicDB {
                 priceUSDPercentChange: (chain.priceUSDPercentChange != undefined) ? chain.priceUSDPercentChange : 0,
                 relayChain: chain.relayChain,
                 paraID: paraID,
-                isEVM: (chain.isEVM == 1) ? true : false
+                isEVM: (chain.isEVM == 1) ? true : false,
+                githubURL: chain.githubURL,
+                subscanURL: chain.subscanURL,
+                parachainsURL: chain.parachainsURL,
+                dappURL: chain.dappURL
             } //use the first decimal until we see an "exception"
             chainInfoMap[chain.chainID] = info
             chainNameMap[chain.id] = info

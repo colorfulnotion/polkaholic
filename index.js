@@ -1111,10 +1111,14 @@ app.get('/tx/:txhash', async (req, res) => {
         let tx = await query.getTransaction(txHash, decorate, decorateExtra);
         if (tx) {
             let txview = 'tx';
-            if (tx.to) txview = 'evmtx';
+            if (tx.to) {
+                txview = 'evmtx';
+            }
+            let chain = await query.getChain(tx.chainID);
             res.render(txview, {
                 txHash: txHash,
                 tx: tx,
+                chain: chain,
                 chainInfo: query.getChainInfo(tx.chainID),
                 apiUrl: req.path,
                 docsSection: "get-transaction"

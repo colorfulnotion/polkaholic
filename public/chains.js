@@ -74,7 +74,12 @@ async function show_chains() {
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
                             let subexplorerURL = `https://${row.id}.polkaholic.io`;
-                            return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus) + `<div class="explorer"><a href='${subexplorerURL}'>explorer</a></div>`
+                            console.log(row);
+                            let links = [`<a href='${subexplorerURL}'>explorer</a>`];
+                            if (row.dappURL) {
+                                links.push(`<a href='${row.dappURL}' target='_new'>app</a>`);
+                            }
+                            return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus) + `<div class="explorer">` + links.join(" | ") + `</div>`
                         }
                         return row.chainName;
                     }

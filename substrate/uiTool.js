@@ -601,5 +601,18 @@ module.exports = {
         return timeline.map((t) => {
             return [t.id, t.blockNumber.toString(), t.blockTS, t.blockTS + 6, t.objects, t.extra]
         });
+    },
+    getPublicWSEndpoints: function(chain) {
+        let endpoints = [];
+        if (chain.WSEndpoint && chain.WSEndpoint.length > 0 && !chain.WSEndpoint.includes("polkaholic.io")) {
+            endpoints.push(chain.WSEndpoint);
+        }
+        if (chain.WSEndpoint2 && chain.WSEndpoint2.length > 0 && !chain.WSEndpoint2.includes("polkaholic.io")) {
+            endpoints.push(chain.WSEndpoint2);
+        }
+        if (chain.WSEndpoint3 && chain.WSEndpoint3.length > 0 && !chain.WSEndpoint3.includes("polkaholic.io")) {
+            endpoints.push(chain.WSEndpoint3);
+        }
+        return endpoints;
     }
 };
