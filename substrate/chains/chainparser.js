@@ -2825,6 +2825,125 @@ module.exports = class ChainParser {
         }
     }
 
+    //moonbeam/heiko
+    async fetchAssetManagerAssetIdType(indexer) {
+        if (!indexer.api) {
+            console.log(`[fetchAssetManagerAssetIdType] Fatal indexer.api not initiated`)
+            return
+        }
+        let relayChain = indexer.relayChain
+        let relayChainID = (relayChain == 'polkadot') ? 0 : 2
+        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+
+        var a;
+        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver){
+          var a = await indexer.api.query.assetManager.assetIdType.entries()
+        }else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko){
+          var a = await indexer.api.query.assetRegistry.assetIdType.entries()
+        }
+        if (!a) return
+        let assetList = {}
+
+        a.forEach(async ([key, val]) => {
+            let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let parsedAsset = {
+                Token: assetID
+            }
+            let paraID = 0
+            let chainID = -1
+
+            var asset = JSON.stringify(parsedAsset);
+            let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
+            let cachedAssetInfo = indexer.assetInfo[assetChain]
+            if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
+                //cached found
+                //console.log(`cached AssetInfo found`, cachedAssetInfo)
+                let symbol = (cachedAssetInfo.symbol)? cachedAssetInfo.symbol.replace('xc','') : ''
+                let nativeSymbol = symbol
+
+                let xcmAsset = val.toJSON().xcm
+                let parents = xcmAsset.parents
+                let interior = xcmAsset.interior
+                //x1/x2/x3 refers to the number to params
+                let interiorK = Object.keys(interior)[0]
+                let interiorV = interior[interiorK]
+                let interiorVStr = JSON.stringify(interiorV)
+                if (interiorK == 'here' && interior[interiorK] == null){
+                  interiorVStr = 'here'
+                  chainID = relayChainID
+                }
+
+                if (interiorK == 'here'){
+                  //relaychain case
+                  chainID = relayChainID
+                }else if (interiorK == 'x1'){
+                  paraID = interiorV['parachain']
+                  chainID = paraID + paraIDExtra
+                }else{
+                  let generalIndex = -1
+                  for (const v of interiorV){
+                    if (v.parachain != undefined){
+                        paraID = v.parachain
+                        chainID = paraID + paraIDExtra
+                    }else if (v.generalIndex != undefined){
+                      generalIndex = v.generalIndex
+                    }
+                  }
+                  //over-write statemine asset with assetID
+
+                  if (paraID == 1000){
+                    nativeSymbol = `${generalIndex}`
+                  }
+                }
+                if (symbol == 'AUSD'){
+                  nativeSymbol = 'KUSD'
+                }else if (symbol == 'aUSD'){
+                  nativeSymbol = 'AUSD'
+                }
+                let nativeParsedAsset = {
+                    Token: nativeSymbol
+                }
+                var nativeAsset = JSON.stringify(nativeParsedAsset);
+
+                /*
+
+                //Moonbeam Registry
+                2000	[{"parachain":2000},{"generalKey":"0x0001"}]	      {"Token":"aUSD"}[2000] |	[AUSD]	[x2]
+                2012	[{"parachain":2012},{"generalKey":"0x50415241"}]	  {"Token":"PARA"}[2012] |	[PARA]	[x2]
+                0	    here	                                                {"Token":"DOT"}	[0]  |	[DOT]	[here]
+                2000	[{"parachain":2000},{"generalKey":"0x0000"}]	       {"Token":"ACA"}[2000] |	[ACA]	[x2]
+
+                //Moonriver Registry
+                22012	{"parachain":2012}	                                {"Token":"CSM"}	[2012] |	[CSM]	[x1]
+                22007	{"parachain":2007}	                                {"Token":"SDN"}	[2007] |	[SDN]	[x1]
+                22085	[{"parachain":2085},{"generalKey":"0x484b4f"}]	    {"Token":"HKO"}	[2085] |	[HKO]	[x2]
+                22092	[{"parachain":2092},{"generalKey":"0x000b"}]	      {"Token":"KBTC"}[2092] |	[KBTC]	[x2]
+                22084	{"parachain":2084}	                                { "Token":"KMA"}[2084] |	[KMA]	[x1]
+                22105	[{"parachain":2105},{"palletInstance":5}]	          {"Token":"CRAB"}[2105] |	[CRAB]	[x2]
+                22004	{"parachain":2004}	                                {"Token":"PHA"} [2004] |	[PHA]	[x1]
+                22000	[{"parachain":2000},{"generalKey":"0x0081"}]	      {"Token":"AUSD"}[2000] |	[KUSD]	[x2]
+                22092	[{"parachain":2092},{"generalKey":"0x000c"}]    	  {"Token":"KINT"}[2092] |	[KINT]	[x2]
+                22015	[{"parachain":2015},{"generalKey":"0x54454552"}]	  {"Token":"TEER"}[2015] |	[TEER]	[x2]
+                2	    here	{"Token":"KSM"}	                                                 [0] |	[KSM]	[here]
+                22000	[{"parachain":2000},{"generalKey":"0x0080"}]	      {"Token":"KAR"} [2000] |	[KAR]	[x2]
+                22001	[{"parachain":2001},{"generalKey":"0x0001"}]	      {"Token":"BNC"} [2001] |	[BNC]	[x2]
+                21000	[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]	  {"Token":"1984"}[1000] |	[USDT]	[x3]
+                21000	[{"parachain":1000},{"palletInstance":50},{"generalIndex":8}]	         {"Token":"8"}[1000] |	[RMRK]	[x3]
+
+                //Heiko Registry
+                21000 [{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]    {"Token":"1984"} [1000] | [USDT] [x3]
+                */
+
+                console.log(`${chainID} ${interiorVStr} ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
+                //await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAsset');
+            }else{
+              console.log(`AssetInfo unknown -- skip`, assetChain)
+            }
+        });
+    }
+
+
     //moonbeam/parallel/astar
     async fetchAsset(indexer) {
         if (!indexer.api) {
@@ -2832,6 +2951,7 @@ module.exports = class ChainParser {
             return
         }
         var a = await indexer.api.query.assets.metadata.entries()
+
         let assetList = {}
         a.forEach(async ([key, val]) => {
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma

@@ -5711,10 +5711,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint) {
             console.log(`fetch asset:metadata`)
             await this.chainParser.fetchAsset(this)
+            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel){
+              console.log(`fetch assetManager:assetIdType`)
+              await this.chainParser.fetchAssetManagerAssetIdType(this)
+            }
         } else if (this.chainID == paraTool.chainIDKico) {
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)
             await this.chainParser.fetchCurrenciesDicoAssetInfos(this)
         }
+
         await this.get_skipStorageKeys();
         await this.getChainERCAssets(this.chainID);
 
