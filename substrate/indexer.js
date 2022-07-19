@@ -5699,14 +5699,19 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
     async setup_chainParser(chain, debugLevel = paraTool.debugNoLog) {
         await this.chainParserInit(chain.chainID, debugLevel);
-        let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrost]
+        let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrostKSM, paraTool.chainIDBifrostDOT]
         let assetMetaChain = [paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDHeiko, paraTool.chainIDParallel]
-        if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala || this.chainID == paraTool.chainIDBifrost) {
+        if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala || this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
             //TODO: fetch assetRegistry:assetMetadatas
             console.log(`Fetch assetRegistry:assetMetadatas`)
             await this.chainParser.fetchAssetRegistry(this)
             if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala) {
-                await this.chainParser.updateLiquidityInfo(this)
+                console.log(`Fetch assetRegistry:foreignAssetLocations`)
+                await this.chainParser.fetchAssetRegistryForeignAssetLocations(this)
+            }
+            if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
+                //console.log(`Fetch assetRegistry:foreignAssetLocations`)
+                //await this.chainParser.fetchAssetRegistryForeignAssetLocations(this)
             }
         } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint) {
             console.log(`fetch asset:metadata`)

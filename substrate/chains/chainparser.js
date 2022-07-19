@@ -50,7 +50,7 @@ module.exports = class ChainParser {
             }
 
             // bifrost
-            if (paraTool.chainIDBifrost) {
+            if (paraTool.chainIDBifrostKSM) {
                 if (i.native != undefined) {
                     // BNC
                     o['Token'] = i.native
@@ -100,7 +100,7 @@ module.exports = class ChainParser {
         }
 
         // bifrost
-        if (paraTool.chainIDBifrost) {
+        if (paraTool.chainIDBifrostKSM) {
             if (i.native != undefined) {
                 // BNC
                 o['Token'] = i.native
@@ -2872,6 +2872,12 @@ module.exports = class ChainParser {
                   interiorVStr = 'here'
                   chainID = relayChainID
                 }
+                let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
+                let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined){
+                      console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                      return
+                }
 
                 if (interiorK == 'here'){
                   //relaychain case
@@ -2908,35 +2914,49 @@ module.exports = class ChainParser {
                 /*
 
                 //Moonbeam Registry
-                2000	[{"parachain":2000},{"generalKey":"0x0001"}]	      {"Token":"aUSD"}[2000] |	[AUSD]	[x2]
-                2012	[{"parachain":2012},{"generalKey":"0x50415241"}]	  {"Token":"PARA"}[2012] |	[PARA]	[x2]
-                0	    here	                                                {"Token":"DOT"}	[0]  |	[DOT]	[here]
-                2000	[{"parachain":2000},{"generalKey":"0x0000"}]	       {"Token":"ACA"}[2000] |	[ACA]	[x2]
+                2000	'[{"parachain":2000},{"generalKey":"0x0001"}]'	      {"Token":"AUSD"}[2000] |	[aUSD]	[x2]
+                2012	'[{"parachain":2012},{"generalKey":"0x50415241"}]'	  {"Token":"PARA"}[2012] |	[PARA]	[x2]
+                0	    'here'	                                              {"Token":"DOT"}	[0]    |	[DOT]	[here]
+                2000	'[{"parachain":2000},{"generalKey":"0x0000"}]'	      {"Token":"ACA"}[2000]  |	[ACA]	[x2]
 
                 //Moonriver Registry
-                22012	{"parachain":2012}	                                {"Token":"CSM"}	[2012] |	[CSM]	[x1]
-                22007	{"parachain":2007}	                                {"Token":"SDN"}	[2007] |	[SDN]	[x1]
-                22085	[{"parachain":2085},{"generalKey":"0x484b4f"}]	    {"Token":"HKO"}	[2085] |	[HKO]	[x2]
-                22092	[{"parachain":2092},{"generalKey":"0x000b"}]	      {"Token":"KBTC"}[2092] |	[KBTC]	[x2]
-                22084	{"parachain":2084}	                                { "Token":"KMA"}[2084] |	[KMA]	[x1]
-                22105	[{"parachain":2105},{"palletInstance":5}]	          {"Token":"CRAB"}[2105] |	[CRAB]	[x2]
-                22004	{"parachain":2004}	                                {"Token":"PHA"} [2004] |	[PHA]	[x1]
-                22000	[{"parachain":2000},{"generalKey":"0x0081"}]	      {"Token":"AUSD"}[2000] |	[KUSD]	[x2]
-                22092	[{"parachain":2092},{"generalKey":"0x000c"}]    	  {"Token":"KINT"}[2092] |	[KINT]	[x2]
-                22015	[{"parachain":2015},{"generalKey":"0x54454552"}]	  {"Token":"TEER"}[2015] |	[TEER]	[x2]
-                2	    here	{"Token":"KSM"}	                                                 [0] |	[KSM]	[here]
-                22000	[{"parachain":2000},{"generalKey":"0x0080"}]	      {"Token":"KAR"} [2000] |	[KAR]	[x2]
-                22001	[{"parachain":2001},{"generalKey":"0x0001"}]	      {"Token":"BNC"} [2001] |	[BNC]	[x2]
-                21000	[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]	  {"Token":"1984"}[1000] |	[USDT]	[x3]
-                21000	[{"parachain":1000},{"palletInstance":50},{"generalIndex":8}]	         {"Token":"8"}[1000] |	[RMRK]	[x3]
+                22012	'{"parachain":2012}'	                                {"Token":"CSM"}	[2012] |	[CSM]	[x1]
+                22007	'{"parachain":2007}'	                                {"Token":"SDN"}	[2007] |	[SDN]	[x1]
+                22085	'[{"parachain":2085},{"generalKey":"0x484b4f"}]'	    {"Token":"HKO"}	[2085] |	[HKO]	[x2]
+                22092	'[{"parachain":2092},{"generalKey":"0x000b"}]'	      {"Token":"KBTC"}[2092] |	[KBTC]	[x2]
+                22084	'{"parachain":2084}'	                                {"Token":"KMA"} [2084] |	[KMA]	[x1]
+                22105	'[{"parachain":2105},{"palletInstance":5}]'	          {"Token":"CRAB"}[2105] |	[CRAB]	[x2]
+                22004	'{"parachain":2004}'	                                {"Token":"PHA"} [2004] |	[PHA]	[x1]
+                22000	'[{"parachain":2000},{"generalKey":"0x0081"}]'	      {"Token":"KUSD"}[2000] |	[AUSD]	[x2]
+                22092	'[{"parachain":2092},{"generalKey":"0x000c"}]'    	  {"Token":"KINT"}[2092] |	[KINT]	[x2]
+                22015	'[{"parachain":2015},{"generalKey":"0x54454552"}]'	  {"Token":"TEER"}[2015] |	[TEER]	[x2]
+                2	    'here'	                                              {"Token":"KSM"}    [0] |	[KSM]	[here]
+                22000	'[{"parachain":2000},{"generalKey":"0x0080"}]'	      {"Token":"KAR"} [2000] |	[KAR]	[x2]
+                22001	'[{"parachain":2001},{"generalKey":"0x0001"}]'	      {"Token":"BNC"} [2001] |	[BNC]	[x2]
+                21000	'[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'	  {"Token":"1984"}[1000] |	[USDT]	[x3]
+                21000	'[{"parachain":1000},{"palletInstance":50},{"generalIndex":8}]'	         {"Token":"8"}[1000] |	[RMRK]	[x3]
 
                 //Heiko Registry
-                21000 [{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]    {"Token":"1984"} [1000] | [USDT] [x3]
+                21000 '[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'    {"Token":"1984"} [1000] | [USDT] [x3]
                 */
 
-                console.log(`${chainID} ${interiorVStr} ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
-                //if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
-                //await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAsset');
+                //console.log(`${chainID} '${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
+
+                let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
+                let xcmAssetInfo = {
+                  chainID: chainID,
+                  xcmConcept: interiorVStr, //interior
+                  asset: nativeAsset,
+                  paraID: paraID,
+                  relayChain: relayChain,
+                  parents: parents,
+                  interiorType: interiorK,
+                  xcmInteriorKey: xcmInteriorKey,
+                  nativeAssetChain: nativeAssetChain,
+                }
+                //console.log(`xcmAssetInfo`, xcmAssetInfo)
+                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');
             }else{
               console.log(`AssetInfo unknown -- skip`, assetChain)
             }
@@ -3032,6 +3052,134 @@ module.exports = class ChainParser {
             }
         });
         if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
+    }
+
+    //acala/karura
+    async fetchAssetRegistryForeignAssetLocations(indexer) {
+        let isAcala = true;
+        if (!indexer.api) {
+            console.log(`[fetchAssetRegistryForeignAssetLocations] Fatal indexer.api not initiated`)
+            return
+        }
+        let relayChain = indexer.relayChain
+        let relayChainID = (relayChain == 'polkadot') ? 0 : 2
+        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+
+        var a;
+        if (indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDKarura){
+          var a = await indexer.api.query.assetRegistry.foreignAssetLocations.entries()
+        }else if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT){
+          //var a = await indexer.api.query.assetRegistry.currencyIdToLocations.entries()
+          isAcala = false
+        }
+        if (!a) return
+        let assetList = {}
+
+        a.forEach(async ([key, val]) => {
+            let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let parsedAsset = {};
+            if (isAcala){
+              parsedAsset.ForeignAsset = assetID
+            }
+            let paraID = 0
+            let chainID = -1
+
+            var asset = JSON.stringify(parsedAsset);
+            let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
+            let cachedAssetInfo = indexer.assetInfo[assetChain]
+            if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
+                //cached found
+                //console.log(`cached AssetInfo found`, cachedAssetInfo)
+                let symbol = (cachedAssetInfo.symbol)? cachedAssetInfo.symbol : ''
+                let nativeSymbol = symbol
+
+                let xcmAsset = val.toJSON()
+                let parents = xcmAsset.parents
+                let interior = xcmAsset.interior
+                //x1/x2/x3 refers to the number to params
+
+                let interiorK = Object.keys(interior)[0]
+                let interiork = paraTool.firstCharLowerCase(interiorK)
+                let interiorVRaw = interior[interiorK]
+
+                //console.log(`${interiork} interiorVRaw`, interiorVRaw)
+                let interiorVStr0 = JSON.stringify(interiorVRaw)
+                interiorVStr0.replace('Parachain','parachain').replace('Parachain','parachain').replace('PalletInstance','palletInstance').replace('GeneralIndex','generalIndex').replace('GeneralKey','generalKey')
+                //hack: lower first char
+                let interiorV = JSON.parse(interiorVStr0)
+
+                if ((interiork == 'here') && interior[interiorK] == null){
+                  interiorVStr = 'here'
+                  chainID = relayChainID
+                }
+
+                if (interiork == 'here'){
+                  //relaychain case
+                  chainID = relayChainID
+                }else if (interiork == 'x1'){
+                  paraID = interiorV['parachain']
+                  chainID = paraID + paraIDExtra
+                }else{
+                  let generalIndex = -1
+                  for (let i = 0; i < interiorV.length; i++) {
+                    let v = interiorV[i]
+                    if (v.parachain != undefined){
+                        paraID = v.parachain
+                        chainID = paraID + paraIDExtra
+                    }else if (v.generalIndex != undefined){
+                      generalIndex = v.generalIndex
+                    }else if (v.generalKey != undefined){
+                      let generalKey = v.generalKey
+                      if (generalKey.substr(0,2) != '0x'){
+                          generalKey = paraTool.stringToHex(generalKey)
+                          v.generalKey = generalKey
+                      }
+                    }
+                  }
+                  //over-write statemine asset with assetID
+                  if (paraID == 1000){
+                    nativeSymbol = `${generalIndex}`
+                  }
+                }
+                if (symbol == 'AUSD'){
+                  nativeSymbol = 'KUSD'
+                }else if (symbol == 'aUSD'){
+                  nativeSymbol = 'AUSD'
+                }
+                let nativeParsedAsset = {
+                    Token: nativeSymbol
+                }
+                var nativeAsset = JSON.stringify(nativeParsedAsset);
+                let interiorVStr = JSON.stringify(interiorV)
+
+                let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
+                let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined){
+                      console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                      return
+                }
+
+                //console.log(`${chainID} '${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
+
+                let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
+                let xcmAssetInfo = {
+                  chainID: chainID,
+                  xcmConcept: interiorVStr, //interior
+                  asset: nativeAsset,
+                  paraID: paraID,
+                  relayChain: relayChain,
+                  parents: parents,
+                  interiorType: interiorK,
+                  xcmInteriorKey: xcmInteriorKey,
+                  nativeAssetChain: nativeAssetChain,
+                }
+                //console.log(`xcmAssetInfo`, xcmAssetInfo)
+                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');
+            }else{
+              console.log(`AssetInfo unknown -- skip`, assetChain)
+            }
+        });
     }
 
     //moonbeam/parallel/astar/statemine
@@ -3196,7 +3344,7 @@ module.exports = class ChainParser {
     // universal parser
     getGenericSymbolAndDecimal(indexer, currency_id) {
         try {
-            if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDBifrost) {
+            if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
                 //assetregistry
                 return this.getAssetRegistrySymbolAndDecimals(indexer, currency_id)
             } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
@@ -3222,7 +3370,7 @@ module.exports = class ChainParser {
 
     // universal parser
     processGenericCurrencyID(indexer, currency_id) {
-        if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDBifrost) {
+        if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
             //assetregistry
             return this.processAssetRegistryCurrencyID(indexer, currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
@@ -3238,7 +3386,7 @@ module.exports = class ChainParser {
 
     // strip first layer
     processRawGenericCurrencyID(indexer, currency_id) {
-        if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDBifrost) {
+        if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
             //assetregistry
             return this.token_to_string(currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {

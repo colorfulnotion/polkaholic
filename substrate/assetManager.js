@@ -29,6 +29,7 @@ const ChainParser = require("./chains/chainparser");
 module.exports = class AssetManager extends PolkaholicDB {
     nativeAssetInfo = {};
     assetInfo = {};
+    xcmAssetInfo = {};
     assetlog = {};
     ratelog = {};
     assetlogTTL = 0;
@@ -373,11 +374,15 @@ module.exports = class AssetManager extends PolkaholicDB {
         // reload assetInfo
         await this.init_asset_info()
 
+        // reload xcmAsset
+        await this.init_xcm_asset();
+
         // reload paras
         await this.init_paras();
 
         // init nativeAsset
         await this.init_nativeAssetInfo();
+
         return true
     }
 
@@ -407,6 +412,58 @@ module.exports = class AssetManager extends PolkaholicDB {
         this.nativeAssetInfo = nativeAssetInfo;
         //console.log(`this.nativeAssetInfo`, nativeAssetInfo)
     }
+
+//    |    2012 | [{"parachain":2012},{"generalKey":"0x50415241"}]                 | {"Token":"PARA"} |   2012 | polkadot   |      1 |
+//    |   21000 | [{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}] | {"Token":"1984"} |   1000 | kusama     |      1 |
+/*
+xcmAssetInfo {
+  chainID: 22085,
+  xcmConcept: '[{"parachain":2085},{"generalKey":"0x484b4f"}]',
+  asset: '{"Token":"HKO"}',
+  paraID: 2085,
+  relayChain: 'kusama',
+  parents: 1,
+  interiorType: 'x2',
+  xcmInteriorKey: '[{"parachain":2085},{"generalKey":"0x484b4f"}]~kusama'
+}
+*/
+    async init_xcm_asset() {
+        let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
+        let xcmAssetInfo = {};
+        for (let i = 0; i < xcmAssetRecs.length; i++) {
+            let v = xcmAssetRecs[i];
+            let a = {}
+            // add assetChain (string) + parseUSDpaths (JSON array)
+            let xcmInteriorKey = paraTool.makeXcmInteriorKey(v.xcmConcept, v.relayChain);
+            let nativeAssetChain = paraTool.makeAssetChain(v.asset, v.chainID);
+            //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
+            a = {
+                chainID: v.chainID,
+                xcmConcept: v.xcmConcept,
+                asset: v.asset,
+                paraID: v.paraID,
+                relayChain: v.relayChain,
+                parents: v.parents,
+                xcmInteriorKey: xcmInteriorKey,
+                nativeAssetChain: nativeAssetChain,
+            }
+            //TODO: derive potential interior type?
+            xcmAssetInfo[xcmInteriorKey] = a; //the key has no chainID
+        }
+        this.xcmAssetInfo = xcmAssetInfo;
+        //console.log(`init_xcm_asset !!`, xcmAssetInfo)
+    }
+
+    getXcmAssetInfoByInteriorkey(xcmInteriorKey) {
+      let xcmAssetInfo = this.xcmAssetInfo[xcmInteriorKey]
+      //console.log(`getXcmAssetInfoByInteriorkey k=${xcmInteriorKey}`, xcmAssetInfo)
+      if (xcmAssetInfo != undefined){
+          return xcmAssetInfo
+      }
+      //TODO: expand keys from x1 to x2 for not found case
+      return false
+    }
+
 
     async init_asset_info() {
         let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.asset, asset.symbol, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.chainName, asset.isUSD, priceUSDpaths, nativeAssetChain, currencyID from asset, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow') order by chainID, assetType, asset");
@@ -514,6 +571,31 @@ module.exports = class AssetManager extends PolkaholicDB {
             console.log(`[${caller}] adding this.assetInfo[${assetChain}]`, this.assetInfo[assetChain])
         } else {
             console.log(`adding this.assetInfo[${assetChain}]`, this.assetInfo[assetChain])
+        }
+        this.reloadChainInfo = true;
+    }
+
+    /*
+    2000	'[{"parachain":2000},{"generalKey":"0x0001"}]'	      {"Token":"AUSD"}[2000] |	[aUSD]	[x2]
+    2012	'[{"parachain":2012},{"generalKey":"0x50415241"}]'	  {"Token":"PARA"}[2012] |	[PARA]	[x2]
+    */
+
+    async addXcmAssetInfo(xcmAssetInfo, caller = false) {
+        let out = [`('${xcmAssetInfo.chainID}', '${xcmAssetInfo.xcmConcept}', '${xcmAssetInfo.asset}', '${xcmAssetInfo.paraID}', '${xcmAssetInfo.relayChain}', Now())`]
+        let vals = [`paraID`, `relayChain`, `lastUpdateDT`]
+        await this.upsertSQL({
+            "table": "xcmConcept",
+            "keys": ["chainID", "xcmConcept", "asset"],
+            "vals": vals,
+            "data": out,
+            "replace": vals
+        });
+        let xcmInteriorKey = xcmAssetInfo.xcmInteriorKey
+        this.xcmAssetInfo[xcmInteriorKey] = xcmAssetInfo;
+        if (caller) {
+            console.log(`[${caller}] adding this.xcmAssetInfo[${xcmInteriorKey}]`, this.xcmAssetInfo[xcmInteriorKey])
+        } else {
+            console.log(`adding this.xcmAssetInfo[${xcmInteriorKey}]`, this.xcmAssetInfo[xcmInteriorKey])
         }
         this.reloadChainInfo = true;
     }
