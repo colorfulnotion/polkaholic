@@ -3252,24 +3252,25 @@ module.exports = class ChainParser {
         ]
         */
         //console.log(`assets(Issued) detected`, e)
+
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
-
-        let assetIDWithComma = paraTool.toNumWithComma(paraTool.dechexAssetID(e.data[0]))
+        let d = e.data;
+        let assetIDWithComma = paraTool.toNumWithComma(paraTool.dechexAssetID(d[0]))
         let assetID = this.cleanedAssetID(assetIDWithComma)
-        let fromAddress = paraTool.getPubKey(e.data[1])
+        let fromAddress = paraTool.getPubKey(d[1])
         let parsedAsset = {
             Token: assetID
         }
         let rawAssetString = this.token_to_string(parsedAsset);
 
         //TODO: not sure here..
-        //let assetString = this.processGenericCurrencyID(indexer, e.data[0]);
-        //let rawAssetString = this.processRawGenericCurrencyID(indexer, e.data[0]);
+        //let assetString = this.processGenericCurrencyID(indexer, d[0]);
+        //let rawAssetString = this.processRawGenericCurrencyID(indexer, d[0]);
         //let parsedAsset = JSON.parse(assetString)
         let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
         if (assetInfo != undefined && assetInfo.symbol != undefined) {
-            let amountReceived = paraTool.dechexToInt(parseInt(e.data[2], 10))
+            let amountReceived = paraTool.dechexToInt(d[2])
             let rAasset = {
                 Token: assetInfo.symbol
             }
