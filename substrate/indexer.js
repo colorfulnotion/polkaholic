@@ -3911,8 +3911,13 @@ order by chainID, extrinsicHash, diffTS`
                 if (feedTransfers.length > 0) {
                     feed["transfers"] = this.map_feedTransfers_to_transfers(feedTransfers);
                 }
-                // process xcmtransfer
+
+                // process xcmtransfer extrinsic params
                 this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
+                if (rExtrinsic.xcms == undefined){
+                  //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
+                  this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
+                }
 
                 if (rExtrinsic.xcms != undefined && Array.isArray(rExtrinsic.xcms) && rExtrinsic.xcms.length > 0) {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`[${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length}`, rExtrinsic.xcms)

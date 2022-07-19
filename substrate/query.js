@@ -4869,6 +4869,7 @@ module.exports = class Query extends AssetManager {
                     // if matched, push and tally
                     // TODO: use filterfunc?
                     if (matched) {
+                        e.extrinsicID = `${chainID}-${e.extrinsicID}`
                         tallyScore += 10;
                         out.push({
                             "type": "extrinsic",
@@ -4920,6 +4921,7 @@ module.exports = class Query extends AssetManager {
         if (rRow.autotrace) {
             // trace filtering on matcher["trace"]
             let traces = rRow.autotrace.filter((f) => {
+                f.traceID = `${chainID}-${f.traceID}`
                 let s = `${f.p.toLowerCase()}`
                 let m = `${f.s.toLowerCase()}`
                 let sm = `${s}:${m}`
@@ -4931,6 +4933,7 @@ module.exports = class Query extends AssetManager {
                         if (features[sm] != undefined) {
                             tallyScore += this.score_feature(features[sm]);
                             if (features[sm] == "xcmmessage" && f.msgHashes != undefined) {
+
                                 console.log("MSGHASH FROM TRACE", f);
                                 // EXTRACT out the msgHash+xcmMessage from the trace element "f" (set up in parseTrace), so we can match across blocks
                                 for (let m = 0; m < f.msgHashes.length; m++) {
@@ -4948,7 +4951,7 @@ module.exports = class Query extends AssetManager {
                                             isIncoming: 0
                                         });
                                     } catch (err0) {
-                                        // 
+                                        //
                                     }
                                 }
                             } else if (features[sm] == "watermark" && f.pv != undefined) {
