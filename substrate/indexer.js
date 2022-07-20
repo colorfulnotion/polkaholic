@@ -5236,7 +5236,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let rawAsset = null;
         let rawAssetString = null;
         // WIP: add additional events using chainParser
-        if (pallet_method == "balances:Transfer" || pallet_method == "currencies:Transferred" || pallet_method == "assets:Transferred") {
+        if (pallet_method == "balances:Transfer" || pallet_method == "currencies:Transferred" || pallet_method == "assets:Transferred" || pallet_method == "tokens:Transfer") {
             let feedTransfer = {}
             let fdata = {}
             let decimals = null
@@ -5258,7 +5258,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     break;
 
                 case "currencies:Transferred":
-                    //case "tokens:Transfer":
+                case "tokens:Transfer":
                     /*
                     currencies:Transferred [
                       { token: 'ACA' },
