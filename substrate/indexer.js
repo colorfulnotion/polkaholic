@@ -376,16 +376,17 @@ module.exports = class Indexer extends AssetManager {
         if (extrinsicID == undefined) return //safety check
         let k = `${address}#${extrinsicHash}`;
         let x = JSON.stringify(rec);
+        //MK: let's process long msgs anyway
         if (x.length > 65535) {
             let prevLen = x.length
             if (rec.events) {
-                rec.events = []
+                let eventLen = JSON.stringify(rec.events).length
+                //rec.events = []
+                console.log(`Warning: [${extrinsicID}] ${k}, ${family} too long!(length=${prevLen}, eventLen=${eventLen}, withoutEventlen=${prevLen-eventLen}, finalized=${finalized})`)
             }
-            x = JSON.stringify(rec);
-            console.log(`[${extrinsicID}] ${k}, ${family} too long!(length=${prevLen}, withoutEventlen=${x.length}, finalized=${finalized})`)
-            if (x.length > 65535) return;
+            //x = JSON.stringify(rec);
+            //if (x.length > 65535) return;
         }
-
         let eventID = (rec.eventID != undefined) ? rec.eventID : `${this.chainID}-${extrinsicID}`
         let columnfamily = family;
         switch (family) {
