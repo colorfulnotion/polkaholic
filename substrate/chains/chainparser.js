@@ -2954,6 +2954,7 @@ module.exports = class ChainParser {
                   interiorType: interiorK,
                   xcmInteriorKey: xcmInteriorKey,
                   nativeAssetChain: nativeAssetChain,
+                  source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
                 await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');
@@ -3173,6 +3174,7 @@ module.exports = class ChainParser {
                   interiorType: interiorK,
                   xcmInteriorKey: xcmInteriorKey,
                   nativeAssetChain: nativeAssetChain,
+                  source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
                 await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');

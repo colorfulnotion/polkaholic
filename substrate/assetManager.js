@@ -581,8 +581,8 @@ xcmAssetInfo {
     */
 
     async addXcmAssetInfo(xcmAssetInfo, caller = false) {
-        let out = [`('${xcmAssetInfo.chainID}', '${xcmAssetInfo.xcmConcept}', '${xcmAssetInfo.asset}', '${xcmAssetInfo.paraID}', '${xcmAssetInfo.relayChain}', Now())`]
-        let vals = [`paraID`, `relayChain`, `lastUpdateDT`]
+        let out = [`('${xcmAssetInfo.chainID}', '${xcmAssetInfo.xcmConcept}', '${xcmAssetInfo.asset}', '${xcmAssetInfo.paraID}', '${xcmAssetInfo.relayChain}', '${xcmAssetInfo.nativeAssetChain}', '${xcmAssetInfo.source}', Now())`]
+        let vals = [`paraID`, `relayChain`, `nativeAssetChain`, `source`, `lastUpdateDT`]
         await this.upsertSQL({
             "table": "xcmConcept",
             "keys": ["chainID", "xcmConcept", "asset"],
