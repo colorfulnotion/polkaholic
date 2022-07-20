@@ -2875,7 +2875,7 @@ module.exports = class ChainParser {
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined){
-                      console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                      if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
                       return
                 }
 
@@ -2959,7 +2959,7 @@ module.exports = class ChainParser {
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
                 await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');
             }else{
-              console.log(`AssetInfo unknown -- skip`, assetChain)
+              if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
         });
     }
@@ -3168,7 +3168,7 @@ module.exports = class ChainParser {
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined){
-                      console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                      if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
                       return
                 }
 
@@ -3188,10 +3188,10 @@ module.exports = class ChainParser {
                   nativeAssetChain: nativeAssetChain,
                   source: indexer.chainID,
                 }
-                console.log(`xcmAssetInfo`, xcmAssetInfo)
+                //console.log(`xcmAssetInfo`, xcmAssetInfo)
                 await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');
             }else{
-              console.log(`AssetInfo unknown -- skip`, assetChain)
+              if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
         });
     }
