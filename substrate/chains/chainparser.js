@@ -3024,8 +3024,10 @@ module.exports = class ChainParser {
             let assetKey = Object.keys(assetKeyWithID)[0] // ForeignAssetId
             let assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetKey]) // "123,456" or {"Token":"XXX"}
             if (assetKey == 'NativeAssetId') {
+                //this is the bifrost case
                 parsedAsset = assetKeyVal
             } else {
+                // this is the acala/karura case
                 let assetKeyWithoutID = assetKey.replace('Id', '') //ForeignAsset
                 parsedAsset[assetKeyWithoutID] = assetKeyVal
             }
@@ -3038,9 +3040,18 @@ module.exports = class ChainParser {
                 assetList[assetChain] = cachedAssetInfo
             } else {
                 if (assetMetadata.decimals && assetMetadata.symbol) {
+                    let symbol = assetMetadata.symbol
+                    let name = assetMetadata.name
+                    if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT){
+                      //biforst VSToken has erroneous/ambiguous symbol representation
+                      if (parsedAsset.VSToken != undefined){
+                        symbol = 'VS'+symbol
+                        name = `Bifrost Voucher Slot `+name
+                      }
+                    }
                     let assetInfo = {
-                        name: assetMetadata.name,
-                        symbol: assetMetadata.symbol,
+                        name: name,
+                        symbol: symbol,
                         decimals: assetMetadata.decimals,
                         assetType: paraTool.assetTypeToken
                     };
@@ -3068,9 +3079,9 @@ module.exports = class ChainParser {
 
         var a;
         if (indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDKarura){
-          var a = await indexer.api.query.assetRegistry.foreignAssetLocations.entries()
+          a = await indexer.api.query.assetRegistry.foreignAssetLocations.entries()
         }else if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT){
-          //var a = await indexer.api.query.assetRegistry.currencyIdToLocations.entries()
+          a = await indexer.api.query.assetRegistry.currencyIdToLocations.entries()
           isAcala = false
         }
         if (!a) return
@@ -3081,6 +3092,8 @@ module.exports = class ChainParser {
             let parsedAsset = {};
             if (isAcala){
               parsedAsset.ForeignAsset = assetID
+            }else{
+              parsedAsset = assetID
             }
             let paraID = 0
             let chainID = -1
@@ -3108,11 +3121,6 @@ module.exports = class ChainParser {
                 interiorVStr0.replace('Parachain','parachain').replace('Parachain','parachain').replace('PalletInstance','palletInstance').replace('GeneralIndex','generalIndex').replace('GeneralKey','generalKey')
                 //hack: lower first char
                 let interiorV = JSON.parse(interiorVStr0)
-
-                if ((interiork == 'here') && interior[interiorK] == null){
-                  interiorVStr = 'here'
-                  chainID = relayChainID
-                }
 
                 if (interiork == 'here'){
                   //relaychain case
@@ -3153,6 +3161,10 @@ module.exports = class ChainParser {
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
                 let interiorVStr = JSON.stringify(interiorV)
 
+                if ((interiork == 'here') && interior[interiorK] == null){
+                  interiorVStr = 'here'
+                }
+
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined){
@@ -3176,7 +3188,7 @@ module.exports = class ChainParser {
                   nativeAssetChain: nativeAssetChain,
                   source: indexer.chainID,
                 }
-                //console.log(`xcmAssetInfo`, xcmAssetInfo)
+                console.log(`xcmAssetInfo`, xcmAssetInfo)
                 await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');
             }else{
               console.log(`AssetInfo unknown -- skip`, assetChain)
