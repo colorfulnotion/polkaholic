@@ -871,7 +871,7 @@ module.exports = {
     makeAssetChain: function(asset, chainID = 99) {
         return (asset + assetChainSeparator + chainID);
     },
-    makeXcmInteriorKey: function(interior, relayChain ='kusama') {
+    makeXcmInteriorKey: function(interior, relayChain = 'kusama') {
         return (interior + assetChainSeparator + relayChain);
     },
     inverted_ts_key: function(ts) {

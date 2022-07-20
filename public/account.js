@@ -134,7 +134,11 @@ function showextrinsics(address) {
             {
                 data: 'id',
                 render: function(data, type, row, meta) {
-                    return data;
+		    if ( row.id )  {
+			return data;
+		    } else {
+			return "";
+		    }
                 }
             },
         ]

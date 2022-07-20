@@ -1,5 +1,5 @@
 
-function setuptabs(tabs, chain_id, blockNumber, blockHash) {
+function setuptabs(tabs, chain_id, blockNumber, blockHash, hash = "#extrinsics") {
     setupapidocs("block", "", `${chain_id}/${blockNumber}`);
     for (let i=0; i<tabs.length; i++) {
     	let t = tabs[i];
@@ -13,7 +13,6 @@ function setuptabs(tabs, chain_id, blockNumber, blockHash) {
     	})
     }
     let url = location.href.replace(/\/$/, "");
-    let hash = "#extrinsics";
     if (location.hash) {
     	const urlhash = url.split("#");
     	if ( urlhash.length > 1 ) hash = "#" + urlhash[1];
@@ -58,5 +57,5 @@ function showblockstatus(blockHash) {
 }
 
 $(document).ready(function() {
-    setuptabs(tabs, id, blockNumber, blockHash);
+    setuptabs(tabs, id, blockNumber, blockHash, defHash);
 });

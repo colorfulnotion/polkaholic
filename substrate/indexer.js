@@ -3915,9 +3915,9 @@ order by chainID, extrinsicHash, diffTS`
 
                 // process xcmtransfer extrinsic params
                 this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
-                if (rExtrinsic.xcms == undefined){
-                  //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
-                  this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
+                if (rExtrinsic.xcms == undefined) {
+                    //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
+                    this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
                 }
 
                 if (rExtrinsic.xcms != undefined && Array.isArray(rExtrinsic.xcms) && rExtrinsic.xcms.length > 0) {
@@ -5717,9 +5717,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint) {
             console.log(`fetch asset:metadata`)
             await this.chainParser.fetchAsset(this)
-            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel){
-              console.log(`fetch assetManager:assetIdType`)
-              await this.chainParser.fetchAssetManagerAssetIdType(this)
+            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel) {
+                console.log(`fetch assetManager:assetIdType`)
+                await this.chainParser.fetchAssetManagerAssetIdType(this)
             }
         } else if (this.chainID == paraTool.chainIDKico) {
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)

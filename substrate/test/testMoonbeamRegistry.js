@@ -23,8 +23,8 @@ async function main() {
         //x1/x2/x3 refers to the number to params
         let interiorK = Object.keys(interior)[0]
         let interiorV = JSON.stringify(interior[interiorK])
-        if (interiorK == 'here' && interior[interiorK] == null){
-          interiorV = 'here'
+        if (interiorK == 'here' && interior[interiorK] == null) {
+            interiorV = 'here'
         }
 
         /*
