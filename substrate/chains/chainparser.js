@@ -1210,209 +1210,209 @@ module.exports = class ChainParser {
     }
 
     processOutgoingXCMFromXTokensEvent(indexer, extrinsic, feed, fromAddress, section_method, args) {
-      let xTokensEvents = extrinsic.events.filter((ev) => {
-          return this.xTokensFilter(`${ev.section}(${ev.method})`);
-      })
-      if (xTokensEvents.length == 0 ) return
-      if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent found len=${xTokensEvents.length}`, xTokensEvents)
-      extrinsic.xcms = []
-      for (const xTokensEvent of xTokensEvents){
-        this.processOutgoingXTokensEvent(indexer, extrinsic, feed, xTokensEvent)
-      }
+        let xTokensEvents = extrinsic.events.filter((ev) => {
+            return this.xTokensFilter(`${ev.section}(${ev.method})`);
+        })
+        if (xTokensEvents.length == 0) return
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent found len=${xTokensEvents.length}`, xTokensEvents)
+        extrinsic.xcms = []
+        for (const xTokensEvent of xTokensEvents) {
+            this.processOutgoingXTokensEvent(indexer, extrinsic, feed, xTokensEvent)
+        }
     }
 
 
 
-    processOutgoingXTokensEvent(indexer, extrinsic, feed, event){
-      //xTokens:TransferredMultiAssets
-      /*
-      [
-          {
-              "typeDef": "AccountId20",
-              "name": "sender"
-          },
-          {
-              "typeDef": "Vec<XcmV1MultiAsset>",
-              "name": "assets"
-          },
-          {
-              "typeDef": "{\"id\":\"XcmV1MultiassetAssetId\",\"fun\":\"XcmV1MultiassetFungibility\"}",
-              "name": "fee"
-          },
-          {
-              "typeDef": "{\"parents\":\"u8\",\"interior\":\"XcmV1MultilocationJunctions\"}",
-              "name": "dest"
-          }
-      ]
-      */
-      /*
-      [
-          "0x9C1E5D6335D23cd153BdF450F888De590754Cb8F",
-          [
-              {
-                  "id": {
-                      "concrete": {
-                          "parents": 1,
-                          "interior": {
-                              "here": null
-                          }
-                      }
-                  },
-                  "fun": {
-                      "fungible": 10701278131894
-                  }
-              }
-          ],
-          {
-              "id": {
-                  "concrete": {
-                      "parents": 1,
-                      "interior": {
-                          "here": null
-                      }
-                  }
-              },
-              "fun": {
-                  "fungible": 10701278131894
-              }
-          },
-          {
-              "parents": 1,
-              "interior": {
-                  "x1": {
-                      "accountId32": {
-                          "network": {
-                              "any": null
-                          },
-                          "id": "0xf8c309d6472fab1a89e619867d57934db759e5d76d63b9e67968e36f02787335"
-                      }
-                  }
-              }
-          }
-      ]
-      */
-      let section_method = `${event.section}:${event.method}`
-      let evetnData = event.data
-      let transferIndex = 0;
-      let xcmIndex = extrinsic.xcms.length
-      let relayChain = indexer.relayChain
-      let fromAddress = paraTool.getPubKey(evetnData[0])
-      let incomplete = this.extract_xcm_incomplete(extrinsic.events);
-      let assetAndAmountSents = [];
+    processOutgoingXTokensEvent(indexer, extrinsic, feed, event) {
+        //xTokens:TransferredMultiAssets
+        /*
+        [
+            {
+                "typeDef": "AccountId20",
+                "name": "sender"
+            },
+            {
+                "typeDef": "Vec<XcmV1MultiAsset>",
+                "name": "assets"
+            },
+            {
+                "typeDef": "{\"id\":\"XcmV1MultiassetAssetId\",\"fun\":\"XcmV1MultiassetFungibility\"}",
+                "name": "fee"
+            },
+            {
+                "typeDef": "{\"parents\":\"u8\",\"interior\":\"XcmV1MultilocationJunctions\"}",
+                "name": "dest"
+            }
+        ]
+        */
+        /*
+        [
+            "0x9C1E5D6335D23cd153BdF450F888De590754Cb8F",
+            [
+                {
+                    "id": {
+                        "concrete": {
+                            "parents": 1,
+                            "interior": {
+                                "here": null
+                            }
+                        }
+                    },
+                    "fun": {
+                        "fungible": 10701278131894
+                    }
+                }
+            ],
+            {
+                "id": {
+                    "concrete": {
+                        "parents": 1,
+                        "interior": {
+                            "here": null
+                        }
+                    }
+                },
+                "fun": {
+                    "fungible": 10701278131894
+                }
+            },
+            {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "accountId32": {
+                            "network": {
+                                "any": null
+                            },
+                            "id": "0xf8c309d6472fab1a89e619867d57934db759e5d76d63b9e67968e36f02787335"
+                        }
+                    }
+                }
+            }
+        ]
+        */
+        let section_method = `${event.section}:${event.method}`
+        let evetnData = event.data
+        let transferIndex = 0;
+        let xcmIndex = extrinsic.xcms.length
+        let relayChain = indexer.relayChain
+        let fromAddress = paraTool.getPubKey(evetnData[0])
+        let incomplete = this.extract_xcm_incomplete(extrinsic.events);
+        let assetAndAmountSents = [];
 
-      let paraID = indexer.getParaIDfromChainID(indexer.chainID)
-      let paraIDDest = -1;
-      let destAddress = null;
-      // dest for parachain   {"v1":{"parents":1,"interior":{"x2":[{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]}}}
-      // dest for relaychain  {"v1":{"parents":1,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}}}}
-      let chainIDDest = -1;
+        let paraID = indexer.getParaIDfromChainID(indexer.chainID)
+        let paraIDDest = -1;
+        let destAddress = null;
+        // dest for parachain   {"v1":{"parents":1,"interior":{"x2":[{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]}}}
+        // dest for relaychain  {"v1":{"parents":1,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}}}}
+        let chainIDDest = -1;
 
-      let dest = evetnData[3] //XcmV1MultilocationJunctions
-      //MK: not sure about v1?
-      if (dest.v1 !== undefined && dest.v1.interior !== undefined) {
-          let destV1Interior = dest.v1.interior;
-          // dest for relaychain
-          if (destV1Interior.x1 !== undefined) {
-              // {"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}
-              [paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
-          } else if (destV1Interior.x2 !== undefined) {
-              // dest for parachain, add 20000 for kusama-relay
-              // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
-              [paraIDDest, chainIDDest, destAddress] = this.processX2(destV1Interior.x2, relayChain)
-          }
-      } else if (dest.x2 != undefined) {
-          //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
-          [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
-      } else if (dest.interior !== undefined) {
-          let destInterior = dest.interior;
-          // looks like it's getting here
-          // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
-          if (destInterior.x1 !== undefined) {
-              [paraIDDest, chainIDDest, destAddress] = this.processX1(destInterior.x1, relayChain)
-          } else if (destInterior.x2 !== undefined) {
-              // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
-              // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
-              [paraIDDest, chainIDDest, destAddress] = this.processX2(destInterior.x2, relayChain)
-          } else {
-              if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest.interior`, JSON.stringify(dest, null, 2))
-          }
-      } else {
-          if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest`, JSON.stringify(dest, null, 2))
-      }
+        let dest = evetnData[3] //XcmV1MultilocationJunctions
+        //MK: not sure about v1?
+        if (dest.v1 !== undefined && dest.v1.interior !== undefined) {
+            let destV1Interior = dest.v1.interior;
+            // dest for relaychain
+            if (destV1Interior.x1 !== undefined) {
+                // {"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}
+                [paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
+            } else if (destV1Interior.x2 !== undefined) {
+                // dest for parachain, add 20000 for kusama-relay
+                // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
+                [paraIDDest, chainIDDest, destAddress] = this.processX2(destV1Interior.x2, relayChain)
+            }
+        } else if (dest.x2 != undefined) {
+            //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
+            [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
+        } else if (dest.interior !== undefined) {
+            let destInterior = dest.interior;
+            // looks like it's getting here
+            // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
+            if (destInterior.x1 !== undefined) {
+                [paraIDDest, chainIDDest, destAddress] = this.processX1(destInterior.x1, relayChain)
+            } else if (destInterior.x2 !== undefined) {
+                // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
+                // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
+                [paraIDDest, chainIDDest, destAddress] = this.processX2(destInterior.x2, relayChain)
+            } else {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest.interior`, JSON.stringify(dest, null, 2))
+            }
+        } else {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest`, JSON.stringify(dest, null, 2))
+        }
 
-      let aAsset = evetnData[1] //Vec<XcmV1MultiAsset>
-      if (aAsset != undefined && Array.isArray(aAsset)) {
-          // todo: extract this
-          if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent xTokens:transferMultiasset`)
-          let assetArr = []
-          //let aAssetv1 = aAsset.v1
-          //assetArr.push(aAsset)
-          let transferIndex = 0
-          assetArr = aAsset
-          //no fee items
-          for (const asset of assetArr) {
-              // 0xc003ebdaaa4ef4d8ed2d89ca419cf79cefc883859ab9d74349d882dacf6bb811
-              // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
-              if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                  let [targetedAsset, rawTargetedAsset] = this.processConcreteCurrency(indexer, asset)
-                  let aa = {
-                      asset: targetedAsset,
-                      rawAsset: rawTargetedAsset,
-                      amountSent: paraTool.dechexToInt(asset.fun.fungible),
-                      transferIndex: transferIndex,
-                      isFeeItem: 1,
-                  }
-                  assetAndAmountSents.push(aa)
-              } else {
-                  if (this.debugLevel >= paraTool.debugErrorOnly) console.log("asset v1 unknown", asset);
-                  asset = false;
-              }
-              transferIndex++
-          }
-      } else {
-          if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset asset unknown`)
-      }
+        let aAsset = evetnData[1] //Vec<XcmV1MultiAsset>
+        if (aAsset != undefined && Array.isArray(aAsset)) {
+            // todo: extract this
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent xTokens:transferMultiasset`)
+            let assetArr = []
+            //let aAssetv1 = aAsset.v1
+            //assetArr.push(aAsset)
+            let transferIndex = 0
+            assetArr = aAsset
+            //no fee items
+            for (const asset of assetArr) {
+                // 0xc003ebdaaa4ef4d8ed2d89ca419cf79cefc883859ab9d74349d882dacf6bb811
+                // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
+                if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
+                    let [targetedAsset, rawTargetedAsset] = this.processConcreteCurrency(indexer, asset)
+                    let aa = {
+                        asset: targetedAsset,
+                        rawAsset: rawTargetedAsset,
+                        amountSent: paraTool.dechexToInt(asset.fun.fungible),
+                        transferIndex: transferIndex,
+                        isFeeItem: 1,
+                    }
+                    assetAndAmountSents.push(aa)
+                } else {
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log("asset v1 unknown", asset);
+                    asset = false;
+                }
+                transferIndex++
+            }
+        } else {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset asset unknown`)
+        }
 
-      for (const assetAndAmountSent of assetAndAmountSents) {
-          let asset = assetAndAmountSent.asset
-          let rawAsset = assetAndAmountSent.rawAsset
-          let amountSent = assetAndAmountSent.amountSent
-          let transferIndex = assetAndAmountSent.transferIndex
-          let isFeeItem = assetAndAmountSent.isFeeItem
-          if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent)) {
-              if (extrinsic.xcms == undefined) extrinsic.xcms = []
-              let xcmIndex = extrinsic.xcms.length
-              let r = {
-                  sectionMethod: section_method,
-                  extrinsicHash: feed.extrinsicHash,
-                  extrinsicID: feed.extrinsicID,
-                  transferIndex: transferIndex,
-                  xcmIndex: xcmIndex,
-                  relayChain: relayChain,
-                  chainID: indexer.chainID,
-                  chainIDDest: chainIDDest,
-                  paraID: paraID,
-                  paraIDDest: paraIDDest,
-                  blockNumber: this.parserBlockNumber,
-                  fromAddress: fromAddress,
-                  destAddress: destAddress,
-                  asset: asset,
-                  rawAsset: rawAsset,
-                  sourceTS: feed.ts,
-                  amountSent: amountSent,
-                  incomplete: incomplete,
-                  isFeeItem: isFeeItem,
-                  msgHash: '0x',
-              }
-              //console.log("processOutgoingXTokens xTokens", r);
-              console.log(`processOutgoingXTokensEvent`, r)
-              //outgoingXTokens.push(r)
-              extrinsic.xcms.push(r)
-              //outgoingXcmList.push(r)
-          } else {
-              if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens unknown asset/amountSent`);
-          }
-      }
+        for (const assetAndAmountSent of assetAndAmountSents) {
+            let asset = assetAndAmountSent.asset
+            let rawAsset = assetAndAmountSent.rawAsset
+            let amountSent = assetAndAmountSent.amountSent
+            let transferIndex = assetAndAmountSent.transferIndex
+            let isFeeItem = assetAndAmountSent.isFeeItem
+            if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent)) {
+                if (extrinsic.xcms == undefined) extrinsic.xcms = []
+                let xcmIndex = extrinsic.xcms.length
+                let r = {
+                    sectionMethod: section_method,
+                    extrinsicHash: feed.extrinsicHash,
+                    extrinsicID: feed.extrinsicID,
+                    transferIndex: transferIndex,
+                    xcmIndex: xcmIndex,
+                    relayChain: relayChain,
+                    chainID: indexer.chainID,
+                    chainIDDest: chainIDDest,
+                    paraID: paraID,
+                    paraIDDest: paraIDDest,
+                    blockNumber: this.parserBlockNumber,
+                    fromAddress: fromAddress,
+                    destAddress: destAddress,
+                    asset: asset,
+                    rawAsset: rawAsset,
+                    sourceTS: feed.ts,
+                    amountSent: amountSent,
+                    incomplete: incomplete,
+                    isFeeItem: isFeeItem,
+                    msgHash: '0x',
+                }
+                //console.log("processOutgoingXTokens xTokens", r);
+                console.log(`processOutgoingXTokensEvent`, r)
+                //outgoingXTokens.push(r)
+                extrinsic.xcms.push(r)
+                //outgoingXcmList.push(r)
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens unknown asset/amountSent`);
+            }
+        }
 
     }
 
@@ -2836,10 +2836,10 @@ module.exports = class ChainParser {
         let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
 
         var a;
-        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver){
-          var a = await indexer.api.query.assetManager.assetIdType.entries()
-        }else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko){
-          var a = await indexer.api.query.assetRegistry.assetIdType.entries()
+        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver) {
+            var a = await indexer.api.query.assetManager.assetIdType.entries()
+        } else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
+            var a = await indexer.api.query.assetRegistry.assetIdType.entries()
         }
         if (!a) return
         let assetList = {}
@@ -2858,7 +2858,7 @@ module.exports = class ChainParser {
             if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
                 //cached found
                 //console.log(`cached AssetInfo found`, cachedAssetInfo)
-                let symbol = (cachedAssetInfo.symbol)? cachedAssetInfo.symbol.replace('xc','') : ''
+                let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol.replace('xc', '') : ''
                 let nativeSymbol = symbol
 
                 let xcmAsset = val.toJSON().xcm
@@ -2868,43 +2868,43 @@ module.exports = class ChainParser {
                 let interiorK = Object.keys(interior)[0]
                 let interiorV = interior[interiorK]
                 let interiorVStr = JSON.stringify(interiorV)
-                if (interiorK == 'here' && interior[interiorK] == null){
-                  interiorVStr = 'here'
-                  chainID = relayChainID
+                if (interiorK == 'here' && interior[interiorK] == null) {
+                    interiorVStr = 'here'
+                    chainID = relayChainID
                 }
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
-                if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined){
-                      if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
-                      return
+                if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                    return
                 }
 
-                if (interiorK == 'here'){
-                  //relaychain case
-                  chainID = relayChainID
-                }else if (interiorK == 'x1'){
-                  paraID = interiorV['parachain']
-                  chainID = paraID + paraIDExtra
-                }else{
-                  let generalIndex = -1
-                  for (const v of interiorV){
-                    if (v.parachain != undefined){
-                        paraID = v.parachain
-                        chainID = paraID + paraIDExtra
-                    }else if (v.generalIndex != undefined){
-                      generalIndex = v.generalIndex
+                if (interiorK == 'here') {
+                    //relaychain case
+                    chainID = relayChainID
+                } else if (interiorK == 'x1') {
+                    paraID = interiorV['parachain']
+                    chainID = paraID + paraIDExtra
+                } else {
+                    let generalIndex = -1
+                    for (const v of interiorV) {
+                        if (v.parachain != undefined) {
+                            paraID = v.parachain
+                            chainID = paraID + paraIDExtra
+                        } else if (v.generalIndex != undefined) {
+                            generalIndex = v.generalIndex
+                        }
                     }
-                  }
-                  //over-write statemine asset with assetID
+                    //over-write statemine asset with assetID
 
-                  if (paraID == 1000){
-                    nativeSymbol = `${generalIndex}`
-                  }
+                    if (paraID == 1000) {
+                        nativeSymbol = `${generalIndex}`
+                    }
                 }
-                if (symbol == 'AUSD'){
-                  nativeSymbol = 'KUSD'
-                }else if (symbol == 'aUSD'){
-                  nativeSymbol = 'AUSD'
+                if (symbol == 'AUSD') {
+                    nativeSymbol = 'KUSD'
+                } else if (symbol == 'aUSD') {
+                    nativeSymbol = 'AUSD'
                 }
                 let nativeParsedAsset = {
                     Token: nativeSymbol
@@ -2945,21 +2945,21 @@ module.exports = class ChainParser {
 
                 let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
                 let xcmAssetInfo = {
-                  chainID: chainID,
-                  xcmConcept: interiorVStr, //interior
-                  asset: nativeAsset,
-                  paraID: paraID,
-                  relayChain: relayChain,
-                  parents: parents,
-                  interiorType: interiorK,
-                  xcmInteriorKey: xcmInteriorKey,
-                  nativeAssetChain: nativeAssetChain,
-                  source: indexer.chainID,
+                    chainID: chainID,
+                    xcmConcept: interiorVStr, //interior
+                    asset: nativeAsset,
+                    paraID: paraID,
+                    relayChain: relayChain,
+                    parents: parents,
+                    interiorType: interiorK,
+                    xcmInteriorKey: xcmInteriorKey,
+                    nativeAssetChain: nativeAssetChain,
+                    source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
                 await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');
-            }else{
-              if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
         });
     }
@@ -3042,12 +3042,12 @@ module.exports = class ChainParser {
                 if (assetMetadata.decimals && assetMetadata.symbol) {
                     let symbol = assetMetadata.symbol
                     let name = assetMetadata.name
-                    if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT){
-                      //biforst VSToken has erroneous/ambiguous symbol representation
-                      if (parsedAsset.VSToken != undefined){
-                        symbol = 'VS'+symbol
-                        name = `Bifrost Voucher Slot `+name
-                      }
+                    if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
+                        //biforst VSToken has erroneous/ambiguous symbol representation
+                        if (parsedAsset.VSToken != undefined) {
+                            symbol = 'VS' + symbol
+                            name = `Bifrost Voucher Slot ` + name
+                        }
                     }
                     let assetInfo = {
                         name: name,
@@ -3078,11 +3078,11 @@ module.exports = class ChainParser {
         let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
 
         var a;
-        if (indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDKarura){
-          a = await indexer.api.query.assetRegistry.foreignAssetLocations.entries()
-        }else if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT){
-          a = await indexer.api.query.assetRegistry.currencyIdToLocations.entries()
-          isAcala = false
+        if (indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDKarura) {
+            a = await indexer.api.query.assetRegistry.foreignAssetLocations.entries()
+        } else if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
+            a = await indexer.api.query.assetRegistry.currencyIdToLocations.entries()
+            isAcala = false
         }
         if (!a) return
         let assetList = {}
@@ -3090,10 +3090,10 @@ module.exports = class ChainParser {
         a.forEach(async ([key, val]) => {
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let parsedAsset = {};
-            if (isAcala){
-              parsedAsset.ForeignAsset = assetID
-            }else{
-              parsedAsset = assetID
+            if (isAcala) {
+                parsedAsset.ForeignAsset = assetID
+            } else {
+                parsedAsset = assetID
             }
             let paraID = 0
             let chainID = -1
@@ -3104,7 +3104,7 @@ module.exports = class ChainParser {
             if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
                 //cached found
                 //console.log(`cached AssetInfo found`, cachedAssetInfo)
-                let symbol = (cachedAssetInfo.symbol)? cachedAssetInfo.symbol : ''
+                let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol : ''
                 let nativeSymbol = symbol
 
                 let xcmAsset = val.toJSON()
@@ -3118,42 +3118,42 @@ module.exports = class ChainParser {
 
                 //console.log(`${interiork} interiorVRaw`, interiorVRaw)
                 let interiorVStr0 = JSON.stringify(interiorVRaw)
-                interiorVStr0.replace('Parachain','parachain').replace('Parachain','parachain').replace('PalletInstance','palletInstance').replace('GeneralIndex','generalIndex').replace('GeneralKey','generalKey')
+                interiorVStr0.replace('Parachain', 'parachain').replace('Parachain', 'parachain').replace('PalletInstance', 'palletInstance').replace('GeneralIndex', 'generalIndex').replace('GeneralKey', 'generalKey')
                 //hack: lower first char
                 let interiorV = JSON.parse(interiorVStr0)
 
-                if (interiork == 'here'){
-                  //relaychain case
-                  chainID = relayChainID
-                }else if (interiork == 'x1'){
-                  paraID = interiorV['parachain']
-                  chainID = paraID + paraIDExtra
-                }else{
-                  let generalIndex = -1
-                  for (let i = 0; i < interiorV.length; i++) {
-                    let v = interiorV[i]
-                    if (v.parachain != undefined){
-                        paraID = v.parachain
-                        chainID = paraID + paraIDExtra
-                    }else if (v.generalIndex != undefined){
-                      generalIndex = v.generalIndex
-                    }else if (v.generalKey != undefined){
-                      let generalKey = v.generalKey
-                      if (generalKey.substr(0,2) != '0x'){
-                          generalKey = paraTool.stringToHex(generalKey)
-                          v.generalKey = generalKey
-                      }
+                if (interiork == 'here') {
+                    //relaychain case
+                    chainID = relayChainID
+                } else if (interiork == 'x1') {
+                    paraID = interiorV['parachain']
+                    chainID = paraID + paraIDExtra
+                } else {
+                    let generalIndex = -1
+                    for (let i = 0; i < interiorV.length; i++) {
+                        let v = interiorV[i]
+                        if (v.parachain != undefined) {
+                            paraID = v.parachain
+                            chainID = paraID + paraIDExtra
+                        } else if (v.generalIndex != undefined) {
+                            generalIndex = v.generalIndex
+                        } else if (v.generalKey != undefined) {
+                            let generalKey = v.generalKey
+                            if (generalKey.substr(0, 2) != '0x') {
+                                generalKey = paraTool.stringToHex(generalKey)
+                                v.generalKey = generalKey
+                            }
+                        }
                     }
-                  }
-                  //over-write statemine asset with assetID
-                  if (paraID == 1000){
-                    nativeSymbol = `${generalIndex}`
-                  }
+                    //over-write statemine asset with assetID
+                    if (paraID == 1000) {
+                        nativeSymbol = `${generalIndex}`
+                    }
                 }
-                if (symbol == 'AUSD'){
-                  nativeSymbol = 'KUSD'
-                }else if (symbol == 'aUSD'){
-                  nativeSymbol = 'AUSD'
+                if (symbol == 'AUSD') {
+                    nativeSymbol = 'KUSD'
+                } else if (symbol == 'aUSD') {
+                    nativeSymbol = 'AUSD'
                 }
                 let nativeParsedAsset = {
                     Token: nativeSymbol
@@ -3161,15 +3161,15 @@ module.exports = class ChainParser {
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
                 let interiorVStr = JSON.stringify(interiorV)
 
-                if ((interiork == 'here') && interior[interiorK] == null){
-                  interiorVStr = 'here'
+                if ((interiork == 'here') && interior[interiorK] == null) {
+                    interiorVStr = 'here'
                 }
 
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
-                if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined){
-                      if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
-                      return
+                if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                    return
                 }
 
                 //console.log(`${chainID} '${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
@@ -3177,21 +3177,21 @@ module.exports = class ChainParser {
 
                 let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
                 let xcmAssetInfo = {
-                  chainID: chainID,
-                  xcmConcept: interiorVStr, //interior
-                  asset: nativeAsset,
-                  paraID: paraID,
-                  relayChain: relayChain,
-                  parents: parents,
-                  interiorType: interiorK,
-                  xcmInteriorKey: xcmInteriorKey,
-                  nativeAssetChain: nativeAssetChain,
-                  source: indexer.chainID,
+                    chainID: chainID,
+                    xcmConcept: interiorVStr, //interior
+                    asset: nativeAsset,
+                    paraID: paraID,
+                    relayChain: relayChain,
+                    parents: parents,
+                    interiorType: interiorK,
+                    xcmInteriorKey: xcmInteriorKey,
+                    nativeAssetChain: nativeAssetChain,
+                    source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
                 await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');
-            }else{
-              if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
         });
     }

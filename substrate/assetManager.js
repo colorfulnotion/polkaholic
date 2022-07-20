@@ -413,20 +413,20 @@ module.exports = class AssetManager extends PolkaholicDB {
         //console.log(`this.nativeAssetInfo`, nativeAssetInfo)
     }
 
-//    |    2012 | [{"parachain":2012},{"generalKey":"0x50415241"}]                 | {"Token":"PARA"} |   2012 | polkadot   |      1 |
-//    |   21000 | [{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}] | {"Token":"1984"} |   1000 | kusama     |      1 |
-/*
-xcmAssetInfo {
-  chainID: 22085,
-  xcmConcept: '[{"parachain":2085},{"generalKey":"0x484b4f"}]',
-  asset: '{"Token":"HKO"}',
-  paraID: 2085,
-  relayChain: 'kusama',
-  parents: 1,
-  interiorType: 'x2',
-  xcmInteriorKey: '[{"parachain":2085},{"generalKey":"0x484b4f"}]~kusama'
-}
-*/
+    //    |    2012 | [{"parachain":2012},{"generalKey":"0x50415241"}]                 | {"Token":"PARA"} |   2012 | polkadot   |      1 |
+    //    |   21000 | [{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}] | {"Token":"1984"} |   1000 | kusama     |      1 |
+    /*
+    xcmAssetInfo {
+      chainID: 22085,
+      xcmConcept: '[{"parachain":2085},{"generalKey":"0x484b4f"}]',
+      asset: '{"Token":"HKO"}',
+      paraID: 2085,
+      relayChain: 'kusama',
+      parents: 1,
+      interiorType: 'x2',
+      xcmInteriorKey: '[{"parachain":2085},{"generalKey":"0x484b4f"}]~kusama'
+    }
+    */
     async init_xcm_asset() {
         let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
         let xcmAssetInfo = {};
@@ -455,13 +455,13 @@ xcmAssetInfo {
     }
 
     getXcmAssetInfoByInteriorkey(xcmInteriorKey) {
-      let xcmAssetInfo = this.xcmAssetInfo[xcmInteriorKey]
-      //console.log(`getXcmAssetInfoByInteriorkey k=${xcmInteriorKey}`, xcmAssetInfo)
-      if (xcmAssetInfo != undefined){
-          return xcmAssetInfo
-      }
-      //TODO: expand keys from x1 to x2 for not found case
-      return false
+        let xcmAssetInfo = this.xcmAssetInfo[xcmInteriorKey]
+        //console.log(`getXcmAssetInfoByInteriorkey k=${xcmInteriorKey}`, xcmAssetInfo)
+        if (xcmAssetInfo != undefined) {
+            return xcmAssetInfo
+        }
+        //TODO: expand keys from x1 to x2 for not found case
+        return false
     }
 
 

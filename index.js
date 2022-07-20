@@ -26,6 +26,7 @@ const prodConfig = require('./substrate/config');
 const port = 3000;
 const Query = require("./substrate/query");
 const cookieParser = require("cookie-parser");
+const ini = require('node-ini');
 
 var debugLevel = paraTool.debugTracing
 var query = new Query(debugLevel);
@@ -54,11 +55,35 @@ app.set('view engine', 'ejs');
 app.use(express.urlencoded({
     extended: true
 }))
-app.use(session({
-    secret: 'polkaholic colorful notion',
-    resave: false,
-    saveUninitialized: true
-}))
+
+// ready db config for sessionStore
+const mysqlStore = require('express-mysql-session')(session);
+try {
+    let dbconfigFilename = (process.env.POLKAHOLIC_DB != undefined) ? process.env.POLKAHOLIC_DB : '/root/.mysql/.db00.cnf';
+    let dbconfig = ini.parseSync(dbconfigFilename);
+    let c = dbconfig.client;
+    const sessionStore = new mysqlStore({
+        connectionLimit: 10,
+        user: c.user,
+        database: c.database,
+        password: c.password,
+        host: c.host,
+        createDatabaseTable: true
+    });
+    app.use(session({
+        secret: 'polkaholic colorful notion',
+        resave: false,
+        store: sessionStore,
+        cookie: {
+            maxAge: 1000 * 3600 * 4,
+            secure: process.env.NODE_ENV == "production"
+        },
+        saveUninitialized: false
+    }))
+} catch (err) {
+    console.log(err);
+}
+
 
 app.use(function(req, res, next) {
     res.locals.req = req;
@@ -1139,18 +1164,53 @@ app.get('/tx/:txhash', async (req, res) => {
     }
 })
 
+app.get('/xcmmessage/:msgHash/:sentAt?', async (req, res) => {
+    try {
+        let msgHash = req.params['msgHash'];
+        let sentAt = req.params['sentAt'];
+        let [decorate, decorateExtra] = decorateOptUI(req)
+        let xcm = await query.getXCMMessage(msgHash, sentAt);
+        if (xcm) {
+            res.render('xcmmessage', {
+                msgHash: msgHash,
+                sentAt: sentAt,
+                xcm: xcm,
+                chainInfo: query.getChainInfo(xcm.chainID),
+                apiUrl: req.path,
+                docsSection: "get-xcmmessage"
+            });
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "transaction",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
 // Sample cases:
 // /timeline/0xb5a24bc52710c0f142b1911ec6313385cb8fd3ce78fe5d36b538311158cd8da4
 // /timeline/0xfae361c0d6716a1e03ea45496d492130e78d24936855ded6e9a2ccc04aabedbb
 // /timeline/0x77a4af790a693be027fdc1cfd671a3bd63941f8abfe0343491c0d50cb7a8171f
-app.get('/timeline/:txhash', async (req, res) => {
+app.get('/timeline/:hash/:hashType?/:sentAt?', async (req, res) => {
     try {
-        let txHash = req.params['txhash'];
-        let [timeline, xcmmessagesMap] = await query.getXCMTimeline(txHash)
+        let hash = req.params['hash'];
+        let hashType = req.params['hashType'] ? req.params['hashType'] : "extrinsic";
+        let sentAt = (req.params['sentAt'] && hashType == "xcm") ? req.params['sentAt'] : null;
+        let [timeline, xcmmessages] = await query.getXCMTimeline(hash, hashType, sentAt)
+
         res.render('timeline', {
             timeline: timeline,
-            txHash: txHash,
-            xcmmessagesMap: xcmmessagesMap,
+            hash: hash,
+            hashType: hashType,
+            xcmmessages: xcmmessages,
             apiUrl: "/",
             chainInfo: query.getChainInfo()
         });
