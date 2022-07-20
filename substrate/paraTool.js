@@ -29,7 +29,8 @@ const {
     stringToU8a,
     u8aToHex,
     u8aConcat,
-    hexToString
+    hexToString,
+    stringToHex
 } = require("@polkadot/util");
 const {
     signatureVerify,
@@ -520,7 +521,7 @@ module.exports = {
     chainIDStatemine: 21000, // 1. was 3
     chainIDEncointer: 21001, // 2. was 1001
     chainIDKarura: 22000, // 3. was 8
-    chainIDBifrost: 22001, // 4. was 6
+    chainIDBifrostKSM: 22001, // 4. was 6
     chainIDKhala: 22004, // 5. was 2004 [CAREFUL cf Moonbeam]
 
     chainIDShiden: 22007, // done [was 2007]
@@ -565,6 +566,7 @@ module.exports = {
     chainIDNodle: 2026,
     chainIDCentrifuge: 2031,
 
+    chainIDBifrostDOT: 2030,
     chainIDInterlay: 2032,
     chainIDHydraDX: 2034,
     chainIDPhala: 2035,
@@ -869,6 +871,9 @@ module.exports = {
     makeAssetChain: function(asset, chainID = 99) {
         return (asset + assetChainSeparator + chainID);
     },
+    makeXcmInteriorKey: function(interior, relayChain ='kusama') {
+        return (interior + assetChainSeparator + relayChain);
+    },
     inverted_ts_key: function(ts) {
         return inverted_ts_key(ts);
     },
@@ -995,5 +1000,8 @@ module.exports = {
     },
     getAuthor: function(digest, validatorsList) {
         return getAuthor(digest, validatorsList);
+    },
+    stringToHex: function(x) {
+        return stringToHex(x)
     },
 };

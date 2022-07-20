@@ -80,7 +80,22 @@
          %>
       <a href='<%- subscanURL; %>' target='_new'><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
       <% } %>
+      <% if ( chainID && (chainID == 2004 || chainID == 22023)) {
+         let externalURL = (chainID == 2004)? `https://moonscan.io` : `https://moonriver.moonscan.io`
+         let imgURL = (chainID == 2004) ? "https://cdn.polkaholic.io/moonscan.svg" : "https://cdn.polkaholic.io/moonriverscan.svg"
+         let txURL = `${externalURL}/block/${b.hash}`;
+         %>
+      <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>
+      <% }%>
+      <% if ( chainID && (chainID == 2006 || chainID == 22007)) {
+         let externalURL = (chainID == 2006)? `https://blockscout.com/astar` : `https://blockscout.com/shiden`
+         let imgURL = "https://cdn.polkaholic.io/blockscout.png"
+         let txURL = `${externalURL}/block/${b.hash}`;
+         %>
+      <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>
+      <% }%>
     </td>
+
   </tr>
 </table>
 

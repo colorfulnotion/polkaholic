@@ -376,16 +376,17 @@ module.exports = class Indexer extends AssetManager {
         if (extrinsicID == undefined) return //safety check
         let k = `${address}#${extrinsicHash}`;
         let x = JSON.stringify(rec);
+        //MK: let's process long msgs anyway
         if (x.length > 65535) {
             let prevLen = x.length
             if (rec.events) {
-                rec.events = []
+                let eventLen = JSON.stringify(rec.events).length
+                //rec.events = []
+                console.log(`Warning: [${extrinsicID}] ${k}, ${family} too long!(length=${prevLen}, eventLen=${eventLen}, withoutEventlen=${prevLen-eventLen}, finalized=${finalized})`)
             }
-            x = JSON.stringify(rec);
-            console.log(`[${extrinsicID}] ${k}, ${family} too long!(length=${prevLen}, withoutEventlen=${x.length}, finalized=${finalized})`)
-            if (x.length > 65535) return;
+            //x = JSON.stringify(rec);
+            //if (x.length > 65535) return;
         }
-
         let eventID = (rec.eventID != undefined) ? rec.eventID : `${this.chainID}-${extrinsicID}`
         let columnfamily = family;
         switch (family) {
@@ -5235,7 +5236,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let rawAsset = null;
         let rawAssetString = null;
         // WIP: add additional events using chainParser
-        if (pallet_method == "balances:Transfer" || pallet_method == "currencies:Transferred" || pallet_method == "assets:Transferred") {
+        if (pallet_method == "balances:Transfer" || pallet_method == "currencies:Transferred" || pallet_method == "assets:Transferred" || pallet_method == "tokens:Transfer") {
             let feedTransfer = {}
             let fdata = {}
             let decimals = null
@@ -5257,7 +5258,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     break;
 
                 case "currencies:Transferred":
-                    //case "tokens:Transfer":
+                case "tokens:Transfer":
                     /*
                     currencies:Transferred [
                       { token: 'ACA' },
@@ -5699,22 +5700,32 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
     async setup_chainParser(chain, debugLevel = paraTool.debugNoLog) {
         await this.chainParserInit(chain.chainID, debugLevel);
-        let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrost]
+        let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrostKSM, paraTool.chainIDBifrostDOT]
         let assetMetaChain = [paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDHeiko, paraTool.chainIDParallel]
-        if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala || this.chainID == paraTool.chainIDBifrost) {
-            //TODO: fetch assetRegistry:assetMetadatas
+        if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala || this.chainID == paraTool.chainIDBifrostKSM) {
+            //TODO: chainIDBifrostDOT does not support assetRegistry yet
             console.log(`Fetch assetRegistry:assetMetadatas`)
             await this.chainParser.fetchAssetRegistry(this)
             if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala) {
-                await this.chainParser.updateLiquidityInfo(this)
+                console.log(`Fetch assetRegistry:foreignAssetLocations`)
+                await this.chainParser.fetchAssetRegistryForeignAssetLocations(this)
+            }
+            if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
+                console.log(`Fetch assetRegistry:currencyIdToLocations`)
+                await this.chainParser.fetchAssetRegistryForeignAssetLocations(this)
             }
         } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint) {
             console.log(`fetch asset:metadata`)
             await this.chainParser.fetchAsset(this)
+            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel){
+              console.log(`fetch assetManager:assetIdType`)
+              await this.chainParser.fetchAssetManagerAssetIdType(this)
+            }
         } else if (this.chainID == paraTool.chainIDKico) {
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)
             await this.chainParser.fetchCurrenciesDicoAssetInfos(this)
         }
+
         await this.get_skipStorageKeys();
         await this.getChainERCAssets(this.chainID);
 
