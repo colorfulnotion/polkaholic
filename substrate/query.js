@@ -950,7 +950,7 @@ module.exports = class Query extends AssetManager {
         let out = [];
         try {
             let w = address ? `and fromAddress = '${address}'` : "";
-            let xcmtransfers = await this.poolREADONLY.query(`select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete from xcmtransfer where length(asset) > 3 ${w} order by sourceTS desc limit ${limit}`);
+            let xcmtransfers = await this.poolREADONLY.query(`select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(asset) > 3 ${w} order by sourceTS desc limit ${limit}`);
             for (let i = 0; i < xcmtransfers.length; i++) {
                 let x = xcmtransfers[i];
 
@@ -971,6 +971,16 @@ module.exports = class Query extends AssetManager {
                     let rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
                     if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
                         decimals = this.assetInfo[rawassetChain].decimals;
+                    }else{
+                      //missing
+                      let [nativeChainID, isFound] = await this.getNativeAssetChainID(defaultAsset)
+                      if (isFound){
+                        targetChainID = nativeChainID
+                        rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
+                      }
+                      if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
+                          decimals = this.assetInfo[rawassetChain].decimals;
+                      }
                     }
 
                     if (this.assetInfo[rawassetChain]) {
