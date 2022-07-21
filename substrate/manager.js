@@ -370,44 +370,6 @@ module.exports = class Manager extends AssetManager {
         return false;
     }
 
-    async auditChains(lookback = 60) {
-        let chains = await this.getChains();
-        for (var i = 0; i < chains.length; i++) {
-            let c = chains[i];
-            let chainID = c.chainID;
-            let flds = (c.isEVM) ? ", sum(crawlBlockEVM) as numCrawlBlockEVM, sum(crawlReceiptsEVM) as numCrawlReceiptsEVM" : "";
-            var sums = await this.poolREADONLY.query(`select sum(crawlBlock) as numCrawlBlock, sum(IF(crawlTrace>0 and numSignedExtrinsics > 0, 1,0)) as numCrawlTrace, sum(crawlFeed) as numCrawlFeed ${flds} from block${c.chainID} where blockNumber < ${c.blocksFinalized} and not blockDT < '2021-12-18'`);
-
-            let numCrawlBlock = sums[0].numCrawlBlock;
-            let numCrawlBlockEVM = sums[0].numCrawlBlockEVM;
-            let numCrawlReceiptsEVM = sums[0].numCrawlReceiptsEVM;
-            let vals = [];
-            if (numCrawlBlock > 0) vals.push(`${numCrawlBlock} blocks/events`);
-            if (numCrawlBlockEVM > 0) vals.push(`${numCrawlBlockEVM} evmblocks`);
-            if (numCrawlReceiptsEVM > 0) vals.push(`${numCrawlReceiptsEVM} evmReceipts`);
-            if (vals.length > 0) {
-                console.log(`# [${c.chainName}: ${vals.join("; ")}]\tscreen -S crawlBackfill${chainID} 'while true; do ./crawlBackfill ${chainID}; done'`);
-            }
-            let numCrawlTrace = sums[0].numCrawlTrace;
-            if (numCrawlTrace > 10) {
-                console.log(`# [${c.chainName}: ${numCrawlTrace} traces]\tscreen -S crawlTrace${chainID} 'while true; do ./crawlTraces ${chainID}; done'`);
-            }
-
-            let sql = `update chain set numCrawlBlock = ${numCrawlBlock}, numCrawlTrace = ${numCrawlTrace} where chainID = ${chainID}`
-            this.batchedSQL.push(sql);
-            await this.update_batchedSQL();
-        }
-        await this.update_batchedSQL();
-    }
-
-    async mapChains(f) {
-        let chains = await this.getChains();
-        for (var i = 0; i < chains.length; i++) {
-            let c = chains[i];
-            f(c)
-        }
-    }
-
     async get_block_mysql(chainID, blockNumber) {
         let sql = `select blockHash, UNIX_TIMESTAMP(blockDT) as blockTS from block${chainID} where blockNumber = ${blockNumber}`
         let blocks = await this.poolREADONLY.query(sql);
@@ -430,25 +392,6 @@ module.exports = class Manager extends AssetManager {
             if (diff < 1) {
                 console.log(`${i} : ${diff} --- MISMATCH on chain#${chainID}`, `currPeriod`, currPeriod, `nextPeriod`, nextPeriod);
             }
-        }
-    }
-
-    async backupChain(chainID, logDT, instance, cluster) {
-        let cmd = `gcloud  bigtable backups create chain${chainID}-${logDT} --instance=${instance} --cluster=${cluster} --table=chain${chainID} --async --retention-period=3d`;
-        console.log(cmd);
-        console.log(`gcloud bigtable backups list --instance=${instance} --cluster=${cluster}`);
-        // TODO: execute the cmd
-    }
-
-    async backupChains() {
-        let chains = await this.poolREADONLY.query(`select chainID from chain where crawling = 1 limit 50`);
-
-        var today = new Date();
-        var dd = today.getUTCDate().toString().padStart(2, '0');
-        var mm = (today.getUTCMonth() + 1).toString().padStart(2, '0'); //January is 0!
-        let logDT = today.getUTCFullYear() + mm + dd;
-        for (let i = 0; i < chains.length; i++) {
-            await this.backupChain(chains[i].chainID, logDT);
         }
     }
 

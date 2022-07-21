@@ -971,16 +971,16 @@ module.exports = class Query extends AssetManager {
                     let rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
                     if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
                         decimals = this.assetInfo[rawassetChain].decimals;
-                    }else{
-                      //missing
-                      let [nativeChainID, isFound] = await this.getNativeAssetChainID(defaultAsset)
-                      if (isFound){
-                        targetChainID = nativeChainID
-                        rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
-                      }
-                      if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
-                          decimals = this.assetInfo[rawassetChain].decimals;
-                      }
+                    } else {
+                        //missing
+                        let [nativeChainID, isFound] = await this.getNativeAssetChainID(defaultAsset)
+                        if (isFound) {
+                            targetChainID = nativeChainID
+                            rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
+                        }
+                        if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
+                            decimals = this.assetInfo[rawassetChain].decimals;
+                        }
                     }
 
                     if (this.assetInfo[rawassetChain]) {

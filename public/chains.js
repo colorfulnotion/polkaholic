@@ -56,7 +56,11 @@ async function show_chains() {
             [5] numEvents
             [6] relayChain
             */
-            iDisplayLength: 50,
+            pageLength: -1,
+            lengthMenu: [
+                [10, 25, 50, -1],
+                [10, 25, 50, "All"]
+            ],
             columnDefs: [{
                     "className": "dt-right",
                     "targets": [1, 2, 3, 4, 5, 6]
@@ -210,7 +214,11 @@ async function show_xcmtransfers(relaychain) {
             [7] sourceTS
             [8] relayChain
             */
-            iDisplayLength: 100,
+            pageLength: 100,
+            lengthMenu: [
+                [10, 25, 50, 100],
+                [10, 25, 50, 100]
+            ],
             columnDefs: [{
                     "className": "dt-right",
                     "targets": [1, 2, 3]
@@ -399,7 +407,11 @@ async function showaddresstopn() {
             [2] balanceUSD
             [3] val
             */
-            iDisplayLength: 100,
+            pageLength: 100,
+            lengthMenu: [
+                [10, 25, 50, 100, -1],
+                [10, 25, 50, 100, "All"]
+            ],
             columnDefs: [{
                 "className": "dt-right",
                 "targets": [1, 2, 3]

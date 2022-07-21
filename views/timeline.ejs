@@ -3,7 +3,11 @@
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="/">Polkaholic</a></li>
     <li class="breadcrumb-item"><a href="/chains/polkadot#xcmtransfers">XCM Extrinsics</a></li>
-    <li class="breadcrumb-item">Extrinsic <a href='/tx/<%= txHash; %>'><%- uiTool.getShortHash(txHash, true, false); %></a></li>
+    <% if(hashType == 'extrinsic'){%>
+      <li class="breadcrumb-item">Extrinsic <a href='/tx/<%= hash; %>'><%- uiTool.getShortHash(hash, true, false); %></a></li>
+    <% } else if (hashType == 'xcm') {%>
+      <li class="breadcrumb-item">XCM MsgHash <a href='/timeline/<%= hash; %>'><%- uiTool.getShortHash(hash, true, false); %></a></li>
+    <% } %>
     <li class="breadcrumb-item active" aria-current="page">XCM Timeline</li>
   </ol>
 </nav>

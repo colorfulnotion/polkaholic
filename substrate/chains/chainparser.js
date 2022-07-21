@@ -1417,7 +1417,7 @@ module.exports = class ChainParser {
     }
 
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
-        return
+        //return
         let outgoingXTokens = []
         try {
             //let module_section = extrinsic.section;

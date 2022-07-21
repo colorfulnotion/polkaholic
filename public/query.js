@@ -317,7 +317,11 @@ function showxcmtransfers(filter) {
     } else {
         initxcmtransfers = true;
         var table = $(tableName).DataTable({
-            iDisplayLength: 25,
+            pageLength: 25,
+            lengthMenu: [
+                [10, 25, 50, 100],
+                [10, 25, 50, 100]
+            ],
             columnDefs: [{
                 "className": "dt-right",
                 "targets": [1, 2, 3]
@@ -484,7 +488,11 @@ function showxcmmessages(filter) {
     } else {
         initxcmmessages = true;
         var table = $(tableName).DataTable({
-            iDisplayLength: 25,
+            pageLength: 25,
+            lengthMenu: [
+                [10, 25, 50],
+                [10, 25, 50]
+            ],
             columnDefs: [{
                 "className": "dt-center",
                 "targets": [1, 2, 3]

@@ -58,6 +58,7 @@ module.exports = class Indexer extends AssetManager {
     chainID = false;
     relayChain = "";
     metadata = {};
+    authorErrorSpecVersion = 0; //query.session.currentIndex is not available for certain v. cache the errorV and do not ask author until specV changed again
     specVersion = -1;
     xcmeventsMap = {};
     xcmmsgMap = {};
@@ -2447,10 +2448,13 @@ order by chainID, extrinsicHash, diffTS`
         let debugCode = 0
         let palletSection = `${o.p}:${o.s}` //firstChar toUpperCase to match the testParseTraces tbl
 
-
-        if (!query[p]) decodeFailed = true;
-        if (!query[p][s]) decodeFailed = true;
-        if (!query[p][s].meta) decodeFailed = true;
+        try {
+            if (!query[p]) decodeFailed = true;
+            if (!query[p][s]) decodeFailed = true;
+            if (!query[p][s].meta) decodeFailed = true;
+        } catch (e) {
+            decodeFailed = true
+        }
 
         if (decodeFailed) {
             o.p = p
@@ -2749,6 +2753,10 @@ order by chainID, extrinsicHash, diffTS`
 
     // find the msgHash given {BN, recipient}
     getMsgHashCandidate(targetBN, destAddress = false) {
+        if (!destAddress) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}], dest MISSING`)
+            return false
+        }
         let rawDestAddr = destAddress.substr(2) // without the prefix 0x
         if (rawDestAddr.length != 64 && rawDestAddr.length != 40) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] Invalid destAddress`)
@@ -3913,22 +3921,49 @@ order by chainID, extrinsicHash, diffTS`
                     feed["transfers"] = this.map_feedTransfers_to_transfers(feedTransfers);
                 }
 
-                // process xcmtransfer extrinsic params
-                this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
+                //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
+                this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
+
                 if (rExtrinsic.xcms == undefined) {
-                    //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
-                    this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
+                    // process xcmtransfer extrinsic params
+                    this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
+                } else if (rExtrinsic.xcms != undefined && Array.isArray(rExtrinsic.xcms)) {
+                    // check if fallback is required
+                    let fallbackRequired = false
+                    for (const xcm of rExtrinsic.xcms) {
+                        if (xcm.destAddress == undefined) {
+                            console.log(`fallback Required [${rExtrinsic.extrinsicID}] [${rExtrinsic.extrinsicHash}] [${xcm.xcmIndex}-${xcm.transferIndex}]`)
+                            fallbackRequired = true
+                        }
+                    }
+                    //destAddress is missing from events
+                    if (fallbackRequired) {
+                        delete rExtrinsic.xcms
+                        this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
+                    }
+                }
+
+                // signed Extrinsic are guranteed to be consistent, regardless of proposer
+                // unsigned Extrinsic is NOT guranteed to bo consistent, therefore we shouldn't write it unless it's finalized
+                let isXcmTipSafe = false
+                if (isSigned || finalized) {
+                    isXcmTipSafe = true
                 }
 
                 if (rExtrinsic.xcms != undefined && Array.isArray(rExtrinsic.xcms) && rExtrinsic.xcms.length > 0) {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`[${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length}`, rExtrinsic.xcms)
-                    for (const xcmtransfer of rExtrinsic.xcms) {
-                        //Look up msgHash
-                        let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress)
-                        if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
-                        this.stat.addressRows.xcmsend++;
-                        this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized);
-                        this.updateXCMTransferStorage(xcmtransfer); // store, flushed in flushXCM
+                    if (isXcmTipSafe) {
+                        if (this.debugLevel >= paraTool.debugInfo && !finalized) console.log(`safeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length}`)
+                        for (const xcmtransfer of rExtrinsic.xcms) {
+                            //Look up msgHash
+                            let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress)
+                            if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
+                            this.stat.addressRows.xcmsend++;
+                            this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized);
+                            this.updateXCMTransferStorage(xcmtransfer); // store, flushed in flushXCM
+                        }
+                    } else {
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length} - skip`)
                     }
                     delete rExtrinsic.xcms
                 }
@@ -4870,6 +4905,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (!isNewSession && currSessionIndex > 0 && currSessionValidators.length > 0) {
             // no need to fetch sessionValidators
         } else {
+            if (this.authorErrorSpecVersion == this.specVersion) return
             try {
                 if (sessionIndex) {
                     currSessionIndex = sessionIndex
@@ -4886,7 +4922,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 this.currentSessionValidators = currSessionValidators
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSessionValidators (${currSessionIndex}, len=${currSessionValidators.length})`)
             } catch (e) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`*[${blockNumber}] getSessionIndexAndValidators error`, e.toString())
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`*[${blockNumber}] [specV=${this.specVersion}] getSessionIndexAndValidators error`, e.toString())
+                if (e.toString() == 'Error: query.session.currentIndex is not available in this version of the metadata') {
+                    this.authorErrorSpecVersion = this.specVersion
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`*[${blockNumber}] [specV=${this.specVersion}] set authorErrorSpecVersion=${this.specVersion}`)
+                }
                 return
             }
         }
