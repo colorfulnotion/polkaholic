@@ -3946,7 +3946,7 @@ order by chainID, extrinsicHash, diffTS`
                 // signed Extrinsic are guranteed to be consistent, regardless of proposer
                 // unsigned Extrinsic is NOT guranteed to bo consistent, therefore we shouldn't write it unless it's finalized
                 let isXcmTipSafe = false
-                if (isSigned || finalized){
+                if (isSigned || finalized) {
                     isXcmTipSafe = true
                 }
 

@@ -9,7 +9,11 @@ function showchains() {
     } else {
         initchains = true;
         var table = $(tableName).DataTable({
-            iDisplayLength: 25,
+            pageLength: -1,
+            lengthMenu: [
+                [10, 25, 50, 100, -1],
+                [10, 25, 50, 100, "All"]
+            ],
             columnDefs: [{
                     "className": "dt-right",
                 "targets": [3, 4, 5, 6]
