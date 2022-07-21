@@ -1272,6 +1272,9 @@ module.exports = class Query extends AssetManager {
                             if (!decimals) {
                                 decimals = this.getAssetDecimal(xcm.asset, xcm.chainIDDest)
                             }
+                            if (!decimal) {
+                                //TODO: fix here
+                            }
                             if (decimals) {
                                 xcm.amountSent = xcm.amountSent / 10 ** decimals;
                                 xcm.amountReceived = xcm.amountReceived / 10 ** decimals;
