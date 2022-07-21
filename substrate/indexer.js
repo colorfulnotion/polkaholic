@@ -58,6 +58,7 @@ module.exports = class Indexer extends AssetManager {
     chainID = false;
     relayChain = "";
     metadata = {};
+    authorErrorSpecVersion = 0; //query.session.currentIndex is not available for certain v. cache the errorV and do not ask author until specV changed again
     specVersion = -1;
     xcmeventsMap = {};
     xcmmsgMap = {};
@@ -4892,6 +4893,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (!isNewSession && currSessionIndex > 0 && currSessionValidators.length > 0) {
             // no need to fetch sessionValidators
         } else {
+            if (this.authorErrorSpecVersion == this.specVersion) return
             try {
                 if (sessionIndex) {
                     currSessionIndex = sessionIndex
@@ -4908,7 +4910,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 this.currentSessionValidators = currSessionValidators
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSessionValidators (${currSessionIndex}, len=${currSessionValidators.length})`)
             } catch (e) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`*[${blockNumber}] getSessionIndexAndValidators error`, e.toString())
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`*[${blockNumber}] [specV=${this.specVersion}] getSessionIndexAndValidators error`, e.toString())
+                if (e.toString() == 'Error: query.session.currentIndex is not available in this version of the metadata') {
+                    this.authorErrorSpecVersion = this.specVersion
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`*[${blockNumber}] [specV=${this.specVersion}] set authorErrorSpecVersion=${this.specVersion}`)
+                }
                 return
             }
         }
