@@ -2447,10 +2447,13 @@ order by chainID, extrinsicHash, diffTS`
         let debugCode = 0
         let palletSection = `${o.p}:${o.s}` //firstChar toUpperCase to match the testParseTraces tbl
 
-
-        if (!query[p]) decodeFailed = true;
-        if (!query[p][s]) decodeFailed = true;
-        if (!query[p][s].meta) decodeFailed = true;
+        try {
+          if (!query[p]) decodeFailed = true;
+          if (!query[p][s]) decodeFailed = true;
+          if (!query[p][s].meta) decodeFailed = true;
+        }catch(e){
+          decodeFailed = true
+        }
 
         if (decodeFailed) {
             o.p = p
@@ -2749,6 +2752,10 @@ order by chainID, extrinsicHash, diffTS`
 
     // find the msgHash given {BN, recipient}
     getMsgHashCandidate(targetBN, destAddress = false) {
+        if (!destAddress){
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}], dest MISSING`)
+            return false
+        }
         let rawDestAddr = destAddress.substr(2) // without the prefix 0x
         if (rawDestAddr.length != 64 && rawDestAddr.length != 40) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] Invalid destAddress`)
@@ -3913,11 +3920,26 @@ order by chainID, extrinsicHash, diffTS`
                     feed["transfers"] = this.map_feedTransfers_to_transfers(feedTransfers);
                 }
 
-                // process xcmtransfer extrinsic params
-                this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
+                //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
+                this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
+
                 if (rExtrinsic.xcms == undefined) {
-                    //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
-                    this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
+                    // process xcmtransfer extrinsic params
+                    this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
+                }else if (rExtrinsic.xcms != undefined && Array.isArray(rExtrinsic.xcms)){
+                    // check if fallback is required
+                    let fallbackRequired = false
+                    for (const xcm of rExtrinsic.xcms){
+                        if (xcm.destAddress == undefined){
+                           console.log(`fallback Required [${rExtrinsic.extrinsicID}] [${rExtrinsic.extrinsicHash}] [${xcm.xcmIndex}-${xcm.transferIndex}]`)
+                           fallbackRequired = true
+                        }
+                    }
+                    //destAddress is missing from events
+                    if (fallbackRequired){
+                      delete rExtrinsic.xcms
+                      this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
+                    }
                 }
 
                 if (rExtrinsic.xcms != undefined && Array.isArray(rExtrinsic.xcms) && rExtrinsic.xcms.length > 0) {
