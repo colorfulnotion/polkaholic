@@ -5761,6 +5761,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 console.log(`fetch assetManager:assetIdType`)
                 await this.chainParser.fetchAssetManagerAssetIdType(this)
             }
+            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden){
+                console.log(`fetch xcAssetConfig:assetIdToLocation`)
+                await this.chainParser.fetchXcAssetConfigAssetIdToLocation(this)
+            }
         } else if (this.chainID == paraTool.chainIDKico) {
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)
             await this.chainParser.fetchCurrenciesDicoAssetInfos(this)
