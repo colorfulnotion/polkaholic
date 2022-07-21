@@ -75,8 +75,7 @@ try {
         resave: false,
         store: sessionStore,
         cookie: {
-            maxAge: 1000 * 3600 * 4,
-            secure: process.env.NODE_ENV == "production"
+            maxAge: 1000 * 3600 * 4
         },
         saveUninitialized: false
     }))

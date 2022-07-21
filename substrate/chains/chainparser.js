@@ -1417,6 +1417,7 @@ module.exports = class ChainParser {
     }
 
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
+        return
         let outgoingXTokens = []
         try {
             //let module_section = extrinsic.section;
@@ -1719,6 +1720,8 @@ module.exports = class ChainParser {
           }
         },
         */
+        let relayChain = indexer.relayChain
+        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
         let targetedAsset = false;
         let rawTargetedAsset = false;
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`processConcreteCurrency asset`, fungibleAsset)
@@ -1744,17 +1747,57 @@ module.exports = class ChainParser {
                         rawTargetedAsset = indexer.getRelayChainAsset()
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`processConcreteCurrency targetedAsset parents:1, here`, targetedAsset)
                     }
-                } else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
-                    let v1_id_concrete_interior_x2 = v1_id_concrete_interior.x2
-                    if (v1_id_concrete_interior_x2.length == 2 && v1_id_concrete_interior_x2[1].generalIndex != undefined) {
-                        targetedAsset = this.processDecHexCurrencyID(indexer, v1_id_concrete_interior_x2[1].generalIndex)
-                        rawTargetedAsset = this.processRawDecHexCurrencyID(indexer, v1_id_concrete_interior_x2[1].generalIndex)
-                    } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency unknown v1.id.concrete.interior.x2`, JSON.stringify(v1_id_concrete_interior_x2, null, 2))
-                    }
+                    //} else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency unknown v1.id.concrete.interior!`, JSON.stringify(v1_id_concrete_interior, null, 2))
+                    //v1_id_concrete_interior case [x1/x2/x3]
+                    //TODO: this is outcoming - relaychain's perspective
+                    let xType = Object.keys(v1_id_concrete_interior)[0]
+                    let v1_id_concrete_interiorVal = v1_id_concrete_interior[xType]
+                    if (v1_id_concrete_parents == 1) {
+                        // easy case: no expansion
+                    } else {
+                        // expand the key
+                        let new_v1_id_concrete_interiorVal = []
+                        let paraChainID = indexer.chainID - paraIDExtra
+                        let expandedParachainPiece = {
+                            parachain: paraChainID
+                        }
+                        new_v1_id_concrete_interiorVal.push(expandedParachainPiece)
+                        if (xType == 'x1') {
+                            new_v1_id_concrete_interiorVal.push(v1_id_concrete_interiorVal)
+
+                        } else if (Array.isArray(v1_id_concrete_interiorVal)) {
+                            //x2/x3...
+                            new_v1_id_concrete_interiorVal.concat(v1_id_concrete_interiorVal)
+                        } else {
+                            console.log(`processConcreteCurrency error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
+                        }
+                        v1_id_concrete_interiorVal = new_v1_id_concrete_interiorVal
+                    }
+
+                    let interiorVStr = JSON.stringify(v1_id_concrete_interiorVal)
+                    let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
+                    let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                    if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
+                        targetedAsset = cachedXcmAssetInfo.asset
+                        rawTargetedAsset = cachedXcmAssetInfo.asset
+                        if (cachedXcmAssetInfo.paraID == 1000) {
+                            //statemine/statemint
+                            let nativeChainID = paraIDExtra + 1000
+                            let t = JSON.parse(targetedAsset)
+                            let currencyID = t.Token
+                            let symbol = indexer.getCurrencyIDSymbol(currencyID, nativeChainID);
+                            targetedAsset = JSON.stringify({
+                                Token: symbol
+                            })
+                        }
+                    } else {
+                        console.log(`processConcreteCurrency cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
+                        targetedAsset = interiorVStr
+                        rawTargetedAsset = interiorVStr
+                    }
                 }
+
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency unknown v1.id.concrete unknown!`, JSON.stringify(v1_id_concrete, null, 2))
             }
@@ -1784,6 +1827,7 @@ module.exports = class ChainParser {
         if (fungibleAsset.id != undefined && fungibleAsset.id.null !== undefined) {
             targetedAsset = indexer.getNativeAsset()
             rawTargetedAsset = indexer.getNativeAsset()
+            //} else if (fungibleAsset.id != undefined && fungibleAsset.id.concrete !== undefined) { //MK: was expecting xcmInteriorKey case here?
         } else if (fungibleAsset.id != undefined && fungibleAsset.id.x2 !== undefined && Array.isArray(fungibleAsset.id.x2)) {
             let fungibleAsset_id_x2 = fungibleAsset.id.x2
             if (fungibleAsset_id_x2.length == 2 && fungibleAsset_id_x2[1].generalIndex != undefined) {
@@ -2046,6 +2090,7 @@ module.exports = class ChainParser {
                     let assets = a.assets;
                     let feeAssetIndex = a.fee_asset_item
                     if (assets.v0 !== undefined && Array.isArray(assets.v0) && assets.v0.length > 0) {
+                        console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} v0 case`, JSON.stringify(a, null, 2))
                         let assetsv0 = assets.v0
                         let transferIndex = 0
                         for (const asset of assetsv0) {
