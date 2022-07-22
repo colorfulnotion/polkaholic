@@ -183,6 +183,130 @@ module.exports = class AstarParser extends ChainParser {
         return false
     }
 
+    //shiden/astar
+    //xcAssetConfig.assetIdToLocation
+    async fetchXcAssetConfigAssetIdToLocation(indexer) {
+        let isAcala = true;
+        if (!indexer.api) {
+            console.log(`[fetchXcAssetConfigAssetIdToLocation] Fatal indexer.api not initiated`)
+            return
+        }
+        let relayChain = indexer.relayChain
+        let relayChainID = (relayChain == 'polkadot') ? 0 : 2
+        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+
+        var a = await indexer.api.query.xcAssetConfig.assetIdToLocation.entries()
+        if (!a) return
+        let assetList = {}
+
+        a.forEach(async ([key, val]) => {
+            let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let parsedAsset = {
+                Token: assetID
+            }
+            let paraID = 0
+            let chainID = -1
+
+            var asset = JSON.stringify(parsedAsset);
+            let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
+            let cachedAssetInfo = indexer.assetInfo[assetChain]
+            if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
+                //cached found
+                //console.log(`cached AssetInfo found`, cachedAssetInfo)
+                let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol : ''
+                let nativeSymbol = symbol
+
+                let xcmAssetType = val.toJSON()
+                // type V0/V1/...
+                let xcmAssetTypeV = Object.keys(xcmAssetType)[0]
+                let xcmAsset = xcmAssetType[xcmAssetTypeV]
+                let parents = xcmAsset.parents
+                let interior = xcmAsset.interior
+                //x1/x2/x3 refers to the number to params
+
+                let interiorK = Object.keys(interior)[0]
+                let interiork = paraTool.firstCharLowerCase(interiorK)
+                let interiorVRaw = interior[interiorK]
+
+                //console.log(`${interiork} interiorVRawV`, interiorVRawV)
+                let interiorVStr0 = JSON.stringify(interiorVRaw)
+                interiorVStr0.replace('Parachain', 'parachain').replace('Parachain', 'parachain').replace('PalletInstance', 'palletInstance').replace('GeneralIndex', 'generalIndex').replace('GeneralKey', 'generalKey')
+                //hack: lower first char
+                let interiorV = JSON.parse(interiorVStr0)
+
+                if (interiork == 'here' || interiork == 'Here') {
+                    //relaychain case
+                    chainID = relayChainID
+                } else if (interiork == 'x1') {
+                    paraID = interiorV['parachain']
+                    chainID = paraID + paraIDExtra
+                } else {
+                    let generalIndex = -1
+                    for (let i = 0; i < interiorV.length; i++) {
+                        let v = interiorV[i]
+                        if (v.parachain != undefined) {
+                            paraID = v.parachain
+                            chainID = paraID + paraIDExtra
+                        } else if (v.generalIndex != undefined) {
+                            generalIndex = v.generalIndex
+                        } else if (v.generalKey != undefined) {
+                            let generalKey = v.generalKey
+                            if (generalKey.substr(0, 2) != '0x') {
+                                generalKey = paraTool.stringToHex(generalKey)
+                                v.generalKey = generalKey
+                            }
+                        }
+                    }
+                    //over-write statemine asset with assetID
+                    if (paraID == 1000) {
+                        nativeSymbol = `${generalIndex}`
+                    }
+                }
+                if (symbol == 'AUSD') {
+                    nativeSymbol = 'KUSD'
+                } else if (symbol == 'aUSD') {
+                    nativeSymbol = 'AUSD'
+                }
+                let nativeParsedAsset = {
+                    Token: nativeSymbol
+                }
+                var nativeAsset = JSON.stringify(nativeParsedAsset);
+                let interiorVStr = JSON.stringify(interiorV)
+
+                if ((interiork == 'here' || interiork == 'Here') && interior[interiorK] == null) {
+                    interiorVStr = 'here'
+                }
+
+                let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
+                let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                    return
+                }
+
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
+
+                let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
+                let xcmAssetInfo = {
+                    chainID: chainID,
+                    xcmConcept: interiorVStr, //interior
+                    asset: nativeAsset,
+                    paraID: paraID,
+                    relayChain: relayChain,
+                    parents: parents,
+                    interiorType: interiorK,
+                    xcmInteriorKey: xcmInteriorKey,
+                    nativeAssetChain: nativeAssetChain,
+                    source: indexer.chainID,
+                }
+                //console.log(`xcmAssetInfo`, xcmAssetInfo)
+                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXcAssetConfigAssetIdToLocation');
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
+            }
+        });
+    }
+
     processDappsStakingLedger(indexer, e2, rAssetkey, fromAddress) {
         let aa = {};
         aa['dappsStaking'] = e2.pv / (10 ** indexer.getChainDecimal(indexer.chainID))
