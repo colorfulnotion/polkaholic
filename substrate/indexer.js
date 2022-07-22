@@ -4087,13 +4087,19 @@ order by chainID, extrinsicHash, diffTS`
                     if (reapingEvents.length > 0) {
                         reapingEvents.forEach((ev) => {
                             // from the event, get the pubkey of the account being reaped and flag it for a balance query
-                            var accountID = ev.data[0] // ... check
+                            let palletMethod = `${ev.section}(${ev.method})`
+                            let accountIDIdx = 0;
+                            if (palletMethod == "balances(DustLost)" || palletMethod == "system(KilledAccount)"){
+                              accountIDIdx = 0
+                            }else if (palletMethod == "tokens(DustLost)"){
+                              accountIDIdx =1
+                            }
+                            accountID = ev.data[accountIDIdx]
                             let reapedAddress = paraTool.getPubKey(accountID)
                             if (reapedAddress) {
                                 this.flagAddressBalanceRequest(reapedAddress);
                             }
                         })
-
                     }
 
                     // if this is a multisig extrinsic, update map
