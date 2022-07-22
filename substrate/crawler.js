@@ -1921,7 +1921,7 @@ create table talismanEndpoint (
                     if (evmReceipts) crawlReceiptsEVM = 0;
                     if (evmTrace) crawlTraceEVM = 0;
                 }
-                let r = await this.index_chain_block_row(rRow, false, false); // signedBlock is false, write_bq_log = false
+                let r = await this.index_chain_block_row(rRow, false, false, false, true); // signedBlock is false, write_bq_log = false, isTip = TRUE
                 blockStats = r.blockStats;
                 // IMMEDIATELY flush all address feed + hashes (txs + blockhashes)
                 await this.flush(block.blockTS, bn, false, isTip); //ts, bn, isFullPeriod, isTip

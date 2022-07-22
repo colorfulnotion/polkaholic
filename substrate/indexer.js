@@ -75,6 +75,7 @@ module.exports = class Indexer extends AssetManager {
     recentTransfers = [];
     recentXCMMessages = [];
 
+    addressBalanceRequest = {}
 
     context = {};
     stat = {
@@ -725,6 +726,9 @@ module.exports = class Indexer extends AssetManager {
         await this.dump_xcm_messages()
         await this.dump_recent_activity()
         await this.dump_failed_traces()
+        if (isTip) {
+            await this.dump_addressBalanceRequest();
+        }
 
         if (isFullPeriod || lastBlockNumber % 3000 == 2998) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`unhandledTraceMap`, this.unhandledTraceMap)
@@ -3731,7 +3735,44 @@ order by chainID, extrinsicHash, diffTS`
         return rewards;
     }
 
-    async process_extrinsic(api, extrinsicRaw, eventsRaw, block, index, finalized = false) {
+    // we wait until the end of the block to do the call -- these are only for accounts on the tip if traces are not available
+    flagAddressBalanceRequest(address) {
+        this.addressBalanceRequest[address] = {
+            blockNumber: this.chainParser.parserBlockNumber,
+            blockTS: this.chainParser.parserTS
+        };
+        console.log("flagAddressBalanceRequest", address, this.chainParser.parserBlockNumber, this.chainParser.parserTS);
+    }
+
+    async dump_addressBalanceRequest() {
+        // queue requests in address${chainID} so streaming process can work through requests
+        let addresses = Object.keys(this.addressBalanceRequest);
+        if (addresses.length == 0) return;
+        let out = [];
+        for (const address of addresses) {
+            let r = this.addressBalanceRequest[address];
+            out.push(`('${address}', '${r.blockNumber}', '${r.blockTS}', 1)`)
+        }
+
+
+        let vals = ["lastUpdateBN", "blockTS", "requested"];
+        await this.upsertSQL({
+            "table": `address${this.chainID}`,
+            "keys": ["address"],
+            "vals": vals,
+            "data": out,
+            "lastUpdateBN": vals
+        });
+        // TODO OPTIMIZATION: also write placeholder in "accountrealtime" (in "request" column family) which can mark the need to do work on the client (ie when traces are not available)
+        this.logger.info({
+            "op": "dump_addressBalanceRequest",
+            "chainID": this.chainID,
+	    "addresses": addresses
+        })
+        this.addressBalanceRequest = {}
+    }
+
+    async process_extrinsic(api, extrinsicRaw, eventsRaw, block, index, finalized = false, isTip = false, tracesPresent = false) {
         let blockNumber = block.header.number;
         let blockHash = block.hash;
         let blockTS = block.blockTS;
@@ -3968,83 +4009,100 @@ order by chainID, extrinsicHash, diffTS`
                     delete rExtrinsic.xcms
                 }
 
-                // process proxy
-                // step 1 - filter proxy events
-                let proxyEvents = extrinsic.events.filter((ev) => {
-                    return this.chainParser.proxyFilter(`${ev.section}(${ev.method})`);
-                })
-                // step 2 - generate proxy events
-                let rawProxies = proxyEvents.map((pe) => {
-                    return this.chainParser.prepareFeedProxy(this, pe.section, pe.method, pe.data, pe.eventID);
-                })
-                // step 3 - set proxyEvent
-                if (rawProxies.length > 0 && block.finalized) {
-                    for (const rawProxyRec of rawProxies) {
-                        // mostly likely it's array of 1 element
-                        if (rawProxyRec) {
-                            this.updateProxyMap(rawProxyRec)
+                if (block.finalized) {
+                    // filter events into proxyEvents, rewardEvents, crowdloanEvents, reapingEvents, multisigEvents
+                    let proxyEvents = [];
+                    let rewardEvents = [];
+                    let crowdloanEvents = [];
+                    let reapingEvents = [];
+                    extrinsic.events.forEach((ev) => {
+                        let palletMethod = `${ev.section}(${ev.method})`
+                        if (this.chainParser.proxyFilter(palletMethod)) {
+                            proxyEvents.push(ev);
+                        } else if (this.chainParser.rewardFilter(palletMethod)) {
+                            rewardEvents.push(ev);
+                        } else if (this.chainParser.crowdloanFilter(palletMethod)) {
+                            crowdloanEvents.push(ev);
+                        } else if (this.chainParser.reapingFilter(palletMethod)) {
+                            reapingEvents.push(ev);
                         }
-                    }
-                }
-
-                // process feedrewards
-                // step 1 - filter rewards events
-                let rewardEvents = extrinsic.events.filter((ev) => {
-                    return this.chainParser.rewardFilter(`${ev.section}(${ev.method})`);
-                })
-                // step 2 - generate rewardEvents
-                let rawFeedRewards = rewardEvents.map((re) => {
-                    return this.chainParser.prepareFeedReward(this, re.section, re.method, re.data, re.eventID);
-                })
-
-                // step 3 - decorate RawFeedReward using the "feed" we build
-                if (rawFeedRewards.length > 0 && block.finalized) {
-                    let feedRewards = await this.processRawFeedRewards(feed, rawFeedRewards, blockTS)
-                    //console.log(`feedRewards`, feedRewards)
-                    for (const feedreward of feedRewards) {
-                        // TODO: can a same address get touched twice with an extrinsic?
-                        // claim: it's possible but super rare
-                        let toAddress = paraTool.getPubKey(feedreward.account)
-                        // (3) acct:feedreward -> recFeedreward (can be processed immediately)
-                        this.stat.addressRows.feedreward++
-                        this.updateAddressExtrinsicStorage(toAddress, extrinsicID, extrinsicHash, "feedreward", feedreward, blockTS, block.finalized);
-                    }
-                    if (feedRewards.length > 0) {
-                        feed["rewards"] = this.map_feedRewards_to_rewards(feedRewards);
-                    }
-                }
-
-                // process feedcrowdloan
-                let crowdloanEvents = extrinsic.events.filter((ev) => {
-                    return this.chainParser.crowdloanFilter(`${ev.section}(${ev.method})`);
-                })
-                if (crowdloanEvents.length > 0 && block.finalized) {
-                    let rawFeedCrowdloans = crowdloanEvents.map((ce) => {
-                        return this.chainParser.prepareFeedcrowdloan(this, ce.section, ce.method, ce.data, ce.eventID);
                     })
 
-                    if (extrinsic.remarks.length > 0) {
-                        //console.log(`remarks found!`, extrinsic.remarks)
+                    // (a) process proxyEvents
+                    if (proxyEvents.length > 0) {
+                        let rawProxies = proxyEvents.map((pe) => {
+                            return this.chainParser.prepareFeedProxy(this, pe.section, pe.method, pe.data, pe.eventID);
+                        })
+                        // step 3 - set proxyEvent if any turn up
+                        for (const rawProxyRec of rawProxies) {
+                            // mostly likely it's array of 1 element
+                            if (rawProxyRec) {
+                                this.updateProxyMap(rawProxyRec)
+                            }
+                        }
                     }
 
-                    let feedCrowdLoans = this.processRawFeedCrowdLoans(feed, rawFeedCrowdloans, blockTS, extrinsic.remarks)
-                    for (const feedcrowdloan of feedCrowdLoans) {
-                        // TODO: can a same address get touched twice with an extrinsic?
-                        // claim: it's possible but super rare
-                        let toAddress = paraTool.getPubKey(feedcrowdloan.account)
-                        //TODO:should the key include event index?
-                        // (3) acct:feedcrowdloan -> recFeedcrowdloan (can be processed immediately)
-                        this.stat.addressRows.feedcrowdloan++
-                        //console.log(`${toAddress} feedcrowdloan`, feedcrowdloan)
-                        this.updateAddressExtrinsicStorage(toAddress, extrinsicID, extrinsicHash, "feedcrowdloan", feedcrowdloan, blockTS, block.finalized);
-                        this.updateCrowdloanStorage(feedcrowdloan);
+                    // (b) process rewardEvents into feedrewards
+                    if (rewardEvents.length > 0) {
+                        let rawFeedRewards = rewardEvents.map((re) => {
+                            return this.chainParser.prepareFeedReward(this, re.section, re.method, re.data, re.eventID);
+                        })
+                        // decorate RawFeedReward using the "feed" we build
+                        let feedRewards = await this.processRawFeedRewards(feed, rawFeedRewards, blockTS)
+                        //console.log(`feedRewards`, feedRewards)
+                        for (const feedreward of feedRewards) {
+                            // TODO: can a same address get touched twice with an extrinsic?
+                            // claim: it's possible but super rare
+                            let toAddress = paraTool.getPubKey(feedreward.account)
+                            // (3) acct:feedreward -> recFeedreward (can be processed immediately)
+                            this.stat.addressRows.feedreward++
+                            this.updateAddressExtrinsicStorage(toAddress, extrinsicID, extrinsicHash, "feedreward", feedreward, blockTS, block.finalized);
+                        }
+                        if (feedRewards.length > 0) {
+                            feed["rewards"] = this.map_feedRewards_to_rewards(feedRewards);
+                        }
+                    }
+
+                    // (c) process crowdloanEvents into feedcrowdloan
+                    if (crowdloanEvents.length > 0) {
+                        let rawFeedCrowdloans = crowdloanEvents.map((ce) => {
+                            return this.chainParser.prepareFeedcrowdloan(this, ce.section, ce.method, ce.data, ce.eventID);
+                        })
+
+                        let feedCrowdLoans = this.processRawFeedCrowdLoans(feed, rawFeedCrowdloans, blockTS, extrinsic.remarks)
+                        for (const feedcrowdloan of feedCrowdLoans) {
+                            // TODO: can a same address get touched twice with an extrinsic?
+                            // claim: it's possible but super rare
+                            let toAddress = paraTool.getPubKey(feedcrowdloan.account)
+                            //TODO:should the key include event index?
+                            // (3) acct:feedcrowdloan -> recFeedcrowdloan (can be processed immediately)
+                            this.stat.addressRows.feedcrowdloan++
+                            //console.log(`${toAddress} feedcrowdloan`, feedcrowdloan)
+                            this.updateAddressExtrinsicStorage(toAddress, extrinsicID, extrinsicHash, "feedcrowdloan", feedcrowdloan, blockTS, block.finalized);
+                            this.updateCrowdloanStorage(feedcrowdloan);
+                        }
+                    }
+
+                    // process reapingEvents
+                    if (reapingEvents.length > 0) {
+                        reapingEvents.forEach((ev) => {
+                            // from the event, get the pubkey of the account being reaped and flag it for a balance query
+                            var accountID = ev.data[0] // ... check
+                            let reapedAddress = paraTool.getPubKey(accountID)
+                            if (reapedAddress) {
+                                this.flagAddressBalanceRequest(reapedAddress);
+                            }
+                        })
+
+                    }
+
+                    // if this is a multisig extrinsic, update map
+                    let multisigRec = this.chainParser.processMultisig(this, rExtrinsic, feed, fromAddress);
+                    if (multisigRec) {
+                        this.updateMultisigMap(multisigRec)
                     }
                 }
 
-                let multisigRec = this.chainParser.processMultisig(this, rExtrinsic, feed, fromAddress);
-                if (multisigRec) {
-                    this.updateMultisigMap(multisigRec)
-                }
 
             }
 
@@ -4937,7 +4995,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false) {
+    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
         if (!block) return;
         if (!block.extrinsics) return;
@@ -4969,7 +5027,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let extrinsics = [];
         for (let index = 0; index < block.extrinsics.length; index++) {
             let extrinsicRaw = block.extrinsics[index];
-            let ext = await this.process_extrinsic(api, extrinsicRaw, eventsIndexed[index], block, index, finalized);
+            let ext = await this.process_extrinsic(api, extrinsicRaw, eventsIndexed[index], block, index, finalized, isTip, tracesPresent);
             if (ext) {
                 extrinsics.push(ext);
                 if ((this.currentTS() - blockTS < 86400 * 2) && finalized) { // only save in recentExtrinsic if finalized (otherwise extrinsicID would not be usable as a deduping key)
@@ -4997,6 +5055,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                     let recentTransfer = `('${ext.extrinsicID}', '${this.chainID}', '${logDT}', '${hr}', '${ext.blockNumber}', '${ext.extrinsicHash}', '${t.section}', '${t.method}', '${t.fromAddress}', '${t.toAddress}', ${tAsset}, ${tSymbol}, ${tAmount}, '${priceUSD}', '${amountUSD}', '${ext.ts}', ${tRawAsset}, ${tRawAmount}, ${tDecimals})`
                                     //console.log(`recentTransfer`, recentTransfer)
                                     recentTransfers.push(recentTransfer);
+                                    if (isTip && (tracesPresent == false)) {
+                                        // because traces are missing, we'll fill in gaps dynamically at the tip for the sender and the receiver
+                                        this.flagAddressBalanceRequest(t.fromAddress);
+                                        this.flagAddressBalanceRequest(t.toAddress);
+                                    }
                                 }
                             }
                         }
@@ -5775,7 +5838,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     // given a row r fetched with "fetch_block_row", processes the block, events + trace
-    async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false) {
+    async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false) {
         /* index_chain_block_row shall process trace(if available) + block + events in orders
         xcm steps:
         (1a) processTrace: parse outgoing xcmmessages from traces
@@ -5831,8 +5894,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
             let processBlockEventsStartTS = new Date().getTime()
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
-            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
-            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, autoTraces, true, write_bq_log);
+            let tracesPresent = (r.trace) ? true : false;
+            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, autoTraces, true, write_bq_log, isTip, tracesPresent);
 
             let processBlockEventsTS = (new Date().getTime() - processBlockEventsStartTS) / 1000
             this.timeStat.processBlockEventsTS += processBlockEventsTS
