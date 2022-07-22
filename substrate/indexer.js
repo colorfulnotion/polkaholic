@@ -4087,13 +4087,19 @@ order by chainID, extrinsicHash, diffTS`
                     if (reapingEvents.length > 0) {
                         reapingEvents.forEach((ev) => {
                             // from the event, get the pubkey of the account being reaped and flag it for a balance query
-                            var accountID = ev.data[0] // ... check
+                            let palletMethod = `${ev.section}(${ev.method})`
+                            let accountIDIdx = 0;
+                            if (palletMethod == "balances(DustLost)" || palletMethod == "system(KilledAccount)"){
+                              accountIDIdx = 0
+                            }else if (palletMethod == "tokens(DustLost)"){
+                              accountIDIdx =1
+                            }
+                            accountID = ev.data[accountIDIdx]
                             let reapedAddress = paraTool.getPubKey(accountID)
                             if (reapedAddress) {
                                 this.flagAddressBalanceRequest(reapedAddress);
                             }
                         })
-
                     }
 
                     // if this is a multisig extrinsic, update map
@@ -5823,6 +5829,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel) {
                 console.log(`fetch assetManager:assetIdType`)
                 await this.chainParser.fetchAssetManagerAssetIdType(this)
+            }
+            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden){
+                console.log(`fetch xcAssetConfig:assetIdToLocation`)
+                await this.chainParser.fetchXcAssetConfigAssetIdToLocation(this)
             }
         } else if (this.chainID == paraTool.chainIDKico) {
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)

@@ -2332,7 +2332,7 @@ module.exports = class ChainParser {
 
     reapingFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
-        if (palletMethod == "balances(DustLost)" || palletMethod == "tokens:dustLost") {
+        if (palletMethod == "balances(DustLost)" || palletMethod == "system(KilledAccount)" || palletMethod == "tokens(DustLost)" ) {
             return true
         } else {
             return false;
@@ -2923,7 +2923,7 @@ module.exports = class ChainParser {
                 let interiorK = Object.keys(interior)[0]
                 let interiorV = interior[interiorK]
                 let interiorVStr = JSON.stringify(interiorV)
-                if (interiorK == 'here' && interior[interiorK] == null) {
+                if ((interiorK == 'here' || interiork == 'Here') && interior[interiorK] == null) {
                     interiorVStr = 'here'
                     chainID = relayChainID
                 }
@@ -2934,7 +2934,7 @@ module.exports = class ChainParser {
                     return
                 }
 
-                if (interiorK == 'here') {
+                if (interiorK == 'here' || interiork == 'Here') {
                     //relaychain case
                     chainID = relayChainID
                 } else if (interiorK == 'x1') {
@@ -3177,7 +3177,7 @@ module.exports = class ChainParser {
                 //hack: lower first char
                 let interiorV = JSON.parse(interiorVStr0)
 
-                if (interiork == 'here') {
+                if (interiork == 'here' || interiork == 'Here') {
                     //relaychain case
                     chainID = relayChainID
                 } else if (interiork == 'x1') {
@@ -3216,7 +3216,7 @@ module.exports = class ChainParser {
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
                 let interiorVStr = JSON.stringify(interiorV)
 
-                if ((interiork == 'here') && interior[interiorK] == null) {
+                if ((interiork == 'here' || interiork == 'Here') && interior[interiorK] == null) {
                     interiorVStr = 'here'
                 }
 
@@ -3244,7 +3244,7 @@ module.exports = class ChainParser {
                     source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
-                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetManagerAssetIdType');
+                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchAssetRegistryForeignAssetLocations');
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
