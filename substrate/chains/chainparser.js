@@ -2329,6 +2329,16 @@ module.exports = class ChainParser {
         }
     }
 
+
+    reapingFilter(palletMethod) {
+        //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
+        if (palletMethod == "balances(DustLost)" || palletMethod == "tokens:dustLost") {
+            return true
+        } else {
+            return false;
+        }
+    }
+
     proxyFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
         if (palletMethod == "proxy(ProxyAdded)" || palletMethod == "proxy(ProxyRemoved)" || palletMethod == "proxy(AnonymousCreated)") {

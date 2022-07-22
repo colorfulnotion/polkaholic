@@ -16,5 +16,5 @@ cbt createtable  apikeys  "families=rate:maxversions=1,n:maxversions=1"
 cbt setgcpolicy  apikeys  rate maxage=3d or maxversions=1
 
 # chain tables follow the following schema; but evm chain tables have 4 additional columns: blockrawevm, feedevm, receiptsevm, traceevm
-cbt createtable  chain0      "families=blockraw:maxversions=1,trace:maxversions=1,finalized:maxversions=1,n:maxversions=1,events:maxversions=1,feed:maxversions=1"
-cbt createtable  chain2004   "families=blockraw:maxversions=1,trace:maxversions=1,finalized:maxversions=1,n:maxversions=1,events:maxversions=1,feed:maxversions=1,blockrawevm:maxversions=1,feedevm:maxversions=1,receiptsevm:maxversions=1,traceevm:maxversions=1"
+cbt createtable  chain0      "families=blockraw:maxversions=1,autotrace=maxversions=1,trace:maxversions=1,finalized:maxversions=1,n:maxversions=1,events:maxversions=1,feed:maxversions=1"
+cbt createtable  chain2004   "families=blockraw:maxversions=1,autotrace=maxversions=1,trace:maxversions=1,finalized:maxversions=1,n:maxversions=1,events:maxversions=1,feed:maxversions=1,blockrawevm:maxversions=1,feedevm:maxversions=1,receiptsevm:maxversions=1,traceevm:maxversions=1"
