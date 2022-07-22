@@ -3736,12 +3736,14 @@ order by chainID, extrinsicHash, diffTS`
     }
 
     // we wait until the end of the block to do the call -- these are only for accounts on the tip if traces are not available
-    flagAddressBalanceRequest(address) {
+    flagAddressBalanceRequest(address, reaped = false) {
         this.addressBalanceRequest[address] = {
             blockNumber: this.chainParser.parserBlockNumber,
-            blockTS: this.chainParser.parserTS
+            blockTS: this.chainParser.parserTS,
+            blockHash: this.chainParser.parserBlockHash,
+            reaped: reaped
         };
-        console.log("flagAddressBalanceRequest", address, this.chainParser.parserBlockNumber, this.chainParser.parserTS);
+        console.log("flagAddressBalanceRequest", address, this.chainParser.parserBlockNumber, this.chainParser.parserTS, this.chainParser.parserBlockHash, reaped);
     }
 
     async dump_addressBalanceRequest() {
@@ -3749,13 +3751,44 @@ order by chainID, extrinsicHash, diffTS`
         let addresses = Object.keys(this.addressBalanceRequest);
         if (addresses.length == 0) return;
         let out = [];
+        let vals = ["free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN", "blockTS", "requested"];
         for (const address of addresses) {
             let r = this.addressBalanceRequest[address];
-            out.push(`('${address}', '${r.blockNumber}', '${r.blockTS}', 1)`)
+            if (r.reaped) {
+                out.push(`('${address}', '0', '0', '0', '0', '${r.blockHash}', Now(), '${r.blockNumber}', '${r.blockTS}',  3)`)
+                this.logger.warn({
+                    "op": "dump_addressBalanceRequest REAP",
+                    "chainID": this.chainID,
+                    "address": address,
+                })
+            } else {
+                try {
+                    let query = await this.api.query.system.account(address);
+                    let balance = query.data;
+                    let free_balance = (balance.free) ? balance.free.toString() : 0;
+                    let reserved_balance = (balance.reserved) ? balance.reserved.toString() : 0;
+                    let miscFrozen_balance = (balance.miscFrozen) ? balance.miscFrozen.toString() : 0;
+                    let feeFrozen_balance = (balance.feeFrozen) ? balance.feeFrozen.toString() : 0;
+                    let str = `('${address}', '${free_balance}', '${reserved_balance}', '${miscFrozen_balance}', '${feeFrozen_balance}', '${r.blockHash}', Now(), '${r.blockNumber}', '${r.blockTS}',   2)`
+                    out.push(str)
+                    console.log("dump_addressBalanceRequest", str);
+                    this.logger.info({
+                        "op": "dump_addressBalanceRequest system.account",
+                        "chainID": this.chainID,
+                        "address": address,
+                        "upd": str
+                    })
+                } catch (err) {
+                    this.logger.error({
+                        "op": "dump_addressBalanceRequest",
+                        "chainID": this.chainID,
+                        "address": address,
+                        err
+                    })
+                }
+            }
         }
 
-
-        let vals = ["lastUpdateBN", "blockTS", "requested"];
         await this.upsertSQL({
             "table": `address${this.chainID}`,
             "keys": ["address"],
@@ -3764,11 +3797,6 @@ order by chainID, extrinsicHash, diffTS`
             "lastUpdateBN": vals
         });
         // TODO OPTIMIZATION: also write placeholder in "accountrealtime" (in "request" column family) which can mark the need to do work on the client (ie when traces are not available)
-        this.logger.info({
-            "op": "dump_addressBalanceRequest",
-            "chainID": this.chainID,
-	    "addresses": addresses
-        })
         this.addressBalanceRequest = {}
     }
 
@@ -4089,15 +4117,15 @@ order by chainID, extrinsicHash, diffTS`
                             // from the event, get the pubkey of the account being reaped and flag it for a balance query
                             let palletMethod = `${ev.section}(${ev.method})`
                             let accountIDIdx = 0;
-                            if (palletMethod == "balances(DustLost)" || palletMethod == "system(KilledAccount)"){
-                              accountIDIdx = 0
-                            }else if (palletMethod == "tokens(DustLost)"){
-                              accountIDIdx =1
+                            if (palletMethod == "balances(DustLost)" || palletMethod == "system(KilledAccount)") {
+                                accountIDIdx = 0
+                            } else if (palletMethod == "tokens(DustLost)") {
+                                accountIDIdx = 1
                             }
                             accountID = ev.data[accountIDIdx]
                             let reapedAddress = paraTool.getPubKey(accountID)
                             if (reapedAddress) {
-                                this.flagAddressBalanceRequest(reapedAddress);
+                                this.flagAddressBalanceRequest(reapedAddress, true);
                             }
                         })
                     }
@@ -5065,6 +5093,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                         // because traces are missing, we'll fill in gaps dynamically at the tip for the sender and the receiver
                                         this.flagAddressBalanceRequest(t.fromAddress);
                                         this.flagAddressBalanceRequest(t.toAddress);
+                                        // TODO: check if this misses { burns, xcmtransfers, unsigned extrinsics }
                                     }
                                 }
                             }
@@ -5830,7 +5859,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 console.log(`fetch assetManager:assetIdType`)
                 await this.chainParser.fetchAssetManagerAssetIdType(this)
             }
-            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden){
+            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden) {
                 console.log(`fetch xcAssetConfig:assetIdToLocation`)
                 await this.chainParser.fetchXcAssetConfigAssetIdToLocation(this)
             }
@@ -6108,7 +6137,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 });
             }
 
-            this.batchedSQL.push(`update chain, asset set chain.numHolders = asset.numHolders, chain.lastUpdateChainAssetsTS = FROM_UNIXTIME(Now()) where chain.asset = asset.asset and chain.chainID = asset.chainID`);
+            this.batchedSQL.push(`update chain set lastUpdateChainAssetsTS = FROM_UNIXTIME(Now()) where chainID = ${chain.chainID}`);
             await this.update_batchedSQL(10.0);
             return (true);
         } catch (err) {

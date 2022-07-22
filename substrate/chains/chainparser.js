@@ -2332,7 +2332,7 @@ module.exports = class ChainParser {
 
     reapingFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
-        if (palletMethod == "balances(DustLost)" || palletMethod == "system(KilledAccount)" || palletMethod == "tokens(DustLost)" ) {
+        if (palletMethod == "balances(DustLost)" || palletMethod == "system(KilledAccount)" || palletMethod == "tokens(DustLost)") {
             return true
         } else {
             return false;
