@@ -1768,9 +1768,13 @@ module.exports = class ChainParser {
 
                         } else if (Array.isArray(v1_id_concrete_interiorVal)) {
                             //x2/x3...
-                            new_v1_id_concrete_interiorVal.concat(v1_id_concrete_interiorVal)
+                            for (const v of v1_id_concrete_interiorVal){
+                              new_v1_id_concrete_interiorVal.push(v)
+                              if (this.debugLevel >= paraTool.debugInfo) console.log(`${indexer.chainID}, [parents=${v1_id_concrete_parents}] expandedkey ${JSON.stringify(v1_id_concrete_interiorVal)} ->  ${JSON.stringify(new_v1_id_concrete_interiorVal)}`)
+                            }
+                            //new_v1_id_concrete_interiorVal.concat(v1_id_concrete_interiorVal)
                         } else {
-                            console.log(`processConcreteCurrency error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
+                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
                         }
                         v1_id_concrete_interiorVal = new_v1_id_concrete_interiorVal
                     }
@@ -1792,7 +1796,7 @@ module.exports = class ChainParser {
                             })
                         }
                     } else {
-                        console.log(`processConcreteCurrency cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
                         targetedAsset = interiorVStr
                         rawTargetedAsset = interiorVStr
                     }
@@ -1807,6 +1811,7 @@ module.exports = class ChainParser {
         return [targetedAsset, rawTargetedAsset]
     }
 
+    //TODO. this is the V0 format
     processConcreteFungible(indexer, fungibleAsset) {
         let targetedAsset = false;
         let rawTargetedAsset = false;
