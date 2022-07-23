@@ -3752,43 +3752,76 @@ order by chainID, extrinsicHash, diffTS`
         if (addresses.length == 0) return;
         let out = [];
         let vals = ["free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN", "blockTS", "requested"];
+        let rows = [];
         for (const address of addresses) {
             let r = this.addressBalanceRequest[address];
-            if (r.reaped) {
-                out.push(`('${address}', '0', '0', '0', '0', '${r.blockHash}', Now(), '${r.blockNumber}', '${r.blockTS}',  3)`)
-                this.logger.warn({
-                    "op": "dump_addressBalanceRequest REAP",
+            let free_balance = 0;
+            let reserved_balance = 0;
+            let miscFrozen_balance = 0;
+            let feeFrozen_balance = 0;
+            try {
+                let query = await this.api.query.system.account(address);
+                let balance = query.data;
+                let decimals = this.getChainDecimal(this.chainID)
+                if (balance.free) free_balance = parseInt(balance.free.toString(), 10) / 10 ** decimals;
+                if (balance.reserved) reserved_balance = balance.reserved.toString() / 10 ** decimals;
+                if (balance.miscFrozen) miscFrozen_balance = balance.miscFrozen.toString() / 10 ** decimals;
+                if (balance.feeFrozen) feeFrozen_balance = balance.feeFrozen.toString() / 10 ** decimals;
+            } catch (err) {
+                this.logger.error({
+                    "op": "dump_addressBalanceRequest",
                     "chainID": this.chainID,
                     "address": address,
+                    err
                 })
-            } else {
-                try {
-                    let query = await this.api.query.system.account(address);
-                    let balance = query.data;
-                    let free_balance = (balance.free) ? balance.free.toString() : 0;
-                    let reserved_balance = (balance.reserved) ? balance.reserved.toString() : 0;
-                    let miscFrozen_balance = (balance.miscFrozen) ? balance.miscFrozen.toString() : 0;
-                    let feeFrozen_balance = (balance.feeFrozen) ? balance.feeFrozen.toString() : 0;
-                    let str = `('${address}', '${free_balance}', '${reserved_balance}', '${miscFrozen_balance}', '${feeFrozen_balance}', '${r.blockHash}', Now(), '${r.blockNumber}', '${r.blockTS}',   2)`
-                    out.push(str)
-                    console.log("dump_addressBalanceRequest", str);
-                    this.logger.info({
-                        "op": "dump_addressBalanceRequest system.account",
-                        "chainID": this.chainID,
-                        "address": address,
-                        "upd": str
-                    })
-                } catch (err) {
-                    this.logger.error({
-                        "op": "dump_addressBalanceRequest",
-                        "chainID": this.chainID,
-                        "address": address,
-                        err
-                    })
-                }
             }
+
+
+            let str = `('${address}', '${free_balance}', '${reserved_balance}', '${miscFrozen_balance}', '${feeFrozen_balance}', '${r.blockHash}', Now(), '${r.blockNumber}', '${r.blockTS}',   2)`
+            out.push(str)
+            console.log("dump_addressBalanceRequest", str);
+
+            let asset = this.getChainAsset(this.chainID);
+            let assetChain = paraTool.makeAssetChain(asset, this.chainID);
+            let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
+            let rec = {};
+            let newState = {
+                free: free_balance,
+                reserved: reserved_balance,
+                miscFrozen: miscFrozen_balance,
+                feeFrozen: feeFrozen_balance,
+                frozen: feeFrozen_balance,
+                ts: r.blockTS,
+                bn: r.blockNumber,
+                source: this.hostname,
+                genTS: this.currentTS()
+            };
+            rec[encodedAssetChain] = {
+                value: JSON.stringify(newState),
+                timestamp: r.blockTS * 1000000
+            }
+            this.logger.info({
+                "op": "dump_addressBalanceRequest upd",
+                "chainID": this.chainID,
+                "address": address,
+                "asset": asset,
+                "assetChain": assetChain,
+                "encodedAssetChain": encodedAssetChain,
+                "newState": newState,
+                "upd": str
+            })
+            let rowKey = address.toLowerCase()
+            rows.push({
+                key: rowKey,
+                data: {
+                    realtime: rec
+                }
+            });
         }
 
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+        await this.insertBTRows(tblRealtime, rows, tblName);
+        rows = [];
         await this.upsertSQL({
             "table": `address${this.chainID}`,
             "keys": ["address"],
@@ -4119,10 +4152,10 @@ order by chainID, extrinsicHash, diffTS`
                             let accountIDIdx = 0;
                             if (palletMethod == "balances(DustLost)" || palletMethod == "system(KilledAccount)") {
                                 accountIDIdx = 0
-                            } else if (palletMethod == "tokens(DustLost)") {
-                                accountIDIdx = 1
+                            //} else if (palletMethod == "tokens(DustLost)") {
+                            //   accountIDIdx = 1
                             }
-                            accountID = ev.data[accountIDIdx]
+                            let accountID = ev.data[accountIDIdx]
                             let reapedAddress = paraTool.getPubKey(accountID)
                             if (reapedAddress) {
                                 this.flagAddressBalanceRequest(reapedAddress, true);
