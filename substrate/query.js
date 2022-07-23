@@ -2575,7 +2575,7 @@ module.exports = class Query extends AssetManager {
     async get_account_realtime(address, realtimeData) {
         let realtime = {};
         if (realtimeData) {
-
+            let lastCellTS = {};
             for (const assetChainEncoded of Object.keys(realtimeData)) {
                 let cell = realtimeData[assetChainEncoded];
                 let assetChain = paraTool.decodeAssetChain(assetChainEncoded);
@@ -2590,11 +2590,15 @@ module.exports = class Query extends AssetManager {
                             if (realtime[assetType] == undefined) {
                                 realtime[assetType] = [];
                             }
-                            realtime[assetType].push({
-                                assetChain,
-                                assetInfo,
-                                state: JSON.parse(cell[0].value)
-                            });
+                            let cellTS = cell[0].timestamp / 1000000;
+                            if ((lastCellTS[assetChain] == undefined) || (lastCellTS[assetChain] > cellTS)) {
+                                realtime[assetType].push({
+                                    assetChain,
+                                    assetInfo,
+                                    state: JSON.parse(cell[0].value)
+                                });
+                                lastCellTS[assetChain] = cellTS;
+                            }
                         }
                     } catch (err) {
                         console.log("REALTIME ERR", err);

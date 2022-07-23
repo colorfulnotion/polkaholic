@@ -1768,9 +1768,13 @@ module.exports = class ChainParser {
 
                         } else if (Array.isArray(v1_id_concrete_interiorVal)) {
                             //x2/x3...
-                            new_v1_id_concrete_interiorVal.concat(v1_id_concrete_interiorVal)
+                            for (const v of v1_id_concrete_interiorVal) {
+                                new_v1_id_concrete_interiorVal.push(v)
+                                if (this.debugLevel >= paraTool.debugInfo) console.log(`${indexer.chainID}, [parents=${v1_id_concrete_parents}] expandedkey ${JSON.stringify(v1_id_concrete_interiorVal)} ->  ${JSON.stringify(new_v1_id_concrete_interiorVal)}`)
+                            }
+                            //new_v1_id_concrete_interiorVal.concat(v1_id_concrete_interiorVal)
                         } else {
-                            console.log(`processConcreteCurrency error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
+                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
                         }
                         v1_id_concrete_interiorVal = new_v1_id_concrete_interiorVal
                     }
@@ -1792,7 +1796,7 @@ module.exports = class ChainParser {
                             })
                         }
                     } else {
-                        console.log(`processConcreteCurrency cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
                         targetedAsset = interiorVStr
                         rawTargetedAsset = interiorVStr
                     }
@@ -1807,6 +1811,7 @@ module.exports = class ChainParser {
         return [targetedAsset, rawTargetedAsset]
     }
 
+    //TODO. this is the V0 format
     processConcreteFungible(indexer, fungibleAsset) {
         let targetedAsset = false;
         let rawTargetedAsset = false;
@@ -2921,9 +2926,10 @@ module.exports = class ChainParser {
                 let interior = xcmAsset.interior
                 //x1/x2/x3 refers to the number to params
                 let interiorK = Object.keys(interior)[0]
+                let interiork = paraTool.firstCharLowerCase(interiorK)
                 let interiorV = interior[interiorK]
                 let interiorVStr = JSON.stringify(interiorV)
-                if ((interiorK == 'here' || interiork == 'Here') && interior[interiorK] == null) {
+                if (((interiorK == 'here') || (interiork == "here")) && interior[interiorK] == null) {
                     interiorVStr = 'here'
                     chainID = relayChainID
                 }
@@ -2934,7 +2940,7 @@ module.exports = class ChainParser {
                     return
                 }
 
-                if (interiorK == 'here' || interiork == 'Here') {
+                if ((typeof interiorK == "string") && (interiorK.toLowerCase() == 'here')) {
                     //relaychain case
                     chainID = relayChainID
                 } else if (interiorK == 'x1') {
@@ -3177,7 +3183,7 @@ module.exports = class ChainParser {
                 //hack: lower first char
                 let interiorV = JSON.parse(interiorVStr0)
 
-                if (interiork == 'here' || interiork == 'Here') {
+                if (interiork == 'here') {
                     //relaychain case
                     chainID = relayChainID
                 } else if (interiork == 'x1') {
@@ -3216,7 +3222,7 @@ module.exports = class ChainParser {
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
                 let interiorVStr = JSON.stringify(interiorV)
 
-                if ((interiork == 'here' || interiork == 'Here') && interior[interiorK] == null) {
+                if ((interiorK == 'here') && interior[interiorK] == null) {
                     interiorVStr = 'here'
                 }
 

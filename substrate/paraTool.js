@@ -926,10 +926,10 @@ module.exports = {
         return Number(Math.round(value + 'e' + decimals) + 'e-' + decimals);
     },
     encodeAssetChain: function(assetChain) {
-        return assetChain.replace(":", "~~")
+        return assetChain.replaceAll(":", "~~")
     },
     decodeAssetChain: function(assetChainEncoded) {
-        return assetChainEncoded.replace("~~", ":")
+        return assetChainEncoded.replaceAll("~~", ":")
     },
     //1645135200 -> [ '2022-02-17', 22 ]
     ts_to_logDT_hr: function ts_to_logDT_hr(ts) {
