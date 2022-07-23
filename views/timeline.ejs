@@ -6,7 +6,7 @@
     <% if(hashType == 'extrinsic'){%>
       <li class="breadcrumb-item">Extrinsic <a href='/tx/<%= hash; %>'><%- uiTool.getShortHash(hash, true, false); %></a></li>
     <% } else if (hashType == 'xcm') {%>
-      <li class="breadcrumb-item">XCM MsgHash <a href='/timeline/<%= hash; %>'><%- uiTool.getShortHash(hash, true, false); %></a></li>
+      <li class="breadcrumb-item">XCM Message <a href='/xcmmessage/<%= hash; %>'><%- uiTool.getShortHash(hash, true, false); %></a></li>
     <% } %>
     <li class="breadcrumb-item active" aria-current="page">XCM Timeline</li>
   </ol>
@@ -21,14 +21,30 @@ let timelineRows = uiTool.getTimelineRows(timeline);
 <div id="xcmmessagesmap">
  <h6>XCM Instructions</h6>
  <table  class="table table-striped table-hover">
-    <tr><th>Msg Hash</th><th>XCM Instructions</th></tr>
-   <% for ( const k of Object.keys(xcmmessagesMap) ) {
-    let xcminstructions = xcmmessagesMap[k];  %>
+    <tr><th>Msg Hash</th><th>XCM Instructions</th><th>Assets</th></tr>
+   <% for (let k = 0; k < xcmmessages.length; k++) {
+    let xcm = xcmmessages[k];  %>
     <tr>
-     <td><%- uiTool.getShortHash(k, false); %></td>
+     <td><a href='/xcmmessage/<%= xcm.msgHash; %>'><%- uiTool.getShortHash(xcm.msgHash, false); %></a>
+
+     <% if ( xcm.parentMsgHash ) { %>
+       <br> <B>Parent</B>: <br> <a href='/timeline/<%= xcm.parentMsgHash %>/xcm/<%= xcm.parentSentAt %>'><%- uiTool.getShortHash(xcm.parentMsgHash, false); %></a> sentAt: <%= xcm.parentSentAt %>
+     <% } %>
+
+     <% if ( xcm.childMsgHash ) { %>
+       <br> <B>Child</B>: <br> <a href='/timeline/<%= xcm.childMsgHash %>/xcm/<%= xcm.childSentAt %>'><%- uiTool.getShortHash(xcm.childMsgHash, false); %></a> sentAt: <%= xcm.childSentAt %>
+     <% } %>
+     </td>
      <td>
       <div id="typ<%= k; %>" class="renderjson"></div>
-      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(5)(<%- xcminstructions %>));</script>
+      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(5)(<%- xcm.msgStr %>));</script>
+     </td>
+     <td>
+     <% if ( xcm.assetChains ) { let assetChains = JSON.parse(xcm.assetChains); %>
+        <% for ( const ac of assetChains ) { %>
+          <%= ac; %><br/>
+	<% } %>
+     <% } %>
      </td>
     </tr>
    <% } %>

@@ -3775,7 +3775,7 @@ order by chainID, extrinsicHash, diffTS`
                     err
                 })
             }
-	    
+
 
             let str = `('${address}', '${free_balance}', '${reserved_balance}', '${miscFrozen_balance}', '${feeFrozen_balance}', '${r.blockHash}', Now(), '${r.blockNumber}', '${r.blockTS}',   2)`
             out.push(str)
@@ -4152,8 +4152,8 @@ order by chainID, extrinsicHash, diffTS`
                             let accountIDIdx = 0;
                             if (palletMethod == "balances(DustLost)" || palletMethod == "system(KilledAccount)") {
                                 accountIDIdx = 0
-                            //} else if (palletMethod == "tokens(DustLost)") {
-                            //   accountIDIdx = 1
+                                //} else if (palletMethod == "tokens(DustLost)") {
+                                //   accountIDIdx = 1
                             }
                             let accountID = ev.data[accountIDIdx]
                             let reapedAddress = paraTool.getPubKey(accountID)

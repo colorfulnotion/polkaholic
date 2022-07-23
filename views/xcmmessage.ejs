@@ -1,0 +1,127 @@
+<%
+let f = xcm;
+%>
+<%- include('header', {chainInfo: chainInfo, title: `${f.chainName} => ${f.chainDestName} XCM Message`}); %>
+<h4>XCM Message</h4>
+
+
+
+
+<table class="table table-hover table-bordered">
+  <tbody>
+    <tr>
+      <td>Hash</td>
+      <td>
+        <code><%= f.msgHash; %></code> <a class="btn btn-primary" href="/timeline/<%= f.msgHash; %>/xcm/<%= f.sentAt; %>" target="_new">XCM Timeline</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Sent At</td>
+      <td>
+        <code><%= f.sentAt; %></code>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Send Timestamp</td>
+      <td class='date'>
+        <%= uiTool.presentTS(f.blockTS); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Sent Message Time</td>
+      <td>
+        <%= uiTool.presentSecondsAgoTS(f.blockTS); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Received Timestamp</td>
+      <td class='date'>
+        <%= uiTool.presentTS(f.blockTSDest); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Received Message Time</td>
+      <td>
+        <%= uiTool.presentSecondsAgoTS(f.blockTSDest); %>
+      </td>
+    </tr>
+
+
+    <tr>
+      <td>Message Type</td>
+      <td><code><%= f.msgType %></code></td>
+    </tr>
+
+    <tr>
+      <td>Version</td>
+      <td><code><%= f.version %></code></td>
+    </tr>
+
+<% if ( f.extrinsicHash ) { %>
+    <tr>
+      <td>Extrinsic</td>
+      <td><a href='/tx/<%= f.extrinsicHash %>'><%= f.extrinsicID  %></a></td>
+    </tr>
+<% } %>
+
+<% if ( f.parentMsgHash ) { %>
+    <tr>
+      <td>Parent Message</td>
+      <td><a href='/xcmmessage/<%= f.parentMsgHash %>/<%= f.parentSentAt %>'><%= f.parentMsgHash %></a> (Sent At: <%= f.parentSentAt %>)</td>
+    </tr>
+<% } %>
+
+<% if ( f.childMsgHash ) { %>
+    <tr>
+      <td>Child Message</td>
+      <td><a href='/xcmmessage/<%= f.childMsgHash %>/<%= f.childSentAt %>'><%= f.childMsgHash %></a> (Sent At: <%= f.childSentAt %>)</td>
+    </tr>
+<% } %>
+
+    <tr>
+      <td>Relay Chain</td>
+      <td>
+        <%= f.relayChain; %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Chain Source</td>
+      <td>
+        <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a> 
+        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.blockNumber}); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Chain Dest</td>
+      <td>
+        <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a> 
+        <%- include("blockNumber", {chainID: f.idDest, blockNumber: f.blockNumberDest}); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Instructions Summary</td>
+      <td><code><%= f.path  %></code></td>
+    </tr>
+
+    <% if ( f.assetChains ) { %>
+    <tr>
+      <td>Assets Mentioned In Instructions</td>
+      <td><code><%= f.assetChains %></code></td>
+    </tr>
+    <% } %>
+    
+    <tr>
+      <td>Instructions</td>
+      <td>
+        <div id="msgStr" class="renderjson"></div>
+        <script>document.getElementById("msgStr").appendChild(renderjson.set_show_to_level(10)(<%- f.msgStr %>));</script>
+      </td>
+    </tr>
+</table>
+
+<%- include('footer', {apiUrl: apiUrl}); %>

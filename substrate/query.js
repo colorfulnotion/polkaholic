@@ -4831,7 +4831,7 @@ module.exports = class Query extends AssetManager {
         return (0);
     }
 
-    filter_block_row_objects_and_msgHashes(rRow, filter, chainID, blockNumber, extrinsicHash = null) {
+    filter_block_row_objects_and_msgHashes(rRow, filter, chainID, blockNumber, hash = null, hashType = null) {
         let out = [];
         let extra = {}
         let msgHashes = [];
@@ -4875,7 +4875,7 @@ module.exports = class Query extends AssetManager {
                 let m = `${e.method.toLowerCase()}`
                 let sm = `${s}:${m}`
                 if (matcher["extrinsics"][sm] || matcher["extrinsics"][s] || matcher["extrinsics"][m]) {
-                    let matched = (extrinsicHash) ? (e.extrinsicHash == extrinsicHash) : true;
+                    let matched = (hash && hashType == "extrinsic") ? (e.extrinsicHash == hash) : true;
                     // if matched, push and tally
                     // TODO: use filterfunc?
                     if (matched) {
@@ -4983,7 +4983,7 @@ module.exports = class Query extends AssetManager {
         return [out, msgHashes, extra];
     }
 
-    async get_timeline_chain(chainID, ts, filter, rangebackward = -1, rangeforward = 30, extrinsicHash = null) {
+    async get_timeline_chain(chainID, ts, filter, rangebackward = -1, rangeforward = 30, hash = null, hashType = null) {
         let chain = await this.getChain(chainID)
 
         let [b0, b1] = await this.getBlockNumberByTS(chainID, ts, rangebackward, rangeforward)
@@ -4992,7 +4992,7 @@ module.exports = class Query extends AssetManager {
         // TODO: OPTIMIZATION -- get JUST events and autotraces for a prefix range, though probably brute force row keys are better for small range
         for (let bn = b0; bn <= b1; bn++) {
             let rRow = await this.fetch_block_row(chain, bn, ["autotrace", "blockraw", "feed", "finalized"]);
-            let [objects, msgHashes, extra] = this.filter_block_row_objects_and_msgHashes(rRow, filter, chainID, bn, extrinsicHash);
+            let [objects, msgHashes, extra] = this.filter_block_row_objects_and_msgHashes(rRow, filter, chainID, bn, hash, hashType);
             let blockTS = rRow.feed.blockTS;
             if (objects && Array.isArray(objects) && objects.length > 0) {
                 timeline.push({
@@ -5009,13 +5009,13 @@ module.exports = class Query extends AssetManager {
         return (timeline)
     }
 
-    async getTimeline(ts, chainIDs, filter, range = 13, extrinsicHash = null) {
+    async getTimeline(ts, chainIDs, filter, range = 13, hash = null, hashType = null) {
         let timeline = [];
         for (let i = 0; i < chainIDs.length; i++) {
             // TODO: OPTIMIZATION - do this with promise.all so all N chainIDs done in parallel
             let rangebackward = -1;
             let rangeforward = (i == 0) ? range : range * 2;
-            let timeline_chain = await this.get_timeline_chain(chainIDs[i], ts, filter, rangebackward, rangeforward, extrinsicHash)
+            let timeline_chain = await this.get_timeline_chain(chainIDs[i], ts, filter, rangebackward, rangeforward, hash, hashType)
             for (let j = 0; j < timeline_chain.length; j++) {
                 timeline.push(timeline_chain[j])
             }
@@ -5023,21 +5023,74 @@ module.exports = class Query extends AssetManager {
         return (timeline);
     }
 
-    // given extrinsic hash
-    async getXCMTimeline(extrinsicHash) {
+    parseMsgHashSentAt(hashSentAt) {
+        if (hashSentAt) {
+            let sa = hashSentAt.split(":");
+            if (sa.length == 2) {
+                return (sa);
+            }
+        }
+        return ([null, null]);
+    }
+
+    async getXCMMessage(msgHash, sentAt = null) {
+        let w = (sentAt) ? ` and sentAt = ${sentAt}` : "";
+        let sql = `select msgHash, sentAt, chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, msgType, msgHex, msgStr, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, childMsgHash, assetChains from xcmmessages where msgHash = '${msgHash}' ${w} and incoming = 0 order by blockTS desc limit 1`
+        let xcmrecs = await this.poolREADONLY.query(sql);
+        if (xcmrecs.length == 0) {
+            throw new paraTool.NotFoundError(`XCM Message not found: ${hash}`)
+        }
+        let x = xcmrecs[0];
+
+        // parse parentMsgHash, childMsgHash out
+        [x.parentMsgHash, x.parentSentAt] = this.parseMsgHashSentAt(x.parentMsgHash);
+        [x.childMsgHash, x.childSentAt] = this.parseMsgHashSentAt(x.childMsgHash);
+
+        // add id, idDest, chainName, chainNameDest
+        let [_, id] = this.convertChainID(x.chainID)
+        x.chainName = this.getChainName(x.chainID);
+        let [__, idDest] = this.convertChainID(x.chainIDDest)
+        x.id = id
+        x.idDest = idDest
+        x.chainDestName = this.getChainName(x.chainIDDest);
+        x.blockTSDest = null
+
+        let sql2 = `select blockTS as blockTSDest, blockNumber as blockNumberDest from xcmmessages where msgHash = '${msgHash}' and incoming = 1 order by blockTS desc limit 1`
+        console.log(sql2)
+        let xcmrecs2 = await this.poolREADONLY.query(sql2);
+        if (xcmrecs2.length > 0) {
+            let x2 = xcmrecs2[0];
+            x.blockTSDest = x2.blockTSDest
+            x.blockNumberDest = x2.blockNumberDest;
+        }
+        return x;
+    }
+
+    // given a hash of an extrinsic OR a XCM message hash, get the timeline of blocks
+    async getXCMTimeline(hash, hashType = "extrinsic", sentAt = null) {
         try {
             // read xcmtransfers table to map into parameters below
-            let sql = `select chainID, chainIDDest, paraID, paraIDDest, relayChain, sourceTS as ts from xcmtransfer where extrinsicHash = '${extrinsicHash}' limit 1`
-            let xcmtransfers = await this.poolREADONLY.query(sql);
-            if (xcmtransfers.length == 0) {
-                throw new paraTool.NotFoundError(`XCM Transfer not found: ${extrinsicHash}`)
+            let sql = "";
+            if (hashType == "extrinsic") {
+                sql = `select chainID, chainIDDest, paraID, paraIDDest, relayChain, sourceTS as ts, extrinsicID, extrinsicHash from xcmtransfer where extrinsicHash = '${hash}' limit 1`
+            } else if (hashType == "xcm") {
+                let w = (sentAt) ? ` and sentAt = ${sentAt}` : "" // because XCM messages hash aren't _perfectly_ unique, we need to have sentAt params disambiguate
+                sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS as ts, extrinsicID, extrinsicHash from xcmmessages where msgHash = '${hash}' and incoming = 0 ${w} order by blockTS desc limit 1`
             }
-            let t = xcmtransfers[0];
+            let xcmrecs = await this.poolREADONLY.query(sql);
+            if (xcmrecs.length == 0) {
+                throw new paraTool.NotFoundError(`XCM Record (type ${hashType}) not found: ${hash}`)
+            }
+
+            let t = xcmrecs[0];
             let relayChainID = (t.relayChain == "polkadot") ? 0 : 2;
             let chainIDs = [t.chainID, t.chainIDDest];
+            let extrinsicHash = (hashType == "extrinsic") ? hash : t.extrinsicHash; // expectation is that all records in xcmmessages with the same extrinsicHash will have xcmmessages.extrinsicHash set
+            let extrinsicID = t.extrinsicID;
 
             let ts = t.ts;
             let filter = [];
+            console.log("C0", t);
 
             let mpType = 'unknown';
             if (t.chainID == relayChainID) {
@@ -5074,7 +5127,6 @@ module.exports = class Query extends AssetManager {
                 return (true);
             }
 
-            console.log(extrinsicHash, ts, chainIDs, mpType);
             // hrmp [2000->2004] 0xffc0bc017d8b0f0f383e579721fcc4cb434a3589e2f339a98d34a9dab00487aa
             // dmp  [0->2000] 0x28c5915be3fd9c204881cc5ad9e050d8d0b4597ebc1b45b523a12074056c9142
             // ump  [2000->0] 0xfa44ca4eb7069ffac0d1a7a7a0ab48771206e78346c80d7ef8f31c7726c0fae8
@@ -5169,13 +5221,14 @@ module.exports = class Query extends AssetManager {
                 filter.push(["trace", 'ParachainSystem', 'LastHrmpMqcHeads', null, "mqc"]) // hrmpMqc per each open channel (paraIDs)
                 filter.push(["trace", 'ParachainSystem', 'HrmpWatermark', null, 'watermark']) // hrmp get updated for this block
             }
-            let timeline = await this.getTimeline(ts, chainIDs, filter, 13, extrinsicHash);
-
+            let timeline = await this.getTimeline(ts, chainIDs, filter, 13, hash);
+            console.log(timeline);
             // for all the msgHashes that have appeared across all blocks on different chains in the timeline,
             // flag them in a "msgIO" with "incoming" or "outgoing"collect them and read the msgStr from the "xcmmessages" table
             let msgIO = {}
             for (let i = 0; i < timeline.length; i++) {
                 let t = timeline[i];
+                console.log("A", t.msgHashes);
                 if (t.msgHashes != undefined && t.msgHashes.length > 0) {
                     //console.log("FINAL TIMELINE msg", t.msgHashes);
                     for (let j = 0; j < t.msgHashes.length; j++) {
@@ -5196,7 +5249,8 @@ module.exports = class Query extends AssetManager {
             // map msgIO into msgHashes + msgHashesMap for the next steps of (a) reading from SQL "xcmmessages" (b) filtering out blocks that have no matching xcm
             let msgHashes = [];
             let msgHashesMap = {};
-            let requireMsgHashMatch = true;
+            let requireMsgHashMatch = false; //true;
+            console.log("msgIO", msgIO);
             for (const m of Object.keys(msgIO)) {
                 let include = (requireMsgHashMatch) ? (msgIO[m].incoming && msgIO[m].outgoing) : true;
                 if (!msgHashes.includes(m) && include) {
@@ -5204,17 +5258,37 @@ module.exports = class Query extends AssetManager {
                     msgHashesMap[m] = 1;
                 }
             }
-            // (a) read xcm message JSON from  SQL "xcmmessages", storing in xcmmessagesMap
-            // now that we have a map from msgHash => msgStr, we can reannotate any data in the timeline ... but we just return the map to the caller
-            // TODO OPTIMIZATION: this SQL should not be necessary because the msgStr fetched by the SQL is in timeline already
-            let xcmmessagesMap = {};
-            if (msgHashes.length > 0) {
-                let msgHashesStr = msgHashes.join(",");
-                var sql2 = `select msgHash, msgStr from xcmmessages where msgHash in (${msgHashesStr})`
-                let xcmmessages = await this.poolREADONLY.query(sql2);
-                for (let k = 0; k < xcmmessages.length; k++) {
-                    xcmmessagesMap[xcmmessages[k].msgHash] = xcmmessages[k].msgStr;
+            console.log('msgH', msgHashes);
+            // ALL the XCM messages related to extrinsic are fetched here ( A =m1=> B =m2=> C ) for the timeline of an extrinsicHash (hashType="extrinsic") OR all the sibling xcmmessages of a XCM msgHash (hashType="xcm")
+            // This is returned as an array -- the XCM Timeline UI can then display all the xcmmessages and support clicking into a timeline for
+            // (a) any msgHash/sentAt in this array 
+            // (b) parentMsgHash/sentAt (if present)
+            // (c) childMsgHash/sentAt (if parent)
+            let xcmmessages = [];
+            try {
+                if (msgHashes.length > 0) {
+                    let msgHashesStr = msgHashes.join(",");
+                    var sql2 = `select msgHash, msgStr, extrinsicID, extrinsicHash, parentMsgHash, childMsgHash, assetChains from xcmmessages where ( ( msgHash in (${msgHashesStr}) and incoming = 0 ) or (extrinsicHash = '${extrinsicHash}' and incoming = 0) ) and (blockTS >= ${ts} and blockTS < ${ts+60})`
+                    let xcmmessagesRaw = await this.poolREADONLY.query(sql2);
+                    for (let i = 0; i < xcmmessagesRaw.length; i++) {
+                        let x = xcmmessagesRaw[i];
+                        let [parentMsgHash, parentSentAt] = this.parseMsgHashSentAt(x.parentMsgHash);
+                        let [childMsgHash, childSentAt] = this.parseMsgHashSentAt(x.childMsgHash);
+                        xcmmessages.push({
+                            msgHash: x.msgHash,
+                            msgStr: x.msgStr,
+                            extrinsicID: x.extrinsicID,
+                            extrinsicHash: x.extrinsicHash,
+                            parentMsgHash,
+                            parentSentAt,
+                            childMsgHash,
+                            childSentAt,
+                            assetChains: x.assetChains
+                        });
+                    }
                 }
+            } catch (err) {
+                console.log(err);
             }
 
             // (b) filter out blocks from timeline that have no matching xcm
@@ -5232,7 +5306,7 @@ module.exports = class Query extends AssetManager {
                 })
             }
 
-            return [timeline, xcmmessagesMap];
+            return [timeline, xcmmessages];
         } catch (err) {
             console.log(err);
             return [
