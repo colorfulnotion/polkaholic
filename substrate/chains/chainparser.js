@@ -2926,9 +2926,10 @@ module.exports = class ChainParser {
                 let interior = xcmAsset.interior
                 //x1/x2/x3 refers to the number to params
                 let interiorK = Object.keys(interior)[0]
+                let interiork = paraTool.firstCharLowerCase(interiorK)
                 let interiorV = interior[interiorK]
                 let interiorVStr = JSON.stringify(interiorV)
-                if ((interiorK == 'here' || interiork == 'Here') && interior[interiorK] == null) {
+		if ( ( ( interiorK == 'here' ) || (interiork == "here" ) ) && interior[interiorK] == null )  {
                     interiorVStr = 'here'
                     chainID = relayChainID
                 }
@@ -2939,7 +2940,7 @@ module.exports = class ChainParser {
                     return
                 }
 
-                if (interiorK == 'here' || interiork == 'Here') {
+                if ( ( typeof interiorK == "string" ) && ( interiorK.toLowerCase() == 'here' ) ) {
                     //relaychain case
                     chainID = relayChainID
                 } else if (interiorK == 'x1') {
@@ -3182,7 +3183,7 @@ module.exports = class ChainParser {
                 //hack: lower first char
                 let interiorV = JSON.parse(interiorVStr0)
 
-                if (interiork == 'here' || interiork == 'Here') {
+                if ( interiork == 'here') {
                     //relaychain case
                     chainID = relayChainID
                 } else if (interiork == 'x1') {
@@ -3221,7 +3222,7 @@ module.exports = class ChainParser {
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
                 let interiorVStr = JSON.stringify(interiorV)
 
-                if ((interiork == 'here' || interiork == 'Here') && interior[interiorK] == null) {
+                if ( ( interiorK == 'here' ) && interior[interiorK] == null) {
                     interiorVStr = 'here'
                 }
 
