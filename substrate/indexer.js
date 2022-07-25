@@ -1290,10 +1290,10 @@ order by chainID, extrinsicHash, diffTS`
                     let amountSentUSD = 0;
                     let amountReceivedUSD = 0;
                     let decimals = this.getAssetDecimal(d.asset, d.chainID)
-                    if (!decimals) {
+                    if (decimals === false) {
                         decimals = this.getAssetDecimal(d.asset, d.chainIDDest)
                     }
-                    if (decimals) {
+                    if (decimals !== false) {
                         let [_, __, priceUSDsourceTS] = await this.computeUSD(1.0, d.asset, d.chainID, d.sourceTS);
                         if (priceUSDsourceTS > 0) {
                             priceUSD = priceUSDsourceTS;
@@ -3413,7 +3413,7 @@ order by chainID, extrinsicHash, diffTS`
         let symbol = this.getChainSymbol(feed.chainID)
         let asset = `{"Token":"${symbol}"}`
         let decimals = this.getChainDecimal(feed.chainID)
-        if (symbol && decimals) {
+        if (symbol && decimals !== false) {
             feedReward["rawAmount"] = feedReward["amount"];
             feedReward["amount"] = feedReward["amount"] / 10 ** decimals;
             var [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(feedReward["amount"], asset, this.chainID, blockTS)
@@ -5473,7 +5473,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         symbol = rawAssetSymbol
                         decimals = rawAssetDecimals
                         asset = `{"Token":"${symbol}"}`
-                    } else if (rawAssetSymbol && rawAssetDecimals) {
+                    } else if (rawAssetSymbol && rawAssetDecimals !== false) {
                         //symbol = rawAssetSymbol
                         //asset = `{"Token":"${symbol}"}`
                         symbol = rawAssetSymbol
@@ -5524,7 +5524,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     let assetID = data[0]
                     //console.log(`assets:Transferred - rawAsset = ${assetID}`)
                     let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID)
-                    if (assetIDSymbol && assetIDDecimals) {
+                    if (assetIDSymbol && assetIDDecimals !== false) {
                         symbol = assetIDSymbol
                         decimals = assetIDDecimals
                         asset = `{"Token":"${symbol}"}`
@@ -5568,7 +5568,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                   decimals: asset's decimals
                 */
 
-                if (symbol && decimals) {
+                if (symbol && decimals !== false) {
                     //asset = `{"Token":"${symbol}"}`
                     let amount = fdata.rawAmount / 10 ** decimals
                     let amountUSD = 0;

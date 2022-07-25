@@ -247,7 +247,7 @@ async function getTokenTotalSupply(web3Api, contractAddress, bn = 'latest', deci
     }
     try {
         var totalSupply;
-        if (decimals) {
+        if (decimals !== false) {
             console.log("HI");
             totalSupply = await Promise.all([
                 erc20Contract.methods.totalSupply().call({}, bn)
