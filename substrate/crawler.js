@@ -2036,6 +2036,7 @@ create table talismanEndpoint (
         if (chain.WSEndpointSelfHosted == 1) {
             setInterval(this.crawlPendingExtrinsics, 1000, chain, this);
         }
+	
         if (chain.blocksFinalized) this.finalizedHashes[chain.blocksFinalized] = "known";
         const unsubscribeFinalizedHeads = await this.api.rpc.chain.subscribeFinalizedHeads(async (header) => {
             let bn = parseInt(header.number.toString(), 10);
@@ -2084,6 +2085,7 @@ create table talismanEndpoint (
 
         // subscribeStorage returns changes from ALL blockHashes, including the ones that eventually got dropped
         let unsubscribeStorage = null
+	this.blocksCovered = chain.blocksCovered;
         try {
             unsubscribeStorage = await this.api.rpc.state.subscribeStorage(async (results) => {
                 try {
@@ -2137,9 +2139,13 @@ create table talismanEndpoint (
 
                             await this.immediateFlushBlockAndAddressExtrinsics()
 
-                            var sql = `update chain set blocksCovered = '${blockNumber}', lastCrawlDT = Now() where chainID = '${chainID}'`
-                            console.log(sql);
-                            this.batchedSQL.push(sql);
+                            if ( blockNumber > this.blocksCovered ) {
+				// only update blocksCovered in the DB if its HIGHER than what we have seen before
+				var sql = `update chain set blocksCovered = '${blockNumber}', lastCrawlDT = Now() where chainID = '${chainID}' and blockCovered < ${blockNumber}`
+				console.log(sql);
+				this.batchedSQL.push(sql);
+				this.blocksCovered = blockNumber;
+			    }
                             let numExtrinsics = blockStats && blockStats.numExtrinsics ? blockStats.numExtrinsics : 0
                             let numSignedExtrinsics = blockStats && blockStats.numSignedExtrinsics ? blockStats.numSignedExtrinsics : 0
                             let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
