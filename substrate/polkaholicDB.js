@@ -801,14 +801,14 @@ from chain where chainID = '${chainID}' limit 1`);
                 types: typesDef.index.types,
                 rpc: typesDef.index.rpc
             });
-        } else if (chainID == paraTool.chainIDCrust) {
+        } else if (chainID == paraTool.chainIDCrustShadow) {
             const typesDef = require("@crustio/type-definitions");
             api = await ApiPromise.create({
                 provider: provider,
                 typesBundle: typesDef.typesBundleForPolkadot,
                 rpc: typesDef.typesBundleForPolkadot.spec.crust.rpc
             });
-        } else if (chainID == paraTool.chainIDDarwinia) {
+        } else if (chainID == paraTool.chainIDDarwiniaCrab) {
             const typesDef = require("@darwinia/types");
             api = await ApiPromise.create({
                 provider: provider,
