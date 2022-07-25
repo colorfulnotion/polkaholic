@@ -5015,8 +5015,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     async getBlockAuthor(api, block, isNewSession = false, sessionIndex = false) {
-        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDRobonomics) return //moonbeam has different struct. skip for now
-
+        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver
+          || this.chainID == paraTool.chainIDRobonomics
+          || this.chainID == paraTool.chainIDQuartz
+        ) {
+          return //moonbeam has different struct. skip for now
+        }
         let currSessionValidators = this.currentSessionValidators
         let currSessionIndex = this.currentSessionIndex
 
@@ -5042,8 +5046,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     this.currentSessionIndex = currSessionIndex
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSession=${currSessionIndex}`)
                 } else {
-		    return;
-		}
+                  return;
+                }
                 currSessionValidators = await api.query.session.validators.at(blockHash)
                 currSessionValidators = currSessionValidators.toJSON()
                 this.currentSessionValidators = currSessionValidators
