@@ -5036,12 +5036,14 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     currSessionIndex = sessionIndex
                     this.currentSessionIndex = currSessionIndex
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] update currentSession=${currSessionIndex}`)
-                } else {
+                } else if ( api.query.session != undefined && api.query.session.currentIndex != undefined ) {
                     let currIndex = await api.query.session.currentIndex.at(blockHash)
                     currSessionIndex = currIndex.toNumber()
                     this.currentSessionIndex = currSessionIndex
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSession=${currSessionIndex}`)
-                }
+                } else {
+		    return;
+		}
                 currSessionValidators = await api.query.session.validators.at(blockHash)
                 currSessionValidators = currSessionValidators.toJSON()
                 this.currentSessionValidators = currSessionValidators
