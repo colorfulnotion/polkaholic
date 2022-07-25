@@ -3304,6 +3304,10 @@ module.exports = class ChainParser {
         }
         var a;
         switch (indexer.chainID) {
+          case paraTool.chainIDListen:
+            console.log(`fetch currencies:listenAssetsInfo`)
+            a = await indexer.api.query.currencies.listenAssetsInfo.entries()
+            break;
           case paraTool.chainIDMangataX:
             console.log(`fetch assetsInfo:assetsInfo`)
             a = await indexer.api.query.assetsInfo.assetsInfo.entries()
@@ -3335,6 +3339,7 @@ module.exports = class ChainParser {
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
                 assetList[asset] = cachedAssetInfo
             } else {
+                if (indexer.chainID == paraTool.chainIDListen) assetMetadata = assetMetadata.metadata
                 if (assetMetadata.decimals && assetMetadata.symbol) {
                     let name = (assetMetadata.name != undefined)? assetMetadata.name : `${assetMetadata.symbol}` //Basilisk doens't habe assetName, use symbol in this case
                     let assetInfo = {
