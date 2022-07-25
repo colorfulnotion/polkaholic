@@ -5015,8 +5015,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     async getBlockAuthor(api, block, isNewSession = false, sessionIndex = false) {
-        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDRobonomics) return //moonbeam has different struct. skip for now
-
+        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver
+          || this.chainID == paraTool.chainIDRobonomics
+          || this.chainID == paraTool.chainIDQuartz
+        ) {
+          return //moonbeam has different struct. skip for now
+        }
         let currSessionValidators = this.currentSessionValidators
         let currSessionIndex = this.currentSessionIndex
 
@@ -5042,8 +5046,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     this.currentSessionIndex = currSessionIndex
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSession=${currSessionIndex}`)
                 } else {
-		    return;
-		}
+                  return;
+                }
                 currSessionValidators = await api.query.session.validators.at(blockHash)
                 currSessionValidators = currSessionValidators.toJSON()
                 this.currentSessionValidators = currSessionValidators
@@ -5875,28 +5879,41 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         await this.chainParserInit(chain.chainID, debugLevel);
         let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrostKSM, paraTool.chainIDBifrostDOT]
         let assetMetaChain = [paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDHeiko, paraTool.chainIDParallel]
-        if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala || this.chainID == paraTool.chainIDBifrostKSM) {
+        if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala
+            || this.chainID == paraTool.chainIDBifrostKSM) {
             //TODO: chainIDBifrostDOT does not support assetRegistry yet
             console.log(`Fetch assetRegistry:assetMetadatas`)
             await this.chainParser.fetchAssetRegistry(this)
             if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala) {
                 console.log(`Fetch assetRegistry:foreignAssetLocations`)
-                await this.chainParser.fetchAssetRegistryForeignAssetLocations(this)
+                await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
             if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
                 console.log(`Fetch assetRegistry:currencyIdToLocations`)
-                await this.chainParser.fetchAssetRegistryForeignAssetLocations(this)
+                await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
-        } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint || this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala) {
-            console.log(`fetch asset:metadata`)
+        } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden
+          || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver
+          || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel
+          || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint
+          || this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala
+          || this.chainID == paraTool.chainIDHydraDX || this.chainID == paraTool.chainIDBasilisk
+          || this.chainID == paraTool.chainIDCalamari
+          || this.chainID == paraTool.chainIDRobonomics
+          || this.chainID == paraTool.chainIDMangataX
+          || this.chainID == paraTool.chainIDListen
+          || this.chainID == paraTool.chainIDCrustShadow) {
             await this.chainParser.fetchAsset(this)
-            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel) {
+            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver
+              || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel
+              || this.chainID == paraTool.chainIDCrustShadow) {
                 console.log(`fetch assetManager:assetIdType`)
-                await this.chainParser.fetchAssetManagerAssetIdType(this)
+                await this.chainParser.fetchXCMAssetIdType(this)
             }
-            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden) {
-                console.log(`fetch xcAssetConfig:assetIdToLocation`)
-                await this.chainParser.fetchXcAssetConfigAssetIdToLocation(this)
+            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden
+            || this.chainID == paraTool.chainIDCalamari) {
+                console.log(`fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
+                await this.chainParser.fetchXCMAssetIdToLocation(this)
             }
         } else if (this.chainID == paraTool.chainIDKico) {
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)
