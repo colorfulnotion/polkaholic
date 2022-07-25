@@ -3032,7 +3032,8 @@ module.exports = class ChainParser {
         let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
 
         var a;
-        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver) {
+        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver
+        || indexer.chainID == paraTool.chainIDCrustShadow) {
             var a = await indexer.api.query.assetManager.assetIdType.entries()
         } else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
             var a = await indexer.api.query.assetRegistry.assetIdType.entries()
@@ -3298,7 +3299,14 @@ module.exports = class ChainParser {
             console.log(`[fetchAsset] Fatal indexer.api not initiated`)
             return
         }
-        var a = await indexer.api.query.assets.metadata.entries()
+        var a;
+        switch (indexer.chainID) {
+          default:
+            console.log(`fetch asset:metadata`)
+            a = await indexer.api.query.assets.metadata.entries()
+            break;
+        }
+        if (!a) return
 
         let assetList = {}
         a.forEach(async ([key, val]) => {

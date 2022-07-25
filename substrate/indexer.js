@@ -5893,11 +5893,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
           || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel
           || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint
           || this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala
-          || this.chainID == paraTool.chainIDCalamari) {
-            console.log(`fetch asset:metadata`)
+          || this.chainID == paraTool.chainIDCalamari
+          || this.chainID == paraTool.chainIDCrustShadow) {
             await this.chainParser.fetchAsset(this)
             if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver
-              || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel) {
+              || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel
+              || this.chainID == paraTool.chainIDCrustShadow) {
                 console.log(`fetch assetManager:assetIdType`)
                 await this.chainParser.fetchXCMAssetIdType(this)
             }
