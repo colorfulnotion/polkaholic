@@ -3301,6 +3301,9 @@ module.exports = class ChainParser {
         }
         var a;
         switch (indexer.chainID) {
+          case paraTool.chainIDMangataX:
+            a = await indexer.api.query.assetsInfo.assetsInfo.entries()
+            break;
           default:
             console.log(`fetch asset:metadata`)
             a = await indexer.api.query.assets.metadata.entries()

@@ -5895,6 +5895,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
           || this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala
           || this.chainID == paraTool.chainIDCalamari
           || this.chainID == paraTool.chainIDRobonomics
+          || this.chainID == paraTool.chainIDMangataX
           || this.chainID == paraTool.chainIDCrustShadow) {
             await this.chainParser.fetchAsset(this)
             if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver
