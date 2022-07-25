@@ -383,7 +383,7 @@ module.exports = class ChainParser {
         try {
             //let v = JSON.parse(decoratedVal)
             //if (v != undefined && v.length == 0) return extraField['mpIsEmpty'] = 1
-            let v = decoratedVal.replace('[', '').replace(']', '').replace(' ', '').split(',')
+            let v = decoratedVal.replace('[', '').replace(']', '').replaceAll(' ', '').split(',')
             let umps = []
             let umpRaws = []
             let prevData = false
@@ -2520,7 +2520,7 @@ module.exports = class ChainParser {
         let xcmMessages = []
         let decoratedVal = o.pv
         try {
-            let v = decoratedVal.replace('[', '').replace(']', '').replace(' ', '').split(',')
+            let v = decoratedVal.replace('[', '').replace(']', '').replaceAll(' ', '').split(',')
             for (const ump of v) {
                 let data = ump.replace(' ', '')
                 let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
