@@ -4084,7 +4084,7 @@ order by chainID, extrinsicHash, diffTS`
                             rewardEvents.push(ev);
                         } else if (this.chainParser.crowdloanFilter(palletMethod)) {
                             crowdloanEvents.push(ev);
-                        } else if (this.chainParser.reapingFilter(palletMethod)) {
+                        } else if (isTip && tracesPresent && this.chainParser.reapingFilter(palletMethod)) {
                             reapingEvents.push(ev);
                         }
                     })
