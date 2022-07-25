@@ -2718,7 +2718,7 @@ module.exports = class ChainParser {
             let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, e2.asset);
             //let decimals = await this.getAssetDecimal(indexer, rAssetkey);
             let decimals = e2.decimals
-            if (decimals) {
+            if (decimals !== false) {
                 //console.log("processAssetsAccount FOUND decimals", rAssetkey, decimals);
                 if (e2.pv !== undefined) {
                     let v = JSON.parse(e2.pv);
@@ -3340,7 +3340,7 @@ module.exports = class ChainParser {
                 assetList[asset] = cachedAssetInfo
             } else {
                 if (indexer.chainID == paraTool.chainIDListen) assetMetadata = assetMetadata.metadata
-                if (assetMetadata.decimals && assetMetadata.symbol) {
+                if (assetMetadata.decimals !== false && assetMetadata.symbol) {
                     let name = (assetMetadata.name != undefined)? assetMetadata.name : `${assetMetadata.symbol}` //Basilisk doens't habe assetName, use symbol in this case
                     let assetInfo = {
                         name: name,
@@ -3400,7 +3400,7 @@ module.exports = class ChainParser {
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
                 assetList[assetChain] = cachedAssetInfo
             } else {
-                if (assetMetadata.decimals && assetMetadata.symbol) {
+                if (assetMetadata.decimals !== false && assetMetadata.symbol) {
                     let symbol = assetMetadata.symbol
                     let name = assetMetadata.name
                     if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
