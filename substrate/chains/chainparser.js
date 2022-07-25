@@ -152,7 +152,7 @@ module.exports = class ChainParser {
                     name: symbol,
                     symbol: symbol,
                     decimals: decimals,
-                    isNativeChain: 1
+                    isNativeChain: 0 // this has to be set manually
                 };
                 // TODO: skip this if we already know about this!
                 let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
