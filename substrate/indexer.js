@@ -5887,14 +5887,21 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 console.log(`Fetch assetRegistry:currencyIdToLocations`)
                 await this.chainParser.fetchAssetRegistryForeignAssetLocations(this)
             }
-        } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint || this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala) {
+        } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden
+          || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver
+          || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel
+          || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint
+          || this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala
+          || this.chainID == paraTool.chainIDCalamari) {
             console.log(`fetch asset:metadata`)
             await this.chainParser.fetchAsset(this)
-            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel) {
+            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver
+              || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel) {
                 console.log(`fetch assetManager:assetIdType`)
                 await this.chainParser.fetchAssetManagerAssetIdType(this)
             }
-            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden) {
+            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden
+            || this.chainID == paraTool.chainIDCalamari) {
                 console.log(`fetch xcAssetConfig:assetIdToLocation`)
                 await this.chainParser.fetchXcAssetConfigAssetIdToLocation(this)
             }

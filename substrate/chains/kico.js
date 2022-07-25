@@ -110,7 +110,7 @@ module.exports = class KicoParser extends ChainParser {
         return;
     }
 
-    //acala/karura/bifrost
+    //kico
     async fetchCurrenciesDicoAssetInfos(indexer) {
         var a = await indexer.api.query.currencies.dicoAssetsInfo.entries()
         let assetList = {}
