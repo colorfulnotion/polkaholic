@@ -985,7 +985,7 @@ module.exports = class Query extends AssetManager {
 
                     if (this.assetInfo[rawassetChain]) {
                         //let decimals = this.assetInfo[assetChain].decimals;
-                        if (decimals) {
+                        if (decimals !== false) {
                             x.amountSent = x.amountSent / 10 ** decimals;
                             x.amountReceived = x.amountReceived / 10 ** decimals;
                             if (decorateUSD) {
@@ -1225,7 +1225,7 @@ module.exports = class Query extends AssetManager {
                             let tokenAssetChain = paraTool.makeAssetChain(tokenAsset, c.chainID);
                             if (this.assetInfo[tokenAssetChain]) {
                                 t.assetInfo = this.assetInfo[tokenAssetChain];
-                                if (t.assetInfo.decimals) {
+                                if (t.assetInfo.decimals !== false) {
                                     t.value = t.value / 10 ** t.assetInfo.decimals;
                                     //await this.decorateUSD(t, "value", tokenAsset, c.chainID, cTimestamp, decorateUSD)
                                     if (decorateUSD) {
@@ -1279,10 +1279,10 @@ module.exports = class Query extends AssetManager {
                                 xcm.fromAddress = d.signer
                             }
                             let decimals = this.getAssetDecimal(xcm.asset, xcm.chainID)
-                            if (!decimals) {
+                            if (decimals === false) {
                                 decimals = this.getAssetDecimal(xcm.asset, xcm.chainIDDest)
                             }
-                            if (decimals) {
+                            if (decimals !== false) {
                                 xcm.amountSent = xcm.amountSent / 10 ** decimals;
                                 xcm.amountReceived = xcm.amountReceived / 10 ** decimals;
                                 /*await this.decorateUSD(xcm, "amountSent", xcm.asset, xcm.chainID, xcm.destTS, decorateUSD)
@@ -2157,7 +2157,7 @@ module.exports = class Query extends AssetManager {
                                         let tokenAssetChain = paraTool.makeAssetChain(tokenAsset, c.chainID);
                                         if (this.assetInfo[tokenAssetChain]) {
                                             t.assetInfo = this.assetInfo[tokenAssetChain];
-                                            if (t.assetInfo.decimals) {
+                                            if (t.assetInfo.decimals !== false) {
                                                 t.value = t.value / 10 ** t.assetInfo.decimals;
                                                 if (decorateUSD) {
                                                     let [valueUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(t.value, tokenAsset, c.chainID, cTimestamp);
@@ -3999,7 +3999,7 @@ module.exports = class Query extends AssetManager {
                     if (x.msgHash == undefined) x.msgHash = '0x'
 
                     if (this.assetInfo[rawassetChain]) {
-                        if (decimals) {
+                        if (decimals !== false) {
                             let amountSent = (x.amountSent != undefined) ? x.amountSent / 10 ** decimals : 0
                             let amountReceived = (x.amountReceived != undefined) ? x.amountReceived / 10 ** decimals : 0;
                             x.amountSent = amountSent

@@ -1290,10 +1290,10 @@ order by chainID, extrinsicHash, diffTS`
                     let amountSentUSD = 0;
                     let amountReceivedUSD = 0;
                     let decimals = this.getAssetDecimal(d.asset, d.chainID)
-                    if (!decimals) {
+                    if (decimals === false) {
                         decimals = this.getAssetDecimal(d.asset, d.chainIDDest)
                     }
-                    if (decimals) {
+                    if (decimals !== false) {
                         let [_, __, priceUSDsourceTS] = await this.computeUSD(1.0, d.asset, d.chainID, d.sourceTS);
                         if (priceUSDsourceTS > 0) {
                             priceUSD = priceUSDsourceTS;
@@ -3413,7 +3413,7 @@ order by chainID, extrinsicHash, diffTS`
         let symbol = this.getChainSymbol(feed.chainID)
         let asset = `{"Token":"${symbol}"}`
         let decimals = this.getChainDecimal(feed.chainID)
-        if (symbol && decimals) {
+        if (symbol && decimals !== false) {
             feedReward["rawAmount"] = feedReward["amount"];
             feedReward["amount"] = feedReward["amount"] / 10 ** decimals;
             var [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(feedReward["amount"], asset, this.chainID, blockTS)
@@ -4084,7 +4084,7 @@ order by chainID, extrinsicHash, diffTS`
                             rewardEvents.push(ev);
                         } else if (this.chainParser.crowdloanFilter(palletMethod)) {
                             crowdloanEvents.push(ev);
-                        } else if (this.chainParser.reapingFilter(palletMethod)) {
+                        } else if (isTip && tracesPresent && this.chainParser.reapingFilter(palletMethod)) {
                             reapingEvents.push(ev);
                         }
                     })
@@ -5015,8 +5015,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     async getBlockAuthor(api, block, isNewSession = false, sessionIndex = false) {
-        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDRobonomics) return //moonbeam has different struct. skip for now
-
+        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver ||
+            this.chainID == paraTool.chainIDRobonomics ||
+            this.chainID == paraTool.chainIDQuartz
+        ) {
+            return //moonbeam has different struct. skip for now
+        }
         let currSessionValidators = this.currentSessionValidators
         let currSessionIndex = this.currentSessionIndex
 
@@ -5036,11 +5040,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     currSessionIndex = sessionIndex
                     this.currentSessionIndex = currSessionIndex
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] update currentSession=${currSessionIndex}`)
-                } else {
+                } else if (api.query.session != undefined && api.query.session.currentIndex != undefined) {
                     let currIndex = await api.query.session.currentIndex.at(blockHash)
                     currSessionIndex = currIndex.toNumber()
                     this.currentSessionIndex = currSessionIndex
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`*[${blockNumber}] update currentSession=${currSessionIndex}`)
+                } else {
+                    return;
                 }
                 currSessionValidators = await api.query.session.validators.at(blockHash)
                 currSessionValidators = currSessionValidators.toJSON()
@@ -5467,7 +5473,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         symbol = rawAssetSymbol
                         decimals = rawAssetDecimals
                         asset = `{"Token":"${symbol}"}`
-                    } else if (rawAssetSymbol && rawAssetDecimals) {
+                    } else if (rawAssetSymbol && rawAssetDecimals !== false) {
                         //symbol = rawAssetSymbol
                         //asset = `{"Token":"${symbol}"}`
                         symbol = rawAssetSymbol
@@ -5518,7 +5524,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     let assetID = data[0]
                     //console.log(`assets:Transferred - rawAsset = ${assetID}`)
                     let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID)
-                    if (assetIDSymbol && assetIDDecimals) {
+                    if (assetIDSymbol && assetIDDecimals !== false) {
                         symbol = assetIDSymbol
                         decimals = assetIDDecimals
                         asset = `{"Token":"${symbol}"}`
@@ -5562,7 +5568,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                   decimals: asset's decimals
                 */
 
-                if (symbol && decimals) {
+                if (symbol && decimals !== false) {
                     //asset = `{"Token":"${symbol}"}`
                     let amount = fdata.rawAmount / 10 ** decimals
                     let amountUSD = 0;
@@ -5873,28 +5879,41 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         await this.chainParserInit(chain.chainID, debugLevel);
         let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrostKSM, paraTool.chainIDBifrostDOT]
         let assetMetaChain = [paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDHeiko, paraTool.chainIDParallel]
-        if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala || this.chainID == paraTool.chainIDBifrostKSM) {
+        if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala ||
+            this.chainID == paraTool.chainIDBifrostKSM) {
             //TODO: chainIDBifrostDOT does not support assetRegistry yet
             console.log(`Fetch assetRegistry:assetMetadatas`)
             await this.chainParser.fetchAssetRegistry(this)
             if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala) {
                 console.log(`Fetch assetRegistry:foreignAssetLocations`)
-                await this.chainParser.fetchAssetRegistryForeignAssetLocations(this)
+                await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
             if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
                 console.log(`Fetch assetRegistry:currencyIdToLocations`)
-                await this.chainParser.fetchAssetRegistryForeignAssetLocations(this)
+                await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
-        } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel || this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint || this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala) {
-            console.log(`fetch asset:metadata`)
+        } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden ||
+            this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver ||
+            this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
+            this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint ||
+            this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala ||
+            this.chainID == paraTool.chainIDHydraDX || this.chainID == paraTool.chainIDBasilisk ||
+            this.chainID == paraTool.chainIDCalamari ||
+            this.chainID == paraTool.chainIDRobonomics ||
+            this.chainID == paraTool.chainIDMangataX ||
+            this.chainID == paraTool.chainIDListen ||
+            this.chainID == paraTool.chainIDCrustShadow) {
             await this.chainParser.fetchAsset(this)
-            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel) {
+            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver ||
+                this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
+                this.chainID == paraTool.chainIDCrustShadow) {
                 console.log(`fetch assetManager:assetIdType`)
-                await this.chainParser.fetchAssetManagerAssetIdType(this)
+                await this.chainParser.fetchXCMAssetIdType(this)
             }
-            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden) {
-                console.log(`fetch xcAssetConfig:assetIdToLocation`)
-                await this.chainParser.fetchXcAssetConfigAssetIdToLocation(this)
+            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden ||
+                this.chainID == paraTool.chainIDCalamari) {
+                console.log(`fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
+                await this.chainParser.fetchXCMAssetIdToLocation(this)
             }
         } else if (this.chainID == paraTool.chainIDKico) {
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)

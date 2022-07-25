@@ -647,7 +647,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         let currencyChain = paraTool.makeAssetChain(currencyID, chainID);
         if (this.currencyIDInfo[currencyChain] !== undefined) {
             let assetInfo = this.currencyIDInfo[currencyChain];
-            if (assetInfo.decimals != undefined && assetInfo.decimals) {
+            if (assetInfo.decimals != undefined) {
                 return assetInfo.decimals
             }
         }

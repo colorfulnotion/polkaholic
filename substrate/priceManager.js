@@ -291,8 +291,8 @@ module.exports = class PriceManager extends Query {
 
     async getCoinPricesRange(startTS, endTS) {
         var coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, asset, chainID from chain where symbol is not null and coingeckoID is not null and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) order by coingeckoLastUpdateDT limit 1000`);
+        console.log(`nativeChainAsset coingeckoIDs list=${coingeckoIDs.length}`)
         let batchSize = 86400 * 30
-
         for (let currDailyTS = startTS; currDailyTS < endTS; currDailyTS += batchSize) {
             let currDailyEndTS = currDailyTS + batchSize
             for (const ids of coingeckoIDs) {
@@ -308,6 +308,7 @@ module.exports = class PriceManager extends Query {
 
         // to cover cases like RMRK which are not specifically attached to any chain
         coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, asset, chainID from asset where symbol is not null and coingeckoID is not null and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) order by coingeckoLastUpdateDT limit 1000`);
+        console.log(`non-nativeChainAsset coingeckoIDs list=${coingeckoIDs.length}`)
         for (let currDailyTS = startTS; currDailyTS < endTS; currDailyTS += batchSize) {
             let currDailyEndTS = currDailyTS + batchSize
             for (const ids of coingeckoIDs) {
