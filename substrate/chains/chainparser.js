@@ -3294,6 +3294,9 @@ module.exports = class ChainParser {
     }
 
     //moonbeam/parallel/astar
+    //asset:metadata
+    //assetRegistry:assetMetadataMap
+    //assetsInfo:assetsInfo
     async fetchAsset(indexer) {
         if (!indexer.api) {
             console.log(`[fetchAsset] Fatal indexer.api not initiated`)
@@ -3302,7 +3305,13 @@ module.exports = class ChainParser {
         var a;
         switch (indexer.chainID) {
           case paraTool.chainIDMangataX:
+            console.log(`fetch assetsInfo:assetsInfo`)
             a = await indexer.api.query.assetsInfo.assetsInfo.entries()
+            break;
+          case paraTool.chainIDBasilisk:
+          case paraTool.chainIDHydraDX:
+            console.log(`fetch assetRegistry:assetMetadataMap`)
+            a = await indexer.api.query.assetRegistry.assetMetadataMap.entries()
             break;
           default:
             console.log(`fetch asset:metadata`)
@@ -3327,8 +3336,9 @@ module.exports = class ChainParser {
                 assetList[asset] = cachedAssetInfo
             } else {
                 if (assetMetadata.decimals && assetMetadata.symbol) {
+                    let name = (assetMetadata.name != undefined)? assetMetadata.name : `${assetMetadata.symbol}` //Basilisk doens't habe assetName, use symbol in this case
                     let assetInfo = {
-                        name: assetMetadata.name,
+                        name: name,
                         symbol: assetMetadata.symbol,
                         decimals: assetMetadata.decimals,
                         assetType: paraTool.assetTypeToken,
@@ -3345,13 +3355,21 @@ module.exports = class ChainParser {
         if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
     }
 
-    //acala/karura/bifrost
+    //acala/karura/bifrost/basilisk
+    //assetRegistry.assetMetadatas
     async fetchAssetRegistry(indexer) {
         if (!indexer.api) {
             console.log(`[fetchAssetRegistry] Fatal indexer.api not initiated`)
             return
         }
-        var a = await indexer.api.query.assetRegistry.assetMetadatas.entries()
+        var a;
+        switch (indexer.chainID) {
+          default:
+            console.log(`fetch assetRegistry:assetMetadatas`)
+            a = await indexer.api.query.assetRegistry.assetMetadatas.entries()
+            break;
+        }
+        if (!a) return
         let assetList = {}
         //ForeignAssetId/{"NativeAssetId":{"Token":"XXX"}}/{"Erc20":"0x1f3a10587a20114ea25ba1b388ee2dd4a337ce27"}/{"StableAssetId":"0"}
         // remove the Id prefix here
