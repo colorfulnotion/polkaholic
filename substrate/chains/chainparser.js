@@ -1230,6 +1230,58 @@ module.exports = class ChainParser {
         return [paraIDDest, chainIDDest, destAddress]
     }
 
+    processX3(x3, relayChain) {
+        //dest.v1.interior.x3
+      /*
+      "x3": [
+        {
+          "parent": null
+        },
+        {
+          "parachain": 2001
+        },
+        {
+          "accountId32": {
+            "network": {
+              "any": null
+            },
+            "id": "qLpr9ztSDVYFxAhbEcWJyMorjZJv7LoZLGHS2RfLL2y7bvu"
+          }
+        }
+      ]
+    */
+        let paraIDDest = -1
+        let chainIDDest = -1
+        let destAddress = null
+        if (Array.isArray(x3)) {
+            //same as dest X1
+            let x3_0 = x3[0]; //not used?
+            let x3_1 = x3[1];
+            if (x3_1.parachain !== undefined) {
+                //{ parachain: 2001 }
+                paraIDDest = x3_1.parachain
+                if (relayChain == "polkadot") {
+                    chainIDDest = paraIDDest;
+                } else {
+                    chainIDDest = paraIDDest + 20000;
+                }
+            } else if (x3_1.parent !== undefined) {
+                // { parent: null }
+                paraIDDest = 0
+                if (relayChain == "polkadot") {
+                    chainIDDest = paraTool.chainIDPolkadot;
+                } else if (relayChain == "kusama") {
+                    chainIDDest = paraTool.chainIDKusama;
+                }
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x3_1`, x3_1)
+            }
+            let accKey = x3[2]
+            destAddress = this.processAccountKey(accKey)
+        }
+        return [paraIDDest, chainIDDest, destAddress]
+    }
+
     processAccountKey(accKey) {
         let destAddress = null
 
@@ -1357,6 +1409,9 @@ module.exports = class ChainParser {
         } else if (dest.x2 != undefined) {
             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
             [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
+        } else if (dest.x3 != undefined) {
+              //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
+              [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
         } else if (dest.interior !== undefined) {
             let destInterior = dest.interior;
             // looks like it's getting here
@@ -1368,10 +1423,10 @@ module.exports = class ChainParser {
                 // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
                 [paraIDDest, chainIDDest, destAddress] = this.processX2(destInterior.x2, relayChain)
             } else {
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest.interior`, JSON.stringify(dest, null, 2))
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent section_method=${section_method} Unknown dest.interior`, JSON.stringify(dest, null, 2))
             }
         } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest`, JSON.stringify(dest, null, 2))
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent section_method=${section_method} Unknown dest`, JSON.stringify(dest, null, 2))
         }
 
         let aAsset = evetnData[1] //Vec<XcmV1MultiAsset>
@@ -1490,6 +1545,9 @@ module.exports = class ChainParser {
                 } else if (dest.x2 != undefined) {
                     //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
                     [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
+                } else if (dest.x3 != undefined) {
+                    //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
+                    [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
                 } else if (dest.interior !== undefined) {
                     let destInterior = dest.interior;
                     // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
