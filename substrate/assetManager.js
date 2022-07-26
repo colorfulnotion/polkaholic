@@ -351,8 +351,9 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     async get_skipStorageKeys() {
-        var storageKeysList = await this.poolREADONLY.query(`select palletName, storageName, storageKey from chainPalletStorage where skip = 1`);
+        if (Object.keys(this.skipStorageKeys).length > 0) return;
         this.skipStorageKeys = {};
+        var storageKeysList = await this.poolREADONLY.query(`select palletName, storageName, storageKey from chainPalletStorage where skip = 1`);
         if (storageKeysList.length > 0) {
             for (const sk of storageKeysList) {
                 this.skipStorageKeys[`${sk.storageKey}`] = sk;

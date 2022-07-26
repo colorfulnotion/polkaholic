@@ -2011,6 +2011,10 @@ create table talismanEndpoint (
                 }
                 if (bn % 7200 == 0) { // 1-2x/day
                     await this.crawlParachains();
+                    try {
+                        await this.setup_chainParser(chain, paraTool.debugNoLog, true);
+                    } catch (e1) {}
+
                 }
             }
         } catch (err) {
@@ -2032,7 +2036,7 @@ create table talismanEndpoint (
         }
         // Subscribe to chain updates and log the current block number on update.
         let chain = await this.setupChainAndAPI(chainID);
-        await this.setup_chainParser(chain);
+        await this.setup_chainParser(chain, paraTool.debugNoLog, true);
         if (chain.WSEndpointSelfHosted == 1) {
             setInterval(this.crawlPendingExtrinsics, 1000, chain, this);
         }
@@ -2141,7 +2145,7 @@ create table talismanEndpoint (
 
                             if (blockNumber > this.blocksCovered) {
                                 // only update blocksCovered in the DB if its HIGHER than what we have seen before
-                                var sql = `update chain set blocksCovered = '${blockNumber}', lastCrawlDT = Now() where chainID = '${chainID}' and blockCovered < ${blockNumber}`
+                                var sql = `update chain set blocksCovered = '${blockNumber}', lastCrawlDT = Now() where chainID = '${chainID}' and blocksCovered < ${blockNumber}`
                                 console.log(sql);
                                 this.batchedSQL.push(sql);
                                 this.blocksCovered = blockNumber;

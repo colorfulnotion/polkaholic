@@ -1393,6 +1393,75 @@ order by chainID, extrinsicHash, diffTS`
         console.log(`match_xcm ${startTS} covered ${logDT}`)
     }
 
+    // This is the key workhorse that matches xcmmessages with 
+    // match xcmmessages incoming = 0 with incoming = 1 
+    //   (a) msgHash + chainID + chainIDDest matching
+    //   (b) time difference between blockTS matching has to be less than 120 (lookbackSeconds parameter)
+    //   (c) 
+    // In case of ties, the FIRST one ( "order by diffTS" ) covers this
+    async xcmmessages_match(startTS, endTS, lookbackSeconds = 600) {
+        let sql = `select
+          s.msgHash, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, (d.blockTS - s.blockTS) as diffTS
+        from xcmmessages as s, xcmmessages as d
+ where  d.msgHash = s.msgHash and
+        d.chainID = s.chainID and
+        d.chainIDDest = s.chainIDDest and
+        s.incoming = 0 and
+        d.incoming = 1 and 
+        s.blockTS >= ${startTS} and
+        s.blockTS < ${endTS} and
+        d.blockTS >= ${startTS} and
+        d.blockTS < ${endTS+lookbackSeconds} and
+        s.matched = 0 and
+        d.matched = 0 
+having diffTS >= 0 and diffTS < ${lookbackSeconds} 
+order by msgHash, diffTS`
+	//console.log("xcmmessages_match", sql)
+        try {
+            let xcmmatches = await this.poolREADONLY.query(sql);
+            let matched = {}
+            if (xcmmatches.length > 0) {
+                console.log("[Found] xcmmessages_match ${xcmmatches.length}", sql)
+            } else {
+                //enable this for debugging
+                //console.log("[Empty] match_xcm", sql)
+            }
+	    let vals = ["sourceTS", "destTS", "matched"];
+	    let out = [];
+            for (let i = 0; i < xcmmatches.length; i++) {
+                let s = xcmmatches[i];
+		// to protect against the same dest message matched more than once we keep in the "matched" map a set of msgHash-sentAt (for xcmmessages dest candidates)
+		// Note in case of multiple matches, the "order by diffTS" in the SQL statment picks the FIRST one in time closest with the smallest diffTS
+		let k = `${s.msgHash}:${s.d_sentAt}`
+		if ( matched[k] == undefined ) {
+		    out.push(`('${s.msgHash}', ${s.s_sentAt}, 0, ${s.sourceTS}, ${s.destTS}, 1)`)
+		    out.push(`('${s.msgHash}', ${s.d_sentAt}, 1, ${s.sourceTS}, ${s.destTS}, 1)`)
+		    matched[k] = true; 
+		} else {
+		    // console.log("NO MATCH", s);
+		}
+            }
+            let logDT = new Date(startTS * 1000)
+            console.log(`xcmmessages_match ${startTS} covered ${logDT} MATCHES: `, out.length/2);
+            await this.upsertSQL({
+		"table": "xcmmessages",
+		"keys": ["msgHash", "sentAt", "incoming"],
+		"vals": vals,
+		"data": out,
+		"replace": vals
+            });
+        } catch (err) {
+            console.log("xcmmessages_match", err)
+        }
+    }
+
+    async xcmmessagesMatch(startTS = 1626145851, endTS = false, lookbackSeconds = 120) {
+        if (!endTS) endTS = this.currentTS();
+        for (let ts = startTS; ts < endTS; ts += 86400) {
+            await this.xcmmessages_match(ts, ts + 86400, lookbackSeconds)
+        }
+    }
+
     knownParaID(paraID) {
         return this.paraIDs.includes(paraID);
     }
@@ -5875,8 +5944,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return signedBlock2
     }
 
-    async setup_chainParser(chain, debugLevel = paraTool.debugNoLog) {
+    async setup_chainParser(chain, debugLevel = paraTool.debugNoLog, isTip = false) {
         await this.chainParserInit(chain.chainID, debugLevel);
+        if (chain.isEVM == 1) {
+            await this.getChainERCAssets(this.chainID);
+        }
+        await this.get_skipStorageKeys();
+        if (isTip == false) return;
         let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrostKSM, paraTool.chainIDBifrostDOT]
         let assetMetaChain = [paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDHeiko, paraTool.chainIDParallel]
         if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala ||
@@ -5887,6 +5961,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala) {
                 console.log(`Fetch assetRegistry:foreignAssetLocations`)
                 await this.chainParser.fetchXCMAssetRegistryLocations(this)
+                await this.chainParser.updateLiquidityInfo(this)
             }
             if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
                 console.log(`Fetch assetRegistry:currencyIdToLocations`)
@@ -5919,9 +5994,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)
             await this.chainParser.fetchCurrenciesDicoAssetInfos(this)
         }
-
-        await this.get_skipStorageKeys();
-        await this.getChainERCAssets(this.chainID);
 
         // for any new unknown assets, set them up with names, decimals
 

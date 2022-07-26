@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+ // Usage:  xcmmessagesMatch [lookbackDays]
+
+
+var Crawler = require("./crawler");
+async function main() {
+    var crawler = new Crawler();
+    let lookbackDays = 400;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            lookbackDays = parseInt(val, 10);
+        }
+    });
+
+    await crawler.assetManagerInit(); 
+    do {
+        let currentTS = crawler.currentTS();
+        await crawler.xcmmessagesMatch(currentTS - 86400 * lookbackDays, currentTS);
+    } while (true);
+}
+
+main()
+    .then(() => {
+        console.log("finishing...")
+
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
