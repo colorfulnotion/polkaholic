@@ -284,12 +284,14 @@ module.exports = class AcalaParser extends ChainParser {
 
     async updateLiquidityInfo(indexer) {
         let a = await indexer.api.query.dex.tradingPairStatuses.entries();
+        console.log(`updateLiquidityInfo called pairLen=${a.length}`)
         let assetList = {}
         a.forEach(async ([key, val]) => {
             let assetMetadata = val.toHuman() //enabled
             let lp = key.args.map((k) => k.toHuman())[0]
             let lpAsset = JSON.stringify(lp)
             let lpAssetChain = paraTool.makeAssetChain(lpAsset, indexer.chainID);
+            console.log(`LP ${lpAssetChain}`, assetMetadata)
             if (Array.isArray(lp) && lp.length == 2) {
                 let lp0 = lp[0]
                 let lp1 = lp[1]
@@ -301,7 +303,7 @@ module.exports = class AcalaParser extends ChainParser {
                 let cachedLPAssetInfo = indexer.assetInfo[lpAssetChain]
                 if (cachedLPAssetInfo != undefined && cachedLPAssetInfo.token1Decimals != undefined && cachedLPAssetInfo.token0Decimals != undefined && cachedLPAssetInfo.assetName != undefined) {
                     //cached found
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedLPAssetInfo)
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`cached AssetInfo found`, cachedLPAssetInfo)
                     //assetList[asset] = cachedAssetInfo
                 } else {
                     let token0 = indexer.assetInfo[assetChain0]
@@ -327,9 +329,11 @@ module.exports = class AcalaParser extends ChainParser {
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`COULD NOT ADD asset -- no assetType ${assetChain0}, ${assetChain1}`);
                     }
                 }
+            }else{
+              if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`NOT dex pair LP ${lpAssetChain}`, assetMetadata)
             }
         });
-        console.log(assetList);
+        if (this.debugLevel >= paraTool.debugInfo && assetList.length>0) console.log(`new liquidity found`, assetList);
     }
 
     async processLoansPositions(indexer, e2, rAssetkey, fromAddress) {
@@ -494,6 +498,7 @@ module.exports = class AcalaParser extends ChainParser {
     async processTokensTotalIssuance(indexer, e2) {
         //get issuance here (if changed)
         let parsedAsset = JSON.parse(e2.asset)
+        // Not sure if you will ever get here..
         if (Array.isArray(parsedAsset) && parsedAsset.length == 2) { // parsedAsset['DexShare'] != undefined)
             //let pair = parsedAsset['DexShare']
             let decimals0 = await this.getAssetDecimal(indexer, JSON.stringify(parsedAsset[0]), "processTokensTotalIssuance");
@@ -742,10 +747,11 @@ module.exports = class AcalaParser extends ChainParser {
             return (res);
         }
         let parsedAsset = JSON.parse(asset);
-        let assetInfo = await this.getAssetInfo(indexer, parsedAsset);
+        let assetInfo = await this.getAssetInfo(indexer, parsedAsset, 'getAssetDecimal');
         if (assetInfo && assetInfo.decimals) {
             return assetInfo.decimals;
         }
+        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getAssetDecimal parsedAsset ${asset} not found`, ctx)
         return (false);
     }
 
@@ -755,12 +761,13 @@ module.exports = class AcalaParser extends ChainParser {
         if (res) {
             return (res);
         } else {
-            console.log(`getCachedAssetDecimal ${asset} not found`)
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getCachedAssetDecimal ${asset} not found`)
             return (12);
         }
     }
 
-    async getAssetInfo(indexer, parsedAsset) {
+    async getAssetInfo(indexer, parsedAsset, caller=false) {
+        if (parsedAsset != undefined && parsedAsset.DEXShare != undefined) parsedAsset = parsedAsset.DEXShare
         var asset = JSON.stringify(parsedAsset);
         let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
         if (indexer.assetInfo[assetChain] !== undefined) {
@@ -768,10 +775,10 @@ module.exports = class AcalaParser extends ChainParser {
                 indexer.assetInfo[assetChain].name = 'lcDOT';
                 indexer.assetInfo[assetChain].symbol = 'lcDOT';
             }
-            console.log(`getAssetInfo found`)
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`getAssetInfo ${assetChain} found`)
             return (indexer.assetInfo[assetChain]);
         } else {
-            console.log(`getAssetInfo not found ${asset}`)
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getAssetInfo not found ${asset}, caller=${caller}`)
         }
 
         let name = false;
@@ -784,8 +791,8 @@ module.exports = class AcalaParser extends ChainParser {
         if (asset.substring(0, 2) == "0x") return (false);
         if (Array.isArray(parsedAsset)) {
             // decimals is the FIRST element decimals
-            let assetRec0 = await this.getAssetInfo(indexer, parsedAsset[0]) // RECURSIVE call
-            let assetRec1 = await this.getAssetInfo(indexer, parsedAsset[1]) // RECURSIVE call
+            let assetRec0 = await this.getAssetInfo(indexer, parsedAsset[0], 'getAssetInfo-array0') // RECURSIVE call
+            let assetRec1 = await this.getAssetInfo(indexer, parsedAsset[1], 'getAssetInfo-array1') // RECURSIVE call
             if (assetRec0 && assetRec1) {
                 name = `${assetRec0.symbol}/${assetRec1.symbol}`;
                 //console.log(`assetRec0/assetRec1`, `${name}`)
@@ -809,7 +816,7 @@ module.exports = class AcalaParser extends ChainParser {
             decimals = 1;
             assetType = paraTool.assetTypeNFT;
         } else if (parsedAsset.Loan) {
-            let assetRec = await this.getAssetInfo(indexer, parsedAsset.Loan); // RECURSIVE call
+            let assetRec = await this.getAssetInfo(indexer, parsedAsset.Loan, 'getAssetInfo-loan'); // RECURSIVE call
             name = `Loan:${assetRec.symbol}`
             symbol = name;
             decimals = assetRec.decimals;
@@ -862,7 +869,7 @@ module.exports = class AcalaParser extends ChainParser {
                     }
                 }
             } catch (err) {
-                console.log("indexer.api.query.assetRegistry.assetMetadatas ERR", err);
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("indexer.api.query.assetRegistry.assetMetadatas ERR", err);
                 this.parserErrors++;
             }
         }
@@ -876,7 +883,7 @@ module.exports = class AcalaParser extends ChainParser {
             await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'getAssetInfo');
             return (assetInfo);
         } else {
-            console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`COULD NOT ADD asset -- no assetType [caller=${caller}]`, decimals, assetType, parsedAsset, asset);
         }
         return (false);
     }

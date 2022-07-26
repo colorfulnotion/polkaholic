@@ -5892,6 +5892,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala) {
                 console.log(`Fetch assetRegistry:foreignAssetLocations`)
                 await this.chainParser.fetchXCMAssetRegistryLocations(this)
+                await this.chainParser.updateLiquidityInfo(this)
             }
             if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
                 console.log(`Fetch assetRegistry:currencyIdToLocations`)
