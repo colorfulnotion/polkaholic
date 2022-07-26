@@ -329,11 +329,11 @@ module.exports = class AcalaParser extends ChainParser {
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`COULD NOT ADD asset -- no assetType ${assetChain0}, ${assetChain1}`);
                     }
                 }
-            }else{
-              if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`NOT dex pair LP ${lpAssetChain}`, assetMetadata)
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`NOT dex pair LP ${lpAssetChain}`, assetMetadata)
             }
         });
-        if (this.debugLevel >= paraTool.debugInfo && assetList.length>0) console.log(`new liquidity found`, assetList);
+        if (this.debugLevel >= paraTool.debugInfo && assetList.length > 0) console.log(`new liquidity found`, assetList);
     }
 
     async processLoansPositions(indexer, e2, rAssetkey, fromAddress) {
@@ -766,7 +766,7 @@ module.exports = class AcalaParser extends ChainParser {
         }
     }
 
-    async getAssetInfo(indexer, parsedAsset, caller=false) {
+    async getAssetInfo(indexer, parsedAsset, caller = false) {
         if (parsedAsset != undefined && parsedAsset.DEXShare != undefined) parsedAsset = parsedAsset.DEXShare
         var asset = JSON.stringify(parsedAsset);
         let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
