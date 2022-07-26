@@ -1399,9 +1399,9 @@ order by chainID, extrinsicHash, diffTS`
     //   (b) time difference between blockTS matching has to be less than 120 (lookbackSeconds parameter)
     //   (c) 
     // In case of ties, the FIRST one ( "order by diffTS" ) covers this
-    async xcmmessages_match(startTS, endTS, lookbackSeconds = 600) {
+    async xcmmessages_match(startTS, endTS, lookbackSeconds = 120) {
         let sql = `select
-          s.msgHash, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, (d.blockTS - s.blockTS) as diffTS
+          s.msgHash, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, (d.blockTS - s.blockTS) as diffTS, (d.sentAt - s.sentAt) as diffSentAt
         from xcmmessages as s, xcmmessages as d
  where  d.msgHash = s.msgHash and
         d.chainID = s.chainID and
@@ -1414,8 +1414,8 @@ order by chainID, extrinsicHash, diffTS`
         d.blockTS < ${endTS+lookbackSeconds} and
         s.matched = 0 and
         d.matched = 0 
-having diffTS >= 0 and diffTS < ${lookbackSeconds} 
-order by msgHash, diffTS`
+having (diffTS >= 0 and diffTS < ${lookbackSeconds}) or (diffSentAt >= 0 and diffSentAt <= 4)
+order by msgHash, diffSentAt, diffTS`
 	//console.log("xcmmessages_match", sql)
         try {
             let xcmmatches = await this.poolREADONLY.query(sql);
@@ -1426,7 +1426,7 @@ order by msgHash, diffTS`
                 //enable this for debugging
                 //console.log("[Empty] match_xcm", sql)
             }
-	    let vals = ["sourceTS", "destTS", "matched"];
+	    let vals = ["sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt"];
 	    let out = [];
             for (let i = 0; i < xcmmatches.length; i++) {
                 let s = xcmmatches[i];
@@ -1434,8 +1434,8 @@ order by msgHash, diffTS`
 		// Note in case of multiple matches, the "order by diffTS" in the SQL statment picks the FIRST one in time closest with the smallest diffTS
 		let k = `${s.msgHash}:${s.d_sentAt}`
 		if ( matched[k] == undefined ) {
-		    out.push(`('${s.msgHash}', ${s.s_sentAt}, 0, ${s.sourceTS}, ${s.destTS}, 1)`)
-		    out.push(`('${s.msgHash}', ${s.d_sentAt}, 1, ${s.sourceTS}, ${s.destTS}, 1)`)
+		    out.push(`('${s.msgHash}', ${s.s_sentAt}, 0, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}')`)
+		    out.push(`('${s.msgHash}', ${s.d_sentAt}, 1, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}')`)
 		    matched[k] = true; 
 		} else {
 		    // console.log("NO MATCH", s);
