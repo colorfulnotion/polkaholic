@@ -1331,7 +1331,7 @@ module.exports = class ChainParser {
         let xcmIndex = extrinsic.xcms.length
         let relayChain = indexer.relayChain
         let fromAddress = paraTool.getPubKey(evetnData[0])
-        let incomplete = this.extract_xcm_incomplete(extrinsic.events);
+        let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
         let assetAndAmountSents = [];
 
         let paraID = indexer.getParaIDfromChainID(indexer.chainID)
@@ -1621,7 +1621,7 @@ module.exports = class ChainParser {
                     let transferIndex = assetAndAmountSent.transferIndex
                     let isFeeItem = assetAndAmountSent.isFeeItem
                     if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent)) {
-                        let incomplete = this.extract_xcm_incomplete(extrinsic.events);
+                        let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                         if (extrinsic.xcms == undefined) extrinsic.xcms = []
                         let xcmIndex = extrinsic.xcms.length
                         let r = {
@@ -1665,12 +1665,16 @@ module.exports = class ChainParser {
         return outgoingXTokens;
     }
 
-    extract_xcm_incomplete(events) {
+    extract_xcm_incomplete(events, extrinsicID=false) {
         let incomplete = 0;
         for (let i = 0; i < events.length; i++) {
             let e = events[i];
             let sectionMethod = `${e.section}(${e.method})`
-            if ((e.section == "xcmPallet" || e.section == "polkadotXcm") && e.method == "Attempted") {
+            if (sectionMethod =='xTokens(TransferFailed)'){
+              if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
+              incomplete = 1
+              return incomplete;
+            } else if ((e.section == "xcmPallet" || e.section == "polkadotXcm") && e.method == "Attempted") {
                 let data = e.data;
                 //console.log(`sectionMethod=${sectionMethod}`, data)
                 if (Array.isArray(data)) {
@@ -2145,7 +2149,7 @@ module.exports = class ChainParser {
                         let transferIndex = assetAndAmountSent.transferIndex
                         let isFeeItem = assetAndAmountSent.isFeeItem
                         if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent) && chainIDDest) {
-                            let incomplete = this.extract_xcm_incomplete(extrinsic.events);
+                            let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcms.length
                             let r = {
@@ -2373,7 +2377,7 @@ module.exports = class ChainParser {
                         let transferIndex = assetAndAmountSent.transferIndex
                         let isFeeItem = assetAndAmountSent.isFeeItem
                         if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent) && chainIDDest) {
-                            let incomplete = this.extract_xcm_incomplete(extrinsic.events);
+                            let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcms.length
                             let r = {
