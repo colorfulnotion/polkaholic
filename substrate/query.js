@@ -5040,7 +5040,8 @@ module.exports = class Query extends AssetManager {
         return ([null, null]);
     }
 
-    async getXCMMessage(msgHash, sentAt = null) {
+    async getXCMMessage(msgHash, sentAt = null, decorate = true, decorateExtra = true) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let w = (sentAt) ? ` and sentAt = ${sentAt}` : "";
         let sql = `select msgHash, sentAt, chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, msgType, msgHex, msgStr, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, childMsgHash, assetChains from xcmmessages where msgHash = '${msgHash}' ${w} and incoming = 0 order by blockTS desc limit 1`
         let xcmrecs = await this.poolREADONLY.query(sql);
@@ -5073,8 +5074,39 @@ module.exports = class Query extends AssetManager {
         return x;
     }
 
+
+    /*
+    decorateXCM -- in query.js "getXCMMessage" compute
+    (a) asset referenced;
+    (b) estimated valueUSD to any XCM instruction
+    (c) estimated value xcm contained within
+    (d) any encoded call of transact
+    (e) any nickname of beneficiary (accountID32/20);
+
+    */
+    async decorateXCM(rawXcmRec, decorate = true, decorateExtra = true){
+      let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+
+      let [parentMsgHash, parentSentAt] = this.parseMsgHashSentAt(rawXcmRec.parentMsgHash);
+      let [childMsgHash, childSentAt] = this.parseMsgHashSentAt(rawXcmRec.childMsgHash);
+
+      let dXcm = {
+        msgHash: rawXcmRec.msgHash,
+        msgStr: rawXcmRec.msgStr,
+        extrinsicID: rawXcmRec.extrinsicID,
+        extrinsicHash: rawXcmRec.extrinsicHash,
+        parentMsgHash,
+        parentSentAt,
+        childMsgHash,
+        childSentAt,
+        assetChains: rawXcmRec.assetChains
+      }
+      return dXcm
+    }
+
     // given a hash of an extrinsic OR a XCM message hash, get the timeline of blocks
-    async getXCMTimeline(hash, hashType = "extrinsic", sentAt = null) {
+    async getXCMTimeline(hash, hashType = "extrinsic", sentAt = null, decorate = true, decorateExtra = true) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         try {
             // read xcmtransfers table to map into parameters below
             let sql = "";
@@ -5268,17 +5300,21 @@ module.exports = class Query extends AssetManager {
             console.log('msgH', msgHashes);
             // ALL the XCM messages related to extrinsic are fetched here ( A =m1=> B =m2=> C ) for the timeline of an extrinsicHash (hashType="extrinsic") OR all the sibling xcmmessages of a XCM msgHash (hashType="xcm")
             // This is returned as an array -- the XCM Timeline UI can then display all the xcmmessages and support clicking into a timeline for
-            // (a) any msgHash/sentAt in this array 
+            // (a) any msgHash/sentAt in this array
             // (b) parentMsgHash/sentAt (if present)
             // (c) childMsgHash/sentAt (if parent)
+
             let xcmmessages = [];
             try {
                 if (msgHashes.length > 0) {
                     let msgHashesStr = msgHashes.join(",");
-                    var sql2 = `select msgHash, msgStr, extrinsicID, extrinsicHash, parentMsgHash, childMsgHash, assetChains from xcmmessages where ( ( msgHash in (${msgHashesStr}) and incoming = 0 ) or (extrinsicHash = '${extrinsicHash}' and incoming = 0) ) and (blockTS >= ${ts} and blockTS < ${ts+60})`
+                    var sql2 = `select msgHash, msgHex, msgStr, extrinsicID, extrinsicHash, parentMsgHash, childMsgHash, assetChains from xcmmessages where ( ( msgHash in (${msgHashesStr}) and incoming = 0 ) or (extrinsicHash = '${extrinsicHash}' and incoming = 0) ) and (blockTS >= ${ts} and blockTS < ${ts+60})`
                     let xcmmessagesRaw = await this.poolREADONLY.query(sql2);
                     for (let i = 0; i < xcmmessagesRaw.length; i++) {
-                        let x = xcmmessagesRaw[i];
+                        let rawXcmRec = xcmmessagesRaw[i];
+                        let xcmmessage = await this.decorateXCM(rawXcmRec, decorate, decorateExtra)
+                        xcmmessages.push(xcmmessage)
+                        /*
                         let [parentMsgHash, parentSentAt] = this.parseMsgHashSentAt(x.parentMsgHash);
                         let [childMsgHash, childSentAt] = this.parseMsgHashSentAt(x.childMsgHash);
                         xcmmessages.push({
@@ -5292,6 +5328,7 @@ module.exports = class Query extends AssetManager {
                             childSentAt,
                             assetChains: x.assetChains
                         });
+                        */
                     }
                 }
             } catch (err) {
