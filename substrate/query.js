@@ -2416,13 +2416,16 @@ module.exports = class Query extends AssetManager {
             let chainID = a.assetInfo.chainID;
             if (chainsMap[chainID] == undefined) {
                 let chainInfo = this.chainInfos[chainID];
-                let chainName = this.getChainName(chainID);
-                let id = chainInfo.id;
-                let ss58Format = this.chainInfos[chainID].ss58Format;
-                let ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
-                let iconUrl = this.chainInfos[chainID].iconUrl;
-                let subscanURL = this.chainInfos[chainID].subscanURL;
-                let dappURL = this.chainInfos[chainID].dappURL;
+                var id, chainName, ss58Format, ss58Address, iconUrl, subscanURL, dappURL;
+                if (chainInfo !== undefined) {
+                    chainName = this.getChainName(chainID);
+                    id = chainInfo.id;
+                    ss58Format = this.chainInfos[chainID].ss58Format;
+                    ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
+                    iconUrl = this.chainInfos[chainID].iconUrl;
+                    subscanURL = this.chainInfos[chainID].subscanURL;
+                    dappURL = this.chainInfos[chainID].dappURL;
+                }
                 chainsMap[chainID] = {
                     chainID,
                     chainName,

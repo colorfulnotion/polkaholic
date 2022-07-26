@@ -5875,8 +5875,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return signedBlock2
     }
 
-    async setup_chainParser(chain, debugLevel = paraTool.debugNoLog) {
+    async setup_chainParser(chain, debugLevel = paraTool.debugNoLog, isTip = false) {
         await this.chainParserInit(chain.chainID, debugLevel);
+        if (chain.isEVM == 1) {
+            await this.getChainERCAssets(this.chainID);
+        }
+        await this.get_skipStorageKeys();
+        if (isTip == false) return;
         let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrostKSM, paraTool.chainIDBifrostDOT]
         let assetMetaChain = [paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDHeiko, paraTool.chainIDParallel]
         if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala ||
@@ -5919,9 +5924,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)
             await this.chainParser.fetchCurrenciesDicoAssetInfos(this)
         }
-
-        await this.get_skipStorageKeys();
-        await this.getChainERCAssets(this.chainID);
 
         // for any new unknown assets, set them up with names, decimals
 
