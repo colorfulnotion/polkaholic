@@ -37,7 +37,7 @@ let timelineRows = uiTool.getTimelineRows(timeline);
      </td>
      <td>
       <div id="typ<%= k; %>" class="renderjson"></div>
-      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(5)(<%- JSON.stringify(xcm.msgStr) %>));</script>
+      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(5)(<%- JSON.stringify(xcm.msg) %>));</script>
      </td>
      <td>
      <% if ( xcm.assetChains ) {
