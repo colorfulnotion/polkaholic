@@ -1232,7 +1232,7 @@ module.exports = class ChainParser {
 
     processX3(x3, relayChain) {
         //dest.v1.interior.x3
-      /*
+        /*
       "x3": [
         {
           "parent": null
@@ -1410,8 +1410,8 @@ module.exports = class ChainParser {
             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
             [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
         } else if (dest.x3 != undefined) {
-              //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
-              [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
+            //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
+            [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
         } else if (dest.interior !== undefined) {
             let destInterior = dest.interior;
             // looks like it's getting here
@@ -1723,15 +1723,15 @@ module.exports = class ChainParser {
         return outgoingXTokens;
     }
 
-    extract_xcm_incomplete(events, extrinsicID=false) {
+    extract_xcm_incomplete(events, extrinsicID = false) {
         let incomplete = 0;
         for (let i = 0; i < events.length; i++) {
             let e = events[i];
             let sectionMethod = `${e.section}(${e.method})`
-            if (sectionMethod =='xTokens(TransferFailed)'){
-              if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
-              incomplete = 1
-              return incomplete;
+            if (sectionMethod == 'xTokens(TransferFailed)') {
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
+                incomplete = 1
+                return incomplete;
             } else if ((e.section == "xcmPallet" || e.section == "polkadotXcm") && e.method == "Attempted") {
                 let data = e.data;
                 //console.log(`sectionMethod=${sectionMethod}`, data)

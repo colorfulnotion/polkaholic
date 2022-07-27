@@ -1416,7 +1416,7 @@ order by chainID, extrinsicHash, diffTS`
         d.matched = 0 
 having (diffTS >= 0 and diffTS < ${lookbackSeconds}) or (diffSentAt >= 0 and diffSentAt <= 4)
 order by msgHash, diffSentAt, diffTS`
-	//console.log("xcmmessages_match", sql)
+        //console.log("xcmmessages_match", sql)
         try {
             let xcmmatches = await this.poolREADONLY.query(sql);
             let matched = {}
@@ -1426,29 +1426,29 @@ order by msgHash, diffSentAt, diffTS`
                 //enable this for debugging
                 //console.log("[Empty] match_xcm", sql)
             }
-	    let vals = ["sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt"];
-	    let out = [];
+            let vals = ["sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt"];
+            let out = [];
             for (let i = 0; i < xcmmatches.length; i++) {
                 let s = xcmmatches[i];
-		// to protect against the same dest message matched more than once we keep in the "matched" map a set of msgHash-sentAt (for xcmmessages dest candidates)
-		// Note in case of multiple matches, the "order by diffTS" in the SQL statment picks the FIRST one in time closest with the smallest diffTS
-		let k = `${s.msgHash}:${s.d_sentAt}`
-		if ( matched[k] == undefined ) {
-		    out.push(`('${s.msgHash}', ${s.s_sentAt}, 0, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}')`)
-		    out.push(`('${s.msgHash}', ${s.d_sentAt}, 1, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}')`)
-		    matched[k] = true; 
-		} else {
-		    // console.log("NO MATCH", s);
-		}
+                // to protect against the same dest message matched more than once we keep in the "matched" map a set of msgHash-sentAt (for xcmmessages dest candidates)
+                // Note in case of multiple matches, the "order by diffTS" in the SQL statment picks the FIRST one in time closest with the smallest diffTS
+                let k = `${s.msgHash}:${s.d_sentAt}`
+                if (matched[k] == undefined) {
+                    out.push(`('${s.msgHash}', ${s.s_sentAt}, 0, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}')`)
+                    out.push(`('${s.msgHash}', ${s.d_sentAt}, 1, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}')`)
+                    matched[k] = true;
+                } else {
+                    // console.log("NO MATCH", s);
+                }
             }
             let logDT = new Date(startTS * 1000)
-            console.log(`xcmmessages_match ${startTS} covered ${logDT} MATCHES: `, out.length/2);
+            console.log(`xcmmessages_match ${startTS} covered ${logDT} MATCHES: `, out.length);
             await this.upsertSQL({
-		"table": "xcmmessages",
-		"keys": ["msgHash", "sentAt", "incoming"],
-		"vals": vals,
-		"data": out,
-		"replace": vals
+                "table": "xcmmessages",
+                "keys": ["msgHash", "sentAt", "incoming"],
+                "vals": vals,
+                "data": out,
+                "replace": vals
             });
         } catch (err) {
             console.log("xcmmessages_match", err)

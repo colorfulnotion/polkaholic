@@ -398,12 +398,12 @@ module.exports = class Crawler extends Indexer {
                 eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit)";
             }
             if (trace && finalized) {
-                sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, blockDT, lastTraceDT ${eflds} ) values (${bn}, '${blockHash}', '${parentHash}', FROM_UNIXTIME(${blockTS}), Now()  ${evals} ) on duplicate key update lastTraceDT = values(lastTraceDT), blockHash = values(blockHash), parentHash = values(parentHash), blockDT = values(blockDT) ${eupds} ;`;
+                sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, blockDT, crawlBlock, crawlTrace, lastTraceDT ${eflds} ) values (${bn}, '${blockHash}', '${parentHash}', FROM_UNIXTIME(${blockTS}), 0, 0, Now()  ${evals} ) on duplicate key update lastTraceDT = values(lastTraceDT), blockHash = values(blockHash), parentHash = values(parentHash), crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace), blockDT = values(blockDT) ${eupds} ;`;
             } else if (trace) {
                 sql = `insert into block${chainID} (blockNumber, lastTraceDT) values (${bn}, Now()) on duplicate key update lastTraceDT = values(lastTraceDT)`
             } else if (finalized) {
                 //check here
-                sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, blockDT ${eflds} ) values (${bn}, '${blockHash}', '${parentHash}', FROM_UNIXTIME(${blockTS})  ${evals} ) on duplicate key update blockHash = values(blockHash), parentHash = values(parentHash), blockDT = values(blockDT) ${eupds};`;
+                sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, crawlBlock, blockDT ${eflds} ) values (${bn}, '${blockHash}', '${parentHash}', 0, FROM_UNIXTIME(${blockTS})  ${evals} ) on duplicate key update blockHash = values(blockHash), parentHash = values(parentHash), crawlBlock = values(crawlBlock), blockDT = values(blockDT) ${eupds};`;
             }
             if (sql) {
                 this.batchedSQL.push(sql);
@@ -503,7 +503,7 @@ module.exports = class Crawler extends Indexer {
             await tableChain.insert([cres]);
 
             var sql = false;
-            sql = `insert into block${chainID} (blockNumber, lastTraceDT) values (${bn}, Now()) on duplicate key update lastTraceDT = values(lastTraceDT)`
+            sql = `insert into block${chainID} (blockNumber, crawlTrace, lastTraceDT) values (${bn}, 0, Now()) on duplicate key update crawlTrace = values(crawlTrace), lastTraceDT = values(lastTraceDT)`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
             return (true);
@@ -1800,6 +1800,8 @@ create table talismanEndpoint (
         let crawlBlockEVM = (chain.isEVM > 0) ? 1 : 0;
         let crawlReceiptsEVM = (chain.isEVM > 0) ? 1 : 0;
         let crawlTraceEVM = (chain.isEVM > 0) ? 1 : 0;
+        let crawlBlock = 1;
+        let crawlTrace = 1;
         if (bn > this.latestBlockNumber) this.latestBlockNumber = bn;
         // read the row and DELETE all the blockraw:XXX and trace:XXX rows that do NOT match the finalized hash
         // todo: delete evmblock evmreceipt evmtrace and fetch the finalized one
@@ -1837,7 +1839,6 @@ create table talismanEndpoint (
             const evmBlockData = rowData["blockrawevm"];
             const evmReceiptsData = rowData["receiptsevm"];
             const evmTraceData = rowData["traceevm"];
-
             let block = false;
             let events = false;
             let trace = false;
@@ -1847,6 +1848,7 @@ create table talismanEndpoint (
                         cols.push("blockraw:" + blockHash);
                         cols.push("events:" + blockHash);
                     } else {
+                        crawlBlock = 0;
                         let cell = blockData[blockHash][0];
                         if (cell) {
                             block = JSON.parse(cell.value);
@@ -1888,6 +1890,7 @@ create table talismanEndpoint (
                     if (blockHash != finalizedHash) {
                         cols.push("trace:" + blockHash);
                     } else {
+                        crawlTrace = 0;
                         let cellTrace = traceData[blockHash][0];
                         if (cellTrace) {
                             trace = JSON.parse(cellTrace.value);
@@ -1970,7 +1973,7 @@ create table talismanEndpoint (
                     evals = `, '${blockHashEVM}', '${parentHashEVM}', '${numTransactionsEVM}', '${numReceiptsEVM}', '${gasUsed}', '${gasLimit}', ${crawlBlockEVM}, ${crawlReceiptsEVM}, ${crawlTraceEVM}`;
                     eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), numReceiptsEVM = values(numReceiptsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit), crawlBlockEVM = values(crawlBlockEVM), crawlReceiptsEVM = values(crawlReceiptsEVM), crawlTraceEVM = values(crawlTraceEVM)";
                 }
-                let sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, blockDT, lastFeedDT, crawlFeed ${eflds}) values ('${bn}', '${finalizedHash}', '${parentHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', FROM_UNIXTIME('${blockTS}'), Now(), 0 ${evals}) on duplicate key update blockHash=values(blockHash), parentHash = values(parentHash), blockDT=values(blockDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), lastFeedDT = values(lastFeedDT), crawlFeed = values(crawlFeed) ${eupds}`;
+                let sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, blockDT, crawlBlock, crawlTrace ${eflds}) values ('${bn}', '${finalizedHash}', '${parentHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', FROM_UNIXTIME('${blockTS}'), '${crawlBlock}', '${crawlTrace}' ${evals}) on duplicate key update blockHash=values(blockHash), parentHash = values(parentHash), blockDT=values(blockDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace) ${eupds}`;
                 this.batchedSQL.push(sql);
                 // mark that the PREVIOUS hour is ready for indexing, since this block is FINALIZED, so that continuously running "indexChain" job can index the newly finalized hour
                 this.markFinalizedReadyForIndexing(chainID, blockTS);

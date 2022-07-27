@@ -17,6 +17,7 @@ async function main() {
     do {
         let currentTS = crawler.currentTS();
         await crawler.xcmMatch(currentTS - 86400 * lookbackDays, currentTS, ratMin);
+        await crawler.xcmmessagesMatch(currentTS - 86400 * lookbackDays, currentTS);
         ratMin = ratMin - .01;
         await crawler.sleep(5000)
         let lastAUSDUpdateAgo = currentTS - lastAUSDUpdateTS
