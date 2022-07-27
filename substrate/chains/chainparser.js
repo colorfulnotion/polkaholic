@@ -866,23 +866,23 @@ module.exports = class ChainParser {
         }
     }
 
-    decodeXcmVersionedXcm(indexer, data, caller = false, useApiAt = true){
-      let api = (useApiAt)? indexer.apiAt: indexer.api
-      let msgHash = '0x' + paraTool.blake2_256_from_hex(data)
-      try {
-        let instructions = api.registry.createType('XcmVersionedXcm', data);
-        if (this.debugLevel >= paraTool.debugInfo && !useApiAt) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] Fallback decode success!`)
-        //if (this.debugLevel >= paraTool.debugErrorOnly && !useApiAt) console.log(`decodeXcmVersionedXcm [${msgHash}](${data}) instructions`, instructions.toJSON())
-        return instructions
-      }catch(err){
-        if (useApiAt){
-          if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] apiAt decode failed. trying fallback`)
-          return this.decodeXcmVersionedXcm(indexer, data, caller, false)
-        }else{
-          if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}](${data}) decode failed. error`, err.toString())
-          return false
+    decodeXcmVersionedXcm(indexer, data, caller = false, useApiAt = true) {
+        let api = (useApiAt) ? indexer.apiAt : indexer.api
+        let msgHash = '0x' + paraTool.blake2_256_from_hex(data)
+        try {
+            let instructions = api.registry.createType('XcmVersionedXcm', data);
+            if (this.debugLevel >= paraTool.debugInfo && !useApiAt) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] Fallback decode success!`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly && !useApiAt) console.log(`decodeXcmVersionedXcm [${msgHash}](${data}) instructions`, instructions.toJSON())
+            return instructions
+        } catch (err) {
+            if (useApiAt) {
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] apiAt decode failed. trying fallback`)
+                return this.decodeXcmVersionedXcm(indexer, data, caller, false)
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}](${data}) decode failed. error`, err.toString())
+                return false
+            }
         }
-      }
     }
 
     decodeUpwardMsg(indexer, upwardMsg, hrmpWatermark, channelMsgIndex) {
@@ -925,8 +925,8 @@ module.exports = class ChainParser {
             return r
             //return umpMsg
         } catch (e) {
-          if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeUpwardMsg decode failed. error`, e.toString())
-          return false
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeUpwardMsg decode failed. error`, e.toString())
+            return false
         }
     }
 
@@ -948,8 +948,8 @@ module.exports = class ChainParser {
             let mpType = pieces[2]
             let chainIDDest = pieces[3]
             let chainID = pieces[4]
-            let data = (downwardMsg.msg != undefined)? downwardMsg.msg: downwardMsg.pubMsg
-            let sentAt = (downwardMsg.sentAt != undefined)? paraTool.dechexToInt(downwardMsg.sentAt): paraTool.dechexToInt(downwardMsg.pubSentAt)
+            let data = (downwardMsg.msg != undefined) ? downwardMsg.msg : downwardMsg.pubMsg
+            let sentAt = (downwardMsg.sentAt != undefined) ? paraTool.dechexToInt(downwardMsg.sentAt) : paraTool.dechexToInt(downwardMsg.pubSentAt)
             msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as dmpqueue (ExecutedDownward)
             //console.log(`decodeDownwardMsg`, downwardMsg)
             var instructions = this.decodeXcmVersionedXcm(indexer, data, `decodeDownwardMsg-${channelMsgIndex}`)
@@ -999,13 +999,13 @@ module.exports = class ChainParser {
             let chainIDDest = pieces[3]
             let chainID = pieces[4]
             let data = '0x' + horizontalMsg.data.slice(4)
-            if (horizontalMsg.data != undefined){
-              console.log(`horizontalMsg data fatal case!!`, JSON.stringify(hrmpMsg, null, 2))
+            if (horizontalMsg.data == undefined) {
+                console.log(`horizontalMsg data fatal case!!`, JSON.stringify(horizontalMsg, null, 2))
             }
-            if (downwardMsg.sentAt == undefined && downwardMsg.pubSentAt == undefined){
-              console.log(`horizontalMsg sentAt fatal case!!`, JSON.stringify(hrmpMsg, null, 2))
+            if (horizontalMsg.sentAt == undefined && horizontalMsg.pubSentAt == undefined) {
+                console.log(`horizontalMsg sentAt fatal case!!`, JSON.stringify(hrmpMsg, null, 2))
             }
-            let sentAt = (downwardMsg.sentAt != undefined)? paraTool.dechexToInt(downwardMsg.sentAt): paraTool.dechexToInt(downwardMsg.pubSentAt)
+            let sentAt = (horizontalMsg.sentAt != undefined) ? paraTool.dechexToInt(horizontalMsg.sentAt) : paraTool.dechexToInt(horizontalMsg.pubSentAt)
             msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
             var instructions = this.decodeXcmVersionedXcm(indexer, data, `decodeHorizontalMsg-${channelMsgIndex}`)
             var hrmpMsg = instructions.toJSON()
@@ -1033,8 +1033,8 @@ module.exports = class ChainParser {
             return r
             //return hrmpMsg
         } catch (e) {
-          if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeHorizontalMsg decode failed. error`, e.toString())
-          return false
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeHorizontalMsg decode failed. error`, e.toString())
+            return false
         }
     }
 
@@ -1230,6 +1230,58 @@ module.exports = class ChainParser {
         return [paraIDDest, chainIDDest, destAddress]
     }
 
+    processX3(x3, relayChain) {
+        //dest.v1.interior.x3
+      /*
+      "x3": [
+        {
+          "parent": null
+        },
+        {
+          "parachain": 2001
+        },
+        {
+          "accountId32": {
+            "network": {
+              "any": null
+            },
+            "id": "qLpr9ztSDVYFxAhbEcWJyMorjZJv7LoZLGHS2RfLL2y7bvu"
+          }
+        }
+      ]
+    */
+        let paraIDDest = -1
+        let chainIDDest = -1
+        let destAddress = null
+        if (Array.isArray(x3)) {
+            //same as dest X1
+            let x3_0 = x3[0]; //not used?
+            let x3_1 = x3[1];
+            if (x3_1.parachain !== undefined) {
+                //{ parachain: 2001 }
+                paraIDDest = x3_1.parachain
+                if (relayChain == "polkadot") {
+                    chainIDDest = paraIDDest;
+                } else {
+                    chainIDDest = paraIDDest + 20000;
+                }
+            } else if (x3_1.parent !== undefined) {
+                // { parent: null }
+                paraIDDest = 0
+                if (relayChain == "polkadot") {
+                    chainIDDest = paraTool.chainIDPolkadot;
+                } else if (relayChain == "kusama") {
+                    chainIDDest = paraTool.chainIDKusama;
+                }
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x3_1`, x3_1)
+            }
+            let accKey = x3[2]
+            destAddress = this.processAccountKey(accKey)
+        }
+        return [paraIDDest, chainIDDest, destAddress]
+    }
+
     processAccountKey(accKey) {
         let destAddress = null
 
@@ -1331,7 +1383,7 @@ module.exports = class ChainParser {
         let xcmIndex = extrinsic.xcms.length
         let relayChain = indexer.relayChain
         let fromAddress = paraTool.getPubKey(evetnData[0])
-        let incomplete = this.extract_xcm_incomplete(extrinsic.events);
+        let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
         let assetAndAmountSents = [];
 
         let paraID = indexer.getParaIDfromChainID(indexer.chainID)
@@ -1357,6 +1409,9 @@ module.exports = class ChainParser {
         } else if (dest.x2 != undefined) {
             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
             [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
+        } else if (dest.x3 != undefined) {
+              //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
+              [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
         } else if (dest.interior !== undefined) {
             let destInterior = dest.interior;
             // looks like it's getting here
@@ -1368,10 +1423,10 @@ module.exports = class ChainParser {
                 // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
                 [paraIDDest, chainIDDest, destAddress] = this.processX2(destInterior.x2, relayChain)
             } else {
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest.interior`, JSON.stringify(dest, null, 2))
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent section_method=${section_method} Unknown dest.interior`, JSON.stringify(dest, null, 2))
             }
         } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest`, JSON.stringify(dest, null, 2))
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent section_method=${section_method} Unknown dest`, JSON.stringify(dest, null, 2))
         }
 
         let aAsset = evetnData[1] //Vec<XcmV1MultiAsset>
@@ -1490,6 +1545,9 @@ module.exports = class ChainParser {
                 } else if (dest.x2 != undefined) {
                     //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
                     [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
+                } else if (dest.x3 != undefined) {
+                    //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
+                    [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
                 } else if (dest.interior !== undefined) {
                     let destInterior = dest.interior;
                     // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
@@ -1621,7 +1679,7 @@ module.exports = class ChainParser {
                     let transferIndex = assetAndAmountSent.transferIndex
                     let isFeeItem = assetAndAmountSent.isFeeItem
                     if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent)) {
-                        let incomplete = this.extract_xcm_incomplete(extrinsic.events);
+                        let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                         if (extrinsic.xcms == undefined) extrinsic.xcms = []
                         let xcmIndex = extrinsic.xcms.length
                         let r = {
@@ -1665,12 +1723,16 @@ module.exports = class ChainParser {
         return outgoingXTokens;
     }
 
-    extract_xcm_incomplete(events) {
+    extract_xcm_incomplete(events, extrinsicID=false) {
         let incomplete = 0;
         for (let i = 0; i < events.length; i++) {
             let e = events[i];
             let sectionMethod = `${e.section}(${e.method})`
-            if ((e.section == "xcmPallet" || e.section == "polkadotXcm") && e.method == "Attempted") {
+            if (sectionMethod =='xTokens(TransferFailed)'){
+              if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
+              incomplete = 1
+              return incomplete;
+            } else if ((e.section == "xcmPallet" || e.section == "polkadotXcm") && e.method == "Attempted") {
                 let data = e.data;
                 //console.log(`sectionMethod=${sectionMethod}`, data)
                 if (Array.isArray(data)) {
@@ -1845,8 +1907,11 @@ module.exports = class ChainParser {
         return [targetedAsset, rawTargetedAsset]
     }
 
-    //TODO. this is the V0 format
-    processConcreteFungible(indexer, fungibleAsset) {
+    //This is the V0 format
+    processV0ConcreteFungible(indexer, fungibleAsset) {
+        let relayChain = indexer.relayChain
+        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+        let selfParaID = (indexer.chainID == paraTool.chainIDKusama || indexer.chainID == paraTool.chainIDPolkadot) ? 0 : indexer.chainID - paraIDExtra
         let targetedAsset = false;
         let rawTargetedAsset = false;
         let amountSent = 0
@@ -1861,28 +1926,110 @@ module.exports = class ChainParser {
           }
         ]
         }
+        "id": {
+          "x3": [
+          {
+            "parent": null
+          },
+          {
+            "parachain": 2000
+          },
+          {
+            "generalKey": "0x0081"
+          }
+          ]
+        },
+        "id": {
+          "x1": {
+            "generalKey": "0x000000000000000000"
+          }
+        },
         */
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`fungibleAsset`, fungibleAsset)
-        if (fungibleAsset.id != undefined && fungibleAsset.id.null !== undefined) {
-            targetedAsset = indexer.getNativeAsset()
-            rawTargetedAsset = indexer.getNativeAsset()
-            //} else if (fungibleAsset.id != undefined && fungibleAsset.id.concrete !== undefined) { //MK: was expecting xcmInteriorKey case here?
-        } else if (fungibleAsset.id != undefined && fungibleAsset.id.x2 !== undefined && Array.isArray(fungibleAsset.id.x2)) {
-            let fungibleAsset_id_x2 = fungibleAsset.id.x2
-            if (fungibleAsset_id_x2.length == 2 && fungibleAsset_id_x2[1].generalIndex != undefined) {
-                targetedAsset = this.processDecHexCurrencyID(indexer, fungibleAsset_id_x2[1].generalIndex)
-                rawTargetedAsset = this.processRawDecHexCurrencyID(indexer, fungibleAsset_id_x2[1].generalIndex)
+        if (fungibleAsset.id != undefined) {
+            let fungibleAsset_id = fungibleAsset.id
+            let xType = Object.keys(fungibleAsset_id)[0]
+            let interiorV0 = fungibleAsset_id[xType]
+            if (fungibleAsset_id.null !== undefined || xType == 'null') {
+                targetedAsset = indexer.getNativeAsset()
+                rawTargetedAsset = indexer.getNativeAsset()
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteFungible unknown fungibleAsset.id.x2`, JSON.stringify(fungibleAsset_id_x2, null, 2))
+                //x1/x2/x3....
+                let interiorVStr = false;
+                let new_interiorV0 = []
+                switch (xType) {
+                    case 'x1':
+                        if (interiorV0.parachain != undefined) {
+                            //this is the interior key
+                            interiorVStr = JSON.stringify(interiorV0)
+                        } else {
+                            // either genrealkey or generalIndex case -- expand to x2 by adding parachain
+                            let expandedParachainPiece = {
+                                parachain: selfParaID
+                            }
+                            new_interiorV0.push(expandedParachainPiece)
+                            new_interiorV0.push(interiorV0)
+                            interiorVStr = JSON.stringify(new_interiorV0)
+                        }
+                        break;
+                    default:
+                        //x2/x3/...
+                        if (Array.isArray(interiorV0)) {
+                            // check the first key: parent/parachain/generalKey/palletInstance/generalIndex...
+                            let firstPiece = interiorV0.shift()
+                            let firstPieceKey = Object.keys(firstPiece)[0]
+                            if (firstPieceKey == 'parent') {
+                                //remove parent (no push)
+                            } else if (firstPieceKey == 'parachain') {
+                                //no change (push only)
+                                new_interiorV0.push(firstPiece)
+                            } else {
+                                //pad (add expandedParachainPiece before push)
+                                let expandedParachainPiece = {
+                                    parachain: selfParaID
+                                }
+                                new_interiorV0.push(expandedParachainPiece)
+                                new_interiorV0.push(firstPiece)
+                            }
+                            for (const interiorV0Piece of interiorV0) {
+                                new_interiorV0.push(interiorV0Piece)
+                            }
+                            interiorVStr = JSON.stringify(new_interiorV0)
+                        } else {
+                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible unknown fungibleAsset type [${xType}]`, JSON.stringify(interiorV0, null, 2))
+                        }
+                        break;
+                }
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible derived interiorVStr [${xType}] ${JSON.stringify(interiorV0)} -> ${interiorVStr}`)
+                let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
+                let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
+                    targetedAsset = cachedXcmAssetInfo.asset
+                    rawTargetedAsset = cachedXcmAssetInfo.asset
+                    if (cachedXcmAssetInfo.paraID == 1000) {
+                        //statemine/statemint
+                        let nativeChainID = paraIDExtra + 1000
+                        let t = JSON.parse(targetedAsset)
+                        let currencyID = t.Token
+                        let symbol = indexer.getCurrencyIDSymbol(currencyID, nativeChainID);
+                        targetedAsset = JSON.stringify({
+                            Token: symbol
+                        })
+                    }
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`xcmInteriorKey ${xcmInteriorKey} Found -> targetedAsset=${targetedAsset}, rawTargetedAsset=${rawTargetedAsset}`)
+                } else {
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible cachedXcmAssetInfo lookup failed! [${xType}]`, xcmInteriorKey)
+                    targetedAsset = interiorVStr
+                    rawTargetedAsset = interiorVStr
+                }
             }
-        } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteFungible not null id! unknown`, JSON.stringify(fungibleAsset, null, 2))
         }
+
         if (fungibleAsset.amount !== undefined) {
             amountSent = paraTool.dechexToInt(fungibleAsset.amount);
             if (this.debugLevel >= paraTool.debugVerbose) console.log(`fungibleAsset amountSent`, amountSent)
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processConcreteFungible v0 fungibleAsset unknown", fungibleAsset);
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processV0ConcreteFungible fungibleAsset unknown", fungibleAsset);
             targetedAsset = false;
             rawTargetedAsset = false;
         }
@@ -1932,8 +2079,8 @@ module.exports = class ChainParser {
                                 let fungibleAsset = asset.concreteFungible;
                                 //let targetedAsset = false;
                                 //let amountSent = 0;
-                                if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] processConcreteFungible`)
-                                let [targetedAsset, rawTargetedAsset, amountSent] = this.processConcreteFungible(indexer, fungibleAsset)
+                                if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] processV0ConcreteFungible`)
+                                let [targetedAsset, rawTargetedAsset, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
                                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`targetedAsset=${targetedAsset}, amountSent=${amountSent}`)
                                 let aa = {
                                     asset: targetedAsset,
@@ -2060,7 +2207,7 @@ module.exports = class ChainParser {
                         let transferIndex = assetAndAmountSent.transferIndex
                         let isFeeItem = assetAndAmountSent.isFeeItem
                         if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent) && chainIDDest) {
-                            let incomplete = this.extract_xcm_incomplete(extrinsic.events);
+                            let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcms.length
                             let r = {
@@ -2149,7 +2296,7 @@ module.exports = class ChainParser {
                                 //let targetedAsset = false;
                                 //let rawTargetedAsset = false;
                                 //let amountSent = 0;
-                                let [targetedAsset, rawTargetedAsset, amountSent] = this.processConcreteFungible(indexer, fungibleAsset)
+                                let [targetedAsset, rawTargetedAsset, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
                                 let aa = {
                                     asset: targetedAsset,
                                     rawAsset: rawTargetedAsset,
@@ -2288,7 +2435,7 @@ module.exports = class ChainParser {
                         let transferIndex = assetAndAmountSent.transferIndex
                         let isFeeItem = assetAndAmountSent.isFeeItem
                         if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent) && chainIDDest) {
-                            let incomplete = this.extract_xcm_incomplete(extrinsic.events);
+                            let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcms.length
                             let r = {
