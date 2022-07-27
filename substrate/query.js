@@ -5059,7 +5059,11 @@ module.exports = class Query extends AssetManager {
 
         let dAssetChains = await this.decorateXCMAssetReferences(x.assetChains, blockTS, decorate, decorateExtra)
         x.assetChains = dAssetChains
-        x.msg = (x.msg != undefined)? JSON.parse(x.msg): null
+
+        let xcmMsg = (x.msg != undefined)? JSON.parse(x.msg): null
+        let dMsg = await this.decorateXCMMsg(xcmMsg, blockTS, decorate, decorateExtra)
+        x.msg = xcmMsg
+        x.decodeMsg = dMsg
         x.path = (x.path != undefined)? JSON.parse(x.path): []
         // add id, idDest, chainName, chainNameDest
         let [_, id] = this.convertChainID(x.chainID)
@@ -5109,14 +5113,52 @@ module.exports = class Query extends AssetManager {
       return dAssetChains
     }
 
+    async decorateXCMIntrusction(dXcmMsg, instructionK, instructionV , blockTS = 0, decorate = true, decorateExtra = true){
+      let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+      let version = dXcmMsg.version
+      switch (instructionK) {
+        case "withdrawAsset":
+          dXcmMsg[version].instructionK = instructionV
+          break;
+        case "withdrawAsset":
+          dXcmMsg[version].instructionK = instructionV
+          break;
+        case "withdrawAsset":
+          dXcmMsg[version].instructionK = instructionV
+          break;
+        case "withdrawAsset":
+          dXcmMsg[version].instructionK = instructionV
+          break;
+        default:
+          dXcmMsg[version].instructionK = instructionV
+          break;
+      }
+    }
+
     async decorateXCMMsg(xcmMsg, blockTS = 0, decorate = true, decorateExtra = true){
       let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+      let dXcmMsg = {}
       let version = Object.keys(xcmMsg)[0]
-      let dXcmMsg = xcmMsg
+      let xcmMsgV = xcmMsg[version]
+
+      dXcmMsg.version = version
+      dXcmMsg[version] = []
+
+      let xcmPath = []
+      for (let i = 0; i < xcmMsgV.length; i++){
+        let instructionK = Object.keys(xcmMsgV[i])[0]
+        xcmPath.push(instructionK)
+      }
+      console.log(`decorateXCMMsg Path`, xcmPath)
+      //"withdrawAsset", "clearOrigin","buyExecution", "depositAsset"
       if (version == 'v2' || version == 'v1'){
-
+        for (let i = 0; i < xcmPath.length; i++){
+          let instructionK = xcmPath[i]
+          let instructionV = xcmMsgV[i][instructionK]
+          await this.decorateXCMIntrusction(dXcmMsg, instructionK, instructionV , blockTS, decorate, decorateExtra)
+        }
       }else if(version == 'v0'){
-
+        //skip for now
       }
       return dXcmMsg
     }
@@ -5170,11 +5212,13 @@ module.exports = class Query extends AssetManager {
       let blockTS = (rawXcmRec.blockTS != undefined)? rawXcmRec.blockTS: 0
       let dAssetChains = await this.decorateXCMAssetReferences(rawXcmRec.assetChains, blockTS, decorate, decorateExtra)
       console.log(`dAssetChains`, JSON.stringify(dAssetChains))
-
+      let xcmMsg = (rawXcmRec.msgStr != undefined)? JSON.parse(rawXcmRec.msgStr): null
+      let dMsg = await this.decorateXCMMsg(xcmMsg, blockTS, decorate, decorateExtra)
       let dXcm = {
         msgHash: rawXcmRec.msgHash,
         msgHex: rawXcmRec.msgHex,
-        msg: (rawXcmRec.msgStr != undefined)? JSON.parse(rawXcmRec.msgStr): null,
+        msg: xcmMsg,
+        //decodeMsg: dMsg,
         extrinsicID: rawXcmRec.extrinsicID,
         extrinsicHash: rawXcmRec.extrinsicHash,
         parentMsgHash,
