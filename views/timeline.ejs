@@ -41,9 +41,13 @@ let timelineRows = uiTool.getTimelineRows(timeline);
      </td>
      <td>
      <% if ( xcm.assetChains ) { let assetChains = JSON.parse(xcm.assetChains); %>
-        <% for ( const ac of assetChains ) { %>
-          <%= ac; %><br/>
-	<% } %>
+        <% for (var i = 0; i < assetChains.length; i++) {
+          let ac = assetChains[i]
+          let acID = `msgAc${i}`
+          %>
+          <div id="<%= acID; %>" class="renderjson"></div>
+          <script>document.getElementById("<%= acID; %>").appendChild(renderjson.set_show_to_level(5)(<%- JSON.stringify(ac) %>));</script>
+	      <% } %>
      <% } %>
      </td>
     </tr>

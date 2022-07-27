@@ -5082,16 +5082,74 @@ module.exports = class Query extends AssetManager {
     (c) estimated value xcm contained within
     (d) any encoded call of transact
     (e) any nickname of beneficiary (accountID32/20);
-
     */
+    async decorateXCMAssetReference(assetChain, blockTS = 0, decorate = true, decorateExtra = true) {
+      //{"Token":"KSM"}~2
+      let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+      let decimals;
+      let symbol;
+      let rawassetChain = assetChain
+      let [targetAsset, targetChainID] = paraTool.parseAssetChain(rawassetChain)
+      if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
+          decimals = this.assetInfo[rawassetChain].decimals;
+          symbol =  this.assetInfo[rawassetChain].symbol
+      } else {
+          let [nativeAsset, _] = paraTool.parseAssetChain(rawassetChain)
+          let [nativeChainID, isFound] = await this.getNativeAssetChainID(nativeAsset)
+          if (isFound) {
+              targetChainID = nativeChainID
+              rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
+          }
+          if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
+              decimals = this.assetInfo[rawassetChain].decimals;
+              symbol =  this.assetInfo[rawassetChain].symbol
+          }else{
+            console.log(`*decimals not found assetChain=${assetChain}`)
+          }
+      }
+      let dXCMAsset = {
+        assetChain: rawassetChain,
+        asset: targetAsset,
+        chainID: targetChainID,
+        decimals: decimals,
+        symbol: symbol,
+      }
+      if (this.assetInfo[rawassetChain]){
+        if (decorateUSD) {
+            let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1, targetAsset, targetChainID, blockTS);
+            dXCMAsset.priceUSD = priceUSD
+            dXCMAsset.priceUSDCurrent = priceUSDCurrent
+        }
+      }
+      return dXCMAsset
+    }
+
     async decorateXCM(rawXcmRec, decorate = true, decorateExtra = true){
       let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
 
       let [parentMsgHash, parentSentAt] = this.parseMsgHashSentAt(rawXcmRec.parentMsgHash);
       let [childMsgHash, childSentAt] = this.parseMsgHashSentAt(rawXcmRec.childMsgHash);
+      let xcmTS = (rawXcmRec.blockTS != undefined)? rawXcmRec.blockTS: 0
+      let assetChains = []
+      if (rawXcmRec.assetChains != undefined){
+        try {
+          assetChains = JSON.parse(rawXcmRec.assetChains)
+        }catch(err){
+          console.log(`AssetChains ERR`, err.toString())
+          assetChains = []
+        }
+      }
+      //console.log(`decorateXCM assetChains`, assetChains)
+      let dAssetChains = []
+      for (const assetChain of assetChains) {
+        let dAssetChain = await this.decorateXCMAssetReference(assetChain, xcmTS, decorate, decorateExtra)
+        dAssetChains.push(dAssetChain)
+      }
+      console.log(`dAssetChains`, JSON.stringify(dAssetChains))
 
       let dXcm = {
         msgHash: rawXcmRec.msgHash,
+        msgHex: rawXcmRec.msgHex,
         msgStr: rawXcmRec.msgStr,
         extrinsicID: rawXcmRec.extrinsicID,
         extrinsicHash: rawXcmRec.extrinsicHash,
@@ -5099,7 +5157,7 @@ module.exports = class Query extends AssetManager {
         parentSentAt,
         childMsgHash,
         childSentAt,
-        assetChains: rawXcmRec.assetChains
+        assetChains: JSON.stringify(dAssetChains)
       }
       return dXcm
     }
@@ -5308,7 +5366,7 @@ module.exports = class Query extends AssetManager {
             try {
                 if (msgHashes.length > 0) {
                     let msgHashesStr = msgHashes.join(",");
-                    var sql2 = `select msgHash, msgHex, msgStr, extrinsicID, extrinsicHash, parentMsgHash, childMsgHash, assetChains from xcmmessages where ( ( msgHash in (${msgHashesStr}) and incoming = 0 ) or (extrinsicHash = '${extrinsicHash}' and incoming = 0) ) and (blockTS >= ${ts} and blockTS < ${ts+60})`
+                    var sql2 = `select msgHash, msgHex, msgStr, extrinsicID, extrinsicHash, parentMsgHash, childMsgHash, assetChains, blockTS from xcmmessages where ( ( msgHash in (${msgHashesStr}) and incoming = 0 ) or (extrinsicHash = '${extrinsicHash}' and incoming = 0) ) and (blockTS >= ${ts} and blockTS < ${ts+60})`
                     let xcmmessagesRaw = await this.poolREADONLY.query(sql2);
                     for (let i = 0; i < xcmmessagesRaw.length; i++) {
                         let rawXcmRec = xcmmessagesRaw[i];
