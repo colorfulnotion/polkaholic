@@ -90,7 +90,7 @@ let f = xcm;
     <tr>
       <td>Chain Source</td>
       <td>
-        <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a> 
+        <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
         <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.blockNumber}); %>
       </td>
     </tr>
@@ -98,7 +98,7 @@ let f = xcm;
     <tr>
       <td>Chain Dest</td>
       <td>
-        <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a> 
+        <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
         <%- include("blockNumber", {chainID: f.idDest, blockNumber: f.blockNumberDest}); %>
       </td>
     </tr>
@@ -108,18 +108,26 @@ let f = xcm;
       <td><code><%= f.path  %></code></td>
     </tr>
 
-    <% if ( f.assetChains ) { %>
+    <% if ( f.assetChains ) {
+      let assetChains = f.assetChains %>
     <tr>
       <td>Assets Mentioned In Instructions</td>
-      <td><code><%= f.assetChains %></code></td>
+      <td>
+        <% for (var i = 0; i < assetChains.length; i++) {
+          let ac = assetChains[i]
+          let acID = `msgAc${i}`
+          %>
+          <div id="<%= acID; %>" class="renderjson"></div>
+          <script>document.getElementById("<%= acID; %>").appendChild(renderjson.set_show_to_level(5)(<%- JSON.stringify(ac) %>));</script>
+        <% } %>
+      </td>
     </tr>
     <% } %>
-    
     <tr>
       <td>Instructions</td>
       <td>
         <div id="msgStr" class="renderjson"></div>
-        <script>document.getElementById("msgStr").appendChild(renderjson.set_show_to_level(10)(<%- f.msgStr %>));</script>
+        <script>document.getElementById("msgStr").appendChild(renderjson.set_show_to_level(10)(<%- JSON.stringify(f.msgStr) %>));</script>
       </td>
     </tr>
 </table>

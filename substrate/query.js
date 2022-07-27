@@ -5043,7 +5043,9 @@ module.exports = class Query extends AssetManager {
     async getXCMMessage(msgHash, sentAt = null, decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let w = (sentAt) ? ` and sentAt = ${sentAt}` : "";
-        let sql = `select msgHash, sentAt, chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, msgType, msgHex, msgStr, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, childMsgHash, assetChains from xcmmessages where msgHash = '${msgHash}' ${w} and incoming = 0 order by blockTS desc limit 1`
+        let sql = `select if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest,
+        msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, childMsgHash, assetChains, blockTS from xcmmessages
+        where msgHash = '${msgHash}' ${w} and incoming = 0 order by blockTS desc limit 1`
         let xcmrecs = await this.poolREADONLY.query(sql);
         if (xcmrecs.length == 0) {
             throw new paraTool.NotFoundError(`XCM Message not found: ${hash}`)
@@ -5053,7 +5055,11 @@ module.exports = class Query extends AssetManager {
         // parse parentMsgHash, childMsgHash out
         [x.parentMsgHash, x.parentSentAt] = this.parseMsgHashSentAt(x.parentMsgHash);
         [x.childMsgHash, x.childSentAt] = this.parseMsgHashSentAt(x.childMsgHash);
+        let blockTS = (x.blockTS != undefined)? x.blockTS: 0
 
+        let dAssetChains = await this.decorateXCMAssetReferences(x.assetChains, blockTS, decorate, decorateExtra)
+        x.assetChains = dAssetChains
+        x.msgStr = (x.msgStr != undefined)? JSON.parse(x.msgStr): null
         // add id, idDest, chainName, chainNameDest
         let [_, id] = this.convertChainID(x.chainID)
         x.chainName = this.getChainName(x.chainID);
@@ -5083,6 +5089,26 @@ module.exports = class Query extends AssetManager {
     (d) any encoded call of transact
     (e) any nickname of beneficiary (accountID32/20);
     */
+
+    async decorateXCMAssetReferences(assetChainsStr, blockTS = 0, decorate = true, decorateExtra = true) {
+      let assetChains = []
+      if (assetChainsStr != undefined){
+        try {
+          assetChains = JSON.parse(assetChainsStr)
+        }catch(err){
+          console.log(`AssetChains ERR`, err.toString())
+          assetChains = []
+        }
+      }
+      //console.log(`decorateXCM assetChains`, assetChains)
+      let dAssetChains = []
+      for (const assetChain of assetChains) {
+        let dAssetChain = await this.decorateXCMAssetReference(assetChain, blockTS, decorate, decorateExtra)
+        dAssetChains.push(dAssetChain)
+      }
+      return dAssetChains
+    }
+
     async decorateXCMAssetReference(assetChain, blockTS = 0, decorate = true, decorateExtra = true) {
       //{"Token":"KSM"}~2
       let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -5129,35 +5155,21 @@ module.exports = class Query extends AssetManager {
 
       let [parentMsgHash, parentSentAt] = this.parseMsgHashSentAt(rawXcmRec.parentMsgHash);
       let [childMsgHash, childSentAt] = this.parseMsgHashSentAt(rawXcmRec.childMsgHash);
-      let xcmTS = (rawXcmRec.blockTS != undefined)? rawXcmRec.blockTS: 0
-      let assetChains = []
-      if (rawXcmRec.assetChains != undefined){
-        try {
-          assetChains = JSON.parse(rawXcmRec.assetChains)
-        }catch(err){
-          console.log(`AssetChains ERR`, err.toString())
-          assetChains = []
-        }
-      }
-      //console.log(`decorateXCM assetChains`, assetChains)
-      let dAssetChains = []
-      for (const assetChain of assetChains) {
-        let dAssetChain = await this.decorateXCMAssetReference(assetChain, xcmTS, decorate, decorateExtra)
-        dAssetChains.push(dAssetChain)
-      }
+      let blockTS = (rawXcmRec.blockTS != undefined)? rawXcmRec.blockTS: 0
+      let dAssetChains = await this.decorateXCMAssetReferences(rawXcmRec.assetChains, blockTS, decorate, decorateExtra)
       console.log(`dAssetChains`, JSON.stringify(dAssetChains))
 
       let dXcm = {
         msgHash: rawXcmRec.msgHash,
         msgHex: rawXcmRec.msgHex,
-        msgStr: rawXcmRec.msgStr,
+        msgStr: (rawXcmRec.msgStr != undefined)? JSON.parse(rawXcmRec.msgStr): null,
         extrinsicID: rawXcmRec.extrinsicID,
         extrinsicHash: rawXcmRec.extrinsicHash,
         parentMsgHash,
         parentSentAt,
         childMsgHash,
         childSentAt,
-        assetChains: JSON.stringify(dAssetChains)
+        assetChains: dAssetChains
       }
       return dXcm
     }
