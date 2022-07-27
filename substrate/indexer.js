@@ -1393,11 +1393,11 @@ order by chainID, extrinsicHash, diffTS`
         console.log(`match_xcm ${startTS} covered ${logDT}`)
     }
 
-    // This is the key workhorse that matches xcmmessages with 
-    // match xcmmessages incoming = 0 with incoming = 1 
+    // This is the key workhorse that matches xcmmessages with
+    // match xcmmessages incoming = 0 with incoming = 1
     //   (a) msgHash + chainID + chainIDDest matching
     //   (b) time difference between blockTS matching has to be less than 120 (lookbackSeconds parameter)
-    //   (c) 
+    //   (c)
     // In case of ties, the FIRST one ( "order by diffTS" ) covers this
     async xcmmessages_match(startTS, endTS, lookbackSeconds = 120) {
         let sql = `select
@@ -1407,13 +1407,13 @@ order by chainID, extrinsicHash, diffTS`
         d.chainID = s.chainID and
         d.chainIDDest = s.chainIDDest and
         s.incoming = 0 and
-        d.incoming = 1 and 
+        d.incoming = 1 and
         s.blockTS >= ${startTS} and
         s.blockTS < ${endTS} and
         d.blockTS >= ${startTS} and
         d.blockTS < ${endTS+lookbackSeconds} and
         s.matched = 0 and
-        d.matched = 0 
+        d.matched = 0
 having (diffTS >= 0 and diffTS < ${lookbackSeconds}) or (diffSentAt >= 0 and diffSentAt <= 4)
 order by msgHash, diffSentAt, diffTS`
         //console.log("xcmmessages_match", sql)
@@ -1421,7 +1421,7 @@ order by msgHash, diffSentAt, diffTS`
             let xcmmatches = await this.poolREADONLY.query(sql);
             let matched = {}
             if (xcmmatches.length > 0) {
-                console.log("[Found] xcmmessages_match ${xcmmatches.length}", sql)
+                console.log(`[Found] xcmmessages_match ${xcmmatches.length}`, sql)
             } else {
                 //enable this for debugging
                 //console.log("[Empty] match_xcm", sql)

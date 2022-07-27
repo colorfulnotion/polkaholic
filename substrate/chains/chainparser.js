@@ -2731,6 +2731,7 @@ module.exports = class ChainParser {
     decorateAutoTraceValidationData(indexer, o = false) {
         //NOTE: duplicate dmp is NOT removed here
         let decoratedVal = o.pv
+        //console.log(`decorateAutoTraceValidationData`, o)
         try {
             let v = JSON.parse(decoratedVal)
             if (this.debugLevel >= paraTool.debugTracing) console.log(`decorateAutoTraceValidationData`, v) //TODO: we can find  the parent's state root here at relayParentStorageRoot
@@ -2738,7 +2739,7 @@ module.exports = class ChainParser {
             this.parserWatermark = hrmpWatermark
             if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark: ${hrmpWatermark}`)
         } catch (err) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceValidationDats error`, err.toString())
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceValidationData error`, err.toString())
         }
     }
 
@@ -2749,7 +2750,7 @@ module.exports = class ChainParser {
         let pallet_section = `${o.p}:${o.s}`
         let pv = o.pv
         if (pallet_section == 'ParachainSystem:HrmpOutboundMessages' || pallet_section == 'Dmp:DownwardMessageQueues' || pallet_section == 'ParachainSystem:UpwardMessages' || pallet_section == 'ParachainSystem:ValidationData') {
-            if (pv != '[]') {
+            if (pv != '[]' && pv != undefined) {
                 //console.log(`decorateAutoTraceXCM found`, `${pallet_section}`, o)
                 //do something
                 switch (pallet_section) {
@@ -2763,7 +2764,7 @@ module.exports = class ChainParser {
                         this.decorateAutoTraceDmp(indexer, o);
                         break;
                     case 'ParachainSystem:ValidationData':
-                        this.decorateAutoTraceValidationData(indexer, o);
+                        if (o.v != undefined && o.v != '0x00') this.decorateAutoTraceValidationData(indexer, o);
                         break;
                     default:
                         break;
