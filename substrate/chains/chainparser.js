@@ -1443,7 +1443,7 @@ module.exports = class ChainParser {
                 // 0xc003ebdaaa4ef4d8ed2d89ca419cf79cefc883859ab9d74349d882dacf6bb811
                 // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                 if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                    let [targetedAsset, rawTargetedAsset] = this.processConcreteCurrency(indexer, asset)
+                    let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
                     let aa = {
                         asset: targetedAsset,
                         rawAsset: rawTargetedAsset,
@@ -1650,7 +1650,7 @@ module.exports = class ChainParser {
                             // 0xc003ebdaaa4ef4d8ed2d89ca419cf79cefc883859ab9d74349d882dacf6bb811
                             // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                                let [targetedAsset, rawTargetedAsset] = this.processConcreteCurrency(indexer, asset)
+                                let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
                                 let aa = {
                                     asset: targetedAsset,
                                     rawAsset: rawTargetedAsset,
@@ -1752,7 +1752,8 @@ module.exports = class ChainParser {
         return incomplete;
     }
 
-    processConcreteCurrency(indexer, fungibleAsset) {
+    //This is the V1 format
+    processV1ConcreteFungible(indexer, fungibleAsset) {
         //v1
         // only parse the currency_id here
         /*
@@ -1820,7 +1821,7 @@ module.exports = class ChainParser {
         let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
         let targetedAsset = false;
         let rawTargetedAsset = false;
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`processConcreteCurrency asset`, fungibleAsset)
+        if (this.debugLevel >= paraTool.debugVerbose) console.log(`processV1ConcreteFungible asset`, fungibleAsset)
         if (fungibleAsset.id != undefined && fungibleAsset.id.null !== undefined) {
             targetedAsset = indexer.getNativeAsset()
             rawTargetedAsset = indexer.getNativeAsset()
@@ -1836,12 +1837,12 @@ module.exports = class ChainParser {
                         //normal case?
                         targetedAsset = indexer.getNativeAsset()
                         rawTargetedAsset = indexer.getNativeAsset()
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processConcreteCurrency targetedAsset parents:0, here`, targetedAsset)
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:0, here`, targetedAsset)
                     } else if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 1) {
                         //ump
                         targetedAsset = indexer.getRelayChainAsset()
                         rawTargetedAsset = indexer.getRelayChainAsset()
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processConcreteCurrency targetedAsset parents:1, here`, targetedAsset)
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:1, here`, targetedAsset)
                     }
                     //} else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
                 } else {
@@ -1870,7 +1871,7 @@ module.exports = class ChainParser {
                             }
                             //new_v1_id_concrete_interiorVal.concat(v1_id_concrete_interiorVal)
                         } else {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
+                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
                         }
                         v1_id_concrete_interiorVal = new_v1_id_concrete_interiorVal
                     }
@@ -1892,17 +1893,17 @@ module.exports = class ChainParser {
                             })
                         }
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
                         targetedAsset = interiorVStr
                         rawTargetedAsset = interiorVStr
                     }
                 }
 
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency unknown v1.id.concrete unknown!`, JSON.stringify(v1_id_concrete, null, 2))
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible unknown v1.id.concrete unknown!`, JSON.stringify(v1_id_concrete, null, 2))
             }
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processConcreteCurrency fungibleAsset unknown id not found?`, fungibleAsset)
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible fungibleAsset unknown id not found?`, fungibleAsset)
         }
         return [targetedAsset, rawTargetedAsset]
     }
@@ -2103,7 +2104,7 @@ module.exports = class ChainParser {
                             // 0x2374aae493ae96e44954bcb4f242a049f2578d490bc382eae113fd5893dfd297
                             // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                                let [targetedAsset, rawTargetedAsset] = this.processConcreteCurrency(indexer, asset)
+                                let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
                                 let aa = {
                                     asset: targetedAsset,
                                     rawAsset: rawTargetedAsset,
@@ -2337,7 +2338,7 @@ module.exports = class ChainParser {
                             "fee_asset_item": 0
                             */
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                                let [targetedAsset, rawTargetedAsset] = this.processConcreteCurrency(indexer, asset)
+                                let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
                                 let aa = {
                                     asset: targetedAsset,
                                     rawAsset: rawTargetedAsset,
