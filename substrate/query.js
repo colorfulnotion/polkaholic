@@ -5061,9 +5061,13 @@ module.exports = class Query extends AssetManager {
         x.assetChains = dAssetChains
 
         let xcmMsg = (x.msg != undefined)? JSON.parse(x.msg): null
-        let dMsg = await this.decorateXCMMsg(xcmMsg, blockTS, decorate, decorateExtra)
         x.msg = xcmMsg
-        x.decodeMsg = dMsg
+        if (xcmMsg != undefined){
+          let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
+          let dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
+          x.decodeMsg = dMsg
+        }
+
         x.path = (x.path != undefined)? JSON.parse(x.path): []
         // add id, idDest, chainName, chainNameDest
         let [_, id] = this.convertChainID(x.chainID)
@@ -5113,29 +5117,74 @@ module.exports = class Query extends AssetManager {
       return dAssetChains
     }
 
-    async decorateXCMIntrusction(dXcmMsg, instructionK, instructionV , blockTS = 0, decorate = true, decorateExtra = true){
+    decorateFungible(fun, xcmAssetInfo){
+      if (fun != undefined && fun.fungible != undefined){
+          let assetFun = fun
+          let fungible = assetFun.fungible
+          let decimals = xcmAssetInfo.decimals
+          let fungibleAmount = fungible / 10**decimals
+          let dassetFun = {
+            symbol: xcmAssetInfo.symbol,
+            decimals: decimals,
+            fungible: fungible,
+            fungibleAmount: fungibleAmount,
+            fungibleUSD: fungibleAmount*xcmAssetInfo.priceUSD,
+            fungibleUSDCurrent: fungibleAmount*xcmAssetInfo.priceUSDCurrent,
+          }
+          console.log(`decorateFungible ->`,fun)
+          return dassetFun
+      }else{
+        // can't decorate
+        return fun
+      }
+    }
+
+    async decorateXCMIntrusction(dXcmMsg, instructionK, instructionV , blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true){
       let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
       let version = dXcmMsg.version
+      let dInstructionV = {}
       switch (instructionK) {
         case "withdrawAsset":
-          dXcmMsg[version].instructionK = instructionV
+        case "reserveAssetDeposited":
+          for (let i = 0; i < instructionV.length; i++){
+              if (dAssetChains.length >= i+1 && instructionV[i] != undefined && instructionV[i].fun != undefined){
+                  let xcmAssetInfo = dAssetChains[i] // "inferenced"
+                  instructionV[i].fun = this.decorateFungible(instructionV[i].fun, xcmAssetInfo)
+                  console.log(`++ instructionV[${i}]`, instructionV[i])
+              }else{
+                  continue // cannot decorate without going through the messy lookup again..
+              }
+          }
+          dInstructionV[instructionK] = instructionV
+          dXcmMsg[version].push(dInstructionV)
           break;
-        case "withdrawAsset":
-          dXcmMsg[version].instructionK = instructionV
+        case "clearOrigin":
+          dInstructionV[instructionK] = instructionV
+          dXcmMsg[version].push(dInstructionV)
           break;
-        case "withdrawAsset":
-          dXcmMsg[version].instructionK = instructionV
+        case "buyExecution":
+          if (instructionV.fees != undefined && instructionV.fees.fun!= undefined){
+              if (dAssetChains.length != 0){
+                let xcmAssetInfo = dAssetChains[0] // "inferenced"
+                instructionV.fees.fun = this.decorateFungible(instructionV.fees.fun, xcmAssetInfo)
+              }
+          }
+          dInstructionV[instructionK] = instructionV
+          dXcmMsg[version].push(dInstructionV)
           break;
-        case "withdrawAsset":
-          dXcmMsg[version].instructionK = instructionV
+        case "depositAsset":
+          //TODO: need to decorate addr
+          dInstructionV[instructionK] = instructionV
+          dXcmMsg[version].push(dInstructionV)
           break;
         default:
-          dXcmMsg[version].instructionK = instructionV
+          dInstructionV[instructionK] = instructionV
+          dXcmMsg[version].push(dInstructionV)
           break;
       }
     }
 
-    async decorateXCMMsg(xcmMsg, blockTS = 0, decorate = true, decorateExtra = true){
+    async decorateXCMMsg(xcmMsg, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true){
       let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
       let dXcmMsg = {}
       let version = Object.keys(xcmMsg)[0]
@@ -5155,7 +5204,8 @@ module.exports = class Query extends AssetManager {
         for (let i = 0; i < xcmPath.length; i++){
           let instructionK = xcmPath[i]
           let instructionV = xcmMsgV[i][instructionK]
-          await this.decorateXCMIntrusction(dXcmMsg, instructionK, instructionV , blockTS, decorate, decorateExtra)
+          console.log(`instructionK=${instructionK}, instructionV`, instructionV)
+          await this.decorateXCMIntrusction(dXcmMsg, instructionK, instructionV , blockTS, dAssetChains, decorate, decorateExtra)
         }
       }else if(version == 'v0'){
         //skip for now
@@ -5213,7 +5263,11 @@ module.exports = class Query extends AssetManager {
       let dAssetChains = await this.decorateXCMAssetReferences(rawXcmRec.assetChains, blockTS, decorate, decorateExtra)
       console.log(`dAssetChains`, JSON.stringify(dAssetChains))
       let xcmMsg = (rawXcmRec.msgStr != undefined)? JSON.parse(rawXcmRec.msgStr): null
-      let dMsg = await this.decorateXCMMsg(xcmMsg, blockTS, decorate, decorateExtra)
+      let dMsg;
+      if (xcmMsg != undefined){
+        let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
+        dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
+      }
       let dXcm = {
         msgHash: rawXcmRec.msgHash,
         msgHex: rawXcmRec.msgHex,
