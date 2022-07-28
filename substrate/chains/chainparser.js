@@ -2299,7 +2299,7 @@ module.exports = class ChainParser {
                     let assets = a.assets;
                     let feeAssetIndex = a.fee_asset_item
                     if (assets.v0 !== undefined && Array.isArray(assets.v0) && assets.v0.length > 0) {
-                        console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} v0 case`, JSON.stringify(a, null, 2))
+                        if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} v0 case`, JSON.stringify(a, null, 2))
                         let assetsv0 = assets.v0
                         let transferIndex = 0
                         for (const asset of assetsv0) {
