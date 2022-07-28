@@ -1421,7 +1421,7 @@ order by msgHash, diffSentAt, diffTS`
             let xcmmatches = await this.poolREADONLY.query(sql);
             let matched = {}
             if (xcmmatches.length > 0) {
-                console.log("[Found] xcmmessages_match ${xcmmatches.length}", sql)
+                console.log(`[Found] xcmmessages_match ${xcmmatches.length}`, sql)
             } else {
                 //enable this for debugging
                 //console.log("[Empty] match_xcm", sql)

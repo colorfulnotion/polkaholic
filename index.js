@@ -1168,7 +1168,7 @@ app.get('/xcmmessage/:msgHash/:sentAt?', async (req, res) => {
         let msgHash = req.params['msgHash'];
         let sentAt = req.params['sentAt'];
         let [decorate, decorateExtra] = decorateOptUI(req)
-        let xcm = await query.getXCMMessage(msgHash, sentAt);
+        let xcm = await query.getXCMMessage(msgHash, sentAt, decorate, decorateExtra);
         if (xcm) {
             res.render('xcmmessage', {
                 msgHash: msgHash,
@@ -1203,7 +1203,8 @@ app.get('/timeline/:hash/:hashType?/:sentAt?', async (req, res) => {
         let hash = req.params['hash'];
         let hashType = req.params['hashType'] ? req.params['hashType'] : "extrinsic";
         let sentAt = (req.params['sentAt'] && hashType == "xcm") ? req.params['sentAt'] : null;
-        let [timeline, xcmmessages] = await query.getXCMTimeline(hash, hashType, sentAt)
+        let [decorate, decorateExtra] = decorateOptUI(req)
+        let [timeline, xcmmessages] = await query.getXCMTimeline(hash, hashType, sentAt, decorate, decorateExtra)
 
         res.render('timeline', {
             timeline: timeline,
