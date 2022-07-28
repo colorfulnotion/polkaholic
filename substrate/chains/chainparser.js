@@ -18,9 +18,16 @@ module.exports = class ChainParser {
     }
 
     // set parser unix timestamp to record "realtime" cells in btAddress, btAsset properly
-    setParserContext(ts, blockNumber, blockHash) {
+    setParserContext(ts, blockNumber, blockHash, chainID) {
         this.parserTS = ts;
         this.parserBlockNumber = blockNumber;
+        if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
+          //for relaychain, blockNumber is the watermark
+          this.parserWatermark = blockNumber
+        }else{
+          // remove watermark
+          if (this.parserWatermark != blockNumber) this.parserWatermark = 0
+        }
         this.parserBlockHash = blockHash;
         this.umpReceived = false;
         this.umpReceivedFromParaID = {};
@@ -829,6 +836,14 @@ module.exports = class ChainParser {
         try {
             if (extrinsic.params != undefined && extrinsic.params.data != undefined) {
                 let data = extrinsic.params.data
+                try {
+                  let hrmpWatermark = data.validationData.relayParentNumber
+                  this.parserWatermark = hrmpWatermark
+                  if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark}`)
+                } catch (err1){
+                  console.log(`unable to find watermarkBN`, err1.toString())
+                }
+
                 let downwardMessages = data.downwardMessages // this is from relaychain
                 let relayChain = indexer.relayChain
                 let relayChainID = (relayChain == 'polkadot') ? 0 : 2
@@ -1492,6 +1507,7 @@ module.exports = class ChainParser {
                     incomplete: incomplete,
                     isFeeItem: isFeeItem,
                     msgHash: '0x',
+                    sentAt: this.parserWatermark,
                 }
                 //console.log("processOutgoingXTokens xTokens", r);
                 console.log(`processOutgoingXTokensEvent`, r)
@@ -1703,6 +1719,7 @@ module.exports = class ChainParser {
                             incomplete: incomplete,
                             isFeeItem: isFeeItem,
                             msgHash: '0x',
+                            sentAt: this.parserWatermark,
                         }
                         //console.log("processOutgoingXTokens xTokens", r);
                         outgoingXTokens.push(r)
@@ -2231,6 +2248,7 @@ module.exports = class ChainParser {
                                 incomplete: incomplete,
                                 isFeeItem: isFeeItem,
                                 msgHash: '0x',
+                                sentAt: this.parserWatermark,
                             }
                             if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingXcmPallet xcmPallet", r);
                             outgoingXcmPallet.push(r)
@@ -2459,6 +2477,7 @@ module.exports = class ChainParser {
                                 incomplete: incomplete,
                                 isFeeItem: isFeeItem,
                                 msgHash: '0x',
+                                sentAt: this.parserWatermark,
                             }
                             //if (this.debugLevel >= paraTool.debugVerbose) console.log("processOutgoingXcmPallet xcmPallet", r);
                             extrinsic.xcms.push(r)
