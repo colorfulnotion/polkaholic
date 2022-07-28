@@ -1050,7 +1050,7 @@ module.exports = class Indexer extends AssetManager {
             for (let i = 0; i < xcmtransferKeys.length; i++) {
                 let r = this.xcmtransfer[xcmtransferKeys[i]];
                 let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`, `'${r.chainID}'`, `'${r.chainIDDest}'`,
-                    `'${r.blockNumber}'`, `'${r.fromAddress}'`, `'${r.asset}'`, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.rawAsset}', '${r.msgHash}'`
+                    `'${r.blockNumber}'`, `'${r.fromAddress}'`, `'${r.asset}'`, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.rawAsset}', '${r.msgHash}', '${r.sentAt}'`
                 ].join(",") + ")";
                 if (r.asset !== undefined && this.validAsset(r.asset, r.chainID, "xcmtransfer", t)) {
                     xcmtransfers.push(t);
@@ -1063,9 +1063,9 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash", "sentAt"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash"]
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash", "sentAt"]
             });
         }
 
@@ -1393,11 +1393,11 @@ order by chainID, extrinsicHash, diffTS`
         console.log(`match_xcm ${startTS} covered ${logDT}`)
     }
 
-    // This is the key workhorse that matches xcmmessages with 
-    // match xcmmessages incoming = 0 with incoming = 1 
+    // This is the key workhorse that matches xcmmessages with
+    // match xcmmessages incoming = 0 with incoming = 1
     //   (a) msgHash + chainID + chainIDDest matching
     //   (b) time difference between blockTS matching has to be less than 120 (lookbackSeconds parameter)
-    //   (c) 
+    //   (c)
     // In case of ties, the FIRST one ( "order by diffTS" ) covers this
     async xcmmessages_match(startTS, endTS, lookbackSeconds = 120) {
         let sql = `select
@@ -1407,13 +1407,13 @@ order by chainID, extrinsicHash, diffTS`
         d.chainID = s.chainID and
         d.chainIDDest = s.chainIDDest and
         s.incoming = 0 and
-        d.incoming = 1 and 
+        d.incoming = 1 and
         s.blockTS >= ${startTS} and
         s.blockTS < ${endTS} and
         d.blockTS >= ${startTS} and
         d.blockTS < ${endTS+lookbackSeconds} and
         s.matched = 0 and
-        d.matched = 0 
+        d.matched = 0
 having (diffTS >= 0 and diffTS < ${lookbackSeconds}) or (diffSentAt >= 0 and diffSentAt <= 4)
 order by msgHash, diffSentAt, diffTS`
         //console.log("xcmmessages_match", sql)
@@ -5150,7 +5150,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let recentXcmMsgs = []; //new xcm here
 
         // setParserContext
-        this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash);
+        this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash, chainID);
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
         block.finalized = finalized;
 
@@ -5796,9 +5796,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return (true);
     }
 
-    async processTraceAsAuto(blockTS, blockNumber, blockHash, trace, traceType, api) {
+    async processTraceAsAuto(blockTS, blockNumber, blockHash, chainID, trace, traceType, api) {
         // setParserContext
-        this.chainParser.setParserContext(blockTS, blockNumber, blockHash)
+        this.chainParser.setParserContext(blockTS, blockNumber, blockHash, chainID)
         let rawTraces = [];
         if (!trace) return;
         if (!Array.isArray(trace)) {
@@ -5826,10 +5826,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
       pv: '101052848337458791'
     }
     */
-    async processTraceFromAuto(blockTS, blockNumber, blockHash, autoTraces, traceType, api) {
+    async processTraceFromAuto(blockTS, blockNumber, blockHash, chainID, autoTraces, traceType, api) {
 
         // setParserContext
-        this.chainParser.setParserContext(blockTS, blockNumber, blockHash)
+        this.chainParser.setParserContext(blockTS, blockNumber, blockHash, chainID)
 
         let dedupEvents = {};
         if (!autoTraces) return;
@@ -6027,12 +6027,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             } else {
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, r.trace, traceType, api);
+                autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
                 for (const t of autoTraces) {
                     if (this.debugLevel >= paraTool.debugTracing) console.log(`[autoTraces ${t.traceID}]`, t)
                     //TODO: write this to chain table
                 }
-                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, autoTraces, traceType, api); // TODO: use result from rawtrace to decorate
+                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // TODO: use result from rawtrace to decorate
                 //await this.processTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api);
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
                 //console.log(`index_chain_block_row: processTrace`, processTraceTS);
