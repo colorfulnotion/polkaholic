@@ -16,16 +16,19 @@
 <%
 let timelineRows = uiTool.getTimelineRows(timeline);
 %>
-<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-<div id="timeline" style="height: 180px;"></div>
 <div id="xcmmessagesmap">
- <h6>XCM Instructions</h6>
+ <h6>XCM Messages with Instructions</h6>
  <table  class="table table-striped table-hover">
     <tr><th>Msg Hash</th><th>XCM Instructions</th><th>Assets</th></tr>
    <% for (let k = 0; k < xcmmessages.length; k++) {
     let xcm = xcmmessages[k];  %>
     <tr>
-     <td><a href='/xcmmessage/<%= xcm.msgHash; %>'><%- uiTool.getShortHash(xcm.msgHash, false); %></a>
+     <td><a href='/xcmmessage/<%= xcm.msgHash; %>'><%- uiTool.getShortHash(xcm.msgHash, false); %></a><br>
+     <B>From:</B> <%= xcm.id %><br/>
+     <B>To:</B> <%= xcm.idDest %> (<a href='/block/<%= xcm.idDest %>/<%= xcm.blockNumber %>'><%= xcm.blockNumber %></a>)<br/>
+     <B>Relay Chain:</B> <%= xcm.relayChain; %><br/>
+     <B>MessageType:</B> <%= xcm.msgType %><br/>
+     <B>Time:</B> <%= uiTool.presentTS(xcm.blockTS) %> <br/>
 
      <% if ( xcm.parentMsgHash ) { %>
        <br> <B>Parent</B>: <br> <a href='/timeline/<%= xcm.parentMsgHash %>/xcm/<%= xcm.parentSentAt %>'><%- uiTool.getShortHash(xcm.parentMsgHash, false); %></a> sentAt: <%= xcm.parentSentAt %>
@@ -55,6 +58,11 @@ let timelineRows = uiTool.getTimelineRows(timeline);
    <% } %>
   </table>
 </div>
+
+<h6>Visualization</h6>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<div id="timeline" style="height: 180px;"></div>
+<div><i>Select any block in the timeline above to see events, traces and extrinsics in the table below:</i></div>
 
 <table id="tableobjects" class="display" style='width: 100%'>
   <thead>
