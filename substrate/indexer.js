@@ -62,7 +62,9 @@ module.exports = class Indexer extends AssetManager {
     specVersion = -1;
     xcmeventsMap = {};
     xcmmsgMap = {};
-    xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove trailing
+    xcmmsgSentAtUnknownMap = {};
+    xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove
+
     recentXcmMsgs = []; //will flush from here.
     // bqlog
     extrinsicsfn = false;
@@ -1101,22 +1103,40 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    //the new one for now..
-    updateXCMMsg(xcmMsg) {
+    fixOutgoingUnknownSentAt(sentAt){
+      let xcmKeys = Object.keys(this.xcmmsgSentAtUnknownMap)
+      for (const xcmKey of xcmKeys){
+        let xcmMsg = this.xcmmsgSentAtUnknownMap[xcmKey]
+        xcmMsg.sentAt = sentAt
+        this.updateXCMMsg(xcmMsg, true)
+      }
+      this.xcmmsgSentAtUnknownMap = {}
+    }
+
+    //this is the xcmmessages table
+    updateXCMMsg(xcmMsg, overwrite = false) {
         let direction = (xcmMsg.isIncoming) ? 'i' : 'o'
-        let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
-        if (this.xcmTrailingKeyMap[xcmKey] == undefined) {
-            this.xcmTrailingKeyMap[xcmKey] = {
-                blockNumber: xcmMsg.blockNumber,
-                msgHex: xcmMsg.msgHex,
-                msgHash: xcmMsg.msgHash,
-                isFresh: true,
-            }
-            this.xcmmsgMap[xcmKey] = xcmMsg
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
-        } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
+        if (direction == 'o' && xcmMsg.msgType != 'dmp' && !overwrite){
+          //sentAt is technically unknown for ..
+          let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${direction}`
+          console.log(`updateXCMMsg [${xcmKey}] sentAt unknown`)
+          this.xcmmsgSentAtUnknownMap[xcmKey] = xcmMsg
+        }else{
+          let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
+          if (overwrite) console.log(`updateXCMMsg sentAt=${xcmMsg.sentAt}, ${xcmKey}`)
+          if (this.xcmTrailingKeyMap[xcmKey] == undefined) {
+              this.xcmTrailingKeyMap[xcmKey] = {
+                  blockNumber: xcmMsg.blockNumber,
+                  msgHex: xcmMsg.msgHex,
+                  msgHash: xcmMsg.msgHash,
+                  isFresh: true,
+              }
+              this.xcmmsgMap[xcmKey] = xcmMsg
+              if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
+              if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
+          } else {
+              if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
+          }
         }
     }
 

@@ -348,7 +348,7 @@ module.exports = class ChainParser {
                         msgHash: msgHash,
                         msgHex: data,
                         msgStr: JSON.stringify(dmpMsg),
-                        sentAt: dmp.sentAt,
+                        sentAt: dmp.sentAt, //dmp is guranteed to be correct
                         chainID: indexer.chainID,
                         chainIDDest: chainIDDest,
                         relayChain: relayChain,
@@ -410,7 +410,8 @@ module.exports = class ChainParser {
                         msgHash: msgHash,
                         msgHex: data,
                         msgStr: JSON.stringify(umpMsg),
-                        sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                        //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                        sentAt: 0,
                         chainID: indexer.chainID,
                         chainIDDest: (relayChain == 'polkadot') ? 0 : 2,
                         relayChain: relayChain,
@@ -469,7 +470,8 @@ module.exports = class ChainParser {
                         msgHash: msgHash,
                         msgHex: data,
                         msgStr: JSON.stringify(hrmpMsg),
-                        sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                        //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                        sentAt: 0,
                         chainID: indexer.chainID,
                         chainIDDest: hrmp.recipient + paraIDExtra,
                         relayChain: relayChain,
@@ -840,6 +842,8 @@ module.exports = class ChainParser {
                   let hrmpWatermark = data.validationData.relayParentNumber
                   this.parserWatermark = hrmpWatermark
                   if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark}`)
+                  //TODO: update all outgoing trace msg with this hrmp
+                  indexer.fixOutgoingUnknownSentAt(hrmpWatermark);
                 } catch (err1){
                   console.log(`unable to find watermarkBN`, err1.toString())
                 }
