@@ -16,6 +16,7 @@ async function main() {
     do {
         let currentTS = crawler.currentTS();
         await crawler.xcmmessagesMatch(currentTS - 86400 * lookbackDays, currentTS);
+	await crawler.sleep(5000);
     } while (true);
 }
 

@@ -22,11 +22,11 @@ module.exports = class ChainParser {
         this.parserTS = ts;
         this.parserBlockNumber = blockNumber;
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
-          //for relaychain, blockNumber is the watermark
-          this.parserWatermark = blockNumber
-        }else{
-          // remove watermark
-          if (this.parserWatermark != blockNumber) this.parserWatermark = 0
+            //for relaychain, blockNumber is the watermark
+            this.parserWatermark = blockNumber
+        } else {
+            // remove watermark
+            if (this.parserWatermark != blockNumber) this.parserWatermark = 0
         }
         this.parserBlockHash = blockHash;
         this.umpReceived = false;
@@ -839,13 +839,13 @@ module.exports = class ChainParser {
             if (extrinsic.params != undefined && extrinsic.params.data != undefined) {
                 let data = extrinsic.params.data
                 try {
-                  let hrmpWatermark = data.validationData.relayParentNumber
-                  this.parserWatermark = hrmpWatermark
-                  if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark}`)
-                  //TODO: update all outgoing trace msg with this hrmp
-                  indexer.fixOutgoingUnknownSentAt(hrmpWatermark);
-                } catch (err1){
-                  console.log(`unable to find watermarkBN`, err1.toString())
+                    let hrmpWatermark = data.validationData.relayParentNumber
+                    this.parserWatermark = hrmpWatermark
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark}`)
+                    //TODO: update all outgoing trace msg with this hrmp
+                    indexer.fixOutgoingUnknownSentAt(hrmpWatermark);
+                } catch (err1) {
+                    console.log(`unable to find watermarkBN`, err1.toString())
                 }
 
                 let downwardMessages = data.downwardMessages // this is from relaychain
