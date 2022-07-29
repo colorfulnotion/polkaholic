@@ -5158,6 +5158,57 @@ module.exports = class Query extends AssetManager {
         }
     }
 
+    async decorateInternalXCMIntrusction(dXcmMsg, internalXCM, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
+        this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        let dInstructionV = {}
+        switch (instructionK) {
+            case "withdrawAsset":
+            case "reserveAssetDeposited":
+                for (let i = 0; i < instructionV.length; i++) {
+                    if (dAssetChains.length >= i + 1 && instructionV[i] != undefined && instructionV[i].fun != undefined) {
+                        let xcmAssetInfo = dAssetChains[i] // "inferenced"
+                        instructionV[i].fun = this.decorateFungible(instructionV[i].fun, xcmAssetInfo)
+                        console.log(`++ instructionV[${i}]`, instructionV[i])
+                    } else {
+                        continue // cannot decorate without going through the messy lookup again..
+                    }
+                }
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
+            case "clearOrigin":
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
+            case "buyExecution":
+                if (instructionV.fees != undefined && instructionV.fees.fun != undefined) {
+                    if (dAssetChains.length != 0) {
+                        let xcmAssetInfo = dAssetChains[0] // "inferenced"
+                        instructionV.fees.fun = this.decorateFungible(instructionV.fees.fun, xcmAssetInfo)
+                    }
+                }
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
+            case "depositAsset":
+                //TODO: need to decorate addr
+                if (instructionV.beneficiary != undefined) {
+                    let destAddress = this.chainParser.processBeneficiary(this, instructionV.beneficiary, 'polkadot', true)
+                    if (destAddress){
+                        dXcmMsg.destAddress = destAddress
+                    }
+                }
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
+            default:
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
+        }
+    }
+
     async decorateXCMIntrusction(dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
         this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -5200,6 +5251,19 @@ module.exports = class Query extends AssetManager {
                         dXcmMsg.destAddress = destAddress
                     }
                 }
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version].push(dInstructionV)
+                break;
+            case "depositReserveAsset":
+                if (Array.isArray(instructionV.xcm)){
+                    for (let i = 0; i < instructionV.xcm.length; i++){
+                      let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
+                      let instructionXCMV = instructionV.xcm[i][instructionXCMK]
+                      console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                      await this.decorateInternalXCMIntrusction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
+                    }
+                }
+                console.log(`depositReserveAsset final`, JSON.stringify(instructionV,null,4))
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version].push(dInstructionV)
                 break;
