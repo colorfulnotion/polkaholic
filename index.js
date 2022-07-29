@@ -1195,9 +1195,8 @@ app.get('/xcmmessage/:msgHash/:sentAt?', async (req, res) => {
 })
 
 // Sample cases:
-// /timeline/0xb5a24bc52710c0f142b1911ec6313385cb8fd3ce78fe5d36b538311158cd8da4
-// /timeline/0xfae361c0d6716a1e03ea45496d492130e78d24936855ded6e9a2ccc04aabedbb
-// /timeline/0x77a4af790a693be027fdc1cfd671a3bd63941f8abfe0343491c0d50cb7a8171f
+// /timeline/0x00068acbbecec355f0c495389a29d7829f265553e258ad44d37bd52130bc44be
+// /timeline/0x5f69a283785972097f08e568a4bc61d94912e973ba418dfd32d868339ed03c7a/xcm/10121074
 app.get('/timeline/:hash/:hashType?/:sentAt?', async (req, res) => {
     try {
         let hash = req.params['hash'];
