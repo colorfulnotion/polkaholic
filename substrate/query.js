@@ -5084,13 +5084,15 @@ module.exports = class Query extends AssetManager {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
             let dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
             x.decodeMsg = dMsg
+            if (dMsg.destAddress != undefined) x.destAddress = dMsg.destAddress
         }
-
+        if (decorate) this.decorateAddress(x, "destAddress", decorateAddr, decorateRelated);
         x.path = (x.path != undefined) ? JSON.parse(x.path) : []
         // add id, idDest, chainName, chainNameDest
         let [_, id] = this.convertChainID(x.chainID)
         x.chainName = this.getChainName(x.chainID);
         let [__, idDest] = this.convertChainID(x.chainIDDest)
+
         x.id = id
         x.idDest = idDest
         x.chainDestName = this.getChainName(x.chainIDDest);
@@ -5193,7 +5195,10 @@ module.exports = class Query extends AssetManager {
             case "depositAsset":
                 //TODO: need to decorate addr
                 if (instructionV.beneficiary != undefined) {
-                    this.chainParser.processBeneficiary(this, instructionV.beneficiary, 'polkadot', true)
+                    let destAddress = this.chainParser.processBeneficiary(this, instructionV.beneficiary, 'polkadot', true)
+                    if (destAddress){
+                        dXcmMsg.destAddress = destAddress
+                    }
                 }
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version].push(dInstructionV)
@@ -5303,6 +5308,7 @@ module.exports = class Query extends AssetManager {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
             dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
         }
+        let destAddress = (dMsg.destAddress != undefined)? dMsg.destAddress: null
         let [_, id] = this.convertChainID(rawXcmRec.chainID);
         let [__, idDest] = this.convertChainID(rawXcmRec.chainIDDest);
         let dXcm = {
@@ -5310,6 +5316,7 @@ module.exports = class Query extends AssetManager {
             msgHex: rawXcmRec.msgHex,
             msg: xcmMsg,
             msgType: rawXcmRec.msgType,
+            destAddress: destAddress,
             received: rawXcmRec.received,
             relayChain: rawXcmRec.relayChain,
             paraID: rawXcmRec.paraID,
@@ -5327,7 +5334,7 @@ module.exports = class Query extends AssetManager {
             childSentAt,
             assetChains: dAssetChains
         }
-
+        if (decorate) this.decorateAddress(dXcm, "destAddress", decorateAddr, decorateRelated);
         return dXcm
     }
 
