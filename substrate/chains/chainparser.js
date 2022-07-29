@@ -348,7 +348,7 @@ module.exports = class ChainParser {
                         msgHash: msgHash,
                         msgHex: data,
                         msgStr: JSON.stringify(dmpMsg),
-                        sentAt: dmp.sentAt,
+                        sentAt: dmp.sentAt, //dmp is guranteed to be correct
                         chainID: indexer.chainID,
                         chainIDDest: chainIDDest,
                         relayChain: relayChain,
@@ -410,7 +410,8 @@ module.exports = class ChainParser {
                         msgHash: msgHash,
                         msgHex: data,
                         msgStr: JSON.stringify(umpMsg),
-                        sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                        //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                        sentAt: 0,
                         chainID: indexer.chainID,
                         chainIDDest: (relayChain == 'polkadot') ? 0 : 2,
                         relayChain: relayChain,
@@ -469,7 +470,8 @@ module.exports = class ChainParser {
                         msgHash: msgHash,
                         msgHex: data,
                         msgStr: JSON.stringify(hrmpMsg),
-                        sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                        //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                        sentAt: 0,
                         chainID: indexer.chainID,
                         chainIDDest: hrmp.recipient + paraIDExtra,
                         relayChain: relayChain,
@@ -840,6 +842,8 @@ module.exports = class ChainParser {
                     let hrmpWatermark = data.validationData.relayParentNumber
                     this.parserWatermark = hrmpWatermark
                     if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark}`)
+                    //update all outgoing trace msg with this hrmp
+                    indexer.fixOutgoingUnknownSentAt(hrmpWatermark);
                 } catch (err1) {
                     console.log(`unable to find watermarkBN`, err1.toString())
                 }
@@ -1130,7 +1134,8 @@ module.exports = class ChainParser {
         return [candidate, caller]
     }
 
-    processV0X1(v0x1, relayChain) {
+    //return paraIDDest, chainIDDest
+    processDestV0X1(v0x1, relayChain) {
         //same as dest.v0.x1, dest.v1.interior.x1
         let paraIDDest = 0
         let chainIDDest = -1
@@ -1157,7 +1162,8 @@ module.exports = class ChainParser {
         return [paraIDDest, chainIDDest]
     }
 
-    processV0X2(v0x2, relayChain) {
+    //return paraIDDest, chainIDDest
+    processDestV0X2(v0x2, relayChain) {
         //0x98324306c4ae1a6ecb9ab3798ba3a300e5a7cdef377fccb9ee716209d4c16891
         let paraIDDest = -1
         let chainIDDest = -1
@@ -1195,10 +1201,10 @@ module.exports = class ChainParser {
                 }
             }
         }
-        return [paraIDDest, chainIDDest, '']
+        return [paraIDDest, chainIDDest]
     }
 
-    processX1(x1, relayChain) {
+    processX1(x1, relayChain, decorate = false, indexer = false) {
         //same as beneficiary.v0.x1, dest.v1.interior.x1
         let paraIDDest = 0
         let chainIDDest = -1
@@ -1208,11 +1214,11 @@ module.exports = class ChainParser {
         } else if (relayChain == "kusama") {
             chainIDDest = paraTool.chainIDKusama;
         }
-        destAddress = this.processAccountKey(x1)
+        destAddress = this.processAccountKey(x1, decorate, indexer)
         return [paraIDDest, chainIDDest, destAddress]
     }
 
-    processX2(x2, relayChain) {
+    processX2(x2, relayChain, decorate = false, indexer = false) {
         //dest.v1.interior.x2
         let paraIDDest = -1
         let chainIDDest = -1
@@ -1239,13 +1245,13 @@ module.exports = class ChainParser {
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x2_1`, x2)
             }
-            let accKey = x2[1]
-            destAddress = this.processAccountKey(accKey)
+            //let accKey = x2[1]
+            destAddress = this.processAccountKey(x2[1], decorate, indexer)
         }
         return [paraIDDest, chainIDDest, destAddress]
     }
 
-    processX3(x3, relayChain) {
+    processX3(x3, relayChain, decorate = false, indexer = false) {
         //dest.v1.interior.x3
         /*
       "x3": [
@@ -1291,17 +1297,19 @@ module.exports = class ChainParser {
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x3_1`, x3_1)
             }
-            let accKey = x3[2]
-            destAddress = this.processAccountKey(accKey)
+            //let accKey = x3[2]
+            destAddress = this.processAccountKey(x3[2], decorate, indexer)
         }
         return [paraIDDest, chainIDDest, destAddress]
     }
 
-    processAccountKey(accKey) {
+    processAccountKey(accKey, decorate = false, indexer = false) {
         let destAddress = null
-
         if (accKey.accountId32 != undefined && accKey.accountId32.id != undefined) {
             destAddress = paraTool.getPubKey(accKey.accountId32.id);
+            if (decorate && indexer) {
+                indexer.decorateAddress(accKey.accountId32, "id", true, true)
+            }
         } else if (accKey.accountKey20 != undefined && accKey.accountKey20.key != undefined) {
             destAddress = paraTool.getPubKey(accKey.accountKey20.key);
         } else {
@@ -1925,6 +1933,84 @@ module.exports = class ChainParser {
         return [targetedAsset, rawTargetedAsset]
     }
 
+    processBeneficiary(indexer, beneficiary, relayChain = 'polkadot', decorate = false) {
+      console.log(`processBeneficiary called`, beneficiary)
+      let paraIDDest, chainIDDest, destAddress;
+      let isInterior = (beneficiary.interior != undefined)? 1 : 0
+      let beneficiaryType = (beneficiary.interior != undefined)? Object.keys(beneficiary.interior)[0]: Object.keys(beneficiary)[0]    //handle dest.beneficiary
+      let beneficiaryV = (beneficiary.interior != undefined)? beneficiary['interior'][beneficiaryType] : beneficiary[beneficiaryType] //move up dest.beneficiary
+      switch (beneficiaryType) {
+        case 'x1':
+          //I think it's possible?
+          [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV, relayChain, true, indexer)
+          if (isInterior) {
+            beneficiary['interior'][beneficiaryType] = beneficiaryV
+          }else{
+            beneficiary[beneficiaryType] = beneficiaryV
+          }
+          break;
+        case 'x2':
+          [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV, relayChain, true, indexer)
+          if (isInterior) {
+            beneficiary['interior'][beneficiaryType] = beneficiaryV
+          }else{
+            beneficiary[beneficiaryType] = beneficiaryV
+          }
+          break;
+        case 'v0':
+          let beneficiaryV0XType = Object.keys(beneficiaryV)[0]
+          let beneficiaryV0V = Object.keys(beneficiaryV0XType)[0]
+          if (beneficiaryV0XType == 'x1'){
+            //0x0db891b6d6af60401a21f72761ed04a6024bf37b6cdeaab62d0bc3963c5c9357
+            [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV0V, relayChain, true, indexer)
+          }else if(beneficiaryV0XType == 'x2'){
+            // I think this this can happen when xcmPallet to para?
+            [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV0V, relayChain, true, indexer)
+          }else{
+            console.log(`unknown beneficiaryV0XType=${beneficiaryV0XType}`)
+            break;
+          }
+          if (isInterior) {
+            beneficiary['interior'][beneficiaryType][beneficiaryV0XType] = beneficiaryV0V
+          }else{
+            beneficiary[beneficiaryType][beneficiaryV0XType] = beneficiaryV0V
+          }
+          break;
+        case 'v1':
+          let beneficiaryV1XType = Object.keys(beneficiaryV)[0]
+          let beneficiaryV1V = Object.keys(beneficiaryV1XType)[0]
+          if (beneficiaryV1V.interior != undefined){
+            let beneficiaryV1VInteriorXType = Object.keys(beneficiaryV1V.interior)[0]
+            let beneficiaryV1VInteriorV = beneficiaryV1V['interior'][beneficiaryV1VInteriorXType]
+            if (beneficiaryV1VInteriorXType == 'x1'){
+              //0x0db891b6d6af60401a21f72761ed04a6024bf37b6cdeaab62d0bc3963c5c9357
+              [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV1VInteriorV, relayChain, true, indexer)
+            }else if(beneficiaryV1VInteriorXType == 'x2'){
+              // I think this this can happen when xcmPallet to para?
+              [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV1VInteriorV, relayChain, true, indexer)
+            }else{
+              console.log(`unknown beneficiaryV1VInteriorXType=${beneficiaryV1VInteriorXType}`)
+              break;
+            }
+            if (isInterior) {
+              beneficiary['interior'][beneficiaryType][beneficiaryV1XType]['interior'][beneficiaryV1VInteriorXType] = beneficiaryV1VInteriorV
+            }else{
+              beneficiary[beneficiaryType][beneficiaryV1XType]['interior'][beneficiaryV1VInteriorXType] = beneficiaryV1VInteriorV
+            }
+          }else{
+            console.log(`unknown beneficiaryV1V interior not exist`)
+          }
+          break;
+        case 'v2':
+          console.log(`unknown beneficiaryV2Type=${beneficiaryV}`)
+          break;
+        default:
+          console.log(`unknown beneficiaryType ${beneficiaryType}`)
+      }
+      console.log(`destAddress found: ${destAddress}`)
+      return destAddress
+    }
+
     //This is the V0 format
     processV0ConcreteFungible(indexer, fungibleAsset) {
         let relayChain = indexer.relayChain
@@ -2184,7 +2270,7 @@ module.exports = class ChainParser {
                         //todo: extract
                         let dest_v0 = dest.v0
                         if (dest_v0.x1 !== undefined) {
-                            [paraIDDest, chainIDDest] = this.processV0X1(dest_v0.x1, relayChain)
+                            [paraIDDest, chainIDDest] = this.processDestV0X1(dest_v0.x1, relayChain)
                         } else if (dest_v0.x2 !== undefined) {
                             /*
                               {"x2":[
@@ -2195,7 +2281,7 @@ module.exports = class ChainParser {
                             */
                             //MK check
                             //0x98324306c4ae1a6ecb9ab3798ba3a300e5a7cdef377fccb9ee716209d4c16891
-                            [paraIDDest, chainIDDest, destAddress2] = this.processV0X2(dest_v0.x2, relayChain)
+                            [paraIDDest, chainIDDest] = this.processDestV0X2(dest_v0.x2, relayChain)
                             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}`)
                         } else {
                             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] dest v0 unk = `, JSON.stringify(dest.v0));
@@ -2207,7 +2293,7 @@ module.exports = class ChainParser {
                         if (destV1Interior.x1 !== undefined) {
                             // {"v1":{"parents":0,"interior":{"x1":{"parachain":2012}}}}
                             //[paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
-                            [paraIDDest, chainIDDest] = this.processV0X1(destV1Interior.x1, relayChain)
+                            [paraIDDest, chainIDDest] = this.processDestV0X1(destV1Interior.x1, relayChain)
                         } else if (destV1Interior.x2 !== undefined) {
                             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
                             // dest for parachain, add 20000 for kusama-relay
@@ -2295,7 +2381,7 @@ module.exports = class ChainParser {
                     let assets = a.assets;
                     let feeAssetIndex = a.fee_asset_item
                     if (assets.v0 !== undefined && Array.isArray(assets.v0) && assets.v0.length > 0) {
-                        console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} v0 case`, JSON.stringify(a, null, 2))
+                        if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} v0 case`, JSON.stringify(a, null, 2))
                         let assetsv0 = assets.v0
                         let transferIndex = 0
                         for (const asset of assetsv0) {
@@ -2419,12 +2505,12 @@ module.exports = class ChainParser {
                         //todo: extract
                         let dest_v0 = dest.v0
                         if (dest_v0.x1 !== undefined) {
-                            [paraIDDest, chainIDDest] = this.processV0X1(dest_v0.x1, relayChain)
+                            [paraIDDest, chainIDDest] = this.processDestV0X1(dest_v0.x1, relayChain)
                         } else if (dest_v0.x2 !== undefined) {
                             /*
                             {"x2":[{"parent":null},{"parachain":2000}]}
                             */
-                            [paraIDDest, chainIDDest, destAddress2] = this.processV0X2(dest_v0.x2, relayChain)
+                            [paraIDDest, chainIDDest] = this.processDestV0X2(dest_v0.x2, relayChain)
 
                         } else {
                             if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
@@ -2436,7 +2522,7 @@ module.exports = class ChainParser {
                         if (destV1Interior.x1 !== undefined) {
                             // {"v1":{"parents":0,"interior":{"x1":{"parachain":2012}}}}
                             //[paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
-                            [paraIDDest, chainIDDest] = this.processV0X1(destV1Interior.x1, relayChain)
+                            [paraIDDest, chainIDDest] = this.processDestV0X1(destV1Interior.x1, relayChain)
                         } else if (destV1Interior.x2 !== undefined) {
                             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
                             // dest for parachain, add 20000 for kusama-relay

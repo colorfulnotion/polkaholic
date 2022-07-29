@@ -62,7 +62,9 @@ module.exports = class Indexer extends AssetManager {
     specVersion = -1;
     xcmeventsMap = {};
     xcmmsgMap = {};
-    xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove trailing
+    xcmmsgSentAtUnknownMap = {};
+    xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove
+
     recentXcmMsgs = []; //will flush from here.
     // bqlog
     extrinsicsfn = false;
@@ -1101,22 +1103,40 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    //the new one for now..
-    updateXCMMsg(xcmMsg) {
+    fixOutgoingUnknownSentAt(sentAt) {
+        let xcmKeys = Object.keys(this.xcmmsgSentAtUnknownMap)
+        for (const xcmKey of xcmKeys) {
+            let xcmMsg = this.xcmmsgSentAtUnknownMap[xcmKey]
+            xcmMsg.sentAt = sentAt
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`Adding sentAt ${sentAt} [${xcmKey}]`)
+            this.updateXCMMsg(xcmMsg, true)
+        }
+        this.xcmmsgSentAtUnknownMap = {}
+    }
+
+    //this is the xcmmessages table
+    updateXCMMsg(xcmMsg, overwrite = false) {
         let direction = (xcmMsg.isIncoming) ? 'i' : 'o'
-        let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
-        if (this.xcmTrailingKeyMap[xcmKey] == undefined) {
-            this.xcmTrailingKeyMap[xcmKey] = {
-                blockNumber: xcmMsg.blockNumber,
-                msgHex: xcmMsg.msgHex,
-                msgHash: xcmMsg.msgHash,
-                isFresh: true,
-            }
-            this.xcmmsgMap[xcmKey] = xcmMsg
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
+        if (direction == 'o' && xcmMsg.msgType != 'dmp' && !overwrite) {
+            //sentAt is theoretically unknown for ump/hrmp..
+            let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${direction}`
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`xcmmsg SentAt Unknown [${xcmKey}]`)
+            this.xcmmsgSentAtUnknownMap[xcmKey] = xcmMsg
         } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
+            let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
+            if (this.xcmTrailingKeyMap[xcmKey] == undefined) {
+                this.xcmTrailingKeyMap[xcmKey] = {
+                    blockNumber: xcmMsg.blockNumber,
+                    msgHex: xcmMsg.msgHex,
+                    msgHash: xcmMsg.msgHash,
+                    isFresh: true,
+                }
+                this.xcmmsgMap[xcmKey] = xcmMsg
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
+            } else {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
+            }
         }
     }
 
@@ -2825,7 +2845,7 @@ order by msgHash, diffSentAt, diffTS`
     }
 
     // find the msgHash given {BN, recipient}
-    getMsgHashCandidate(targetBN, destAddress = false) {
+    getMsgHashCandidate(targetBN, destAddress = false, extrinsicID = false, extrinsicHash = false) {
         if (!destAddress) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}], dest MISSING`)
             return false
@@ -2847,6 +2867,10 @@ order by msgHash, diffSentAt, diffTS`
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] FOUND candidate=${msgHash}`)
+                if (this.xcmmsgMap[tk] != undefined) {
+                    this.xcmmsgMap[tk].extrinsicID = extrinsicID
+                    this.xcmmsgMap[tk].extrinsicHash = extrinsicHash
+                }
                 return msgHash
             }
         }
@@ -2875,7 +2899,7 @@ order by msgHash, diffSentAt, diffTS`
             let rows = this.recentXcmMsgs
             if (this.debugLevel >= paraTool.debugTracing) console.log(`dump_xcm_messages rowsLen=${rows.length}`, rows)
             let i = 0;
-            let vals = ["chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "relayChain", "version", "path"];
+            let vals = ["chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "relayChain", "version", "path", "extrinsicID", "extrinsicHash"];
             for (i = 0; i < rows.length; i += 10000) {
                 let j = i + 10000;
                 if (j > rows.length) j = rows.length;
@@ -4127,7 +4151,7 @@ order by msgHash, diffSentAt, diffTS`
                         if (this.debugLevel >= paraTool.debugInfo && !finalized) console.log(`safeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length}`)
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
-                            let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress)
+                            let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash)
                             if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                             this.stat.addressRows.xcmsend++;
                             this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized);
@@ -5345,8 +5369,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let mpKey = this.xcmTrailingKeyMap[xcmKey]
                 if (mpKey != undefined && mpKey.isFresh) {
                     let mp = this.xcmmsgMap[xcmKey]
+                    let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
+                    if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
+                    let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
+                    let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
                     //["msgHash", "incoming", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "sentAt", "relayChain", "version", "path"];
-                    let s = `('${mp.msgHash}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.blockNumber}', '${mp.relayChain}', '${mp.version}', '${mp.path}')`
+                    let s = `('${mp.msgHash}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.blockNumber}', '${mp.relayChain}', '${mp.version}', '${mp.path}', ${extrinsicID}, ${extrinsicHash})`
                     recentXcmMsgs.push(s);
                     if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] add ${xcmKey}`, s)
                     this.xcmTrailingKeyMap[xcmKey].isFresh = false // mark the record as processed

@@ -29,7 +29,8 @@ const ChainParser = require("./chains/chainparser");
 module.exports = class AssetManager extends PolkaholicDB {
     nativeAssetInfo = {};
     assetInfo = {};
-    xcmAssetInfo = {};
+    xcmAssetInfo = {}; // xcmInteriorKey   -> nativeAssetChain
+    xcmInteriorInfo = {}; // nativeAssetChain -> xcmInteriorKey
     assetlog = {};
     ratelog = {};
     assetlogTTL = 0;
@@ -431,6 +432,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     async init_xcm_asset() {
         let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
         let xcmAssetInfo = {};
+        let xcmInteriorInfo = {};
         for (let i = 0; i < xcmAssetRecs.length; i++) {
             let v = xcmAssetRecs[i];
             let a = {}
@@ -448,10 +450,11 @@ module.exports = class AssetManager extends PolkaholicDB {
                 xcmInteriorKey: xcmInteriorKey,
                 nativeAssetChain: nativeAssetChain,
             }
-            //TODO: derive potential interior type?
             xcmAssetInfo[xcmInteriorKey] = a; //the key has no chainID
+            xcmInteriorInfo[nativeAssetChain] = a
         }
         this.xcmAssetInfo = xcmAssetInfo;
+        this.xcmInteriorInfo = xcmInteriorInfo;
         //console.log(`init_xcm_asset !!`, xcmAssetInfo)
     }
 
@@ -461,10 +464,16 @@ module.exports = class AssetManager extends PolkaholicDB {
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo
         }
-        //TODO: expand keys from x1 to x2 for not found case
         return false
     }
 
+    getXcmAssetInfoByNativeAssetChain(nativeAssetChain) {
+        let xcmAssetInfo = this.xcmInteriorInfo[nativeAssetChain]
+        if (xcmAssetInfo != undefined) {
+            return xcmAssetInfo
+        }
+        return false
+    }
 
     async init_asset_info() {
         let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.asset, asset.symbol, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.chainName, asset.isUSD, priceUSDpaths, nativeAssetChain, currencyID from asset, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow') order by chainID, assetType, asset");
