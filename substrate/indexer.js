@@ -1434,7 +1434,7 @@ order by chainID, extrinsicHash, diffTS`
         d.blockTS < ${endTS+lookbackSeconds} and
         s.matched = 0 and
         d.matched = 0
-having (diffTS >= 0 and diffTS < ${lookbackSeconds}) or (diffSentAt >= 0 and diffSentAt <= 4)
+having (diffSentAt >= 0 and diffSentAt <= 4)
 order by msgHash, diffSentAt, diffTS`
         //console.log("xcmmessages_match", sql)
         try {

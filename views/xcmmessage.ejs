@@ -12,13 +12,19 @@ let f = xcm;
     <tr>
       <td>Hash</td>
       <td>
-        <code><%= f.msgHash; %></code> <a class="btn btn-primary" href="/timeline/<%= f.msgHash; %>/xcm/<%= f.sentAt; %>" target="_new">XCM Timeline</a>
+        <%- uiTool.getShortHash(f.msgHash, false) %><br/><a class="btn btn-link" href="/timeline/<%= f.msgHash; %>/xcm/<%= f.sentAt; %>" target="_new">XCM Timeline</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Hex</td>
+      <td>
+        <%- uiTool.getShortHash(f.msgHex, true) %>
       </td>
     </tr>
     <tr>
       <td>Sent At</td>
       <td>
-        <code><%= f.sentAt; %></code>
+        <%= f.sentAt; %>
       </td>
     </tr>
 
@@ -51,12 +57,12 @@ let f = xcm;
 
     <tr>
       <td>Message Type</td>
-      <td><code><%= f.msgType %></code></td>
+      <td><%= f.msgType %></td>
     </tr>
 
     <tr>
       <td>Version</td>
-      <td><code><%= f.version %></code></td>
+      <td><%= f.version %></td>
     </tr>
 
 <% if ( f.extrinsicHash ) { %>
@@ -100,6 +106,21 @@ let f = xcm;
       <td>
         <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
         <%- include("blockNumber", {chainID: f.idDest, blockNumber: f.blockNumberDest}); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Dest Address</td>
+      <td>
+        <% if (f.destAddress){  %>
+          <img src="/identicon/<%= f.destAddress; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+          <a href='/account/<%= paraTool.getPubKey(f.destAddress) %>'>
+            <code><%= f.destAddress; %></code>
+          </a>
+	         <%- uiTool.showAccountInfo(f, "destAddress") %>
+        <% } else {%>
+          <%- `-`; %>
+        <% } %>
       </td>
     </tr>
 
