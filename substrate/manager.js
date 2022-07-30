@@ -16,6 +16,16 @@
 
 const AssetManager = require("./assetManager");
 const PolkaholicDB = require("./polkaholicDB");
+const {
+    ApiPromise,
+    WsProvider
+} = require("@polkadot/api");
+const {
+    encodeAddress
+} = require("@polkadot/keyring");
+const {
+    u8aToHex
+} = require("@polkadot/util");
 const mysql = require("mysql2");
 const fs = require("fs");
 const axios = require("axios");
@@ -41,6 +51,449 @@ module.exports = class Manager extends AssetManager {
     parachainID = null;
     concept = null;
 
+
+    async getFinalizedBlockInfo(chainID, api) {
+        let done = false;
+        let finalizedBlockHash = null;
+        let blockTS = null;
+        let bn = null;
+        while (!done) {
+            const finalizedHead = await api.rpc.chain.getFinalizedHead();
+            finalizedBlockHash = u8aToHex(finalizedHead)
+            let finalizedHeader = await api.rpc.chain.getHeader(finalizedBlockHash);
+            bn = finalizedHeader.number ? paraTool.dechexToInt(finalizedHeader.number) : null
+            let sql_blockTS = `select blockDT, UNIX_TIMESTAMP(blockDT) as blockTS from block${chainID} where blockNumber = '${bn}' and blockHash = '${finalizedBlockHash}' limit 1`
+            let blocks = await this.poolREADONLY.query(sql_blockTS)
+            if (blocks.length == 0) {
+                console.log(`Blockhash not found for ${chainID} @ block ${bn} in last 24 hours: ${finalizedBlockHash}`)
+                let sql_unfinalized = `select blockDT, UNIX_TIMESTAMP(blockDT) as blockTS from blockunfinalized where chainID = '${chainID}' and blockNumber = '${bn}' and blockHash = '${finalizedBlockHash}' limit 1`
+                blocks = await this.poolREADONLY.query(sql_unfinalized)
+                if (blocks.length == 1) {
+                    blockTS = blocks[0].blockTS;
+                    done = true;
+                } else {
+                    await this.sleep(2000);
+                }
+            } else if (blocks.length == 1) {
+                let block = blocks[0];
+                console.log(`Found finalized blockHash ${chainID} : ${finalizedBlockHash} at ${block.blockTS}: ${block.blockDT} -- READY`, block)
+                blockTS = block.blockTS;
+                if (!(blockTS > 0)) {
+                    done = false;
+                }
+                done = true;
+            }
+        }
+        return [finalizedBlockHash, blockTS, bn]
+    }
+    canonicalizeAssetJSON(a) {
+        if (a.DexShare != undefined) {
+            return (JSON.stringify(a.DexShare));
+        }
+        if (typeof a == "string")
+            return (a);
+        return (JSON.stringify(a));
+    }
+
+    async get_chain_balance_update() {
+        let chains = await this.pool.query(`select chainID from chain where active = 1 and crawling = 1 and ( lastBalanceUpdateDT < date_sub(Now(), interval 12 hour) or lastBalanceUpdateDT is Null ) and chainID >= 0 order by rand() limit 1`)
+        if (chains.length == 0) {
+            console.log("No chain found");
+            return null;
+        }
+        let chainID = chains[0].chainID;
+        await this.update_chain_lastBalanceUpdateDT(chainID); // this is to not pick it again, if it fails we reset it
+        return chainID;
+    }
+
+    async update_chain_lastBalanceUpdateDT(chainID, reset = false) {
+        if ( chainID >= 0 ) {
+	    let s = (reset) ? "Now()" : "Null";
+            let sql = `update chain set lastBalanceUpdateDT = ${s} where chainID = ${chainID}`
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL();
+	}
+    }
+
+    async updateNonNativeBalances(chainID, perPagelimit = 1000) {
+        await this.assetManagerInit();
+        let chains = await this.pool.query(`select chainID, WSEndpoint, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
+        if (chains.length == 0) {
+            console.log("No chain found ${chainID}")
+            return false;
+        }
+        let chain = chains[0];
+        if (chain.assetaddressPallet == "none") {
+            console.log(`No valid pallet ${chainID}: ${chain.assetaddresPallet}`)
+            return false;
+        }
+        let wsEndpoint = chain.WSEndpoint;
+        let chainName = chain.chainName
+        const provider = new WsProvider(wsEndpoint);
+        const api = await ApiPromise.create({
+            provider
+        });
+        const rawChainInfo = await api.registry.getChainProperties()
+        var chainInfo = JSON.parse(rawChainInfo);
+        const prefix = chainInfo.ss58Format
+        let pallet = "none"
+        let rows = [];
+        let asset = this.getChainAsset(chainID);
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+        let [finalizedBlockHash, blockTS, bn] = await this.getFinalizedBlockInfo(chainID, api)
+        let apiAt = await api.at(finalizedBlockHash)
+        let last_key = '';
+        let numHolders = {}
+        let numFailures = {};
+        // create the table if needed
+        let TABLE = `assetaddress${chainID}`
+        let sql_create_table = `create table if not exists ${TABLE} like assetaddress1000`;
+        this.batchedSQL.push(sql_create_table);
+        await this.update_batchedSQL();
+
+        while (true) {
+            let query = null
+            if (apiAt.query.assets != undefined && apiAt.query.assets.account != undefined) {
+                query = await apiAt.query.assets.account.entriesPaged({
+                    args: [],
+                    pageSize: perPagelimit,
+                    startKey: last_key
+                })
+                pallet = "assets";
+            } else if (apiAt.query.tokens != undefined && apiAt.query.tokens.accounts != undefined) {
+                // karura (22000) and acala (2000)
+                query = await apiAt.query.tokens.accounts.entriesPaged({
+                    args: [],
+                    pageSize: perPagelimit,
+                    startKey: last_key
+                })
+                pallet = "tokens";
+            } else {
+                console.log(`${chainID}: No assets or tokens pallet!`);
+                pallet = "none";
+                break;
+            }
+            if (query.length == 0) {
+                console.log(`Query Completed:`, numHolders)
+                break
+            }
+
+            var cnt = 0
+            let out = [];
+            let vals = ["ss58Address", "asset", "symbol", "free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN", "blockTS", "lastState"];
+            let replace = ["ss58Address", "asset", "symbol"];
+            let lastUpdateBN = ["free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN", "blockTS", "lastState"];
+            let idx = 0
+            for (const user of query) {
+                cnt++
+                if (pallet == "assets") {
+                    let key = user[0].toHuman();
+                    let val = user[1].toHuman();
+
+                    /*
+                      Responses like: [currencyID, account_id]
+                      key:  [  0, DaCSCEQBRmMaBLRQQ5y7swdtfRzjcsewVgCCmngeigwLiax ]
+                      val:  // has balance
+                      {
+                      balance: 100,000,000
+                      isFrozen: false
+                      reason: Consumer
+                      extra: null
+                      }
+                    */
+                    let currencyID = paraTool.toNumWithoutComma(key[0]);
+                    let account_id = key[1];
+                    let address = paraTool.getPubKey(account_id);
+                    let decimals = this.getCurrencyIDDecimal(currencyID, chainID)
+                    let symbol = this.getCurrencyIDSymbol(currencyID, chainID)
+                    let asset = JSON.stringify({
+                        "Token": currencyID
+                    })
+                    let assetChain = paraTool.makeAssetChain(asset, chainID);
+                    let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
+
+                    let balance = 0;
+                    if (decimals !== false) {
+                        if (val.balance != undefined) {
+                            balance = parseFloat(paraTool.toNumWithoutComma(val.balance), 10) / 10 ** decimals;
+                        }
+                        out.push(`('${currencyID}', '${address}', '${account_id}', ${mysql.escape(asset)}, '${symbol}', '${balance}', 0, 0, 0, '${finalizedBlockHash}', Now(), '${bn}', '${blockTS}', ${mysql.escape(JSON.stringify(val))})`);
+                        let rowKey = address.toLowerCase() // just in case
+
+                        if (numHolders[currencyID] != undefined) {
+                            numHolders[currencyID]++;
+                        } else {
+                            numHolders[currencyID] = 1;
+                        }
+                        rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, balance, 0, 0, 0, blockTS, bn));
+                        console.log(symbol, currencyID, `cbt read accountrealtime prefix=${rowKey}`, balance, val.balance, "decimals", decimals);
+                    } else {
+                        if (numFailures[currencyID] != undefined) {
+                            numFailures[currencyID]++;
+                        } else {
+                            numFailures[currencyID] = 1;
+                        }
+                        console.log("FAIL", val, currencyID, symbol, asset, "decimals", decimals, decimals != false);
+                    }
+                } else if (pallet == "tokens") { //this is by [account-asset]. not way to tally by asset
+                    let userTokenAccountK = user[0].toHuman()
+                    let userTokenAccountBal = user[1].toJSON()
+                    let account_id = userTokenAccountK[0];
+                    let rawAsset = userTokenAccountK[1];
+                    if (typeof rawAsset == "string" && rawAsset.includes("{")) {
+                        rawAsset = JSON.parse(rawAsset);
+                    }
+                    let asset = this.canonicalizeAssetJSON(rawAsset); // remove DexShare, remove commas inside if needed, etc.
+                    let currencyID = asset
+                    let decimals = this.getAssetDecimal(asset, chainID, "tokens")
+                    if ((chainID == paraTool.chainIDKico) || (chainID == paraTool.chainIDMangataX) || (chainID == paraTool.chainIDListen) || (chainID == paraTool.chainIDBasilisk) ||
+                        (chainID == paraTool.chainIDComposable) || (chainID == paraTool.chainIDPicasso)) {
+                        currencyID = paraTool.toNumWithoutComma(currencyID).toString();
+                        decimals = this.getCurrencyIDDecimal(currencyID, chainID)
+                        asset = JSON.stringify({
+                            "Token": currencyID
+                        })
+                        //console.log(currencyID, "asset=", asset, "decimals=", decimals);
+                    } else if ((chainID == paraTool.chainIDTuring) || (chainID == paraTool.chainIDDoraFactory)) {
+                        decimals = this.getCurrencyIDDecimal(currencyID, chainID)
+                        asset = JSON.stringify({
+                            "Token": currencyID
+                        })
+                        console.log(currencyID, "asset=", asset, "decimals=", decimals);
+                    }
+                    let state = userTokenAccountBal;
+                    let assetChain = paraTool.makeAssetChain(asset, chainID);
+                    let symbol = this.assetInfo[assetChain] ? this.assetInfo[assetChain].symbol : null;
+                    let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
+                    let address = paraTool.getPubKey(account_id);
+                    let free = 0;
+                    let reserved = 0;
+                    let miscFrozen = 0;
+                    let frozen = 0;
+                    if (decimals !== false) {
+                        if (state.free != undefined) {
+                            free = state.free / 10 ** decimals;
+                        }
+                        if (state.reserved != undefined) {
+                            reserved = state.reserved / 10 ** decimals;
+                        }
+                        if (state.miscFrozen != undefined) {
+                            miscFrozen = state.miscFrozen / 10 ** decimals;
+                        }
+                        if (state.frozen != undefined) {
+                            frozen = state.frozen / 10 ** decimals;
+                        }
+
+                        out.push(`('${asset}', '${address}', '${account_id}', ${mysql.escape(asset)}, '${symbol}', '${free}', '${reserved}', '${miscFrozen}', '${frozen}', '${finalizedBlockHash}', Now(), '${bn}', '${blockTS}', ${mysql.escape(JSON.stringify(state))})`);
+                        let rowKey = address.toLowerCase() // just in case
+
+                        if (numHolders[currencyID] != undefined) {
+                            numHolders[currencyID]++;
+                        } else {
+                            numHolders[currencyID] = 1;
+                        }
+                        rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free, reserved, miscFrozen, frozen, blockTS, bn));
+                        console.log(`CHECK ${assetChain} -- cbt read accountrealtime prefix=${rowKey}`);
+                    } else {
+                        if (numFailures[currencyID] != undefined) {
+                            numFailures[currencyID]++;
+                        } else {
+                            numFailures[currencyID] = 1;
+                        }
+                        console.log(`FAIL idx=[${idx}] k=${JSON.stringify(userTokenAccountK)}, v=${JSON.stringify(userTokenAccountBal)} currencyID=${currencyID}`)
+                    }
+                    idx++
+                    /*
+                      idx=[0] k=["266LcLP1Mg523NBD58E2bBz4Ud3E2ZyZSNJjKz1G1nH3rPFh",{"LiquidCrowdloan":"13"}], v={"free":100000000000,"reserved":0,"frozen":0}
+                      idx=[1] k=["223xsNEtCfmnnpcXgJMtyzaCFyNymu7mEUTRGhurKJ8jzw1i",{"Token":"DOT"}], v={"free":2522375571,"reserved":0,"frozen":0}
+                    */
+                }
+                last_key = user[0];
+            }
+
+            await this.upsertSQL({
+                "table": TABLE,
+                "keys": ["currencyID", "address"],
+                "vals": vals,
+                "data": out,
+                "replace": vals,
+                "lastUpdateBN": lastUpdateBN
+            });
+            console.log(`writing ${chainName}`, rows.length, "rows chainID=", chainID);
+            await this.insertBTRows(tblRealtime, rows, tblName);
+
+            rows = [];
+        }
+
+        // for all the other accounts that did NOT appear, we can delete them if they were OLDER than bn, because they are reaped == but we still need to 0 out the balances
+        let sql_reap = `select address, asset, lastUpdateBN from ${TABLE} where lastUpdateBN < ${bn}`
+        let sql_delete = `delete from ${TABLE} where lastUpdateBN < ${bn}`
+        console.log(`REAPING: `, sql_reap, ` DELETE: `, sql_delete);
+
+        let reapedAccounts = await this.poolREADONLY.query(sql_reap)
+        for (let a = 0; a < reapedAccounts.length; a++) {
+            let address = reapedAccounts[a].address;
+            let asset = reapedAccounts[a].asset;
+            let assetChain = paraTool.makeAssetChain(asset, chainID);
+            let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
+            rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
+            console.log("REAPED ACCOUNT-ADDRESS", address, encodedAssetChain);
+        }
+        console.log("writing ", rows.length, " REAPED accounts to bt");
+        await this.insertBTRows(tblRealtime, rows, tblName);
+        rows = [];
+
+        // now that we have written them out to BT, we can delete them
+        this.batchedSQL.push(sql_delete);
+        await this.update_batchedSQL();
+
+        for (const asset of Object.keys(numHolders)) {
+            let cnt = numHolders[asset];
+            let sql = `update asset set numHolders = '${cnt}'  where asset = '${asset}' and chainID = '${chainID}'`
+            this.batchedSQL.push(sql);
+            console.log("writing", asset, chainID, "rows numHolders=", cnt, sql)
+        }
+        for (const asset of Object.keys(numFailures)) {
+            let cnt = numFailures[asset];
+            let sql = `insert into assetfailures ( asset, chainID, numFailures, lastUpdateDT ) values ( '${asset}', '${chainID}', '${cnt}', Now() ) on duplicate key update numFailures = values(numFailures)`
+            this.batchedSQL.push(sql);
+            console.log("writing", asset, chainID, "rows numHolders=", cnt, sql)
+        }
+
+        let sql_assetPallet = `update chain set assetaddressPallet = '${pallet}', assetNonNativeRegistered = '${Object.keys(numHolders).length}', assetNonNativeUnregistered = '${Object.keys(numFailures).length}'  where chainID = '${chainID}'`
+        this.batchedSQL.push(sql_assetPallet);
+        await this.update_batchedSQL();
+
+    }
+
+    async updateNativeBalances(chainID, perPagelimit = 1000) {
+        await this.assetManagerInit();
+        let chains = await this.pool.query(`select chainID, WSEndpoint, numHolders from chain where chainID = ${chainID}`);
+        if (chains.length == 0) {
+            console.log("No chain found ${chainID}")
+            return false;
+        }
+        let chain = chains[0];
+        let wsEndpoint = chain.WSEndpoint;
+        let prev_numHolders = chain.numHolders;
+        const provider = new WsProvider(wsEndpoint);
+        const api = await ApiPromise.create({
+            provider
+        });
+        const rawChainInfo = await api.registry.getChainProperties()
+        var chainInfo = JSON.parse(rawChainInfo);
+        const prefix = chainInfo.ss58Format
+
+        let numHolders = 0;
+        let rows = [];
+        let asset = this.getChainAsset(chainID);
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
+        let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+
+        let decimals = this.getChainDecimal(chainID)
+        let [finalizedBlockHash, blockTS, bn] = await this.getFinalizedBlockInfo(chainID, api)
+        let apiAt = await api.at(finalizedBlockHash)
+        let last_key = '';
+        while (true) {
+            let query = await apiAt.query.system.account.entriesPaged({
+                args: [],
+                pageSize: perPagelimit,
+                startKey: last_key
+            })
+            if (query.length == 0) {
+                console.log(`Query Completed: total ${numHolders} accounts`)
+                break
+            }
+
+            var cnt = 0
+            let out = [];
+            let vals = ["ss58Address", "free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN"];
+            let replace = ["ss58Address"];
+            let lastUpdateBN = ["free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN"];
+            for (const user of query) {
+                cnt++
+                numHolders++;
+                let pub = user[0].slice(-32);
+                let pubkey = u8aToHex(pub);
+                let account_id = encodeAddress(pub, prefix);
+                let nonce = user[1].nonce.toString()
+                let balance = user[1].data
+                let free_balance = (balance.free) ? parseInt(balance.free.toString(), 10) / 10 ** decimals : 0;
+                let reserved_balance = (balance.reserved) ? parseInt(balance.reserved.toString(), 10) / 10 ** decimals : 0;
+                let miscFrozen_balance = (balance.miscFrozen) ? parseInt(balance.miscFrozen.toString(), 10) / 10 ** decimals : 0;
+                let feeFrozen_balance = (balance.feeFrozen) ? parseInt(balance.feeFrozen.toString(), 10) / 10 ** decimals : 0;
+
+                let stateHash = u8aToHex(user[1].createdAtHash)
+                out.push(`('${pubkey}', '${account_id}', '${free_balance}', '${reserved_balance}', '${miscFrozen_balance}', '${feeFrozen_balance}', '${finalizedBlockHash}', Now(), '${bn}')`);
+                let rowKey = pubkey.toLowerCase()
+                console.log(rowKey, `cbt read accountrealtime prefix=${rowKey}`);
+                rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn));
+                last_key = user[0];
+            }
+            await this.upsertSQL({
+                "table": `address${chainID}`,
+                "keys": ["address"],
+                "vals": vals,
+                "data": out,
+                "replace": vals,
+                "lastUpdateBN": lastUpdateBN
+            });
+            console.log("writing", rows.length, chainID, "rows numHolders=", numHolders, "/", prev_numHolders);
+            await this.insertBTRows(tblRealtime, rows, tblName);
+            rows = [];
+        }
+        // for all the other accounts that did NOT appear, we can delete them if they were OLDER than bn, because they are reaped == but we still need to 0 out the balances
+        let sql_reap = `select address, lastUpdateBN from address${chainID} where lastUpdateBN < ${bn}`
+        let sql_delete = `delete from address${chainID} where lastUpdateBN < ${bn}`
+        console.log(`REAPING: `, sql_reap, ` DELETE: `, sql_delete);
+
+        let reapedAccounts = await this.poolREADONLY.query(sql_reap)
+        for (let a = 0; a < reapedAccounts.length; a++) {
+            let address = reapedAccounts[a].address;
+            rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
+            console.log("REAPED ACCOUNT", address);
+        }
+        console.log("writing ", rows.length, " REAPED accounts to bt");
+        await this.insertBTRows(tblRealtime, rows, tblName);
+        rows = [];
+
+        // now that we have written them out to BT, we can delete them
+        this.batchedSQL.push(sql_delete);
+        await this.update_batchedSQL();
+
+        let sql = `update chain set numHolders = '${numHolders}', lastUpdateAddressNativeBalanceDT = Now() where chainID = ${chainID}`
+        console.log(numHolders, sql);
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
+    }
+
+    generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn) {
+        let newState = {
+            free: free_balance,
+            reserved: reserved_balance,
+            miscFrozen: miscFrozen_balance,
+            feeFrozen: feeFrozen_balance,
+            frozen: feeFrozen_balance,
+            ts: blockTS,
+            bn: bn,
+            source: this.hostname,
+            genTS: this.currentTS()
+        };
+        let rec = {};
+        rec[encodedAssetChain] = {
+            value: JSON.stringify(newState),
+            timestamp: blockTS * 1000000
+        }
+        let row = {
+            key: rowKey,
+            data: {
+                realtime: rec
+            }
+        }
+        return (row);
+    }
+
     // fetch session.NewSession from bq events table and store in indexlog.blockNumberNewSession
     async updateIndexlogBlocknumberNewSession(minLogDT = "2019-01-01", maxLogDT = "2022-07-22") {
         let fullTable = this.getBQTable("events");
@@ -53,7 +506,7 @@ module.exports = class Manager extends AssetManager {
             location: 'US',
         };
 
-        // Run BigQuery on events 
+        // Run BigQuery on events
         const [rows] = await bigqueryClient.query(options);
         var out = [];
         let vals = ["blockNumberNewSession"];

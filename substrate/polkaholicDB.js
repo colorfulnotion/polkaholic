@@ -928,6 +928,39 @@ from chain where chainID = '${chainID}' limit 1`);
         return api;
     }
 
+    async insertBTRows(tbl, rows, tableName = "") {
+        if (rows.length == 0) return (true);
+        try {
+            await tbl.insert(rows);
+            return (true);
+        } catch (err) {
+            let succ = true;
+            for (let a = 0; a < rows.length; a++) {
+                try {
+                    let r = rows[a];
+                    if (r.key !== undefined && r.key) {
+                        await tbl.insert([r]);
+                    }
+                } catch (err) {
+                    let tries = 0;
+                    while (tries < 10) {
+                        try {
+                            tries++;
+                            await tbl.insert([rows[a]]);
+                            await this.sleep(100);
+                        } catch (err) {
+                            //console.log(err);
+                        }
+                    }
+                    if (tries >= 10) {
+                        this.log_indexing_warn(err, tableName, rows[a]);
+                        succ = false;
+                    }
+                }
+            }
+            return (succ);
+        }
+    }
     build_block_from_row(row) {
         let rowData = row.data;
         let r = {
