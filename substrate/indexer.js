@@ -2893,13 +2893,13 @@ order by msgHash, diffSentAt, diffTS`
         this.xcmTrailingKeyMap = updatedTrailingKeyMap
     }
 
-    // this is the "new" xcm table
+    // this is the xcmmessages table
     async dump_xcm_messages() {
         if (this.recentXcmMsgs.length > 0) {
             let rows = this.recentXcmMsgs
             if (this.debugLevel >= paraTool.debugTracing) console.log(`dump_xcm_messages rowsLen=${rows.length}`, rows)
             let i = 0;
-            let vals = ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT"];
+            let vals = ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries"];
             for (i = 0; i < rows.length; i += 10000) {
                 let j = i + 10000;
                 if (j > rows.length) j = rows.length;
@@ -5373,8 +5373,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
                     let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
                     let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
-                    //["msgHash", "incoming", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "blockNumber", "sentAt", "relayChain", "version", "path"];
-                    let s = `('${mp.msgHash}', '${mp.blockNumber}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.relayChain}', '${mp.version}', '${mp.path}', ${extrinsicID}, ${extrinsicHash}, Now())`
+                    let beneficiaries = (mp.beneficiaries != undefined) ? `'${mp.beneficiaries}'` : 'NULL'
+                    console.log(`mp beneficiaries`, beneficiaries)
+                    //["msgHash", "blockNumber", "incoming"] + ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries"]
+                    let s = `('${mp.msgHash}', '${mp.blockNumber}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.relayChain}', '${mp.version}', '${mp.path}', ${extrinsicID}, ${extrinsicHash}, Now(), ${beneficiaries})`
                     recentXcmMsgs.push(s);
                     if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] add ${xcmKey}`, s)
                     this.xcmTrailingKeyMap[xcmKey].isFresh = false // mark the record as processed

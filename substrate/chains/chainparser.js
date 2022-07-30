@@ -339,6 +339,9 @@ module.exports = class ChainParser {
                     let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
                     var instructions = this.decodeXcmVersionedXcm(indexer, data, `DownwardMessageQueuesVal`)
                     var dmpMsg = instructions.toJSON()
+                    var msg0 = instructions.toJSON()
+                    let beneficiaries = this.getBeneficiary(msg0)
+                    console.log(`[Trace] Outgoing DownwardMessageQueuesVal [${msgHash}] beneficiaries=${beneficiaries}`)
                     let p = this.getInstructionPath(dmpMsg)
                     let dmpDecoded = {
                         msg: JSON.stringify(dmpMsg),
@@ -352,6 +355,7 @@ module.exports = class ChainParser {
                         chainID: indexer.chainID,
                         chainIDDest: chainIDDest,
                         relayChain: relayChain,
+                        beneficiaries: beneficiaries,
                     }
                     if (p) {
                         dmpRaw.version = p.version
@@ -401,6 +405,9 @@ module.exports = class ChainParser {
                     let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
                     var instructions = this.decodeXcmVersionedXcm(indexer, data, `UpwardMessagesVal`)
                     var umpMsg = instructions.toJSON()
+                    var msg0 = instructions.toJSON()
+                    let beneficiaries = this.getBeneficiary(msg0)
+                    console.log(`[Trace] Outgoing UpwardMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
                     let p = this.getInstructionPath(umpMsg)
                     let umpDecoded = {
                         msg: JSON.stringify(umpMsg),
@@ -415,6 +422,7 @@ module.exports = class ChainParser {
                         chainID: indexer.chainID,
                         chainIDDest: (relayChain == 'polkadot') ? 0 : 2,
                         relayChain: relayChain,
+                        beneficiaries: beneficiaries,
                     }
                     if (p) {
                         umpRaw.version = p.version
@@ -461,6 +469,9 @@ module.exports = class ChainParser {
                     let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
                     var instructions = this.decodeXcmVersionedXcm(indexer, data, `HrmpOutboundMessagesVal`)
                     var hrmpMsg = instructions.toJSON()
+                    var msg0 = instructions.toJSON()
+                    let beneficiaries = this.getBeneficiary(msg0)
+                    console.log(`[Trace] Outgoing HrmpOutboundMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
                     let p = this.getInstructionPath(hrmpMsg)
                     let hrmpDecoded = {
                         msg: JSON.stringify(hrmpMsg),
@@ -475,6 +486,7 @@ module.exports = class ChainParser {
                         chainID: indexer.chainID,
                         chainIDDest: hrmp.recipient + paraIDExtra,
                         relayChain: relayChain,
+                        beneficiaries: beneficiaries,
                     }
                     if (p) {
                         hrmpRaw.version = p.version
@@ -492,6 +504,89 @@ module.exports = class ChainParser {
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${mpType}] HrmpOutboundMessagesVal decoratedVal=${decoratedVal}, error`, e)
         }
+    }
+
+
+    processInternalXCMIntrusctionBeneficiary(dXcmMsg, internalXCM, instructionK, instructionV) {
+        let dInstructionV = {}
+        switch (instructionK) {
+            case "depositAsset":
+                //TODO: need to decorate addr
+                if (instructionV.beneficiary != undefined) {
+                    let destAddress = this.chainParser.processBeneficiary(false, instructionV.beneficiary)
+                    if (destAddress){
+                        internalXCM.destAddress = destAddress
+                        dXcmMsg.destAddress.push(destAddress)
+                    }
+                }
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
+            default:
+                break;
+        }
+    }
+
+    processXCMIntrusctionBeneficiary(dXcmMsg, instructionK, instructionV) {
+        let version = dXcmMsg.version
+        let dInstructionV = {}
+        switch (instructionK) {
+            case "depositAsset":
+                //TODO: need to decorate addr
+                if (instructionV.beneficiary != undefined) {
+                    let destAddress = this.processBeneficiary(false, instructionV.beneficiary)
+                    if (destAddress){
+                        dXcmMsg.destAddress.push(destAddress)
+                    }
+                }
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version].push(dInstructionV)
+                break;
+            case "depositReserveAsset":
+                if (Array.isArray(instructionV.xcm)){
+                    for (let i = 0; i < instructionV.xcm.length; i++){
+                      let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
+                      let instructionXCMV = instructionV.xcm[i][instructionXCMK]
+                      console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                      this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV)
+                    }
+                }
+                console.log(`depositReserveAsset final`, JSON.stringify(instructionV,null,4))
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version].push(dInstructionV)
+                break;
+            default:
+                break;
+        }
+    }
+
+
+    getBeneficiary(xcmMsg) {
+        let dXcmMsg = {}
+        let version = Object.keys(xcmMsg)[0]
+        let xcmMsgV = xcmMsg[version]
+
+        dXcmMsg.version = version
+        dXcmMsg[version] = []
+        dXcmMsg.destAddress = []
+
+        let xcmPath = []
+        for (let i = 0; i < xcmMsgV.length; i++) {
+            let instructionK = Object.keys(xcmMsgV[i])[0]
+            xcmPath.push(instructionK)
+        }
+        //"withdrawAsset", "clearOrigin","buyExecution", "depositAsset"
+        if (version == 'v2' || version == 'v1') {
+            for (let i = 0; i < xcmPath.length; i++) {
+                let instructionK = xcmPath[i]
+                let instructionV = xcmMsgV[i][instructionK]
+                //console.log(`getBeneficiary instructionK=${instructionK}, instructionV`, instructionV)
+                this.processXCMIntrusctionBeneficiary(dXcmMsg, instructionK, instructionV)
+            }
+        } else if (version == 'v0') {
+            //skip for now
+        }
+        return dXcmMsg.destAddress.join('|')
     }
 
     //TODO: make this meaningful
@@ -920,6 +1015,9 @@ module.exports = class ChainParser {
             msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as ump (ExecutedUpward)?
             var instructions = this.decodeXcmVersionedXcm(indexer, data, `decodeUpwardMsg-${channelMsgIndex}`)
             var umpMsg = instructions.toJSON()
+            var msg0 = instructions.toJSON()
+            let beneficiaries = this.getBeneficiary(msg0)
+            console.log(`[Extrinsic] Incoming upwardMsg [${msgHash}] beneficiaries=${beneficiaries}`)
             let p = this.getInstructionPath(umpMsg)
             if (this.debugLevel >= paraTool.debugInfo) console.log(`upwardMsg [${msgHash}]`, JSON.stringify(umpMsg, null, 2))
             let r = {
@@ -935,6 +1033,7 @@ module.exports = class ChainParser {
                 blockNumber: this.parserBlockNumber,
                 relayChain: indexer.relayChain,
                 sentAt: sentAt,
+                beneficiaries: beneficiaries,
             }
             if (p) {
                 r.version = p.version
@@ -973,6 +1072,9 @@ module.exports = class ChainParser {
             //console.log(`decodeDownwardMsg`, downwardMsg)
             var instructions = this.decodeXcmVersionedXcm(indexer, data, `decodeDownwardMsg-${channelMsgIndex}`)
             var dmpMsg = instructions.toJSON()
+            var msg0 = instructions.toJSON()
+            let beneficiaries = this.getBeneficiary(msg0)
+            console.log(`[Extrinsic] Incoming downwardMsg [${msgHash}] beneficiaries=${beneficiaries}`)
             let p = this.getInstructionPath(dmpMsg)
             if (this.debugLevel >= paraTool.debugInfo) console.log(`downwardMsg [${msgHash}]`, JSON.stringify(dmpMsg, null, 2))
             let r = {
@@ -988,6 +1090,7 @@ module.exports = class ChainParser {
                 blockNumber: this.parserBlockNumber,
                 relayChain: indexer.relayChain,
                 sentAt: sentAt,
+                beneficiaries: beneficiaries,
             }
             if (p) {
                 r.version = p.version
@@ -1028,6 +1131,9 @@ module.exports = class ChainParser {
             msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
             var instructions = this.decodeXcmVersionedXcm(indexer, data, `decodeHorizontalMsg-${channelMsgIndex}`)
             var hrmpMsg = instructions.toJSON()
+            var msg0 = instructions.toJSON()
+            let beneficiaries = this.getBeneficiary(msg0)
+            console.log(`[Extrinsic] Incoming horizontalMsg [${msgHash}] beneficiaries=${beneficiaries}`)
             let p = this.getInstructionPath(hrmpMsg)
             if (this.debugLevel >= paraTool.debugInfo) console.log(`horizontalMsg`, JSON.stringify(hrmpMsg, null, 2))
             let r = {
@@ -1043,6 +1149,7 @@ module.exports = class ChainParser {
                 blockNumber: this.parserBlockNumber,
                 relayChain: indexer.relayChain,
                 sentAt: sentAt,
+                beneficiaries: beneficiaries,
             }
             if (p) {
                 r.version = p.version
@@ -3032,6 +3139,7 @@ module.exports = class ChainParser {
                 sentAt: (msg.sentAt) ? msg.sentAt : 0, //TODO: only dmp has known sentAt. need to parse hrmpWatermark somehow
                 version: msg.version,
                 path: msg.path,
+                beneficiaries: (msg.beneficiaries != undefined && msg.beneficiaries !='')? msg.beneficiaries : null
             }
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processxcmMsgRaw error`, e.toString())
