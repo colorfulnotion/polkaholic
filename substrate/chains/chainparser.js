@@ -547,11 +547,11 @@ module.exports = class ChainParser {
                     for (let i = 0; i < instructionV.xcm.length; i++){
                       let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
                       let instructionXCMV = instructionV.xcm[i][instructionXCMK]
-                      console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                      //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
                       this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV)
                     }
                 }
-                console.log(`depositReserveAsset final`, JSON.stringify(instructionV,null,4))
+                //console.log(`depositReserveAsset final`, JSON.stringify(instructionV,null,4))
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version].push(dInstructionV)
                 break;
@@ -2041,7 +2041,7 @@ module.exports = class ChainParser {
     }
 
     processBeneficiary(indexer, beneficiary, relayChain = 'polkadot', decorate = false) {
-      console.log(`processBeneficiary called`, beneficiary)
+      //console.log(`processBeneficiary called`, beneficiary)
       let paraIDDest, chainIDDest, destAddress;
       let isInterior = (beneficiary.interior != undefined)? 1 : 0
       let beneficiaryType = (beneficiary.interior != undefined)? Object.keys(beneficiary.interior)[0]: Object.keys(beneficiary)[0]    //handle dest.beneficiary
@@ -4050,6 +4050,7 @@ module.exports = class ChainParser {
                 method: method,
                 fromAddress: fromAddress,
                 blockNumberDest: this.parserBlockNumber,
+                sentAt: this.parserWatermark,
                 asset: assetString,
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
@@ -4085,6 +4086,7 @@ module.exports = class ChainParser {
                 method: method,
                 fromAddress: fromAddress,
                 blockNumberDest: this.parserBlockNumber,
+                sentAt: this.parserWatermark,
                 asset: assetString,
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
@@ -4121,6 +4123,7 @@ module.exports = class ChainParser {
                 method: method,
                 fromAddress: fromAddress,
                 blockNumberDest: this.parserBlockNumber,
+                sentAt: this.parserWatermark,
                 asset: assetString,
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
@@ -4184,6 +4187,7 @@ module.exports = class ChainParser {
                     method: method,
                     fromAddress: fromAddress,
                     blockNumberDest: this.parserBlockNumber,
+                    sentAt: this.parserWatermark,
                     asset: assetString,
                     rawAsset: rawAssetString,
                     destTS: this.parserTS,
