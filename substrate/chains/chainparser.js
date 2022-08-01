@@ -514,7 +514,7 @@ module.exports = class ChainParser {
                 //TODO: need to decorate addr
                 if (instructionV.beneficiary != undefined) {
                     let destAddress = this.chainParser.processBeneficiary(false, instructionV.beneficiary)
-                    if (destAddress){
+                    if (destAddress) {
                         internalXCM.destAddress = destAddress
                         dXcmMsg.destAddress.push(destAddress)
                     }
@@ -535,7 +535,7 @@ module.exports = class ChainParser {
                 //TODO: need to decorate addr
                 if (instructionV.beneficiary != undefined) {
                     let destAddress = this.processBeneficiary(false, instructionV.beneficiary)
-                    if (destAddress){
+                    if (destAddress) {
                         dXcmMsg.destAddress.push(destAddress)
                     }
                 }
@@ -543,12 +543,12 @@ module.exports = class ChainParser {
                 dXcmMsg[version].push(dInstructionV)
                 break;
             case "depositReserveAsset":
-                if (Array.isArray(instructionV.xcm)){
-                    for (let i = 0; i < instructionV.xcm.length; i++){
-                      let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
-                      let instructionXCMV = instructionV.xcm[i][instructionXCMK]
-                      //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                      this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV)
+                if (Array.isArray(instructionV.xcm)) {
+                    for (let i = 0; i < instructionV.xcm.length; i++) {
+                        let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
+                        let instructionXCMV = instructionV.xcm[i][instructionXCMK]
+                        //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV)
                     }
                 }
                 //console.log(`depositReserveAsset final`, JSON.stringify(instructionV,null,4))
@@ -2041,81 +2041,81 @@ module.exports = class ChainParser {
     }
 
     processBeneficiary(indexer, beneficiary, relayChain = 'polkadot', decorate = false) {
-      //console.log(`processBeneficiary called`, beneficiary)
-      let paraIDDest, chainIDDest, destAddress;
-      let isInterior = (beneficiary.interior != undefined)? 1 : 0
-      let beneficiaryType = (beneficiary.interior != undefined)? Object.keys(beneficiary.interior)[0]: Object.keys(beneficiary)[0]    //handle dest.beneficiary
-      let beneficiaryV = (beneficiary.interior != undefined)? beneficiary['interior'][beneficiaryType] : beneficiary[beneficiaryType] //move up dest.beneficiary
-      switch (beneficiaryType) {
-        case 'x1':
-          //I think it's possible?
-          [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV, relayChain, true, indexer)
-          if (isInterior) {
-            beneficiary['interior'][beneficiaryType] = beneficiaryV
-          }else{
-            beneficiary[beneficiaryType] = beneficiaryV
-          }
-          break;
-        case 'x2':
-          [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV, relayChain, true, indexer)
-          if (isInterior) {
-            beneficiary['interior'][beneficiaryType] = beneficiaryV
-          }else{
-            beneficiary[beneficiaryType] = beneficiaryV
-          }
-          break;
-        case 'v0':
-          let beneficiaryV0XType = Object.keys(beneficiaryV)[0]
-          let beneficiaryV0V = Object.keys(beneficiaryV0XType)[0]
-          if (beneficiaryV0XType == 'x1'){
-            //0x0db891b6d6af60401a21f72761ed04a6024bf37b6cdeaab62d0bc3963c5c9357
-            [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV0V, relayChain, true, indexer)
-          }else if(beneficiaryV0XType == 'x2'){
-            // I think this this can happen when xcmPallet to para?
-            [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV0V, relayChain, true, indexer)
-          }else{
-            console.log(`unknown beneficiaryV0XType=${beneficiaryV0XType}`)
-            break;
-          }
-          if (isInterior) {
-            beneficiary['interior'][beneficiaryType][beneficiaryV0XType] = beneficiaryV0V
-          }else{
-            beneficiary[beneficiaryType][beneficiaryV0XType] = beneficiaryV0V
-          }
-          break;
-        case 'v1':
-          let beneficiaryV1XType = Object.keys(beneficiaryV)[0]
-          let beneficiaryV1V = Object.keys(beneficiaryV1XType)[0]
-          if (beneficiaryV1V.interior != undefined){
-            let beneficiaryV1VInteriorXType = Object.keys(beneficiaryV1V.interior)[0]
-            let beneficiaryV1VInteriorV = beneficiaryV1V['interior'][beneficiaryV1VInteriorXType]
-            if (beneficiaryV1VInteriorXType == 'x1'){
-              //0x0db891b6d6af60401a21f72761ed04a6024bf37b6cdeaab62d0bc3963c5c9357
-              [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV1VInteriorV, relayChain, true, indexer)
-            }else if(beneficiaryV1VInteriorXType == 'x2'){
-              // I think this this can happen when xcmPallet to para?
-              [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV1VInteriorV, relayChain, true, indexer)
-            }else{
-              console.log(`unknown beneficiaryV1VInteriorXType=${beneficiaryV1VInteriorXType}`)
-              break;
-            }
-            if (isInterior) {
-              beneficiary['interior'][beneficiaryType][beneficiaryV1XType]['interior'][beneficiaryV1VInteriorXType] = beneficiaryV1VInteriorV
-            }else{
-              beneficiary[beneficiaryType][beneficiaryV1XType]['interior'][beneficiaryV1VInteriorXType] = beneficiaryV1VInteriorV
-            }
-          }else{
-            console.log(`unknown beneficiaryV1V interior not exist`)
-          }
-          break;
-        case 'v2':
-          console.log(`unknown beneficiaryV2Type=${beneficiaryV}`)
-          break;
-        default:
-          console.log(`unknown beneficiaryType ${beneficiaryType}`)
-      }
-      console.log(`destAddress found: ${destAddress}`)
-      return destAddress
+        //console.log(`processBeneficiary called`, beneficiary)
+        let paraIDDest, chainIDDest, destAddress;
+        let isInterior = (beneficiary.interior != undefined) ? 1 : 0
+        let beneficiaryType = (beneficiary.interior != undefined) ? Object.keys(beneficiary.interior)[0] : Object.keys(beneficiary)[0] //handle dest.beneficiary
+        let beneficiaryV = (beneficiary.interior != undefined) ? beneficiary['interior'][beneficiaryType] : beneficiary[beneficiaryType] //move up dest.beneficiary
+        switch (beneficiaryType) {
+            case 'x1':
+                //I think it's possible?
+                [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV, relayChain, true, indexer)
+                if (isInterior) {
+                    beneficiary['interior'][beneficiaryType] = beneficiaryV
+                } else {
+                    beneficiary[beneficiaryType] = beneficiaryV
+                }
+                break;
+            case 'x2':
+                [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV, relayChain, true, indexer)
+                if (isInterior) {
+                    beneficiary['interior'][beneficiaryType] = beneficiaryV
+                } else {
+                    beneficiary[beneficiaryType] = beneficiaryV
+                }
+                break;
+            case 'v0':
+                let beneficiaryV0XType = Object.keys(beneficiaryV)[0]
+                let beneficiaryV0V = Object.keys(beneficiaryV0XType)[0]
+                if (beneficiaryV0XType == 'x1') {
+                    //0x0db891b6d6af60401a21f72761ed04a6024bf37b6cdeaab62d0bc3963c5c9357
+                    [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV0V, relayChain, true, indexer)
+                } else if (beneficiaryV0XType == 'x2') {
+                    // I think this this can happen when xcmPallet to para?
+                    [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV0V, relayChain, true, indexer)
+                } else {
+                    console.log(`unknown beneficiaryV0XType=${beneficiaryV0XType}`)
+                    break;
+                }
+                if (isInterior) {
+                    beneficiary['interior'][beneficiaryType][beneficiaryV0XType] = beneficiaryV0V
+                } else {
+                    beneficiary[beneficiaryType][beneficiaryV0XType] = beneficiaryV0V
+                }
+                break;
+            case 'v1':
+                let beneficiaryV1XType = Object.keys(beneficiaryV)[0]
+                let beneficiaryV1V = Object.keys(beneficiaryV1XType)[0]
+                if (beneficiaryV1V.interior != undefined) {
+                    let beneficiaryV1VInteriorXType = Object.keys(beneficiaryV1V.interior)[0]
+                    let beneficiaryV1VInteriorV = beneficiaryV1V['interior'][beneficiaryV1VInteriorXType]
+                    if (beneficiaryV1VInteriorXType == 'x1') {
+                        //0x0db891b6d6af60401a21f72761ed04a6024bf37b6cdeaab62d0bc3963c5c9357
+                        [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV1VInteriorV, relayChain, true, indexer)
+                    } else if (beneficiaryV1VInteriorXType == 'x2') {
+                        // I think this this can happen when xcmPallet to para?
+                        [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV1VInteriorV, relayChain, true, indexer)
+                    } else {
+                        console.log(`unknown beneficiaryV1VInteriorXType=${beneficiaryV1VInteriorXType}`)
+                        break;
+                    }
+                    if (isInterior) {
+                        beneficiary['interior'][beneficiaryType][beneficiaryV1XType]['interior'][beneficiaryV1VInteriorXType] = beneficiaryV1VInteriorV
+                    } else {
+                        beneficiary[beneficiaryType][beneficiaryV1XType]['interior'][beneficiaryV1VInteriorXType] = beneficiaryV1VInteriorV
+                    }
+                } else {
+                    console.log(`unknown beneficiaryV1V interior not exist`)
+                }
+                break;
+            case 'v2':
+                console.log(`unknown beneficiaryV2Type=${beneficiaryV}`)
+                break;
+            default:
+                console.log(`unknown beneficiaryType ${beneficiaryType}`)
+        }
+        console.log(`destAddress found: ${destAddress}`)
+        return destAddress
     }
 
     //This is the V0 format
@@ -3139,7 +3139,7 @@ module.exports = class ChainParser {
                 sentAt: (msg.sentAt) ? msg.sentAt : 0, //TODO: only dmp has known sentAt. need to parse hrmpWatermark somehow
                 version: msg.version,
                 path: msg.path,
-                beneficiaries: (msg.beneficiaries != undefined && msg.beneficiaries !='')? msg.beneficiaries : null
+                beneficiaries: (msg.beneficiaries != undefined && msg.beneficiaries != '') ? msg.beneficiaries : null
             }
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processxcmMsgRaw error`, e.toString())

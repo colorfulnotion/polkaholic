@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+ // Usage:  decodexcm [hex]
+var Manager = require("./manager");
+
+async function main() {
+    var manager = new Manager();
+    let hex = "0x021000040000000007007dec26010a130000000003803e7693010700f2052a010e010004000100451f08130001000003803e7693010700f2052a010d01000400010100e27d987db9ed2a7a48f4137c997d610226dc93bf256c9026268b0b8489bb9862";
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            hex = val;
+        }
+    });
+    
+    let j = await manager.decodeXCMv2(hex)
+    console.log(JSON.stringify(j, null, 4));
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
