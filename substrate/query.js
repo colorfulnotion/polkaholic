@@ -5453,8 +5453,10 @@ module.exports = class Query extends AssetManager {
             if (x.incoming == 1) {
                 x.received = 1;
                 x.sent = 0;
+                x.incomingBlockNumber = x.blockNumber;
                 xcmmessages.push(x);
             } else if (x.incoming == 0) {
+                x.outgoingBlockNumber = x.blockNumber
                 sent[x.msgHash] = x // this is used to mark .sent = 1 below
             }
         }
@@ -5467,6 +5469,7 @@ module.exports = class Query extends AssetManager {
                     xcmmessages[r].sent = 1;
                     xcmmessages[r].parentMsgHash = x.parentMsgHash; // parentSentAt
                     xcmmessages[r].childMsgHash = x.childMsgHash; // childSentAt
+                    xcmmessages[r].outgoingBlockNumber = x.blockNumber
                     found = true;
                 }
             }
@@ -5474,6 +5477,8 @@ module.exports = class Query extends AssetManager {
                 // somehow we don't have a "received" (incoming=1) record, so we'll add
                 x.sent = 1;
                 x.received = 0;
+                x.outgoingBlockNumber = x.blockNumber
+                // incoming is technically unknown
                 xcmmessages.push(x);
             }
         }
