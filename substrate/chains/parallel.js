@@ -34,16 +34,21 @@ module.exports = class ParallelParser extends ChainParser {
             for (const c of args.calls) {
                 let call_section = c.section;
                 let call_method = c.method;
+                let c_args = c.args
                 //console.log(`[${extrinsic.extrinsicID}] call`, i, call_section, call_method, c);
                 i++;
-                this.processOutgoingXCM(indexer, extrinsic, feed, fromAddress, call_section, call_method, c.args)
+                this.processOutgoingXCM(indexer, extrinsic, feed, fromAddress, call_section, call_method, c_args)
             }
         } else if (args.call != undefined) { // this is an object
             let call = args.call
+            let call_args = call.args
             let call_section = call.section;
             let call_method = call.method;
+            let isHexEncoded = (typeof call === 'object') ? false : true
             //console.log(`[${extrinsic.extrinsicID}] descend into call`, call)
-            this.processOutgoingXCM(indexer, extrinsic, feed, fromAddress, call_section, call_method, call.args)
+            if (!isHexEncoded && call_args != undefined){
+              this.processOutgoingXCM(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args)
+            }
         }
         switch (module_section) {
             case 'xTokens':
