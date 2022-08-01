@@ -25,7 +25,6 @@ let timelineRows = uiTool.getTimelineRows(timeline);
     <tr>
      <td><B>Hash: </B><a href='/xcmmessage/<%= xcm.msgHash; %>'><%- uiTool.getShortHash(xcm.msgHash, false); %></a><br>
      <B>Hex:</B> <%- uiTool.getShortHash(xcm.msgHex, true) %><br/>
-     <B>From:</B> <%= xcm.id %><br/>
      <% if ( xcm.destAddress ) { %>
        <B>Dest:</B>
        <img src="/identicon/<%= xcm.destAddress; %>" class="rounded-start"  width="25px"  loading="lazy"/>
@@ -35,9 +34,10 @@ let timelineRows = uiTool.getTimelineRows(timeline);
        <%- uiTool.showAccountInfo(xcm, "destAddress") %>
        <br/>
      <% } %>
+     <B>From:</B> <%= xcm.id %><br/>
      <B>To:</B> <%= xcm.idDest %> (<a href='/block/<%= xcm.idDest %>/<%= xcm.blockNumber %>'><%= xcm.blockNumber %></a>)<br/>
+     <B>MessageType:</B> <%= xcm.msgType %><%= ` (${xcm.id} -> ${xcm.idDest})` %><br/>
      <B>Relay Chain:</B> <%= xcm.relayChain; %><br/>
-     <B>MessageType:</B> <%= xcm.msgType %><br/>
      <B>Time:</B> <%= uiTool.presentTS(xcm.blockTS) %> <br/>
      <B>Received:</B> <%= xcm.received; %> <br/>
 
@@ -51,7 +51,7 @@ let timelineRows = uiTool.getTimelineRows(timeline);
      </td>
      <td>
       <div id="typ<%= k; %>" class="renderjson"></div>
-      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(5)(<%- JSON.stringify(xcm.msg) %>));</script>
+      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(10)(<%- JSON.stringify(xcm.msg) %>));</script>
      </td>
      <td>
      <% if ( xcm.assetChains ) {

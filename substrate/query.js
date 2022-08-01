@@ -4951,10 +4951,10 @@ module.exports = class Query extends AssetManager {
             filter.push(["trace", 'ParachainSystem', 'HrmpWatermark', null, 'watermark']) // hrmp get updated for this block
         }
 	//if ( mpType == 'dmp' || mpType == 'hrmp' ) {
-            filter.push(["events", "balances", "Deposit", null, 'beneficiary']); 
-            filter.push(["events", "currencies", "Deposited", null, 'beneficiary']); 
-            filter.push(["events", "tokens", "Deposited", null, 'beneficiary']); 
-            filter.push(["events", "assets", "Issued", null, 'beneficiary']); 
+            filter.push(["events", "balances", "Deposit", null, 'beneficiary']);
+            filter.push(["events", "currencies", "Deposited", null, 'beneficiary']);
+            filter.push(["events", "tokens", "Deposited", null, 'beneficiary']);
+            filter.push(["events", "assets", "Issued", null, 'beneficiary']);
 	//}
         return (filter);
     }
@@ -5385,7 +5385,7 @@ module.exports = class Query extends AssetManager {
         let destAddress = (dMsg.destAddress != undefined) ? dMsg.destAddress : null
         let [_, id] = this.convertChainID(rawXcmRec.chainID);
         let [__, idDest] = this.convertChainID(rawXcmRec.chainIDDest);
-	let assetsReceived = rawXcmRec.assetsReceived;
+        let assetsReceived = rawXcmRec.assetsReceived;
         let dXcm = {
             msgHash: rawXcmRec.msgHash,
             msgHex: rawXcmRec.msgHex,
@@ -5407,9 +5407,10 @@ module.exports = class Query extends AssetManager {
             parentSentAt,
             childMsgHash,
             childSentAt,
-	    assetsReceived,
+            assetsReceived,
             assetChains: dAssetChains
         }
+        console.log(`decorateXCM`, JSON.stringify(dXcm, null, 4))
         if (decorate) this.decorateAddress(dXcm, "destAddress", decorateAddr, decorateRelated);
         return dXcm
     }
@@ -5522,7 +5523,7 @@ module.exports = class Query extends AssetManager {
             if (hashType == "xcm") {
                 // here we attempt to get the extrinsicHash of the xcmmessage so we an find all siblings
                 let w = (sentAt) ? ` and sentAt = ${sentAt}` : "" // because XCM messages hash aren't _perfectly_ unique, we need to have sentAt params disambiguate
-                let sql = `select extrinsicID, extrinsicHash, parentMsgHash, parentSentAt, childMsgHash, childSentAt, msgHash, sentAt, assetChains from xcmmessages where msgHash = '${hash}' ${w} order by blockTS desc limit 1`
+                let sql = `select extrinsicID, extrinsicHash, parentMsgHash, parentSentAt, childMsgHash, childSentAt, msgHash, sentAt, assetChains, incoming from xcmmessages where msgHash = '${hash}' ${w} order by blockTS desc limit 1`
                 let xcmscope = await this.poolREADONLY.query(sql);
                 if (xcmscope.length == 1) {
                     let x = xcmscope[0];
@@ -5572,12 +5573,12 @@ module.exports = class Query extends AssetManager {
 			    }
 			});
 		    } catch (e) {
-			
+
 		    }
 		}
 	    } );
 	    console.log("&&& EVENTIDS &&&&", eventIDs);
-	    
+
             // build timeline
             let timeline = [];
             let coveredBlocks = {};
