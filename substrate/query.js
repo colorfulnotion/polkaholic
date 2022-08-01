@@ -5477,6 +5477,8 @@ module.exports = class Query extends AssetManager {
                 xcmmessages.push(x);
             }
         }
+        console.log(`fetch_xcmmessages_chainpaths xcmmessages`, xcmmessages)
+        console.log(`fetch_xcmmessages_chainpaths chainpaths`, chainpaths)
         return [xcmmessages, chainpaths];
     }
 
