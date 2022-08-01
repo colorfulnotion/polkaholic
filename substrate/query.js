@@ -5468,7 +5468,9 @@ module.exports = class Query extends AssetManager {
                 if (xcmmessages[r].msgHash == sentMsgHash) {
                     xcmmessages[r].sent = 1;
                     xcmmessages[r].parentMsgHash = x.parentMsgHash; // parentSentAt
+                    xcmmessages[r].parentSentAt = x.parentSentAt; // parentSentAt
                     xcmmessages[r].childMsgHash = x.childMsgHash; // childSentAt
+                    xcmmessages[r].childSentAt = x.childSentAt; // childSentAt
                     xcmmessages[r].outgoingBlockNumber = x.blockNumber
                     found = true;
                 }
