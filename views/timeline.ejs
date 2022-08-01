@@ -34,13 +34,12 @@ let timelineRows = uiTool.getTimelineRows(timeline);
        <%- uiTool.showAccountInfo(xcm, "destAddress") %>
        <br/>
      <% } %>
-     <B>From:</B> <%= xcm.id %><br/>
-     <B>To:</B> <%= xcm.idDest %> (<a href='/block/<%= xcm.idDest %>/<%= xcm.blockNumber %>'><%= xcm.blockNumber %></a>)<br/>
+     <B>From:</B> <%= xcm.id %> (<a href='/block/<%= xcm.id %>/<%= xcm.BlockNumberSent %>'><%= xcm.BlockNumberSent %></a>)<br/>
+     <B>To:</B> <%= xcm.idDest %> (<a href='/block/<%= xcm.idDest %>/<%= xcm.BlockNumberReceived %>'><%= xcm.BlockNumberReceived %></a>)<br/>
      <B>MessageType:</B> <%= xcm.msgType %><%= ` (${xcm.id} -> ${xcm.idDest})` %><br/>
      <B>Relay Chain:</B> <%= xcm.relayChain; %><br/>
      <B>Time:</B> <%= uiTool.presentTS(xcm.blockTS) %> <br/>
      <B>Received:</B> <%= xcm.received; %> <br/>
-
      <% if ( xcm.parentMsgHash ) { %>
        <br> <B>Parent</B>: <br> <a href='/timeline/<%= xcm.parentMsgHash %>/xcm/<%= xcm.parentSentAt %>'><%- uiTool.getShortHash(xcm.parentMsgHash, false); %></a> sentAt: <%= xcm.parentSentAt %>
      <% } %>

@@ -5399,6 +5399,8 @@ module.exports = class Query extends AssetManager {
             idDest,
             blockTS: rawXcmRec.blockTS,
             blockNumber: rawXcmRec.blockNumber, // which one depends whether received ... should put paraID blockNumber (sent), paraIDDest blockNumber (received)
+            BlockNumberReceived: rawXcmRec.BlockNumberReceived, // /idDest/BlockNumberReceived
+            blockNumberSent: rawXcmRec.blockNumberSent,         // /id/blockNumberSent
             paraIDDest: rawXcmRec.paraIDDest,
             //decodeMsg: dMsg,
             extrinsicID: rawXcmRec.extrinsicID,
@@ -5453,17 +5455,17 @@ module.exports = class Query extends AssetManager {
             if (x.incoming == 1) {
                 x.received = 1;
                 x.sent = 0;
-                x.incomingBlockNumber = x.blockNumber;
+                x.BlockNumberReceived = x.blockNumber;
                 xcmmessages.push(x);
             } else if (x.incoming == 0) {
-                x.outgoingBlockNumber = x.blockNumber
+                x.BlockNumberSent = x.blockNumber
                 sent[x.msgHash] = x // this is used to mark .sent = 1 below
             }
         }
         // for all the msgHash keys in the sent map,  update "sent" attribute to 1 ... but if it can't be found then add it into the array
         for (const sentMsgHash of Object.keys(sent)) {
             let found = false;
-            let x = sent[sentMsgHash];
+            let x = sent[sentMsgHash]; //outgoing record
             for (let r = 0; r < xcmmessages.length; r++) {
                 if (xcmmessages[r].msgHash == sentMsgHash) {
                     xcmmessages[r].sent = 1;
@@ -5471,7 +5473,7 @@ module.exports = class Query extends AssetManager {
                     xcmmessages[r].parentSentAt = x.parentSentAt; // parentSentAt
                     xcmmessages[r].childMsgHash = x.childMsgHash; // childSentAt
                     xcmmessages[r].childSentAt = x.childSentAt; // childSentAt
-                    xcmmessages[r].outgoingBlockNumber = x.blockNumber
+                    xcmmessages[r].BlockNumberSent = x.blockNumber
                     found = true;
                 }
             }
@@ -5479,8 +5481,8 @@ module.exports = class Query extends AssetManager {
                 // somehow we don't have a "received" (incoming=1) record, so we'll add
                 x.sent = 1;
                 x.received = 0;
-                x.outgoingBlockNumber = x.blockNumber
-                // incoming is technically unknown
+                x.BlockNumberSent = x.blockNumber
+                x.BlockNumberReceived = null // BlockNumberReceived is unknown
                 xcmmessages.push(x);
             }
         }
