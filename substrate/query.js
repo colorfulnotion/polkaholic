@@ -4950,12 +4950,12 @@ module.exports = class Query extends AssetManager {
             filter.push(["trace", 'ParachainSystem', 'LastHrmpMqcHeads', null, "mqc"]) // hrmpMqc per each open channel (paraIDs)
             filter.push(["trace", 'ParachainSystem', 'HrmpWatermark', null, 'watermark']) // hrmp get updated for this block
         }
-	//if ( mpType == 'dmp' || mpType == 'hrmp' ) {
-            filter.push(["events", "balances", "Deposit", null, 'beneficiary']);
-            filter.push(["events", "currencies", "Deposited", null, 'beneficiary']);
-            filter.push(["events", "tokens", "Deposited", null, 'beneficiary']);
-            filter.push(["events", "assets", "Issued", null, 'beneficiary']);
-	//}
+        //if ( mpType == 'dmp' || mpType == 'hrmp' ) {
+        filter.push(["events", "balances", "Deposit", null, 'beneficiary']);
+        filter.push(["events", "currencies", "Deposited", null, 'beneficiary']);
+        filter.push(["events", "tokens", "Deposited", null, 'beneficiary']);
+        filter.push(["events", "assets", "Issued", null, 'beneficiary']);
+        //}
         return (filter);
     }
 
@@ -5019,8 +5019,8 @@ module.exports = class Query extends AssetManager {
                     let m2 = `${ev.method.toLowerCase()}`
                     let sm2 = `${s2}:${m2}`
                     if (matcher["events"][sm2] || matcher["events"][s2] || matcher["events"][m2]) {
-			// RULE: if we find an event that has a beneficiary feature, the eventID must be inside eventIDs
-			let pass = ( features[sm2] == "beneficiary" ) ? eventIDs.includes(ev.eventID) : true;
+                        // RULE: if we find an event that has a beneficiary feature, the eventID must be inside eventIDs
+                        let pass = (features[sm2] == "beneficiary") ? eventIDs.includes(ev.eventID) : true;
                         if (features[sm2] != undefined) {
                             if (features[sm2] == "processed") {
                                 extra[ev.method] = ev.data;
@@ -5028,14 +5028,14 @@ module.exports = class Query extends AssetManager {
                                 extra[ev.method] = ev.data;
                             }
                         }
-			if ( pass ) {
+                        if (pass) {
                             out.push({
-				"type": "event",
-				"obj": ev,
-				"idx": idx
+                                "type": "event",
+                                "obj": ev,
+                                "idx": idx
                             });
                             idx++;
-			}
+                        }
                     }
                 });
             });
@@ -5400,7 +5400,7 @@ module.exports = class Query extends AssetManager {
             blockTS: rawXcmRec.blockTS,
             blockNumber: rawXcmRec.blockNumber, // which one depends whether received ... should put paraID blockNumber (sent), paraIDDest blockNumber (received)
             BlockNumberReceived: rawXcmRec.BlockNumberReceived, // /idDest/BlockNumberReceived
-            blockNumberSent: rawXcmRec.blockNumberSent,         // /id/blockNumberSent
+            blockNumberSent: rawXcmRec.blockNumberSent, // /id/blockNumberSent
             paraIDDest: rawXcmRec.paraIDDest,
             //decodeMsg: dMsg,
             extrinsicID: rawXcmRec.extrinsicID,
@@ -5517,12 +5517,12 @@ module.exports = class Query extends AssetManager {
     }
 
     chainpaths_contains(chainpaths, chainID, blockNumber) {
-	for (let i = 0 ; i < chainpaths.length; i++ ) {
-	    if ( chainpaths[i].chainID == chainID && chainpaths[i].blockNumber == blockNumber ) {
-		return(true);
-	    }
-	}
-	return false
+        for (let i = 0; i < chainpaths.length; i++) {
+            if (chainpaths[i].chainID == chainID && chainpaths[i].blockNumber == blockNumber) {
+                return (true);
+            }
+        }
+        return false
     }
     // given a hash of an extrinsic OR a XCM message hash, get the timeline of blocks and ALL xcmmessages we have indexed
     async getXCMTimeline(hash, hashType = "extrinsic", sentAt = null, decorate = true, decorateExtra = true, advanced = true) {
@@ -5559,38 +5559,38 @@ module.exports = class Query extends AssetManager {
                 [xcmmessages, chainpaths] = await this.get_xcm_messages_extrinsic(extrinsicHash);
             }
 
-	    // get eventIDs in assetsReceived, which may also contain additional chainpaths
-	    let eventIDs = [];
-	    xcmmessages.forEach( (m) => {
-		if ( m.assetsReceived != undefined && m.assetsReceived.length > 0 ) {
-		    try {
-			let assetsReceived = JSON.parse(m.assetsReceived);
-			assetsReceived.forEach( (r) => {
-			    if ( r.eventID != undefined && r.eventID.length > 0 ) {
-				eventIDs.push(r.eventID);
-				// "eventID": "0-11411458-2-20"
-				let a = r.eventID.split("-");
-				if ( a.length == 4 ) {
-				    // add to chainpaths: chainID, blockNumber -- because the xcmmatch processes detected an "assets:Issued" type event  for the beneficiary
-				    let [ chainID, blockNumber, extrinsicNo, eventIndex ] = a;
-				    if ( this.chainpaths_contains(chainpaths, chainID, blockNumber) == false ) {
-					chainpaths.push({
-					    chainID: chainID,
-					    chainIDDest: null,
-					    incoming: -1,
-					    blockNumber: parseInt(blockNumber, 10),
-					    msgType: "none"
-					});
-				    }
-				}
-			    }
-			});
-		    } catch (e) {
+            // get eventIDs in assetsReceived, which may also contain additional chainpaths
+            let eventIDs = [];
+            xcmmessages.forEach((m) => {
+                if (m.assetsReceived != undefined && m.assetsReceived.length > 0) {
+                    try {
+                        let assetsReceived = JSON.parse(m.assetsReceived);
+                        assetsReceived.forEach((r) => {
+                            if (r.eventID != undefined && r.eventID.length > 0) {
+                                eventIDs.push(r.eventID);
+                                // "eventID": "0-11411458-2-20"
+                                let a = r.eventID.split("-");
+                                if (a.length == 4) {
+                                    // add to chainpaths: chainID, blockNumber -- because the xcmmatch processes detected an "assets:Issued" type event  for the beneficiary
+                                    let [chainID, blockNumber, extrinsicNo, eventIndex] = a;
+                                    if (this.chainpaths_contains(chainpaths, chainID, blockNumber) == false) {
+                                        chainpaths.push({
+                                            chainID: chainID,
+                                            chainIDDest: null,
+                                            incoming: -1,
+                                            blockNumber: parseInt(blockNumber, 10),
+                                            msgType: "none"
+                                        });
+                                    }
+                                }
+                            }
+                        });
+                    } catch (e) {
 
-		    }
-		}
-	    } );
-	    console.log("&&& EVENTIDS &&&&", eventIDs);
+                    }
+                }
+            });
+            console.log("&&& EVENTIDS &&&&", eventIDs);
 
             // build timeline
             let timeline = [];
