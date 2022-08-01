@@ -62,7 +62,17 @@ let timelineRows = uiTool.getTimelineRows(timeline);
           %>
           <div id="<%= acID; %>" class="renderjson"></div>
           <script>document.getElementById("<%= acID; %>").appendChild(renderjson.set_show_to_level(5)(<%- JSON.stringify(ac) %>));</script>
-	      <% } %>
+      <% } %>
+      <% let assetsReceived = xcm.assetsReceived;
+         if ( assetsReceived ) {
+	     let ar = JSON.parse(assetsReceived);
+             for (var j = 0; j < ar.length; j++) {
+	        let arID = "ar" + j + "_" + xcm.msgHash; %>
+  	        <B> Received </B>
+                <div id="<%= arID; %>" class="renderjson"></div>
+                <script>document.getElementById("<%= arID; %>").appendChild(renderjson.set_show_to_level(5)(<%- JSON.stringify(ar[j]) %>));</script>
+	  <% } %>
+	<% } %>
      <% } %>
      </td>
     </tr>
@@ -110,7 +120,6 @@ let rows = rowsRaw.map( (t) => {
     // t[4] has the objects, t[5] has the tooltip
     let extra = ( t[5] == undefined ) ? {} : t[5];
     let str = JSON.stringify(extra);
-    console.log("TOOLTIP", str);
     return [ t[0], t[1], str, new Date(1000*t[2]), new Date(1000*t[3]) ];
 });
 google.charts.load('current', {

@@ -4950,10 +4950,16 @@ module.exports = class Query extends AssetManager {
             filter.push(["trace", 'ParachainSystem', 'LastHrmpMqcHeads', null, "mqc"]) // hrmpMqc per each open channel (paraIDs)
             filter.push(["trace", 'ParachainSystem', 'HrmpWatermark', null, 'watermark']) // hrmp get updated for this block
         }
+	//if ( mpType == 'dmp' || mpType == 'hrmp' ) {
+            filter.push(["events", "balances", "Deposit", null, 'beneficiary']); 
+            filter.push(["events", "currencies", "Deposited", null, 'beneficiary']); 
+            filter.push(["events", "tokens", "Deposited", null, 'beneficiary']); 
+            filter.push(["events", "assets", "Issued", null, 'beneficiary']); 
+	//}
         return (filter);
     }
 
-    filter_block_row_objects_and_msgHashes(rRow, filter, chainID, extrinsicHash = null) {
+    filter_block_row_objects_and_msgHashes(rRow, filter, chainID, extrinsicHash = null, eventIDs = []) {
         let out = [];
         let extra = {}
         let msgHashes = [];
@@ -5013,6 +5019,8 @@ module.exports = class Query extends AssetManager {
                     let m2 = `${ev.method.toLowerCase()}`
                     let sm2 = `${s2}:${m2}`
                     if (matcher["events"][sm2] || matcher["events"][s2] || matcher["events"][m2]) {
+			// RULE: if we find an event that has a beneficiary feature, the eventID must be inside eventIDs
+			let pass = ( features[sm2] == "beneficiary" ) ? eventIDs.includes(ev.eventID) : true;
                         if (features[sm2] != undefined) {
                             if (features[sm2] == "processed") {
                                 extra[ev.method] = ev.data;
@@ -5020,12 +5028,14 @@ module.exports = class Query extends AssetManager {
                                 extra[ev.method] = ev.data;
                             }
                         }
-                        out.push({
-                            "type": "event",
-                            "obj": ev,
-                            "idx": idx
-                        });
-                        idx++;
+			if ( pass ) {
+                            out.push({
+				"type": "event",
+				"obj": ev,
+				"idx": idx
+                            });
+                            idx++;
+			}
                     }
                 });
             });
@@ -5375,6 +5385,7 @@ module.exports = class Query extends AssetManager {
         let destAddress = (dMsg.destAddress != undefined) ? dMsg.destAddress : null
         let [_, id] = this.convertChainID(rawXcmRec.chainID);
         let [__, idDest] = this.convertChainID(rawXcmRec.chainIDDest);
+	let assetsReceived = rawXcmRec.assetsReceived;
         let dXcm = {
             msgHash: rawXcmRec.msgHash,
             msgHex: rawXcmRec.msgHex,
@@ -5396,6 +5407,7 @@ module.exports = class Query extends AssetManager {
             parentSentAt,
             childMsgHash,
             childSentAt,
+	    assetsReceived,
             assetChains: dAssetChains
         }
         if (decorate) this.decorateAddress(dXcm, "destAddress", decorateAddr, decorateRelated);
@@ -5487,10 +5499,18 @@ module.exports = class Query extends AssetManager {
 
     // get all the xcm messages associated with an extrinsicHash, and also return an array of chainpaths that have chainID/chainIDDest/incoming/blocknumber that allow us to fetch events/traces and formulate the timeline
     async get_xcm_messages_extrinsic(extrinsicHash) {
-        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, childMsgHash, childSentAt from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
+        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, childMsgHash, childSentAt, assetsReceived from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
         return this.fetch_xcmmessages_chainpaths(sql);
     }
 
+    chainpaths_contains(chainpaths, chainID, blockNumber) {
+	for (let i = 0 ; i < chainpaths.length; i++ ) {
+	    if ( chainpaths[i].chainID == chainID && chainpaths[i].blockNumber == blockNumber ) {
+		return(true);
+	    }
+	}
+	return false
+    }
     // given a hash of an extrinsic OR a XCM message hash, get the timeline of blocks and ALL xcmmessages we have indexed
     async getXCMTimeline(hash, hashType = "extrinsic", sentAt = null, decorate = true, decorateExtra = true, advanced = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -5524,6 +5544,40 @@ module.exports = class Query extends AssetManager {
                 extrinsicHash = hash;
                 [xcmmessages, chainpaths] = await this.get_xcm_messages_extrinsic(hash);
             }
+
+	    // get eventIDs in assetsReceived, which may also contain additional chainpaths
+	    let eventIDs = [];
+	    xcmmessages.forEach( (m) => {
+		if ( m.assetsReceived != undefined && m.assetsReceived.length > 0 ) {
+		    try {
+			let assetsReceived = JSON.parse(m.assetsReceived);
+			assetsReceived.forEach( (r) => {
+			    if ( r.eventID != undefined && r.eventID.length > 0 ) {
+				eventIDs.push(r.eventID);
+				// "eventID": "0-11411458-2-20"
+				let a = r.eventID.split("-");
+				if ( a.length == 4 ) {
+				    // add to chainpaths: chainID, blockNumber -- because the xcmmatch processes detected an "assets:Issued" type event  for the beneficiary
+				    let [ chainID, blockNumber, extrinsicNo, eventIndex ] = a;
+				    if ( this.chainpaths_contains(chainpaths, chainID, blockNumber) == false ) {
+					chainpaths.push({
+					    chainID: chainID,
+					    chainIDDest: null,
+					    incoming: -1,
+					    blockNumber: parseInt(blockNumber, 10),
+					    msgType: "none"
+					});
+				    }
+				}
+			    }
+			});
+		    } catch (e) {
+			
+		    }
+		}
+	    } );
+	    console.log("&&& EVENTIDS &&&&", eventIDs);
+	    
             // build timeline
             let timeline = [];
             let coveredBlocks = {};
@@ -5542,7 +5596,7 @@ module.exports = class Query extends AssetManager {
                     let paraIDDest = (chainIDDest > 20000) ? chainIDDest - 20000 : chainIDDest;
                     let filter = this.get_filter(paraID, paraIDDest, p.msgType, advanced);
 
-                    let [objects, extra] = this.filter_block_row_objects_and_msgHashes(rRow, filter, chainID, extrinsicHash);
+                    let [objects, extra] = this.filter_block_row_objects_and_msgHashes(rRow, filter, chainID, extrinsicHash, eventIDs);
                     let blockTS = rRow.feed.blockTS;
                     if (objects && Array.isArray(objects) && objects.length > 0) {
                         let [_, id] = this.convertChainID(bn_chainID);
