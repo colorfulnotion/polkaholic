@@ -19,50 +19,44 @@ let f = xcm;
       <td>Hex</td>
       <td>
         <%- uiTool.getShortHash(f.msgHex, true) %>
+        <%=` (Len=`%><%- `${(f.msgHex.length/2)-1})`%>
       </td>
     </tr>
-    <tr>
-      <td>Sent At</td>
-      <td>
-        <%= f.sentAt; %>
-      </td>
-    </tr>
-
-    <tr>
-      <td>Send Timestamp</td>
-      <td class='date'>
-        <%= uiTool.presentTS(f.blockTS); %>
-      </td>
-    </tr>
-    <tr>
-      <td>Sent Message Time</td>
-      <td>
-        <%= uiTool.presentSecondsAgoTS(f.blockTS); %>
-      </td>
-    </tr>
-
-    <tr>
-      <td>Received Timestamp</td>
-      <td class='date'>
-        <%= uiTool.presentTS(f.blockTSDest); %>
-      </td>
-    </tr>
-    <tr>
-      <td>Received Message Time</td>
-      <td>
-        <%= uiTool.presentSecondsAgoTS(f.blockTSDest); %>
-      </td>
-    </tr>
-
 
     <tr>
       <td>Message Type</td>
-      <td><%= f.msgType %></td>
+      <td><%= f.msgType %><%= ` (${uiTool.capitalizeFirstLetter(f.id)} -> ${uiTool.capitalizeFirstLetter(f.idDest)})` %></td>
     </tr>
 
     <tr>
-      <td>Version</td>
+      <td>XCM Version</td>
       <td><%= f.version %></td>
+    </tr>
+
+    <tr>
+      <td>Origination</td>
+      <td>
+        <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
+        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.blockNumber}); %>
+        <%=` `%> Sent: <%= uiTool.presentTS(f.blockTS); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Relayed At</td>
+      <td>
+        <a href='/chain/<%= f.relayChain; %>'><%= uiTool.capitalizeFirstLetter(f.relayChain); %></a>
+        <%- include("blockNumber", {chainID: uiTool.capitalizeFirstLetter(f.relayChain), blockNumber: f.sentAt}); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Destination</td>
+      <td>
+        <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
+        <%- include("blockNumber", {chainID: f.idDest, blockNumber: f.blockNumberDest}); %>
+        <%=` `%> Received: <%= uiTool.presentTS(f.blockTSDest); %>
+      </td>
     </tr>
 
 <% if ( f.extrinsicHash ) { %>
@@ -86,28 +80,6 @@ let f = xcm;
     </tr>
 <% } %>
 
-    <tr>
-      <td>Relay Chain</td>
-      <td>
-        <%= f.relayChain; %>
-      </td>
-    </tr>
-
-    <tr>
-      <td>Chain Source</td>
-      <td>
-        <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
-        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.blockNumber}); %>
-      </td>
-    </tr>
-
-    <tr>
-      <td>Chain Dest</td>
-      <td>
-        <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
-        <%- include("blockNumber", {chainID: f.idDest, blockNumber: f.blockNumberDest}); %>
-      </td>
-    </tr>
 
     <tr>
       <td>Dest Address</td>

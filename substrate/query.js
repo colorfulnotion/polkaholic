@@ -5403,8 +5403,10 @@ module.exports = class Query extends AssetManager {
             paraID: rawXcmRec.paraID,
             id,
             idDest,
-            blockTS: rawXcmRec.blockTS,
-            blockNumber: rawXcmRec.blockNumber, // which one depends whether received ... should put paraID blockNumber (sent), paraIDDest blockNumber (received)
+            blockTS: rawXcmRec.blockTS, //TODO: remove ambiguous blockTS
+            receivedTS: rawXcmRec.receivedTS,
+            sentTS: rawXcmRec.sentTS,
+            blockNumber: rawXcmRec.blockNumber, //TODO: remove ambiguous blockNumber, which one depends whether received ... should put paraID blockNumber (sent), paraIDDest blockNumber (received)
             blockNumberReceived: rawXcmRec.blockNumberReceived, // /idDest/blockNumberReceived
             blockNumberSent: rawXcmRec.blockNumberSent, // /id/blockNumberSent
             paraIDDest: rawXcmRec.paraIDDest,
@@ -5462,9 +5464,11 @@ module.exports = class Query extends AssetManager {
                 x.received = 1;
                 x.sent = 0;
                 x.blockNumberReceived = x.blockNumber;
+                x.receivedTS = x.blockTS;
                 xcmmessages.push(x);
             } else if (x.incoming == 0) {
                 x.blockNumberSent = x.blockNumber
+                x.sentTS = x.blockTS
                 sent[x.msgHash] = x // this is used to mark .sent = 1 below
             }
         }
@@ -5480,6 +5484,7 @@ module.exports = class Query extends AssetManager {
                     xcmmessages[r].childMsgHash = x.childMsgHash; // childSentAt
                     xcmmessages[r].childSentAt = x.childSentAt; // childSentAt
                     xcmmessages[r].blockNumberSent = x.blockNumber
+                    xcmmessages[r].sentTS = x.blockTS
                     found = true;
                 }
             }
@@ -5488,6 +5493,7 @@ module.exports = class Query extends AssetManager {
                 x.sent = 1;
                 x.received = 0;
                 x.blockNumberReceived = null // blockNumberReceived is unknown
+                x.receivedTS = null
                 xcmmessages.push(x);
             }
         }
