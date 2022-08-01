@@ -5501,6 +5501,7 @@ module.exports = class Query extends AssetManager {
     // get all the xcm messages associated with an extrinsicHash, and also return an array of chainpaths that have chainID/chainIDDest/incoming/blocknumber that allow us to fetch events/traces and formulate the timeline
     async get_xcm_messages_extrinsic(extrinsicHash) {
         let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, childMsgHash, childSentAt, assetsReceived from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
+        console.log(`get_xcm_messages_extrinsic sql=${sql}`)
         return this.fetch_xcmmessages_chainpaths(sql);
     }
 
@@ -5543,7 +5544,8 @@ module.exports = class Query extends AssetManager {
                 }
             } else if (hashType == "extrinsic") {
                 extrinsicHash = hash;
-                [xcmmessages, chainpaths] = await this.get_xcm_messages_extrinsic(hash);
+                //console.log(`getXCMTimeline type=extrinsic, hash=${extrinsicHash}`)
+                [xcmmessages, chainpaths] = await this.get_xcm_messages_extrinsic(extrinsicHash);
             }
 
 	    // get eventIDs in assetsReceived, which may also contain additional chainpaths
