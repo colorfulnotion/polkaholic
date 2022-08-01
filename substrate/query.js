@@ -5094,7 +5094,10 @@ module.exports = class Query extends AssetManager {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
             let dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
             x.decodeMsg = dMsg
-            if (dMsg.destAddress != undefined) x.destAddress = dMsg.destAddress
+            if (dMsg.destAddress != undefined) {
+              x.destAddress = dMsg.destAddress
+              x.destSS58Address = this.getSS58ByChainID(x.destAddress, x.chainIDDest)
+            }
         }
         if (decorate) this.decorateAddress(x, "destAddress", decorateAddr, decorateRelated);
         x.path = (x.path != undefined) ? JSON.parse(x.path) : []
@@ -5383,6 +5386,8 @@ module.exports = class Query extends AssetManager {
             dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
         }
         let destAddress = (dMsg.destAddress != undefined) ? dMsg.destAddress : null
+        let destSS58Address = this.getSS58ByChainID(destAddress,rawXcmRec.chainIDDest)
+
         let [_, id] = this.convertChainID(rawXcmRec.chainID);
         let [__, idDest] = this.convertChainID(rawXcmRec.chainIDDest);
         let assetsReceived = rawXcmRec.assetsReceived;
@@ -5392,6 +5397,7 @@ module.exports = class Query extends AssetManager {
             msg: xcmMsg,
             msgType: rawXcmRec.msgType,
             destAddress: destAddress,
+            destSS58Address: destSS58Address,
             received: rawXcmRec.received,
             relayChain: rawXcmRec.relayChain,
             paraID: rawXcmRec.paraID,
@@ -5399,7 +5405,7 @@ module.exports = class Query extends AssetManager {
             idDest,
             blockTS: rawXcmRec.blockTS,
             blockNumber: rawXcmRec.blockNumber, // which one depends whether received ... should put paraID blockNumber (sent), paraIDDest blockNumber (received)
-            BlockNumberReceived: rawXcmRec.BlockNumberReceived, // /idDest/BlockNumberReceived
+            blockNumberReceived: rawXcmRec.blockNumberReceived, // /idDest/blockNumberReceived
             blockNumberSent: rawXcmRec.blockNumberSent, // /id/blockNumberSent
             paraIDDest: rawXcmRec.paraIDDest,
             //decodeMsg: dMsg,
@@ -5455,10 +5461,10 @@ module.exports = class Query extends AssetManager {
             if (x.incoming == 1) {
                 x.received = 1;
                 x.sent = 0;
-                x.BlockNumberReceived = x.blockNumber;
+                x.blockNumberReceived = x.blockNumber;
                 xcmmessages.push(x);
             } else if (x.incoming == 0) {
-                x.BlockNumberSent = x.blockNumber
+                x.blockNumberSent = x.blockNumber
                 sent[x.msgHash] = x // this is used to mark .sent = 1 below
             }
         }
@@ -5473,7 +5479,7 @@ module.exports = class Query extends AssetManager {
                     xcmmessages[r].parentSentAt = x.parentSentAt; // parentSentAt
                     xcmmessages[r].childMsgHash = x.childMsgHash; // childSentAt
                     xcmmessages[r].childSentAt = x.childSentAt; // childSentAt
-                    xcmmessages[r].BlockNumberSent = x.blockNumber
+                    xcmmessages[r].blockNumberSent = x.blockNumber
                     found = true;
                 }
             }
@@ -5481,8 +5487,7 @@ module.exports = class Query extends AssetManager {
                 // somehow we don't have a "received" (incoming=1) record, so we'll add
                 x.sent = 1;
                 x.received = 0;
-                x.BlockNumberSent = x.blockNumber
-                x.BlockNumberReceived = null // BlockNumberReceived is unknown
+                x.blockNumberReceived = null // blockNumberReceived is unknown
                 xcmmessages.push(x);
             }
         }
@@ -5524,6 +5529,24 @@ module.exports = class Query extends AssetManager {
         }
         return false
     }
+
+    getSS58ByChainID(destAddress, chainID=0){
+      let ss58Address = false
+      if (!destAddress) return false
+      if (destAddress.length == 42){
+        ss58Address = destAddress
+      }else if (destAddress.length == 66){
+        let chainIDDestInfo = this.chainInfos[chainID]
+        if (chainIDDestInfo.ss58Format != undefined){
+          ss58Address = paraTool.getAddress(destAddress, chainIDDestInfo.ss58Format)
+        }else{
+          ss58Address = paraTool.getAddress(destAddress, 42) // default
+        }
+      }
+      return ss58Address
+    }
+
+
     // given a hash of an extrinsic OR a XCM message hash, get the timeline of blocks and ALL xcmmessages we have indexed
     async getXCMTimeline(hash, hashType = "extrinsic", sentAt = null, decorate = true, decorateExtra = true, advanced = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)

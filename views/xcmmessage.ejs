@@ -112,10 +112,12 @@ let f = xcm;
     <tr>
       <td>Dest Address</td>
       <td>
-        <% if (f.destAddress){  %>
-          <img src="/identicon/<%= f.destAddress; %>" class="rounded-start"  width="25px"  loading="lazy"/>
-          <a href='/account/<%= paraTool.getPubKey(f.destAddress) %>'>
-            <code><%= f.destAddress; %></code>
+        <% if (f.destAddress){
+          let dest = (f.destSS58Address != undefined)? f.destSS58Address : f.destAddress
+          %>
+          <img src="/identicon/<%= dest; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+          <a href='/account/<%= paraTool.getPubKey(dest) %>'>
+            <code><%= dest; %></code>
           </a>
 	         <%- uiTool.showAccountInfo(f, "destAddress") %>
         <% } else {%>
