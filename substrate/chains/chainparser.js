@@ -513,7 +513,7 @@ module.exports = class ChainParser {
             case "depositAsset":
                 //TODO: need to decorate addr
                 if (instructionV.beneficiary != undefined) {
-                    let destAddress = this.chainParser.processBeneficiary(false, instructionV.beneficiary)
+                    let destAddress = this.processBeneficiary(false, instructionV.beneficiary)
                     if (destAddress) {
                         internalXCM.destAddress = destAddress
                         dXcmMsg.destAddress.push(destAddress)
