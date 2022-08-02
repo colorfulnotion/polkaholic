@@ -993,6 +993,7 @@ module.exports = class Indexer extends AssetManager {
 
     validAsset(assetKey, chainID, ctx, o) {
         if (typeof assetKey == "string" && assetKey.includes("0x") && (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala)) {
+            let err = `InvalidAsset ${assetKey}`
             this.log_indexing_error(err, "validAsset", {
                 "ctx": ctx,
                 "o": o
@@ -1001,6 +1002,38 @@ module.exports = class Indexer extends AssetManager {
         } else {
             return true
         }
+    }
+
+    validDouble(obj, ctx, o, flds=['low','high','open','close', 'lp0', 'lp1']) {
+        for (const fld of flds){
+          let val = obj[fld]
+          if (val != undefined && val >= 1e+308) {
+              let err = `InvalidDouble ${fld}=${val}`
+              this.log_indexing_warn(err, "InvalidDouble", {
+                "ctx": ctx,
+                "o": o
+              })
+              if (this.debugLevel >= paraTool.debugNoLog) console.log(`InvalidDecimal ${fld} ${val}`, o)
+              return (false);
+          }
+        }
+        return true
+    }
+
+    validDecimal(obj, ctx, o, flds=['total_volumes', 'token0Volume', 'token1Volume','debitExchangeRate', 'supplyExchangeRate', 'borrowExchangeRate']) {
+        for (const fld of flds){
+          let val = obj[fld]
+          if (val != undefined && val >= 1e+18) {
+              let err = `InvalidDecimal ${fld}=${val}`
+              this.log_indexing_warn(err, "validDecimal", {
+                  "ctx": ctx,
+                  "o": o
+              })
+              if (this.debugLevel >= paraTool.debugNoLog) console.log(`InvalidDecimal ${fld} ${val}`, o)
+              return (false);
+          }
+        }
+        return true
     }
 
     updateMultisigMap(m, caller = false) {
@@ -1634,7 +1667,7 @@ order by msgHash, diffSentAt, diffTS`
                 let state = JSON.stringify(r)
                 //(asset, chainID, indexTS, source, open, close, low, high, lp0, lp1, issuance, token0Volume, token1Volume, state )
                 let s = `('${r.lpAddress.toLowerCase()}', '${this.chainID}', '${ts}', '${paraTool.assetSourceOnChain}', '${r.open}', '${r.close}', '${r.low}', '${r.high}', '${r.lp0}', '${r.lp1}', '${r.issuance}', '${r.token0Volume}', '${r.token1Volume}', ` + mysql.escape(state) + `)`
-                if (this.validAsset(r.lpAddress.toLowerCase(), this.chainID, assetInfo.assetType, s)) {
+                if (this.validAsset(r.lpAddress.toLowerCase(), this.chainID, assetInfo.assetType, s) && this.validDouble(r, assetInfo.assetType, s) && this.validDecimal(r, assetInfo.assetType, s)) {
                     //assetlogLiquidityPairs.push(s)
                     return s
                 }
@@ -1970,7 +2003,7 @@ order by msgHash, diffSentAt, diffTS`
                         if (upd) {
                             let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.issuance}', '${r.debitExchangeRate}')`
                             if (this.debugLevel >= paraTool.debugInfo) console.log(`Loan`, o)
-                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o)) {
+                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o) && this.validDouble(r, assetInfo.assetType, o) && this.validDecimal(r, assetInfo.assetType, o)) {
                                 assetlogLoans.push(o);
                             }
                         }
@@ -2001,7 +2034,7 @@ order by msgHash, diffSentAt, diffTS`
                         if (upd) {
                             let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.supplyExchangeRate}', '${r.borrowExchangeRate}')`
                             console.log(`CDP`, o)
-                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o)) {
+                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o) && this.validDouble(r, assetInfo.assetType, o) && this.validDecimal(r, assetInfo.assetType, o)) {
                                 assetlogCDPs.push(o);
                             }
                         }
@@ -2073,7 +2106,7 @@ order by msgHash, diffSentAt, diffTS`
                             let state = JSON.stringify(r)
                             let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.open}', '${r.close}', '${r.low}', '${r.high}', '${r.lp0}', '${r.lp1}', '${r.issuance}', '${r.token0Volume}', '${r.token1Volume}', '${state}')`
                             if (this.debugLevel >= paraTool.debugInfo) console.log(`LP update`, o)
-                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o)) {
+                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o) && this.validDouble(r, assetInfo.assetType, o) && this.validDecimal(r, assetInfo.assetType, o)) {
                                 assetlogLiquidityPairs.push(o);
                             }
                         }
