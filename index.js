@@ -113,6 +113,34 @@ function getHostChain(req) {
     }
 }
 
+function chainFilterOptUI(req) {
+    // default: return all chains
+    let chainList = []
+    try {
+        if (req.query.chainfilters != undefined) {
+            let chainIdentifierList = []
+            let chainIdentifiers = req.query.chainfilters
+            if (!Array.isArray(chainIdentifiers)) {
+                chainIdentifiers = chainIdentifiers.split(',')
+            }
+            for (const chainIdentifier of chainIdentifiers) {
+                if (chainIdentifier == 'all') return []
+                //handle both chainID, id
+                let [chainID, _] = query.convertChainID(chainIdentifier.toLowerCase())
+                if (chainID !== false) {
+                    chainIdentifierList.push(chainID)
+                }
+            }
+            chainList = paraTool.unique(chainIdentifierList)
+        } else {
+            chainList = []
+        }
+    } catch (e) {
+        console.log(`chainFilterOpt`, e.toString())
+    }
+    //console.log(`chainFilterOpt chainList=${chainList}`)
+    return chainList
+}
 
 function decorateOptUI(req) {
     // default decorate is true
@@ -1058,8 +1086,10 @@ app.get('/account/:address', async (req, res) => {
         let address = req.params["address"];
         let [decorate, decorateExtra] = decorateOptUI(req)
         let [requestedChainID, id] = getHostChain(req);
+        let chainList = chainFilterOptUI(req)
+        // console.log(`UI /account/ chainList`, chainList)
         // console.log(`getHostChain chainID=${requestedChainID}, id=${id}`)
-        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, decorate, decorateExtra);
+        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, decorate, decorateExtra);
         res.render('account', {
             account: account,
             chainInfo: query.getChainInfo(),
@@ -1068,6 +1098,7 @@ app.get('/account/:address', async (req, res) => {
             apiUrl: req.path,
             fromAddress: fromAddress,
             requestedChainID: requestedChainID,
+            chainListStr: chainList.join(','),
             docsSection: "get-account"
         });
     } catch (err) {

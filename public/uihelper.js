@@ -745,7 +745,7 @@ function currencyFormat(c, priceUSD = false, priceUSDCurrent = false, isDefaultO
 }
 
 
-function setupapidocs(major = "", minor = "", input = "") {
+function setupapidocs(major = "", minor = "", input = "", chainfilterStr = false) {
     let docsSection = false;
     let apiUrl = false;
     let extra = "";
@@ -803,6 +803,9 @@ function setupapidocs(major = "", minor = "", input = "") {
                 apiUrl += "/<Address>"
             } else {
                 apiUrl += `/${input}`
+            }
+            if (chainfilterStr && chainfilterStr != 'all') {
+                apiUrl += `?chainfilters=${chainfilterStr}`
             }
             break;
         case "block":

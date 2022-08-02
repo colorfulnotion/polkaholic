@@ -492,6 +492,12 @@ function audit_args_tx(tx, args) {
     return true
 }
 
+function unique(a) {
+    return a.sort().filter(function(item, pos, ary) {
+        return !pos || item != ary[pos - 1];
+    });
+}
+
 class NotFoundError extends Error {
     constructor(message) {
         // Needs to pass both `message` and `options` to install the "cause" property.
@@ -1101,5 +1107,8 @@ module.exports = {
     },
     stringToHex: function(x) {
         return stringToHex(x)
+    },
+    unique: function(x) {
+        return unique(x)
     },
 };

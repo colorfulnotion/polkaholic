@@ -460,7 +460,8 @@ module.exports = class PolkaholicDB {
     getNameByChainID(chainID) {
         if (this.chainInfos[chainID] != undefined) {
             // [chainID, id]
-            return [chainID, this.chainInfos[chainID].id]
+            let cID = parseInt(chainID, 10)
+            return [cID, this.chainInfos[chainID].id]
         }
         return false
     }
