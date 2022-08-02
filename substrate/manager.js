@@ -107,12 +107,12 @@ module.exports = class Manager extends AssetManager {
     }
 
     async update_chain_lastBalanceUpdateDT(chainID, reset = false) {
-        if ( chainID >= 0 ) {
-	    let s = (reset) ? "Now()" : "Null";
+        if (chainID >= 0) {
+            let s = (reset) ? "Now()" : "Null";
             let sql = `update chain set lastBalanceUpdateDT = ${s} where chainID = ${chainID}`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
-	}
+        }
     }
 
     async updateNonNativeBalances(chainID, perPagelimit = 1000) {

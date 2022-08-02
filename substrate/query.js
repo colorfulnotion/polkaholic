@@ -4959,7 +4959,10 @@ module.exports = class Query extends AssetManager {
         return (filter);
     }
 
-    filter_block_row_objects_and_msgHashes(rRow, filter, chainID, extrinsicHash = null, eventIDs = []) {
+    filter_block_row_objects_and_msgHashes(rRow, filter, chainID, extrinsicHash = null, eventIDs = [], blockNumber, blockTS) {
+        // add id, idDest, chainName, chainNameDest
+        let [_, id] = this.convertChainID(chainID)
+        let chainName = this.getChainName(chainID);
         let out = [];
         let extra = {}
         let msgHashes = [];
@@ -5006,9 +5009,13 @@ module.exports = class Query extends AssetManager {
                     if (e.extrinsicHash == extrinsicHash) {
                         e.extrinsicID = `${chainID}-${e.extrinsicID}`
                         out.push({
+                            "chainID": chainID,
+                            "id": id,
+                            "chainName": chainName,
+                            "blockNumber": blockNumber,
                             "type": "extrinsic",
                             "obj": e,
-                            "idx": idx
+                            "ts": blockTS + .001
                         });
                         idx++
                     }
@@ -5030,9 +5037,13 @@ module.exports = class Query extends AssetManager {
                         }
                         if (pass) {
                             out.push({
+                                "chainID": chainID,
+                                "id": id,
+                                "chainName": chainName,
+                                "blockNumber": blockNumber,
                                 "type": "event",
                                 "obj": ev,
-                                "idx": idx
+                                "ts": blockTS + idx * .001
                             });
                             idx++;
                         }
@@ -5058,9 +5069,13 @@ module.exports = class Query extends AssetManager {
                             }
                         }
                         out.push({
+                            "chainID": chainID,
+                            "id": id,
+                            "chainName": chainName,
+                            "blockNumber": blockNumber,
                             "type": "trace",
                             "obj": f,
-                            "idx": idx
+                            "ts": blockTS + idx * .001
                         });
                         idx++;
                     }
@@ -5096,8 +5111,8 @@ module.exports = class Query extends AssetManager {
             let dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
             x.decodeMsg = dMsg
             if (dMsg.destAddress != undefined) {
-              x.destAddress = dMsg.destAddress
-              x.destSS58Address = this.getSS58ByChainID(x.destAddress, x.chainIDDest)
+                x.destAddress = dMsg.destAddress
+                x.destSS58Address = this.getSS58ByChainID(x.destAddress, x.chainIDDest)
             }
         }
         if (decorate) this.decorateAddress(x, "destAddress", decorateAddr, decorateRelated);
@@ -5387,7 +5402,7 @@ module.exports = class Query extends AssetManager {
             dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
         }
         let destAddress = (dMsg.destAddress != undefined) ? dMsg.destAddress : null
-        let destSS58Address = this.getSS58ByChainID(destAddress,rawXcmRec.chainIDDest)
+        let destSS58Address = this.getSS58ByChainID(destAddress, rawXcmRec.chainIDDest)
 
         let [_, id] = this.convertChainID(rawXcmRec.chainID);
         let [__, idDest] = this.convertChainID(rawXcmRec.chainIDDest);
@@ -5499,8 +5514,8 @@ module.exports = class Query extends AssetManager {
                 xcmmessages.push(x);
             }
         }
-        console.log(`fetch_xcmmessages_chainpaths xcmmessages`, xcmmessages)
-        console.log(`fetch_xcmmessages_chainpaths chainpaths`, chainpaths)
+        //console.log(`fetch_xcmmessages_chainpaths xcmmessages`, xcmmessages)
+        //console.log(`fetch_xcmmessages_chainpaths chainpaths`, chainpaths)
         return [xcmmessages, chainpaths];
     }
 
@@ -5538,20 +5553,20 @@ module.exports = class Query extends AssetManager {
         return false
     }
 
-    getSS58ByChainID(destAddress, chainID=0){
-      let ss58Address = false
-      if (!destAddress) return false
-      if (destAddress.length == 42){
-        ss58Address = destAddress
-      }else if (destAddress.length == 66){
-        let chainIDDestInfo = this.chainInfos[chainID]
-        if (chainIDDestInfo.ss58Format != undefined){
-          ss58Address = paraTool.getAddress(destAddress, chainIDDestInfo.ss58Format)
-        }else{
-          ss58Address = paraTool.getAddress(destAddress, 42) // default
+    getSS58ByChainID(destAddress, chainID = 0) {
+        let ss58Address = false
+        if (!destAddress) return false
+        if (destAddress.length == 42) {
+            ss58Address = destAddress
+        } else if (destAddress.length == 66) {
+            let chainIDDestInfo = this.chainInfos[chainID]
+            if (chainIDDestInfo.ss58Format != undefined) {
+                ss58Address = paraTool.getAddress(destAddress, chainIDDestInfo.ss58Format)
+            } else {
+                ss58Address = paraTool.getAddress(destAddress, 42) // default
+            }
         }
-      }
-      return ss58Address
+        return ss58Address
     }
 
 
@@ -5621,7 +5636,6 @@ module.exports = class Query extends AssetManager {
                     }
                 }
             });
-            console.log("&&& EVENTIDS &&&&", eventIDs);
 
             // build timeline
             let timeline = [];
@@ -5641,8 +5655,8 @@ module.exports = class Query extends AssetManager {
                     let paraIDDest = (chainIDDest > 20000) ? chainIDDest - 20000 : chainIDDest;
                     let filter = this.get_filter(paraID, paraIDDest, p.msgType, advanced);
 
-                    let [objects, extra] = this.filter_block_row_objects_and_msgHashes(rRow, filter, chainID, extrinsicHash, eventIDs);
                     let blockTS = rRow.feed.blockTS;
+                    let [objects, extra] = this.filter_block_row_objects_and_msgHashes(rRow, filter, bn_chainID, extrinsicHash, eventIDs, p.blockNumber, blockTS);
                     if (objects && Array.isArray(objects) && objects.length > 0) {
                         let [_, id] = this.convertChainID(bn_chainID);
                         let chainName = this.getChainName(id);

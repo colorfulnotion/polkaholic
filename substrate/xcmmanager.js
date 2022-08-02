@@ -335,27 +335,24 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
     */
 
     async decodeXCMv2(hex) {
-        var chain = await this.getChain(2000);
-        await this.setupAPI(chain);
         var obj = this.api.registry.createType('XcmVersionedXcm', hex);
         return obj.toJSON();
     }
 
     // for any xcmmessages which have not been fingerprinted (instructionFingerprints is Null), fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints} using getXCMParentFingerprintsOfChild + getXCMChildFingerprints
     //    this is the raw data for the next step which matches fingerprints across time
-    async computeXCMFingerprints(lookbackDays = 3) {
-        let chain = await this.getChain(2000);
-        await this.setupAPI(chain);
+    async computeXCMFingerprints(startTS, endTS) {
 
-        let sql = `select incoming, msgHash, blockNumber, sentAt, msgHex from xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval ${lookbackDays} DAY)) and instructionFingerprints is Null order by blockTS desc limit 100000`
+        let sql = `select incoming, msgHash, blockNumber, sentAt, msgHex from xcmmessages where blockTS >= ${startTS} and blockTS <= ${endTS} and instructionFingerprints is Null order by blockTS desc limit 100000`
         console.log("computeXCMFingerprints:", sql)
         let xcmRecs = await this.poolREADONLY.query(sql);
         let out = [];
         let vals = ["parentInclusionFingerprints", "instructionFingerprints"];
         for (let r = 0; r < xcmRecs.length; r++) {
             let rec = xcmRecs[r];
+            let msgHex = xcmRecs[r].msgHex.toString();
             try {
-                var xcmObj = this.api.registry.createType('XcmVersionedXcm', xcmRecs[r].msgHex);
+                var xcmObj = this.api.registry.createType('XcmVersionedXcm', msgHex);
                 if (xcmObj.isV2) {
                     let parentInclusionFingerprints = this.getXCMParentFingerprintsOfChild(xcmObj);
                     let instructionFingerprints = this.getXCMChildFingerprints(xcmObj);
@@ -373,7 +370,7 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
                     }
                 }
             } catch (err) {
-                console.log(err);
+                console.log(err, msgHex);
             }
         }
         if (out.length > 0) {
@@ -453,11 +450,8 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
 
     // computeXCMMessageParentMsgHash updates xcmmessages.{parentMsgHash, childMsgHash} using special xcmmessages (those with parentInclusionFingerprints)
     // with these parent-child linkages, a "tree" (really, short chains) can be established
-    async computeXCMMessageParentMsgHash(lookbackDays = 3) {
-        let chain = await this.getChain(2000);
-        await this.setupAPI(chain);
-
-        let sql = `select incoming, msgHash, blockNumber, sentAt, msgHex, parentInclusionFingerprints, instructionFingerprints, blockTS, chainID, chainIDDest from xcmmessages where parentInclusionFingerprints != '[]' and incoming = 0 and childMsgHash is Null and blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval ${lookbackDays} DAY)) order by blockTS desc limit 100000`
+    async computeXCMMessageParentMsgHash(startTS, endTS) {
+        let sql = `select incoming, msgHash, blockNumber, sentAt, msgHex, parentInclusionFingerprints, instructionFingerprints, blockTS, chainID, chainIDDest from xcmmessages where parentInclusionFingerprints != '[]' and incoming = 0 and childMsgHash is Null and blockTS >= ${startTS} and blockTS <= ${endTS} order by blockTS desc limit 100000`
         console.log("computeXCMMessageParentMsgHash: ", sql);
         let xcmRecs = await this.poolREADONLY.query(sql);
         let sqlout = [];
@@ -470,7 +464,7 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
             let childRecs = await this.poolREADONLY.query(sqlchild);
             for (let c = 0; c < childRecs.length; c++) {
                 let childRec = childRecs[c];
-                var childObj = this.api.registry.createType('XcmVersionedXcm', rec.msgHex);
+                var childObj = this.api.registry.createType('XcmVersionedXcm', rec.msgHex.toString());
                 let instructionFingerprints = JSON.parse(childRec.instructionFingerprints);
                 let inclusion = this.compute_fingerprints_inclusion(parentInclusionFingerprints, instructionFingerprints);
                 //console.log("CHILD", inclusion, childRec.msgHash, childRec.sentAt, childRec.chainID, childRec.chainIDDest, "delay", childRec.blockTS - rec.blockTS, childRec.instructionFingerprints, JSON.stringify(this.getXCMInstructionsFromHex(childRec.msgHex), null, 2));
@@ -489,12 +483,17 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
             //console.log("---");
         }
 
-        let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash where xcmtransfer.msgHash = xcmmessages.msgHash and xcmtransfer.sentAt = xcmmessages.sentAt and xcmtransfer.msgHash is not null and xcmmessages.blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval ${lookbackDays} DAY))`;
+        let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash where xcmtransfer.msgHash = xcmmessages.msgHash and xcmtransfer.sentAt = xcmmessages.sentAt and xcmtransfer.msgHash is not null and xcmmessages.blockTS >= ${startTS} and xcmmessages.blockTS <= ${endTS}`;
         this.batchedSQL.push(sql1);
         console.log(sql1);
         await this.update_batchedSQL();
 
-        let sql2 = `update xcmmessages as c, xcmmessages as p  set c.extrinsicID = p.extrinsicID, c.extrinsicHash = p.extrinsicHash where p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.childMsgHash and abs(c.sentAt - p.childSentAt) <= 4 and c.extrinsicID is null and p.blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval ${lookbackDays} DAY)) and c.blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval ${lookbackDays} DAY))`
+        let sql2 = `update xcmmessages as c, xcmmessages as p  set c.extrinsicID = p.extrinsicID, c.extrinsicHash = p.extrinsicHash where 
+p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.childMsgHash and
+ abs(c.sentAt - p.childSentAt) <= 4 and 
+ c.extrinsicID is null and
+ p.blockTS >= ${startTS} and p.blockTS <= ${endTS} and
+ c.blockTS >= ${startTS} and c.blockTS <= ${endTS}`
         this.batchedSQL.push(sql2);
         console.log(sql2);
         await this.update_batchedSQL();
@@ -502,15 +501,7 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
         console.log("computeXCMMessageParentMsgHash DONE");
     }
 
-    async xcmMatch2(lookbackDays = 3, lookbackSeconds = 120) {
-        let endTS = this.currentTS();
-        let startTS = endTS - lookbackDays * 86400;
-        for (let ts = startTS; ts < endTS; ts += 86400) {
-            await this.xcmmatch2_matcher(ts, ts + 86400, lookbackSeconds)
-        }
-    }
-
-    async xcmmatch2_matcher(startTS, endTS, lookbackSeconds) {
+    async xcmmatch2_matcher(startTS, endTS, lookbackSeconds = 120) {
         // ((d.asset = xcmmessages.asset) or (d.nativeAssetChain = xcmmessages.nativeAssetChain and d.nativeAssetChain is not null)) and
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
         let sql = `select  xcmmessages.chainID, xcmmessages.chainIDDest, 
@@ -621,11 +612,11 @@ order by chainID, extrinsicHash, diffTS`;
     }
 
     // computeAssetChainsAndBeneficiaries reads any unanalyzed OUTGOING messages and updates xcmmessages.assetChains + beneficiaries for any assets mentioned in the instructions using analyzeXCMInstructions 
-    async computeAssetChainsAndBeneficiaries(lookbackDays = 3) {
+    async computeAssetChainsAndBeneficiaries(startTS, endTS) {
         await this.assetManagerInit();
 
         let ts = this.getCurrentTS() - 86400 * 180;
-        let sql = `select msgHash, blockNumber, sentAt, incoming, chainID, chainIDDest, msgStr, blockTS from xcmmessages where assetChains is Null or beneficiaries2 is null and blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval ${lookbackDays} DAY)) order by blockTS desc`;
+        let sql = `select msgHash, blockNumber, sentAt, incoming, chainID, chainIDDest, msgStr, blockTS from xcmmessages where ( assetChains is Null or beneficiaries2 is null ) and ( blockTS >= ${startTS} and blockTS <= ${endTS} )  order by blockTS desc`;
         let msgs = await this.pool.query(sql);
         console.log("computeAssetChains: ", sql);
         let vals = ["assetChains", "beneficiaries2"]
@@ -665,19 +656,28 @@ order by chainID, extrinsicHash, diffTS`;
         console.log("computeAssetChains DONE");
     }
 
-    async xcmanalytics(lookbackDays = 3) {
-        // this.computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints}
-        await this.computeXCMFingerprints(lookbackDays);
+    async xcmanalytics(lookbackDays) {
+        let chain = await this.getChain(2);
+        await this.setupAPI(chain);
 
-        // computeXCMMessageParentMsgHash updates xcmmessages.{parentMsgHash/SentAt, childMsgHash/SentAt} using special xcmmessages (those with parentInclusionFingerprints)
-        // with these parent-child linkages, a "tree" (currently just short chains) can be established
-        await this.computeXCMMessageParentMsgHash(lookbackDays);
+        let endTS = this.currentTS();
+        let startTS = endTS - lookbackDays * 86400;
+        for (let ts = startTS; ts < endTS; ts += 86400) {
+            let t0 = ts;
+            let t1 = ts + 86400;
+            // this.computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints}
+            await this.computeXCMFingerprints(t0, t1);
 
-        // computerAssetChainsAndBeneficiaries updates xcmmessages.assetChains for any assets mentioned in the instructions
-        await this.computeAssetChainsAndBeneficiaries(lookbackDays);
+            // computeXCMMessageParentMsgHash updates xcmmessages.{parentMsgHash/SentAt, childMsgHash/SentAt} using special xcmmessages (those with parentInclusionFingerprints)
+            // with these parent-child linkages, a "tree" (currently just short chains) can be established
+            await this.computeXCMMessageParentMsgHash(t0, t1);
 
-        // prototype
-        await this.xcmMatch2(lookbackDays);
+            // computerAssetChainsAndBeneficiaries updates xcmmessages.assetChains for any assets mentioned in the instructions
+            await this.computeAssetChainsAndBeneficiaries(t0, t1);
+
+            // computes assetsReceived
+            await this.xcmmatch2_matcher(t0, t1)
+        }
     }
 
 }

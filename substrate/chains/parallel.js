@@ -46,8 +46,8 @@ module.exports = class ParallelParser extends ChainParser {
             let call_method = call.method;
             let isHexEncoded = (typeof call === 'object') ? false : true
             //console.log(`[${extrinsic.extrinsicID}] descend into call`, call)
-            if (!isHexEncoded && call_args != undefined){
-              this.processOutgoingXCM(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args)
+            if (!isHexEncoded && call_args != undefined) {
+                this.processOutgoingXCM(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args)
             }
         }
         switch (module_section) {
