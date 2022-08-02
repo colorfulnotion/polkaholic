@@ -138,7 +138,7 @@ function chainFilterOptUI(req) {
     } catch (e) {
         console.log(`chainFilterOpt`, e.toString())
     }
-    console.log(`chainFilterOpt chainList=${chainList}`)
+    //console.log(`chainFilterOpt chainList=${chainList}`)
     return chainList
 }
 
@@ -1087,7 +1087,7 @@ app.get('/account/:address', async (req, res) => {
         let [decorate, decorateExtra] = decorateOptUI(req)
         let [requestedChainID, id] = getHostChain(req);
         let chainList = chainFilterOptUI(req)
-        // console.log(`/account/ chainList`, chainList)
+        // console.log(`UI /account/ chainList`, chainList)
         // console.log(`getHostChain chainID=${requestedChainID}, id=${id}`)
         let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, decorate, decorateExtra);
         res.render('account', {
@@ -1098,6 +1098,7 @@ app.get('/account/:address', async (req, res) => {
             apiUrl: req.path,
             fromAddress: fromAddress,
             requestedChainID: requestedChainID,
+            chainListStr: chainList.join(','),
             docsSection: "get-account"
         });
     } catch (err) {

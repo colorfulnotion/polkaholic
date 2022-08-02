@@ -361,7 +361,7 @@ for (let i=0; i<tabs.length; i++) {
     <div class="card" style="width: 100%">
      <div class="card-body">
        <div class="card-title"><b>Compare / Contribute:</b></div>
-       <a class="btn-sm btn-outline-secondary" target='_new' href='https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.polkadot.io#/parachains/crowdloan'>Polkadot Crowdloans</a> 
+       <a class="btn-sm btn-outline-secondary" target='_new' href='https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.polkadot.io#/parachains/crowdloan'>Polkadot Crowdloans</a>
        <a class="btn-sm btn-outline-secondary" target='_new' href='https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/parachains/crowdloan'>Kusama Crowdloans</a>
      </div>
     </div>
@@ -413,6 +413,7 @@ for (let i=0; i<tabs.length; i++) {
 let address = '<%= account.address; %>';
 let requestedChainAddress = '<%= account.requestedChainAddress; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
+let chainListStr = '<%= chainListStr; %>';
 <% if ( canClaim ) { %>
 $('#btnClaim').on('click', function(e) {
   var message = new Date().getTime() + "|" + account.address;

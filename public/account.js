@@ -12,10 +12,10 @@ let tableRelated = null;
 
 var initextrinsics = false;
 
-function showextrinsics(address) {
+function showextrinsics(address, chainListStr = 'all') {
     if (initextrinsics) return;
     else initextrinsics = true;
-    let pathParams = `account/${address}?group=extrinsics`
+    let pathParams = `account/${address}?group=extrinsics&chainfilters=${chainListStr}`
     let tableName = '#tableextrinsics'
     tableExtrinsics = $(tableName).DataTable({
         columnDefs: [{
@@ -149,10 +149,10 @@ function showextrinsics(address) {
 
 var initfeed = false;
 
-function showfeed(address) {
+function showfeed(address, chainListStr = 'all') {
     if (initfeed) return;
     else initfeed = true;
-    let pathParams = `account/${address}?group=feed`
+    let pathParams = `account/${address}?group=feed&chainfilters=${chainListStr}`
     let tableName = '#tablefeed'
     tableFeed = $(tableName).DataTable({
         columnDefs: [{
@@ -255,11 +255,11 @@ function showfeed(address) {
 
 var inittransfers = false;
 
-function showtransfers(address) {
+function showtransfers(address, chainListStr = 'all') {
     if (inittransfers) {
         return;
     } else inittransfers = true;
-    let pathParams = `account/${address}?group=transfers`
+    let pathParams = `account/${address}?group=transfers&chainfilters=${chainListStr}`
     let tableName = '#tabletransfers'
     tableTransfers = $(tableName).DataTable({
         columnDefs: [{
@@ -404,11 +404,11 @@ function showtransfers(address) {
 
 var inithistory = false;
 
-function showhistory(address) {
+function showhistory(address, chainListStr = 'all') {
     return;
     if (inithistory) return;
     else inithistory = true;
-    let pathParams = `account/${address}?group=history`
+    let pathParams = `account/${address}?group=history&chainfilters=${chainListStr}`
     let tableName = '#tablehistory'
     tableHistory = $(tableName).DataTable({
         columnDefs: [{
@@ -508,10 +508,10 @@ let initcurrent = false;
 
 var initxcmtransfers = false;
 
-function showxcmtransfers(address) {
+function showxcmtransfers(address, chainListStr = 'all') {
     if (initxcmtransfers) return;
     else initxcmtransfers = true;
-    let pathParams = `account/${address}?group=xcmtransfers`
+    let pathParams = `account/${address}?group=xcmtransfers&chainfilters=${chainListStr}`
     let tableName = '#tablexcmtransfers'
     tableXCMTransfers = $(tableName).DataTable({
         columnDefs: [{
@@ -673,10 +673,10 @@ function showxcmtransfers(address) {
 
 var initrewards = false;
 
-function showrewards(address) {
+function showrewards(address, chainListStr = 'all') {
     if (initrewards) return;
     else initrewards = true;
-    let pathParams = `account/${address}?group=rewards`
+    let pathParams = `account/${address}?group=rewards&chainfilters=${chainListStr}`
     let tableName = '#tablerewards'
     tableRewards = $(tableName).DataTable({
         columnDefs: [{
@@ -812,10 +812,10 @@ var initcrowdloans = false;
 /*
 {"chainID":2,"blockNumber":8322280,"blockHash":"0x8b6598fd05fe8119abd7d6d0d5bcad14f8d630eb7cc61b11cc7a5dc31d3503c6","ts":1626157344,"eventID":"2-8322280-2-6","extrinsicID":"8322280-2","extrinsicHash":"0x6bf498a69a32b7d53c82a3cabd47e5a1dc5a422af41a0db0d8fdfb8d36fdbb3f","action":"crowdloan(Contributed)","account":"EkmdfH2Fc6XgPgDwMjye3Nsdj27CCSi9np8Kc7zYoCL2S3G","paraID":2004,"amount":2.03578933,"finalized":true,"genTS":1648901809,"source":"d10","chainName":"Kusama","asset":"{\"Token\":\"KSM\"}","amountUSD":392.95009226593,"priceUSD":193.021,"chainIDDest":"1284","chainDestName":"Moonbeam"}
 */
-function showcrowdloans(address) {
+function showcrowdloans(address, chainListStr = 'all') {
     if (initcrowdloans) return;
     else initcrowdloans = true;
-    let pathParams = `account/${address}?group=crowdloans`
+    let pathParams = `account/${address}?group=crowdloans&chainfilters=${chainListStr}`
     let tableName = '#tablecrowdloans'
     tableCrowdloans = $(tableName).DataTable({
         columnDefs: [{
@@ -933,12 +933,12 @@ function showcrowdloans(address) {
 
 var initnfts = false;
 
-function shownfts(address) {
+function shownfts(address, chainListStr = 'all') {
     //setupapidocs("account", "nfts", address);
     if (initnfts) return;
     else initnfts = true;
 
-    let pathParams = `account/${address}?group=nfts`
+    let pathParams = `account/${address}?group=nfts&chainfilters=${chainListStr}`
     let tableName = '#tablenfts'
     tableNFTs = $(tableName).DataTable({
         columns: [{
@@ -956,7 +956,7 @@ function shownfts(address) {
 
 var initss58h160 = false;
 
-function showss58h160(address) {
+function showss58h160(address, chainListStr = 'all') {
     if (initss58h160) return;
     else initss58h160 = true;
     let pathParams = `account/${address}?group=ss58h160`
@@ -978,10 +978,10 @@ function showss58h160(address) {
 
 var initoffers = false;
 
-function showoffers(address) {
+function showoffers(address, chainListStr = 'all') {
     if (initoffers) return;
     else initoffers = true;
-    let pathParams = `account/${address}?group=offers`
+    let pathParams = `account/${address}?group=offers&chainfilters=${chainListStr}`
     let tableName = '#tableoffers'
 
     tableOffers = $(tableName).DataTable({
@@ -1001,7 +1001,7 @@ function showoffers(address) {
 
 var initrelated = false;
 
-function showrelated(address) {
+function showrelated(address, chainListStr = 'all') {
     if (initrelated) return;
     else initrelated = true;
     let pathParams = `account/${address}?group=related`
@@ -1023,55 +1023,57 @@ function showrelated(address) {
 }
 
 
-function showaccounttab(hash) {
+function showaccounttab(hash, chainListStr = 'all') {
     switch (hash) {
         case "#extrinsics":
-            showextrinsics(address);
-            setupapidocs("account", "extrinsics", address);
+            showextrinsics(address, chainListStr);
+            setupapidocs("account", "extrinsics", address, chainListStr);
             break;
         case "#transfers":
-            showtransfers(address);
-            setupapidocs("account", "transfers", address);
+            showtransfers(address, chainListStr);
+            setupapidocs("account", "transfers", address, chainListStr);
             break;
         case "#history":
-            showhistory(address);
-            setupapidocs("account", "history", address);
+            showhistory(address, chainListStr);
+            setupapidocs("account", "history", address, chainListStr);
             break;
         case "#rewards":
-            showrewards(address);
-            setupapidocs("account", "rewards", address);
+            showrewards(address, chainListStr);
+            setupapidocs("account", "rewards", address, chainListStr);
             break;
         case "#crowdloans":
-            showcrowdloans(address);
-            setupapidocs("account", "crowdloans", address);
+            showcrowdloans(address, chainListStr);
+            setupapidocs("account", "crowdloans", address, chainListStr);
             break;
         case "#xcmtransfers":
-            showxcmtransfers(address);
-            setupapidocs("account", "xcmtransfers", address);
+            showxcmtransfers(address, chainListStr);
+            setupapidocs("account", "xcmtransfers", address, chainListStr);
             break;
         case "#ss58h160":
-            showss58h160(address);
+            showss58h160(address, chainListStr);
             setupapidocs("account", "ss58h160", address);
             break;
         case "#offers":
-            showoffers(address);
+            showoffers(address, chainListStr);
             setupapidocs("account", "offers", address);
             break;
         case "#related":
-            showrelated(address);
+            showrelated(address, chainListStr);
             setupapidocs("account", "related", address);
             break;
         case "#feed":
-            showfeed(address);
-            setupapidocs("account", "feed", address);
+            showfeed(address, chainListStr);
+            setupapidocs("account", "feed", address, chainListStr);
             break;
         default:
-            showextrinsics(address);
-            setupapidocs("account", "extrinsics", address);
+            showextrinsics(address, chainListStr);
+            setupapidocs("account", "extrinsics", address, chainListStr);
     }
 }
 
-function setuptabs(tabs, address, requestedChainAddress) {
+function setuptabs(tabs, address, requestedChainAddress, chainListStr = 'all') {
+    if (chainListStr == '') chainListStr = 'all'
+    console.log(`setuptabs chainListStr=${chainListStr}`)
     for (let i = 0; i < tabs.length; i++) {
         let t = tabs[i];
         let id = "#" + t.target + "-tab";
@@ -1079,10 +1081,10 @@ function setuptabs(tabs, address, requestedChainAddress) {
         tabEl.addEventListener('shown.mdb.tab', function(event) {
             const hash = $(this).attr("href");
             //let newUrl = "/account/" + requestedChainAddress + hash;
-            let newUrl = "/account/" + requestedChainAddress + `?group=${t.target}`
-            //console.log("shown.mdb.tab", hash, newUrl);
+            let newUrl = "/account/" + requestedChainAddress + `?group=${t.target}&chainfilters=${chainListStr}`
+            console.log("shown.mdb.tab", hash, newUrl);
             setTimeout(() => {
-                showaccounttab(hash);
+                showaccounttab(hash, chainListStr);
             }, 250);
             history.replaceState(null, null, newUrl);
         })
@@ -1096,7 +1098,7 @@ function setuptabs(tabs, address, requestedChainAddress) {
     const triggerEl = document.querySelector('#accountTab a[href="' + hash + '"]');
     //console.log("CAUSE shownmdb.tab for", triggerEl, hash);
     if (triggerEl) mdb.Tab.getInstance(triggerEl).show();
-    initTabs(address); //preemptively show the first page of every group
+    initTabs(address, chainListStr); //preemptively show the first page of every group
 }
 
 function show_unfinalized(address) {
@@ -1144,16 +1146,16 @@ function show_unfinalized(address) {
 
 
 
-function initTabs(address) {
-    //showextrinsics(address);
-    showunfinalized(address)
-    showtransfers(address);
-    showxcmtransfers(address);
-    showrewards(address);
-    showcrowdloans(address);
-    showss58h160(address);
-    //showoffers(address);
-    showrelated(address);
+function initTabs(address, chainListStr = 'all') {
+    //showextrinsics(address, chainListStr);
+    showunfinalized(address, chainListStr)
+    showtransfers(address, chainListStr);
+    showxcmtransfers(address, chainListStr);
+    showrewards(address, chainListStr);
+    showcrowdloans(address, chainListStr);
+    showss58h160(address, chainListStr);
+    //showoffers(address, chainListStr);
+    showrelated(address, chainListStr);
 }
 var refreshIntervalMS = 6100;
 var unfinalizedUpdateIntervalId = false;
@@ -1218,4 +1220,4 @@ $('#chainIDfilter').on('change', function() {
     if (tableXCMTransfers) tableXCMTransfers.search(filter, true).draw();
 });
 
-setuptabs(tabs, address, requestedChainAddress);
+setuptabs(tabs, address, requestedChainAddress, chainListStr);

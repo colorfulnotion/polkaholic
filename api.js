@@ -90,7 +90,7 @@ function chainFilterOpt(req) {
     } catch (e) {
         console.log(`chainFilterOpt`, e.toString())
     }
-    console.log(`chainFilterOpt chainList=${chainList}`)
+    //console.log(`chainFilterOpt chainList=${chainList}`)
     return chainList
 }
 

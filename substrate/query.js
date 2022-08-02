@@ -955,7 +955,7 @@ module.exports = class Query extends AssetManager {
                 let x = xcmtransfers[i];
                 let chainIDIncluded = this.chainFilters(chainList, x.chainID)
                 let chainIDDestIncluded = this.chainFilters(chainList, x.chainIDDest)
-                if (!chainIDIncluded && !chainIDDestIncluded){
+                if (!chainIDIncluded && !chainIDDestIncluded) {
                     //filter non-specified records .. do not decorate
                     continue
                 }
@@ -2114,7 +2114,7 @@ module.exports = class Query extends AssetManager {
                     for (const extrinsicHashEventID of Object.keys(extrinsics)) {
                         for (const cell of extrinsics[extrinsicHashEventID]) {
                             var t = JSON.parse(cell.value);
-                            if (!this.chainFilters(chainList, t.chainID)){
+                            if (!this.chainFilters(chainList, t.chainID)) {
                                 //filter non-specified records .. do not decorate
                                 continue
                             }
@@ -2241,7 +2241,7 @@ module.exports = class Query extends AssetManager {
                                 let extrinsicHash = extrinsicHashEventID.split('#')[0]
                                 let eventID = extrinsicHashEventID.split('#')[1]
                                 var t = JSON.parse(cell.value);
-                                if (!this.chainFilters(chainList, t.chainID)){
+                                if (!this.chainFilters(chainList, t.chainID)) {
                                     //filter non-specified records .. do not decorate
                                     continue
                                 }
@@ -2598,9 +2598,9 @@ module.exports = class Query extends AssetManager {
                 let cell = realtimeData[assetChainEncoded];
                 let assetChain = paraTool.decodeAssetChain(assetChainEncoded);
                 let [asset, chainID] = paraTool.parseAssetChain(assetChain);
-                if (!this.chainFilters(chainList, chainID)){
-                  //filter non-specified records .. do not decorate
-                  continue
+                if (!this.chainFilters(chainList, chainID)) {
+                    //filter non-specified records .. do not decorate
+                    continue
                 }
                 if (chainID !== undefined) {
                     try {
@@ -2662,7 +2662,7 @@ module.exports = class Query extends AssetManager {
                     for (const assetChainEncoded of Object.keys(historyData)) {
                         let assetChain = paraTool.decodeAssetChain(assetChainEncoded)
                         let [asset, chainID] = paraTool.parseAssetChain(assetChain);
-                        if (!this.chainFilters(chainList, chainID)){
+                        if (!this.chainFilters(chainList, chainID)) {
                             //filter non-specified records .. do not decorate
                             continue
                         }
@@ -2730,7 +2730,7 @@ module.exports = class Query extends AssetManager {
                         for (const cell of crowdloansData[extrinsicHashEventID]) {
                             try {
                                 var t = JSON.parse(cell.value);
-                                if (!this.chainFilters(chainList, t.chainID)){
+                                if (!this.chainFilters(chainList, t.chainID)) {
                                     //filter non-specified records .. do not decorate
                                     continue
                                 }
@@ -2797,7 +2797,7 @@ module.exports = class Query extends AssetManager {
                         for (const cell of rewardsData[extrinsicHashEventID]) {
                             try {
                                 var t = JSON.parse(cell.value);
-                                if (!this.chainFilters(chainList, t.chainID)){
+                                if (!this.chainFilters(chainList, t.chainID)) {
                                     //filter non-specified records .. do not decorate
                                     continue
                                 }
@@ -4776,16 +4776,16 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    chainFilters(chainList = [], targetChainID){
-      if (targetChainID == undefined) return false
-      if (isNaN(targetChainID)) return false
-      let chainID = paraTool.dechexToInt(targetChainID, 10)
-      if (chainList.length == 0){
-          return true
-      }else if(chainList.includes(chainID)){
-          return true
-      }
-      return false
+    chainFilters(chainList = [], targetChainID) {
+        if (targetChainID == undefined) return false
+        if (isNaN(targetChainID)) return false
+        let chainID = paraTool.dechexToInt(targetChainID, 10)
+        if (chainList.length == 0) {
+            return true
+        } else if (chainList.includes(chainID)) {
+            return true
+        }
+        return false
     }
 
     getDecorateOption(decorateExtra) {
