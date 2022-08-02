@@ -943,7 +943,7 @@ module.exports = class Query extends AssetManager {
         return s;
     }
 
-    async getXCMTransfers(address = false, limit = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async getXCMTransfers(address = false, limit = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
 
@@ -953,7 +953,12 @@ module.exports = class Query extends AssetManager {
             let xcmtransfers = await this.poolREADONLY.query(`select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(asset) > 3 ${w} order by sourceTS desc limit ${limit}`);
             for (let i = 0; i < xcmtransfers.length; i++) {
                 let x = xcmtransfers[i];
-
+                let chainIDIncluded = this.chainFilters(chainList, x.chainID)
+                let chainIDDestIncluded = this.chainFilters(chainList, x.chainIDDest)
+                if (!chainIDIncluded && !chainIDDestIncluded){
+                    //filter non-specified records .. do not decorate
+                    continue
+                }
                 x.asset = this.trimquote(x.asset); // temporary hack
                 if (x.asset.includes("Token")) {
                     let decimals = false;
@@ -2018,18 +2023,20 @@ module.exports = class Query extends AssetManager {
     }
 
     async getAccountBalances(rawAddress, lookback = 180, ts = null) {
-        let balances = await this.getAccount(rawAddress, "balances", ts, lookback);
+        let chainList = []
+        let balances = await this.getAccount(rawAddress, "balances", chainList, ts, lookback);
         // TODO: treat "false" case
         return (balances);
     }
 
     async getAccountUnfinalized(rawAddress, lookback = 180, ts = null) {
-        let unfinalized = await this.getAccount(rawAddress, "unfinalized", ts, lookback);
+        let chainList = []
+        let unfinalized = await this.getAccount(rawAddress, "unfinalized", chainList, ts, lookback);
         // TODO: treat "false" case
         return (unfinalized);
     }
 
-    async get_account_extrinsics_unfinalized(address, rows, maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async get_account_extrinsics_unfinalized(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let nextPage = null;
         let feedItems = 0;
@@ -2045,7 +2052,7 @@ module.exports = class Query extends AssetManager {
                     for (const extrinsicHashEventID of Object.keys(extrinsics)) {
                         for (const cell of extrinsics[extrinsicHashEventID]) {
                             var t = JSON.parse(cell.value);
-                            if (feedItems < maxRows && decoratedFeeds[extrinsicHashPiece] == undefined) {
+                            if (this.chainFilters(chainList, t.chainID) && feedItems < maxRows && decoratedFeeds[extrinsicHashPiece] == undefined) {
                                 let d = await this.decorateExtrinsic(t, t.chainID, "", decorate, decorateExtra)
                                 decoratedFeeds[extrinsicHashPiece] = {
                                     extrinsicHash: extrinsicHashPiece,
@@ -2069,7 +2076,7 @@ module.exports = class Query extends AssetManager {
                     for (const extrinsicHashEventID of Object.keys(extrinsics)) {
                         for (const cell of extrinsics[extrinsicHashEventID]) {
                             var t = JSON.parse(cell.value);
-                            if (decoratedFeeds[extrinsicHashPiece] != undefined) {
+                            if (this.chainFilters(chainList, t.chainID) && decoratedFeeds[extrinsicHashPiece] != undefined) {
                                 decoratedFeeds[extrinsicHashPiece]['extrinsicID'] = t.extrinsicID;
                                 decoratedFeeds[extrinsicHashPiece]['blockNumber'] = parseInt(t.blockNumber, 10);
                                 decoratedFeeds[extrinsicHashPiece]['ts'] = parseInt(t.ts, 10);
@@ -2089,7 +2096,7 @@ module.exports = class Query extends AssetManager {
     }
 
     //cbt read addressextrinsic prefix=0x109d58c19ac53a8cf9fe9793e0ae027d5dada0b79e6f6ee81a8fbe4cb0955649
-    async get_account_extrinsics(address, rows, maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async get_account_extrinsics(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let feed = [];
         let nextPage = null;
@@ -2107,6 +2114,10 @@ module.exports = class Query extends AssetManager {
                     for (const extrinsicHashEventID of Object.keys(extrinsics)) {
                         for (const cell of extrinsics[extrinsicHashEventID]) {
                             var t = JSON.parse(cell.value);
+                            if (!this.chainFilters(chainList, t.chainID)){
+                                //filter non-specified records .. do not decorate
+                                continue
+                            }
                             let isEVMTx = (t.transactionHash != undefined) ? true : false
                             if (isEVMTx) {
                                 // this is an EVM tx
@@ -2205,7 +2216,7 @@ module.exports = class Query extends AssetManager {
         };
     }
 
-    async get_account_transfers(address, rows, maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async get_account_transfers(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let nextPage = null;
         let feedTransfer = [];
@@ -2230,6 +2241,10 @@ module.exports = class Query extends AssetManager {
                                 let extrinsicHash = extrinsicHashEventID.split('#')[0]
                                 let eventID = extrinsicHashEventID.split('#')[1]
                                 var t = JSON.parse(cell.value);
+                                if (!this.chainFilters(chainList, t.chainID)){
+                                    //filter non-specified records .. do not decorate
+                                    continue
+                                }
                                 //console.log(`extrinsicHash`, t)
                                 if (t['extrinsicHash'] != undefined) {
                                     t['extrinsicHash'] = extrinsicHash;
@@ -2396,7 +2411,7 @@ module.exports = class Query extends AssetManager {
         return (related)
     }
 
-    async getAccountAssetsRealtimeByChain(requestedChainID, rawAddress, rawFromAddress, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async getAccountAssetsRealtimeByChain(requestedChainID, rawAddress, rawFromAddress, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let fromAddress = paraTool.getPubKey(rawFromAddress) // observer
         let address = paraTool.getPubKey(rawAddress)
@@ -2404,7 +2419,7 @@ module.exports = class Query extends AssetManager {
 
         let assets = null;
         try {
-            assets = await this.getAccount(address, "realtime");
+            assets = await this.getAccount(address, "realtime", chainList);
         } catch (err) {
             console.log("getAccountAssetsRealtimeByChain", err);
             throw err;
@@ -2575,7 +2590,7 @@ module.exports = class Query extends AssetManager {
         return (account);
     }
 
-    async get_account_realtime(address, realtimeData) {
+    async get_account_realtime(address, realtimeData, chainList = []) {
         let realtime = {};
         if (realtimeData) {
             let lastCellTS = {};
@@ -2583,6 +2598,10 @@ module.exports = class Query extends AssetManager {
                 let cell = realtimeData[assetChainEncoded];
                 let assetChain = paraTool.decodeAssetChain(assetChainEncoded);
                 let [asset, chainID] = paraTool.parseAssetChain(assetChain);
+                if (!this.chainFilters(chainList, chainID)){
+                  //filter non-specified records .. do not decorate
+                  continue
+                }
                 if (chainID !== undefined) {
                     try {
                         let assetInfo = this.assetInfo[assetChain];
@@ -2626,7 +2645,7 @@ module.exports = class Query extends AssetManager {
         return (current);
     }
 
-    async get_account_history(address, rows, maxRows = 1000, daily = false) {
+    async get_account_history(address, rows, maxRows = 1000, chainList = [], daily = false) {
         let history = {};
         let nHistoryItems = 0;
         let minTS = 0;
@@ -2643,6 +2662,10 @@ module.exports = class Query extends AssetManager {
                     for (const assetChainEncoded of Object.keys(historyData)) {
                         let assetChain = paraTool.decodeAssetChain(assetChainEncoded)
                         let [asset, chainID] = paraTool.parseAssetChain(assetChain);
+                        if (!this.chainFilters(chainList, chainID)){
+                            //filter non-specified records .. do not decorate
+                            continue
+                        }
                         if (this.assetInfo[assetChain] !== undefined) {
                             let assetInfo = this.assetInfo[assetChain];
                             let assetType = assetInfo.assetType;
@@ -2689,7 +2712,7 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async get_account_crowdloans(address, rows, maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async get_account_crowdloans(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let crowdloans = [];
         let nextPage = null;
@@ -2707,9 +2730,11 @@ module.exports = class Query extends AssetManager {
                         for (const cell of crowdloansData[extrinsicHashEventID]) {
                             try {
                                 var t = JSON.parse(cell.value);
-
+                                if (!this.chainFilters(chainList, t.chainID)){
+                                    //filter non-specified records .. do not decorate
+                                    continue
+                                }
                                 let extrinsicHash = extrinsicHashEventID.split('#')[0]
-
                                 t['blockNumber'] = parseInt(t.blockNumber, 10);
                                 t['chainID'] = parseInt(t.chainID, 10);
                                 t['chainName'] = this.getChainName(t["chainID"]);
@@ -2755,7 +2780,7 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async get_account_rewards(address, rows, maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async get_account_rewards(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let rewards = [];
         let nextPage = null;
@@ -2772,6 +2797,10 @@ module.exports = class Query extends AssetManager {
                         for (const cell of rewardsData[extrinsicHashEventID]) {
                             try {
                                 var t = JSON.parse(cell.value);
+                                if (!this.chainFilters(chainList, t.chainID)){
+                                    //filter non-specified records .. do not decorate
+                                    continue
+                                }
                                 let extrinsicHash = extrinsicHashEventID.split('#')[0]
                                 t['blockNumber'] = parseInt(t.blockNumber, 10);
                                 t['chainID'] = parseInt(t.chainID, 10);
@@ -2819,7 +2848,7 @@ module.exports = class Query extends AssetManager {
         return (o);
     }
 
-    async getAccountFeed(fromAddress, maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async getAccountFeed(fromAddress, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
 
@@ -2850,7 +2879,7 @@ module.exports = class Query extends AssetManager {
                 }],
                 limit: maxRows
             });
-            let extrinsics = await this.get_account_extrinsics(fromAddress, rows, 1000, decorate, decorateExtra);
+            let extrinsics = await this.get_account_extrinsics(fromAddress, rows, 1000, chainList, decorate, decorateExtra);
             if (extrinsics.data) {
                 for (let d = 0; d < extrinsics.data.length; d++) {
                     feed.push(extrinsics.data[d]);
@@ -3022,7 +3051,7 @@ module.exports = class Query extends AssetManager {
         }
         return addressTopN;
     }
-    async getAccount(rawAddress, accountGroup = "realtime", TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async getAccount(rawAddress, accountGroup = "realtime", chainList = [], TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let maxRows = 1000;
         let address = paraTool.getPubKey(rawAddress)
@@ -3033,11 +3062,11 @@ module.exports = class Query extends AssetManager {
 
         // xcmtransfers comes from mysql "xcmtransfer" table
         if (accountGroup == "xcmtransfers") {
-            return await this.getXCMTransfers(address, 500, decorate, decorateExtra);
+            return await this.getXCMTransfers(address, 500, chainList, decorate, decorateExtra);
         }
         // xcmtransfers comes from mysql "xcmtransfer" table
         if (accountGroup == "feed") {
-            return await this.getAccountFeed(address, 500, decorate, decorateExtra);
+            return await this.getAccountFeed(address, 500, chainList, decorate, decorateExtra);
         }
 
         // offers are what is in progress and what has been claimed
@@ -3220,9 +3249,9 @@ module.exports = class Query extends AssetManager {
                 case "realtime":
                     if (row) {
                         let rowData = row.data;
-                        return await this.get_account_realtime(address, rowData["realtime"])
+                        return await this.get_account_realtime(address, rowData["realtime"], chainList)
                     } else {
-                        return await this.get_account_realtime(address, false)
+                        return await this.get_account_realtime(address, false, chainList)
                     }
                 case "ss58h160":
                     let relatedData = false
@@ -3232,23 +3261,23 @@ module.exports = class Query extends AssetManager {
                     return await this.get_hashes_related(address, relatedData, "address")
                 case "unfinalized":
                     //feed:extrinsicHash#chainID-extrinsicID
-                    return await this.get_account_extrinsics_unfinalized(address, rows, maxRows);
+                    return await this.get_account_extrinsics_unfinalized(address, rows, maxRows, chainList, decorate, decorateExtra);
                 case "extrinsics":
                     //feed:extrinsicHash#chainID-extrinsicID
-                    return await this.get_account_extrinsics(address, rows, maxRows, decorate, decorateExtra);
+                    return await this.get_account_extrinsics(address, rows, maxRows, chainList, decorate, decorateExtra);
                 case "transfers":
                     // need to also bring in "feedtransferunfinalized" from the same table
                     //feedtransfer:extrinsicHash#eventID
-                    return await this.get_account_transfers(address, rows, maxRows, decorate, decorateExtra);
+                    return await this.get_account_transfers(address, rows, maxRows, chainList, decorate, decorateExtra);
                 case "crowdloans":
                     //feedcrowdloan:extrinsicHash#eventID
-                    return await this.get_account_crowdloans(address, rows, maxRows, decorate, decorateExtra);
+                    return await this.get_account_crowdloans(address, rows, maxRows, chainList, decorate, decorateExtra);
                 case "rewards":
                     //feedreward:extrinsicHash#eventID
-                    return await this.get_account_rewards(address, rows, maxRows, decorate, decorateExtra);
+                    return await this.get_account_rewards(address, rows, maxRows, chainList, decorate, decorateExtra);
                 case "history":
                     let relatedExtrinsicsMap = {}
-                    let hist = await this.get_account_history(address, rows, maxRows)
+                    let hist = await this.get_account_history(address, rows, maxRows, chainList, false)
                     try {
                         //MK: history has family "history" but we are calling "feed" family here??
                         let [extrinsics] = await this.btAddressExtrinsic.getRows({
@@ -3317,7 +3346,7 @@ module.exports = class Query extends AssetManager {
                         data: out, nextPage: hist.nextPage
                     };
                 case "balances":
-                    let historyObj = await this.get_account_history(address, rows, maxRows, true);
+                    let historyObj = await this.get_account_history(address, rows, maxRows, chainList, true);
                     let h = historyObj.data
                     let balances = [];
                     let currentTS = this.currentTS();
@@ -4745,6 +4774,18 @@ module.exports = class Query extends AssetManager {
             });
             return false;
         }
+    }
+
+    chainFilters(chainList = [], targetChainID){
+      if (targetChainID == undefined) return false
+      if (isNaN(targetChainID)) return false
+      let chainID = paraTool.dechexToInt(targetChainID, 10)
+      if (chainList.length == 0){
+          return true
+      }else if(chainList.includes(chainID)){
+          return true
+      }
+      return false
     }
 
     getDecorateOption(decorateExtra) {

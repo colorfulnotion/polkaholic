@@ -65,42 +65,71 @@ function getapikey(req) {
     return (apikey);
 }
 
-function decorateOpt(req){
-  // default decorate is true
-  let decorate = (req.query.decorate != undefined) ? paraTool.parseBool(req.query.decorate) : true
-  let decorateExtra = []
-  if (!decorate){
-    return [decorate, decorateExtra]
-  }
-
-  /*
-    data: show docs/decodedData/dataType in event
-    usd: xxxUSD/priceUSD/priceUSDCurrent/ decoration
-    address: identity decoration
-    related: proxy/related decoration
-  */
-  let predefinedExtra = ["data", "usd", "address", "related"]
-
-  try {
-    if (req.query.extra != undefined){
-      let extraList = []
-      let extra = req.query.extra
-      if (!Array.isArray(extra)){
-        extra = extra.split(',')
-      }
-      for (const ex of extra){
-        let extFld = ex.toLowerCase()
-        if (predefinedExtra.includes(extFld)) extraList.push(extFld)
-      }
-      decorateExtra = extraList
-    }else{
-      //default option: [true] usd, addr [false] related
-      decorateExtra = ["data", "usd", "address"]
+function chainFilterOpt(req) {
+    // default: return all chains
+    let chainList = []
+    try {
+        if (req.query.chainfilters != undefined) {
+            let chainIdentifierList = []
+            let chainIdentifiers = req.query.chainfilters
+            if (!Array.isArray(chainIdentifiers)) {
+                chainIdentifiers = chainIdentifiers.split(',')
+            }
+            for (const chainIdentifier of chainIdentifiers) {
+                if (chainIdentifier == 'all') return []
+                //handle both chainID, id
+                let [chainID, _] = query.convertChainID(chainIdentifier.toLowerCase())
+                if (chainID !== false) {
+                    chainIdentifierList.push(chainID)
+                }
+            }
+            chainList = paraTool.unique(chainIdentifierList)
+        } else {
+            chainList = []
+        }
+    } catch (e) {
+        console.log(`chainFilterOpt`, e.toString())
     }
-  } catch(e) {
-    console.log(`decorateOpt`, e.toString())
-  }
-  return [decorate, decorateExtra]
+    console.log(`chainFilterOpt chainList=${chainList}`)
+    return chainList
+}
+
+function decorateOpt(req) {
+    // default decorate is true
+    let decorate = (req.query.decorate != undefined) ? paraTool.parseBool(req.query.decorate) : true
+    let decorateExtra = []
+    if (!decorate) {
+        return [decorate, decorateExtra]
+    }
+
+    /*
+      data: show docs/decodedData/dataType in event
+      usd: xxxUSD/priceUSD/priceUSDCurrent/ decoration
+      address: identity decoration
+      related: proxy/related decoration
+    */
+    let predefinedExtra = ["data", "usd", "address", "related"]
+
+    try {
+        if (req.query.extra != undefined) {
+            let extraList = []
+            let extra = req.query.extra
+            if (!Array.isArray(extra)) {
+                extra = extra.split(',')
+            }
+            for (const ex of extra) {
+                let extFld = ex.toLowerCase()
+                if (predefinedExtra.includes(extFld)) extraList.push(extFld)
+            }
+            decorateExtra = extraList
+        } else {
+            //default option: [true] usd, addr [false] related
+            decorateExtra = ["data", "usd", "address"]
+        }
+    } catch (e) {
+        console.log(`decorateOpt`, e.toString())
+    }
+    return [decorate, decorateExtra]
 }
 
 const downtime = false;
@@ -108,7 +137,7 @@ app.use(async (req, res, next) => {
     setCrossOrigin(res)
     let apikey = getapikey(req);
     let result = await query.checkAPIKey(apikey);
-    if ( downtime ) {
+    if (downtime) {
         var err = new Error("API is down for maintainance");
         err.http_code = 503;
         next(err);
@@ -188,7 +217,8 @@ app.get('/xcmtransfers', async (req, res) => {
     try {
         let limit = (req.query.limit != undefined) ? paraTool.parseInt(req.query.limit) : 1000
         let [decorate, decorateExtra] = decorateOpt(req)
-        let xcmtransfers = await query.getXCMTransfers(false, limit, decorate, decorateExtra);
+        let chainList = chainFilterOpt(req)
+        let xcmtransfers = await query.getXCMTransfers(false, limit, chainList, decorate, decorateExtra);
         if (xcmtransfers) {
             res.write(JSON.stringify(xcmtransfers));
             await query.tallyAPIKey(getapikey(req));
@@ -206,7 +236,7 @@ app.get('/xcmtransfers', async (req, res) => {
 // Usage: http://api.polkaholic.io/addresstopn
 app.get('/addresstopn/:topN', async (req, res) => {
     try {
-	let topN = req.params["topN"]
+        let topN = req.params["topN"]
         let [decorate, decorateExtra] = decorateOpt(req)
         let addresstopn = await query.getAddressTopN(topN, decorate, decorateExtra);
         if (addresstopn) {
@@ -369,16 +399,16 @@ app.get('/hash/:hash', async (req, res) => {
         let h = req.params['hash'];
         let hashrec = await query.lookupHash(h);
         if (hashrec) {
-	    if ( ( hashrec.status != undefined ) && ( hashrec.status == "unfinalized" ) && ( hashrec.blockNumber != undefined ) && ( hashrec.chainID != undefined ) ) {
-		let chainID = hashrec.chainID;
-		let chain = await query.getChain(chainID);
-		if ( chain.blocksFinalized >= hashrec.blockNumber ) {
-		    let blockHashFinalized = await query.getBlockHashFinalized(chainID, hashrec.blockNumber);
-		    if ( blockHashFinalized ) {
-			hashrec.blockHashFinalized = blockHashFinalized;
-		    }
-		}
-	    }
+            if ((hashrec.status != undefined) && (hashrec.status == "unfinalized") && (hashrec.blockNumber != undefined) && (hashrec.chainID != undefined)) {
+                let chainID = hashrec.chainID;
+                let chain = await query.getChain(chainID);
+                if (chain.blocksFinalized >= hashrec.blockNumber) {
+                    let blockHashFinalized = await query.getBlockHashFinalized(chainID, hashrec.blockNumber);
+                    if (blockHashFinalized) {
+                        hashrec.blockHashFinalized = blockHashFinalized;
+                    }
+                }
+            }
             res.write(JSON.stringify(hashrec));
             await query.tallyAPIKey(getapikey(req));
             res.end();
@@ -396,7 +426,7 @@ app.post('/suggest/:address', async (req, res) => {
     let address = req.params["address"];
     let nickname = req.body.nickname;
     let addressType = req.body.addressType;
-    let submitter = req.body.submitter; 
+    let submitter = req.body.submitter;
     let result = query.submitAddressSuggestion(address, nickname, submitter, addressType);
     res.write(JSON.stringify(result));
 })
@@ -406,51 +436,51 @@ app.post('/search/:table', async (req, res) => {
     try {
         let table = req.params["table"];
         let q = req.body;
-        let chainID_or_chainName = ( q.chainID != undefined ) ? q.chainID : "all";
-	let maxLimit = 1000;
-	let hardLimit = 100000; // 100x [above this it takes too long] -- users should use date ranges to filter
+        let chainID_or_chainName = (q.chainID != undefined) ? q.chainID : "all";
+        let maxLimit = 1000;
+        let hardLimit = 100000; // 100x [above this it takes too long] -- users should use date ranges to filter
         let queryLimit = (req.query.limit != undefined) ? req.query.limit : maxLimit;
-	if ( queryLimit > hardLimit ) {
+        if (queryLimit > hardLimit) {
             return res.status(400).json({
-		error: "Search: 'limit' parameter must be less or equal to than 100K"
+                error: "Search: 'limit' parameter must be less or equal to than 100K"
             });
-	}
+        }
         let [chainID, id] = query.convertChainID(chainID_or_chainName)
         let [decorate, decorateExtra] = decorateOpt(req)
-        if ( chainID !== undefined || chainID_or_chainName == "all" ) {
-          var results = [];
-            if( table == "extrinsics" ) {
-            results = await query.getExtrinsics(q, queryLimit, decorate, decorateExtra);
-          } else if ( table == "events" ) {
-            results = await query.getEvents(q, queryLimit, decorate, decorateExtra);
-          } else if ( table == "evmtxs" ) {
-            results = await query.getEVMTxs(q, queryLimit, decorate, decorateExtra);
-          } else if ( table == "transfers" ) {
-            results = await query.getTransfers(q, queryLimit, decorate, decorateExtra);
-          } else if ( table == "xcmmessages" ) {
-            results = await query.getXCMMessages(q, queryLimit, decorate, decorateExtra);
-          } else if ( table == "xcmtransfers" ) {
-            results = await query.searchXCMTransfers(q, queryLimit, decorate, decorateExtra);
-          } else {
-	      // TODO: say the table is unknown
-            return res.sendStatus(404).json();
-          }
+        if (chainID !== undefined || chainID_or_chainName == "all") {
+            var results = [];
+            if (table == "extrinsics") {
+                results = await query.getExtrinsics(q, queryLimit, decorate, decorateExtra);
+            } else if (table == "events") {
+                results = await query.getEvents(q, queryLimit, decorate, decorateExtra);
+            } else if (table == "evmtxs") {
+                results = await query.getEVMTxs(q, queryLimit, decorate, decorateExtra);
+            } else if (table == "transfers") {
+                results = await query.getTransfers(q, queryLimit, decorate, decorateExtra);
+            } else if (table == "xcmmessages") {
+                results = await query.getXCMMessages(q, queryLimit, decorate, decorateExtra);
+            } else if (table == "xcmtransfers") {
+                results = await query.searchXCMTransfers(q, queryLimit, decorate, decorateExtra);
+            } else {
+                // TODO: say the table is unknown
+                return res.sendStatus(404).json();
+            }
             if (results) {
-		let cnt = 1;
-		if ( results.length > maxLimit ) {
-		    cnt += results.length / (10 * maxLimit);
-		}
-		// since BigQuery has high "scanning" costs, if the user wastefully asks for a high maxLimit (100K), even we didn't get many rows, tally 1 per 2500 
-		let cnt2 = maxLimit / 2500;
-		if ( cnt2 > cnt ) {
-		    cnt = cnt2;
-		}
-		res.write(JSON.stringify(results));
-		await query.tallyAPIKey(getapikey(req), cnt);
-              return res.end();
-          } else {
-              return res.sendStatus(404).json();
-          }
+                let cnt = 1;
+                if (results.length > maxLimit) {
+                    cnt += results.length / (10 * maxLimit);
+                }
+                // since BigQuery has high "scanning" costs, if the user wastefully asks for a high maxLimit (100K), even we didn't get many rows, tally 1 per 2500
+                let cnt2 = maxLimit / 2500;
+                if (cnt2 > cnt) {
+                    cnt = cnt2;
+                }
+                res.write(JSON.stringify(results));
+                await query.tallyAPIKey(getapikey(req), cnt);
+                return res.end();
+            } else {
+                return res.sendStatus(404).json();
+            }
         } else {
             return res.sendStatus(404).json();
         }
@@ -536,7 +566,6 @@ app.get('/account/:address', async (req, res) => {
         let address = req.params["address"];
         let targetGroup = (req.query["group"] != undefined) ? req.query["group"].toLowerCase() : "realtime"
         let lookback = (req.query["lookback"] != undefined) ? req.query["lookback"] : 180
-
         let predefinedGroups = ["extrinsics", "transfers", "crowdloans", "rewards", "realtime", "history", "related", "xcmtransfers", "nfts", "balances", "feed", "unfinalized", "offers", "ss58h160"]
         if (!predefinedGroups.includes(targetGroup)) {
             return res.status(400).json({
@@ -546,7 +575,9 @@ app.get('/account/:address', async (req, res) => {
         let ts = null;
         //console.log(`${targetGroup} requested`)
         let [decorate, decorateExtra] = decorateOpt(req)
-        let account = await query.getAccount(address, targetGroup, ts, lookback, decorate, decorateExtra);
+        let chainList = chainFilterOpt(req)
+        //console.log(`/account/ chainList`, chainList)
+        let account = await query.getAccount(address, targetGroup, chainList, ts, lookback, decorate, decorateExtra);
         if (account) {
             res.write(JSON.stringify(account));
             await query.tallyAPIKey(getapikey(req));
@@ -564,15 +595,18 @@ app.get('/account/:address', async (req, res) => {
 app.get('/account/:accountGroup/:address', async (req, res) => {
     try {
         let address = req.params["address"];
-	let accountGroup = req.params["accountGroup"];
+        let accountGroup = req.params["accountGroup"];
         let lookback = (req.query["lookback"] != undefined) ? req.query["lookback"] : 180
         let [decorate, decorateExtra] = decorateOpt(req)
+        let chainList = chainFilterOpt(req)
+        //console.log(`/account/ chainList`, chainList)
+
         let ts = (req.query["ts"] != undefined) ? req.query["ts"] : null
-	if ( accountGroup == "feed" ) {
-	    account = await query.getAccountFeed(address);
+        if (accountGroup == "feed") {
+            account = await query.getAccountFeed(address, 500, chainList, decorate, decorateExtra);
         } else {
-            account = await query.getAccount(address, accountGroup, ts, lookback);
-	}
+            account = await query.getAccount(address, accountGroup, chainList, ts, lookback);
+        }
         if (account) {
             res.write(JSON.stringify(account));
             await query.tallyAPIKey(getapikey(req));
@@ -653,7 +687,7 @@ let x = query.init();
 Promise.all([x]).then(() => {
     // delayed listening of your app
     app.listen(port, hostname, () => {
-	console.log(`Polkaholic listening on port ${hostname}:${port}`)
+        console.log(`Polkaholic listening on port ${hostname}:${port}`)
     })
     // reload chains/assets/specVersions regularly
     query.autoUpdate()

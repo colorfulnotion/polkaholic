@@ -1078,7 +1078,8 @@ function setuptabs(tabs, address, requestedChainAddress) {
         let tabEl = document.querySelector(id);
         tabEl.addEventListener('shown.mdb.tab', function(event) {
             const hash = $(this).attr("href");
-            let newUrl = "/account/" + requestedChainAddress + hash;
+            //let newUrl = "/account/" + requestedChainAddress + hash;
+            let newUrl = "/account/" + requestedChainAddress + `?group=${t.target}`
             //console.log("shown.mdb.tab", hash, newUrl);
             setTimeout(() => {
                 showaccounttab(hash);
@@ -1184,7 +1185,7 @@ function submitSuggestion(address, nickname, submitter, addressType) {
     try {
         console.log("submitSuggestion", endpoint, data)
         $('#suggestModal').modal('hide');
-        // TODO: address cross-domain 
+        // TODO: address cross-domain
         fetch(req)
             .then((response) => {
                 console.log(response);
