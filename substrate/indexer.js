@@ -1004,34 +1004,34 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    validDouble(obj, ctx, o, flds=['low','high','open','close', 'lp0', 'lp1']) {
-        for (const fld of flds){
-          let val = obj[fld]
-          if (val != undefined && val >= 1e+308) {
-              let err = `InvalidDouble ${fld}=${val}`
-              this.log_indexing_warn(err, "InvalidDouble", {
-                "ctx": ctx,
-                "o": o
-              })
-              if (this.debugLevel >= paraTool.debugNoLog) console.log(`InvalidDecimal ${fld} ${val}`, o)
-              return (false);
-          }
+    validDouble(obj, ctx, o, flds = ['low', 'high', 'open', 'close', 'lp0', 'lp1']) {
+        for (const fld of flds) {
+            let val = obj[fld]
+            if (val != undefined && val >= 1e+308) {
+                let err = `InvalidDouble ${fld}=${val}`
+                this.log_indexing_warn(err, "InvalidDouble", {
+                    "ctx": ctx,
+                    "o": o
+                })
+                if (this.debugLevel >= paraTool.debugNoLog) console.log(`InvalidDecimal ${fld} ${val}`, o)
+                return (false);
+            }
         }
         return true
     }
 
-    validDecimal(obj, ctx, o, flds=['total_volumes', 'token0Volume', 'token1Volume','debitExchangeRate', 'supplyExchangeRate', 'borrowExchangeRate']) {
-        for (const fld of flds){
-          let val = obj[fld]
-          if (val != undefined && val >= 1e+18) {
-              let err = `InvalidDecimal ${fld}=${val}`
-              this.log_indexing_warn(err, "validDecimal", {
-                  "ctx": ctx,
-                  "o": o
-              })
-              if (this.debugLevel >= paraTool.debugNoLog) console.log(`InvalidDecimal ${fld} ${val}`, o)
-              return (false);
-          }
+    validDecimal(obj, ctx, o, flds = ['total_volumes', 'token0Volume', 'token1Volume', 'debitExchangeRate', 'supplyExchangeRate', 'borrowExchangeRate']) {
+        for (const fld of flds) {
+            let val = obj[fld]
+            if (val != undefined && val >= 1e+18) {
+                let err = `InvalidDecimal ${fld}=${val}`
+                this.log_indexing_warn(err, "validDecimal", {
+                    "ctx": ctx,
+                    "o": o
+                })
+                if (this.debugLevel >= paraTool.debugNoLog) console.log(`InvalidDecimal ${fld} ${val}`, o)
+                return (false);
+            }
         }
         return true
     }
@@ -6857,13 +6857,14 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (this.chainParser) {
             numIndexingErrors += this.chainParser.numParserErrors;
         }
+        let indexed = (numIndexingErrors == 0) ? 1 : 0;
         let numIndexingWarns = this.numIndexingWarns;
         let elapsedSeconds = (new Date().getTime() - indexStartTS) / 1000
         await this.upsertSQL({
             "table": "indexlog",
             "keys": ["chainID", "indexTS"],
             "vals": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns"],
-            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', 1, 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}')`],
+            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', '${indexed}', 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}')`],
             "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns"]
         });
 

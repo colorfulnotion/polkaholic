@@ -148,13 +148,13 @@ function timeSince(seconds) {
 
 function timeConverter(UNIX_timestamp) {
     var a = new Date(UNIX_timestamp * 1000);
-    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    var year = a.getFullYear();
-    var month = months[a.getMonth()];
-    var date = a.getDate();
-    var hour = a.getHours().toString().padStart(2, '0');
-    var min = a.getMinutes().toString().padStart(2, '0');;
-    var time = date + ' ' + month + ' ' + year + ' ' + hour + ':' + min;
+    var year = a.getUTCFullYear();
+    var month = (a.getUTCMonth() + 1).toString().padStart(2, '0');
+    var date = a.getUTCDate().toString().padStart(2, '0');
+    var hour = a.getUTCHours().toString().padStart(2, '0');
+    var min = a.getUTCMinutes().toString().padStart(2, '0');;
+    var secs = a.getUTCSeconds().toString().padStart(2, '0');
+    var time = year + '-' + month + '-' + date + ' ' + hour + ':' + min + ":" + secs + " (+UTC)";
     return time;
 }
 
