@@ -4489,7 +4489,7 @@ module.exports = class Query extends AssetManager {
                     chainDestName: this.getChainName(chainIDDest),
                     msgType: r.msgType,
                     msgHash: msgHash,
-                    msgHex: r.msgHex,
+                    msgHex: `${r.msgHex}`,
                     //msgStr: r.msgStr,
                     msgDecoded: parsedMsg,
                     blockNumber: r.blockNumber,
@@ -5082,6 +5082,7 @@ module.exports = class Query extends AssetManager {
             throw new paraTool.NotFoundError(`XCM Message not found: ${hash}`)
         }
         let x = xcmrecs[0];
+        x.msgHex = `${x.msgHex}`
 
         let blockTS = (x.blockTS != undefined) ? x.blockTS : 0
 
@@ -5373,7 +5374,7 @@ module.exports = class Query extends AssetManager {
 
     async decorateXCM(rawXcmRec, decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-
+        rawXcmRec.msgHex = `${rawXcmRec.msgHex}`
         let [parentMsgHash, parentSentAt] = [rawXcmRec.parentMsgHash, rawXcmRec.parentSentAt];
         let [childMsgHash, childSentAt] = [rawXcmRec.childMsgHash, rawXcmRec.childSentAt];
         let blockTS = (rawXcmRec.blockTS != undefined) ? rawXcmRec.blockTS : 0
@@ -5453,6 +5454,7 @@ module.exports = class Query extends AssetManager {
         let sent = {};
         for (let r = 0; r < xcmRecs.length; r++) {
             let x = xcmRecs[r];
+            x.msgHex = `${x.msgHex}`
             chainpaths.push({
                 chainID: x.chainID,
                 chainIDDest: x.chainIDDest,
