@@ -3205,7 +3205,7 @@ order by msgHash, diffSentAt, diffTS`
                             }
                         }
                     } catch (err1) {
-                        console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, err1)
+                        console.log(`* [${extrinsicID}] ${extrinsicHash} try errored [call=${opaqueCall}]`, err1)
                     }
 
                     //console.log("innerexs", JSON.stringify(innerexs))
@@ -3214,7 +3214,8 @@ order by msgHash, diffSentAt, diffTS`
                     //console.log("innerOutput", JSON.stringify(innerOutput))
 
                 } catch (e) {
-                    console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, e, f)
+                    console.log(`* [${extrinsicID}] ${extrinsicHash} try errored [call=${opaqueCall}]`, e, f)
+                    console.log(`Blockhash = ${this.chainParser.parserBlockHash}`)
                 }
             } else {
                 //This is the proxy:proxy case - where api has automatically decoded the "call"
@@ -5998,14 +5999,17 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         var signedBlock2;
         try {
             signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
+            console.log(`[${r.block.number} ${r.block.hash}] OK`)
         } catch (e) {
             // try fallback here
-            console.log(`failed with specV=${this.specVersion} [${r.block.number} ${r.block.hash}]`)
-	    console.log(r.block.hash, r.block.number, e);
-	    process.exit(0);
+            console.log(`failed with specV=${this.specVersion} [${r.block.number} ${r.block.hash}] -- trying fallback`)
+            //console.log(r.block.hash, r.block.number, e);
             let chain = await this.setupChainAndAPI(this.chainID); //not sure
             await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
+            this.apiAt = this.api
             signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
+            console.log(`[${r.block.number} ${r.block.hash}] fallback OK`)
+            //process.exit(0);
         }
         // signedBlock2.block.extrinsics.forEach((ex, index) => {  console.log(index, ex.hash.toHex());    });
         return signedBlock2
