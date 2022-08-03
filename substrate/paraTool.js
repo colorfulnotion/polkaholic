@@ -1105,6 +1105,14 @@ module.exports = {
     getAuthor: function(digest, validatorsList) {
         return getAuthor(digest, validatorsList);
     },
+    isJSONString: function(x) {
+        if (typeof x != "string") return (false);
+        let l = x.length;
+        if (x.length < 2) return (false);
+        if (x.charAt(0) == "{" && x.charAt(l - 1) == "}") return (true);
+        if (x.charAt(0) == "[" && x.charAt(l - 1) == "]") return (true);
+        return (false);
+    },
     stringToHex: function(x) {
         return stringToHex(x)
     },

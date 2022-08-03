@@ -1127,7 +1127,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     // for any missing blocks/traces, this refetches the dataset
-    async crawlBackfill(chain, techniqueParams = ["mod", 0, 1]) {
+    async crawlBackfill(chain, techniqueParams = ["mod", 0, 1], wsBackfill = false) {
         let chainID = chain.chainID;
         let sql = false;
         let extraflds = (chain.isEVM > 0) ? " crawlBlockEVM, crawlReceiptsEVM, " : "";
@@ -1145,6 +1145,9 @@ module.exports = class Crawler extends Indexer {
         if (tasks.length == 0) return (false);
 
         await this.setupAPI(chain);
+	if ( wsBackfill && chain.WSBackfill && ( chain.WSBackfill.length > 0 ) ) {
+	    chain.WSEndpoint = chain.WSBackfill;
+	}
         var jmp = 10; // do 10 at a time
         for (var i = 0; i < tasks.length; i += jmp) {
             let j = i + jmp;
