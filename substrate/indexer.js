@@ -5135,7 +5135,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 index = 0;
             }
             if (index >= 0) {
-                let eventID = `${this.chainID}-${blockNumber}-${index}-${j}`
+                let eventID = `${this.chainID}-${blockNumber}-${index}-${j}` //current format prior Aug 3rd
+                // For completeness, we will want the following format after reindexing
+                // let eventID = `${this.chainID}-${blockNumber}-${index}-${idxWithinExtrinsic}-${j}` //breaking change
                 let event = this.parseEvent(e.event, eventID, api); // this is the apiAt
                 if (event) {
                     events[index].push(event)
