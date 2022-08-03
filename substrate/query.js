@@ -5096,6 +5096,24 @@ module.exports = class Query extends AssetManager {
             // trace filtering on matcher["trace"]
             let traces = rRow.autotrace.filter((f) => {
                 f.traceID = `${chainID}-${f.traceID}`
+		if ( paraTool.isJSONString(f.pv) ) {
+		    try {
+			let pvParsed = JSON.parse(f.pv)
+			f.pv = pvParsed;
+		    } catch {
+			// leave it alone
+		    }
+		}
+		if ( f.xcmMessages != undefined && Array.isArray(f.xcmMessages) ) {
+		    try {
+			let xcmMessagesParsed = f.xcmMessages.map( (m) => {
+			    return JSON.parse(m)
+			});
+			f.xcmMessages = xcmMessagesParsed;
+		    } catch {
+			// leave it alone
+		    }
+		}
                 let s = `${f.p.toLowerCase()}`
                 let m = `${f.s.toLowerCase()}`
                 let sm = `${s}:${m}`
