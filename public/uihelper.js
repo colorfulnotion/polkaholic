@@ -158,6 +158,15 @@ function timeConverter(UNIX_timestamp) {
     return time;
 }
 
+function shorttimeConverter(UNIX_timestamp) {
+    var a = new Date(UNIX_timestamp * 1000);
+    var hour = a.getUTCHours().toString().padStart(2, '0');
+    var min = a.getUTCMinutes().toString().padStart(2, '0');;
+    var secs = a.getUTCSeconds().toString().padStart(2, '0');
+    var time = hour + ':' + min + ":" + secs;
+    return time;
+}
+
 function beautifyCamelCase(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
@@ -169,8 +178,9 @@ function presentSpecVersion(chainID, specVersion) {
 function presentBlockNumber(id, chainName, blockNumber) {
     if (!blockNumber) return "-";
     let txt = (typeof blockNumber == "string") ? blockNumber : blockNumber.toString();
-    if (chainName) txt = chainName + " " + txt;
-    return '<a href="/block/' + id + '/' + blockNumber + '">' + txt + '</a>';
+    let out = '<a href="/block/' + id + '/' + blockNumber + '"><code>' + txt + '</code></a>';
+    if (chainName) out = chainName + " " + out;
+    return out;
 }
 
 function presentEvent(data) {
@@ -395,9 +405,9 @@ function presentIDs(ids) {
 }
 
 
-function cover_params(params, id) {
+function cover_params(params, id, depth = 2) {
     try {
-        let scr = `document.getElementById("params${id}").appendChild(renderjson.set_show_to_level(2)(` + JSON.stringify(params) + `))`;
+        let scr = `document.getElementById("params${id}").appendChild(renderjson.set_show_to_level(${depth})(` + JSON.stringify(params) + `))`;
         return "<div id='params" + id + "' class='renderjson'></div><script>" + scr + "</script>";
     } catch (e) {
         console.log("FAIL", e);

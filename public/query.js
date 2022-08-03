@@ -242,6 +242,46 @@ function showevmtxs(filter) {
 
 var initevents = false;
 
+function rendereventdata(data, id = "datascope") {
+    var script = document.createElement("script");
+    document.getElementById(id).innerHTML = "";
+    script.innerHTML = `document.getElementById("${id}").appendChild(renderjson.set_show_to_level(5)(` + JSON.stringify(data) + `))`;
+    document.body.appendChild(script);
+}
+
+function fetcheventdata(eventID) {
+    let endpoint = `${baseURL}/event/${eventID}`
+    console.log(`requesting endpoint:${endpoint}`)
+    var req = new Request(endpoint, {
+        method: 'GET',
+        headers: new Headers({
+            "Content-Type": "application/json"
+        })
+    });
+    fetch(req)
+        .then((response) => response.json())
+        .then((data) => {
+            try {
+                rendereventdata(data, "data" + eventID);
+            } catch (err) {
+                console.log(err);
+            }
+        });
+}
+
+function presentEventDetails(eventID) {
+    let title = eventID;
+    let ida = eventID.split("-");
+    if (ida.length == 4) {
+        let extrinsicID = `${ida[1]}-${ida[2]}`
+        title = `View ${extrinsicID} Event#` + ida[3];
+    }
+    return `<div style='width:650px'>
+<a class="btn btn-outline-secondary btn-block text-capitalize" data-mdb-toggle="collapse" href="#data${eventID}" role="button" aria-control="data${eventID}" aria-expanded="false" style="text-align:left">${title}</a>
+<div class="collapse mt-3 renderjson" id="data${eventID}"></div>
+</div><script>document.getElementById('data${eventID}').addEventListener('show.bs.collapse', () => { fetcheventdata("${eventID}") } )</script>`;
+}
+
 function showevents(filter) {
     let tableName = '#tableevents'
     if (initevents) {} else {
@@ -253,7 +293,7 @@ function showevents(filter) {
             ],
             columnDefs: [{
                 "className": "dt-center",
-                "targets": [1, 2, 3, 4]
+                "targets": [2, 3, 4]
             }],
             columns: [{
                     data: 'section',
@@ -268,7 +308,8 @@ function showevents(filter) {
                     data: 'eventID',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentExtrinsicIDHash(row.eventID, row.extrinsicHash);
+                            // return presentExtrinsicIDHash(row.eventID, row.extrinsicHash);
+                            return presentEventDetails(row.eventID)
                         }
                         return data;
                     }
