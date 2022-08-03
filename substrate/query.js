@@ -5048,7 +5048,6 @@ module.exports = class Query extends AssetManager {
                 let sm = `${s}:${m}`
                 if (matcher["extrinsics"][sm] || matcher["extrinsics"][s] || matcher["extrinsics"][m]) {
                     if (e.extrinsicHash == extrinsicHash) {
-                        e.extrinsicID = `${chainID}-${e.extrinsicID}`
                         out.push({
                             "chainID": chainID,
                             "id": id,
@@ -5077,6 +5076,8 @@ module.exports = class Query extends AssetManager {
                             }
                         }
                         if (pass) {
+                            ev.extrinsicHash = e.extrinsicHash;
+                            ev.extrinsicID = e.extrinsicID
                             out.push({
                                 "chainID": chainID,
                                 "id": id,
@@ -5096,24 +5097,24 @@ module.exports = class Query extends AssetManager {
             // trace filtering on matcher["trace"]
             let traces = rRow.autotrace.filter((f) => {
                 f.traceID = `${chainID}-${f.traceID}`
-		if ( paraTool.isJSONString(f.pv) ) {
-		    try {
-			let pvParsed = JSON.parse(f.pv)
-			f.pv = pvParsed;
-		    } catch {
-			// leave it alone
-		    }
-		}
-		if ( f.xcmMessages != undefined && Array.isArray(f.xcmMessages) ) {
-		    try {
-			let xcmMessagesParsed = f.xcmMessages.map( (m) => {
-			    return JSON.parse(m)
-			});
-			f.xcmMessages = xcmMessagesParsed;
-		    } catch {
-			// leave it alone
-		    }
-		}
+                if (paraTool.isJSONString(f.pv)) {
+                    try {
+                        let pvParsed = JSON.parse(f.pv)
+                        f.pv = pvParsed;
+                    } catch {
+                        // leave it alone
+                    }
+                }
+                if (f.xcmMessages != undefined && Array.isArray(f.xcmMessages)) {
+                    try {
+                        let xcmMessagesParsed = f.xcmMessages.map((m) => {
+                            return JSON.parse(m)
+                        });
+                        f.xcmMessages = xcmMessagesParsed;
+                    } catch {
+                        // leave it alone
+                    }
+                }
                 let s = `${f.p.toLowerCase()}`
                 let m = `${f.s.toLowerCase()}`
                 let sm = `${s}:${m}`
@@ -5142,6 +5143,51 @@ module.exports = class Query extends AssetManager {
             })
         }
         return [out, extra];
+    }
+
+    async getEvent(eventID) {
+        let ida = eventID.split("-");
+        if (ida.length != 4) {
+            throw new paraTool.NotFoundError(`Invalid eventID`)
+        }
+        let chainID = parseInt(ida[0], 10);
+        let blockNumber = parseInt(ida[1], 10);
+        let extrinsic = parseInt(ida[2], 10);
+        let event = parseInt(ida[3], 10)
+        let [_, id] = this.convertChainID(chainID);
+        let chain = await this.getChain(chainID);
+
+        try {
+            let families = ["feed", "finalized", "feedevm"];
+            let row = await this.fetch_block(chainID, blockNumber, families, true);
+            let block = row.feed;
+            let eventIndex = 0;
+            for (const extrinsic of block.extrinsics) {
+                for (const e of extrinsic.events) {
+                    if (eventIndex == event) {
+                        return (e)
+                    }
+                    eventIndex++
+                }
+            }
+            if (event < ext.events.length) {
+                return (events[event]);
+            } else {
+                throw new paraTool.NotFoundError(`Invalid eventID: Event ${event} not in Extrinsic ${extrinsic} of Block number ${blockNumber} (# Events: ${events.length})`)
+            }
+            return event;
+        } catch (err) {
+            if (err.code == 404) {
+                throw new paraTool.NotFoundError(`Block not found: ${blockNumber}`)
+            }
+            this.logger.error({
+                "op": "query.getEvent",
+                chainID,
+                blockNumber,
+                err
+            });
+        }
+        return (null);
     }
 
 

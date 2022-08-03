@@ -74,8 +74,24 @@ let timelineRows = uiTool.getTimelineRows(timeline);
      <% } %>
      </td>
      <td>
-      <div id="typ<%= k; %>" class="renderjson"></div>
-      <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(10)(<%- JSON.stringify(xcm.msg) %>));</script>
+
+<div class="accordion  accordion-flush" style="width: 600px">
+  <div class="accordion-item">
+    <h2 class="accordion-header" id="heading<%= k; %>">
+      <button class="accordion-button collapsed" type="button" data-mdb-toggle="collapse"
+        data-mdb-target="#flush<%= k; %>" aria-expanded="true" aria-controls="flush<%= k; %>">
+        View Instructions
+      </button>
+    </h2>
+    <div id="flush<%= k; %>" class="accordion-collapse collapse" aria-labelledby="heading<%= k; %>">
+      <div class="accordion-body">
+        <div id="typ<%= k; %>" class="renderjson"></div>
+        <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(10)(<%- JSON.stringify(xcm.msg) %>));</script>
+      </div>
+    </div>
+  </div>
+</div>
+
      </td>
      <td>
      <% if ( xcm.assetChains ) {

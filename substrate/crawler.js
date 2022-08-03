@@ -1145,9 +1145,9 @@ module.exports = class Crawler extends Indexer {
         if (tasks.length == 0) return (false);
 
         await this.setupAPI(chain);
-	if ( wsBackfill && chain.WSBackfill && ( chain.WSBackfill.length > 0 ) ) {
-	    chain.WSEndpoint = chain.WSBackfill;
-	}
+        if (wsBackfill && chain.WSBackfill && (chain.WSBackfill.length > 0)) {
+            chain.WSEndpoint = chain.WSBackfill;
+        }
         var jmp = 10; // do 10 at a time
         for (var i = 0; i < tasks.length; i += jmp) {
             let j = i + jmp;
