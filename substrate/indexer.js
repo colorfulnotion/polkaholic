@@ -23,6 +23,7 @@ module.exports = class Indexer extends AssetManager {
 
     readyForIndexing = {};
     readyToCrawlParachains = false;
+    refreshRequired = false;
 
     hashesRowsToInsert = [];
     blockRowsToInsert = [];
@@ -3130,7 +3131,7 @@ order by msgHash, diffSentAt, diffTS`
         return [null, null]
     }
 
-    recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = {}) {
+    recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = {}, retry = false) {
         if (call_s && call_s.args.calls != undefined) {
             for (let i = 0; i < call_s.args.calls.length; i++) {
                 let callIndex = call_s.args.calls[i].callIndex
@@ -3153,9 +3154,9 @@ order by msgHash, diffSentAt, diffTS`
                     //recursively decode opaque call
                     let s = " ".repeat()
                     //console.log(`\t${" ".repeat(o.length+2)} - additional 'call' argument found`)
-                    this.decode_opaque_call(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks)
+                    this.decode_opaque_call(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks, retry)
                 }
-                this.recursive_batch_all(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks)
+                this.recursive_batch_all(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks, retry)
                 call_s.args.calls[i] = ff
             }
             //console.log("recursive_batch_all done")
@@ -3163,7 +3164,7 @@ order by msgHash, diffSentAt, diffTS`
             //sudo:sudoAs case
             if (call_s && call_s.args.call != undefined) {
                 //console.log(`${extrinsicHash}`, 'call only', innerexs)
-                this.decode_opaque_call(call_s, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks)
+                this.decode_opaque_call(call_s, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks, retry)
             } else {
                 //console.log("recursive_batch_all no more loop")
             }
@@ -3171,7 +3172,7 @@ order by msgHash, diffSentAt, diffTS`
     }
 
     //this is right the level above args
-    decode_opaque_call(f, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = []) {
+    decode_opaque_call(f, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = [], retry = false) {
         //console.log(`${extrinsicHash}`, 'decode_opaque_call', f)
         if (f.args.call != undefined) {
             let opaqueCall = f.args.call
@@ -3189,11 +3190,11 @@ order by msgHash, diffSentAt, diffTS`
                     try {
                         // only utility batch will have struct like this
                         if (innerexs && innerexs.args.calls != undefined) {
-                            this.recursive_batch_all(innerexs, apiAt, extrinsicHash, extrinsicID, lvl, remarks)
+                            this.recursive_batch_all(innerexs, apiAt, extrinsicHash, extrinsicID, lvl, remarks, retry)
                         }
                         if (innerexs && innerexs.args.call != undefined) {
                             //console.log(`${extrinsicHash}`, 'call only', innerexs)
-                            this.decode_opaque_call(innerexs, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks)
+                            this.decode_opaque_call(innerexs, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks, retry)
                         }
                         innerOutput = this.decode_s_internal_raw(innerexs, apiAt)
                         //console.log(`${extrinsicHash}`, 'innerexs', innerexs)
@@ -3206,6 +3207,11 @@ order by msgHash, diffSentAt, diffTS`
                         }
                     } catch (err1) {
                         console.log(`* [${extrinsicID}] ${extrinsicHash} try errored [call=${opaqueCall}]`, err1)
+                        if (retry){
+                            retry = false
+                        }
+                        this.refreshRequired = `[${extrinsicID}] ${err1.toString()}`
+                        return
                     }
 
                     //console.log("innerexs", JSON.stringify(innerexs))
@@ -3215,7 +3221,11 @@ order by msgHash, diffSentAt, diffTS`
 
                 } catch (e) {
                     console.log(`* [${extrinsicID}] ${extrinsicHash} try errored [call=${opaqueCall}]`, e, f)
-                    console.log(`Blockhash = ${this.chainParser.parserBlockHash}`)
+                    if (retry){
+                        retry = false
+                    }
+                    this.refreshRequired = `[${extrinsicID}] ${e.toString()}`
+                    return
                 }
             } else {
                 //This is the proxy:proxy case - where api has automatically decoded the "call"
@@ -3229,7 +3239,7 @@ order by msgHash, diffSentAt, diffTS`
                             remarks[call_s.args.remark] = 1
                         }
                     }
-                    this.recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl, remarks)
+                    this.recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl, remarks, retry)
                     f.args.call = call_s
                 }
                 //console.log(`* [${extrinsicID}] ${extrinsicHash} already decoded opaqueCall`, extrinsicCall.toString())
@@ -3237,7 +3247,7 @@ order by msgHash, diffSentAt, diffTS`
         }
     }
 
-    decode_s_extrinsic(extrinsic, blockNumber, index = 'pending', apiAt) {
+    decode_s_extrinsic(extrinsic, blockNumber, index = 'pending', apiAt, retry = false) {
         let exos = JSON.parse(extrinsic.toString());
 
         let extrinsicHash = extrinsic.hash.toHex()
@@ -3245,6 +3255,7 @@ order by msgHash, diffSentAt, diffTS`
         let callIndex = exos.method.callIndex
         let [method, section] = this.getMethodSection(callIndex, apiAt)
         let remarks = {} // add all remarks here
+        let decodeFailure = false;
         let pv = `${section}:${method}`
         if (pv == 'system:remarkWithEvent' || pv == 'system:remark') {
             if (exos.method.args.remark != undefined) {
@@ -3252,14 +3263,13 @@ order by msgHash, diffSentAt, diffTS`
             }
         }
 
-
         //console.log(`[${extrinsicID}] ${extrinsicHash}   |  ${section}:${method}`)
         // console.log("exos", exos)
 
         try {
             // this is picking up utility batch with "calls" array
             if (exos && exos.method.args.calls != undefined && Array.isArray(exos.method.args.calls)) {
-                this.recursive_batch_all(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks)
+                this.recursive_batch_all(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks, retry)
                 let exosArgsCall = exos.method.args.calls
                 for (let i = 0; i < exosArgsCall.length; i++) {
                     let f = exosArgsCall[i]
@@ -3270,10 +3280,15 @@ order by msgHash, diffSentAt, diffTS`
         } catch (err1) {
             /// TODO: ....
             console.log(`[${extrinsicID}] ${extrinsicHash} error at err1`, err1)
+            if (retry){
+                retry = false
+            }
+            this.refreshRequired = `[${extrinsicID}] ${err1.toString()}`
+            return
         }
 
         if (exos.method.args.call != undefined) {
-            this.decode_opaque_call(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks)
+            this.decode_opaque_call(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks, retry)
         }
 
         let sig = exos.signature
@@ -3321,7 +3336,16 @@ order by msgHash, diffSentAt, diffTS`
             signature: sig,
             lifetime: lifetime
         }
-        return (out)
+        decodeFailure = this.get_extrinsic_decodeFailure()
+        return [out, decodeFailure]
+    }
+
+    get_extrinsic_decodeFailure(){
+      let decodeError = this.refreshRequired
+      if (this.refreshRequired){
+          this.refreshRequired = false
+      }
+      return decodeError
     }
 
     getErrorDoc(errModule, apiAt) {
@@ -3684,8 +3708,7 @@ order by msgHash, diffSentAt, diffTS`
         this.pendingExtrinsic[extrinsicHash] = 1;
 
         let extrinsicID = `${extrinsicHash}-pending`
-        let extrinsic = this.decode_s_extrinsic(extrinsicRaw, lastestBlockNumber, 'pending', api); //lastestBlockNumber is used to compute lifetime
-
+        let [extrinsic, decodeFailure] = this.decode_s_extrinsic(extrinsicRaw, lastestBlockNumber, 'pending', api, false); //lastestBlockNumber is used to compute lifetime
         if (!extrinsic.method) {
             // TODO: onInitialize, onFinalize
             return (extrinsic);
@@ -3974,7 +3997,18 @@ order by msgHash, diffSentAt, diffTS`
             delete this.pendingExtrinsic[extrinsicHash];
         }
 
-        let extrinsic = this.decode_s_extrinsic(extrinsicRaw, blockNumber, index, api);
+        let [extrinsic, decodeFailure] = this.decode_s_extrinsic(extrinsicRaw, blockNumber, index, api, true);
+        if (decodeFailure){
+            let apiAt = await this.api.at(blockHash)
+            console.log(`[${extrinsicID}] [${extrinsicHash}] Decode with current apiAt failed. Updated apiAt at[${blockNumber}] [${blockHash}]`)
+            this.apiAt = apiAt
+            console.log(`Retry decoding [${extrinsicID}] [${extrinsicHash}]`)
+            let [extrinsic2, decodeFailure2] = this.decode_s_extrinsic(extrinsicRaw, blockNumber, index, apiAt, false);
+            if (decodeFailure2){
+                console.log(`Decoding using apiAt at[${blockNumber}] [${blockHash}] still failed`, decodeFailure2)
+            }
+            extrinsic = extrinsic2
+        }
         if (!extrinsic.method) {
             // TODO: onInitialize, onFinalize
             return (extrinsic);
@@ -5999,17 +6033,20 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         var signedBlock2;
         try {
             signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
-            console.log(`[${r.block.number} ${r.block.hash}] OK`)
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`[${r.block.number} ${r.block.hash}] OK`)
         } catch (e) {
             // try fallback here
-            console.log(`failed with specV=${this.specVersion} [${r.block.number} ${r.block.hash}] -- trying fallback`)
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`failed with specV=${this.specVersion} [${r.block.number} ${r.block.hash}] -- trying fallback`)
             //console.log(r.block.hash, r.block.number, e);
             let chain = await this.setupChainAndAPI(this.chainID); //not sure
             await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
             this.apiAt = this.api
-            signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
-            console.log(`[${r.block.number} ${r.block.hash}] fallback OK`)
-            //process.exit(0);
+            try {
+                signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${r.block.number} ${r.block.hash}] fallback OK`)
+            } catch (e2){
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`failed with specV=${this.specVersion} [${r.block.number} ${r.block.hash}] -- fallback also failed`)
+            }
         }
         // signedBlock2.block.extrinsics.forEach((ex, index) => {  console.log(index, ex.hash.toHex());    });
         return signedBlock2
