@@ -6001,6 +6001,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         } catch (e) {
             // try fallback here
             console.log(`failed with specV=${this.specVersion} [${r.block.number} ${r.block.hash}]`)
+	    console.log(r.block.hash, r.block.number, e);
+	    process.exit(0);
             let chain = await this.setupChainAndAPI(this.chainID); //not sure
             await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
             signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
@@ -6627,6 +6629,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     getSpecVersionAtBlockNumber(chain, bn) {
         if (chain.specVersions == undefined) return (null);
         let result = null;
+
         for (let i = 0; i < chain.specVersions.length; i++) {
             let sv = chain.specVersions[i];
             if (bn >= sv.blockNumber) {
@@ -6644,11 +6647,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (chain.specVersions !== undefined && Array.isArray(chain.specVersions) && chain.specVersions.length > 0) {
             let sv = this.getSpecVersionAtBlockNumber(chain, bn);
             if ((sv != null) && this.specVersion == sv.specVersion) {
+		console.log("returning", this.specVersion);
                 return (this.specVersion);
             }
             if (sv) {
                 // we have a new specVersion, thus we need new metadata!
                 this.specVersion = sv.specVersion;
+		console.log("moving on", this.specVersion);
             }
         }
         try {
@@ -6657,13 +6662,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             this.specVersion = runtimeVersion.toJSON().specVersion;
 
             await this.getSpecVersionMetadata(chain, this.specVersion, blockHash, bn);
-            if (this.debugLevel >= paraTool.debugInfo) console.log("--- ADJUSTED API AT ", blockHash, this.specVersion)
+            //if (this.debugLevel >= paraTool.debugInfo)
+	    console.log("--- ADJUSTED API AT ", blockHash, this.specVersion, blockHash)
         } catch (err) {
             this.apiAt = await this.api;
             var runtimeVersion = await this.api.rpc.state.getRuntimeVersion();
             this.specVersion = runtimeVersion.toJSON().specVersion;
             await this.getSpecVersionMetadata(chain, this.specVersion, false, bn);
-            if (this.debugLevel >= paraTool.debugInfo) console.log("!!! ADJUSTED API AT ", blockHash, this.specVersion)
+            //if (this.debugLevel >= paraTool.debugInfo)
+	    console.log("!!! ADJUSTED API AT ", blockHash, this.specVersion)
         }
 
         return this.specVersion
@@ -6741,6 +6748,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             if (_specVersion != undefined) {
                                 startSpecVersion = _specVersion;
                                 endSpecVersion = _specVersion;
+				console.log("this.getSpecVersionAtBlockNumber START", bn, endSpecVersion);
                                 j = rows.length;
                                 break;
                             }
@@ -6748,6 +6756,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     }
                 }
                 let endSV = this.getSpecVersionAtBlockNumber(chain, currPeriod.endBN);
+		console.log("this.getSpecVersionAtBlockNumber", currPeriod.endBN, endSV);
                 if (endSV != null) {
                     endSpecVersion = endSV.specVersion;
                     endSpecVersionStartBN = endSV.blockNumber;
@@ -6812,6 +6821,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     if (r != undefined) r = null
                 } catch (err) {
                     this.log_indexing_error(err, `index_blocks_period`);
+		    process.exit(0);
                 }
             }
             let indexChainBlockRowTS = (new Date().getTime() - startTS) / 1000
