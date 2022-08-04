@@ -1,5 +1,21 @@
 //var baseURL is set at header
 
+function JSONToHTMLTable(data) {
+    let mid = Object.keys(data).map( (k) => {
+	let p = ''
+        if ( !Array.isArray(data) ) {
+	    p += `<td width="20%"><b>${k}</b></td>`
+        }
+	if ( data[k] && typeof data[k] === 'object') {
+            p += `<td width="80%">` + JSONToHTMLTable(data[k]) + '</td>';
+        } else {
+	    p += `<td width="80%">${data[k]}</td>`;
+	}
+	return `<tr>${p}</tr>`;
+    });
+    return `<table class="jsontable" width="100%"><tbody>${mid.join("")}</tbody></table>`;
+}
+    
 function showProcessing(processing) {
     let processing2 = document.getElementById("processing");
     if (processing2) {

@@ -125,6 +125,11 @@ let f = xcm;
         <script>document.getElementById("msg").appendChild(renderjson.set_show_to_level(10)(<%- JSON.stringify(f.msg) %>));</script>
       </td>
     </tr>
+    <tr>
+      <td>Instructions (decoded)</td>
+      <td><div id="mytable"></div><script>document.getElementById("mytable").innerHTML = JSONToHTMLTable(<%- JSON.stringify(f.msg) %>);</script>
+      </td>
+    </tr>
 </table>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
