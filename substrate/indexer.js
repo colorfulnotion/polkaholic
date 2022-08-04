@@ -540,6 +540,7 @@ module.exports = class Indexer extends AssetManager {
         } else {
             console.log("getSpecVersionMetadata: fetch metadata from db", sql);
             metadata = JSON.parse(metadataRecs[0].metadata);
+            //console.log(`chainID=${chainID}, specVersion=${specVersion}, blockHash=${blockHash}, bn=${bn} metadata=${JSON.stringify(metadata, null,4)}`)
             this.metadata[specVersion] = metadata;
         }
 
@@ -6042,7 +6043,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             //console.log(r.block.hash, r.block.number, e);
             let chain = await this.setupChainAndAPI(this.chainID); //not sure
             await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
-            this.apiAt = this.api
+            //this.apiAt = this.api
             try {
                 signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`[${r.block.number} ${r.block.hash}] fallback OK`)
@@ -6687,27 +6688,43 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         // We use chain.specVersions -- an array of [specVersion, blockNumber] ordered by blockNumber -- of when specVersions change.
         // We look for the first blocknumber in that array >= bn which is the *expected* specVersion at that bn.
         // If this specVersion is the same as the last
+        let sv;
         if (chain.specVersions !== undefined && Array.isArray(chain.specVersions) && chain.specVersions.length > 0) {
-            let sv = this.getSpecVersionAtBlockNumber(chain, bn);
+            sv = this.getSpecVersionAtBlockNumber(chain, bn);
             if ((sv != null) && this.specVersion == sv.specVersion) {
-		console.log("returning", this.specVersion);
+		            console.log("returning", this.specVersion);
+                this.apiAt = await this.api.at(blockHash)
                 return (this.specVersion);
             }
             if (sv) {
                 // we have a new specVersion, thus we need new metadata!
                 this.specVersion = sv.specVersion;
-		console.log("moving on", this.specVersion);
+		            console.log("moving on", this.specVersion);
             }
         }
         try {
-            this.apiAt = await this.api.at(blockHash)
             var runtimeVersion = await this.api.rpc.state.getRuntimeVersion(blockHash)
-            this.specVersion = runtimeVersion.toJSON().specVersion;
+            //this.apiAt = await this.api.at(blockHash)
+            if (sv.blockNumber == bn){
+              //need to decode with previous specV
+              let prevHeader = await this.api.rpc.chain.getBlockHash(bn-1);
+              let prevBlockHash = prevHeader.toHex();
+              var prevRuntimeVersion = await this.api.rpc.state.getRuntimeVersion(prevBlockHash)
+              let metadata = await this.getSpecVersionMetadata(chain, this.specVersion, prevBlockHash, bn-1);
+              this.specVersion = prevRuntimeVersion.toJSON().specVersion;
+              this.apiAt = await this.api.at(blockHash)
+            }else{
+              this.specVersion = runtimeVersion.toJSON().specVersion;
+              let metadata = await this.getSpecVersionMetadata(chain, this.specVersion, blockHash, bn);
+              this.apiAt = await this.api.at(blockHash)
+            }
 
-            await this.getSpecVersionMetadata(chain, this.specVersion, blockHash, bn);
+            //let metadata = await this.getSpecVersionMetadata(chain, this.specVersion, blockHash, bn);
             //if (this.debugLevel >= paraTool.debugInfo)
 	    console.log("--- ADJUSTED API AT ", blockHash, this.specVersion, blockHash)
+      //console.log(`specVersion=${this.specVersion}, blockHash=${blockHash}, bn=${bn} metadata=${JSON.stringify(metadata, null,4)}`)
         } catch (err) {
+            console.log(`err`, err.toString())
             this.apiAt = await this.api;
             var runtimeVersion = await this.api.rpc.state.getRuntimeVersion();
             this.specVersion = runtimeVersion.toJSON().specVersion;
@@ -6791,7 +6808,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             if (_specVersion != undefined) {
                                 startSpecVersion = _specVersion;
                                 endSpecVersion = _specVersion;
-				console.log("this.getSpecVersionAtBlockNumber START", bn, endSpecVersion);
+				                        console.log("this.getSpecVersionAtBlockNumber START", bn, endSpecVersion);
                                 j = rows.length;
                                 break;
                             }
@@ -6835,8 +6852,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     let buildBlockFromRowTS = (new Date().getTime() - buildBlockFromRowStartTS) / 1000
                     this.timeStat.buildBlockFromRowTS += buildBlockFromRowTS
                     this.timeStat.buildBlockFromRow++
-                    let r = await this.index_chain_block_row(rRow, false, true, refreshAPI);
-
+	 	                if (rRow.block!= undefined && rRow.block.header != undefined && rRow.block.header.number && endSpecVersionStartBN != undefined){
+                        let bn = rRow.block.header.number
+                        let bhash = rRow.block.hash
+                        if (bn - endSpecVersionStartBN == 1){
+                            this.apiAt = await this.api.at(bhash)
+                            console.log(`[refresh] currBN=${bn} [${bhash}], endSpecVersionStartBN = ${endSpecVersionStartBN}`)
+                        }
+                    }
+                    let r = await this.index_chain_block_row(rRow, false, true, refreshAPI, false);
                     let blockNumber = r.blockNumber
                     let blockHash = r.blockHash
                     let parentHash = r.block.header && r.block.header.parentHash ? r.block.header.parentHash : false;
