@@ -10,7 +10,7 @@ let f = xcm;
 <table class="table table-hover table-bordered">
   <tbody>
     <tr>
-      <td>Hash</td>
+      <td width="200">Hash</td>
       <td>
         <%- uiTool.getShortHash(f.msgHash, false) %><br/><a class="btn btn-link" href="/timeline/<%= f.msgHash; %>/xcm/<%= f.sentAt; %>" target="_new">XCM Timeline</a>
       </td>
@@ -112,8 +112,7 @@ let f = xcm;
           let ac = assetChains[i]
           let acID = `msgAc${i}`
           %>
-          <div id="<%= acID; %>" class="renderjson"></div>
-          <script>document.getElementById("<%= acID; %>").appendChild(renderjson.set_show_to_level(5)(<%- JSON.stringify(ac) %>));</script>
+          <%- include("decode", {"obj": ac, "id": `asset${i}`}) %>
         <% } %>
       </td>
     </tr>
@@ -121,8 +120,7 @@ let f = xcm;
     <tr>
       <td>Instructions</td>
       <td>
-        <div id="msg" class="renderjson"></div>
-        <script>document.getElementById("msg").appendChild(renderjson.set_show_to_level(10)(<%- JSON.stringify(f.msg) %>));</script>
+        <%- include("decode", {"obj": f.msg, "id": "instructions"}) %>
       </td>
     </tr>
 </table>

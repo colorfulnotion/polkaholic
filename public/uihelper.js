@@ -1,5 +1,53 @@
 //var baseURL is set at header
 
+function presentJSONObject(obj, id) {
+    let renderjsonIDOuter = "rjouter" + id;
+    let jsontableIDOuter = "jhouter" + id;
+    let renderjsonID = "rj" + id;
+    let jsontableID = "jh" + id;
+    let decodeButtonID = "dec" + id;
+    let viewcodeButtonID = "vc" + id;
+    let copyAButtonID = "ca" + id;
+    let copyBButtonID = "cb" + id;
+    if ( ( Array.isArray(obj) && obj.length == 0 ) || Object.keys.length == 0 ) {
+	document.getElementById(renderjsonID).style.display = "none";
+	document.getElementById(jsontableID).style.display = "none";
+	return;
+    }
+    $(`#${decodeButtonID}`).on('click', function(e) {
+	document.getElementById(renderjsonIDOuter).style.display = "none";
+	document.getElementById(jsontableIDOuter).style.display = "block";
+    });
+    $(`#${viewcodeButtonID}`).on('click', function(e) {
+	document.getElementById(renderjsonIDOuter).style.display = "block";
+	document.getElementById(jsontableIDOuter).style.display = "none";
+    });
+    $(`#${copyAButtonID}`).on('click', function(e) {
+        copyToClipboard(JSON.stringify(obj));
+    });
+    $(`#${copyBButtonID}`).on('click', function(e) {
+        copyToClipboard(JSON.stringify(obj));
+    });
+    document.getElementById(renderjsonID).appendChild(renderjson.set_show_to_level(3)(obj));
+    document.getElementById(jsontableID).innerHTML = JSONToHTMLTable(obj);
+}
+
+function JSONToHTMLTable(data) {
+    let mid = Object.keys(data).map( (k) => {
+	let p = ''
+        if ( !Array.isArray(data) ) {
+	    p += `<td width="20%"><b>${k}</b></td>`
+        }
+	if ( data[k] && typeof data[k] === 'object') {
+            p += `<td width="80%">` + JSONToHTMLTable(data[k]) + '</td>';
+        } else {
+	    p += `<td width="80%">${data[k]}</td>`;
+	}
+	return `<tr>${p}</tr>`;
+    });
+    return `<table class="jsontable" width="100%"><tbody>${mid.join("")}</tbody></table>`;
+}
+    
 function showProcessing(processing) {
     let processing2 = document.getElementById("processing");
     if (processing2) {
