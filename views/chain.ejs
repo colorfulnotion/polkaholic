@@ -14,6 +14,8 @@
 <%
 let tabs = [
 { title: "Recent Blocks", target: "recentblocks" },
+{ title: "XCM Transfers", target: "xcmtransfers" },
+{ title: "XCM Messages", target: "xcmmessages" },
 { title: "Top Assets", target: "assets" },
 { title: "Spec Versions", target: "specversions" },
 { title: "Chain Info", target: "chaininfo" }
@@ -51,6 +53,40 @@ for (let i=0; i<tabs.length; i++) {
     </tr>
   </thead>
 </table>
+</div>
+
+<div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
+    <table id="tablexcmtransfers" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Section:Method</th>
+          <th>Amount Sent</th>
+          <th>Value (USD)</th>
+          <th>Sender</th>
+          <th>Beneficiary</th>
+          <th>From Chain/Extrinsic ID</th>
+          <th>To Chain</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+</div>
+
+<div class="tab-pane" id="xcmmessages" role="tabpanel" aria-labelledby="xcmmessages-tab">
+    <table id="tablexcmmessages" class="display" style="width: 100%">
+      <thead>
+        <tr>
+	  <th>MsgHash/Extrinsic</th>
+	  <th>Msg Type</th>
+	  <th>Sent</th>
+	  <th>Received</th>
+	  <th>Instructions</th>
+          <th>Beneficiary</th>
+          <th>Assets Received</th>
+	  <th>Matched/Time</th>
+        </tr>
+      </thead>
+    </table>
 </div>
 
 <div class="tab-pane" id="assets" role="tabpanel" aria-labelledby="assets-tab">

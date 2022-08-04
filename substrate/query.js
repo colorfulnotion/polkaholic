@@ -946,7 +946,7 @@ module.exports = class Query extends AssetManager {
     async getXCMTransfers(address = false, limit = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-
+        console.log("getXCMTransfers", chainList);
         let out = [];
         try {
             let w = address ? `and fromAddress = '${address}'` : "";
@@ -956,8 +956,11 @@ module.exports = class Query extends AssetManager {
                 let chainIDIncluded = this.chainFilters(chainList, x.chainID)
                 let chainIDDestIncluded = this.chainFilters(chainList, x.chainIDDest)
                 if (!chainIDIncluded && !chainIDDestIncluded) {
+                    console.log("getXCMT SKIP", x.chainID, x.chainIDDest);
                     //filter non-specified records .. do not decorate
                     continue
+                } else {
+                    console.log("getXCMT ACCEPT", x.chainID, x.chainIDDest);
                 }
                 x.asset = this.trimquote(x.asset); // temporary hack
                 if (x.asset.includes("Token")) {
@@ -4073,10 +4076,6 @@ module.exports = class Query extends AssetManager {
         return this.bq_query_evmtxs("evmtxs", query, limit, decorate, decorateExtra);
     }
 
-    async getXCMMessages(query = {}, limit = 1000, decorate = true, decorateExtra = true) {
-        return this.bq_query_xcmmessages("xcm", query, limit, decorate, decorateExtra);
-    }
-
     async bq_query(tbl = "extrinsics", filters = {}, limit = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -4378,6 +4377,61 @@ module.exports = class Query extends AssetManager {
 
     }
 
+    async getRecentXCMMessages(chainIDr, limit, chainList, decorate, decorateExtra) {
+        console.log("getRecentXCMMessages -- chainList", chainList);
+        let chainListFilter = "";
+        if (chainList.length > 0) {
+            chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
+        }
+
+        let mysqlQuery = `SELECT msgHash, msgStr, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sourceTS, destTS, beneficiaries, assetsReceived, matched FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 4 hour)) ${chainListFilter} order by blockTS desc limit ${limit}`;
+        console.log(mysqlQuery);
+        let results = [];
+        let recs = await this.poolREADONLY.query(mysqlQuery);
+        let blockNumberIncoming = {};
+        let blockNumberOutgoing = {};
+        for (let i = 0; i < recs.length; i++) {
+            let r = recs[i];
+            let chainID = parseInt(r.chainID, 10);
+            let chainIDDest = parseInt(r.chainIDDest, 10);
+            let parsedMsg = {};
+            let [_chainID, id] = this.convertChainID(chainID)
+            let [_chainIDDest, idDest] = this.convertChainID(chainIDDest)
+            r.id = id
+            r.idDest = idDest;
+            r.msgStr = r.msgStr.toString();
+            r.chainName = this.getChainName(chainID);
+            r.chainDestName = this.getChainName(chainIDDest);
+            r.relayChain = (r.chainIDDest != 2 && (r.chainIDDest < 10000)) ? 'polkadot' : 'kusama';
+            if (r.matched == 0 || r.incoming == 1) {
+                results.push(r);
+            } else if (r.incoming == 0) {
+                // store in the outgoingBlockNumber map, so we can fill in the matched = 1 / incoming = 1 results with this
+                blockNumberOutgoing[r.msgHash] = r.blockNumber;
+            } else if (r.incoming == 1) {
+                blockNumberIncoming[r.msgHash] = r.blockNumber;
+            }
+        }
+        // TODO: fill in matched records with outgoingBlockNumber data
+        for (let i = 0; i < results.length; i++) {
+            let msgHash = results[i].msgHash;
+            if (results[i].incoming == 1) {
+                if (blockNumberOutgoing[msgHash] != undefined) {
+                    results[i].blockNumberOutgoing = blockNumberOutgoing[msgHash];
+                }
+            } else if (results[i].incoming == 0) {
+                if (blockNumberIncoming[msgHash] != undefined) {
+                    results[i].blockNumberIncoming = blockNumberIncoming[msgHash];
+                }
+            }
+        }
+        return (results);
+    }
+
+    async getXCMMessages(query = {}, limit = 1000, decorate = true, decorateExtra = true) {
+        return this.bq_query_xcmmessages("xcm", query, limit, decorate, decorateExtra);
+    }
+
     async bq_query_xcmmessages(tbl = "xcm", filters = {}, limit = 100) {
         const bigqueryClient = new BigQuery();
         let fullTable = this.getBQTable(tbl);
@@ -4534,7 +4588,6 @@ module.exports = class Query extends AssetManager {
                     results.push(x)
                 }
             }
-
 
             // Add rows from mysql "recent" table
             let numRecents = 0;
@@ -5312,18 +5365,18 @@ module.exports = class Query extends AssetManager {
                 internalXCM = dInstructionV
                 break;
             case "claimAsset":
-                if (instructionV.assets != undefined){
-                  let instructionVAssets = instructionV.assets
-                  for (let i = 0; i < instructionVAssets.length; i++) {
-                      if (dAssetChains.length >= i + 1 && instructionVAssets[i] != undefined && instructionVAssets[i].fun != undefined) {
-                          let xcmAssetInfo = dAssetChains[i] // "inferenced"
-                          instructionVAssets[i].fun = this.decorateFungible(instructionVAssets[i].fun, xcmAssetInfo)
-                          console.log(`++ instructionVAssets[${i}]`, instructionVAssets[i])
-                      } else {
-                          continue // cannot decorate without going through the messy lookup again..
-                      }
-                  }
-                  instructionV.assets = instructionVAssets
+                if (instructionV.assets != undefined) {
+                    let instructionVAssets = instructionV.assets
+                    for (let i = 0; i < instructionVAssets.length; i++) {
+                        if (dAssetChains.length >= i + 1 && instructionVAssets[i] != undefined && instructionVAssets[i].fun != undefined) {
+                            let xcmAssetInfo = dAssetChains[i] // "inferenced"
+                            instructionVAssets[i].fun = this.decorateFungible(instructionVAssets[i].fun, xcmAssetInfo)
+                            console.log(`++ instructionVAssets[${i}]`, instructionVAssets[i])
+                        } else {
+                            continue // cannot decorate without going through the messy lookup again..
+                        }
+                    }
+                    instructionV.assets = instructionVAssets
                 }
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV

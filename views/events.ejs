@@ -57,9 +57,9 @@
     <% } else if (isCurrency){ %>
       <%- data; %>
     <% } else if ( (typeof data === 'object') && (data !== null) ) { %>
-      <%- include("decode", {"id": j, "obj": data } ) %>
+      <%- include("decode", {"id": "ev" + i + "-" + j, "obj": data } ) %>
     <% } else if ( uiTool.isJSONString(data) ) { %>
-      <%- include("decode", {"id": j, "obj": JSON.parse(data) } ) %>
+      <%- include("decode", {"id": "ev" + i + "-" + j, "obj": JSON.parse(data) } ) %>
     <% } else { %>
       <%= data; %>
     <% } %>

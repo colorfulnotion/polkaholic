@@ -233,6 +233,27 @@ app.get('/xcmtransfers', async (req, res) => {
     }
 })
 
+// Usage: http://api.polkaholic.io/xcmmessages
+app.get('/xcmmessages', async (req, res) => {
+    try {
+        let limit = (req.query.limit != undefined) ? paraTool.parseInt(req.query.limit) : 1000
+        let [decorate, decorateExtra] = decorateOpt(req)
+        let chainList = chainFilterOpt(req)
+        let xcmmessages = await query.getRecentXCMMessages(false, limit, chainList, decorate, decorateExtra);
+        if (xcmmessages) {
+            res.write(JSON.stringify(xcmmessages));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 // Usage: http://api.polkaholic.io/addresstopn
 app.get('/addresstopn/:topN', async (req, res) => {
     try {

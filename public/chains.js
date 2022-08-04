@@ -3,6 +3,7 @@ var initxcmtransfers = false;
 var initaddresstopn = false;
 var chainsTable = null;
 var xcmTable = null
+var xcmmessagesTable = null
 var addresstopnTable = null
 var refreshIntervalMS = 6100;
 var chainsUpdateIntervalId = false;
@@ -15,10 +16,12 @@ function filterchains(relaychain = "all") {
     if (relaychain == "kusama" || relaychain == "polkadot") {
         if (chainsTable) chainsTable.column(7).search(relaychain).draw();
         if (xcmTable) xcmTable.column(8).search(relaychain).draw();
+        if (xcmmessagesTable) xcmmessagesTable.column(1).search(relaychain).draw();
     } else {
         // empty search effectively removes the filter
         if (chainsTable) chainsTable.search('').columns().search('').draw();
         if (xcmTable) xcmTable.search('').columns().search('').draw();
+        if (xcmmessagesTable) xcmmessagesTable.search('').columns().search('').draw();
     }
 }
 
@@ -78,7 +81,6 @@ async function show_chains() {
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
                             let subexplorerURL = `https://${row.id}.polkaholic.io`;
-                            console.log(row);
                             let links = [`<a href='${subexplorerURL}'>explorer</a>`];
                             if (row.dappURL) {
                                 links.push(`<a href='${row.dappURL}' target='_new'>app</a>`);
@@ -396,6 +398,168 @@ async function show_xcmtransfers(relaychain) {
 }
 
 
+let initxcmmessages = false;
+async function showxcmmessages(relaychain) {
+    let pathParams = 'xcmmessages'
+    let tableName = '#tablexcmmessages'
+    if (initxcmmessages) {
+        // if table is already initiated, update the rows
+        //loadData2(pathParams, tableName, true)
+    } else {
+        initxcmmessages = true;
+        xcmmessagesTable = $(tableName).DataTable({
+            pageLength: 100,
+            lengthMenu: [
+                [10, 25, 50, 100],
+                [10, 25, 50, 100]
+            ],
+            columnDefs: [{
+                "className": "dt-center",
+                "targets": [1]
+            }, {
+                "className": "dt-left",
+                "targets": [2, 3]
+            }],
+            order: [
+                [7, "desc"]
+            ],
+            columns: [{
+                    data: 'msgHash',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            let str = "";
+                            if (row.extrinsicID && row.extrinsicHash) {
+                                str = "<BR>Extrinsic: " + presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                            }
+                            str += "<BR><small>" + presentXCMTimeline(row.msgHash, "xcm", row.sentAt) + "</small>";
+                            return presentXCMMessageHash(row.msgHash, row.sentAt) + str;
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'msgType',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            let str = "";
+                            let relayChain = (row.relayChain != undefined) ? row.relayChain : "";
+                            if (row.matched == 1) {
+                                str = '<button type="button" class="btn transfer" style="background-color:rgba(0,201,167,.2); color:#02977e">' + `${relayChain} ${data} (${row.version})` + '</button>';
+                                return str;
+                            } else {
+                                str = '<button type="button" class="btn transfer" style="background-color:rgba(219,154,4,.2); color:#b47d00">' + `${relayChain} ${data} (${row.version})` + '</button>';
+                                return str;
+                            }
+                        } else {
+                            return row.relayChain + " " + data + " " + row.version
+                        }
+
+                    }
+                },
+                {
+                    data: 'sourceTS',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            let bn = (row.blockNumberOutgoing !== undefined) ? presentBlockNumber(row.id, row.chainName, row.blockNumberOutgoing) : row.chainName;
+                            bn += "<br>";
+                            if (row.sourceTS != undefined && row.sourceTS > 0) {
+                                return bn + shorttimeConverter(data);
+                            } else {
+                                return bn + shorttimeConverter(row.blockTS);
+                            }
+                        } else {
+                            if (row.sourceTS != undefined && row.sourceTS > 0) {
+                                return data;
+                            } else {
+                                return data;
+                            }
+                        }
+                        return 0;
+                    }
+                },
+                {
+                    data: 'destTS',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            let bn = presentBlockNumber(row.idDest, row.chainDestName, row.blockNumber) + "<br>";
+                            if (row.destTS != undefined && row.destTS > 0) {
+                                return bn + shorttimeConverter(data);
+                            } else {
+                                return bn + shorttimeConverter(row.blockTS);
+                            }
+                        } else {
+                            if (row.destTS != undefined && row.destTS > 0) {
+                                return data;
+                            } else if (row.incoming == 1) {
+                                return data;
+                            }
+                            return "unmatched";
+                        }
+                        return 0;
+                    }
+                },
+                {
+                    data: 'msgStr',
+                    render: function(data, type, row, meta) {
+                        if (row.msgStr != undefined) {
+                            if (type == 'display') {
+                                return presentInstructions(row.msgStr, row.msgHash + row.incoming);
+                            } else {
+                                return data;
+                            }
+                        }
+                    }
+                },
+                {
+                    data: 'beneficiaries',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            if (data && data.length > 0) {
+                                return presentID(data);
+                            } else {
+                                return "";
+                            }
+                        } else {
+                            return data;
+                        }
+
+                    }
+                },
+                {
+                    data: 'assetsReceived',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            try {
+                                if (data.length > 0) {
+                                    return presentInstructions(data, "AR" + row.msgHash + row.incoming, "View Assets Received");
+                                }
+                            } catch (err) {}
+                        }
+                        return "None";
+                    }
+                },
+                {
+                    data: 'blockTS',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            return presentSuccessFailure(row.matched);
+                        }
+                        return data;
+                    }
+                }
+            ]
+        });
+    }
+
+    //load data here: warning this function is technically async
+    await loadData2(pathParams, tableName, true)
+    const selectElement = document.querySelector('#relaychain');
+    if (selectElement) {
+        setchainfilter(selectElement.value);
+    }
+}
+
+
 async function showaddresstopn() {
     let tableName = '#tableaddresstopn'
     if (initaddresstopn) {} else {
@@ -514,6 +678,11 @@ function showchainstab(hash) {
         case "#xcmtransfers":
             setupapidocs("xcmtransfers");
             showxcmtransfers();
+            stopchains();
+            break;
+        case "#xcmmessages":
+            setupapidocs("xcmmessages");
+            showxcmmessages();
             stopchains();
             break;
         case "#addresstopn":
