@@ -1,0 +1,22 @@
+<%
+let rjouter = "rjouter" + id;
+let jhouter = "jhouter" + id;
+let rj = "rj" + id;
+let jh = "jh" + id;
+let dec = "dec" + id;
+let vc = "vc" + id;
+let copyA = "ca" + id;
+let copyB = "cb" + id;
+%>
+<div id="<%= rjouter; %>" style="display:none">
+  <div id="<%= rj; %>" class="renderjson"></div>
+  <button id="<%= dec %>" type="button" class="btn btn-secondary-outline">Decode</button>
+  <button id="<%= copyA %>" type="button" class="btn btn-secondary-outline">Copy</button>
+</div>
+<div id="<%= jhouter; %>" style="display: block">
+  <div id="<%= jh; %>" class="jsontable"></div>
+  <button id="<%= vc %>" type="button" class="btn btn-secondary-outline">Raw</button>
+  <button id="<%= copyB %>" type="button" class="btn btn-secondary-outline">Copy</button>
+<div>
+<script>presentJSONObject(<%- JSON.stringify(obj) %>, "<%= id; %>");</script>
+
