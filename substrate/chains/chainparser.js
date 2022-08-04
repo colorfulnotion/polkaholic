@@ -1437,17 +1437,23 @@ module.exports = class ChainParser {
         let xTokensEvents = extrinsic.events.filter((ev) => {
             return this.xTokensFilter(`${ev.section}(${ev.method})`);
         })
+        let xcmMsgHashEvents = extrinsic.events.filter((ev) => {
+            return this.xcmMsgFilter(`${ev.section}(${ev.method})`);
+        })
         if (xTokensEvents.length == 0) return
         if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent found len=${xTokensEvents.length}`, xTokensEvents)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent msgHash len=${xcmMsgHashEvents.length}`, xcmMsgHashEvents)
         extrinsic.xcms = []
-        for (const xTokensEvent of xTokensEvents) {
-            this.processOutgoingXTokensEvent(indexer, extrinsic, feed, xTokensEvent)
+        for (let i = 0; i < xTokensEvents.length; i++) {
+            let xTokensEvent = xTokensEvents[i]
+            let xcmMsgHashCandidate = (xTokensEvents.length == xcmMsgHashEvents.length)? xcmMsgHashEvents[i].data[0] : false
+            this.processOutgoingXTokensEvent(indexer, extrinsic, feed, xTokensEvent, xcmMsgHashCandidate)
         }
     }
 
 
 
-    processOutgoingXTokensEvent(indexer, extrinsic, feed, event) {
+    processOutgoingXTokensEvent(indexer, extrinsic, feed, event, msgHashCandidate = false) {
         //xTokens:TransferredMultiAssets
         /*
         [
@@ -1632,6 +1638,7 @@ module.exports = class ChainParser {
                     msgHash: '0x',
                     sentAt: this.parserWatermark,
                 }
+                if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
                 //console.log("processOutgoingXTokens xTokens", r);
                 console.log(`processOutgoingXTokensEvent`, r)
                 //outgoingXTokens.push(r)
@@ -2721,6 +2728,15 @@ module.exports = class ChainParser {
     xTokensFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
         if (palletMethod == "xTokens(TransferredMultiAssets)") {
+            return true
+        } else {
+            return false;
+        }
+    }
+
+    xcmMsgFilter(palletMethod) {
+        //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
+        if (palletMethod == "xcmpQueue(XcmpMessageSent)") {
             return true
         } else {
             return false;
