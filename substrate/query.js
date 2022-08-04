@@ -5311,6 +5311,23 @@ module.exports = class Query extends AssetManager {
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
                 break;
+            case "claimAsset":
+                if (instructionV.assets != undefined){
+                  let instructionVAssets = instructionV.assets
+                  for (let i = 0; i < instructionVAssets.length; i++) {
+                      if (dAssetChains.length >= i + 1 && instructionVAssets[i] != undefined && instructionVAssets[i].fun != undefined) {
+                          let xcmAssetInfo = dAssetChains[i] // "inferenced"
+                          instructionVAssets[i].fun = this.decorateFungible(instructionVAssets[i].fun, xcmAssetInfo)
+                          console.log(`++ instructionVAssets[${i}]`, instructionVAssets[i])
+                      } else {
+                          continue // cannot decorate without going through the messy lookup again..
+                      }
+                  }
+                  instructionV.assets = instructionVAssets
+                }
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
             case "clearOrigin":
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
