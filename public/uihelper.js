@@ -325,7 +325,7 @@ function presentXCMTimeline(hash, hashType, sentAt) {
     return `<a href="/timeline/${hash}/${hashType}/${sentAt}">timeline</a>`
 }
 
-function presentXCMMessageHash(msgHash, sentAt, allowCopy = false) {
+function presentXCMMessageHash(msgHash, sentAt, allowCopy = true) {
     return `<a href="/xcmmessage/${msgHash}/${sentAt}">` + getShortHash(msgHash, allowCopy) + '</a>';
 }
 
