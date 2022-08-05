@@ -1505,7 +1505,7 @@ module.exports = class ChainParser {
         extrinsic.xcms = []
         for (let i = 0; i < xTokensEvents.length; i++) {
             let xTokensEvent = xTokensEvents[i]
-            let xcmMsgHashCandidate = (xTokensEvents.length == xcmMsgHashEvents.length)? xcmMsgHashEvents[i].data[0] : false
+            let xcmMsgHashCandidate = (xTokensEvents.length == xcmMsgHashEvents.length) ? xcmMsgHashEvents[i].data[0] : false
             this.processOutgoingXTokensEvent(indexer, extrinsic, feed, xTokensEvent, xcmMsgHashCandidate)
         }
     }
