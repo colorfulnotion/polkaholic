@@ -56,13 +56,10 @@
       <%- uiTool.showAccountInfo(dData, "address") %>
     <% } else if (isCurrency){ %>
       <%- data; %>
-    <% } else if ( (typeof data === 'object') && (data !== null) ) {
-            data = JSON.stringify(data); %>
-      <div id="dat<%= j; %>"></div>
-      <script>document.getElementById("dat<%= j; %>").appendChild(renderjson.set_show_to_level(3)(<%- data %>));</script>
+    <% } else if ( (typeof data === 'object') && (data !== null) ) { %>
+      <%- include("decode", {"id": "ev" + i + "-" + j, "obj": data } ) %>
     <% } else if ( uiTool.isJSONString(data) ) { %>
-      <div id="dat<%= j; %>"></div>
-      <script>document.getElementById("dat<%= j; %>").appendChild(renderjson.set_show_to_level(3)(<%- data %>));</script>
+      <%- include("decode", {"id": "ev" + i + "-" + j, "obj": JSON.parse(data) } ) %>
     <% } else { %>
       <%= data; %>
     <% } %>

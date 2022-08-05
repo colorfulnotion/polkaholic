@@ -14,6 +14,7 @@
 let tabs = [
 { title: "Chains", target: "chains", func: "showchains", stopfunc: "stopxcmtransfers" },
 { title: "XCM Transfers", target: "xcmtransfers", func: "showxcmtransfers", stopfunc: "stopchains" },
+{ title: "XCM Messages", target: "xcmmessages", func: "showxcmmessages", stopfunc: "stopchains" },
 { title: "Top Accounts", target: "addresstopn", func: "showaddresstopn" }
 ];
 
@@ -61,6 +62,22 @@ for (let i=0; i<tabs.length; i++) {
           <th>From Chain/Extrinsic ID</th>
           <th>To Chain</th>
           <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="xcmmessages" role="tabpanel" aria-labelledby="xcmmessages-tab">
+    <table id="tablexcmmessages" class="display" style="width: 100%">
+      <thead>
+        <tr>
+	  <th>MsgHash/Extrinsic</th>
+	  <th>Msg Type</th>
+	  <th>Sent</th>
+	  <th>Received</th>
+	  <th>Instructions</th>
+          <th>Beneficiary</th>
+          <th>Assets Received</th>
+	  <th>Matched/Time</th>
         </tr>
       </thead>
     </table>

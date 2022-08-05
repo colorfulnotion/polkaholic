@@ -946,7 +946,7 @@ module.exports = class Query extends AssetManager {
     async getXCMTransfers(address = false, limit = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-
+        console.log("getXCMTransfers", chainList);
         let out = [];
         try {
             let w = address ? `and fromAddress = '${address}'` : "";
@@ -956,8 +956,11 @@ module.exports = class Query extends AssetManager {
                 let chainIDIncluded = this.chainFilters(chainList, x.chainID)
                 let chainIDDestIncluded = this.chainFilters(chainList, x.chainIDDest)
                 if (!chainIDIncluded && !chainIDDestIncluded) {
+                    console.log("getXCMT SKIP", x.chainID, x.chainIDDest);
                     //filter non-specified records .. do not decorate
                     continue
+                } else {
+                    console.log("getXCMT ACCEPT", x.chainID, x.chainIDDest);
                 }
                 x.asset = this.trimquote(x.asset); // temporary hack
                 if (x.asset.includes("Token")) {
@@ -4073,10 +4076,6 @@ module.exports = class Query extends AssetManager {
         return this.bq_query_evmtxs("evmtxs", query, limit, decorate, decorateExtra);
     }
 
-    async getXCMMessages(query = {}, limit = 1000, decorate = true, decorateExtra = true) {
-        return this.bq_query_xcmmessages("xcm", query, limit, decorate, decorateExtra);
-    }
-
     async bq_query(tbl = "extrinsics", filters = {}, limit = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -4378,6 +4377,61 @@ module.exports = class Query extends AssetManager {
 
     }
 
+    async getRecentXCMMessages(chainIDr, limit, chainList, decorate, decorateExtra) {
+        console.log("getRecentXCMMessages -- chainList", chainList);
+        let chainListFilter = "";
+        if (chainList.length > 0) {
+            chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
+        }
+
+        let mysqlQuery = `SELECT msgHash, msgStr, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sourceTS, destTS, beneficiaries, assetsReceived, matched FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 4 hour)) ${chainListFilter} order by blockTS desc limit ${limit}`;
+        console.log(mysqlQuery);
+        let results = [];
+        let recs = await this.poolREADONLY.query(mysqlQuery);
+        let blockNumberIncoming = {};
+        let blockNumberOutgoing = {};
+        for (let i = 0; i < recs.length; i++) {
+            let r = recs[i];
+            let chainID = parseInt(r.chainID, 10);
+            let chainIDDest = parseInt(r.chainIDDest, 10);
+            let parsedMsg = {};
+            let [_chainID, id] = this.convertChainID(chainID)
+            let [_chainIDDest, idDest] = this.convertChainID(chainIDDest)
+            r.id = id
+            r.idDest = idDest;
+            r.msgStr = r.msgStr.toString();
+            r.chainName = this.getChainName(chainID);
+            r.chainDestName = this.getChainName(chainIDDest);
+            r.relayChain = (r.chainIDDest != 2 && (r.chainIDDest < 10000)) ? 'polkadot' : 'kusama';
+            if (r.matched == 0 || r.incoming == 1) {
+                results.push(r);
+            } else if (r.incoming == 0) {
+                // store in the outgoingBlockNumber map, so we can fill in the matched = 1 / incoming = 1 results with this
+                blockNumberOutgoing[r.msgHash] = r.blockNumber;
+            } else if (r.incoming == 1) {
+                blockNumberIncoming[r.msgHash] = r.blockNumber;
+            }
+        }
+        // TODO: fill in matched records with outgoingBlockNumber data
+        for (let i = 0; i < results.length; i++) {
+            let msgHash = results[i].msgHash;
+            if (results[i].incoming == 1) {
+                if (blockNumberOutgoing[msgHash] != undefined) {
+                    results[i].blockNumberOutgoing = blockNumberOutgoing[msgHash];
+                }
+            } else if (results[i].incoming == 0) {
+                if (blockNumberIncoming[msgHash] != undefined) {
+                    results[i].blockNumberIncoming = blockNumberIncoming[msgHash];
+                }
+            }
+        }
+        return (results);
+    }
+
+    async getXCMMessages(query = {}, limit = 1000, decorate = true, decorateExtra = true) {
+        return this.bq_query_xcmmessages("xcm", query, limit, decorate, decorateExtra);
+    }
+
     async bq_query_xcmmessages(tbl = "xcm", filters = {}, limit = 100) {
         const bigqueryClient = new BigQuery();
         let fullTable = this.getBQTable(tbl);
@@ -4534,7 +4588,6 @@ module.exports = class Query extends AssetManager {
                     results.push(x)
                 }
             }
-
 
             // Add rows from mysql "recent" table
             let numRecents = 0;
@@ -5048,7 +5101,6 @@ module.exports = class Query extends AssetManager {
                 let sm = `${s}:${m}`
                 if (matcher["extrinsics"][sm] || matcher["extrinsics"][s] || matcher["extrinsics"][m]) {
                     if (e.extrinsicHash == extrinsicHash) {
-                        e.extrinsicID = `${chainID}-${e.extrinsicID}`
                         out.push({
                             "chainID": chainID,
                             "id": id,
@@ -5077,6 +5129,8 @@ module.exports = class Query extends AssetManager {
                             }
                         }
                         if (pass) {
+                            ev.extrinsicHash = e.extrinsicHash;
+                            ev.extrinsicID = e.extrinsicID
                             out.push({
                                 "chainID": chainID,
                                 "id": id,
@@ -5096,24 +5150,24 @@ module.exports = class Query extends AssetManager {
             // trace filtering on matcher["trace"]
             let traces = rRow.autotrace.filter((f) => {
                 f.traceID = `${chainID}-${f.traceID}`
-		if ( paraTool.isJSONString(f.pv) ) {
-		    try {
-			let pvParsed = JSON.parse(f.pv)
-			f.pv = pvParsed;
-		    } catch {
-			// leave it alone
-		    }
-		}
-		if ( f.xcmMessages != undefined && Array.isArray(f.xcmMessages) ) {
-		    try {
-			let xcmMessagesParsed = f.xcmMessages.map( (m) => {
-			    return JSON.parse(m)
-			});
-			f.xcmMessages = xcmMessagesParsed;
-		    } catch {
-			// leave it alone
-		    }
-		}
+                if (paraTool.isJSONString(f.pv)) {
+                    try {
+                        let pvParsed = JSON.parse(f.pv)
+                        f.pv = pvParsed;
+                    } catch {
+                        // leave it alone
+                    }
+                }
+                if (f.xcmMessages != undefined && Array.isArray(f.xcmMessages)) {
+                    try {
+                        let xcmMessagesParsed = f.xcmMessages.map((m) => {
+                            return JSON.parse(m)
+                        });
+                        f.xcmMessages = xcmMessagesParsed;
+                    } catch {
+                        // leave it alone
+                    }
+                }
                 let s = `${f.p.toLowerCase()}`
                 let m = `${f.s.toLowerCase()}`
                 let sm = `${s}:${m}`
@@ -5144,6 +5198,51 @@ module.exports = class Query extends AssetManager {
         return [out, extra];
     }
 
+    async getEvent(eventID) {
+        let ida = eventID.split("-");
+        if (ida.length != 4) {
+            throw new paraTool.NotFoundError(`Invalid eventID`)
+        }
+        let chainID = parseInt(ida[0], 10);
+        let blockNumber = parseInt(ida[1], 10);
+        let extrinsic = parseInt(ida[2], 10);
+        let event = parseInt(ida[3], 10)
+        let [_, id] = this.convertChainID(chainID);
+        let chain = await this.getChain(chainID);
+
+        try {
+            let families = ["feed", "finalized", "feedevm"];
+            let row = await this.fetch_block(chainID, blockNumber, families, true);
+            let block = row.feed;
+            let eventIndex = 0;
+            for (const extrinsic of block.extrinsics) {
+                for (const e of extrinsic.events) {
+                    if (eventIndex == event) {
+                        return (e)
+                    }
+                    eventIndex++
+                }
+            }
+            if (event < ext.events.length) {
+                return (events[event]);
+            } else {
+                throw new paraTool.NotFoundError(`Invalid eventID: Event ${event} not in Extrinsic ${extrinsic} of Block number ${blockNumber} (# Events: ${events.length})`)
+            }
+            return event;
+        } catch (err) {
+            if (err.code == 404) {
+                throw new paraTool.NotFoundError(`Block not found: ${blockNumber}`)
+            }
+            this.logger.error({
+                "op": "query.getEvent",
+                chainID,
+                blockNumber,
+                err
+            });
+        }
+        return (null);
+    }
+
 
     async getXCMMessage(msgHash, sentAt = null, decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -5159,9 +5258,18 @@ module.exports = class Query extends AssetManager {
         x.msgHex = `${x.msgHex}`
 
         let blockTS = (x.blockTS != undefined) ? x.blockTS : 0
-
+        //TODO: parse asset
+        if (x.version != 'v2'){
+            // for debugging
+            if (x.relayChain == 'polkadot'){
+                x.assetChains = '["{\\"Token\\":\\"DOT\\"}~0"]'
+            }else{
+                x.assetChains = '["{\\"Token\\":\\"KSM\\"}~2"]'
+            }
+        }
         let dAssetChains = await this.decorateXCMAssetReferences(x.assetChains, blockTS, decorate, decorateExtra)
         x.assetChains = dAssetChains
+
 
         let xcmMsg = (x.msg != undefined) ? JSON.parse(x.msg) : null
         x.msg = xcmMsg
@@ -5265,6 +5373,23 @@ module.exports = class Query extends AssetManager {
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
                 break;
+            case "claimAsset":
+                if (instructionV.assets != undefined) {
+                    let instructionVAssets = instructionV.assets
+                    for (let i = 0; i < instructionVAssets.length; i++) {
+                        if (dAssetChains.length >= i + 1 && instructionVAssets[i] != undefined && instructionVAssets[i].fun != undefined) {
+                            let xcmAssetInfo = dAssetChains[i] // "inferenced"
+                            instructionVAssets[i].fun = this.decorateFungible(instructionVAssets[i].fun, xcmAssetInfo)
+                            console.log(`++ instructionVAssets[${i}]`, instructionVAssets[i])
+                        } else {
+                            continue // cannot decorate without going through the messy lookup again..
+                        }
+                    }
+                    instructionV.assets = instructionVAssets
+                }
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
             case "clearOrigin":
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
@@ -5295,6 +5420,88 @@ module.exports = class Query extends AssetManager {
                 internalXCM = dInstructionV
                 break;
         }
+    }
+
+    async decorateXCMIntrusctionV1(dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
+        this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        let version = dXcmMsg.version
+        let dInstructionV = {}
+        console.log('im here' , instructionK, instructionV)
+        switch (instructionK) {
+            case "withdrawAsset":
+            case "reserveAssetDeposited":
+                console.log(`instructionV`, instructionV)
+                if (instructionV.assets != undefined) {
+                    console.log(`instructionV.assets`, instructionV.assets)
+                    for (let i = 0; i < instructionV.assets.length; i++) {
+                        if (dAssetChains.length >= i + 1 && instructionV.assets[i] != undefined && instructionV.assets[i].fun != undefined) {
+                            let xcmAssetInfo = dAssetChains[i] // "inferenced"
+                            instructionV.assets[i].fun = this.decorateFungible(instructionV.assets[i].fun, xcmAssetInfo)
+                            console.log(`++ instructionV.assets[${i}]`, instructionV.assets[i])
+                        } else {
+                            continue // cannot decorate without going through the messy lookup again..
+                        }
+                    }
+                }
+                if (instructionV.effects != undefined){
+                    console.log(`instructionV.effects`, instructionV.effects)
+                    for (let i = 0; i < instructionV.effects.length; i++) {
+                        let instructionXCMK = Object.keys(instructionV.effects[i])[0]
+                        let instructionXCMV = instructionV.effects[i][instructionXCMK]
+                        console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        await this.decorateInternalXCMIntrusction(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
+                    }
+                }
+                dInstructionV[instructionK] = instructionV
+                //console.log(`dInstructionV`, JSON.stringify(dInstructionV, null, 4))
+                dXcmMsg[version] = dInstructionV
+                //console.log(`dXcmMsg++`, JSON.stringify(dXcmMsg, null, 4))
+                break;
+            case "clearOrigin":
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break;
+            case "buyExecution":
+                if (instructionV.fees != undefined && instructionV.fees.fun != undefined) {
+                    if (dAssetChains.length != 0) {
+                        let xcmAssetInfo = dAssetChains[0] // "inferenced"
+                        instructionV.fees.fun = this.decorateFungible(instructionV.fees.fun, xcmAssetInfo)
+                    }
+                }
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break;
+            case "depositAsset":
+                //TODO: need to decorate addr
+                if (instructionV.beneficiary != undefined) {
+                    let destAddress = this.chainParser.processBeneficiary(this, instructionV.beneficiary, 'polkadot', true)
+                    if (destAddress) {
+                        dXcmMsg.destAddress = destAddress
+                    }
+                }
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break;
+            case "depositReserveAsset":
+                if (Array.isArray(instructionV.xcm)) {
+                    for (let i = 0; i < instructionV.xcm.length; i++) {
+                        let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
+                        let instructionXCMV = instructionV.xcm[i][instructionXCMK]
+                        console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        await this.decorateInternalXCMIntrusction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
+                    }
+                }
+                console.log(`depositReserveAsset final`, JSON.stringify(instructionV, null, 4))
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break;
+            default:
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break;
+        }
+        console.log('im here 2')
     }
 
     async decorateXCMIntrusction(dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
@@ -5367,19 +5574,28 @@ module.exports = class Query extends AssetManager {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let dXcmMsg = {}
         let version = Object.keys(xcmMsg)[0]
+        console.log(`decorateXCMMsg version=${version}`, xcmMsg)
         let xcmMsgV = xcmMsg[version]
 
         dXcmMsg.version = version
-        dXcmMsg[version] = []
+
 
         let xcmPath = []
-        for (let i = 0; i < xcmMsgV.length; i++) {
-            let instructionK = Object.keys(xcmMsgV[i])[0]
-            xcmPath.push(instructionK)
-        }
-        console.log(`decorateXCMMsg Path`, xcmPath)
+
         //"withdrawAsset", "clearOrigin","buyExecution", "depositAsset"
-        if (version == 'v2' || version == 'v1') {
+        if (version == 'v1'){
+            let instructionK = Object.keys(xcmMsgV)[0]
+            let instructionV = xcmMsgV[instructionK]
+            console.log(`instructionK=${instructionK}, instructionV`, instructionV)
+            dXcmMsg[version] = {}
+            await this.decorateXCMIntrusctionV1(dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
+        } else if (version == 'v2') {
+            dXcmMsg[version] = []
+            for (let i = 0; i < xcmMsgV.length; i++) {
+                let instructionK = Object.keys(xcmMsgV[i])[0]
+                xcmPath.push(instructionK)
+            }
+            console.log(`decorateXCMMsg Path`, xcmPath)
             for (let i = 0; i < xcmPath.length; i++) {
                 let instructionK = xcmPath[i]
                 let instructionV = xcmMsgV[i][instructionK]
@@ -5452,6 +5668,15 @@ module.exports = class Query extends AssetManager {
         let [parentMsgHash, parentSentAt] = [rawXcmRec.parentMsgHash, rawXcmRec.parentSentAt];
         let [childMsgHash, childSentAt] = [rawXcmRec.childMsgHash, rawXcmRec.childSentAt];
         let blockTS = (rawXcmRec.blockTS != undefined) ? rawXcmRec.blockTS : 0
+        if (rawXcmRec.version != 'v2'){
+            // for debugging
+            if (rawXcmRec.relayChain == 'polkadot'){
+                rawXcmRec.assetChains = '["{\\"Token\\":\\"DOT\\"}~0"]'
+            }else{
+                rawXcmRec.assetChains = '["{\\"Token\\":\\"KSM\\"}~2"]'
+            }
+        }
+        console.log(`decorateXCM, relayChain=${rawXcmRec.relayChain},version=${rawXcmRec.version}, rawXcmRec.assetChains=${rawXcmRec.assetChains}`)
         let dAssetChains = await this.decorateXCMAssetReferences(rawXcmRec.assetChains, blockTS, decorate, decorateExtra)
         console.log(`dAssetChains`, JSON.stringify(dAssetChains))
         let xcmMsg = (rawXcmRec.msgStr != undefined) ? JSON.parse(rawXcmRec.msgStr) : null
@@ -5471,6 +5696,7 @@ module.exports = class Query extends AssetManager {
             msgHex: rawXcmRec.msgHex,
             msg: xcmMsg,
             msgType: rawXcmRec.msgType,
+            version: rawXcmRec.version,
             destAddress: destAddress,
             destSS58Address: destSS58Address,
             received: rawXcmRec.received,
@@ -5592,13 +5818,13 @@ module.exports = class Query extends AssetManager {
             out.push(`( msgHash = '${c.msgHash}' and sentAt = '${c.sentAt}' )`);
         }
         let str = out.join(" or");
-        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, childMsgHash, childSentAt from xcmmessages where ${str} order by blockTS, incoming`
+        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, childMsgHash, childSentAt, version from xcmmessages where ${str} order by blockTS, incoming`
         return this.fetch_xcmmessages_chainpaths(sql);
     }
 
     // get all the xcm messages associated with an extrinsicHash, and also return an array of chainpaths that have chainID/chainIDDest/incoming/blocknumber that allow us to fetch events/traces and formulate the timeline
     async get_xcm_messages_extrinsic(extrinsicHash) {
-        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, childMsgHash, childSentAt, assetsReceived from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
+        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, childMsgHash, childSentAt, assetsReceived, version from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
         console.log(`get_xcm_messages_extrinsic sql=${sql}`)
         return this.fetch_xcmmessages_chainpaths(sql);
     }
@@ -5640,7 +5866,7 @@ module.exports = class Query extends AssetManager {
             if (hashType == "xcm") {
                 // here we attempt to get the extrinsicHash of the xcmmessage so we an find all siblings
                 let w = (sentAt) ? ` and sentAt = ${sentAt}` : "" // because XCM messages hash aren't _perfectly_ unique, we need to have sentAt params disambiguate
-                let sql = `select extrinsicID, extrinsicHash, parentMsgHash, parentSentAt, childMsgHash, childSentAt, msgHash, sentAt, assetChains, incoming from xcmmessages where msgHash = '${hash}' ${w} order by blockTS desc limit 1`
+                let sql = `select extrinsicID, extrinsicHash, parentMsgHash, parentSentAt, childMsgHash, childSentAt, msgHash, sentAt, assetChains, incoming, version from xcmmessages where msgHash = '${hash}' ${w} order by blockTS desc limit 1`
                 let xcmscope = await this.poolREADONLY.query(sql);
                 if (xcmscope.length == 1) {
                     let x = xcmscope[0];

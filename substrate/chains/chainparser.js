@@ -519,6 +519,13 @@ module.exports = class ChainParser {
                         dXcmMsg.destAddress.push(destAddress)
                     }
                 }
+                if (instructionV.dest != undefined){
+                    let destAddress = this.processBeneficiary(false, instructionV.dest)
+                    if (destAddress) {
+                        internalXCM.destAddress = destAddress
+                        dXcmMsg.destAddress.push(destAddress)
+                    }
+                }
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
                 break;
@@ -527,7 +534,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processXCMIntrusctionBeneficiary(dXcmMsg, instructionK, instructionV) {
+    processXCMV2Beneficiary(dXcmMsg, instructionK, instructionV) {
         let version = dXcmMsg.version
         let dInstructionV = {}
         switch (instructionK) {
@@ -560,6 +567,51 @@ module.exports = class ChainParser {
         }
     }
 
+    processXCMV0Beneficiary(dXcmMsg, instructionK, instructionV) {
+        let version = dXcmMsg.version
+        let dInstructionV = {}
+        switch (instructionK) {
+            case "teleportAsset":
+                if (instructionV.effects != undefined){
+                    console.log(`instructionV.effects`, instructionV.effects)
+                    for (let i = 0; i < instructionV.effects.length; i++) {
+                        let instructionXCMK = Object.keys(instructionV.effects[i])[0]
+                        let instructionXCMV = instructionV.effects[i][instructionXCMK]
+                        console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
+                    }
+                }
+            default:
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break
+                break;
+        }
+    }
+
+    processXCMV1Beneficiary(dXcmMsg, instructionK, instructionV) {
+        let version = dXcmMsg.version
+        let dInstructionV = {}
+        switch (instructionK) {
+            case "withdrawAsset":
+            case "reserveAssetDeposited":
+                if (instructionV.effects != undefined){
+                    //console.log(`instructionV.effects`, instructionV.effects)
+                    for (let i = 0; i < instructionV.effects.length; i++) {
+                        let instructionXCMK = Object.keys(instructionV.effects[i])[0]
+                        let instructionXCMV = instructionV.effects[i][instructionXCMK]
+                        //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
+                    }
+                }
+            default:
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break
+                break;
+        }
+    }
+
 
     getBeneficiary(xcmMsg) {
         let dXcmMsg = {}
@@ -571,20 +623,27 @@ module.exports = class ChainParser {
         dXcmMsg.destAddress = []
 
         let xcmPath = []
-        for (let i = 0; i < xcmMsgV.length; i++) {
-            let instructionK = Object.keys(xcmMsgV[i])[0]
-            xcmPath.push(instructionK)
-        }
+
         //"withdrawAsset", "clearOrigin","buyExecution", "depositAsset"
-        if (version == 'v2' || version == 'v1') {
+        if (version == 'v1' || version == 'v0'){
+            let instructionK = Object.keys(xcmMsgV)[0]
+            let instructionV = xcmMsgV[instructionK]
+            //console.log(`instructionK=${instructionK}, instructionV`, instructionV)
+            dXcmMsg[version] = {}
+            if (version == 'v1') this.processXCMV1Beneficiary(dXcmMsg, instructionK, instructionV)
+            if (version == 'v0') this.processXCMV0Beneficiary(dXcmMsg, instructionK, instructionV)
+        } else if (version == 'v2') {
+            dXcmMsg[version] = []
+            for (let i = 0; i < xcmMsgV.length; i++) {
+                let instructionK = Object.keys(xcmMsgV[i])[0]
+                xcmPath.push(instructionK)
+            }
             for (let i = 0; i < xcmPath.length; i++) {
                 let instructionK = xcmPath[i]
                 let instructionV = xcmMsgV[i][instructionK]
                 //console.log(`getBeneficiary instructionK=${instructionK}, instructionV`, instructionV)
-                this.processXCMIntrusctionBeneficiary(dXcmMsg, instructionK, instructionV)
+                this.processXCMV2Beneficiary(dXcmMsg, instructionK, instructionV)
             }
-        } else if (version == 'v0') {
-            //skip for now
         }
         return dXcmMsg.destAddress.join('|')
     }
@@ -1437,17 +1496,23 @@ module.exports = class ChainParser {
         let xTokensEvents = extrinsic.events.filter((ev) => {
             return this.xTokensFilter(`${ev.section}(${ev.method})`);
         })
+        let xcmMsgHashEvents = extrinsic.events.filter((ev) => {
+            return this.xcmMsgFilter(`${ev.section}(${ev.method})`);
+        })
         if (xTokensEvents.length == 0) return
         if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent found len=${xTokensEvents.length}`, xTokensEvents)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent msgHash len=${xcmMsgHashEvents.length}`, xcmMsgHashEvents)
         extrinsic.xcms = []
-        for (const xTokensEvent of xTokensEvents) {
-            this.processOutgoingXTokensEvent(indexer, extrinsic, feed, xTokensEvent)
+        for (let i = 0; i < xTokensEvents.length; i++) {
+            let xTokensEvent = xTokensEvents[i]
+            let xcmMsgHashCandidate = (xTokensEvents.length == xcmMsgHashEvents.length) ? xcmMsgHashEvents[i].data[0] : false
+            this.processOutgoingXTokensEvent(indexer, extrinsic, feed, xTokensEvent, xcmMsgHashCandidate)
         }
     }
 
 
 
-    processOutgoingXTokensEvent(indexer, extrinsic, feed, event) {
+    processOutgoingXTokensEvent(indexer, extrinsic, feed, event, msgHashCandidate = false) {
         //xTokens:TransferredMultiAssets
         /*
         [
@@ -1632,6 +1697,7 @@ module.exports = class ChainParser {
                     msgHash: '0x',
                     sentAt: this.parserWatermark,
                 }
+                if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
                 //console.log("processOutgoingXTokens xTokens", r);
                 console.log(`processOutgoingXTokensEvent`, r)
                 //outgoingXTokens.push(r)
@@ -2049,11 +2115,12 @@ module.exports = class ChainParser {
     }
 
     processBeneficiary(indexer, beneficiary, relayChain = 'polkadot', decorate = false) {
-        //console.log(`processBeneficiary called`, beneficiary)
+        console.log(`processBeneficiary called`, beneficiary)
         let paraIDDest, chainIDDest, destAddress;
         let isInterior = (beneficiary.interior != undefined) ? 1 : 0
         let beneficiaryType = (beneficiary.interior != undefined) ? Object.keys(beneficiary.interior)[0] : Object.keys(beneficiary)[0] //handle dest.beneficiary
         let beneficiaryV = (beneficiary.interior != undefined) ? beneficiary['interior'][beneficiaryType] : beneficiary[beneficiaryType] //move up dest.beneficiary
+        console.log(`beneficiaryType=${beneficiaryType}, beneficiaryV`, beneficiaryV)
         switch (beneficiaryType) {
             case 'x1':
                 //I think it's possible?
@@ -2371,7 +2438,10 @@ module.exports = class ChainParser {
                             } else {
                                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1 unknown case`, beneficiary.v1)
                             }
-                        } else if (beneficiary.x2 !== undefined) {
+                        } else if (beneficiary.x1 !== undefined) {
+                            //0x87d746fe20eb988a34a45b515ce8e09868ffd4dba725a5cfb941cb11dc37a51c
+                            [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary.x1, relayChain)
+                        } else if (beneficiary.x2 !== undefined){
                             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
                             [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x2, relayChain)
                         } else {
@@ -2606,6 +2676,9 @@ module.exports = class ChainParser {
                             } else {
                                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1 unknown case`, beneficiary.v1)
                             }
+                        } else if (beneficiary.x1 !== undefined) {
+                            //0x2cfbeb75fe9a1e13a3a6cf700c27d1afd53c7f164c127e60763c2e27b959e195
+                            [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary.x1, relayChain)
                         } else if (beneficiary.x2 !== undefined) {
                             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
                             [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x2, relayChain)
@@ -2721,6 +2794,15 @@ module.exports = class ChainParser {
     xTokensFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
         if (palletMethod == "xTokens(TransferredMultiAssets)") {
+            return true
+        } else {
+            return false;
+        }
+    }
+
+    xcmMsgFilter(palletMethod) {
+        //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
+        if (palletMethod == "xcmpQueue(XcmpMessageSent)") {
             return true
         } else {
             return false;

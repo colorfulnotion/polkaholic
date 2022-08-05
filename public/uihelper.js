@@ -1,5 +1,72 @@
 //var baseURL is set at header
 
+function presentInstructions(msg, k, hdr = "View Instructions") {
+    return `<div class="accordion  accordion-flush" style="width: 400px">
+  <div class="accordion-item">
+    <h2 class="accordion-header" id="heading${k}">
+      <button class="accordion-button collapsed" type="button" data-mdb-toggle="collapse"
+        data-mdb-target="#flush${k}" aria-expanded="true" aria-controls="flush${k}">
+       ${hdr}
+      </button>
+    </h2>
+    <div id="flush${k}" class="accordion-collapse collapse" aria-labelledby="heading${k}">
+      <div class="accordion-body">
+        <div id="typ${k}" class="renderjson"></div>
+        <script>document.getElementById("typ${k}").appendChild(renderjson.set_show_to_level(10)(` + msg + `));</script>
+      </div>
+    </div>
+  </div>
+</div>`
+}
+
+function presentJSONObject(obj, id) {
+    let renderjsonIDOuter = "rjouter" + id;
+    let jsontableIDOuter = "jhouter" + id;
+    let renderjsonID = "rj" + id;
+    let jsontableID = "jh" + id;
+    let decodeButtonID = "dec" + id;
+    let viewcodeButtonID = "vc" + id;
+    let copyAButtonID = "ca" + id;
+    let copyBButtonID = "cb" + id;
+    if ((Array.isArray(obj) && obj.length == 0) || Object.keys.length == 0) {
+        document.getElementById(renderjsonID).style.display = "none";
+        document.getElementById(jsontableID).style.display = "none";
+        return;
+    }
+    $(`#${decodeButtonID}`).on('click', function(e) {
+        document.getElementById(renderjsonIDOuter).style.display = "none";
+        document.getElementById(jsontableIDOuter).style.display = "block";
+    });
+    $(`#${viewcodeButtonID}`).on('click', function(e) {
+        document.getElementById(renderjsonIDOuter).style.display = "block";
+        document.getElementById(jsontableIDOuter).style.display = "none";
+    });
+    $(`#${copyAButtonID}`).on('click', function(e) {
+        copyToClipboard(JSON.stringify(obj));
+    });
+    $(`#${copyBButtonID}`).on('click', function(e) {
+        copyToClipboard(JSON.stringify(obj));
+    });
+    document.getElementById(renderjsonID).appendChild(renderjson.set_show_to_level(3)(obj));
+    document.getElementById(jsontableID).innerHTML = JSONToHTMLTable(obj);
+}
+
+function JSONToHTMLTable(data) {
+    let mid = Object.keys(data).map((k) => {
+        let p = ''
+        if (!Array.isArray(data)) {
+            p += `<td width="20%"><b>${k}</b></td>`
+        }
+        if (data[k] && typeof data[k] === 'object') {
+            p += `<td width="80%">` + JSONToHTMLTable(data[k]) + '</td>';
+        } else {
+            p += `<td width="80%">${data[k]}</td>`;
+        }
+        return `<tr>${p}</tr>`;
+    });
+    return `<table class="jsontable" width="100%"><tbody>${mid.join("")}</tbody></table>`;
+}
+
 function showProcessing(processing) {
     let processing2 = document.getElementById("processing");
     if (processing2) {
@@ -158,6 +225,15 @@ function timeConverter(UNIX_timestamp) {
     return time;
 }
 
+function shorttimeConverter(UNIX_timestamp) {
+    var a = new Date(UNIX_timestamp * 1000);
+    var hour = a.getUTCHours().toString().padStart(2, '0');
+    var min = a.getUTCMinutes().toString().padStart(2, '0');;
+    var secs = a.getUTCSeconds().toString().padStart(2, '0');
+    var time = hour + ':' + min + ":" + secs;
+    return time;
+}
+
 function beautifyCamelCase(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
@@ -169,8 +245,9 @@ function presentSpecVersion(chainID, specVersion) {
 function presentBlockNumber(id, chainName, blockNumber) {
     if (!blockNumber) return "-";
     let txt = (typeof blockNumber == "string") ? blockNumber : blockNumber.toString();
-    if (chainName) txt = chainName + " " + txt;
-    return '<a href="/block/' + id + '/' + blockNumber + '">' + txt + '</a>';
+    let out = '<a href="/block/' + id + '/' + blockNumber + '"><code>' + txt + '</code></a>';
+    if (chainName) out = chainName + " " + out;
+    return out;
 }
 
 function presentEvent(data) {
@@ -242,6 +319,14 @@ function presentExtrinsicIDHash(extrinsicID, txHash, allowCopy = true) {
 
 function presentTxHash(txHash) {
     return '<a href="/tx/' + txHash + '">' + getShortHash(txHash) + '</a>';
+}
+
+function presentXCMTimeline(hash, hashType, sentAt) {
+    return `<a href="/timeline/${hash}/${hashType}/${sentAt}">timeline</a>`
+}
+
+function presentXCMMessageHash(msgHash, sentAt, allowCopy = false) {
+    return `<a href="/xcmmessage/${msgHash}/${sentAt}">` + getShortHash(msgHash, allowCopy) + '</a>';
 }
 
 function presentChain(id, chainName, iconURL = false, crawlingStatus = "") {
@@ -395,9 +480,9 @@ function presentIDs(ids) {
 }
 
 
-function cover_params(params, id) {
+function cover_params(params, id, depth = 2) {
     try {
-        let scr = `document.getElementById("params${id}").appendChild(renderjson.set_show_to_level(2)(` + JSON.stringify(params) + `))`;
+        let scr = `document.getElementById("params${id}").appendChild(renderjson.set_show_to_level(${depth})(` + JSON.stringify(params) + `))`;
         return "<div id='params" + id + "' class='renderjson'></div><script>" + scr + "</script>";
     } catch (e) {
         console.log("FAIL", e);
