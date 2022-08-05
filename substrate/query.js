@@ -5354,7 +5354,7 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async decorateInternalXCMIntrusction(dXcmMsg, internalXCM, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
+    async decorateInternalXCMInstruction(dXcmMsg, internalXCM, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
         this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let dInstructionV = {}
@@ -5422,7 +5422,7 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async decorateXCMIntrusctionV1(dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
+    async decorateXCMInstructionV1(dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
         this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let version = dXcmMsg.version
@@ -5450,7 +5450,7 @@ module.exports = class Query extends AssetManager {
                         let instructionXCMK = Object.keys(instructionV.effects[i])[0]
                         let instructionXCMV = instructionV.effects[i][instructionXCMK]
                         console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                        await this.decorateInternalXCMIntrusction(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
+                        await this.decorateInternalXCMInstruction(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
                     }
                 }
                 dInstructionV[instructionK] = instructionV
@@ -5489,7 +5489,7 @@ module.exports = class Query extends AssetManager {
                         let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
                         let instructionXCMV = instructionV.xcm[i][instructionXCMK]
                         console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                        await this.decorateInternalXCMIntrusction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
+                        await this.decorateInternalXCMInstruction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
                     }
                 }
                 console.log(`depositReserveAsset final`, JSON.stringify(instructionV, null, 4))
@@ -5504,7 +5504,7 @@ module.exports = class Query extends AssetManager {
         console.log('im here 2')
     }
 
-    async decorateXCMIntrusction(dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
+    async decorateXCMInstruction(dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
         this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let version = dXcmMsg.version
@@ -5555,7 +5555,7 @@ module.exports = class Query extends AssetManager {
                         let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
                         let instructionXCMV = instructionV.xcm[i][instructionXCMK]
                         console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                        await this.decorateInternalXCMIntrusction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
+                        await this.decorateInternalXCMInstruction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
                     }
                 }
                 console.log(`depositReserveAsset final`, JSON.stringify(instructionV, null, 4))
@@ -5588,7 +5588,7 @@ module.exports = class Query extends AssetManager {
             let instructionV = xcmMsgV[instructionK]
             console.log(`instructionK=${instructionK}, instructionV`, instructionV)
             dXcmMsg[version] = {}
-            await this.decorateXCMIntrusctionV1(dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
+            await this.decorateXCMInstructionV1(dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
         } else if (version == 'v2') {
             dXcmMsg[version] = []
             for (let i = 0; i < xcmMsgV.length; i++) {
@@ -5600,7 +5600,7 @@ module.exports = class Query extends AssetManager {
                 let instructionK = xcmPath[i]
                 let instructionV = xcmMsgV[i][instructionK]
                 console.log(`instructionK=${instructionK}, instructionV`, instructionV)
-                await this.decorateXCMIntrusction(dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
+                await this.decorateXCMInstruction(dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
             }
         } else if (version == 'v0') {
             //skip for now
