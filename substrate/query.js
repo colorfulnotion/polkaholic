@@ -5249,10 +5249,10 @@ module.exports = class Query extends AssetManager {
         let w = (sentAt) ? ` and sentAt = ${sentAt}` : "";
         let sql = `select if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest,
         msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, childMsgHash, childSentAt, assetChains, blockTS from xcmmessages
-        where msgHash = '${msgHash}' ${w} and incoming = 0 order by blockTS desc limit 1`
+        where msgHash = '${msgHash}' ${w} order by blockTS desc limit 1`
         let xcmrecs = await this.poolREADONLY.query(sql);
         if (xcmrecs.length == 0) {
-            throw new paraTool.NotFoundError(`XCM Message not found: ${hash}`)
+            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${sentAt}`)
         }
         let x = xcmrecs[0];
         x.msgHex = `${x.msgHex}`

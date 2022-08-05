@@ -1265,12 +1265,13 @@ module.exports = class Crawler extends Indexer {
             console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
             // blockDT >= date_sub(Now(), interval ${lookback} DAY)
-            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, attempted from block${chainID} where blockNumber < ${highestBlock} and crawlTrace > 0 and length(blockHash) > 0  and attempted < ${maxTraceAttempts} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} order by crawlTrace desc,attempted, rand() limit 10000`
+            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, attempted from block${chainID} where blockNumber < ${currentBlock} and crawlTrace > 0 and length(blockHash) > 0  and attempted < ${maxTraceAttempts} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} order by crawlTrace desc,attempted, rand() limit 10000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
                 let endBN = techniqueParams[2];
                 sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, attempted from block${chainID} where crawlTrace > 0 and length(blockHash) > 0 and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < ${maxTraceAttempts} order by rand() limit 10000`
             }
+	    console.log(sql);
             let tasks = await this.poolREADONLY.query(sql);
             let jmp = 1;
             for (var i = 0; i < tasks.length; i += jmp) {
@@ -1285,6 +1286,7 @@ module.exports = class Crawler extends Indexer {
                         blockTS: t1.blockTS,
                         attempted: t1.attempted
                     };
+		    console.log(t2);
                     return this.crawl_trace(chain, t2);
                 });
                 let res2 = await Promise.all(res);
