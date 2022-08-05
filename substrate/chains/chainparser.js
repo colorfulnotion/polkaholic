@@ -519,6 +519,13 @@ module.exports = class ChainParser {
                         dXcmMsg.destAddress.push(destAddress)
                     }
                 }
+                if (instructionV.dest != undefined){
+                    let destAddress = this.processBeneficiary(false, instructionV.dest)
+                    if (destAddress) {
+                        internalXCM.destAddress = destAddress
+                        dXcmMsg.destAddress.push(destAddress)
+                    }
+                }
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
                 break;
@@ -560,6 +567,28 @@ module.exports = class ChainParser {
         }
     }
 
+    processXCMV0Beneficiary(dXcmMsg, instructionK, instructionV) {
+        let version = dXcmMsg.version
+        let dInstructionV = {}
+        switch (instructionK) {
+            case "teleportAsset":
+                if (instructionV.effects != undefined){
+                    console.log(`instructionV.effects`, instructionV.effects)
+                    for (let i = 0; i < instructionV.effects.length; i++) {
+                        let instructionXCMK = Object.keys(instructionV.effects[i])[0]
+                        let instructionXCMV = instructionV.effects[i][instructionXCMK]
+                        console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
+                    }
+                }
+            default:
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break
+                break;
+        }
+    }
+
     processXCMV1Beneficiary(dXcmMsg, instructionK, instructionV) {
         let version = dXcmMsg.version
         let dInstructionV = {}
@@ -596,12 +625,13 @@ module.exports = class ChainParser {
         let xcmPath = []
 
         //"withdrawAsset", "clearOrigin","buyExecution", "depositAsset"
-        if (version == 'v1'){
+        if (version == 'v1' || version == 'v0'){
             let instructionK = Object.keys(xcmMsgV)[0]
             let instructionV = xcmMsgV[instructionK]
             //console.log(`instructionK=${instructionK}, instructionV`, instructionV)
             dXcmMsg[version] = {}
-            this.processXCMV1Beneficiary(dXcmMsg, instructionK, instructionV)
+            if (version == 'v1') this.processXCMV1Beneficiary(dXcmMsg, instructionK, instructionV)
+            if (version == 'v0') this.processXCMV0Beneficiary(dXcmMsg, instructionK, instructionV)
         } else if (version == 'v2') {
             dXcmMsg[version] = []
             for (let i = 0; i < xcmMsgV.length; i++) {
@@ -614,8 +644,6 @@ module.exports = class ChainParser {
                 //console.log(`getBeneficiary instructionK=${instructionK}, instructionV`, instructionV)
                 this.processXCMV2Beneficiary(dXcmMsg, instructionK, instructionV)
             }
-        } else if (version == 'v0') {
-            //skip for now
         }
         return dXcmMsg.destAddress.join('|')
     }
@@ -2087,12 +2115,12 @@ module.exports = class ChainParser {
     }
 
     processBeneficiary(indexer, beneficiary, relayChain = 'polkadot', decorate = false) {
-        //console.log(`processBeneficiary called`, beneficiary)
+        console.log(`processBeneficiary called`, beneficiary)
         let paraIDDest, chainIDDest, destAddress;
         let isInterior = (beneficiary.interior != undefined) ? 1 : 0
         let beneficiaryType = (beneficiary.interior != undefined) ? Object.keys(beneficiary.interior)[0] : Object.keys(beneficiary)[0] //handle dest.beneficiary
         let beneficiaryV = (beneficiary.interior != undefined) ? beneficiary['interior'][beneficiaryType] : beneficiary[beneficiaryType] //move up dest.beneficiary
-        //console.log(`beneficiaryType=${beneficiaryType}, beneficiaryV`, beneficiaryV)
+        console.log(`beneficiaryType=${beneficiaryType}, beneficiaryV`, beneficiaryV)
         switch (beneficiaryType) {
             case 'x1':
                 //I think it's possible?
