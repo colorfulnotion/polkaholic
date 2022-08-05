@@ -946,7 +946,7 @@ module.exports = class Query extends AssetManager {
     async getXCMTransfers(address = false, limit = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        console.log("getXCMTransfers", chainList);
+
         let out = [];
         try {
             let w = address ? `and fromAddress = '${address}'` : "";
@@ -956,11 +956,8 @@ module.exports = class Query extends AssetManager {
                 let chainIDIncluded = this.chainFilters(chainList, x.chainID)
                 let chainIDDestIncluded = this.chainFilters(chainList, x.chainIDDest)
                 if (!chainIDIncluded && !chainIDDestIncluded) {
-                    console.log("getXCMT SKIP", x.chainID, x.chainIDDest);
                     //filter non-specified records .. do not decorate
                     continue
-                } else {
-                    console.log("getXCMT ACCEPT", x.chainID, x.chainIDDest);
                 }
                 x.asset = this.trimquote(x.asset); // temporary hack
                 if (x.asset.includes("Token")) {
@@ -4384,12 +4381,14 @@ module.exports = class Query extends AssetManager {
             chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
         }
 
-        let mysqlQuery = `SELECT msgHash, msgStr, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sourceTS, destTS, beneficiaries, assetsReceived, matched FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 4 hour)) ${chainListFilter} order by blockTS desc limit ${limit}`;
+        // bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
+        let mysqlQuery = `SELECT msgHash, msgStr, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sourceTS, destTS, beneficiaries, assetsReceived, matched, UNIX_TIMESTAMP(matchDT) as matchTS FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour)) and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
         console.log(mysqlQuery);
         let results = [];
         let recs = await this.poolREADONLY.query(mysqlQuery);
         let blockNumberIncoming = {};
         let blockNumberOutgoing = {};
+        let included = {};
         for (let i = 0; i < recs.length; i++) {
             let r = recs[i];
             let chainID = parseInt(r.chainID, 10);
@@ -4403,8 +4402,17 @@ module.exports = class Query extends AssetManager {
             r.chainName = this.getChainName(chainID);
             r.chainDestName = this.getChainName(chainIDDest);
             r.relayChain = (r.chainIDDest != 2 && (r.chainIDDest < 10000)) ? 'polkadot' : 'kusama';
-            if (r.matched == 0 || r.incoming == 1) {
+	    if ( r.matched == 0 && ( this.getCurrentTS() - r.blockTS < 60 ) ) {
+		// if this record hasn't been matched, mark as pending / in transit if its very new (60s)
+		r.pending = 1;
+	    }
+            if (r.matched == 0 && (included[r.msgHash] != undefined) && Math.abs(included[r.msgHash] - r.blockTS) < 30) {
+                // if we already included a matched message within 30s of this one, don't bother
+            } else if (r.matched == 0 || r.incoming == 1) {
                 results.push(r);
+                if (r.matched == 1) {
+                    included[r.msgHash] = r.blockTS;
+                }
             } else if (r.incoming == 0) {
                 // store in the outgoingBlockNumber map, so we can fill in the matched = 1 / incoming = 1 results with this
                 blockNumberOutgoing[r.msgHash] = r.blockNumber;
@@ -5259,11 +5267,11 @@ module.exports = class Query extends AssetManager {
 
         let blockTS = (x.blockTS != undefined) ? x.blockTS : 0
         //TODO: parse asset
-        if (x.version != 'v2'){
+        if (x.version != 'v2') {
             // for debugging
-            if (x.relayChain == 'polkadot'){
+            if (x.relayChain == 'polkadot') {
                 x.assetChains = '["{\\"Token\\":\\"DOT\\"}~0"]'
-            }else{
+            } else {
                 x.assetChains = '["{\\"Token\\":\\"KSM\\"}~2"]'
             }
         }
@@ -5427,7 +5435,7 @@ module.exports = class Query extends AssetManager {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let version = dXcmMsg.version
         let dInstructionV = {}
-        console.log('im here' , instructionK, instructionV)
+        console.log('im here', instructionK, instructionV)
         switch (instructionK) {
             case "withdrawAsset":
             case "reserveAssetDeposited":
@@ -5444,7 +5452,7 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                 }
-                if (instructionV.effects != undefined){
+                if (instructionV.effects != undefined) {
                     console.log(`instructionV.effects`, instructionV.effects)
                     for (let i = 0; i < instructionV.effects.length; i++) {
                         let instructionXCMK = Object.keys(instructionV.effects[i])[0]
@@ -5583,7 +5591,7 @@ module.exports = class Query extends AssetManager {
         let xcmPath = []
 
         //"withdrawAsset", "clearOrigin","buyExecution", "depositAsset"
-        if (version == 'v1'){
+        if (version == 'v1') {
             let instructionK = Object.keys(xcmMsgV)[0]
             let instructionV = xcmMsgV[instructionK]
             console.log(`instructionK=${instructionK}, instructionV`, instructionV)
@@ -5668,11 +5676,11 @@ module.exports = class Query extends AssetManager {
         let [parentMsgHash, parentSentAt] = [rawXcmRec.parentMsgHash, rawXcmRec.parentSentAt];
         let [childMsgHash, childSentAt] = [rawXcmRec.childMsgHash, rawXcmRec.childSentAt];
         let blockTS = (rawXcmRec.blockTS != undefined) ? rawXcmRec.blockTS : 0
-        if (rawXcmRec.version != 'v2'){
+        if (rawXcmRec.version != 'v2') {
             // for debugging
-            if (rawXcmRec.relayChain == 'polkadot'){
+            if (rawXcmRec.relayChain == 'polkadot') {
                 rawXcmRec.assetChains = '["{\\"Token\\":\\"DOT\\"}~0"]'
-            }else{
+            } else {
                 rawXcmRec.assetChains = '["{\\"Token\\":\\"KSM\\"}~2"]'
             }
         }

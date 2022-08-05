@@ -1456,7 +1456,7 @@ order by chainID, extrinsicHash, diffTS`
     // In case of ties, the FIRST one ( "order by diffTS" ) covers this
     async xcmmessages_match(startTS, endTS, lookbackSeconds = 120) {
         let sql = `select
-          s.msgHash, s.blockNumber as s_blockNumber, d.blockNumber as d_blockNumber, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, (d.blockTS - s.blockTS) as diffTS, (d.sentAt - s.sentAt) as diffSentAt
+          s.msgHash, s.blockNumber as s_blockNumber, d.blockNumber as d_blockNumber, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, abs(d.blockTS - s.blockTS) as diffTS, (d.sentAt - s.sentAt) as diffSentAt
         from xcmmessages as s, xcmmessages as d
  where  d.msgHash = s.msgHash and
         d.chainID = s.chainID and

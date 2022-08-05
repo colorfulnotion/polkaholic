@@ -1,5 +1,5 @@
 // Copyright 2022 Colorful Notion, Inc.
-// This file is part of XCMScan
+// This file is part of Polkaholic
 
 const AssetManager = require("../../polkaholic/substrate/assetManager");
 const mysql = require("mysql2");
@@ -504,6 +504,7 @@ p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.child
     async xcmmatch2_matcher(startTS, endTS, lookbackSeconds = 120) {
         // ((d.asset = xcmmessages.asset) or (d.nativeAssetChain = xcmmessages.nativeAssetChain and d.nativeAssetChain is not null)) and
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
+        let fld = (this.getCurrentTS() % 2 == 0) ? "" : "2"
         let sql = `select  xcmmessages.chainID, xcmmessages.chainIDDest, 
           (d.destts - xcmmessages.blockTS) as diffTS,
           xcmmessages.msgHash,
@@ -512,10 +513,10 @@ p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.child
           xcmmessages.extrinsicHash,
           xcmmessages.extrinsicID,
           xcmmessages.blockTS,
-          xcmmessages.beneficiaries2,
+          xcmmessages.beneficiaries${fld},
           d.eventID, d.asset, d.rawAsset, d.nativeAssetChain, d.amountReceived, d.blockNumberDest, d.destTS
         from xcmmessages, xcmtransferdestcandidate as d
- where  d.fromAddress = xcmmessages.beneficiaries2 and
+ where  d.fromAddress = xcmmessages.beneficiaries${fld} and
         d.chainIDDest = xcmmessages.chainIDDest and
         xcmmessages.blockTS >= ${startTS} and
         xcmmessages.blockTS < ${endTS} and
@@ -656,15 +657,56 @@ order by chainID, extrinsicHash, diffTS`;
         console.log("computeAssetChains DONE");
     }
 
+    /* because the indexer may insert multiple xcmmessages record when a partcular xcmmessage sits in the chains message queue for 1 or more blocks, this xcmmessages_dedup process cleans out any records that exist after the above matching process */
+    async xcmmessages_dedup(startTS, endTS, lookbackSeconds = 120) {
+        let sql = `select
+          s.msgHash, s.blockNumber as s_blockNumber, s.incoming, (d.sentAt - s.sentAt) as diffSentAt
+        from xcmmessages as s, xcmmessages as d
+ where  d.msgHash = s.msgHash and
+        d.chainID = s.chainID and
+        d.chainIDDest = s.chainIDDest and
+        ( ( s.incoming = 0 and  d.incoming = 1 ) or ( s.incoming = 1 and d.incoming = 0 ) ) and
+        s.blockTS >= ${startTS} and
+        s.blockTS < ${endTS} and
+        d.blockTS >= ${startTS} and
+        d.blockTS < ${endTS+lookbackSeconds} and
+        s.matched = 0 and
+        d.matched = 1
+having (diffSentAt >= 0 and diffSentAt <= 4)
+order by msgHash`
+        console.log("xcmmessages_match", sql)
+        try {
+            let xcmsingles = await this.poolREADONLY.query(sql);
+            let vals = ["matched"];
+            let out = [];
+            for (let i = 0; i < xcmsingles.length; i++) {
+                let s = xcmsingles[i];
+                out.push(`('${s.msgHash}', ${s.s_blockNumber}, ${s.incoming}, '-1')`)
+            }
+            console.log(`xcmmessages_singles_dedup`, out);
+            await this.upsertSQL({
+                "table": "xcmmessages",
+                "keys": ["msgHash", "blockNumber", "incoming"],
+                "vals": vals,
+                "data": out,
+                "replace": vals
+            });
+        } catch (err) {
+            console.log("xcmmessages_match", err)
+        }
+    }
+
     async xcmanalytics(lookbackDays) {
         let chain = await this.getChain(2);
         await this.setupAPI(chain);
+
 
         let endTS = this.currentTS();
         let startTS = endTS - lookbackDays * 86400;
         for (let ts = startTS; ts < endTS; ts += 86400) {
             let t0 = ts;
             let t1 = ts + 86400;
+
             // this.computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints}
             await this.computeXCMFingerprints(t0, t1);
 
@@ -677,6 +719,9 @@ order by chainID, extrinsicHash, diffTS`;
 
             // computes assetsReceived
             await this.xcmmatch2_matcher(t0, t1)
+
+            // marks duplicates in xcmmessages
+            await this.xcmmessages_dedup(t0, t1);
         }
     }
 

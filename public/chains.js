@@ -418,7 +418,7 @@ async function showxcmmessages(relaychain) {
                 "targets": [1]
             }, {
                 "className": "dt-left",
-                "targets": [2, 3]
+                "targets": [2, 3, 7]
             }],
             order: [
                 [7, "desc"]
@@ -542,7 +542,12 @@ async function showxcmmessages(relaychain) {
                     data: 'blockTS',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentSuccessFailure(row.matched);
+			    if ( row.pending != undefined ) {
+				return "Pending"; 
+			    } else {
+				let str = (row.matchTS != undefined && row.matchTS > 0) ? presentTS(row.matchTS) : "";
+				return presentSuccessFailure(row.matched) + " " + str;
+			    }
                         }
                         return data;
                     }
