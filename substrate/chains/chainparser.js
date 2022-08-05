@@ -765,6 +765,7 @@ module.exports = class ChainParser {
         return false;
     }
 
+    //TODO: fix this
     getInstructionPath(instruction) {
         let v = Object.keys(instruction)
         let version = false
@@ -3230,6 +3231,10 @@ module.exports = class ChainParser {
                 version: msg.version,
                 path: msg.path,
                 beneficiaries: (msg.beneficiaries != undefined && msg.beneficiaries != '') ? msg.beneficiaries : null
+            }
+            if (xcmRec.msgType == 'dmp' && xcmRec.blockNumber != xcmRec.sentAt){
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`duplicates ${msg.msgHash}`)
+                return false
             }
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processxcmMsgRaw error`, e.toString())
