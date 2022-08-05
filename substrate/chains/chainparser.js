@@ -2440,7 +2440,7 @@ module.exports = class ChainParser {
                             }
                         } else if (beneficiary.x1 !== undefined) {
                             //0x87d746fe20eb988a34a45b515ce8e09868ffd4dba725a5cfb941cb11dc37a51c
-                            [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x1, relayChain)
+                            [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary.x1, relayChain)
                         } else if (beneficiary.x2 !== undefined){
                             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
                             [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x2, relayChain)
@@ -2676,6 +2676,9 @@ module.exports = class ChainParser {
                             } else {
                                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1 unknown case`, beneficiary.v1)
                             }
+                        } else if (beneficiary.x1 !== undefined) {
+                            //0x2cfbeb75fe9a1e13a3a6cf700c27d1afd53c7f164c127e60763c2e27b959e195
+                            [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary.x1, relayChain)
                         } else if (beneficiary.x2 !== undefined) {
                             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
                             [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x2, relayChain)
