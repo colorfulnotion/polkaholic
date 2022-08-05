@@ -4382,7 +4382,7 @@ module.exports = class Query extends AssetManager {
         }
 
         // bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
-        let mysqlQuery = `SELECT msgHash, msgStr, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sourceTS, destTS, beneficiaries, assetsReceived, matched, UNIX_TIMESTAMP(matchDT) as matchTS FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour)) and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
+        let mysqlQuery = `SELECT msgHash, msgStr, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sourceTS, destTS, beneficiaries, assetsReceived, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, childMsgHash, childSentAt FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour)) and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
         console.log(mysqlQuery);
         let results = [];
         let recs = await this.poolREADONLY.query(mysqlQuery);
@@ -4402,10 +4402,10 @@ module.exports = class Query extends AssetManager {
             r.chainName = this.getChainName(chainID);
             r.chainDestName = this.getChainName(chainIDDest);
             r.relayChain = (r.chainIDDest != 2 && (r.chainIDDest < 10000)) ? 'polkadot' : 'kusama';
-	    if ( r.matched == 0 && ( this.getCurrentTS() - r.blockTS < 60 ) ) {
-		// if this record hasn't been matched, mark as pending / in transit if its very new (60s)
-		r.pending = 1;
-	    }
+            if (r.matched == 0 && (this.getCurrentTS() - r.blockTS < 60)) {
+                // if this record hasn't been matched, mark as pending / in transit if its very new (60s)
+                r.pending = 1;
+            }
             if (r.matched == 0 && (included[r.msgHash] != undefined) && Math.abs(included[r.msgHash] - r.blockTS) < 30) {
                 // if we already included a matched message within 30s of this one, don't bother
             } else if (r.matched == 0 || r.incoming == 1) {

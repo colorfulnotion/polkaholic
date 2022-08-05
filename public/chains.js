@@ -429,12 +429,27 @@ async function showxcmmessages(relaychain) {
                         if (type == 'display') {
                             let str = "";
                             if (row.extrinsicID && row.extrinsicHash) {
-                                str = "<BR>Extrinsic: " + presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                                str = `<BR>${row.chainName} Extrinsic: ` + presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                            } else {
+                                str = `<BR>${row.chainName} Extrinsic: Unknown`;
+                            }
+                            if (row.parentMsgHash && row.parentSentAt) {
+                                str = "<BR><i>Parent Msg:</i> " + presentXCMMessageHash(row.parentMsgHash, row.parentSentAt);
+                            }
+                            if (row.childMsgHash && row.childSentAt) {
+                                str = "<BR><i>Child Msg:</i> " + presentXCMMessageHash(row.childMsgHash, row.childSentAt);
                             }
                             str += "<BR><small>" + presentXCMTimeline(row.msgHash, "xcm", row.sentAt) + "</small>";
                             return presentXCMMessageHash(row.msgHash, row.sentAt) + str;
+                        } else {
+                            let str = "";
+                            if (row.extrinsicID && row.extrinsicHash) {
+                                str = row.extrinsicID + "  " + row.extrinsicHash;
+                            } else {
+                                str = "Unknown";
+                            }
+                            return str + " " + data;
                         }
-                        return data;
                     }
                 },
                 {
@@ -542,12 +557,12 @@ async function showxcmmessages(relaychain) {
                     data: 'blockTS',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-			    if ( row.pending != undefined ) {
-				return "Pending"; 
-			    } else {
-				let str = (row.matchTS != undefined && row.matchTS > 0) ? presentTS(row.matchTS) : "";
-				return presentSuccessFailure(row.matched) + " " + str;
-			    }
+                            if (row.pending != undefined) {
+                                return "Pending";
+                            } else {
+                                let str = (row.matchTS != undefined && row.matchTS > 0) ? presentTS(row.matchTS) : "";
+                                return presentSuccessFailure(row.matched) + " " + str;
+                            }
                         }
                         return data;
                     }

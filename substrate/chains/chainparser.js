@@ -519,7 +519,7 @@ module.exports = class ChainParser {
                         dXcmMsg.destAddress.push(destAddress)
                     }
                 }
-                if (instructionV.dest != undefined){
+                if (instructionV.dest != undefined) {
                     let destAddress = this.processBeneficiary(false, instructionV.dest)
                     if (destAddress) {
                         internalXCM.destAddress = destAddress
@@ -572,7 +572,7 @@ module.exports = class ChainParser {
         let dInstructionV = {}
         switch (instructionK) {
             case "teleportAsset":
-                if (instructionV.effects != undefined){
+                if (instructionV.effects != undefined) {
                     console.log(`instructionV.effects`, instructionV.effects)
                     for (let i = 0; i < instructionV.effects.length; i++) {
                         let instructionXCMK = Object.keys(instructionV.effects[i])[0]
@@ -595,7 +595,7 @@ module.exports = class ChainParser {
         switch (instructionK) {
             case "withdrawAsset":
             case "reserveAssetDeposited":
-                if (instructionV.effects != undefined){
+                if (instructionV.effects != undefined) {
                     //console.log(`instructionV.effects`, instructionV.effects)
                     for (let i = 0; i < instructionV.effects.length; i++) {
                         let instructionXCMK = Object.keys(instructionV.effects[i])[0]
@@ -625,7 +625,7 @@ module.exports = class ChainParser {
         let xcmPath = []
 
         //"withdrawAsset", "clearOrigin","buyExecution", "depositAsset"
-        if (version == 'v1' || version == 'v0'){
+        if (version == 'v1' || version == 'v0') {
             let instructionK = Object.keys(xcmMsgV)[0]
             let instructionV = xcmMsgV[instructionK]
             //console.log(`instructionK=${instructionK}, instructionV`, instructionV)
@@ -2442,7 +2442,7 @@ module.exports = class ChainParser {
                         } else if (beneficiary.x1 !== undefined) {
                             //0x87d746fe20eb988a34a45b515ce8e09868ffd4dba725a5cfb941cb11dc37a51c
                             [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary.x1, relayChain)
-                        } else if (beneficiary.x2 !== undefined){
+                        } else if (beneficiary.x2 !== undefined) {
                             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
                             [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x2, relayChain)
                         } else {
@@ -3232,7 +3232,7 @@ module.exports = class ChainParser {
                 path: msg.path,
                 beneficiaries: (msg.beneficiaries != undefined && msg.beneficiaries != '') ? msg.beneficiaries : null
             }
-            if (xcmRec.msgType == 'dmp' && xcmRec.blockNumber != xcmRec.sentAt){
+            if (xcmRec.msgType == 'dmp' && xcmRec.blockNumber != xcmRec.sentAt) {
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`duplicates ${msg.msgHash}`)
                 return false
             }

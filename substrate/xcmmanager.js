@@ -483,11 +483,18 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
             //console.log("---");
         }
 
-        let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash where xcmtransfer.msgHash = xcmmessages.msgHash and xcmtransfer.sentAt = xcmmessages.sentAt and xcmtransfer.msgHash is not null and xcmmessages.blockTS >= ${startTS} and xcmmessages.blockTS <= ${endTS}`;
+        // match xcmmessages to xcmtransfer records with sentAt < 4 difference
+        let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash 
+   where xcmtransfer.msgHash = xcmmessages.msgHash and 
+     xcmtransfer.msgHash is not null and
+     xcmmessages.blockTS >= ${startTS} and xcmmessages.blockTS <= ${endTS} and
+     xcmtransfer.sourceTS >= ${startTS} and xcmtransfer.sourceTS <= ${endTS} and
+     abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4`;
         this.batchedSQL.push(sql1);
         console.log(sql1);
         await this.update_batchedSQL();
 
+        // match children xcmmessages to parent xcmmessages
         let sql2 = `update xcmmessages as c, xcmmessages as p  set c.extrinsicID = p.extrinsicID, c.extrinsicHash = p.extrinsicHash where 
 p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.childMsgHash and
  abs(c.sentAt - p.childSentAt) <= 4 and 
