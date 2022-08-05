@@ -507,7 +507,7 @@ module.exports = class ChainParser {
     }
 
 
-    processInternalXCMIntrusctionBeneficiary(dXcmMsg, internalXCM, instructionK, instructionV) {
+    processInternalXCMInstructionBeneficiary(dXcmMsg, internalXCM, instructionK, instructionV) {
         let dInstructionV = {}
         switch (instructionK) {
             case "depositAsset":
@@ -555,7 +555,7 @@ module.exports = class ChainParser {
                         let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
                         let instructionXCMV = instructionV.xcm[i][instructionXCMK]
                         //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                        this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV)
+                        this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV)
                     }
                 }
                 //console.log(`depositReserveAsset final`, JSON.stringify(instructionV,null,4))
@@ -578,7 +578,7 @@ module.exports = class ChainParser {
                         let instructionXCMK = Object.keys(instructionV.effects[i])[0]
                         let instructionXCMV = instructionV.effects[i][instructionXCMK]
                         console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                        this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
+                        this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
                     }
                 }
             default:
@@ -601,7 +601,7 @@ module.exports = class ChainParser {
                         let instructionXCMK = Object.keys(instructionV.effects[i])[0]
                         let instructionXCMV = instructionV.effects[i][instructionXCMK]
                         //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                        this.processInternalXCMIntrusctionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
+                        this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
                     }
                 }
             default:
@@ -765,6 +765,7 @@ module.exports = class ChainParser {
         return false;
     }
 
+    //TODO: fix this
     getInstructionPath(instruction) {
         let v = Object.keys(instruction)
         let version = false
@@ -3230,6 +3231,10 @@ module.exports = class ChainParser {
                 version: msg.version,
                 path: msg.path,
                 beneficiaries: (msg.beneficiaries != undefined && msg.beneficiaries != '') ? msg.beneficiaries : null
+            }
+            if (xcmRec.msgType == 'dmp' && xcmRec.blockNumber != xcmRec.sentAt){
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`duplicates ${msg.msgHash}`)
+                return false
             }
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processxcmMsgRaw error`, e.toString())

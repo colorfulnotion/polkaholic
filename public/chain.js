@@ -122,8 +122,6 @@ function show_recentblocks(chainID) {
 }
 
 function showspecversions(chainID) {
-    console.log("showspecversions");
-
     if (initspecversions) return;
     else initspecversions = true;
     let pathParams = `specversions/${chainID}`
@@ -180,7 +178,7 @@ function showspecversions(chainID) {
 function presentLoan(assetChain, assetString) {
     let asset = JSON.parse(assetString)
     let symbol = "UNK";
-    console.log(assetChain, asset);
+    
     try {
         if (asset.Loan != undefined && asset.Loan.Token != undefined) {
             symbol = asset.Loan.Token;
@@ -195,7 +193,7 @@ function showassets(chainID, address) {
     if (initassets) return;
     else initassets = true;
     let pathParams = `chain/assets/${chainID}/${address}`
-    console.log("showassets", pathParams);
+    
     let tableName = '#tableassets'
     var table = $(tableName).DataTable({
         order: [
@@ -516,7 +514,7 @@ async function showxcmtransfers(chainID) {
             ]
         });
     }
-    console.log("API CALL", pathParams);
+    
     await loadData2(pathParams, tableName, true)
 }
 
@@ -672,8 +670,6 @@ async function showxcmmessages(chainID) {
             ]
         });
     }
-    console.log("API CALL", pathParams);
-
     //load data here: warning this function is technically async
     await loadData2(pathParams, tableName, true)
 }
@@ -713,7 +709,6 @@ function setuptabs(tabs, chain_id) {
         tabEl.addEventListener('shown.mdb.tab', function(event) {
             const hash = $(this).attr("href");
             let newUrl = "/chain/" + chain_id + hash;
-            //console.log("shown.mdb.tab", hash, newUrl);
             setTimeout(() => {
                 showchaintab(hash);
             }, 250);
@@ -727,7 +722,6 @@ function setuptabs(tabs, chain_id) {
         if (urlhash.length > 1) hash = "#" + urlhash[1];
     }
     const triggerEl = document.querySelector('#chainTab a[href="' + hash + '"]');
-    //console.log("CAUSE shownmdb.tab for", triggerEl, hash);
     mdb.Tab.getInstance(triggerEl).show();
 }
 
