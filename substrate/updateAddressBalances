@@ -10,16 +10,17 @@ async function main() {
         }
     });
     if ( chainID >= 0 ) {
-	await manager.update_chain_lastBalanceUpdateDT(chainID);
 	await manager.updateNativeBalances(chainID);
 	await manager.updateNonNativeBalances(chainID);
+	await manager.update_chain_lastBalanceUpdateDT(chainID);
     } else {
+	chainID = await manager.get_chain_balance_update();
 	try {
-	    chainID = await manager.get_chain_balance_update();
 	    if ( chainID != null ) {
 		await manager.updateNativeBalances(chainID);
 		await manager.updateNonNativeBalances(chainID);
 	    }
+	    await manager.update_chain_lastBalanceUpdateDT(chainID, true);
 	} catch (e) {
 	    await manager.update_chain_lastBalanceUpdateDT(chainID, true);
 	}

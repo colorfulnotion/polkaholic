@@ -178,7 +178,7 @@ function showspecversions(chainID) {
 function presentLoan(assetChain, assetString) {
     let asset = JSON.parse(assetString)
     let symbol = "UNK";
-    
+
     try {
         if (asset.Loan != undefined && asset.Loan.Token != undefined) {
             symbol = asset.Loan.Token;
@@ -193,7 +193,7 @@ function showassets(chainID, address) {
     if (initassets) return;
     else initassets = true;
     let pathParams = `chain/assets/${chainID}/${address}`
-    
+
     let tableName = '#tableassets'
     var table = $(tableName).DataTable({
         order: [
@@ -514,7 +514,7 @@ async function showxcmtransfers(chainID) {
             ]
         });
     }
-    
+
     await loadData2(pathParams, tableName, true)
 }
 
@@ -662,7 +662,12 @@ async function showxcmmessages(chainID) {
                     data: 'blockTS',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentSuccessFailure(row.matched);
+			    if ( row.pending != undefined ) {
+				return "Pending"; 
+			    } else {
+				let str = (row.matchTS != undefined && row.matchTS > 0) ? presentTS(row.matchTS) : "";
+				return presentSuccessFailure(row.matched) + " " + str;
+			    }
                         }
                         return data;
                     }
