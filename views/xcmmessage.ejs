@@ -12,7 +12,7 @@ let f = xcm;
     <tr>
       <td width="200">Hash</td>
       <td>
-        <%- uiTool.getShortHash(f.msgHash, false) %><br/><a class="btn btn-link" href="/timeline/<%= f.msgHash; %>/xcm/<%= f.sentAt; %>" target="_new">XCM Timeline</a>
+        <%- uiTool.getShortHash(f.msgHash, false) %><br/><a class="btn btn-link" href="/timeline/<%= f.msgHash; %>/xcm/<%= f.blockNumber; %>" target="_new">XCM Timeline</a>
       </td>
     </tr>
     <tr>
@@ -37,8 +37,10 @@ let f = xcm;
       <td>Origination</td>
       <td>
         <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
-        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.blockNumber}); %>
-        <%=` `%> Sent: <%= uiTool.presentTS(f.blockTS); %>
+        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.sourceBlocknumber}); %>
+	<% if ( f.sourceTS ) { %>
+        <%=` `%> Sent: <%= uiTool.presentTS(f.sourceTS); %>
+	<% } %>
       </td>
     </tr>
 
@@ -54,8 +56,10 @@ let f = xcm;
       <td>Destination</td>
       <td>
         <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
-        <%- include("blockNumber", {chainID: f.idDest, blockNumber: f.blockNumberDest}); %>
-        <%=` `%> Received: <%= uiTool.presentTS(f.blockTSDest); %>
+        <%- include("blockNumber", {chainID: f.idDest, blockNumber: f.destBlocknumber}); %>
+	<% if ( f.destTS ) { %>
+        <%=` `%> Received: <%= uiTool.presentTS(f.destTS); %>
+	<% } %>
       </td>
     </tr>
 
@@ -69,14 +73,14 @@ let f = xcm;
 <% if ( f.parentMsgHash ) { %>
     <tr>
       <td>Parent Message</td>
-      <td><a href='/xcmmessage/<%= f.parentMsgHash %>/<%= f.parentSentAt %>'><%= f.parentMsgHash %></a> (Sent At: <%= f.parentSentAt %>)</td>
+      <td><a href='/xcmmessage/<%= f.parentMsgHash %>/<%= f.parentBlocknumber %>'><%= f.parentMsgHash %></a> (Sent At: <%= f.parentSentAt %>)</td>
     </tr>
 <% } %>
 
 <% if ( f.childMsgHash ) { %>
     <tr>
       <td>Child Message</td>
-      <td><a href='/xcmmessage/<%= f.childMsgHash %>/<%= f.childSentAt %>'><%= f.childMsgHash %></a> (Sent At: <%= f.childSentAt %>)</td>
+      <td><a href='/xcmmessage/<%= f.childMsgHash %>/<%= f.childBlocknumber %>'><%= f.childMsgHash %></a> (Sent At: <%= f.childSentAt %>)</td>
     </tr>
 <% } %>
 

@@ -1481,7 +1481,7 @@ order by msgHash, diffSentAt, diffTS`
                 //enable this for debugging
                 //console.log("[Empty] match_xcm", sql)
             }
-            let vals = ["sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt", "matchDT"];
+            let vals = ["sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt", "sourceBlocknumber", "destBlocknumber", "matchDT"];
             let out = [];
             for (let i = 0; i < xcmmatches.length; i++) {
                 let s = xcmmatches[i];
@@ -1489,8 +1489,8 @@ order by msgHash, diffSentAt, diffTS`
                 // Note in case of multiple matches, the "order by diffTS" in the SQL statment picks the FIRST one in time closest with the smallest diffTS
                 let k = `${s.msgHash}:${s.d_sentAt}`
                 if (matched[k] == undefined) {
-                    out.push(`('${s.msgHash}', ${s.s_blockNumber}, 0, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', Now())`)
-                    out.push(`('${s.msgHash}', ${s.d_blockNumber}, 1, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', Now())`)
+                    out.push(`('${s.msgHash}', ${s.s_blockNumber}, 0, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
+                    out.push(`('${s.msgHash}', ${s.d_blockNumber}, 1, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
                     matched[k] = true;
                 } else {
                     // console.log("NO MATCH", s);
@@ -2879,12 +2879,12 @@ order by msgHash, diffSentAt, diffTS`
         return [o, parsev];
     }
 
-    getBeneficiaryFromMsgHash(msgHash){
+    getBeneficiaryFromMsgHash(msgHash) {
         let xcmKeys = Object.keys(this.xcmmsgMap)
         for (const tk of xcmKeys) {
             let xcm = this.xcmmsgMap[tk]
             let cachedMsgHash = xcm.msgHash
-            if (cachedMsgHash == msgHash && xcm.beneficiaries != undefined){
+            if (cachedMsgHash == msgHash && xcm.beneficiaries != undefined) {
                 return xcm.beneficiaries.split('|')[0]
             }
         }
@@ -4174,15 +4174,15 @@ order by msgHash, diffSentAt, diffTS`
                     let fallbackRequired = false
                     for (const xcm of rExtrinsic.xcms) {
                         if (xcm.destAddress == undefined) {
-                            if (xcm.msgHash != undefined){
+                            if (xcm.msgHash != undefined) {
                                 let beneficiary = this.getBeneficiaryFromMsgHash(xcm.msgHash)
-                                if (beneficiary){
+                                if (beneficiary) {
                                     xcm.destAddress = beneficiary
                                     console.log(`patch destAddress using beneficiary [${rExtrinsic.extrinsicID}] [${rExtrinsic.extrinsicHash}] B=${beneficiary}`)
-                                }else{
+                                } else {
                                     fallbackRequired = true
                                 }
-                            }else{
+                            } else {
                                 console.log(`fallback Required [${rExtrinsic.extrinsicID}] [${rExtrinsic.extrinsicHash}] [${xcm.xcmIndex}-${xcm.transferIndex}]`)
                                 fallbackRequired = true
                             }

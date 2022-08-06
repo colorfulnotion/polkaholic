@@ -554,13 +554,13 @@ async function showxcmmessages(chainID) {
                                 str = `<BR>${row.chainName} Extrinsic: Unknown`;
                             }
                             if (row.parentMsgHash && row.parentSentAt) {
-                                str = "<BR><i>Parent Msg:</i> " + presentXCMMessageHash(row.parentMsgHash, row.parentSentAt);
+                                str = "<BR><i>Parent Msg:</i> " + presentXCMMessageHash(row.parentMsgHash, row.parentBlocknumber);
                             }
                             if (row.childMsgHash && row.childSentAt) {
-                                str = "<BR><i>Child Msg:</i> " + presentXCMMessageHash(row.childMsgHash, row.childSentAt);
+                                str = "<BR><i>Child Msg:</i> " + presentXCMMessageHash(row.childMsgHash, row.childBlocknumber);
                             }
-                            str += "<BR><small>" + presentXCMTimeline(row.msgHash, "xcm", row.sentAt) + "</small>";
-                            return presentXCMMessageHash(row.msgHash, row.sentAt) + str;
+                            str += "<BR><small>" + presentXCMTimeline(row.msgHash, "xcm", row.blockNumber) + "</small>";
+                            return presentXCMMessageHash(row.msgHash, row.blockNumber) + str;
                         } else {
                             let str = "";
                             if (row.extrinsicID && row.extrinsicHash) {

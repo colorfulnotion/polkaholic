@@ -10,17 +10,17 @@ async function main() {
     let sentAt = "10121074";
 
     msgHash = "0xb320d3dc1e8ad42f220a72da8cf55712b6fb22e11863ecae85ce7e0f52448a8c";
-    sentAt = 11350324;
+    blockNumber = 11350324;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             msgHash = val;
         }
         if (index == 3 && val.length > 0) {
-            sentAt = parseInt(val, 10);
+            blockNumber = parseInt(val, 10);
         }
     });
 
-    let [timeline, xcmMessages] = await query.getXCMTimeline(msgHash, "xcm", sentAt);
+    let [timeline, xcmMessages] = await query.getXCMTimeline(msgHash, "xcm", blockNumber);
     for (const t of timeline) {
         if (debugLevel > 0) {
             console.log(JSON.stringify(t, null, 4));

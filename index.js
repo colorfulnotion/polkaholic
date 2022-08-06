@@ -1194,16 +1194,16 @@ app.get('/tx/:txhash', async (req, res) => {
     }
 })
 
-app.get('/xcmmessage/:msgHash/:sentAt?', async (req, res) => {
+app.get('/xcmmessage/:msgHash/:blockNumber?', async (req, res) => {
     try {
         let msgHash = req.params['msgHash'];
-        let sentAt = req.params['sentAt'];
+        let blockNumber = req.params['blockNumber'];
         let [decorate, decorateExtra] = decorateOptUI(req)
-        let xcm = await query.getXCMMessage(msgHash, sentAt, decorate, decorateExtra);
+        let xcm = await query.getXCMMessage(msgHash, blockNumber, decorate, decorateExtra);
         if (xcm) {
             res.render('xcmmessage', {
                 msgHash: msgHash,
-                sentAt: sentAt,
+                blockNumber: blockNumber,
                 xcm: xcm,
                 chainInfo: query.getChainInfo(xcm.chainID),
                 apiUrl: req.path,

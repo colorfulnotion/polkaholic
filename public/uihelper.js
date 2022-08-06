@@ -321,12 +321,12 @@ function presentTxHash(txHash) {
     return '<a href="/tx/' + txHash + '">' + getShortHash(txHash) + '</a>';
 }
 
-function presentXCMTimeline(hash, hashType, sentAt) {
-    return `<a href="/timeline/${hash}/${hashType}/${sentAt}">timeline</a>`
+function presentXCMTimeline(hash, hashType, blockNumber) {
+    return `<a href="/timeline/${hash}/${hashType}/${blockNumber}">timeline</a>`
 }
 
-function presentXCMMessageHash(msgHash, sentAt, allowCopy = true) {
-    return `<a href="/xcmmessage/${msgHash}/${sentAt}">` + getShortHash(msgHash, allowCopy) + '</a>';
+function presentXCMMessageHash(msgHash, blockNumber, allowCopy = true) {
+    return `<a href="/xcmmessage/${msgHash}/${blockNumber}">` + getShortHash(msgHash, allowCopy) + '</a>';
 }
 
 function presentChain(id, chainName, iconURL = false, crawlingStatus = "") {
