@@ -2879,6 +2879,18 @@ order by msgHash, diffSentAt, diffTS`
         return [o, parsev];
     }
 
+    getBeneficiaryFromMsgHash(msgHash){
+        let xcmKeys = Object.keys(this.xcmmsgMap)
+        for (const tk of xcmKeys) {
+            let xcm = this.xcmmsgMap[tk]
+            let cachedMsgHash = xcm.msgHash
+            if (cachedMsgHash == msgHash && xcm.beneficiaries != undefined){
+                return xcm.beneficiaries.split('|')[0]
+            }
+        }
+        return false
+    }
+
     // find the msgHash given {BN, recipient}
     getMsgHashCandidate(targetBN, destAddress = false, extrinsicID = false, extrinsicHash = false) {
         if (!destAddress) {
@@ -4162,8 +4174,18 @@ order by msgHash, diffSentAt, diffTS`
                     let fallbackRequired = false
                     for (const xcm of rExtrinsic.xcms) {
                         if (xcm.destAddress == undefined) {
-                            console.log(`fallback Required [${rExtrinsic.extrinsicID}] [${rExtrinsic.extrinsicHash}] [${xcm.xcmIndex}-${xcm.transferIndex}]`)
-                            fallbackRequired = true
+                            if (xcm.msgHash != undefined){
+                                let beneficiary = this.getBeneficiaryFromMsgHash(xcm.msgHash)
+                                if (beneficiary){
+                                    xcm.destAddress = beneficiary
+                                    console.log(`patch destAddress using beneficiary [${rExtrinsic.extrinsicID}] [${rExtrinsic.extrinsicHash}] B=${beneficiary}`)
+                                }else{
+                                    fallbackRequired = true
+                                }
+                            }else{
+                                console.log(`fallback Required [${rExtrinsic.extrinsicID}] [${rExtrinsic.extrinsicHash}] [${xcm.xcmIndex}-${xcm.transferIndex}]`)
+                                fallbackRequired = true
+                            }
                         }
                     }
                     //destAddress is missing from events
