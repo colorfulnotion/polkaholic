@@ -653,6 +653,16 @@ module.exports = class AssetManager extends PolkaholicDB {
         }
     }
 
+    getAssetSymbol(asset, chainID, ctx = "false") {
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
+        if (this.assetInfo[assetChain] != undefined) {
+            return this.assetInfo[assetChain].symbol
+        } else {
+            //console.log("getAssetDecimal MISS", "CONTEXT", ctx, "assetString", assetString);
+            return (false);
+        }
+    }
+
     getCurrencyIDDecimal(currencyID, chainID) {
         let currencyChain = paraTool.makeAssetChain(currencyID, chainID);
         if (this.currencyIDInfo[currencyChain] !== undefined) {

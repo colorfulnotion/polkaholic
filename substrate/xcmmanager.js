@@ -469,13 +469,13 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
                 let inclusion = this.compute_fingerprints_inclusion(parentInclusionFingerprints, instructionFingerprints);
                 //console.log("CHILD", inclusion, childRec.msgHash, childRec.sentAt, childRec.chainID, childRec.chainIDDest, "delay", childRec.blockTS - rec.blockTS, childRec.instructionFingerprints, JSON.stringify(this.getXCMInstructionsFromHex(childRec.msgHex), null, 2));
                 if (inclusion) {
-                    let updsql = `update xcmmessages set parentMsgHash = '${rec.msgHash}', parentSentAt='${rec.sentAt}' where msgHash = '${childRec.msgHash}' and blockNumber = '${childRec.blockNumber}' and incoming = '${childRec.incoming}'`;
+                    let updsql = `update xcmmessages set parentMsgHash = '${rec.msgHash}', parentBlocknumber='${rec.blockNumber}', parentSentAt='${rec.sentAt}' where msgHash = '${childRec.msgHash}' and blockNumber = '${childRec.blockNumber}' and incoming = '${childRec.incoming}'`;
                     console.log(updsql);
                     this.batchedSQL.push(updsql);
                     await this.update_batchedSQL();
                     c = childRecs.length;
 
-                    let updsql2 = `update xcmmessages set childMsgHash = '${childRec.msgHash}', childSentAt='${childRec.sentAt}' where msgHash = '${rec.msgHash}' and blockNumber = '${rec.blockNumber}' and incoming = '${rec.incoming}'`;
+                    let updsql2 = `update xcmmessages set childMsgHash = '${childRec.msgHash}', childBlockNumber='${childRec.blockNumber}', childSentAt='${childRec.sentAt}' where msgHash = '${rec.msgHash}' and blockNumber = '${rec.blockNumber}' and incoming = '${rec.incoming}'`;
                     console.log(updsql2);
                     this.batchedSQL.push(updsql2);
                 }
@@ -483,9 +483,9 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
             //console.log("---");
         }
 
-        // match xcmmessages to xcmtransfer records with sentAt < 4 difference
-        let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash 
-   where xcmtransfer.msgHash = xcmmessages.msgHash and 
+        // match xcmmessages to xcmtransfer records with sentAt <= 4 difference
+        let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash
+   where xcmtransfer.msgHash = xcmmessages.msgHash and
      xcmtransfer.msgHash is not null and
      xcmmessages.blockTS >= ${startTS} and xcmmessages.blockTS <= ${endTS} and
      xcmtransfer.sourceTS >= ${startTS} and xcmtransfer.sourceTS <= ${endTS} and
@@ -494,10 +494,10 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
         console.log(sql1);
         await this.update_batchedSQL();
 
-        // match children xcmmessages to parent xcmmessages
-        let sql2 = `update xcmmessages as c, xcmmessages as p  set c.extrinsicID = p.extrinsicID, c.extrinsicHash = p.extrinsicHash where 
+        // match children xcmmessages to parent xcmmessages with sentAt <= 4 difference
+        let sql2 = `update xcmmessages as c, xcmmessages as p  set c.extrinsicID = p.extrinsicID, c.extrinsicHash = p.extrinsicHash where
 p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.childMsgHash and
- abs(c.sentAt - p.childSentAt) <= 4 and 
+ abs(c.sentAt - p.childSentAt) <= 4 and
  c.extrinsicID is null and
  p.blockTS >= ${startTS} and p.blockTS <= ${endTS} and
  c.blockTS >= ${startTS} and c.blockTS <= ${endTS}`
@@ -512,7 +512,7 @@ p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.child
         // ((d.asset = xcmmessages.asset) or (d.nativeAssetChain = xcmmessages.nativeAssetChain and d.nativeAssetChain is not null)) and
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
         let fld = (this.getCurrentTS() % 2 == 0) ? "" : "2"
-        let sql = `select  xcmmessages.chainID, xcmmessages.chainIDDest, 
+        let sql = `select  xcmmessages.chainID, xcmmessages.chainIDDest,
           (d.destts - xcmmessages.blockTS) as diffTS,
           xcmmessages.msgHash,
           xcmmessages.blockNumber,
@@ -546,23 +546,29 @@ order by chainID, extrinsicHash, diffTS`;
                 }
                 let priceUSD = 0;
                 let amountReceivedUSD = 0;
+                let amountReceived = m.amountReceived;
+                let symbol = this.getAssetSymbol(m.asset, m.chainID);
                 let decimals = this.getAssetDecimal(m.asset, m.chainID)
                 if (decimals === false) {
                     decimals = this.getAssetDecimal(m.asset, m.chainIDDest)
+                }
+                if (symbol === false) {
+                    symbol = this.getAssetSymbol(m.asset, m.chainIDDest)
                 }
                 if (decimals !== false) {
                     let [_, __, priceUSDblockTS] = await this.computeUSD(1.0, m.asset, m.chainID, m.blockTS);
                     if (priceUSDblockTS > 0) {
                         priceUSD = priceUSDblockTS;
-                        let amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
+                        amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
                         amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
                     }
                 }
                 let destMatch = {
                     chainID: m.chainIDDest,
                     asset: m.asset,
+                    symbol: symbol,
                     rawAsset: m.rawAsset,
-                    amountReceived: m.amountReceived,
+                    amountReceived: amountReceived,
                     amountReceivedUSD: amountReceivedUSD,
                     eventID: m.eventID,
                     blockNumber: m.blockNumber,
@@ -619,7 +625,7 @@ order by chainID, extrinsicHash, diffTS`;
         }
     }
 
-    // computeAssetChainsAndBeneficiaries reads any unanalyzed OUTGOING messages and updates xcmmessages.assetChains + beneficiaries for any assets mentioned in the instructions using analyzeXCMInstructions 
+    // computeAssetChainsAndBeneficiaries reads any unanalyzed OUTGOING messages and updates xcmmessages.assetChains + beneficiaries for any assets mentioned in the instructions using analyzeXCMInstructions
     async computeAssetChainsAndBeneficiaries(startTS, endTS) {
         await this.assetManagerInit();
 

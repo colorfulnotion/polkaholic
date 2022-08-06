@@ -66,11 +66,11 @@ let timelineRows = uiTool.getTimelineRows(timeline);
      <% } %>
     <br/>
      <% if ( xcm.parentMsgHash ) { %>
-       <br> <B>Parent</B>: <br> <a href='/timeline/<%= xcm.parentMsgHash %>/xcm/<%= xcm.parentSentAt %>'><%- uiTool.getShortHash(xcm.parentMsgHash, false); %></a> sentAt: <%= xcm.parentSentAt %>
+       <br> <B>Parent</B>: <br> <a href='/timeline/<%= xcm.parentMsgHash %>/xcm/<%= xcm.parentBlocknumber %>'><%- uiTool.getShortHash(xcm.parentMsgHash, false); %></a> sentAt: <%= xcm.parentSentAt; %>
      <% } %>
 
      <% if ( xcm.childMsgHash ) { %>
-       <br> <B>Child</B>: <br> <a href='/timeline/<%= xcm.childMsgHash %>/xcm/<%= xcm.childSentAt %>'><%- uiTool.getShortHash(xcm.childMsgHash, false); %></a> sentAt: <%= xcm.childSentAt %>
+       <br> <B>Child</B>: <br> <a href='/timeline/<%= xcm.childMsgHash %>/xcm/<%= xcm.childBlocknumber %>'><%- uiTool.getShortHash(xcm.childMsgHash, false); %></a> sentAt: <%= xcm.childSentAt; %>
      <% } %>
      </td>
      <td>

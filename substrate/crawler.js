@@ -1265,7 +1265,7 @@ module.exports = class Crawler extends Indexer {
             console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
             // blockDT >= date_sub(Now(), interval ${lookback} DAY)
-            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, attempted from block${chainID} where blockNumber < ${currentBlock} and crawlTrace > 0 and length(blockHash) > 0  and attempted < ${maxTraceAttempts} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} order by crawlTrace desc,attempted, rand() limit 10000`
+            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, attempted from block${chainID} where crawlTrace > 0 and length(blockHash) > 0  and attempted < ${maxTraceAttempts} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} order by crawlTrace desc,attempted, rand() limit 10000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
                 let endBN = techniqueParams[2];

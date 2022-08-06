@@ -1194,16 +1194,16 @@ app.get('/tx/:txhash', async (req, res) => {
     }
 })
 
-app.get('/xcmmessage/:msgHash/:sentAt?', async (req, res) => {
+app.get('/xcmmessage/:msgHash/:blockNumber?', async (req, res) => {
     try {
         let msgHash = req.params['msgHash'];
-        let sentAt = req.params['sentAt'];
+        let blockNumber = req.params['blockNumber'];
         let [decorate, decorateExtra] = decorateOptUI(req)
-        let xcm = await query.getXCMMessage(msgHash, sentAt, decorate, decorateExtra);
+        let xcm = await query.getXCMMessage(msgHash, blockNumber, decorate, decorateExtra);
         if (xcm) {
             res.render('xcmmessage', {
                 msgHash: msgHash,
-                sentAt: sentAt,
+                blockNumber: blockNumber,
                 xcm: xcm,
                 chainInfo: query.getChainInfo(xcm.chainID),
                 apiUrl: req.path,
@@ -1228,14 +1228,13 @@ app.get('/xcmmessage/:msgHash/:sentAt?', async (req, res) => {
 // Sample cases:
 // /timeline/0x00068acbbecec355f0c495389a29d7829f265553e258ad44d37bd52130bc44be
 // /timeline/0x5f69a283785972097f08e568a4bc61d94912e973ba418dfd32d868339ed03c7a/xcm/10121074
-app.get('/timeline/:hash/:hashType?/:sentAt?', async (req, res) => {
+app.get('/timeline/:hash/:hashType?/:blockNumber?', async (req, res) => {
     try {
         let hash = req.params['hash'];
         let hashType = req.params['hashType'] ? req.params['hashType'] : "extrinsic";
-        let sentAt = (req.params['sentAt'] && hashType == "xcm") ? req.params['sentAt'] : null;
+        let blockNumber = (req.params['blockNumber'] && hashType == "xcm") ? req.params['blockNumber'] : null;
         let [decorate, decorateExtra] = decorateOptUI(req)
-        let [timeline, xcmmessages] = await query.getXCMTimeline(hash, hashType, sentAt, decorate, decorateExtra)
-
+        let [timeline, xcmmessages] = await query.getXCMTimeline(hash, hashType, blockNumber, decorate, decorateExtra)
         res.render('timeline', {
             timeline: timeline,
             hash: hash,

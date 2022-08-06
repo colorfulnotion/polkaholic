@@ -4382,7 +4382,7 @@ module.exports = class Query extends AssetManager {
         }
 
         // bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
-        let mysqlQuery = `SELECT msgHash, msgStr, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sourceTS, destTS, beneficiaries, assetsReceived, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, childMsgHash, childSentAt FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour)) and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
+        let mysqlQuery = `SELECT msgHash, msgStr, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sourceTS, destTS, beneficiaries, assetsReceived, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour)) and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
         console.log(mysqlQuery);
         let results = [];
         let recs = await this.poolREADONLY.query(mysqlQuery);
@@ -5252,32 +5252,25 @@ module.exports = class Query extends AssetManager {
     }
 
 
-    async getXCMMessage(msgHash, sentAt = null, decorate = true, decorateExtra = true) {
+    async getXCMMessage(msgHash, blockNumber = null, decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let w = (sentAt) ? ` and sentAt = ${sentAt}` : "";
+        let w = (blockNumber) ? ` and blockNumber = ${blockNumber}` : "";
         let sql = `select if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest,
-        msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, childMsgHash, childSentAt, assetChains, blockTS from xcmmessages
+        msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber from xcmmessages
         where msgHash = '${msgHash}' ${w} order by blockTS desc limit 1`
         let xcmrecs = await this.poolREADONLY.query(sql);
         if (xcmrecs.length == 0) {
-            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${sentAt}`)
+            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${blockNumbersentAt}`)
         }
         let x = xcmrecs[0];
         x.msgHex = `${x.msgHex}`
 
         let blockTS = (x.blockTS != undefined) ? x.blockTS : 0
-        //TODO: parse asset
-        if (x.version != 'v2') {
-            // for debugging
-            if (x.relayChain == 'polkadot') {
-                x.assetChains = '["{\\"Token\\":\\"DOT\\"}~0"]'
-            } else {
-                x.assetChains = '["{\\"Token\\":\\"KSM\\"}~2"]'
-            }
+        let dAssetChains = []
+        if (x.assetChains) {
+            dAssetChains = await this.decorateXCMAssetReferences(x.assetChains, blockTS, decorate, decorateExtra)
+            x.assetChains = dAssetChains
         }
-        let dAssetChains = await this.decorateXCMAssetReferences(x.assetChains, blockTS, decorate, decorateExtra)
-        x.assetChains = dAssetChains
-
 
         let xcmMsg = (x.msg != undefined) ? JSON.parse(x.msg) : null
         x.msg = xcmMsg
@@ -5300,16 +5293,6 @@ module.exports = class Query extends AssetManager {
         x.id = id
         x.idDest = idDest
         x.chainDestName = this.getChainName(x.chainIDDest);
-        x.blockTSDest = null
-
-        let sql2 = `select blockTS as blockTSDest, blockNumber as blockNumberDest from xcmmessages where msgHash = '${msgHash}' and incoming = 1 order by blockTS desc limit 1`
-        console.log(sql2)
-        let xcmrecs2 = await this.poolREADONLY.query(sql2);
-        if (xcmrecs2.length > 0) {
-            let x2 = xcmrecs2[0];
-            x.blockTSDest = x2.blockTSDest
-            x.blockNumberDest = x2.blockNumberDest;
-        }
         return x;
     }
 
@@ -5673,8 +5656,8 @@ module.exports = class Query extends AssetManager {
     async decorateXCM(rawXcmRec, decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         rawXcmRec.msgHex = `${rawXcmRec.msgHex}`
-        let [parentMsgHash, parentSentAt] = [rawXcmRec.parentMsgHash, rawXcmRec.parentSentAt];
-        let [childMsgHash, childSentAt] = [rawXcmRec.childMsgHash, rawXcmRec.childSentAt];
+        let [parentMsgHash, parentBlocknumber, parentSentAt] = [rawXcmRec.parentMsgHash, rawXcmRec.parentBlocknumber, rawXcmRec.parentSentAt];
+        let [childMsgHash, childBlocknumber, childSentAt] = [rawXcmRec.childMsgHash, rawXcmRec.childBlocknumber, rawXcmRec.childSentAt];
         let blockTS = (rawXcmRec.blockTS != undefined) ? rawXcmRec.blockTS : 0
         if (rawXcmRec.version != 'v2') {
             // for debugging
@@ -5723,8 +5706,10 @@ module.exports = class Query extends AssetManager {
             extrinsicID: rawXcmRec.extrinsicID,
             extrinsicHash: rawXcmRec.extrinsicHash,
             parentMsgHash,
+            parentBlocknumber,
             parentSentAt,
             childMsgHash,
+            childBlocknumber,
             childSentAt,
             assetsReceived,
             assetChains: dAssetChains
@@ -5735,22 +5720,24 @@ module.exports = class Query extends AssetManager {
     }
 
     // stub to look forward or backward in the "xcmmessages" table
-    async get_xcm_message_chain(msgHash, sentAt, dir = "parent", out = []) {
+    async get_xcm_message_chain(msgHash, blockNumber, sentAt, dir = "parent", out = []) {
         out.push({
             msgHash,
+            blockNumber,
             sentAt
         })
         // depending on "dir":
         //   (dir=child)  follow childMsgHash,  childSentAt  forward in time
         //   (dir=parent) follow parentMsgHash, parentSentAt backward in time
-        let sql = `select ${dir}MsgHash, ${dir}SentAt from xcmmessages where incoming = 1 and msgHash = '${msgHash}' and sentAt='${sentAt}' limit 1`
+        let sql = `select ${dir}MsgHash, ${dir}SentAt, ${dir}Blocknumber from xcmmessages where incoming = 1 and msgHash = '${msgHash}' and blockNumber='${blockNumber}' limit 1`
         let xcmRecs = await this.poolREADONLY.query(sql);
         if (xcmRecs.length == 1) {
             let x = xcmRecs[0];
             let dirMsgHash = x[`${dir}MsgHash`];
             let dirSentAt = x[`${dir}SentAt`];
+            let dirBlocknumber = x[`${dir}Blocknumber`];
             if (dirMsgHash != undefined && dirMsgHash.length > 0) {
-                return this.get_xcm_message_chain(dirMsgHash, dirSentAt, dir, out);
+                return this.get_xcm_message_chain(dirMsgHash, dirBlocknumber, dirSentAt, dir, out);
             }
         }
         return out;
@@ -5790,8 +5777,10 @@ module.exports = class Query extends AssetManager {
                 if (xcmmessages[r].msgHash == sentMsgHash) {
                     xcmmessages[r].sent = 1;
                     xcmmessages[r].parentMsgHash = x.parentMsgHash; // parentSentAt
+                    xcmmessages[r].parentBlocknumber = x.parentBlocknumber; // parentBlocknumber
                     xcmmessages[r].parentSentAt = x.parentSentAt; // parentSentAt
                     xcmmessages[r].childMsgHash = x.childMsgHash; // childSentAt
+                    xcmmessages[r].childBlocknumber = x.childBlocknumber; // childBlocknumber
                     xcmmessages[r].childSentAt = x.childSentAt; // childSentAt
                     xcmmessages[r].blockNumberSent = x.blockNumber
                     xcmmessages[r].sentTS = x.blockTS
@@ -5815,24 +5804,24 @@ module.exports = class Query extends AssetManager {
     // for XCM messages not associated with an extrinsic:  link self, any parents + and children xcm messages together -- and get all those
     async get_xcm_messages_parents_children(x) {
         let out = []
-        out.push(`( msgHash = '${x.msgHash}' and sentAt = '${x.sentAt}' )`);
-        let parents = (x.parentMsgHash && x.parentMsgHash.length > 0) ? await this.get_xcm_message_chain(x.parentMsgHash, x.parentSentAt, "parent", []) : [];
-        let children = (x.childMsgHash && x.childMsgHash.length > 0) ? await this.get_xcm_message_chain(x.childMsgHash, x.childSentAt, "child") : [];
+        out.push(`( msgHash = '${x.msgHash}' and blockNumber = '${x.blockNumber}' )`);
+        let parents = (x.parentMsgHash && x.parentMsgHash.length > 0) ? await this.get_xcm_message_chain(x.parentMsgHash, x.parentBlocknumber, x.parentSentAt, "parent", []) : [];
+        let children = (x.childMsgHash && x.childMsgHash.length > 0) ? await this.get_xcm_message_chain(x.childMsgHash, x.childBlocknumber, x.childSentAt, "child") : [];
         // incoming = 0 is from sends (usually from traces), incoming = 1 is from event receives -- so we pick incoming=1 since traces are harder to get
         for (const p of parents) {
-            out.push(`( msgHash = '${p.msgHash}' and sentAt = '${p.sentAt}' )`);
+            out.push(`( msgHash = '${p.msgHash}' and blockNumber = '${p.blockNumber}' )`);
         }
         for (const p of children) {
-            out.push(`( msgHash = '${c.msgHash}' and sentAt = '${c.sentAt}' )`);
+            out.push(`( msgHash = '${c.msgHash}' and blockNumber = '${c.blockNumber}' )`);
         }
         let str = out.join(" or");
-        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, childMsgHash, childSentAt, version from xcmmessages where ${str} order by blockTS, incoming`
+        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, version from xcmmessages where ${str} order by blockTS, incoming`
         return this.fetch_xcmmessages_chainpaths(sql);
     }
 
     // get all the xcm messages associated with an extrinsicHash, and also return an array of chainpaths that have chainID/chainIDDest/incoming/blocknumber that allow us to fetch events/traces and formulate the timeline
     async get_xcm_messages_extrinsic(extrinsicHash) {
-        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, childMsgHash, childSentAt, assetsReceived, version from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
+        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetsReceived, version from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
         console.log(`get_xcm_messages_extrinsic sql=${sql}`)
         return this.fetch_xcmmessages_chainpaths(sql);
     }
@@ -5864,7 +5853,7 @@ module.exports = class Query extends AssetManager {
 
 
     // given a hash of an extrinsic OR a XCM message hash, get the timeline of blocks and ALL xcmmessages we have indexed
-    async getXCMTimeline(hash, hashType = "extrinsic", sentAt = null, decorate = true, decorateExtra = true, advanced = true) {
+    async getXCMTimeline(hash, hashType = "extrinsic", blockNumber = null, decorate = true, decorateExtra = true, advanced = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         try {
             let xcmmessages = [];
@@ -5873,8 +5862,8 @@ module.exports = class Query extends AssetManager {
             let extrinsicID = null;
             if (hashType == "xcm") {
                 // here we attempt to get the extrinsicHash of the xcmmessage so we an find all siblings
-                let w = (sentAt) ? ` and sentAt = ${sentAt}` : "" // because XCM messages hash aren't _perfectly_ unique, we need to have sentAt params disambiguate
-                let sql = `select extrinsicID, extrinsicHash, parentMsgHash, parentSentAt, childMsgHash, childSentAt, msgHash, sentAt, assetChains, incoming, version from xcmmessages where msgHash = '${hash}' ${w} order by blockTS desc limit 1`
+                let w = (blockNumber) ? ` and blockNumber = ${blockNumber}` : "" // because XCM messages hash aren't _perfectly_ unique, we need to have sentAt params disambiguate
+                let sql = `select extrinsicID, extrinsicHash, blockNumber, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, msgHash, sentAt, assetChains, incoming, version from xcmmessages where msgHash = '${hash}' ${w} order by blockTS desc limit 1`
                 let xcmscope = await this.poolREADONLY.query(sql);
                 if (xcmscope.length == 1) {
                     let x = xcmscope[0];

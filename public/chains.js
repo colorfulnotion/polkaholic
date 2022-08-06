@@ -434,13 +434,13 @@ async function showxcmmessages(relaychain) {
                                 str = `<BR>${row.chainName} Extrinsic: Unknown`;
                             }
                             if (row.parentMsgHash && row.parentSentAt) {
-                                str = "<BR><i>Parent Msg:</i> " + presentXCMMessageHash(row.parentMsgHash, row.parentSentAt);
+                                str = "<BR><i>Parent Msg:</i> " + presentXCMMessageHash(row.parentMsgHash, row.parentBlocknumber);
                             }
                             if (row.childMsgHash && row.childSentAt) {
-                                str = "<BR><i>Child Msg:</i> " + presentXCMMessageHash(row.childMsgHash, row.childSentAt);
+                                str = "<BR><i>Child Msg:</i> " + presentXCMMessageHash(row.childMsgHash, row.childBlocknumber);
                             }
-                            str += "<BR><small>" + presentXCMTimeline(row.msgHash, "xcm", row.sentAt) + "</small>";
-                            return presentXCMMessageHash(row.msgHash, row.sentAt) + str;
+                            str += "<BR><small>" + presentXCMTimeline(row.msgHash, "xcm", row.blockNumber) + "</small>";
+                            return presentXCMMessageHash(row.msgHash, row.blockNumber) + str;
                         } else {
                             let str = "";
                             if (row.extrinsicID && row.extrinsicHash) {
@@ -518,7 +518,7 @@ async function showxcmmessages(relaychain) {
                     render: function(data, type, row, meta) {
                         if (row.msgStr != undefined) {
                             if (type == 'display') {
-                                return presentInstructions(row.msgStr, row.msgHash + row.incoming);
+                                return presentInstructions(row.msgStr, row.msgHash + row.blockNumber + row.incoming);
                             } else {
                                 return data;
                             }
@@ -545,10 +545,28 @@ async function showxcmmessages(relaychain) {
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
                             try {
-                                if (data.length > 0) {
-                                    return presentInstructions(data, "AR" + row.msgHash + row.incoming, "View Assets Received");
+                                if (data && data.length > 0) {
+                                    let ar = JSON.parse(data);
+                                    let symbols = [];
+                                    let valueUSD = 0.0;
+                                    ar.forEach((r) => {
+                                        if (r.symbol && !symbols.includes(r.symbol)) {
+                                            symbols.push(r.symbol);
+                                        }
+                                        if (r.amountReceivedUSD != undefined && r.amountReceivedUSD > 0) {
+                                            valueUSD += r.amountReceivedUSD;
+                                        }
+                                    });
+                                    let symbolsStr = (symbols.length > 0) ? symbols.join(", ") : "Assets";
+                                    let title = `View ${symbolsStr} Received`
+                                    if (valueUSD > 0) {
+                                        title += " : " + currencyFormat(valueUSD);
+                                    }
+                                    return presentInstructions(data, "AR" + row.msgHash + row.blockNumber + row.incoming, title);
                                 }
-                            } catch (err) {}
+                            } catch (err) {
+                                console.log(err);
+                            }
                         }
                         return "None";
                     }
