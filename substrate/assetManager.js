@@ -475,6 +475,25 @@ module.exports = class AssetManager extends PolkaholicDB {
         return false
     }
 
+    getXCMAsset(interiorStr, relayChain) {
+        let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorStr, relayChain);
+        let xcmAsset = this.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+        if (xcmAsset && xcmAsset.nativeAssetChain != undefined) {
+            console.log(`Found ${xcmInteriorKey} -> ${xcmAsset.nativeAssetChain}`)
+            return xcmAsset.nativeAssetChain
+        } else {
+            console.log(`getXCMAsset NOT Found/Missing ${xcmInteriorKey}`)
+            return false
+        }
+    }
+
+    getNativeChainAsset(chainID) {
+        let asset = this.getChainAsset(chainID)
+        let nativeAssetChain = paraTool.makeAssetChain(asset, chainID);
+        //console.log(`Convert to nativeAssetChain ${chainID} -> ${nativeAssetChain}`)
+        return nativeAssetChain
+    }
+
     async init_asset_info() {
         let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.asset, asset.symbol, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.chainName, asset.isUSD, priceUSDpaths, nativeAssetChain, currencyID from asset, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow') order by chainID, assetType, asset");
 

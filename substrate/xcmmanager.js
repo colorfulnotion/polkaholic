@@ -1,9 +1,9 @@
 // Copyright 2022 Colorful Notion, Inc.
 // This file is part of Polkaholic
 
-const AssetManager = require("../../polkaholic/substrate/assetManager");
+const AssetManager = require("./assetManager");
 const mysql = require("mysql2");
-const paraTool = require("../../polkaholic/substrate/paraTool");
+const paraTool = require("./paraTool");
 
 module.exports = class XCMManager extends AssetManager {
     constructor() {
@@ -12,48 +12,258 @@ module.exports = class XCMManager extends AssetManager {
 
     lastupdateTS = 0
 
-    xcmAddresses = [];
-    assetChains = {};
+    // xcmtransfer_match matches cross transfers between SENDING events held in "xcmtransfer"  and CANDIDATE destination events (from various xcm received messages on a destination chain)
+    // this will be phased out soon
+    async xcmtransfer_match(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200) {
+        let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds}` : ""
+        // match xcmtransferdestcandidate of the last 2 hours
+        //   (a) > 95% amountReceived / amountSent
+        //   (b) asset match
+        //   (c) time difference matching has to be less than 7200 (and greater than 0)
+        //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
+        // In case of ties, the FIRST one ( "order by diffTS" ) covers this
+        let sql = `select
+          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, xcmtransfer.asset, d.paraIDs,
+          (d.destts - xcmtransfer.sourceTS) as diffTS,
+          xcmtransfer.extrinsicID,
+          xcmtransfer.amountSent,
+          xcmtransfer.transferIndex,
+          xcmtransfer.sourceTS,
+          xcmtransfer.fromAddress as senderAddress,
+          xcmtransfer.destAddress,
+          xcmtransfer.msgHash,
+          d.eventID,
+          d.extrinsicID as destExtrinsicID,
+          d.blockNumberDest,
+          d.amountReceived,
+          d.destTS,
+          d.amountReceived / xcmtransfer.amountSent as rat
+        from xcmtransfer, xcmtransferdestcandidate as d
+ where  d.fromAddress = xcmtransfer.destAddress and
+        d.chainIDDest = xcmtransfer.chainIDDest and
+        ((d.asset = xcmtransfer.asset) or (d.nativeAssetChain = xcmtransfer.nativeAssetChain and d.nativeAssetChain is not null)) and
+        xcmtransfer.sourceTS >= ${startTS} and
+
+        d.destTS >= ${startTS} and
+        xcmtransfer.matched = 0 and
+        d.matched = 0 and
+        xcmtransfer.incomplete = 0 and
+        d.destTS - xcmtransfer.sourceTS >= 0 and
+        d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
+        length(xcmtransfer.extrinsicID) > 0 and
+        xcmtransfer.amountSent >= d.amountReceived
+having ( ( rat > ${ratMin} and rat <= 1.0 ) or
+(asset = '{"Token":"DOT"}' and amountSent - amountReceived < 500000000) or
+(asset = '{"Token":"KSM"}' and amountSent - amountReceived < 1000000000) or
+(asset = '{"Token":"KAR"}' and amountSent - amountReceived < 10000000000 ) )
+order by chainID, extrinsicHash, diffTS`
+        //console.log("match_xcm", sql)
+        try {
+            let xcmmatches = await this.poolREADONLY.query(sql);
+            let addressextrinsic = []
+            let hashes = []
+            let matched = {}
+            let matches = 0;
+            if (xcmmatches.length > 0) {
+                console.log("[Found] match_xcm", sql)
+            } else {
+                //enable this for debugging
+                //console.log("[Empty] match_xcm", sql)
+            }
+            for (let i = 0; i < xcmmatches.length; i++) {
+                let d = xcmmatches[i];
+                if (matched[d.extrinsicHash] == undefined && matched[d.eventID] == undefined) {
+                    let priceUSD = 0;
+                    let amountSentUSD = 0;
+                    let amountReceivedUSD = 0;
+                    let decimals = this.getAssetDecimal(d.asset, d.chainID)
+                    if (decimals === false) {
+                        decimals = this.getAssetDecimal(d.asset, d.chainIDDest)
+                    }
+                    if (decimals !== false) {
+                        let [_, __, priceUSDsourceTS] = await this.computeUSD(1.0, d.asset, d.chainID, d.sourceTS);
+                        if (priceUSDsourceTS > 0) {
+                            priceUSD = priceUSDsourceTS;
+                            let amountSent = parseFloat(d.amountSent) / 10 ** decimals;
+                            let amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
+                            amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
+                            amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                        }
+                    }
+                    let sql = `update xcmtransfer
+            set blockNumberDest = ${d.blockNumberDest},
+                destTS = ${d.destTS},
+                amountSentUSD = '${amountSentUSD}',
+                amountReceived = '${d.amountReceived}',
+                amountReceivedUSD = '${amountReceivedUSD}',
+                priceUSD = '${priceUSD}',
+                matched = 1,
+                matchedExtrinsicID = '${d.destExtrinsicID}',
+                matchedEventID = '${d.eventID}'
+            where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
+                    this.batchedSQL.push(sql);
+                    matches++;
+                    // (a) with extrinsicID, we get both the fee (rat << 1) ANDthe transferred item for when one is isFeeItem=0 and another is isFeeItem=1; ... otherwise we get (b) with just the eventID
+                    let w = d.destExtrinsicID && (d.destExtrinsicID.length > 0) ? `extrinsicID = '${d.destExtrinsicID}'` : `eventID = '${d.eventID}'`;
+                    let sql2 = `update xcmtransferdestcandidate set matched = 1, matchedExtrinsicHash = '${d.extrinsicHash}' where ${w}`
+                    console.log(sql2);
+                    this.batchedSQL.push(sql2);
+                    // never match more than once, by marking both the sending record and the receiving record
+                    matched[d.extrinsicHash] = true;
+                    matched[d.eventID] = true;
+
+                    // problem: this does not store the "dust" fee (which has rat << 1) in bigtable
+                    let match = {
+                        chainID: d.chainID,
+                        chainIDDest: d.chainIDDest,
+                        blockNumberDest: d.blockNumberDest,
+                        asset: d.asset,
+                        amountSent: d.amountSent,
+                        amountReceived: d.amountReceived,
+                        fromAddress: d.senderAddress, //from xcmtransfer.fromAddress
+                        destAddress: d.fromAddress, //from xcmtransferdestcandidate.fromAddress
+                        msgHash: (d.msgHash != undefined) ? d.msgHash : '0x',
+                        extrinsicHash: d.extrinsicHash,
+                        extrinsicID: d.extrinsicID,
+                        destExtrinsicID: d.destExtrinsicID,
+                        eventID: d.eventID,
+                        sourceTS: d.sourceTS,
+                        destTS: d.destTS
+                    }
+
+                    // 1. write "addressExtrinsic" feedxcmdest with row key address-extrinsicHash and column extrinsicHash#chainID-extrinsicID-transferIndex
+                    //    * we use the SENDING chainID + the sender extrinsicID as the column for the "feedxcmdest" column family
+                    let rowKey = `${d.fromAddress.toLowerCase()}#${d.extrinsicHash}` // NOTE: this matches "feed"
+                    let cres = {
+                        key: rowKey,
+                        data: {
+                            feedxcmdest: {},
+                        }
+                    };
+                    let extrinsicHashEventID = `${d.extrinsicHash}#${d.chainID}-${d.extrinsicID}-${d.transferIndex}`
+                    cres['data']['feedxcmdest'][extrinsicHashEventID] = {
+                        value: JSON.stringify(match),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    addressextrinsic.push(cres);
+
+                    // 2. write "hashes" feedxcmdest with row key extrinsicHash and column extrinsicHash#chainID-extrinsicID (same as 1)
+                    let hres = {
+                        key: d.extrinsicHash,
+                        data: {
+                            feedxcmdest: {}
+                        }
+                    }
+                    hres['data']['feedxcmdest'][extrinsicHashEventID] = {
+                        value: JSON.stringify(match),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
+                    hashes.push(hres)
+                } else {
+                    //console.log("SKIP", matched[d.extrinsicHash], matched[d.eventID]);
+                }
+            }
+            if (addressextrinsic.length > 0) {
+                await this.insertBTRows(this.btAddressExtrinsic, addressextrinsic, "addressextrinsic")
+            }
+            if (hashes.length > 0) {
+                await this.insertBTRows(this.btHashes, hashes, "addressextrinsic")
+            }
+            if (addressextrinsic.length > 0 || hashes.length > 0) {
+                await this.update_batchedSQL();
+            }
+        } catch (err) {
+            console.log("WRITE_FEEDXCMDEST", err)
+        }
+        let logDT = new Date(startTS * 1000)
+        console.log(`match_xcm ${startTS} covered ${logDT}`)
+    }
+
+    // This is the key workhorse that matches xcmmessages with
+    // match xcmmessages incoming = 0 (s) with incoming = 1 (d)
+    //   (a) msgHash + chainID + chainIDDest matching between s and d
+    //   (b) time difference between sentAt to be less than 4
+    //   (c) with s and d blockTS being within lookbackSeconds (default 120) of each other
+    // In case of ties, the FIRST one ( "order by diffTS" ) covers this
+    async xcmmessages_match(startTS, endTS = null, lookbackSeconds = 120) {
+        let endWhere = endTS ? `and s.blockTS < ${endTS} and d.blockTS < ${endTS+lookbackSeconds}` : ""
+
+        let sql = `select
+          s.msgHash, s.blockNumber as s_blockNumber, d.blockNumber as d_blockNumber, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, abs(d.blockTS - s.blockTS) as diffTS, (d.sentAt - s.sentAt) as diffSentAt
+        from xcmmessages as s, xcmmessages as d
+ where  d.msgHash = s.msgHash and
+        d.chainID = s.chainID and
+        d.chainIDDest = s.chainIDDest and
+        s.incoming = 0 and
+        d.incoming = 1 and
+        s.blockTS >= ${startTS} and
+        d.blockTS >= ${startTS} and
+        s.matched = 0 and
+        d.matched = 0 ${endWhere}
+having (diffSentAt >= 0 and diffSentAt <= 4)
+order by msgHash, diffSentAt, diffTS`
+        //console.log("xcmmessages_match", sql)
+        try {
+            let xcmmatches = await this.pool.query(sql);
+            let matched = {}
+            let numRecs = 0;
+            if (xcmmatches.length > 0) {
+                console.log(`[Found] xcmmessages_match ${xcmmatches.length}`, sql)
+            } else {
+                //enable this for debugging
+                //console.log("[Empty] match_xcm", sql)
+            }
+            let vals = ["sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt", "sourceBlocknumber", "destBlocknumber", "matchDT"];
+            let out = [];
+            for (let i = 0; i < xcmmatches.length; i++) {
+                let s = xcmmatches[i];
+                // to protect against the same dest message matched more than once we keep in the "matched" map a set of msgHash-sentAt (for xcmmessages dest candidates)
+                // Note in case of multiple matches, the "order by diffTS" in the SQL statment picks the FIRST one in time closest with the smallest diffTS
+                let k = `${s.msgHash}:${s.d_sentAt}`
+                if (matched[k] == undefined) {
+                    out.push(`('${s.msgHash}', ${s.s_blockNumber}, 0, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
+                    out.push(`('${s.msgHash}', ${s.d_blockNumber}, 1, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
+                    matched[k] = true;
+                } else {
+                    numRecs++;
+                }
+            }
+            let logDT = new Date(startTS * 1000)
+            console.log(`xcmmessages_match ${startTS} covered ${logDT} MATCHES: `, out.length);
+            await this.upsertSQL({
+                "table": "xcmmessages",
+                "keys": ["msgHash", "blockNumber", "incoming"],
+                "vals": vals,
+                "data": out,
+                "replace": vals
+            });
+            return (numRecs);
+        } catch (err) {
+            console.log("xcmmessages_match", err)
+        }
+    }
+
+    async xcmAUSDUpdate() {
+        let kUSDTransferSql = `update xcmtransfer set nativeAssetChain = '{"Token":"KUSD"}~22000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and relaychain = 'kusama' and nativeAssetChain is null;`
+        let kUSDCandidateSql = `update xcmtransferdestcandidate set nativeAssetChain = '{"Token":"KUSD"}~22000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and (chainIDDest = 2 or chainIDDest > 20000) and nativeAssetChain is null;`
+        let aUSDTransferSql = `update xcmtransfer set nativeAssetChain = '{"Token":"AUSD"}~2000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and relaychain = 'polkadot' and nativeAssetChain is null;`
+        let aUSDCandidateSql = `update xcmtransferdestcandidate set nativeAssetChain = '{"Token":"AUSD"}~2000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and (chainIDDest !=2 and chainIDDest < 10000) and nativeAssetChain is null;`
+        this.batchedSQL.push(kUSDTransferSql);
+        this.batchedSQL.push(kUSDCandidateSql);
+        this.batchedSQL.push(aUSDTransferSql);
+        this.batchedSQL.push(aUSDCandidateSql);
+        await this.update_batchedSQL();
+    }
 
     async xcm_init() {
         await this.init_chain_asset_and_nativeAsset() // this will init assetInfo and assetLog
         console.log(`this.xcmAssetInfo`, this.xcmAssetInfo)
     }
 
-    getNativeChainAsset(chainID) {
-        let asset = this.getChainAsset(chainID)
-        let nativeAssetChain = paraTool.makeAssetChain(asset, chainID);
-        //console.log(`Convert to nativeAssetChain ${chainID} -> ${nativeAssetChain}`)
-        return nativeAssetChain
-    }
-
-    getXCMAsset(interiorStr, relayChain) {
-        let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorStr, relayChain);
-        let xcmAsset = this.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
-        if (xcmAsset && xcmAsset.nativeAssetChain != undefined) {
-            console.log(`Found ${xcmInteriorKey} -> ${xcmAsset.nativeAssetChain}`)
-            return xcmAsset.nativeAssetChain
-        } else {
-            console.log(`getXCMAsset NOT Found/Missing ${xcmInteriorKey}`)
-            return false
-        }
-    }
-
-    getParaIDfromChainID(chainID) {
-        let paraID;
-        if (chainID == 0 || chainID == 2) {
-            paraID = 0
-        } else if (chainID > 20000) {
-            paraID = chainID - 20000
-        } else {
-            paraID = chainID
-        }
-        return paraID
-    }
-
-    get_concrete_assetChain(c, chainID, chainIDDest) {
-        let paraID = this.getParaIDfromChainID(chainID)
-        let paraIDDest = this.getParaIDfromChainID(chainIDDest)
+    get_concrete_assetChain(analysis, c, chainID, chainIDDest) {
+        let paraID = paraTool.getParaIDfromChainID(chainID)
+        let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
         //let paraIDDest = (chainIDDest > 20000) ? chainIDDest - 20000 : chainIDDest;
         let relayChain = (chainIDDest > 20000 || chainIDDest == 2) ? "kusama" : "polkadot";
         let relayChainID = (relayChain == 'polkadot') ? 0 : 2
@@ -110,7 +320,6 @@ module.exports = class XCMManager extends AssetManager {
                     return false
                 }
             }
-
         } else {
             console.log("get_concrete_assetChain FAILED2 - parents/interior not set", c);
             return null;
@@ -118,13 +327,15 @@ module.exports = class XCMManager extends AssetManager {
     }
 
     // All instructions with "MultiAsset" type should be decorated with assetChain / symbols / decimals + USD value at the time of message
-    analyzeXCM_MultiAsset(c, chainID, chainIDDest, ctx) {
+    analyzeXCM_MultiAsset(analysis, c, chainID, chainIDDest, ctx) {
         if (c.id != undefined) {
             if (c.id.concrete != undefined) {
                 if (ctx == "buyExecution") {} else {
-                    let assetChain = this.get_concrete_assetChain(c.id.concrete, chainID, chainIDDest);
-                    if (assetChain) {
-                        this.assetChains[assetChain] = 1;
+                    let assetChain = this.get_concrete_assetChain(analysis, c.id.concrete, chainID, chainIDDest);
+                    if (assetChain && (analysis.assetChains[assetChain] == undefined)) {
+                        analysis.assetChains[assetChain] = 1;
+                        //console.log("PUSHING", assetChain, c.id.concrete);
+                        return assetChain;
                     } else {
                         console.log("analyzeXCM_MultiAsset MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.id.concrete));
                     }
@@ -132,40 +343,50 @@ module.exports = class XCMManager extends AssetManager {
             } else {
                 console.log("analyzeXCM_MultiAsset NOT CONCRETE PROBLEM", chainID, chainIDDest, JSON.stringify(c))
             }
+        } else if (c.concreteFungible != undefined) {
+            let assetChain = this.get_concrete_assetChain(analysis, c.concreteFungible.id, chainID, chainIDDest);
+            if (assetChain && (analysis.assetChains[assetChain] == undefined)) {
+                analysis.assetChains[assetChain] = 1;
+                //console.log("PUSHING", assetChain, c.id.concrete);
+                return assetChain;
+            } else {
+                console.log("analyzeXCM_MultiAsset V0 MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.concreteFungible.id));
+            }
         } else {
             console.log("analyzeXCM_MultiAsset NO ID PROBLEM", chainID, chainIDDest, JSON.stringify(c))
         }
+        return (false);
     }
 
-    analyzeXCM_MultiAssetFilter(c, fld, chainID, chainIDDest, ctx) {
+    analyzeXCM_MultiAssetFilter(analysis, c, fld, chainID, chainIDDest, ctx) {
         if (c[fld] == undefined) return;
         if (c[fld].wild) {} else if (c[fld].definite) {
             //console.log("analyzeXCM_MultiAssetFilter", chainID, chainIDDest, JSON.stringify(c[fld].definite));
         } else {
             // analyzeXCM_MultiAssetFilter 22085 2 {"definite":[{"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10000000000}}]}
-            console.log("analyzeXCM_MultiAssetFilter", ctx, chainID, chainIDDest);
+            if (Array.isArray(c[fld])) {
+                for (let i = 0; i < c[fld].length; i++) {
+                    let ac = this.analyzeXCM_MultiAsset(analysis, c[fld][i], chainID, chainIDDest, "multiassetfilter")
+                    if (ac) {
+                        console.log("analyzeXCM_MultiAssetFilter", ctx, chainID, chainIDDest, JSON.stringify(c[fld][i]), ac);
+                    }
+                }
+            }
         }
     }
 
     // All instructions with "MultiLocation" (parachain, accountID32/ accountID20, here) should be decorated with chain.id, chain.chainName or the "identity" using lookup_account
-    analyzeXCM_MultiLocation(c, fld, chainID, chainIDDest, ctx) {
+    analyzeXCM_MultiLocation(analysis, c, fld, chainID, chainIDDest, ctx) {
         if (c[fld] == undefined) return;
-
-        let interior = c[fld].interior;
-        if (interior == undefined) return;
-        let x1 = interior.x1;
-        if (x1 == undefined) return;
-        if (x1.accountId32) {
-            this.xcmAddresses.push(x1.accountId32.id);
-        } else if (x1.accountKey20) {
-            this.xcmAddresses.push(x1.accountKey20.key);
-        } else {
-            //console.log("analyzeXCM_MultiLocation MISS ", ctx, chainID, chainIDDest, interior);
-            return;
+        let relayChain = (chainID > 20000 || chainID == 2) ? "kusama" : "polkadot";
+        let destAddress = this.chainParser.processBeneficiary(false, c[fld], relayChain);
+        if (destAddress) {
+            analysis.xcmAddresses.push(destAddress)
+            //console.log(`${msg.msgHash} analyzeXCM_MultiLocation destFound:${destAddress}`)
         }
     }
 
-    analyzeXCM_Call(c, fld, chainID, chainIDDest, ctx) {
+    analyzeXCM_Call(analysis, c, fld, chainID, chainIDDest, ctx) {
         if (c[fld] == undefined) return;
         if (c[fld].encoded != undefined) {
             // analyzeXCM_Call 22000 2 0x1801010006010f23ada31bd3bb06
@@ -178,7 +399,9 @@ module.exports = class XCMManager extends AssetManager {
     getInstructionSet() {
         let instructionSet = {
             'withdrawAsset': { // Remove the on-chain asset(s) (assets) and accrue them into Holding
-                MultiAssets: ['assets']
+                MultiAssets: ['assets'],
+                MultiAssetFilter: ['assets'], //v0
+                Effects: ['effects'] //v0
             },
             'reserveAssetDeposited': { // Accrue into Holding derivative assets to represent the asset(s) (assets) on Origin.
                 MultiAssets: ['assets']
@@ -255,6 +478,21 @@ module.exports = class XCMManager extends AssetManager {
                 MultiLocation: ['origin']
             },
             'expectError': {},
+            //V1
+            'reserveAssetDeposited': {
+                MultiAssetFilter: ['assets'],
+                Effects: ['effects'],
+            },
+            //V0
+            'teleportAsset': {
+                MultiAsset: ['assets'],
+                Effects: ['effects'],
+            },
+            'reserveAssetDeposit': {
+                MultiAsset: ['assets'],
+                Effects: ['effects'],
+            }
+
         }
         return instructionSet
     }
@@ -321,58 +559,177 @@ module.exports = class XCMManager extends AssetManager {
         return (false);
     }
 
-    /*
-Test:
-var Manager = require("./manager");
-var manager = new Manager();
-var chain = await manager.getChain(2000);
-await manager.setupAPI(chain);
-var xcmParentHex = "0x021000040000000007007dec26010a130000000003803e7693010700f2052a010e010004000100451f08130001000003803e7693010700f2052a010d01000400010100e27d987db9ed2a7a48f4137c997d610226dc93bf256c9026268b0b8489bb9862";
-var xcmParentObj = this.api.registry.createType('XcmVersionedXcm', xcmParentHex);
-
-Try one of thses:
-XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAsset, XcmV0MultiLocation, XcmV0Order, XcmV0OriginKind, XcmV0Response, XcmV0Xcm, XcmV1Junction, XcmV1MultiAsset, XcmV1MultiLocation, XcmV1MultiassetAssetId, XcmV1MultiassetAssetInstance, XcmV1MultiassetFungibility, XcmV1MultiassetMultiAssetFilter, XcmV1MultiassetMultiAssets, XcmV1MultiassetWildFungibility, XcmV1MultiassetWildMultiAsset, XcmV1MultilocationJunctions, XcmV1Order, XcmV1Response, XcmV1Xcm, XcmV2Instruction, XcmV2Response, XcmV2TraitsError, XcmV2TraitsOutcome, XcmV2WeightLimit, XcmV2Xcm, XcmVersionedMultiAssets, XcmVersionedMultiLocation, XcmVersionedResponse, XcmVersionedXcm
-    */
-
-    async decodeXCMv2(hex) {
+    async decodeXCM(hex) {
         var obj = this.api.registry.createType('XcmVersionedXcm', hex);
         return obj.toJSON();
     }
 
-    // for any xcmmessages which have not been fingerprinted (instructionFingerprints is Null), fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints} using getXCMParentFingerprintsOfChild + getXCMChildFingerprints
-    //    this is the raw data for the next step which matches fingerprints across time
-    async computeXCMFingerprints(startTS, endTS) {
+    analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx = "") {
+        let instructionSet = this.getInstructionSet();
 
-        let sql = `select incoming, msgHash, blockNumber, sentAt, msgHex from xcmmessages where blockTS >= ${startTS} and blockTS <= ${endTS} and instructionFingerprints is Null order by blockTS desc limit 100000`
-        console.log("computeXCMFingerprints:", sql)
-        let xcmRecs = await this.poolREADONLY.query(sql);
-        let out = [];
-        let vals = ["parentInclusionFingerprints", "instructionFingerprints"];
-        for (let r = 0; r < xcmRecs.length; r++) {
-            let rec = xcmRecs[r];
-            let msgHex = xcmRecs[r].msgHex.toString();
-            try {
-                var xcmObj = this.api.registry.createType('XcmVersionedXcm', msgHex);
-                if (xcmObj.isV2) {
-                    let parentInclusionFingerprints = this.getXCMParentFingerprintsOfChild(xcmObj);
-                    let instructionFingerprints = this.getXCMChildFingerprints(xcmObj);
-                    out.push(`('${rec.msgHash}', '${rec.blockNumber}', '${rec.incoming}', '${JSON.stringify(parentInclusionFingerprints)}', '${JSON.stringify(instructionFingerprints)}')`);
-                    if (out.length > 20) {
-                        console.log("computeXCMFingerprints", out.length);
-                        await this.upsertSQL({
-                            "table": "xcmmessages",
-                            "keys": ["msgHash", "blockNumber", "incoming"],
-                            "vals": vals,
-                            "data": out,
-                            "replace": vals
-                        });
-                        out = [];
+        for (const i of Object.keys(instructionSet)) {
+            if (instruction[i] != undefined) {
+                let features = instructionSet[i];
+                if (features.MultiAssets != undefined) {
+                    for (let j = 0; j < instruction[i].length; j++) {
+                        this.analyzeXCM_MultiAsset(analysis, instruction[i][j], chainID, chainIDDest, i);
                     }
                 }
-            } catch (err) {
-                console.log(err, msgHex);
+                if (features.MultiAsset != undefined) {
+                    for (const fld of features.MultiAsset) {
+                        if (instruction[i][fld] != undefined) {
+                            this.analyzeXCM_MultiAsset(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                        }
+                    }
+                }
+                if (features.MultiAssetFilter != undefined) {
+                    for (const fld of features.MultiAssetFilter) {
+                        this.analyzeXCM_MultiAssetFilter(analysis, instruction[i], fld, chainID, chainIDDest, i);
+                    }
+                }
+                if (features.MultiLocation != undefined) {
+                    for (const fld of features.MultiLocation) {
+                        this.analyzeXCM_MultiLocation(analysis, instruction[i], fld, chainID, chainIDDest, i);
+                    }
+                }
+
+                if (features.XCM != undefined) {
+                    for (const fld of features.XCM) {
+                        if (instruction[i][fld] != undefined) {
+                            //console.log("analyzing instruction containing XCM ", instruction);
+                            // recursive call
+                            let xcmChild = instruction[i][fld];
+                            // console.log( "  ... xcmChild:", xcmChild);
+                            this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                        }
+                    }
+                }
+
+                if (features.Effects != undefined) {
+                    for (const fld of features.Effects) {
+                        if (instruction[i][fld] != undefined) {
+                            //console.log("analyzing instruction containing effects ", instruction);
+                            // recursive call
+                            let xcmChild = instruction[i][fld];
+
+                            this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                        }
+                    }
+                }
+
+                if (features.Call != undefined) {
+                    for (const fld of features.Call) {
+                        this.analyzeXCM_Call(analysis, instruction[i], fld, chainID, chainIDDest, i);
+                    }
+                }
             }
         }
+    }
+
+    analyzeXCMInstructionsV1(analysis, xcmMsgV1, chainID, chainIDDest, ctx) {
+        this.analyzeXCMInstruction(analysis, xcmMsgV1, chainID, chainIDDest, ctx)
+    }
+
+    analyzeXCMInstructionsV0(analysis, xcmMsgV0, chainID, chainIDDest, ctx) {
+        this.analyzeXCMInstruction(analysis, xcmMsgV0, chainID, chainIDDest, ctx)
+    }
+
+    analyzeXCMInstructions(analysis, instructions, chainID, chainIDDest, ctx) {
+        for (const instruction of instructions) {
+            this.analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx)
+        }
+    }
+
+    async match_parentInclusionFingerprints(parentInclusionFingerprints, rec) {
+        if (parentInclusionFingerprints == "[]") return (false);
+        let sqlchild = `select incoming, msgHash, blockNumber, sentAt, instructionFingerprints, blockTS, msgHex, chainID, chainIDDest from xcmmessages where blockTS >= ${rec.blockTS} and blockTS <= ${rec.blockTS+60} and instructionFingerprints is not null and incoming = 0 order by blockTS limit 20`
+        let childRecs = await this.pool.query(sqlchild);
+        for (let c = 0; c < childRecs.length; c++) {
+            let childRec = childRecs[c];
+            if (this.compute_fingerprints_inclusion(parentInclusionFingerprints, childRec.instructionFingerprints)) {
+                let updsql = `update xcmmessages set parentMsgHash = '${rec.msgHash}', parentBlocknumber='${rec.blockNumber}', parentSentAt='${rec.sentAt}' where msgHash = '${childRec.msgHash}' and blockNumber = '${childRec.blockNumber}' and incoming = '${childRec.incoming}'`;
+                this.batchedSQL.push(updsql);
+                // assume chain of messages, not doing tree yet
+                let updsql2 = `update xcmmessages set childMsgHash = '${childRec.msgHash}', childBlockNumber='${childRec.blockNumber}', childSentAt='${childRec.sentAt}' where msgHash = '${rec.msgHash}' and blockNumber = '${rec.blockNumber}' and incoming = '${rec.incoming}'`;
+                this.batchedSQL.push(updsql2);
+                await this.update_batchedSQL();
+                return (true);
+            }
+        }
+        return (false);
+    }
+
+    performAnalysisInstructions(msg, chainID, chainIDDest) {
+        let analysis = {
+            xcmAddresses: [],
+            assetChains: {}
+        }
+        this.chainParserInit(chainID, this.debugLevel);
+        let version = Object.keys(msg)[0]
+        switch (version) {
+            case 'v2':
+                this.analyzeXCMInstructions(analysis, msg.v2, chainID, chainIDDest, "computeAssetChains")
+                break;
+            case 'v1':
+                this.analyzeXCMInstructionsV1(analysis, msg.v1, chainID, chainIDDest, "computeAssetChains")
+                break;
+            case 'v0':
+                this.analyzeXCMInstructionsV0(analysis, msg.v0, chainID, chainIDDest, "computeAssetChains")
+                break;
+            default:
+                console.log("unknown version", version);
+        }
+        return analysis;
+    }
+
+
+    // for any xcmmessages in a period:
+    //  (a) update instructionFingerprints + parentInclusionFingerprints using getXCMParentFingerprintsOfChild + getXCMChildFingerprints
+    //  (b) if there are parentfingerprints detected, look for childfingerprints in the next step
+    //  (c) compute assetChains and beneficiaries
+    async computeXCMFingerprints(startTS, endTS = null) {
+        let lastTS = endTS;
+        let endWhere = (endTS) ? ` and blockTS <= ${endTS} ` : "";
+        let sql = `select msgHash, msgHex, blockNumber, sentAt, incoming, chainID, chainIDDest, msgStr, blockTS, assetChains, beneficiaries2, instructionFingerprints from xcmmessages where blockTS >= ${startTS} ${endWhere} order by blockTS desc`;
+        let xcmRecs = await this.pool.query(sql);
+        let out = [];
+        let vals = ["parentInclusionFingerprints", "instructionFingerprints", "assetChains", "beneficiaries2"];
+        let parentIncFingerprints = [];
+        console.log("computeXCMFingerprints:", xcmRecs.length, sql)
+        for (let r = 0; r < xcmRecs.length; r++) {
+            let rec = xcmRecs[r];
+            let msg = JSON.parse(rec.msgStr);
+            try {
+                if (r == 0) lastTS = rec.blockTS;
+                let analysis = this.performAnalysisInstructions(msg, rec.chainID, rec.chainIDDest)
+                let assetChains = Object.keys(analysis.assetChains);
+                let beneficiaries2 = (analysis.xcmAddresses.length > 0) ? `'${analysis.xcmAddresses.join('|')}'` : `'Null'`
+                var xcmObj = this.api.registry.createType('XcmVersionedXcm', rec.msgHex.toString());
+                let parentInclusionFingerprints = [];
+                let instructionFingerprints = []
+                if (xcmObj.isV2) {
+                    parentInclusionFingerprints = this.getXCMParentFingerprintsOfChild(xcmObj);
+                    instructionFingerprints = this.getXCMChildFingerprints(xcmObj);
+                    if (parentInclusionFingerprints.length > 0) {
+                        parentIncFingerprints.push({
+                            parentInclusionFingerprints,
+                            rec
+                        });
+                    }
+                }
+
+                out.push(`('${rec.msgHash}', '${rec.blockNumber}', '${rec.incoming}', '${JSON.stringify(parentInclusionFingerprints)}', '${JSON.stringify(instructionFingerprints)}', ${mysql.escape(JSON.stringify(assetChains))}, ${beneficiaries2})`);
+            } catch (err) {
+                console.log(err);
+                process.exit(0);
+            }
+        }
+
+        for (let i = 0; i < parentIncFingerprints.length; i++) {
+            let p = parentIncFingerprints[i];
+            await this.match_parentInclusionFingerprints(p.parentInclusionFingerprints, p.rec);
+        }
+
         if (out.length > 0) {
             console.log("computeXCMFingerprints", out.length);
             await this.upsertSQL({
@@ -384,134 +741,38 @@ XcmV0JunctionBodyId, XcmV0JunctionBodyPart, XcmV0JunctionNetworkId, XcmV0MultiAs
             });
             out = [];
         }
-        console.log("computeXCMFingerprints DONE");
+        return lastTS;
     }
 
-    getXCMInstructionsFromHex(hex) {
-        var obj = this.api.registry.createType('XcmVersionedXcm', hex);
-        return obj.toJSON();
-    }
-
-
-    analyzeXCMInstruction(instruction, chainID, chainIDDest, ctx = "") {
-        let instructionSet = this.getInstructionSet();
-
-        for (const i of Object.keys(instructionSet)) {
-            if (instruction[i] != undefined) {
-                let features = instructionSet[i];
-                if (features.MultiAssets != undefined) {
-                    for (let j = 0; j < instruction[i].length; j++) {
-                        this.analyzeXCM_MultiAsset(instruction[i][j], chainID, chainIDDest, i);
-                    }
-                }
-                if (features.MultiAsset != undefined) {
-                    for (const fld of features.MultiAsset) {
-                        if (instruction[i][fld] != undefined) {
-                            this.analyzeXCM_MultiAsset(instruction[i][fld], chainID, chainIDDest, i);
-                        }
-                    }
-                }
-                if (features.MultiAssetFilter != undefined) {
-                    for (const fld of features.MultiAssetFilter) {
-                        this.analyzeXCM_MultiAssetFilter(instruction[i], fld, chainID, chainIDDest, i);
-                    }
-                }
-                if (features.MultiLocation != undefined) {
-                    for (const fld of features.MultiLocation) {
-                        this.analyzeXCM_MultiLocation(instruction[i], fld, chainID, chainIDDest, i);
-                    }
-                }
-
-                if (features.XCM != undefined) {
-                    for (const fld of features.XCM) {
-                        if (instruction[i][fld] != undefined) {
-                            //console.log("analyzing instruction containing XCM ", instruction);
-                            // recursive call
-                            let xcmChild = instruction[i][fld];
-                            // console.log( "  ... xcmChild:", xcmChild);
-                            this.analyzeXCMInstructions(instruction[i][fld], chainID, chainIDDest, i);
-                        }
-                    }
-                }
-                if (features.Call != undefined) {
-                    for (const fld of features.Call) {
-                        this.analyzeXCM_Call(instruction[i], fld, chainID, chainIDDest, i);
-                    }
-                }
-            }
-        }
-    }
-
-    analyzeXCMInstructions(instructions, chainID, chainIDDest, ctx) {
-        for (const instruction of instructions) {
-            this.analyzeXCMInstruction(instruction, chainID, chainIDDest, ctx)
-        }
-    }
-
-    // computeXCMMessageParentMsgHash updates xcmmessages.{parentMsgHash, childMsgHash} using special xcmmessages (those with parentInclusionFingerprints)
-    // with these parent-child linkages, a "tree" (really, short chains) can be established
-    async computeXCMMessageParentMsgHash(startTS, endTS) {
-        let sql = `select incoming, msgHash, blockNumber, sentAt, msgHex, parentInclusionFingerprints, instructionFingerprints, blockTS, chainID, chainIDDest from xcmmessages where parentInclusionFingerprints != '[]' and incoming = 0 and childMsgHash is Null and blockTS >= ${startTS} and blockTS <= ${endTS} order by blockTS desc limit 100000`
-        console.log("computeXCMMessageParentMsgHash: ", sql);
-        let xcmRecs = await this.poolREADONLY.query(sql);
-        let sqlout = [];
-        for (let r = 0; r < xcmRecs.length; r++) {
-            let rec = xcmRecs[r];
-            let parentInclusionFingerprints = JSON.parse(rec.parentInclusionFingerprints);
-            //console.log("PARENT: ", rec.msgHash, rec.sentAt, rec.chainID, rec.chainIDDest, "parentInclusionFingerprints", parentInclusionFingerprints, JSON.stringify(this.getXCMInstructionsFromHex(rec.msgHex), null, 2));
-
-            let sqlchild = `select incoming, msgHash, blockNumber, sentAt, instructionFingerprints, blockTS, msgHex, chainID, chainIDDest from xcmmessages where blockTS >= ${rec.blockTS} and blockTS <= ${rec.blockTS+60} and instructionFingerprints is not null and incoming = 0 order by blockTS limit 20`
-            let childRecs = await this.poolREADONLY.query(sqlchild);
-            for (let c = 0; c < childRecs.length; c++) {
-                let childRec = childRecs[c];
-                var childObj = this.api.registry.createType('XcmVersionedXcm', rec.msgHex.toString());
-                let instructionFingerprints = JSON.parse(childRec.instructionFingerprints);
-                let inclusion = this.compute_fingerprints_inclusion(parentInclusionFingerprints, instructionFingerprints);
-                //console.log("CHILD", inclusion, childRec.msgHash, childRec.sentAt, childRec.chainID, childRec.chainIDDest, "delay", childRec.blockTS - rec.blockTS, childRec.instructionFingerprints, JSON.stringify(this.getXCMInstructionsFromHex(childRec.msgHex), null, 2));
-                if (inclusion) {
-                    let updsql = `update xcmmessages set parentMsgHash = '${rec.msgHash}', parentBlocknumber='${rec.blockNumber}', parentSentAt='${rec.sentAt}' where msgHash = '${childRec.msgHash}' and blockNumber = '${childRec.blockNumber}' and incoming = '${childRec.incoming}'`;
-                    console.log(updsql);
-                    this.batchedSQL.push(updsql);
-                    await this.update_batchedSQL();
-                    c = childRecs.length;
-
-                    let updsql2 = `update xcmmessages set childMsgHash = '${childRec.msgHash}', childBlockNumber='${childRec.blockNumber}', childSentAt='${childRec.sentAt}' where msgHash = '${rec.msgHash}' and blockNumber = '${rec.blockNumber}' and incoming = '${rec.incoming}'`;
-                    console.log(updsql2);
-                    this.batchedSQL.push(updsql2);
-                }
-            }
-            //console.log("---");
-        }
-
-        // match xcmmessages to xcmtransfer records with sentAt <= 4 difference
+    async xcmmatch2_matcher(startTS, endTS = null, lookbackSeconds = 120) {
+        let endWhere = endTS ? `and xcmmessages.blockTS <= ${endTS} and xcmtransfer.sourceTS <= ${endTS}` : "";
+        // set xcmmessages.{extrinsicID,extrinsicHash} based on xcmtransfer.msgHash / sentAt <= 4 difference
         let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash
-   where xcmtransfer.msgHash = xcmmessages.msgHash and
-     xcmtransfer.msgHash is not null and
-     xcmmessages.blockTS >= ${startTS} and xcmmessages.blockTS <= ${endTS} and
-     xcmtransfer.sourceTS >= ${startTS} and xcmtransfer.sourceTS <= ${endTS} and
-     abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4`;
+               where xcmtransfer.msgHash = xcmmessages.msgHash and
+                 xcmtransfer.msgHash is not null and
+                 xcmmessages.blockTS >= ${startTS} and
+                 xcmtransfer.sourceTS >= ${startTS} and
+                 abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4 ${endWhere}`;
         this.batchedSQL.push(sql1);
         console.log(sql1);
         await this.update_batchedSQL();
 
-        // match children xcmmessages to parent xcmmessages with sentAt <= 4 difference
+        // update xcmmessages of children
+        endWhere = endTS ? `and p.blockTS <= ${endTS} and c.blockTS <= ${endTS}` : "";
         let sql2 = `update xcmmessages as c, xcmmessages as p  set c.extrinsicID = p.extrinsicID, c.extrinsicHash = p.extrinsicHash where
-p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.childMsgHash and
- abs(c.sentAt - p.childSentAt) <= 4 and
- c.extrinsicID is null and
- p.blockTS >= ${startTS} and p.blockTS <= ${endTS} and
- c.blockTS >= ${startTS} and c.blockTS <= ${endTS}`
+            p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.childMsgHash and
+             abs(c.sentAt - p.childSentAt) <= 4 and
+             c.extrinsicID is null and
+             p.blockTS >= ${startTS} and 
+             c.blockTS >= ${startTS} ${endWhere}`
         this.batchedSQL.push(sql2);
         console.log(sql2);
         await this.update_batchedSQL();
 
-        console.log("computeXCMMessageParentMsgHash DONE");
-    }
-
-    async xcmmatch2_matcher(startTS, endTS, lookbackSeconds = 120) {
         // ((d.asset = xcmmessages.asset) or (d.nativeAssetChain = xcmmessages.nativeAssetChain and d.nativeAssetChain is not null)) and
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
         let fld = (this.getCurrentTS() % 2 == 0) ? "" : "2"
+        endWhere = endTS ? `and xcmmessages.blockTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds}` : "";
         let sql = `select  xcmmessages.chainID, xcmmessages.chainIDDest,
           (d.destts - xcmmessages.blockTS) as diffTS,
           xcmmessages.msgHash,
@@ -526,12 +787,10 @@ p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.child
  where  d.fromAddress = xcmmessages.beneficiaries${fld} and
         d.chainIDDest = xcmmessages.chainIDDest and
         xcmmessages.blockTS >= ${startTS} and
-        xcmmessages.blockTS < ${endTS} and
         d.destTS >= ${startTS} and
-        d.destTS < ${endTS+lookbackSeconds} and
         d.destTS - xcmmessages.blockTS >= 0 and
         d.destTS - xcmmessages.blockTS < ${lookbackSeconds} and
-        length(xcmmessages.extrinsicID) > 0 and	xcmmessages.assetsReceived is null
+        length(xcmmessages.extrinsicID) > 0 and	xcmmessages.assetsReceived is null ${endWhere}
 order by chainID, extrinsicHash, diffTS`;
         console.log(sql);
         try {
@@ -625,53 +884,9 @@ order by chainID, extrinsicHash, diffTS`;
         }
     }
 
-    // computeAssetChainsAndBeneficiaries reads any unanalyzed OUTGOING messages and updates xcmmessages.assetChains + beneficiaries for any assets mentioned in the instructions using analyzeXCMInstructions
-    async computeAssetChainsAndBeneficiaries(startTS, endTS) {
-        await this.assetManagerInit();
-
-        let ts = this.getCurrentTS() - 86400 * 180;
-        let sql = `select msgHash, blockNumber, sentAt, incoming, chainID, chainIDDest, msgStr, blockTS from xcmmessages where ( assetChains is Null or beneficiaries2 is null ) and ( blockTS >= ${startTS} and blockTS <= ${endTS} )  order by blockTS desc`;
-        let msgs = await this.pool.query(sql);
-        console.log("computeAssetChains: ", sql);
-        let vals = ["assetChains", "beneficiaries2"]
-        let out = [];
-        for (const msg of msgs) {
-            let m = JSON.parse(msg.msgStr);
-            if (m.v2) {
-                this.xcmAddresses = [];
-                this.assetChains = {};
-                this.analyzeXCMInstructions(m.v2, msg.chainID, msg.chainIDDest, "computeAssetChains")
-                let assetChains = Object.keys(this.assetChains);
-                let xcmAddresses = this.xcmAddresses.length > 1 ? "" : (this.xcmAddresses.length == 1) ? this.xcmAddresses[0] : ""; // JSON.stringify(this.xcmAddresses)
-                out.push(`('${msg.msgHash}', '${msg.blockNumber}', '${msg.incoming}', ${mysql.escape(JSON.stringify(assetChains))}, '${xcmAddresses}')`)
-                if (out.length > 100) {
-                    console.log(out.length);
-                    await this.upsertSQL({
-                        "table": "xcmmessages",
-                        "keys": ["msgHash", "blockNumber", "incoming"],
-                        "vals": vals,
-                        "data": out,
-                        "replace": vals
-                    });
-                    out = [];
-                }
-            }
-        }
-        if (out.length > 0) {
-            await this.upsertSQL({
-                "table": "xcmmessages",
-                "keys": ["msgHash", "blockNumber", "incoming"],
-                "vals": vals,
-                "data": out,
-                "replace": vals
-            });
-            out = [];
-        }
-        console.log("computeAssetChains DONE");
-    }
-
     /* because the indexer may insert multiple xcmmessages record when a partcular xcmmessage sits in the chains message queue for 1 or more blocks, this xcmmessages_dedup process cleans out any records that exist after the above matching process */
-    async xcmmessages_dedup(startTS, endTS, lookbackSeconds = 120) {
+    async xcmmessages_dedup(startTS, endTS = null, lookbackSeconds = 120) {
+        let endWhere = endTS ? `and s.blockTS < ${endTS} and d.blockTS < ${endTS+lookbackSeconds}` : "";
         let sql = `select
           s.msgHash, s.blockNumber as s_blockNumber, s.incoming, (d.sentAt - s.sentAt) as diffSentAt
         from xcmmessages as s, xcmmessages as d
@@ -680,16 +895,14 @@ order by chainID, extrinsicHash, diffTS`;
         d.chainIDDest = s.chainIDDest and
         ( ( s.incoming = 0 and  d.incoming = 1 ) or ( s.incoming = 1 and d.incoming = 0 ) ) and
         s.blockTS >= ${startTS} and
-        s.blockTS < ${endTS} and
         d.blockTS >= ${startTS} and
-        d.blockTS < ${endTS+lookbackSeconds} and
         s.matched = 0 and
-        d.matched = 1
+        d.matched = 1 ${endWhere}
 having (diffSentAt >= 0 and diffSentAt <= 4)
 order by msgHash`
         console.log("xcmmessages_match", sql)
         try {
-            let xcmsingles = await this.poolREADONLY.query(sql);
+            let xcmsingles = await this.pool.query(sql);
             let vals = ["matched"];
             let out = [];
             for (let i = 0; i < xcmsingles.length; i++) {
@@ -709,32 +922,48 @@ order by msgHash`
         }
     }
 
-    async xcmanalytics(lookbackDays) {
-        let chain = await this.getChain(2);
-        await this.setupAPI(chain);
+    async waitForNewXCMMessage(minTS, waitMS = 2000, maxIterations = 10) {
+        let iterations = 0;
+        do {
+            let sql = `select msgHash, blockTS from xcmmessages where blockTS > ${minTS} order by blockTS`
+            console.log(sql);
+            let x = await this.poolREADONLY.query(sql);
+            if (x.length > 0) {
+                return x[0].blockTS;
+            } else {
+                await this.sleep(waitMS);
+            }
+            iterations++;
+        } while (iterations < maxIterations);
+    }
 
+    async xcmanalytics_period(chain, t0, t1 = null) {
+        // xcmmessages_match matches incoming=0 and incoming=1 records
+        let numRecs = await this.xcmmessages_match(t0, t1);
 
+        // computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints, beneficiaries2}
+        let lastTS = await this.computeXCMFingerprints(t0, t1);
+
+        // xcmmatch2_matcher computes assetsReceived by matching xcmmessages.beneficiaries(2) to xcmtransferdestcandidate
+        await this.xcmmatch2_matcher(t0, t1)
+
+        // marks duplicates in xcmmessages
+        await this.xcmmessages_dedup(t0, t1);
+
+        await this.xcmtransfer_match(t0, t1, .97);
+
+        // do it again
+        numRecs = await this.xcmmessages_match(t0, t1);
+        return [numRecs, lastTS];
+    }
+
+    async xcmanalytics(chain, lookbackDays) {
         let endTS = this.currentTS();
         let startTS = endTS - lookbackDays * 86400;
         for (let ts = startTS; ts < endTS; ts += 86400) {
             let t0 = ts;
             let t1 = ts + 86400;
-
-            // this.computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints}
-            await this.computeXCMFingerprints(t0, t1);
-
-            // computeXCMMessageParentMsgHash updates xcmmessages.{parentMsgHash/SentAt, childMsgHash/SentAt} using special xcmmessages (those with parentInclusionFingerprints)
-            // with these parent-child linkages, a "tree" (currently just short chains) can be established
-            await this.computeXCMMessageParentMsgHash(t0, t1);
-
-            // computerAssetChainsAndBeneficiaries updates xcmmessages.assetChains for any assets mentioned in the instructions
-            await this.computeAssetChainsAndBeneficiaries(t0, t1);
-
-            // computes assetsReceived
-            await this.xcmmatch2_matcher(t0, t1)
-
-            // marks duplicates in xcmmessages
-            await this.xcmmessages_dedup(t0, t1);
+            await this.xcmanalytics_period(chain, t0, t1);
         }
     }
 
