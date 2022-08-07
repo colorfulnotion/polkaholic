@@ -498,6 +498,18 @@ function unique(a) {
     });
 }
 
+function getParaIDfromChainID(chainID) {
+    let paraID;
+    if (chainID == 0 || chainID == 2) {
+        paraID = 0
+    } else if (chainID > 20000) {
+        paraID = chainID - 20000
+    } else {
+        paraID = chainID
+    }
+    return paraID
+}
+
 class NotFoundError extends Error {
     constructor(message) {
         // Needs to pass both `message` and `options` to install the "cause" property.
@@ -1119,4 +1131,7 @@ module.exports = {
     unique: function(x) {
         return unique(x)
     },
+    getParaIDfromChainID: function(x) {
+        return getParaIDfromChainID(x)
+    }
 };

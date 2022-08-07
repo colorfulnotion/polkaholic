@@ -1,7 +1,7 @@
 //var baseURL is set at header
 
-function presentInstructions(msg, k, hdr = "View Instructions") {
-    return `<div class="accordion  accordion-flush" style="width: 400px">
+function presentInstructions(msg, k, hdr = "Instructions") {
+    return `<div class="accordion  accordion-flush" style="width: 480px">
   <div class="accordion-item">
     <h2 class="accordion-header" id="heading${k}">
       <button class="accordion-button collapsed" type="button" data-mdb-toggle="collapse"

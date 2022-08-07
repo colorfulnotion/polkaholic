@@ -418,10 +418,10 @@ async function showxcmmessages(relaychain) {
                 "targets": [1]
             }, {
                 "className": "dt-left",
-                "targets": [2, 3, 7]
+                "targets": [2, 3, 6]
             }],
             order: [
-                [7, "desc"]
+                [6, "desc"]
             ],
             columns: [{
                     data: 'msgHash',
@@ -462,7 +462,8 @@ async function showxcmmessages(relaychain) {
                                 str = '<button type="button" class="btn transfer" style="background-color:rgba(0,201,167,.2); color:#02977e">' + `${relayChain} ${data} (${row.version})` + '</button>';
                                 return str;
                             } else {
-                                str = '<button type="button" class="btn transfer" style="background-color:rgba(219,154,4,.2); color:#b47d00">' + `${relayChain} ${data} (${row.version})` + '</button>';
+                                let color = (row.incoming == 1) ? "0,0,0,.2" : "255,255,255,.2";
+                                str = `<button type="button" class="btn transfer" style="background-color:rgba(${color}); color:#b47d00">` + `${relayChain} ${data} (${row.version})` + '</button>';
                                 return str;
                             }
                         } else {
@@ -496,7 +497,8 @@ async function showxcmmessages(relaychain) {
                     data: 'destTS',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            let bn = presentBlockNumber(row.idDest, row.chainDestName, row.blockNumber) + "<br>";
+                            let bn = (row.blockNumber !== undefined && row.incoming == 1) ? presentBlockNumber(row.idDest, row.chainDestName, row.blockNumber) : row.chainDestName;
+                            bn += "<br>";
                             if (row.destTS != undefined && row.destTS > 0) {
                                 return bn + shorttimeConverter(data);
                             } else {
@@ -517,10 +519,34 @@ async function showxcmmessages(relaychain) {
                     data: 'msgStr',
                     render: function(data, type, row, meta) {
                         if (row.msgStr != undefined) {
+                            let assetsReceived = "";
+                            let valueUSD = 0.0;
+                            try {
+                                if (row.assetsReceived && row.assetsReceived.length > 0) {
+                                    let ar = JSON.parse(row.assetsReceived);
+                                    let symbols = [];
+                                    ar.forEach((r) => {
+                                        if (r.symbol && !symbols.includes(r.symbol)) {
+                                            symbols.push(r.symbol);
+                                        }
+                                        if (r.amountReceivedUSD != undefined && r.amountReceivedUSD > 0) {
+                                            valueUSD += r.amountReceivedUSD;
+                                        }
+                                    });
+                                    let symbolsStr = (symbols.length > 0) ? symbols.join(", ") : "Assets";
+                                    let title = `${symbolsStr} Received`
+                                    if (valueUSD > 0) {
+                                        title += " : " + currencyFormat(valueUSD);
+                                    }
+                                    assetsReceived = presentInstructions(row.assetsReceived, "AR" + row.msgHash + row.blockNumber + row.incoming, title);
+                                }
+                            } catch (err) {
+                                console.log(err);
+                            }
                             if (type == 'display') {
-                                return presentInstructions(row.msgStr, row.msgHash + row.blockNumber + row.incoming);
+                                return assetsReceived + presentInstructions(row.msgStr, row.msgHash + row.blockNumber + row.incoming);
                             } else {
-                                return data;
+                                return valueUSD;
                             }
                         }
                     }
@@ -538,37 +564,6 @@ async function showxcmmessages(relaychain) {
                             return data;
                         }
 
-                    }
-                },
-                {
-                    data: 'assetsReceived',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            try {
-                                if (data && data.length > 0) {
-                                    let ar = JSON.parse(data);
-                                    let symbols = [];
-                                    let valueUSD = 0.0;
-                                    ar.forEach((r) => {
-                                        if (r.symbol && !symbols.includes(r.symbol)) {
-                                            symbols.push(r.symbol);
-                                        }
-                                        if (r.amountReceivedUSD != undefined && r.amountReceivedUSD > 0) {
-                                            valueUSD += r.amountReceivedUSD;
-                                        }
-                                    });
-                                    let symbolsStr = (symbols.length > 0) ? symbols.join(", ") : "Assets";
-                                    let title = `View ${symbolsStr} Received`
-                                    if (valueUSD > 0) {
-                                        title += " : " + currencyFormat(valueUSD);
-                                    }
-                                    return presentInstructions(data, "AR" + row.msgHash + row.blockNumber + row.incoming, title);
-                                }
-                            } catch (err) {
-                                console.log(err);
-                            }
-                        }
-                        return "None";
                     }
                 },
                 {

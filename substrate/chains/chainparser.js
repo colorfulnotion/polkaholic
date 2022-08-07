@@ -2116,12 +2116,12 @@ module.exports = class ChainParser {
     }
 
     processBeneficiary(indexer, beneficiary, relayChain = 'polkadot', decorate = false) {
-        console.log(`processBeneficiary called`, beneficiary)
+        //console.log(`processBeneficiary called`, beneficiary)
         let paraIDDest, chainIDDest, destAddress;
         let isInterior = (beneficiary.interior != undefined) ? 1 : 0
         let beneficiaryType = (beneficiary.interior != undefined) ? Object.keys(beneficiary.interior)[0] : Object.keys(beneficiary)[0] //handle dest.beneficiary
         let beneficiaryV = (beneficiary.interior != undefined) ? beneficiary['interior'][beneficiaryType] : beneficiary[beneficiaryType] //move up dest.beneficiary
-        console.log(`beneficiaryType=${beneficiaryType}, beneficiaryV`, beneficiaryV)
+        // console.log(`beneficiaryType=${beneficiaryType}, beneficiaryV`, beneficiaryV)
         switch (beneficiaryType) {
             case 'x1':
                 //I think it's possible?
@@ -2190,7 +2190,6 @@ module.exports = class ChainParser {
             default:
                 console.log(`unknown beneficiaryType ${beneficiaryType}`)
         }
-        console.log(`destAddress found: ${destAddress}`)
         return destAddress
     }
 

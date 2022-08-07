@@ -1,42 +1,52 @@
 #!/usr/bin/env node
  // Usage:  xcmmatch [lookbackDays]
-var Crawler = require("./crawler");
 var XCMManager = require("./xcmmanager");
 
 async function main() {
-    var crawler = new Crawler();
-    var manager = new XCMManager();
-
-    let lookbackDays = 1;
+    let lookbackDays = 0;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             lookbackDays = parseInt(val, 10);
         }
     });
 
+    let lastAUSDUpdateTS = 0;
     var manager = new XCMManager();
     await manager.xcm_init()
-
-    let ratMin = .99;
-    let lastAUSDUpdateTS = 0;
-    await crawler.assetManagerInit(); // TODO: how to refresh this?
+    await manager.assetManagerInit();
+    let chain = await manager.getChain(2);
+    await manager.setupAPI(chain);
+    if ( lookbackDays > 0 ) {
+	await manager.xcmanalytics(chain, lookbackDays)
+	process.exit(0);
+    }
+    
+    let startTS = manager.currentTS() - 3600;
+    const lookbackSeconds = 120;
+    let numRecs = 0;
     do {
-        let currentTS = crawler.currentTS();
-        await crawler.xcmMatch(currentTS - 86400 * lookbackDays, currentTS, ratMin);
-        await crawler.xcmmessagesMatch(currentTS - 86400 * lookbackDays, currentTS);
-        ratMin = ratMin - .01;
-	await manager.xcmanalytics(lookbackDays)
-        await crawler.sleep(12000)
-        let lastAUSDUpdateAgo = currentTS - lastAUSDUpdateTS
-        console.log(`[${currentTS}] xcmAUSDUpdate Last Update ${lastAUSDUpdateAgo}s Ago`)
+	// startTS that comes back is the last message unix timestamp
+	[numRecs, startTS] = await manager.xcmanalytics_period(chain, startTS-3600);
+
+	console.log("***** numRecs ", numRecs, "startTS = ", startTS)
+	if ( numRecs == 0 ) {
+	    // this polls every like 1s for a new xcmmessage after startTS, and returns with the timestamp of the first message seen, which is used to start the next process
+            await manager.waitForNewXCMMessage(startTS);
+	} else {
+	    await manager.sleep(6000);
+	}
+
+	// Acala KUSD/AUSD unification
+        let lastAUSDUpdateAgo = manager.getCurrentTS() - lastAUSDUpdateTS
+        console.log(`xcmAUSDUpdate Last Update ${lastAUSDUpdateAgo}s Ago`)
         if (lastAUSDUpdateAgo > 600){
           //update once every 600s
-          console.log(`[${currentTS}] xcmAUSDUpdate now`)
-          await crawler.xcmAUSDUpdate();
-          lastAUSDUpdateTS = currentTS
-	  await crawler.assetManagerInit(); // TODO: how to refresh this?
+          console.log(`xcmAUSDUpdate now`)
+          await manager.xcmAUSDUpdate();
+          lastAUSDUpdateTS = manager.getCurrentTS()
+	  await manager.assetManagerInit(); 
         }
-        if (ratMin < .97) ratMin = .99;
+
     } while (true);
 }
 

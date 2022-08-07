@@ -11,7 +11,7 @@ async function main() {
         }
     });
     
-    let j = await manager.decodeXCMv2(hex)
+    let j = await manager.decodeXCM(hex)
     console.log(JSON.stringify(j, null, 4));
 }
 
