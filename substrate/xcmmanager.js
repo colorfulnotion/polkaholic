@@ -747,7 +747,7 @@ order by msgHash, diffSentAt, diffTS`
     async xcmmatch2_matcher(startTS, endTS = null, lookbackSeconds = 120) {
         let endWhere = endTS ? `and xcmmessages.blockTS <= ${endTS} and xcmtransfer.sourceTS <= ${endTS}` : "";
         // set xcmmessages.{extrinsicID,extrinsicHash} based on xcmtransfer.msgHash / sentAt <= 4 difference
-        let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash
+        let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash, xcmmessages.sectionMethod = xcmtransfer.sectionMethod, xcmmessages.amountSentUSD = xcmtransfer.amountSentUSD
                where xcmtransfer.msgHash = xcmmessages.msgHash and
                  xcmtransfer.msgHash is not null and
                  xcmmessages.blockTS >= ${startTS} and
@@ -790,12 +790,12 @@ order by msgHash, diffSentAt, diffTS`
         d.destTS >= ${startTS} and
         d.destTS - xcmmessages.blockTS >= 0 and
         d.destTS - xcmmessages.blockTS < ${lookbackSeconds} and
-        length(xcmmessages.extrinsicID) > 0 and	xcmmessages.assetsReceived is null ${endWhere}
+        length(xcmmessages.extrinsicID) > 0  ${endWhere}
 order by chainID, extrinsicHash, diffTS`;
         console.log(sql);
         try {
             let matches = await this.pool.query(sql);
-            let vals = ["assetsReceived"];
+            let vals = ["assetsReceived", "amountReceivedUSD"];
             let assetsReceived = {};
             let assetsReceivedXCMTransfer = {};
             for (const m of matches) {
@@ -850,7 +850,9 @@ order by chainID, extrinsicHash, diffTS`;
                 let r = assetsReceived[k];
                 let ar = JSON.stringify(r);
                 if (ar.length < 1024) {
-                    out.push(`('${msgHash}', '${blockNumber}', '${incoming}', ${mysql.escape(ar)})`);
+                    let valueUSD = this.sum_assetsReceived(r);
+                    console.log("*****", valueUSD, r);
+                    out.push(`('${msgHash}', '${blockNumber}', '${incoming}', ${mysql.escape(ar)}, '${valueUSD})`);
                 } else {
                     console.log("LONG VAL", k, "RECS", ar.length, "assetsreceived=", ar);
                 }
@@ -870,7 +872,8 @@ order by chainID, extrinsicHash, diffTS`;
                 let r = assetsReceivedXCMTransfer[k];
                 let ar = JSON.stringify(r);
                 if (ar.length < 1024) {
-                    let sql = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)} where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
+                    let valueUSD = this.sum_assetsReceived(r);
+                    let sql = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)}, amountReceivedUSD2 = ${valueUSD} where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
                     console.log(sql);
                     this.batchedSQL.push(sql);
                     await this.update_batchedSQL();
@@ -884,6 +887,19 @@ order by chainID, extrinsicHash, diffTS`;
         }
     }
 
+    sum_assetsReceived(r) {
+        let valueUSD = 0;
+        let events = {};
+        if (r && Array.isArray(r)) {
+            for (let i = 0; i < r.length; i++) {
+                if (events[r[i].eventID] == undefined) {
+                    valueUSD += r[i].amountReceivedUSD;
+                    events[r[i].eventID] = true;
+                }
+            }
+        }
+        return (valueUSD);
+    }
     /* because the indexer may insert multiple xcmmessages record when a partcular xcmmessage sits in the chains message queue for 1 or more blocks, this xcmmessages_dedup process cleans out any records that exist after the above matching process */
     async xcmmessages_dedup(startTS, endTS = null, lookbackSeconds = 120) {
         let endWhere = endTS ? `and s.blockTS < ${endTS} and d.blockTS < ${endTS+lookbackSeconds}` : "";
