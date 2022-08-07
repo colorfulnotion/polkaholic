@@ -37,11 +37,7 @@ if ( extrinsics !== undefined && extrinsics.length > 0 ) {
           <%- include("module", {chainID: id, section: e.section, method: e.method}); %>
         </td>
         <td>
-          <%
-              	let module_section = e.section;
-              	let module_method = e.method;
-              	let params = e.params; %>
-          <%- include("txparams", {section: module_section, method: module_method, params: params, id: i}); %>
+          <%- include("jsonaccordion", {title: "View Extrinsic Parameters", params: e.params, id: i, width: 750}); %>
         </td>
         <td>
           <% if ( e.evm ) { %>

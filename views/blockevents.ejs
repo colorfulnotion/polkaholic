@@ -34,9 +34,8 @@
         <td>
           <%- include("eventmodule", {chainID: id, palletName: e.section, moduleName: e.method}); %>
         </td>
-
         <td>
-          <%- include("eventparams", {event: e}); %>
+          <%- include("jsonaccordion", {id: e.eventID, title: "View Event", params: e, width: 800}); %>
         </td>
       </tr>
       <% } %>

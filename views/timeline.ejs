@@ -74,24 +74,7 @@ let timelineRows = uiTool.getTimelineRows(timeline);
      <% } %>
      </td>
      <td>
-
-<div class="accordion  accordion-flush" style="width: 600px">
-  <div class="accordion-item">
-    <h2 class="accordion-header" id="heading<%= k; %>">
-      <button class="accordion-button collapsed" type="button" data-mdb-toggle="collapse"
-        data-mdb-target="#flush<%= k; %>" aria-expanded="true" aria-controls="flush<%= k; %>">
-        View Instructions
-      </button>
-    </h2>
-    <div id="flush<%= k; %>" class="accordion-collapse collapse" aria-labelledby="heading<%= k; %>">
-      <div class="accordion-body">
-        <div id="typ<%= k; %>" class="renderjson"></div>
-        <script>document.getElementById("typ<%= k; %>").appendChild(renderjson.set_show_to_level(10)(<%- JSON.stringify(xcm.msg) %>));</script>
-      </div>
-    </div>
-  </div>
-</div>
-
+     <%- include("jsonaccordion", { id: k, title: "View Instructions", params: xcm.msg, width: 600 }) %>
      </td>
      <td>
      <% if ( xcm.assetChains ) {
@@ -123,7 +106,7 @@ let timelineRows = uiTool.getTimelineRows(timeline);
 <h6>Visualization</h6>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <div id="timeline" style="height: 180px; width: 100%"></div>
-<div><i>Select any block in the timeline above to see events, traces and extrinsics in the table below:</i></div>
+<div><i>Select any block in the timeline above to see extrinsics, events, and traces in the table below:</i></div>
 <div>
   <button id="btnShowAllTimelineObjects" type="button" class="btn-sm btn-outline-primary">Show All Events</button>
 </div>
@@ -133,7 +116,7 @@ let timelineRows = uiTool.getTimelineRows(timeline);
       <th>Type</th>
       <th>ID</th>
       <th>Section:Method</th>
-      <th>Object</th>
+      <th>Extrinsic / Event / Trace</th>
       <th>Time</th>
     </tr>
   </thead>
