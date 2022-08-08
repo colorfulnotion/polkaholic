@@ -714,7 +714,17 @@ function getMethodSignature(e) {
         if (inp.indexed != undefined) {
             isIndexed = inp.indexed
         }
-        let typeName = `${inp.type} ${inp.name}`.trim()
+        let typeName;
+        if (Array.isArray(inp.components)){
+            let t = []
+            for (const c of inp.components){
+                let cTypeName = `${c.type} ${c.name}`.trim()
+                t.push(cTypeName)
+            }
+            typeName = `(${t.join(', ')})`
+        }else{
+            typeName = `${inp.type} ${inp.name}`.trim()
+        }
         if (isIndexed) {
             indexedCnt++
             inputs.push(`index_topic_${indexedCnt} ${typeName}`)
@@ -735,7 +745,17 @@ function getMethodFingureprint(e) {
         if (inp.indexed != undefined) {
             isIndexed = inp.indexed
         }
-        let typeName = `${inp.type}`.trim()
+        let typeName;
+        if (Array.isArray(inp.components)){
+            let t = []
+            for (const c of inp.components){
+                let cTypeName = `${c.type}`.trim()
+                t.push(cTypeName)
+            }
+            typeName = `(${t.join(',')})`
+        }else{
+            typeName = `${inp.type}`.trim()
+        }
         if (isIndexed) {
             indexedCnt++
             inputs.push(`index_topic_${indexedCnt} ${typeName}`)
@@ -747,10 +767,32 @@ function getMethodFingureprint(e) {
 }
 
 
-//return raw function signature like transferFrom(address,address,uint256) from abi, which is then used to compute methodID using keccak256(raw_func_sig)
-function getMethodSignatureRaw(e) {
+
+function getMethodSignatureRawOld(e) {
     let inputRaw = `${e.name}(${e.inputs.map(e => e.type)})`
     return inputRaw
+}
+
+//return raw function signature like transferFrom(address,address,uint256) from abi, which is then used to compute methodID using keccak256(raw_func_sig)
+//encodeSelector('transfer(address,uint256,(uint8,bytes[]),uint64)', 10)
+//0xb9f813ff
+function getMethodSignatureRaw(e) {
+    let inputRaw = `${e.name}`
+    let inputs = []
+    for (const inp of e.inputs){
+        if (Array.isArray(inp.components)){
+            let t = []
+            for (const c of inp.components){
+                t.push(c.type)
+            }
+            let rawTuple = `(${t.join(',')})`
+            inputs.push(rawTuple)
+        }else{
+            inputs.push(inp.type)
+        }
+    }
+    let finalRaw = `${inputRaw}(${inputs.join(',')})`
+    return finalRaw
 }
 
 // keccak256 input to certain length
@@ -772,7 +814,7 @@ function parseAbiSignature(abiStrArr) {
         let signatureRaw = getMethodSignatureRaw(e)
         let signatureID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : encodeSelector(signatureRaw, false)
         let fingerprint = getMethodFingureprint(e)
-        let fingerprintID = (abiType == 'function') ? encodeSelector(fingerprint, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint)
+        let fingerprintID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint)
         let abiStr = JSON.stringify([e])
         output.push({
             fingerprint: fingerprint,
