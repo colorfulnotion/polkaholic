@@ -603,6 +603,64 @@ function decorateTxn(dTxn, dReceipt, blockTS = false, chainID = false) {
     return fTxn
 }
 
+function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
+    //etherscan is marking native case as "Transfer"
+    let contractcreationAddress = false
+    let txInput = txn.input
+    let methodID = '0x';
+    let decodedTxnInput = {};
+
+    if (!contractcreationAddress) {
+        if (txInput.length >= 10) {
+            methodID = txInput.slice(0, 10)
+        } else if (txInput >= '0x') {
+            // TODO: check weird case
+            // console.log(`check txhash ${txn.hash}`)
+            methodID = txInput
+        }
+    }
+
+    if (methodID != '0x') {
+        let foundApi = fetchABI(methodID, contractABIs, contractABISignatures)
+        if (foundApi) {
+            let methodSignature = foundApi.signature
+            //console.log(`${methodID} -> ${methodSignature}`)
+            let methodABIStr = foundApi.abi
+            let cachedDecoder = foundApi.decoder
+            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder)
+            if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
+                decodedTxnInput.decodeStatus = decodedInput.name
+                decodedTxnInput.methodID = methodID
+                decodedTxnInput.txInput = txInput
+            } else {
+                //sucessfully decoded, dropping txInput
+                decodedTxnInput.decodeStatus = 'success'
+                decodedTxnInput.methodID = methodID
+                decodedTxnInput.signature = methodSignature
+                decodedTxnInput.params = decodedInput.params
+            }
+        } else {
+            //methodID not found
+            decodedTxnInput.decodeStatus = 'unknown'
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.txInput = txInput
+        }
+    } else {
+        //native transfer case or contract creation
+        if (contractcreationAddress) {
+            //contract creation
+            decodedTxnInput.decodeStatus = 'contractCreation'
+            decodedTxnInput.contractAddress = contractcreationAddress
+        } else {
+            //native transfer
+            decodedTxnInput.decodeStatus = 'success'
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.signature = `nativeTransfer`
+            decodedTxnInput.params = []
+        }
+    }
+    return decodedTxnInput
+}
 
 function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
     //etherscan is marking native case as "Trafer"
@@ -672,6 +730,7 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder) {
     //const abiDecoder = require('abi-decoder');
     //abiDecoder.addABI(methodABIStr)
     //abiDecoder.addABI(JSON.parse(methodABIStr));
+    if (txn.hash == undefined) txn.hash = null
     try {
         let txInput = txn.input
         let methodID = txn.input.slice(0, 10)
@@ -1543,6 +1602,9 @@ module.exports = {
     },
     fuseBlockTransactionReceipt: async function(evmBlk, dTxns, dReceipts, chainID) {
         return fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, chainID)
+    },
+    decodeTransactionInput: function(txn, contractABIs, contractABISignatures){
+        return decodeTransactionInput(txn, contractABIs, contractABISignatures)
     },
     isTxContractCreate: function(tx) {
         return is_tx_contract_create(tx);

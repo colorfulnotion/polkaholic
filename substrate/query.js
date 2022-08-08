@@ -16,6 +16,7 @@
 
 const AssetManager = require("./assetManager");
 const paraTool = require("./paraTool");
+const ethTool = require("./ethTool");
 const mysql = require("mysql2");
 const uiTool = require('./uiTool')
 const assetAndPriceFeedTTL = 300; // how long the data stays cached
@@ -25,6 +26,9 @@ const {
 
 module.exports = class Query extends AssetManager {
     debugLevel = paraTool.debugNoLog;
+
+    contractABIs = false;
+    contractABISignatures = {};
 
     constructor(debugLevel = paraTool.debugNoLog) {
         super()
@@ -36,6 +40,7 @@ module.exports = class Query extends AssetManager {
 
     async init() {
         await this.assetManagerInit()
+        this.contractABIs = await this.getContractABI();
         return (true);
     }
 
@@ -3499,6 +3504,24 @@ module.exports = class Query extends AssetManager {
         this.chainParserInit(chainID, this.debugLevel);
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         try {
+            if (section == 'ethereum' && method == 'transact'){
+                if (args.transaction != undefined){
+                    let evmTx = false;
+                    if (args.transaction.eip1559 != undefined){
+                        evmTx = args.transaction.eip1559
+                    }else if (args.transaction.legacy != undefined){
+                        evmTx = args.transaction.legacy
+                    }
+                    console.log(`evmTx`, evmTx)
+                    if (decorate && evmTx){
+                        let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
+                        console.log(`output`, output)
+                        if (output != undefined){
+                            args.decodedEvmInput = output
+                        }
+                    }
+                }
+            }
             if (args.other_signatories != undefined) {
                 if (decorate) this.decorateAddresses(args, "other_signatories", decorateAddr, false) // ignore here?
             }
