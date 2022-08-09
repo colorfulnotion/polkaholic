@@ -4850,7 +4850,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     async getBlockAuthor(api, block, isNewSession = false, sessionIndex = false) {
-        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver ||
+        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbase || 
             this.chainID == paraTool.chainIDRobonomics ||
             this.chainID == paraTool.chainIDQuartz
         ) {
@@ -5740,7 +5740,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
         } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden ||
-            this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver ||
+            this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbase ||
             this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
             this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint ||
             this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala ||
@@ -5751,7 +5751,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             this.chainID == paraTool.chainIDListen ||
             this.chainID == paraTool.chainIDCrustShadow) {
             await this.chainParser.fetchAsset(this)
-            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver ||
+            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbase ||
                 this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
                 this.chainID == paraTool.chainIDCrustShadow) {
                 console.log(`fetch assetManager:assetIdType`)

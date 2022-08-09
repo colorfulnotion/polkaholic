@@ -691,6 +691,8 @@ module.exports = {
     chainIDUniqueOther: 255,
     chainIDPontem: 105,
     chainIDLaminar: 11,
+    chainIDMoonbase: 61000,
+    chainIDMoonbaseRelay: 60000,
 
     // polkadot/kusama
     chainIDPolkadot: 0,

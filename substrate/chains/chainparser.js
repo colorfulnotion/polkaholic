@@ -3509,7 +3509,7 @@ module.exports = class ChainParser {
         let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
 
         var a;
-        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver ||
+        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase ||
             indexer.chainID == paraTool.chainIDCrustShadow) {
             var a = await indexer.api.query.assetManager.assetIdType.entries()
         } else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
