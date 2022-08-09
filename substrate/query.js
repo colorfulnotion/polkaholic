@@ -4495,13 +4495,18 @@ module.exports = class Query extends AssetManager {
                 case "relaychain":
                     //TODO: need to write xcm.rc for  this to work
                     //w.push(`rc = '${v}'`);
+                    //TODO..
                     if (v.toLowerCase() == 'polkadot') {
                         w.push(`(c!=2 and c<10000)`);
                         wr.push(`relayChain = 'polkadot'`)
                     }
                     if (v.toLowerCase() == 'kusama') {
-                        w.push(`(c=2 or c>=20000)`);
+                        w.push(`(c=2 or (c>=20000 and c<30000))`);
                         wr.push(`relayChain = 'kusama'`)
+                    }
+                    if (v.toLowerCase() == 'moonbase-relay') {
+                        w.push(`(c=60000 or (c>=60000 and c<70000))`);
+                        wr.push(`relayChain = 'moonbase-relay'`)
                     }
                     break;
                 case "datestart":
@@ -5278,14 +5283,15 @@ module.exports = class Query extends AssetManager {
     async getXCMMessage(msgHash, blockNumber = null, decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let w = (blockNumber) ? ` and blockNumber = ${blockNumber}` : "";
-        let sql = `select if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest,
-        msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber from xcmmessages
+        let sql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber from xcmmessages
         where msgHash = '${msgHash}' ${w} order by blockTS desc limit 1`
         let xcmrecs = await this.poolREADONLY.query(sql);
         if (xcmrecs.length == 0) {
             throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${blockNumbersentAt}`)
         }
         let x = xcmrecs[0];
+        x.paraID = paraTool.getParaIDfromChainID(x.chainID)
+        x.paraIDDest = paraTool.getParaIDfromChainID(x.chainIDDest)
         x.msgHex = `${x.msgHex}`
 
         let blockTS = (x.blockTS != undefined) ? x.blockTS : 0
@@ -5772,6 +5778,8 @@ module.exports = class Query extends AssetManager {
         let sent = {};
         for (let r = 0; r < xcmRecs.length; r++) {
             let x = xcmRecs[r];
+            x.paraID = paraTool.getParaIDfromChainID(x.chainID)
+            x.paraIDDest = paraTool.getParaIDfromChainID(x.chainIDDest)
             x.msgHex = `${x.msgHex}`
             chainpaths.push({
                 chainID: x.chainID,
@@ -5838,13 +5846,13 @@ module.exports = class Query extends AssetManager {
             out.push(`( msgHash = '${c.msgHash}' and blockNumber = '${c.blockNumber}' )`);
         }
         let str = out.join(" or");
-        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, version from xcmmessages where ${str} order by blockTS, incoming`
+        let sql = `select chainID, chainIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, version from xcmmessages where ${str} order by blockTS, incoming`
         return this.fetch_xcmmessages_chainpaths(sql);
     }
 
     // get all the xcm messages associated with an extrinsicHash, and also return an array of chainpaths that have chainID/chainIDDest/incoming/blocknumber that allow us to fetch events/traces and formulate the timeline
     async get_xcm_messages_extrinsic(extrinsicHash) {
-        let sql = `select chainID, chainIDDest, if(chainID > 20000, chainID - 20000, chainID) as paraID, if(chainIDDest > 20000, chainIDDest - 20000, chainIDDest) as paraIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetsReceived, version from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
+        let sql = `select chainID, chainIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetsReceived, version from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
         console.log(`get_xcm_messages_extrinsic sql=${sql}`)
         return this.fetch_xcmmessages_chainpaths(sql);
     }
@@ -5956,8 +5964,8 @@ module.exports = class Query extends AssetManager {
                     let rRow = await this.fetch_block_row({
                         chainID: bn_chainID
                     }, p.blockNumber, ["autotrace", "blockraw", "feed", "finalized"]);
-                    let paraID = (chainID > 20000) ? chainID - 20000 : chainID;
-                    let paraIDDest = (chainIDDest > 20000) ? chainIDDest - 20000 : chainIDDest;
+                    let paraID = paraTool.getParaIDfromChainID(chainID)
+                    let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
                     let filter = this.get_filter(paraID, paraIDDest, p.msgType, advanced);
 
                     let blockTS = rRow.feed.blockTS;

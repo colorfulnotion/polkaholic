@@ -498,14 +498,84 @@ function unique(a) {
     });
 }
 
+function getParaIDExtra(relaychain='polkadot'){
+    switch (relaychain) {
+        case 'polkadot':
+            return 0
+            break;
+        case 'kusama':
+            return 20000
+            break;
+        case 'westend':
+            return 30000
+            break;
+        case 'rococo':
+            return 40000
+            break;
+        case 'moonbase-relay':
+            return 60000
+            break;
+        default:
+            //unknown
+            return 90000
+            break;
+    }
+}
+
+function getRelayChainByChainID(chainID=0) {
+    if (chainID == 0){
+        return 'polkadot'
+    }else if (chainID == 2){
+        return 'kusama'
+    }
+    let r = chainID % 10000
+    let prefix = (chainID-r) / 10000
+    switch (prefix) {
+        case 0:
+            return 'polkadot';
+        case 2:
+            return 'kusama';
+        case 3:
+            return 'westend';
+        case 4:
+            return 'rococo';
+        case 6:
+            return 'moonbase-relay';
+        default:
+            return 'unknown';
+    }
+    return false
+}
+
+function getRelayChainID(relaychain='polkadot') {
+    switch (relaychain) {
+        case 'polkadot':
+            return 0
+            break;
+        case 'kusama':
+            return 2
+            break;
+        case 'westend':
+            return 30000
+            break;
+        case 'rococo':
+            return 40000
+            break;
+        case 'moonbase-relay':
+            return 60000
+            break;
+        default:
+            return 90000
+            break;
+    }
+}
+
 function getParaIDfromChainID(chainID) {
     let paraID;
-    if (chainID == 0 || chainID == 2) {
+    if (chainID == 0 || chainID == 2 || chainID == 30000 || chainID == 40000 || chainID == 60000) {
         paraID = 0
-    } else if (chainID > 20000) {
-        paraID = chainID - 20000
     } else {
-        paraID = chainID
+        paraID = chainID % 10000
     }
     return paraID
 }
@@ -691,6 +761,8 @@ module.exports = {
     chainIDUniqueOther: 255,
     chainIDPontem: 105,
     chainIDLaminar: 11,
+    chainIDMoonbase: 61000,
+    chainIDMoonbaseRelay: 60000,
 
     // polkadot/kusama
     chainIDPolkadot: 0,
@@ -1133,5 +1205,14 @@ module.exports = {
     },
     getParaIDfromChainID: function(x) {
         return getParaIDfromChainID(x)
-    }
+    },
+    getRelayChainID: function(x) {
+        return getRelayChainID(x)
+    },
+    getParaIDExtra: function(x) {
+        return getParaIDExtra(x)
+    },
+    getRelayChainByChainID: function(x) {
+        return getRelayChainByChainID(x)
+    },
 };
