@@ -301,8 +301,8 @@ module.exports = class ChainParser {
         try {
             let paraIDDest = paraTool.dechexToInt(k[0].replace(',', ''))
             let relayChain = indexer.relayChain
-            let relayChainID = (relayChain == 'polkadot') ? 0 : 2
-            let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+            let relayChainID = paraTool.getRelayChainID(relayChain)
+            let paraIDExtra = paraTool.getParaIDExtra(relayChain)
             let chainIDDest = paraIDDest + paraIDExtra
             out.paraIDDest = paraIDDest; //paraID
             out.chainIDDest = chainIDDest;
@@ -420,7 +420,7 @@ module.exports = class ChainParser {
                         //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
                         sentAt: 0,
                         chainID: indexer.chainID,
-                        chainIDDest: (relayChain == 'polkadot') ? 0 : 2,
+                        chainIDDest: paraTool.getRelayChainID(relayChain),
                         relayChain: relayChain,
                         beneficiaries: beneficiaries,
                     }
@@ -463,8 +463,8 @@ module.exports = class ChainParser {
             for (const hrmp of hrmpOutboundMsgs) {
                 if (hrmp.data != undefined) {
                     let relayChain = indexer.relayChain
-                    let relayChainID = (relayChain == 'polkadot') ? 0 : 2
-                    let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+                    let relayChainID = paraTool.getRelayChainID(relayChain)
+                    let paraIDExtra = paraTool.getParaIDExtra(relayChain)
                     let data = '0x' + hrmp.data.slice(4)
                     let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
                     var instructions = this.decodeXcmVersionedXcm(indexer, data, `HrmpOutboundMessagesVal`)
@@ -657,7 +657,7 @@ module.exports = class ChainParser {
         if (mpType == 'ump') {
             //para -> relay
             out.chainID = indexer.chainID
-            out.chainIDDest = (out.relaychain == 'polkadot') ? 0 : 2
+            out.chainIDDest = paraTool.getRelayChainID(indexer.relayChain)
         } else if (mpType == 'hrmp') {
             //para -> para
             out.chainID = indexer.chainID
@@ -930,8 +930,8 @@ module.exports = class ChainParser {
                 let backedCandidates = data.backedCandidates
                 //console.log(`[${extrinsic.extrinsicID}] backedCandidates`, backedCandidates)
                 let relayChain = indexer.relayChain
-                let relayChainID = (relayChain == 'polkadot') ? 0 : 2
-                let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+                let relayChainID = paraTool.getRelayChainID(relayChain)
+                let paraIDExtra = paraTool.getParaIDExtra(relayChain)
                 for (let k = 0; k < backedCandidates.length; k++) {
                     let candidate = backedCandidates[k].candidate
                     let candidateDescriptor = candidate.descriptor
@@ -1013,8 +1013,8 @@ module.exports = class ChainParser {
 
                 let downwardMessages = data.downwardMessages // this is from relaychain
                 let relayChain = indexer.relayChain
-                let relayChainID = (relayChain == 'polkadot') ? 0 : 2
-                let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+                let relayChainID = paraTool.getRelayChainID(relayChain)
+                let paraIDExtra = paraTool.getParaIDExtra(relayChain)
                 for (let j = 0; j < downwardMessages.length; j++) {
                     let downwardMsg = downwardMessages[j]
                     let channelMsgIndex = `${extrinsic.extrinsicID}-dmp-${indexer.chainID}-${relayChainID}-${j}`
@@ -1318,11 +1318,9 @@ module.exports = class ChainParser {
         if (v0x1.parachain !== undefined) {
             //{ parachain: 2001 }
             paraIDDest = v0x1.parachain
-            if (relayChain == "polkadot") {
-                chainIDDest = paraIDDest;
-            } else {
-                chainIDDest = paraIDDest + 20000;
-            }
+            let relayChainID = paraTool.getRelayChainID(relayChain)
+            let paraIDExtra = paraTool.getParaIDExtra(relayChain)
+            chainIDDest = paraIDDest + paraIDExtra
         } else if (v0x1.parent !== undefined) {
             // { parent: null }
             paraIDDest = 0
@@ -1343,36 +1341,26 @@ module.exports = class ChainParser {
         let paraIDDest = -1
         let chainIDDest = -1
         let destAddress = null
+        let relayChainID = paraTool.getRelayChainID(relayChain)
+        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
         if (Array.isArray(v0x2)) {
             //same as dest X1
             let x2_0 = v0x2[0];
             if (x2_0.parachain !== undefined) {
                 //{ parachain: 2001 }
                 paraIDDest = x2_0.parachain
-                if (relayChain == "polkadot") {
-                    chainIDDest = paraIDDest;
-                } else {
-                    chainIDDest = paraIDDest + 20000;
-                }
+                chainIDDest = paraIDDest + paraIDExtra
             } else if (x2_0.parent !== undefined) {
                 // { parent: null }
                 paraIDDest = 0
-                if (relayChain == "polkadot") {
-                    chainIDDest = paraTool.chainIDPolkadot;
-                } else if (relayChain == "kusama") {
-                    chainIDDest = paraTool.chainIDKusama;
-                }
+                chainIDDest = relayChainID
             }
             if (Array.isArray(v0x2) && v0x2.length == 2) {
                 let x2_1 = v0x2[1];
                 if (x2_1.parachain !== undefined) {
                     //{ parachain: 2001 }
                     paraIDDest = x2_1.parachain
-                    if (relayChain == "polkadot") {
-                        chainIDDest = paraIDDest;
-                    } else {
-                        chainIDDest = paraIDDest + 20000;
-                    }
+                    chainIDDest = paraIDDest + paraIDExtra
                 }
             }
         }
@@ -1384,11 +1372,9 @@ module.exports = class ChainParser {
         let paraIDDest = 0
         let chainIDDest = -1
         let destAddress = null
-        if (relayChain == "polkadot") {
-            chainIDDest = paraTool.chainIDPolkadot;
-        } else if (relayChain == "kusama") {
-            chainIDDest = paraTool.chainIDKusama;
-        }
+        let relayChainID = paraTool.getRelayChainID(relayChain)
+        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
+        chainIDDest = relayChainID
         destAddress = this.processAccountKey(x1, decorate, indexer)
         return [paraIDDest, chainIDDest, destAddress]
     }
@@ -1398,25 +1384,19 @@ module.exports = class ChainParser {
         let paraIDDest = -1
         let chainIDDest = -1
         let destAddress = null
+        let relayChainID = paraTool.getRelayChainID(relayChain)
+        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
         if (Array.isArray(x2)) {
             //same as dest X1
             let x2_1 = x2[0];
             if (x2_1.parachain !== undefined) {
                 //{ parachain: 2001 }
                 paraIDDest = x2_1.parachain
-                if (relayChain == "polkadot") {
-                    chainIDDest = paraIDDest;
-                } else {
-                    chainIDDest = paraIDDest + 20000;
-                }
+                chainIDDest = paraIDDest + paraIDExtra
             } else if (x2_1.parent !== undefined) {
                 // { parent: null }
                 paraIDDest = 0
-                if (relayChain == "polkadot") {
-                    chainIDDest = paraTool.chainIDPolkadot;
-                } else if (relayChain == "kusama") {
-                    chainIDDest = paraTool.chainIDKusama;
-                }
+                chainIDDest = relayChainID
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x2_1`, x2)
             }
@@ -1449,6 +1429,9 @@ module.exports = class ChainParser {
         let paraIDDest = -1
         let chainIDDest = -1
         let destAddress = null
+        let relayChainID = paraTool.getRelayChainID(relayChain)
+        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
+
         if (Array.isArray(x3)) {
             //same as dest X1
             let x3_0 = x3[0]; //not used?
@@ -1456,19 +1439,11 @@ module.exports = class ChainParser {
             if (x3_1.parachain !== undefined) {
                 //{ parachain: 2001 }
                 paraIDDest = x3_1.parachain
-                if (relayChain == "polkadot") {
-                    chainIDDest = paraIDDest;
-                } else {
-                    chainIDDest = paraIDDest + 20000;
-                }
+                chainIDDest = paraIDDest + paraIDExtra
             } else if (x3_1.parent !== undefined) {
                 // { parent: null }
                 paraIDDest = 0
-                if (relayChain == "polkadot") {
-                    chainIDDest = paraTool.chainIDPolkadot;
-                } else if (relayChain == "kusama") {
-                    chainIDDest = paraTool.chainIDKusama;
-                }
+                chainIDDest = relayChainID
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x3_1`, x3_1)
             }
@@ -2025,7 +2000,7 @@ module.exports = class ChainParser {
         },
         */
         let relayChain = indexer.relayChain
-        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
         let targetedAsset = false;
         let rawTargetedAsset = false;
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`processV1ConcreteFungible asset`, fungibleAsset)
@@ -2196,7 +2171,7 @@ module.exports = class ChainParser {
     //This is the V0 format
     processV0ConcreteFungible(indexer, fungibleAsset) {
         let relayChain = indexer.relayChain
-        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
         let selfParaID = (indexer.chainID == paraTool.chainIDKusama || indexer.chainID == paraTool.chainIDPolkadot) ? 0 : indexer.chainID - paraIDExtra
         let targetedAsset = false;
         let rawTargetedAsset = false;
@@ -3373,8 +3348,8 @@ module.exports = class ChainParser {
             return
         }
         let relayChain = indexer.relayChain
-        let relayChainID = (relayChain == 'polkadot') ? 0 : 2
-        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+        let relayChainID = paraTool.getRelayChainID(relayChain)
+        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
 
         var a;
         if (indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDKarura) {
@@ -3505,8 +3480,8 @@ module.exports = class ChainParser {
             return
         }
         let relayChain = indexer.relayChain
-        let relayChainID = (relayChain == 'polkadot') ? 0 : 2
-        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+        let relayChainID = paraTool.getRelayChainID(relayChain)
+        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
 
         var a;
         if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase ||
@@ -3650,8 +3625,8 @@ module.exports = class ChainParser {
             return
         }
         let relayChain = indexer.relayChain
-        let relayChainID = (relayChain == 'polkadot') ? 0 : 2
-        let paraIDExtra = (relayChain == 'polkadot') ? 0 : 20000
+        let relayChainID = paraTool.getRelayChainID(relayChain)
+        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
 
         var a;
         if (indexer.chainID == paraTool.chainIDAstar || indexer.chainID == paraTool.chainIDShiden) {

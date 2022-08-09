@@ -264,9 +264,8 @@ order by msgHash, diffSentAt, diffTS`
     get_concrete_assetChain(analysis, c, chainID, chainIDDest) {
         let paraID = paraTool.getParaIDfromChainID(chainID)
         let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
-        //let paraIDDest = (chainIDDest > 20000) ? chainIDDest - 20000 : chainIDDest;
-        let relayChain = (chainIDDest > 20000 || chainIDDest == 2) ? "kusama" : "polkadot";
-        let relayChainID = (relayChain == 'polkadot') ? 0 : 2
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let relayChainID = paraTool.getRelayChainID(relayChain)
 
         if (c.parents !== undefined && c.interior !== undefined) {
             let parents = c.parents;
@@ -378,7 +377,7 @@ order by msgHash, diffSentAt, diffTS`
     // All instructions with "MultiLocation" (parachain, accountID32/ accountID20, here) should be decorated with chain.id, chain.chainName or the "identity" using lookup_account
     analyzeXCM_MultiLocation(analysis, c, fld, chainID, chainIDDest, ctx) {
         if (c[fld] == undefined) return;
-        let relayChain = (chainID > 20000 || chainID == 2) ? "kusama" : "polkadot";
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
         let destAddress = this.chainParser.processBeneficiary(false, c[fld], relayChain);
         if (destAddress) {
             analysis.xcmAddresses.push(destAddress)
@@ -763,7 +762,7 @@ order by msgHash, diffSentAt, diffTS`
             p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.childMsgHash and
              abs(c.sentAt - p.childSentAt) <= 4 and
              c.extrinsicID is null and
-             p.blockTS >= ${startTS} and 
+             p.blockTS >= ${startTS} and
              c.blockTS >= ${startTS} ${endWhere}`
         this.batchedSQL.push(sql2);
         console.log(sql2);
