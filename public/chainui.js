@@ -1,8 +1,8 @@
 let initxcmmessages = false;
 async function showxcmmessages(chainID = null) {
     let pathParams = 'xcmmessages'
-    if ( chainID != null ) {
-	pathParams += `?chainfilters=${chainID}`
+    if (chainID != null) {
+        pathParams += `?chainfilters=${chainID}`
     }
     let tableName = '#tablexcmmessages'
     if (initxcmmessages) {
@@ -44,7 +44,7 @@ async function showxcmmessages(chainID = null) {
                         }
                     }
                 },
-		{
+                {
                     data: 'extrinsicID',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
@@ -54,9 +54,9 @@ async function showxcmmessages(chainID = null) {
                             } else {
                                 str = `<BR>${row.chainName} Extrinsic: Unknown`;
                             }
-			    if ( row.sectionMethod ) {
-				str += '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.sectionMethod + '</button>';
-			    }
+                            if (row.sectionMethod) {
+                                str += '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.sectionMethod + '</button>';
+                            }
                             return str;
                         } else {
                             let str = "";
@@ -65,9 +65,9 @@ async function showxcmmessages(chainID = null) {
                             } else {
                                 str = "Unknown";
                             }
-			    if ( row.sectionMethod ) {
-				str += row.sectionMethod;
-			    }
+                            if (row.sectionMethod) {
+                                str += row.sectionMethod;
+                            }
                             return str + " " + data;
                         }
                     }
@@ -136,16 +136,18 @@ async function showxcmmessages(chainID = null) {
                     }
                 },
                 {
-                    data: 'msgStr',
+                    data: 'msg',
                     render: function(data, type, row, meta) {
-                        if (row.msgStr != undefined) {
+                        if (row.msg != undefined) {
                             let assetsReceived = "";
                             let valueUSD = 0.0;
                             try {
                                 if (row.assetsReceived && row.assetsReceived.length > 0) {
-                                    let ar = JSON.parse(row.assetsReceived);
+                                    let ar = row.assetsReceived;
+                                    //let assetsReceivedStr = JSON.stringify(row.assetsReceived);
                                     let symbols = [];
                                     ar.forEach((r) => {
+                                        console.log(`r`, r)
                                         if (r.symbol && !symbols.includes(r.symbol)) {
                                             symbols.push(r.symbol);
                                         }
@@ -157,18 +159,18 @@ async function showxcmmessages(chainID = null) {
                                     let title = `${symbolsStr} Received`
                                     if (valueUSD > 0) {
                                         title += " : " + currencyFormat(valueUSD);
-					if ( row.amountSentUSD > 0 ) {
-					    let feesUSD = row.amountSentUSD - valueUSD;
+                                        if (row.amountSentUSD > 0) {
+                                            let feesUSD = row.amountSentUSD - valueUSD;
                                             title += " (Est fees: " + currencyFormat(feesUSD) + ")";
-					}
+                                        }
                                     }
-                                    assetsReceived = presentInstructions(row.assetsReceived, "AR" + row.msgHash + row.blockNumber + row.incoming, title);
+                                    assetsReceived = presentInstructions(JSON.stringify(row.assetsReceived), "AR" + row.msgHash + row.blockNumber + row.incoming, title);
                                 }
                             } catch (err) {
                                 console.log(err);
                             }
                             if (type == 'display') {
-                                return assetsReceived + presentInstructions(row.msgStr, row.msgHash + row.blockNumber + row.incoming);
+                                return assetsReceived + presentInstructions(JSON.stringify(row.msg), row.msgHash + row.blockNumber + row.incoming);
                             } else {
                                 return valueUSD;
                             }
@@ -215,4 +217,3 @@ async function showxcmmessages(chainID = null) {
         setchainfilter(selectElement.value);
     }
 }
-
