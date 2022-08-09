@@ -528,7 +528,7 @@ function getRelayChainByChainID(chainID=0) {
             return 'polkadot';
         case 2:
             return 'kusama';
-        case 2:
+        case 6:
             return 'moonbase-relay';
         default:
             return 'unknown';
