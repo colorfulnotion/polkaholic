@@ -506,10 +506,17 @@ function getParaIDExtra(relaychain='polkadot'){
         case 'kusama':
             return 20000
             break;
+        case 'westend':
+            return 30000
+            break;
+        case 'rococo':
+            return 40000
+            break;
         case 'moonbase-relay':
             return 60000
             break;
         default:
+            //unknown
             return 90000
             break;
     }
@@ -528,6 +535,10 @@ function getRelayChainByChainID(chainID=0) {
             return 'polkadot';
         case 2:
             return 'kusama';
+        case 3:
+            return 'westend';
+        case 4:
+            return 'rococo';
         case 6:
             return 'moonbase-relay';
         default:
@@ -544,6 +555,12 @@ function getRelayChainID(relaychain='polkadot') {
         case 'kusama':
             return 2
             break;
+        case 'westend':
+            return 30000
+            break;
+        case 'rococo':
+            return 40000
+            break;
         case 'moonbase-relay':
             return 60000
             break;
@@ -555,7 +572,7 @@ function getRelayChainID(relaychain='polkadot') {
 
 function getParaIDfromChainID(chainID) {
     let paraID;
-    if (chainID == 0 || chainID == 2 || chainID == 60000) {
+    if (chainID == 0 || chainID == 2 || chainID == 30000 || chainID == 40000 || chainID == 60000) {
         paraID = 0
     } else {
         paraID = chainID % 10000
