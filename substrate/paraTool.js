@@ -498,7 +498,7 @@ function unique(a) {
     });
 }
 
-function getParaIDExtra(relaychain='polkadot'){
+function getParaIDExtra(relaychain = 'polkadot') {
     switch (relaychain) {
         case 'polkadot':
             return 0
@@ -522,14 +522,14 @@ function getParaIDExtra(relaychain='polkadot'){
     }
 }
 
-function getRelayChainByChainID(chainID=0) {
-    if (chainID == 0){
+function getRelayChainByChainID(chainID = 0) {
+    if (chainID == 0) {
         return 'polkadot'
-    }else if (chainID == 2){
+    } else if (chainID == 2) {
         return 'kusama'
     }
     let r = chainID % 10000
-    let prefix = (chainID-r) / 10000
+    let prefix = (chainID - r) / 10000
     switch (prefix) {
         case 0:
             return 'polkadot';
@@ -547,7 +547,7 @@ function getRelayChainByChainID(chainID=0) {
     return false
 }
 
-function getRelayChainID(relaychain='polkadot') {
+function getRelayChainID(relaychain = 'polkadot') {
     switch (relaychain) {
         case 'polkadot':
             return 0
@@ -578,6 +578,18 @@ function getParaIDfromChainID(chainID) {
         paraID = chainID % 10000
     }
     return paraID
+}
+
+function toUSD(symbol, relayChain) {
+    symbol = symbol.toUpperCase().replace('XC', '')
+    if (symbol == 'AUSD' || symbol == 'KUSD') {
+        if (relayChain == 'polkadot') {
+            symbol = 'AUSD'
+        } else if (relayChain == 'kusama') {
+            symbol = 'KUSD'
+        }
+    }
+    return symbol
 }
 
 class NotFoundError extends Error {
@@ -1214,5 +1226,8 @@ module.exports = {
     },
     getRelayChainByChainID: function(x) {
         return getRelayChainByChainID(x)
+    },
+    toUSD: function(x, relayChain) {
+        return toUSD(x, relayChain)
     },
 };

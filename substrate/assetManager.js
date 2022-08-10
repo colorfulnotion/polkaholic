@@ -31,6 +31,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     assetInfo = {};
     xcmAssetInfo = {}; // xcmInteriorKey   -> nativeAssetChain
     xcmInteriorInfo = {}; // nativeAssetChain -> xcmInteriorKey
+    xcmSymbolInfo = {}; // symbolKey -> xcmInteriorKey
     assetlog = {};
     ratelog = {};
     assetlogTTL = 0;
@@ -376,14 +377,16 @@ module.exports = class AssetManager extends PolkaholicDB {
         // reload assetInfo
         await this.init_asset_info()
 
+        // init nativeAsset
+        await this.init_nativeAssetInfo();
+
         // reload xcmAsset
         await this.init_xcm_asset();
 
         // reload paras
         await this.init_paras();
 
-        // init nativeAsset
-        await this.init_nativeAssetInfo();
+
 
         return true
     }
@@ -433,28 +436,46 @@ module.exports = class AssetManager extends PolkaholicDB {
         let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
         let xcmAssetInfo = {};
         let xcmInteriorInfo = {};
+        let xcmSymbolInfo = {};
         for (let i = 0; i < xcmAssetRecs.length; i++) {
             let v = xcmAssetRecs[i];
             let a = {}
             // add assetChain (string) + parseUSDpaths (JSON array)
             let xcmInteriorKey = paraTool.makeXcmInteriorKey(v.xcmConcept, v.relayChain);
             let nativeAssetChain = paraTool.makeAssetChain(v.asset, v.chainID);
+            let decimals = null;
+            let symbol = null;
+            if (this.assetInfo[nativeAssetChain] && this.assetInfo[nativeAssetChain].decimals != undefined && this.assetInfo[nativeAssetChain].symbol != undefined) {
+                decimals = this.assetInfo[nativeAssetChain].decimals;
+                symbol = this.assetInfo[nativeAssetChain].symbol;
+                symbol.replace('xc', '')
+            }
             //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
             a = {
                 chainID: v.chainID,
                 xcmConcept: v.xcmConcept,
                 asset: v.asset,
+                decimals: decimals,
+                symbol: symbol,
                 paraID: v.paraID,
                 relayChain: v.relayChain,
                 parents: v.parents,
                 xcmInteriorKey: xcmInteriorKey,
                 nativeAssetChain: nativeAssetChain,
             }
+            if (symbol) {
+                let interiorAsset = {
+                    Token: symbol.toUpperCase()
+                }
+                let xcmSymbolKey = paraTool.makeXcmInteriorKey(JSON.stringify(interiorAsset), v.relayChain);
+                xcmSymbolInfo[xcmSymbolKey] = a
+            }
             xcmAssetInfo[xcmInteriorKey] = a; //the key has no chainID
             xcmInteriorInfo[nativeAssetChain] = a
         }
         this.xcmAssetInfo = xcmAssetInfo;
         this.xcmInteriorInfo = xcmInteriorInfo;
+        this.xcmSymbolInfo = xcmSymbolInfo;
         //console.log(`init_xcm_asset !!`, xcmAssetInfo)
     }
 
@@ -469,6 +490,14 @@ module.exports = class AssetManager extends PolkaholicDB {
 
     getXcmAssetInfoByNativeAssetChain(nativeAssetChain) {
         let xcmAssetInfo = this.xcmInteriorInfo[nativeAssetChain]
+        if (xcmAssetInfo != undefined) {
+            return xcmAssetInfo
+        }
+        return false
+    }
+
+    getXcmAssetInfoBySymbolKey(xcmSymbolKey) {
+        let xcmAssetInfo = this.xcmSymbolInfo[xcmSymbolKey]
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo
         }

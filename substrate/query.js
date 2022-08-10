@@ -3504,19 +3504,19 @@ module.exports = class Query extends AssetManager {
         this.chainParserInit(chainID, this.debugLevel);
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         try {
-            if (section == 'ethereum' && method == 'transact'){
-                if (args.transaction != undefined){
+            if (section == 'ethereum' && method == 'transact') {
+                if (args.transaction != undefined) {
                     let evmTx = false;
-                    if (args.transaction.eip1559 != undefined){
+                    if (args.transaction.eip1559 != undefined) {
                         evmTx = args.transaction.eip1559
-                    }else if (args.transaction.legacy != undefined){
+                    } else if (args.transaction.legacy != undefined) {
                         evmTx = args.transaction.legacy
                     }
                     console.log(`evmTx`, evmTx)
-                    if (decorate && evmTx){
+                    if (decorate && evmTx) {
                         let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
                         console.log(`output`, output)
-                        if (output != undefined){
+                        if (output != undefined) {
                             args.decodedEvmInput = output
                         }
                     }
@@ -4405,7 +4405,7 @@ module.exports = class Query extends AssetManager {
         }
 
         // bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
-        let mysqlQuery = `SELECT msgHash, msgStr, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour)) and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
+        let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour)) and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
         console.log(mysqlQuery);
         let results = [];
         let recs = await this.poolREADONLY.query(mysqlQuery);
@@ -4414,6 +4414,21 @@ module.exports = class Query extends AssetManager {
         let included = {};
         for (let i = 0; i < recs.length; i++) {
             let r = recs[i];
+            try {
+                let assetsReceived = JSON.parse(r.assetsReceived)
+                let dedupedAssetsReceived = []
+                let eventIDMap = {}
+                for (const ar of assetsReceived) {
+                    if (eventIDMap[ar.eventID] == undefined) {
+                        eventIDMap[ar.eventID] = 1
+                        dedupedAssetsReceived.push(ar)
+                    }
+                }
+                r.assetsReceived = dedupedAssetsReceived
+            } catch (e) {
+                r.assetsReceived = []
+            }
+
             let chainID = parseInt(r.chainID, 10);
             let chainIDDest = parseInt(r.chainIDDest, 10);
             let parsedMsg = {};
@@ -4421,7 +4436,7 @@ module.exports = class Query extends AssetManager {
             let [_chainIDDest, idDest] = this.convertChainID(chainIDDest)
             r.id = id
             r.idDest = idDest;
-            r.msgStr = r.msgStr.toString();
+            r.msg = JSON.parse(r.msg.toString());
             r.chainName = this.getChainName(chainID);
             r.chainDestName = this.getChainName(chainIDDest);
             r.relayChain = (r.chainIDDest != 2 && (r.chainIDDest < 10000)) ? 'polkadot' : 'kusama';

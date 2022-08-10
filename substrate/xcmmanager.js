@@ -774,6 +774,7 @@ order by msgHash, diffSentAt, diffTS`
         endWhere = endTS ? `and xcmmessages.blockTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds}` : "";
         let sql = `select  xcmmessages.chainID, xcmmessages.chainIDDest,
           (d.destts - xcmmessages.blockTS) as diffTS,
+          (d.sentAt - xcmmessages.sentAt) as diffSentAt,
           xcmmessages.msgHash,
           xcmmessages.blockNumber,
           xcmmessages.incoming,
@@ -785,26 +786,75 @@ order by msgHash, diffSentAt, diffTS`
         from xcmmessages, xcmtransferdestcandidate as d
  where  d.fromAddress = xcmmessages.beneficiaries${fld} and
         d.chainIDDest = xcmmessages.chainIDDest and
+        d.sentAt - xcmmessages.sentAt >= 0 and d.sentAt - xcmmessages.sentAt <= 4 and
         xcmmessages.blockTS >= ${startTS} and
         d.destTS >= ${startTS} and
         d.destTS - xcmmessages.blockTS >= 0 and
         d.destTS - xcmmessages.blockTS < ${lookbackSeconds} and
+        xcmmessages.assetsReceived is Null and
         length(xcmmessages.extrinsicID) > 0  ${endWhere}
-order by chainID, extrinsicHash, diffTS`;
+order by chainID, extrinsicHash, eventID, diffTS`;
         console.log(sql);
+        //	process.exit(0);
         try {
             let matches = await this.pool.query(sql);
-            let vals = ["assetsReceived", "amountReceivedUSD"];
             let assetsReceived = {};
             let assetsReceivedXCMTransfer = {};
+            let prevEventID = false
+            let prevDestMatch = false
             for (const m of matches) {
-                let k = `${m.msgHash}-${m.blockNumber}-${m.incoming}`;
+                let k = `${m.msgHash}-${m.blockNumber}`; //asset received is direction less
                 if (assetsReceived[k] == undefined) {
                     assetsReceived[k] = [];
                 }
                 let priceUSD = 0;
                 let amountReceivedUSD = 0;
                 let amountReceived = m.amountReceived;
+
+                let targetChainID = m.chainIDDest // the chainIDDest to use for price lookup
+                let targetAsset = m.rawAsset // the asset to use for price lookup
+                let defaultAsset = m.asset // the "default" asset (human readable?)
+                let defaultAsset2 = m.asset
+                let decimals = false
+                let symbol = false
+                let xcmInteriorKey = false
+                let relayChain = paraTool.getRelayChainByChainID(targetChainID)
+                let rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
+                if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined && this.assetInfo[rawassetChain].symbol != undefined) {
+                    decimals = this.assetInfo[rawassetChain].decimals;
+                    symbol = this.assetInfo[rawassetChain].symbol;
+                    symbol = paraTool.toUSD(symbol, relayChain)
+                } else {
+                    //missing
+                    let [nativeChainID, isFound] = await this.getNativeAssetChainID(defaultAsset)
+                    if (isFound) {
+                        targetChainID = nativeChainID
+                        rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
+                    }
+                    if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined && this.assetInfo[rawassetChain].symbol != undefined) {
+                        decimals = this.assetInfo[rawassetChain].decimals;
+                        symbol = this.assetInfo[rawassetChain].symbol;
+                        symbol = paraTool.toUSD(symbol, relayChain)
+                    }
+                }
+                if (symbol) {
+                    let interiorAsset = {
+                        Token: symbol
+                    }
+                    let xcmSymbolKey = paraTool.makeXcmInteriorKey(JSON.stringify(interiorAsset), relayChain);
+                    let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(xcmSymbolKey);
+                    if (xcmAssetInfo != undefined) {
+                        xcmInteriorKey = xcmAssetInfo.xcmInteriorKey
+                        if (xcmAssetInfo.nativeAssetChain != undefined) {
+                            let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(xcmAssetInfo.nativeAssetChain)
+                            targetAsset = nativeAsset
+                            targetChainID = nativeChainID
+                        } else {
+                            console.log("WARNING: nativeAssetChain unknown", k, xcmSymbolKey, JSON.stringify(xcmAssetInfo));
+                        }
+                    }
+                }
+                /*
                 let symbol = this.getAssetSymbol(m.asset, m.chainID);
                 let decimals = this.getAssetDecimal(m.asset, m.chainID)
                 if (decimals === false) {
@@ -813,50 +863,67 @@ order by chainID, extrinsicHash, diffTS`;
                 if (symbol === false) {
                     symbol = this.getAssetSymbol(m.asset, m.chainIDDest)
                 }
+                */
                 if (decimals !== false) {
-                    let [_, __, priceUSDblockTS] = await this.computeUSD(1.0, m.asset, m.chainID, m.blockTS);
+                    let [_, __, priceUSDblockTS] = await this.computeUSD(1.0, targetAsset, targetChainID, m.blockTS);
                     if (priceUSDblockTS > 0) {
                         priceUSD = priceUSDblockTS;
                         amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
                         amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                    } else {
+
                     }
                 }
                 let destMatch = {
                     chainID: m.chainIDDest,
+                    xcmInteriorKey,
                     asset: m.asset,
-                    symbol: symbol,
                     rawAsset: m.rawAsset,
+                    symbol: symbol,
+                    decimal: decimals,
                     amountReceived: amountReceived,
                     amountReceivedUSD: amountReceivedUSD,
                     eventID: m.eventID,
                     blockNumber: m.blockNumber,
                     ts: m.destTS
                 };
-                assetsReceived[k].push(destMatch);
+                //console.log(`destMatch`, destMatch)
+                let isNewEventID = false
+                let currEventID = m.eventID
+                if (prevEventID != currEventID) isNewEventID = true
+                if (isNewEventID) {
+                    assetsReceived[k].push(destMatch);
+                }
 
                 if (m.extrinsicHash && m.extrinsicHash.length > 0) {
                     let k2 = `${m.extrinsicHash}:${m.extrinsicID}:${m.msgHash}`
                     if (assetsReceivedXCMTransfer[k2] == undefined) {
                         assetsReceivedXCMTransfer[k2] = [];
                     }
-                    assetsReceivedXCMTransfer[k2].push(destMatch);
+                    if (isNewEventID) {
+                        assetsReceivedXCMTransfer[k2].push(destMatch);
+                    }
                 }
+                prevEventID = currEventID
+                prevDestMatch = destMatch
             }
 
             let out = [];
             for (const k of Object.keys(assetsReceived)) {
-                let [msgHash, blockNumber, incoming] = k.split("-");
+                let [msgHash, blockNumber] = k.split("-");
                 let r = assetsReceived[k];
                 let ar = JSON.stringify(r);
                 if (ar.length < 1024) {
                     let valueUSD = this.sum_assetsReceived(r);
-                    console.log("*****", valueUSD, r);
-                    out.push(`('${msgHash}', '${blockNumber}', '${incoming}', ${mysql.escape(ar)}, '${valueUSD})`);
+                    // console.log("*****", valueUSD, r);
+                    out.push(`('${msgHash}', '${blockNumber}', '0', ${mysql.escape(ar)}, '${valueUSD}')`);
+                    out.push(`('${msgHash}', '${blockNumber}', '1', ${mysql.escape(ar)}, '${valueUSD}')`);
                 } else {
                     console.log("LONG VAL", k, "RECS", ar.length, "assetsreceived=", ar);
                 }
             }
             console.log(out.length);
+            let vals = ["assetsReceived", "amountReceivedUSD"];
             await this.upsertSQL({
                 "table": "xcmmessages",
                 "keys": ["msgHash", "blockNumber", "incoming"],
@@ -873,7 +940,7 @@ order by chainID, extrinsicHash, diffTS`;
                 if (ar.length < 1024) {
                     let valueUSD = this.sum_assetsReceived(r);
                     let sql = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)}, amountReceivedUSD2 = ${valueUSD} where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
-                    console.log(sql);
+                    //console.log(sql);
                     this.batchedSQL.push(sql);
                     await this.update_batchedSQL();
                 } else {
@@ -958,7 +1025,6 @@ order by msgHash`
 
         // computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints, beneficiaries2}
         let lastTS = await this.computeXCMFingerprints(t0, t1);
-
         // xcmmatch2_matcher computes assetsReceived by matching xcmmessages.beneficiaries(2) to xcmtransferdestcandidate
         await this.xcmmatch2_matcher(t0, t1)
 

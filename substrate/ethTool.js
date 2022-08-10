@@ -774,14 +774,14 @@ function getMethodSignature(e) {
             isIndexed = inp.indexed
         }
         let typeName;
-        if (Array.isArray(inp.components)){
+        if (Array.isArray(inp.components)) {
             let t = []
-            for (const c of inp.components){
+            for (const c of inp.components) {
                 let cTypeName = `${c.type} ${c.name}`.trim()
                 t.push(cTypeName)
             }
             typeName = `(${t.join(', ')})`
-        }else{
+        } else {
             typeName = `${inp.type} ${inp.name}`.trim()
         }
         if (isIndexed) {
@@ -805,14 +805,14 @@ function getMethodFingureprint(e) {
             isIndexed = inp.indexed
         }
         let typeName;
-        if (Array.isArray(inp.components)){
+        if (Array.isArray(inp.components)) {
             let t = []
-            for (const c of inp.components){
+            for (const c of inp.components) {
                 let cTypeName = `${c.type}`.trim()
                 t.push(cTypeName)
             }
             typeName = `(${t.join(',')})`
-        }else{
+        } else {
             typeName = `${inp.type}`.trim()
         }
         if (isIndexed) {
@@ -838,15 +838,15 @@ function getMethodSignatureRawOld(e) {
 function getMethodSignatureRaw(e) {
     let inputRaw = `${e.name}`
     let inputs = []
-    for (const inp of e.inputs){
-        if (Array.isArray(inp.components)){
+    for (const inp of e.inputs) {
+        if (Array.isArray(inp.components)) {
             let t = []
-            for (const c of inp.components){
+            for (const c of inp.components) {
                 t.push(c.type)
             }
             let rawTuple = `(${t.join(',')})`
             inputs.push(rawTuple)
-        }else{
+        } else {
             inputs.push(inp.type)
         }
     }
@@ -1603,7 +1603,7 @@ module.exports = {
     fuseBlockTransactionReceipt: async function(evmBlk, dTxns, dReceipts, chainID) {
         return fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, chainID)
     },
-    decodeTransactionInput: function(txn, contractABIs, contractABISignatures){
+    decodeTransactionInput: function(txn, contractABIs, contractABISignatures) {
         return decodeTransactionInput(txn, contractABIs, contractABISignatures)
     },
     isTxContractCreate: function(tx) {
