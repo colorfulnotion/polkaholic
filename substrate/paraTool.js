@@ -592,6 +592,21 @@ function toUSD(symbol, relayChain) {
     return symbol
 }
 
+function VSTokenToToken(tokenStr) {
+    try {
+        let token = JSON.parse(tokenStr)
+        if (token.VSToken != undefined) {
+            let v = `VS${token.VSToken}`
+            return JSON.stringify({
+                Token: v
+            })
+        }
+    } catch (e) {
+        return tokenStr
+    }
+    return tokenStr
+}
+
 class NotFoundError extends Error {
     constructor(message) {
         // Needs to pass both `message` and `options` to install the "cause" property.
@@ -1229,5 +1244,8 @@ module.exports = {
     },
     toUSD: function(x, relayChain) {
         return toUSD(x, relayChain)
+    },
+    VSTokenToToken: function(tokenStr) {
+        return VSTokenToToken(tokenStr)
     },
 };
