@@ -4152,7 +4152,7 @@ module.exports = class ChainParser {
         let rawAssetString = indexer.getNativeAsset();
         let fromAddress = paraTool.getPubKey(d[0]);
         let amountReceived = paraTool.dechexToInt(d[1]);
-
+        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal balances:Deposit`
             candidate = {
@@ -4170,6 +4170,10 @@ module.exports = class ChainParser {
                 amountReceived: amountReceived,
                 msgHash: mpState.msgHash,
             }
+            if(isXCMAssetFound){
+                if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+            }
             return [candidate, caller]
         } else {
             // TODO: log
@@ -4186,6 +4190,7 @@ module.exports = class ChainParser {
         //let assetString = this.token_to_string(d[0]);
         let assetString = this.processGenericCurrencyID(indexer, d[0]);
         let rawAssetString = this.processRawGenericCurrencyID(indexer, d[0]);
+        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
         if (paraTool.validAmount(amountReceived) && finalized) {
@@ -4205,6 +4210,10 @@ module.exports = class ChainParser {
                 amountReceived: amountReceived,
                 msgHash: mpState.msgHash,
             }
+            if(isXCMAssetFound){
+                if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+            }
             return [candidate, caller]
         } else {
             // TODO: log
@@ -4221,6 +4230,7 @@ module.exports = class ChainParser {
         //let assetString = this.token_to_string(d[0]);
         let assetString = this.processGenericCurrencyID(indexer, d[0]);
         let rawAssetString = this.processRawGenericCurrencyID(indexer, d[0]);
+        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
         //console.log(`[${fromAddress}] ${assetString}`, amountReceived, `finalized=${finalized}`)
@@ -4240,6 +4250,10 @@ module.exports = class ChainParser {
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
                 msgHash: mpState.msgHash,
+            }
+            if(isXCMAssetFound){
+                if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
             }
             return [candidate, caller]
         } else {
@@ -4274,6 +4288,7 @@ module.exports = class ChainParser {
         }
         let rawAssetString = this.token_to_string(parsedAsset);
 
+
         //TODO: not sure here..
         //let assetString = this.processGenericCurrencyID(indexer, d[0]);
         //let rawAssetString = this.processRawGenericCurrencyID(indexer, d[0]);
@@ -4285,6 +4300,8 @@ module.exports = class ChainParser {
                 Token: assetInfo.symbol
             }
             let assetString = this.token_to_string(rAasset);
+            let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
+
             let eventIndex = e.eventID.split('-')[3]
             if (this.debugLevel >= paraTool.debugTracing) console.log(`processAssetIssued`, fromAddress, amountReceived, assetString)
             if (paraTool.validAmount(amountReceived) && finalized) {
@@ -4303,6 +4320,10 @@ module.exports = class ChainParser {
                     destTS: this.parserTS,
                     amountReceived: amountReceived,
                     msgHash: mpState.msgHash,
+                }
+                if(isXCMAssetFound){
+                    if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                    if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                 }
                 return [candidate, caller]
             } else {
