@@ -1237,12 +1237,12 @@ module.exports = class ChainParser {
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         // enable this line to explore section:method
         // console.log(`${pallet}:${method}`)
-        if (pallet == "ump" && method == "UpwardMessagesReceived") {
+        if (pallet == "ump" && method == "ExecutedUpward") {
             // parachain -> relaychain
             //console.log("processBlockEvent", pallet, method, e);
             // https://kusama.subscan.io/block/12039596?tab=event has balances/Deposited
             // test case: indexPeriods 2  2022-03-30 21
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] ump:UpwardMessagesReceived signal`)
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] ump:ExecutedUpward signal`)
             let paraID = e.data[0];
             this.umpReceived = true;
             this.umpReceivedFromParaID[paraID]++;
