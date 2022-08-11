@@ -7,7 +7,6 @@ module.exports = class ChainParser {
     parserBlockHash = false;
     parserWatermark = 0;
     numParserErrors = 0;
-    mpReceivedFromParaID = {};
     mpReceived = false;
     mpReceivedHashes = {};
     constructor() {
@@ -31,7 +30,6 @@ module.exports = class ChainParser {
         }
         this.parserBlockHash = blockHash;
         this.mpReceived = false;
-        this.mpReceivedFromParaID = {};
     }
 
     tokens_to_string(tokens) {
@@ -1293,47 +1291,38 @@ module.exports = class ChainParser {
         if (pallet == "ump" && method == "ExecutedUpward") {
             // parachain -> relaychain
             //console.log("processBlockEvent", pallet, method, e);
-            // https://kusama.subscan.io/block/12039596?tab=event has balances/Deposited
             // test case: indexPeriods 2  2022-03-30 21
             let signalStatus = this.processIncomingXCMSignalStatus(e)
             let msgHash = signalStatus.msgHash;
             this.mpReceived = true;
             this.mpReceivedHashes[idx] = signalStatus
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] ump:ExecutedUpward signal [msgHash=${msgHash}, idx=${idx}]`, signalStatus)
-            this.mpReceivedFromParaID['unknown']++;
         } else if (pallet == "xcmpQueue" && method == "Success") {
             // this is the para <=> para case
             //console.log("processBlockEvent", pallet, method);
-            // https://bifrost.subscan.io/block/1539819?tab=event has currencies/Deposited
             // test case: indexPeriods 6 2022-03-30 21
             let signalStatus = this.processIncomingXCMSignalStatus(e)
             let msgHash = signalStatus.msgHash;
             this.mpReceived = true;
             this.mpReceivedHashes[idx] = signalStatus
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Success signal [msgHash=${msgHash}, idx=${idx}]`, signalStatus)
-            this.mpReceivedFromParaID['unknown']++;
         } else if (pallet == "xcmpQueue" && method == "Fail") {
             // this is the para <=> para case
             //console.log("processBlockEvent", pallet, method);
-            // https://bifrost.subscan.io/block/1539819?tab=event has currencies/Deposited
             // test case: indexPeriods 6 2022-03-30 21
             let signalStatus = this.processIncomingXCMSignalStatus(e)
             let msgHash = signalStatus.msgHash;
             this.mpReceived = true;
             this.mpReceivedHashes[idx] = signalStatus
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Fail signal !!! [msgHash=${msgHash}, idx=${idx}]`, signalStatus)
-            //this.mpReceived = true;
-            //this.mpReceivedFromParaID['unknown']++;
         } else if (pallet == "dmpQueue" && method == "ExecutedDownward") {
             // relaychain -> parachain (xcmPallet:reserveTransferAssets)
-            //https://acala.subscan.io/extrinsic/980484-1?event=980484-8
             //0x1983c30b091b39363a07c4a90be79b7ce4650742666f25e8378beff6f54a30f4
             let signalStatus = this.processIncomingXCMSignalStatus(e)
             let msgHash = signalStatus.msgHash;
             this.mpReceived = true;
             this.mpReceivedHashes[idx] = signalStatus
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] dmpqueue:ExecutedDownward signal [msgHash=${msgHash}, idx=${idx}]`, signalStatus)
-            this.mpReceivedFromParaID['unknown']++;
         }
     }
 
@@ -4175,7 +4164,6 @@ module.exports = class ChainParser {
 
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal balances:Deposit`
-            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.mpReceivedFromParaID, caller);
             candidate = {
                 chainIDDest: indexer.chainID,
                 eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4189,7 +4177,6 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID)),
                 msgHash: mpState.msgHash,
             }
             return [candidate, caller]
@@ -4212,7 +4199,6 @@ module.exports = class ChainParser {
         let amountReceived = paraTool.dechexToInt(d[2]);
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal currencies:Deposited`
-            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.mpReceivedFromParaID, caller);
             candidate = {
                 chainIDDest: indexer.chainID,
                 eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4226,7 +4212,6 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID)),
                 msgHash: mpState.msgHash,
             }
             return [candidate, caller]
@@ -4250,7 +4235,6 @@ module.exports = class ChainParser {
         //console.log(`[${fromAddress}] ${assetString}`, amountReceived, `finalized=${finalized}`)
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal tokens:Deposited`
-            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.mpReceivedFromParaID, caller);
             candidate = {
                 chainIDDest: indexer.chainID,
                 eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4264,7 +4248,6 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID)),
                 msgHash: mpState.msgHash,
             }
             return [candidate, caller]
@@ -4315,7 +4298,6 @@ module.exports = class ChainParser {
             if (this.debugLevel >= paraTool.debugTracing) console.log(`processAssetIssued`, fromAddress, amountReceived, assetString)
             if (paraTool.validAmount(amountReceived) && finalized) {
                 let caller = `generic processIncomingAssetSignal assets:Issued`
-                //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.mpReceivedFromParaID, caller);
                 candidate = {
                     chainIDDest: indexer.chainID,
                     eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4329,7 +4311,6 @@ module.exports = class ChainParser {
                     rawAsset: rawAssetString,
                     destTS: this.parserTS,
                     amountReceived: amountReceived,
-                    paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID)),
                     msgHash: mpState.msgHash,
                 }
                 return [candidate, caller]

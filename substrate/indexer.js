@@ -1111,7 +1111,7 @@ module.exports = class Indexer extends AssetManager {
             for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
                 let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
                 // ["chainIDDest", "eventID"] + ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "paraIDs", "rawAsset", "sentAt"
-                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.asset}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.paraIDs}'`, `'${r.rawAsset}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`].join(",") + ")";
+                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.asset}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.rawAsset}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`].join(",") + ")";
                 if (this.validAsset(r.asset, r.chainIDDest, "xcmtransfer", t)) {
                     xcmtransferdestcandidates.push(t);
                 } else {
@@ -1125,9 +1125,9 @@ module.exports = class Indexer extends AssetManager {
                     await this.upsertSQL({
                         "table": "xcmtransferdestcandidate",
                         "keys": ["chainIDDest", "eventID"],
-                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "paraIDs", "rawAsset", "sentAt", "msgHash", "addDT"],
+                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT"],
                         "data": xcmtransferdestcandidates,
-                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "paraIDs", "rawAsset", "sentAt", "msgHash", "addDT"]
+                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT"]
                     });
                 }
             } catch (err0) {
