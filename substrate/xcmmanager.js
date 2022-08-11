@@ -81,7 +81,7 @@ order by chainID, extrinsicHash, diffTS`
                         decimals = this.getAssetDecimal(d.asset, d.chainIDDest)
                     }
                     if (decimals !== false) {
-                        let [_, __, priceUSDsourceTS] = await this.computeUSD(1.0, d.asset, d.chainID, d.sourceTS);
+                        let [_, priceUSDsourceTS, __] = await this.computeUSD(1.0, d.asset, d.chainID, d.sourceTS);
                         if (priceUSDsourceTS > 0) {
                             priceUSD = priceUSDsourceTS;
                             let amountSent = parseFloat(d.amountSent) / 10 ** decimals;
@@ -810,73 +810,39 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                 let priceUSD = 0;
                 let amountReceivedUSD = 0;
                 let amountReceived = m.amountReceived;
-
-                let targetChainID = m.chainIDDest // the chainIDDest to use for price lookup
-                let targetAsset = m.rawAsset // the asset to use for price lookup
-                let defaultAsset = m.asset // the "default" asset (human readable?)
-                let defaultAsset2 = m.asset
+                let targetChainID = m.chainIDDest
+                let asset = m.asset
+                let rawAsset = m.rawAsset
                 let decimals = false
                 let symbol = false
                 let xcmInteriorKey = false
-                let relayChain = paraTool.getRelayChainByChainID(targetChainID)
-                let rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
-                if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined && this.assetInfo[rawassetChain].symbol != undefined) {
-                    decimals = this.assetInfo[rawassetChain].decimals;
-                    symbol = this.assetInfo[rawassetChain].symbol;
-                    symbol = paraTool.toUSD(symbol, relayChain)
-                } else {
-                    //missing
-                    let [nativeChainID, isFound] = await this.getNativeAssetChainID(defaultAsset)
-                    if (isFound) {
-                        targetChainID = nativeChainID
-                        rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
-                    }
-                    if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined && this.assetInfo[rawassetChain].symbol != undefined) {
-                        decimals = this.assetInfo[rawassetChain].decimals;
-                        symbol = this.assetInfo[rawassetChain].symbol;
-                        symbol = paraTool.toUSD(symbol, relayChain)
-                    }
-                }
-                if (symbol) {
-                    let interiorAsset = {
-                        Token: symbol
-                    }
-                    let xcmSymbolKey = paraTool.makeXcmInteriorKey(JSON.stringify(interiorAsset), relayChain);
-                    let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(xcmSymbolKey);
-                    if (xcmAssetInfo != undefined) {
-                        xcmInteriorKey = xcmAssetInfo.xcmInteriorKey
-                        if (xcmAssetInfo.nativeAssetChain != undefined) {
-                            let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(xcmAssetInfo.nativeAssetChain)
-                            targetAsset = nativeAsset
-                            targetChainID = nativeChainID
+                let isIncompleteRec = true
+
+                let [isXCMAssetFound, standardizedXCMInfo] = this.getStandardizedXCMAssetInfo(targetChainID, asset, rawAsset)
+                if (isXCMAssetFound) {
+                    decimals = standardizedXCMInfo.decimals;
+                    symbol = standardizedXCMInfo.symbol;
+                    let nativeAssetChain = standardizedXCMInfo.nativeAssetChain;
+                    xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                    let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(standardizedXCMInfo.nativeAssetChain)
+                    if (decimals !== false) {
+                        let [_, priceUSDblockTS, __] = await this.computeUSD(1.0, nativeAsset, nativeChainID, m.blockTS);
+                        //console.log(`getting price targetAsset=${targetAsset}, targetChainID=${targetChainID}, ts=${m.blockTS}, priceUSDblockTS=${priceUSDblockTS}`)
+                        if (priceUSDblockTS > 0) {
+                            priceUSD = priceUSDblockTS;
+                            amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
+                            amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                            isIncompleteRec = false
                         } else {
-                            console.log("WARNING: nativeAssetChain unknown", k, xcmSymbolKey, JSON.stringify(xcmAssetInfo));
+
                         }
                     }
-                }
-                /*
-                let symbol = this.getAssetSymbol(m.asset, m.chainID);
-                let decimals = this.getAssetDecimal(m.asset, m.chainID)
-                if (decimals === false) {
-                    decimals = this.getAssetDecimal(m.asset, m.chainIDDest)
-                }
-                if (symbol === false) {
-                    symbol = this.getAssetSymbol(m.asset, m.chainIDDest)
-                }
-                */
-                if (decimals !== false) {
-                    let [_, __, priceUSDblockTS] = await this.computeUSD(1.0, targetAsset, targetChainID, m.blockTS);
-                    if (priceUSDblockTS > 0) {
-                        priceUSD = priceUSDblockTS;
-                        amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
-                        amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
-                    } else {
-
-                    }
+                } else {
+                    //not found..
                 }
                 let destMatch = {
                     chainID: m.chainIDDest,
-                    xcmInteriorKey,
+                    xcmInteriorKey: xcmInteriorKey,
                     asset: m.asset,
                     rawAsset: m.rawAsset,
                     symbol: symbol,
@@ -887,7 +853,11 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                     blockNumber: m.blockNumber,
                     ts: m.destTS
                 };
-                //console.log(`destMatch`, destMatch)
+                if (isIncompleteRec) {
+                    console.log(`Incomplete destMatch`, destMatch)
+                } else {
+                    console.log(`OK destMatch`, destMatch)
+                }
                 let isNewEventID = false
                 let currEventID = m.eventID
                 if (prevEventID != currEventID) isNewEventID = true
@@ -1025,6 +995,7 @@ order by msgHash`
 
         // computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints, beneficiaries2}
         let lastTS = await this.computeXCMFingerprints(t0, t1);
+
         // xcmmatch2_matcher computes assetsReceived by matching xcmmessages.beneficiaries(2) to xcmtransferdestcandidate
         await this.xcmmatch2_matcher(t0, t1)
 
@@ -1036,6 +1007,7 @@ order by msgHash`
         // do it again
         numRecs = await this.xcmmessages_match(t0, t1);
         return [numRecs, lastTS];
+
     }
 
     async xcmanalytics(chain, lookbackDays) {
@@ -1045,6 +1017,55 @@ order by msgHash`
             let t0 = ts;
             let t1 = ts + 86400;
             await this.xcmanalytics_period(chain, t0, t1);
+        }
+    }
+
+    // xcmtransfer_match matches cross transfers between SENDING events held in "xcmtransfer"  and CANDIDATE destination events (from various xcm received messages on a destination chain)
+    // this will be phased out soon
+    async xcm_reanalytics(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200) {
+        let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS}` : ""
+        let sql = `select chainID, chainIDDest, extrinsicHash, extrinsicID, asset, amountSent, amountReceived, transferIndex, xcmIndex, sourceTS from xcmtransfer
+ where  sourceTS >= ${startTS} and asset not like '%BTC%'  and incomplete = 0 ${endWhere}
+order by chainID, extrinsicHash`
+        console.log("match_reanalytics", sql)
+        try {
+            let xcmmatches = await this.poolREADONLY.query(sql);
+            let out = [];
+            let vals = ["amountSentUSD", "amountReceivedUSD"];
+            for (let i = 0; i < xcmmatches.length; i++) {
+                let m = xcmmatches[i];
+                let decimals = this.getAssetDecimal(m.asset, m.chainID)
+                if (decimals === false) {
+                    decimals = this.getAssetDecimal(m.asset, m.chainIDDest)
+                }
+                if (decimals !== false) {
+                    let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, m.asset, m.chainID, m.sourceTS);
+                    if (priceUSD > 0) {
+                        let asset = m.asset;
+                        let amountSent = parseFloat(m.amountSent) / 10 ** decimals;
+                        let amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
+                        let amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
+                        let amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                        let sql = `update xcmtransfer set amountSentUSD = '${amountSentUSD}', amountReceivedUSD = '${amountReceivedUSD}' where extrinsicHash = '${m.extrinsicHash}' and  transferIndex = '${m.transferIndex}' and xcmIndex = '${m.xcmIndex}'`;
+                        console.log(sql);
+                        this.batchedSQL.push(sql);
+                        await this.update_batchedSQL()
+                    }
+                }
+            }
+
+        } catch (err) {
+            console.log("xcmtransfer_reanalytics", err)
+        }
+    }
+
+    async xcmReanalytics(lookbackDays) {
+        let endTS = this.currentTS();
+        let startTS = endTS - lookbackDays * 86400;
+        for (let ts = startTS; ts < endTS; ts += 86400) {
+            let t0 = ts;
+            let t1 = ts + 86400;
+            await this.xcm_reanalytics(t0, t1);
         }
     }
 
