@@ -884,7 +884,7 @@ module.exports = class ChainParser {
             let prevIdx = 0;
 
             //TODO: blacklist: author, 0x6d6f646c70792f74727372790000000000000000 (modlpy/trsry)
-            //claim: mpState.endIdx-1 is typically "fee" event either going to blockproducer or trsry
+            //conjecture: the last event prior to msgHash is typically the "fee" event either going to blockproducer or trsry
             for (const idxKey of idxKeys){
                 this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx)
                 this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
@@ -902,15 +902,6 @@ module.exports = class ChainParser {
                 prevIdx = parseInt(idxKey)+1
             }
         }
-        /*
-        for (let i = 0; i < events.length; i++) {
-            let e = events[i]
-            let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, finalized)
-            if (candidate) {
-                indexer.updateXCMTransferDestCandidate(candidate, caller)
-            }
-        }
-        */
     }
 
     //channelMsgIndex: extrinsicID-mpType-receiverChainID-senderChainID-msgIdx

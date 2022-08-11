@@ -6,30 +6,42 @@ module.exports = class MoonbeamParser extends ChainParser {
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized = false) {
         //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
         this.mpReceived = false;
+        this.mpReceivedHashes = {};
         //console.log(`[${extrinsicID}] processIncomingXCM start`, `mpReceived=${this.mpReceived}`)
 
         //step0. parse incoming messages (raw)
         super.processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, finalized)
 
         //step1. parse incoming transfer heuristically
-        for (const e of events) {
-            this.processIncomingXCMSignal(indexer, extrinsic, extrinsicID, e, finalized)
+        for (let i = 0; i < events.length; i++) {
+            let e = events[i]
+            super.processIncomingXCMSignal(indexer, extrinsicID, e, i, finalized)
         }
+        if (this.mpReceived){
+            let idxKeys = Object.keys(this.mpReceivedHashes)
+            let prevIdx = 0;
 
-        for (const e of events) {
-            let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, finalized)
-            if (candidate) {
-                indexer.updateXCMTransferDestCandidate(candidate, caller)
+            for (const idxKey of idxKeys){
+                this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx)
+                this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
+                let mpState = this.mpReceivedHashes[idxKey]
+                console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
+                let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
+                let eventRangeLengthWithoutFee = eventRange.length -1 // remove the fee event here
+                for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
+                    let e = eventRange[i]
+                    let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
+                    if (candidate) {
+                        indexer.updateXCMTransferDestCandidate(candidate, caller)
+                    }
+                }
+                prevIdx = parseInt(idxKey)+1
             }
         }
     }
 
-    processIncomingXCMSignal(indexer, extrinsic, extrinsicID, e, finalized = false) {
-        return super.processIncomingXCMSignal(indexer, extrinsicID, e, finalized)
-    }
-
-    processIncomingAssetSignal(indexer, extrinsicID, e, finalized = false) {
-        let [candidate, caller] = super.processIncomingAssetSignal(indexer, extrinsicID, e, finalized)
+    processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized = false) {
+        let [candidate, caller] = super.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
         caller = `generic processIncomingAssetSignal assets:Issued`
         if (candidate && candidate.asset != undefined) {
             //remove xc
