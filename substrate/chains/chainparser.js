@@ -882,8 +882,29 @@ module.exports = class ChainParser {
             this.processIncomingXCMSignal(indexer, extrinsicID, e, i, finalized)
         }
         if (this.mpReceived){
-            console.log(`mpReceived true [${this.parserBlockNumber}] [${this.parserBlockHash}] mpReceivedHashes`, this.mpReceivedHashes)
+            let idxKeys = Object.keys(this.mpReceivedHashes)
+            let prevIdx = 0;
+
+            //TODO: blacklist: author, 0x6d6f646c70792f74727372790000000000000000 (modlpy/trsry)
+            //claim: mpState.endIdx-1 is typically "fee" event either going to blockproducer or trsry
+            for (const idxKey of idxKeys){
+                this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx)
+                this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
+                let mpState = this.mpReceivedHashes[idxKey]
+                console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
+                let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
+                let eventRangeLengthWithoutFee = eventRange.length -1 // remove the fee event here
+                for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
+                    let e = eventRange[i]
+                    let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
+                    if (candidate) {
+                        indexer.updateXCMTransferDestCandidate(candidate, caller)
+                    }
+                }
+                prevIdx = parseInt(idxKey)+1
+            }
         }
+        /*
         for (let i = 0; i < events.length; i++) {
             let e = events[i]
             let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, finalized)
@@ -891,6 +912,7 @@ module.exports = class ChainParser {
                 indexer.updateXCMTransferDestCandidate(candidate, caller)
             }
         }
+        */
     }
 
     //channelMsgIndex: extrinsicID-mpType-receiverChainID-senderChainID-msgIdx
@@ -1239,10 +1261,13 @@ module.exports = class ChainParser {
     }
 
     processIncomingXCMSignalStatus(e){
+        let sectionMethod = `${e.section}(${e.method})`
         let msgHash = e.data[0];
         let state = e.data[1]
         let statusK = Object.keys(state)[0]
         let signalStatus = {
+            sectionMethod: sectionMethod,
+            eventID: e.eventID,
             msgHash: msgHash,
             success: false,
         }
@@ -1250,6 +1275,9 @@ module.exports = class ChainParser {
         if (statusK == 'complete' || statusK == 'weight'){
             signalStatus.weight = paraTool.dechexToInt(statusV)
             signalStatus.success = true
+        }else if (sectionMethod == 'xcmpQueue(Success)'){
+            signalStatus.success = true
+            signalStatus.weight = paraTool.dechexToInt(state)
         }else{
             signalStatus.error = statusK
             signalStatus.description = statusV
@@ -1309,7 +1337,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processIncomingAssetSignal(indexer, extrinsicID, e, finalized = false) {
+    processIncomingAssetSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         let palletMethod = `${pallet}(${method})` //event
         let candidate = false;
@@ -1319,25 +1347,25 @@ module.exports = class ChainParser {
             case 'balances(Deposit)':
                 //kusama/polkadot format
                 if (this.mpReceived) {
-                    [candidate, caller] = this.processBalancesDepositSignal(indexer, extrinsicID, e, finalized)
+                    [candidate, caller] = this.processBalancesDepositSignal(indexer, extrinsicID, e, mpState, finalized)
                 }
                 break;
             case 'currencies(Deposited)':
                 // acala/bifrost format
                 if (this.mpReceived) {
-                    [candidate, caller] = this.processCurrenciesDepositedSignal(indexer, extrinsicID, e, finalized)
+                    [candidate, caller] = this.processCurrenciesDepositedSignal(indexer, extrinsicID, e, mpState, finalized)
                 }
                 break;
             case 'tokens(Deposited)':
                 // acala format?
                 if (this.mpReceived) {
-                    [candidate, caller] = this.processTokensDepositedSignal(indexer, extrinsicID, e, finalized)
+                    [candidate, caller] = this.processTokensDepositedSignal(indexer, extrinsicID, e, mpState, finalized)
                 }
                 break;
             case 'assets(Issued)':
                 // parallel/moonbeam/astar format
                 if (this.mpReceived) {
-                    [candidate, caller] = this.processAssetsIssuedSignal(indexer, extrinsicID, e, finalized)
+                    [candidate, caller] = this.processAssetsIssuedSignal(indexer, extrinsicID, e, mpState, finalized)
                 }
                 break;
             default:
@@ -4134,7 +4162,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processBalancesDepositSignal(indexer, extrinsicID, e, finalized) {
+    processBalancesDepositSignal(indexer, extrinsicID, e, mpState, finalized) {
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         let eventIndex = e.eventID.split('-')[3]
@@ -4161,7 +4189,8 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID))
+                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID)),
+                msgHash: mpState.msgHash,
             }
             return [candidate, caller]
         } else {
@@ -4170,7 +4199,7 @@ module.exports = class ChainParser {
         return [false, false]
     }
 
-    processCurrenciesDepositedSignal(indexer, extrinsicID, e, finalized) {
+    processCurrenciesDepositedSignal(indexer, extrinsicID, e, mpState, finalized) {
         if (this.debugLevel >= paraTool.debugTracing) console.log(`currencies(Deposited)`, e.data)
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
@@ -4197,7 +4226,8 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID))
+                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID)),
+                msgHash: mpState.msgHash,
             }
             return [candidate, caller]
         } else {
@@ -4206,7 +4236,7 @@ module.exports = class ChainParser {
         return [false, false]
     }
 
-    processTokensDepositedSignal(indexer, extrinsicID, e, finalized) {
+    processTokensDepositedSignal(indexer, extrinsicID, e, mpState, finalized) {
         if (this.debugLevel >= paraTool.debugTracing) console.log(`tokens(Deposited)`, e.data)
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
@@ -4234,7 +4264,8 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID))
+                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID)),
+                msgHash: mpState.msgHash,
             }
             return [candidate, caller]
         } else {
@@ -4243,7 +4274,7 @@ module.exports = class ChainParser {
         return [false, false]
     }
 
-    processAssetsIssuedSignal(indexer, extrinsicID, e, finalized = false) {
+    processAssetsIssuedSignal(indexer, extrinsicID, e, mpState, finalized = false) {
         /*
         data": [
           101,
@@ -4298,7 +4329,8 @@ module.exports = class ChainParser {
                     rawAsset: rawAssetString,
                     destTS: this.parserTS,
                     amountReceived: amountReceived,
-                    paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID))
+                    paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID)),
+                    msgHash: mpState.msgHash,
                 }
                 return [candidate, caller]
             } else {
