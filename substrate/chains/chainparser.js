@@ -1718,6 +1718,11 @@ module.exports = class ChainParser {
                     msgHash: '0x',
                     sentAt: this.parserWatermark,
                 }
+                let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                if(isXCMAssetFound){
+                    if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                    if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                }
                 if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
                 //console.log("processOutgoingXTokens xTokens", r);
                 console.log(`processOutgoingXTokensEvent`, r)
@@ -1930,6 +1935,11 @@ module.exports = class ChainParser {
                             isFeeItem: isFeeItem,
                             msgHash: '0x',
                             sentAt: this.parserWatermark,
+                        }
+                        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                        if(isXCMAssetFound){
+                            if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                            if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                         }
                         //console.log("processOutgoingXTokens xTokens", r);
                         outgoingXTokens.push(r)
@@ -2542,7 +2552,12 @@ module.exports = class ChainParser {
                                 msgHash: '0x',
                                 sentAt: this.parserWatermark,
                             }
-                            if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingXcmPallet xcmPallet", r);
+                            let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                            if(isXCMAssetFound){
+                                if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                                if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                            }
+                            if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingPolkadotXcm xcmPallet", r);
                             outgoingXcmPallet.push(r)
                             extrinsic.xcms.push(r)
                             //outgoingXcmList.push(r)
@@ -2773,6 +2788,11 @@ module.exports = class ChainParser {
                                 isFeeItem: isFeeItem,
                                 msgHash: '0x',
                                 sentAt: this.parserWatermark,
+                            }
+                            let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                            if(isXCMAssetFound){
+                                if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                                if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                             }
                             //if (this.debugLevel >= paraTool.debugVerbose) console.log("processOutgoingXcmPallet xcmPallet", r);
                             extrinsic.xcms.push(r)

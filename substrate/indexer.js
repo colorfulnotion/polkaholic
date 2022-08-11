@@ -1084,8 +1084,10 @@ module.exports = class Indexer extends AssetManager {
             let xcmtransfers = [];
             for (let i = 0; i < xcmtransferKeys.length; i++) {
                 let r = this.xcmtransfer[xcmtransferKeys[i]];
+                let nativeAssetChain = (r.nativeAssetChain != undefined)? `'${r.nativeAssetChain}'` : `'NULL'`
+                let xcmInteriorKey = (r.xcmInteriorKey != undefined)? `'${r.xcmInteriorKey}'` : `'NULL'`
                 let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`, `'${r.chainID}'`, `'${r.chainIDDest}'`,
-                    `'${r.blockNumber}'`, `'${r.fromAddress}'`, `'${r.asset}'`, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.rawAsset}', '${r.msgHash}', '${r.sentAt}'`
+                    `'${r.blockNumber}'`, `'${r.fromAddress}'`, `'${r.asset}'`, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.rawAsset}', '${r.msgHash}', '${r.sentAt}'`, nativeAssetChain, xcmInteriorKey
                 ].join(",") + ")";
                 if (r.asset !== undefined && this.validAsset(r.asset, r.chainID, "xcmtransfer", t)) {
                     xcmtransfers.push(t);
@@ -1098,9 +1100,9 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash", "sentAt"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash", "sentAt", "nativeAssetChain", "xcmInteriorKey"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash", "sentAt"]
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash", "sentAt", "nativeAssetChain", "xcmInteriorKey"]
             });
         }
 
