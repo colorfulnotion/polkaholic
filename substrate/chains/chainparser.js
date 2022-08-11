@@ -9,6 +9,7 @@ module.exports = class ChainParser {
     numParserErrors = 0;
     mpReceivedFromParaID = {};
     mpReceived = false;
+    mpReceivedHashes = {};
     constructor() {
 
     }
@@ -869,17 +870,22 @@ module.exports = class ChainParser {
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized = false) {
         //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
         this.mpReceived = false;
+        this.mpReceivedHashes = {};
         //console.log(`[${extrinsicID}] processIncomingXCM start`, `mpReceived=${this.mpReceived}`)
 
         //step0. parse incoming messages (raw)
         this.processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, finalized)
 
         //step1. parse incoming transfer heuristically
-        for (const e of events) {
-            this.processIncomingXCMSignal(indexer, extrinsicID, e, finalized)
+        for (let i = 0; i < events.length; i++) {
+            let e = events[i]
+            this.processIncomingXCMSignal(indexer, extrinsicID, e, i, finalized)
         }
-
-        for (const e of events) {
+        if (this.mpReceived){
+            console.log(`mpReceived true [${this.parserBlockNumber}] [${this.parserBlockHash}] mpReceivedHashes`, this.mpReceivedHashes)
+        }
+        for (let i = 0; i < events.length; i++) {
+            let e = events[i]
             let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, finalized)
             if (candidate) {
                 indexer.updateXCMTransferDestCandidate(candidate, caller)
@@ -1232,7 +1238,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processIncomingXCMSignal(indexer, extrinsicID, e, finalized = false) {
+    processIncomingXCMSignal(indexer, extrinsicID, e, idx, finalized = false) {
         // here we look for events of note
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         // enable this line to explore section:method
@@ -1242,16 +1248,19 @@ module.exports = class ChainParser {
             //console.log("processBlockEvent", pallet, method, e);
             // https://kusama.subscan.io/block/12039596?tab=event has balances/Deposited
             // test case: indexPeriods 2  2022-03-30 21
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] ump:ExecutedUpward signal`)
-            let paraID = e.data[0];
+            let msgHash = e.data[0];
+            this.mpReceivedHashes[idx] = msgHash
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] ump:ExecutedUpward signal [msgHash=${msgHash}, idx=${idx}]`)
             this.mpReceived = true;
-            this.mpReceivedFromParaID[paraID]++;
+            this.mpReceivedFromParaID['unknown']++;
         } else if (pallet == "xcmpQueue" && method == "Success") {
             // this is the para <=> para case
             //console.log("processBlockEvent", pallet, method);
             // https://bifrost.subscan.io/block/1539819?tab=event has currencies/Deposited
             // test case: indexPeriods 6 2022-03-30 21
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Success signal`)
+            let msgHash = e.data[0];
+            this.mpReceivedHashes[idx] = msgHash
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Success signal [msgHash=${msgHash}, idx=${idx}]`)
             this.mpReceived = true;
             this.mpReceivedFromParaID['unknown']++;
         } else if (pallet == "xcmpQueue" && method == "Fail") {
@@ -1259,14 +1268,18 @@ module.exports = class ChainParser {
             //console.log("processBlockEvent", pallet, method);
             // https://bifrost.subscan.io/block/1539819?tab=event has currencies/Deposited
             // test case: indexPeriods 6 2022-03-30 21
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Fail signal !!!`)
+            let msgHash = e.data[0];
+            this.mpReceivedHashes[idx] = msgHash
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Fail signal !!! [msgHash=${msgHash}, idx=${idx}]`)
             //this.mpReceived = true;
             //this.mpReceivedFromParaID['unknown']++;
         } else if (pallet == "dmpQueue" && method == "ExecutedDownward") {
             // relaychain -> parachain (xcmPallet:reserveTransferAssets)
             //https://acala.subscan.io/extrinsic/980484-1?event=980484-8
             //0x1983c30b091b39363a07c4a90be79b7ce4650742666f25e8378beff6f54a30f4
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] dmpqueue:ExecutedDownward signal`)
+            let msgHash = e.data[0];
+            this.mpReceivedHashes[idx] = msgHash
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] dmpqueue:ExecutedDownward signal [msgHash=${msgHash}, idx=${idx}]`)
             this.mpReceived = true;
             this.mpReceivedFromParaID['unknown']++;
         }
