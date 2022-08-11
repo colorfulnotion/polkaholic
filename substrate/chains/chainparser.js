@@ -7,8 +7,8 @@ module.exports = class ChainParser {
     parserBlockHash = false;
     parserWatermark = 0;
     numParserErrors = 0;
-    umpReceivedFromParaID = {};
-    umpReceived = false;
+    mpReceivedFromParaID = {};
+    mpReceived = false;
     constructor() {
 
     }
@@ -29,8 +29,8 @@ module.exports = class ChainParser {
             if (this.parserWatermark != blockNumber) this.parserWatermark = 0
         }
         this.parserBlockHash = blockHash;
-        this.umpReceived = false;
-        this.umpReceivedFromParaID = {};
+        this.mpReceived = false;
+        this.mpReceivedFromParaID = {};
     }
 
     tokens_to_string(tokens) {
@@ -867,9 +867,9 @@ module.exports = class ChainParser {
     }
 
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized = false) {
-        //IMPORTANT: reset umpReceived at the start of every unsigned extrinsic
-        this.umpReceived = false;
-        //console.log(`[${extrinsicID}] processIncomingXCM start`, `umpReceived=${this.umpReceived}`)
+        //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
+        this.mpReceived = false;
+        //console.log(`[${extrinsicID}] processIncomingXCM start`, `mpReceived=${this.mpReceived}`)
 
         //step0. parse incoming messages (raw)
         this.processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, finalized)
@@ -1244,31 +1244,31 @@ module.exports = class ChainParser {
             // test case: indexPeriods 2  2022-03-30 21
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] ump:ExecutedUpward signal`)
             let paraID = e.data[0];
-            this.umpReceived = true;
-            this.umpReceivedFromParaID[paraID]++;
+            this.mpReceived = true;
+            this.mpReceivedFromParaID[paraID]++;
         } else if (pallet == "xcmpQueue" && method == "Success") {
             // this is the para <=> para case
             //console.log("processBlockEvent", pallet, method);
             // https://bifrost.subscan.io/block/1539819?tab=event has currencies/Deposited
             // test case: indexPeriods 6 2022-03-30 21
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Success signal`)
-            this.umpReceived = true;
-            this.umpReceivedFromParaID['unknown']++;
+            this.mpReceived = true;
+            this.mpReceivedFromParaID['unknown']++;
         } else if (pallet == "xcmpQueue" && method == "Fail") {
             // this is the para <=> para case
             //console.log("processBlockEvent", pallet, method);
             // https://bifrost.subscan.io/block/1539819?tab=event has currencies/Deposited
             // test case: indexPeriods 6 2022-03-30 21
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Fail signal !!!`)
-            //this.umpReceived = true;
-            //this.umpReceivedFromParaID['unknown']++;
+            //this.mpReceived = true;
+            //this.mpReceivedFromParaID['unknown']++;
         } else if (pallet == "dmpQueue" && method == "ExecutedDownward") {
             // relaychain -> parachain (xcmPallet:reserveTransferAssets)
             //https://acala.subscan.io/extrinsic/980484-1?event=980484-8
             //0x1983c30b091b39363a07c4a90be79b7ce4650742666f25e8378beff6f54a30f4
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] dmpqueue:ExecutedDownward signal`)
-            this.umpReceived = true;
-            this.umpReceivedFromParaID['unknown']++;
+            this.mpReceived = true;
+            this.mpReceivedFromParaID['unknown']++;
         }
     }
 
@@ -1281,25 +1281,25 @@ module.exports = class ChainParser {
         switch (palletMethod) {
             case 'balances(Deposit)':
                 //kusama/polkadot format
-                if (this.umpReceived) {
+                if (this.mpReceived) {
                     [candidate, caller] = this.processBalancesDepositSignal(indexer, extrinsicID, e, finalized)
                 }
                 break;
             case 'currencies(Deposited)':
                 // acala/bifrost format
-                if (this.umpReceived) {
+                if (this.mpReceived) {
                     [candidate, caller] = this.processCurrenciesDepositedSignal(indexer, extrinsicID, e, finalized)
                 }
                 break;
             case 'tokens(Deposited)':
                 // acala format?
-                if (this.umpReceived) {
+                if (this.mpReceived) {
                     [candidate, caller] = this.processTokensDepositedSignal(indexer, extrinsicID, e, finalized)
                 }
                 break;
             case 'assets(Issued)':
                 // parallel/moonbeam/astar format
-                if (this.umpReceived) {
+                if (this.mpReceived) {
                     [candidate, caller] = this.processAssetsIssuedSignal(indexer, extrinsicID, e, finalized)
                 }
                 break;
@@ -4110,7 +4110,7 @@ module.exports = class ChainParser {
 
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal balances:Deposit`
-            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.umpReceivedFromParaID, caller);
+            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.mpReceivedFromParaID, caller);
             candidate = {
                 chainIDDest: indexer.chainID,
                 eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4124,7 +4124,7 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.umpReceivedFromParaID))
+                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID))
             }
             return [candidate, caller]
         } else {
@@ -4146,7 +4146,7 @@ module.exports = class ChainParser {
         let amountReceived = paraTool.dechexToInt(d[2]);
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal currencies:Deposited`
-            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.umpReceivedFromParaID, caller);
+            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.mpReceivedFromParaID, caller);
             candidate = {
                 chainIDDest: indexer.chainID,
                 eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4160,7 +4160,7 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.umpReceivedFromParaID))
+                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID))
             }
             return [candidate, caller]
         } else {
@@ -4183,7 +4183,7 @@ module.exports = class ChainParser {
         //console.log(`[${fromAddress}] ${assetString}`, amountReceived, `finalized=${finalized}`)
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal tokens:Deposited`
-            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.umpReceivedFromParaID, caller);
+            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.mpReceivedFromParaID, caller);
             candidate = {
                 chainIDDest: indexer.chainID,
                 eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4197,7 +4197,7 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.umpReceivedFromParaID))
+                paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID))
             }
             return [candidate, caller]
         } else {
@@ -4247,7 +4247,7 @@ module.exports = class ChainParser {
             if (this.debugLevel >= paraTool.debugTracing) console.log(`processAssetIssued`, fromAddress, amountReceived, assetString)
             if (paraTool.validAmount(amountReceived) && finalized) {
                 let caller = `generic processIncomingAssetSignal assets:Issued`
-                //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.umpReceivedFromParaID, caller);
+                //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.mpReceivedFromParaID, caller);
                 candidate = {
                     chainIDDest: indexer.chainID,
                     eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4261,7 +4261,7 @@ module.exports = class ChainParser {
                     rawAsset: rawAssetString,
                     destTS: this.parserTS,
                     amountReceived: amountReceived,
-                    paraIDs: JSON.stringify(Object.keys(this.umpReceivedFromParaID))
+                    paraIDs: JSON.stringify(Object.keys(this.mpReceivedFromParaID))
                 }
                 return [candidate, caller]
             } else {

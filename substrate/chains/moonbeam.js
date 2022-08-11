@@ -4,9 +4,9 @@ const ChainParser = require("./chainparser");
 module.exports = class MoonbeamParser extends ChainParser {
 
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized = false) {
-        //IMPORTANT: reset umpReceived at the start of every unsigned extrinsic
-        this.umpReceived = false;
-        //console.log(`[${extrinsicID}] processIncomingXCM start`, `umpReceived=${this.umpReceived}`)
+        //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
+        this.mpReceived = false;
+        //console.log(`[${extrinsicID}] processIncomingXCM start`, `mpReceived=${this.mpReceived}`)
 
         //step0. parse incoming messages (raw)
         super.processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, finalized)
