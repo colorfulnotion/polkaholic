@@ -23,7 +23,7 @@ module.exports = class XCMManager extends AssetManager {
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
         let sql = `select
-          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, xcmtransfer.asset, d.paraIDs,
+          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, xcmtransfer.asset,
           (d.destts - xcmtransfer.sourceTS) as diffTS,
           xcmtransfer.extrinsicID,
           xcmtransfer.amountSent,

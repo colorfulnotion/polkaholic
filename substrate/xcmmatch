@@ -16,32 +16,32 @@ async function main() {
     await manager.assetManagerInit();
     let chain = await manager.getChain(2);
     await manager.setupAPI(chain);
-    if ( lookbackDays > 0 ) {
-	await manager.xcmanalytics(chain, lookbackDays)
-	process.exit(0);
+    if (lookbackDays > 0) {
+        await manager.xcmanalytics(chain, lookbackDays)
+        process.exit(0);
     }
 
     let startTS = manager.currentTS() - 3600;
     const lookbackSeconds = 120;
     let numRecs = 0;
     do {
-	// startTS that comes back is the last message unix timestamp
-	[numRecs, startTS] = await manager.xcmanalytics_period(chain, startTS-3600);
+        // startTS that comes back is the last message unix timestamp
+        [numRecs, startTS] = await manager.xcmanalytics_period(chain, startTS - 3600);
 
-	console.log("***** numRecs ", numRecs, "startTS = ", startTS)
-	if ( numRecs == 0 ) {
-	    // this polls every like 1s for a new xcmmessage after startTS, and returns with the timestamp of the first message seen, which is used to start the next process
+        console.log("***** numRecs ", numRecs, "startTS = ", startTS)
+        if (numRecs == 0) {
+            // this polls every like 1s for a new xcmmessage after startTS, and returns with the timestamp of the first message seen, which is used to start the next process
             await manager.waitForNewXCMMessage(startTS);
-	} else {
-	    await manager.sleep(6000);
-	}
+        } else {
+            await manager.sleep(6000);
+        }
 
-        let lastUpdateTS = manager.getCurrentTS() - lastUpdateTS
-        if (lastUpdateTS > 600){
-          //update once every 600s
-          console.log(`update assetManager now`)
-          lastUpdateTS = manager.getCurrentTS()
-	      await manager.assetManagerInit();
+        let lastUpdateTSAgo = manager.getCurrentTS() - lastUpdateTS
+        if (lastUpdateTSAgo > 600) {
+            //update once every 600s
+            console.log(`update assetManager now`)
+            lastUpdateTS = manager.getCurrentTS()
+            await manager.assetManagerInit();
         }
     } while (true);
 }
