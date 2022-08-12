@@ -1,27 +1,22 @@
 var initchains = false;
-var initxcmtransfers = false;
 var initaddresstopn = false;
 var chainsTable = null;
-var xcmTable = null
-var xcmmessagesTable = null
 var addresstopnTable = null
 var refreshIntervalMS = 6100;
 var chainsUpdateIntervalId = false;
-var xcmtransferUpdateIntervalId = false;
-
 
 
 function filterchains(relaychain = "all") {
 
     if (relaychain == "kusama" || relaychain == "polkadot") {
         if (chainsTable) chainsTable.column(7).search(relaychain).draw();
-        if (xcmTable) xcmTable.column(8).search(relaychain).draw();
-        if (xcmmessagesTable) xcmmessagesTable.column(1).search(relaychain).draw();
+        //if (xcmTable) xcmTable.column(8).search(relaychain).draw();
+        //if (xcmmessagesTable) xcmmessagesTable.column(1).search(relaychain).draw();
     } else {
         // empty search effectively removes the filter
         if (chainsTable) chainsTable.search('').columns().search('').draw();
-        if (xcmTable) xcmTable.search('').columns().search('').draw();
-        if (xcmmessagesTable) xcmmessagesTable.search('').columns().search('').draw();
+        // if (xcmTable) xcmTable.search('').columns().search('').draw();
+        // if (xcmmessagesTable) xcmmessagesTable.search('').columns().search('').draw();
     }
 }
 
@@ -180,226 +175,6 @@ async function show_chains() {
     }
 }
 
-function stopxcmtransfers() {
-    if (xcmtransferUpdateIntervalId) {
-        clearInterval(xcmtransferUpdateIntervalId);
-        xcmtransferUpdateIntervalId = false
-    }
-}
-
-function showxcmtransfers() {
-    if (!xcmtransferUpdateIntervalId) {
-        show_xcmtransfers();
-    }
-    xcmtransferUpdateIntervalId = setInterval(function() {
-        show_xcmtransfers()
-    }, refreshIntervalMS);
-}
-
-async function show_xcmtransfers(relaychain) {
-    let pathParams = 'xcmtransfers'
-    let tableName = '#tablexcmtransfers'
-    if (initxcmtransfers) {
-        // if table is already initiated, update the rows
-        //loadData2(pathParams, tableName, true)
-    } else {
-        initxcmtransfers = true;
-        xcmTable = $(tableName).DataTable({
-            /*
-            [0] section (+method)
-            [1] amountSent (+symbol)
-            [2] amountSentUSD
-            [3] fromAddress
-            [4] destAddress
-            [5] id (+chainName)
-            [6] chainIDDest (+chainDestName)
-            [7] sourceTS
-            [8] relayChain
-            */
-            pageLength: 100,
-            lengthMenu: [
-                [10, 25, 50, 100],
-                [10, 25, 50, 100]
-            ],
-            columnDefs: [{
-                    "className": "dt-right",
-                    "targets": [1, 2, 3]
-                },
-                {
-                    "targets": [8],
-                    "visible": false
-                }
-            ],
-            order: [
-                [7, "desc"]
-            ],
-            columns: [{
-                    data: 'section',
-                    render: function(data, type, row, meta) {
-                        let sectionMethod = `${data}:${row.method}`
-                        if (type == 'display') {
-                            return '<button type="button" class="btn btn-outline-primary text-capitalize">' + sectionMethod + '</button>';
-                        }
-                        return sectionMethod;
-                    }
-                },
-                {
-                    data: 'amountSent',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            try {
-                                let parsedAsset = JSON.parse(row.asset);
-                                let symbol = parsedAsset.Token;
-                                let assetChain = row.asset + "~" + row.chainID;
-                                if (symbol !== undefined) {
-                                    return presentTokenCount(data) + " " + presentAsset(assetChain, symbol);
-                                } else {
-                                    return row.asset;
-                                }
-                            } catch (err) {
-                                console.log("row.asset", row.asset, err);
-                            }
-                        } else {
-                            try {
-                                let parsedAsset = JSON.parse(row.asset);
-                                let symbol = parsedAsset.Token;
-                                if (symbol !== undefined) {
-                                    return symbol
-                                } else {
-                                    return row.asset;
-                                }
-                            } catch (err) {
-                                return ""
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'amountSentUSD',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            if (row.amountSentUSD !== undefined) {
-                                //
-                                return currencyFormat(row.amountSentUSD, row.priceUSD, row.priceUSDCurrent);
-                            } else {
-                                console.log("missing amountSentUSD", row);
-                                return "--";
-                            }
-                        } else {
-                            if (row.amountSentUSD !== undefined) {
-                                return data
-                            } else {
-                                return 0;
-                            }
-                        }
-                        return;
-                    }
-                },
-                {
-                    data: 'fromAddress',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            if (row.fromAddress !== undefined) {
-                                return presentID(data);
-                            } else {
-                                console.log("missing fromAddress", row);
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'destAddress',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            if (row.destAddress !== undefined) {
-                                return presentID(data);
-                            } else {
-                                console.log("missing destAddress", row);
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'id',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
-                            let timelineURL = `/timeline/${row.extrinsicHash}`
-                            let timelineLink = `<div class="explorer"><a href="${timelineURL}">timeline</a></div>`
-                            return `${presentChain(row.id, row.chainName)} (${s}) ` + timelineLink
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'chainIDDest',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            try {
-                                if (row.chainIDDest != undefined && row.chainDestName) {
-                                    if (row.incomplete !== undefined && row.incomplete > 0) {
-                                        return "Incomplete " + presentSuccessFailure(false);
-                                    } else if (row.blockNumberDest) {
-                                        return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest) + presentSuccessFailure(true);
-                                    } else {
-                                        return presentChain(row.idDest, row.chainDestName);
-                                    }
-                                } else {
-                                    return "-"
-                                }
-                            } catch (err) {
-                                console.log(err);
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'sourceTS',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            if (row.sourceTS !== undefined) {
-                                let s = presentTS(row.sourceTS);
-                                return s;
-                            } else {
-                                return "--";
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'relayChain', //this is the 'hidden' column that we use to supprt filter
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return data;
-                        }
-                        return data;
-                    }
-                }
-            ]
-        });
-    }
-
-    $(tableName).on('page.dt', function() {
-        setupcurrency();
-        stopxcmtransfers();
-    });
-
-    //load data here: warning this function is technically async
-    await loadData2(pathParams, tableName, true)
-    const selectElement = document.querySelector('#relaychain');
-    if (selectElement) {
-        setchainfilter(selectElement.value);
-    }
-}
-
-
-
-
 async function showaddresstopn() {
     let tableName = '#tableaddresstopn'
     if (initaddresstopn) {} else {
@@ -513,17 +288,14 @@ function showchainstab(hash) {
         case "#chains":
             setupapidocs("chains", "list");
             showchains();
-            stopxcmtransfers();
             break;
         case "#xcmtransfers":
             setupapidocs("xcmtransfers");
             showxcmtransfers();
-            stopchains();
             break;
         case "#xcmmessages":
             setupapidocs("xcmmessages");
             showxcmmessages();
-            stopchains();
             break;
         case "#addresstopn":
             setupapidocs("addresstopn");

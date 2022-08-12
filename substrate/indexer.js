@@ -66,6 +66,8 @@ module.exports = class Indexer extends AssetManager {
     xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove
 
     recentXcmMsgs = []; //will flush from here.
+    numXCMMessagesIn = {};
+    numXCMMessagesOut = {};
     // bqlog
     extrinsicsfn = false;
     transfersfn = false;
@@ -75,7 +77,6 @@ module.exports = class Indexer extends AssetManager {
     bqlogindexTS = 0;
     recentExtrinsics = [];
     recentTransfers = [];
-    recentXCMMessages = [];
 
     addressBalanceRequest = {}
 
@@ -1082,10 +1083,11 @@ module.exports = class Indexer extends AssetManager {
         let xcmtransferKeys = Object.keys(this.xcmtransfer)
         if (xcmtransferKeys.length > 0) {
             let xcmtransfers = [];
+            let numXCMTransfersOut = {}
             for (let i = 0; i < xcmtransferKeys.length; i++) {
                 let r = this.xcmtransfer[xcmtransferKeys[i]];
-                let nativeAssetChain = (r.nativeAssetChain != undefined)? `'${r.nativeAssetChain}'` : `'NULL'`
-                let xcmInteriorKey = (r.xcmInteriorKey != undefined)? `'${r.xcmInteriorKey}'` : `'NULL'`
+                let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `'NULL'`
+                let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `'NULL'`
                 let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`, `'${r.chainID}'`, `'${r.chainIDDest}'`,
                     `'${r.blockNumber}'`, `'${r.fromAddress}'`, `'${r.asset}'`, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.rawAsset}', '${r.msgHash}', '${r.sentAt}'`, nativeAssetChain, xcmInteriorKey
                 ].join(",") + ")";
@@ -1093,6 +1095,11 @@ module.exports = class Indexer extends AssetManager {
                     xcmtransfers.push(t);
                 } else {
                     console.log(`invalid asset`, r.asset, r.chainID, "xcmtransfer")
+                }
+                if (numXCMTransfersOut[r.blockNumber] == undefined) {
+                    numXCMTransfersOut[r.blockNumber] = 1;
+                } else {
+                    numXCMTransfersOut[r.blockNumber]++;
                 }
             }
             this.xcmtransfer = {};
@@ -1104,6 +1111,22 @@ module.exports = class Indexer extends AssetManager {
                 "data": xcmtransfers,
                 "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash", "sentAt", "nativeAssetChain", "xcmInteriorKey"]
             });
+
+
+            let out = [];
+            for (const blockNumber of Object.keys(numXCMTransfersOut)) {
+                out.push(`('${blockNumber}', '${numXCMTransfersOut[blockNumber]}')`);
+            }
+            if (out.length > 0) {
+                let vals = ["numXCMTransfersOut"];
+                await this.upsertSQL({
+                    "table": `block${this.chainID}`,
+                    "keys": ["blockNumber"],
+                    "vals": vals,
+                    "data": out,
+                    "replace": vals
+                });
+            }
         }
 
         let xcmtransferdestcandidateKeys = Object.keys(this.xcmtransferdestcandidate)
@@ -1113,8 +1136,8 @@ module.exports = class Indexer extends AssetManager {
             for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
                 let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
                 // ["chainIDDest", "eventID"] + ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT", "nativeAssetChain", "xcmInteriorKey"
-                let nativeAssetChain = (r.nativeAssetChain != undefined)? `'${r.nativeAssetChain}'` : `'NULL'`
-                let xcmInteriorKey = (r.xcmInteriorKey != undefined)? `'${r.xcmInteriorKey}'` : `'NULL'`
+                let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `'NULL'`
+                let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `'NULL'`
                 let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.asset}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.rawAsset}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, nativeAssetChain, xcmInteriorKey].join(",") + ")";
                 if (this.validAsset(r.asset, r.chainIDDest, "xcmtransfer", t)) {
                     xcmtransferdestcandidates.push(t);
@@ -1137,8 +1160,8 @@ module.exports = class Indexer extends AssetManager {
             } catch (err0) {
                 console.log(err0);
             }
-
         }
+
     }
 
     fixOutgoingUnknownSentAt(sentAt) {
@@ -2634,20 +2657,49 @@ module.exports = class Indexer extends AssetManager {
         if (this.recentXcmMsgs.length > 0) {
             let rows = this.recentXcmMsgs
             if (this.debugLevel >= paraTool.debugTracing) console.log(`dump_xcm_messages rowsLen=${rows.length}`, rows)
-            let i = 0;
+
             let vals = ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries"];
-            for (i = 0; i < rows.length; i += 10000) {
-                let j = i + 10000;
-                if (j > rows.length) j = rows.length;
+            await this.upsertSQL({
+                "table": "xcmmessages",
+                "keys": ["msgHash", "blockNumber", "incoming"],
+                "vals": vals,
+                "data": rows,
+                "replace": vals
+            });
+            this.recentXcmMsgs = []
+
+            let out = [];
+            for (const blockNumber of Object.keys(this.numXCMMessagesIn)) {
+                out.push(`('${blockNumber}', '${this.numXCMMessagesIn[blockNumber]}')`);
+            }
+            if (out.length > 0) {
+                let vals = ["numXCMMessagesIn"];
                 await this.upsertSQL({
-                    "table": `xcmmessages`,
-                    "keys": ["msgHash", "blockNumber", "incoming"],
+                    "table": `block${this.chainID}`,
+                    "keys": ["blockNumber"],
                     "vals": vals,
-                    "data": rows.slice(i, j),
+                    "data": out,
                     "replace": vals
                 });
+                this.numXCMMessagesIn = {};
             }
-            this.recentXcmMsgs = []
+
+            out = [];
+            for (const blockNumber of Object.keys(this.numXCMMessagesOut)) {
+                out.push(`('${blockNumber}', '${this.numXCMMessagesOut[blockNumber]}')`);
+            }
+            if (out.length > 0) {
+                vals = ["numXCMMessagesOut"];
+                await this.upsertSQL({
+                    "table": `block${this.chainID}`,
+                    "keys": ["blockNumber"],
+                    "vals": vals,
+                    "data": out,
+                    "replace": vals
+                });
+                console.log("numXCMMessagesOut", this.numXCMMessagesOut);
+                this.numXCMMessagesOut = {};
+            }
         }
     }
 
@@ -2686,23 +2738,6 @@ module.exports = class Indexer extends AssetManager {
             this.recentTransfers = []
         }
 
-        if (this.recentXCMMessages.length > 0) {
-            let rows = this.recentXCMMessages
-            let i = 0;
-            let vals = ["chainIDDest", "chainID", "msgType", "incoming", "msgHex", "msgHash", "msgstr", "blockTS", "blockNumber", "sentAt", "relayChain"];
-            for (i = 0; i < rows.length; i += 10000) {
-                let j = i + 10000;
-                if (j > rows.length) j = rows.length;
-                await this.upsertSQL({
-                    "table": `xcmmessagesrecent`,
-                    "keys": ["xcmID"],
-                    "vals": vals,
-                    "data": rows.slice(i, j),
-                    "replace": vals
-                });
-            }
-            this.recentXCMMessages = []
-        }
     }
 
     async dump_failed_traces() {
@@ -4916,7 +4951,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let blockTS = block.blockTS;
         let recentExtrinsics = [];
         let recentTransfers = [];
-        let recentXCMMessages = [];
+
         let recentXcmMsgs = []; //new xcm here
 
         // setParserContext
@@ -5098,39 +5133,41 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
         }
 
-        // map xcmevents into recentXCMMessages
-        if (blockTS > this.getCurrentTS() - 10800) {
-            for (const xcmID of Object.keys(this.xcmeventsMap)) {
-                let mp = this.xcmeventsMap[xcmID]
-                let pieces = mp.msgIndex.split('-')
-                recentXCMMessages.push(`('${mp.msgIndex}', '${this.chainID}', '${pieces[4]}', '${pieces[2]}', '${mp.isIncoming}', '${mp.msgHex}', '${mp.msgHash}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.blockNumber}', '${mp.sentAt}', '${mp.relayChain}')`);
-            }
-        }
-
-        // new xcm here
-        if (true) {
-            let xcmKeys = Object.keys(this.xcmmsgMap)
-            if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] xcmKeys=${xcmKeys}`)
-            for (const xcmKey of xcmKeys) {
-                let mpKey = this.xcmTrailingKeyMap[xcmKey]
-                if (mpKey != undefined && mpKey.isFresh) {
-                    let mp = this.xcmmsgMap[xcmKey]
-                    let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
-                    if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
-                    let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
-                    let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
-                    let beneficiaries = (mp.beneficiaries != undefined) ? `'${mp.beneficiaries}'` : 'NULL'
-                    //console.log(`mp beneficiaries`, beneficiaries)
-                    //["msgHash", "blockNumber", "incoming"] + ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries"]
-                    let s = `('${mp.msgHash}', '${mp.blockNumber}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.relayChain}', '${mp.version}', '${mp.path}', ${extrinsicID}, ${extrinsicHash}, Now(), ${beneficiaries})`
-                    recentXcmMsgs.push(s);
-                    if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] add ${xcmKey}`, s)
-                    this.xcmTrailingKeyMap[xcmKey].isFresh = false // mark the record as processed
+        let xcmKeys = Object.keys(this.xcmmsgMap)
+        if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] xcmKeys=${xcmKeys}`)
+        for (const xcmKey of xcmKeys) {
+            let mpKey = this.xcmTrailingKeyMap[xcmKey]
+            if (mpKey != undefined && mpKey.isFresh) {
+                let mp = this.xcmmsgMap[xcmKey]
+                let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
+                if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
+                let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
+                let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
+                let beneficiaries = (mp.beneficiaries != undefined) ? `'${mp.beneficiaries}'` : 'NULL'
+                //console.log(`mp beneficiaries`, beneficiaries)
+                //["msgHash", "blockNumber", "incoming"] + ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries"]
+                let s = `('${mp.msgHash}', '${mp.blockNumber}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.relayChain}', '${mp.version}', '${mp.path}', ${extrinsicID}, ${extrinsicHash}, Now(), ${beneficiaries})`
+                if (mp.isIncoming == 1) {
+                    if (this.numXCMMessagesIn[mp.blockNumber] == undefined) {
+                        this.numXCMMessagesIn[mp.blockNumber] = 1;
+                    } else {
+                        this.numXCMMessagesIn[mp.blockNumber]++;
+                    }
+                } else {
+                    if (this.numXCMMessagesOut[mp.blockNumber] == undefined) {
+                        this.numXCMMessagesOut[mp.blockNumber] = 1;
+                    } else {
+                        this.numXCMMessagesOut[mp.blockNumber]++;
+                    }
                 }
+                recentXcmMsgs.push(s);
+                if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] add ${xcmKey}`, s)
+                this.xcmTrailingKeyMap[xcmKey].isFresh = false // mark the record as processed
             }
-            this.xcmmsgMap = {} // remove here...
-            if (recentXcmMsgs.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] recentXcmMsgs`, recentXcmMsgs)
         }
+        this.xcmmsgMap = {} // remove here...
+        if (recentXcmMsgs.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] recentXcmMsgs`, recentXcmMsgs)
+
 
         if (blockNumber % 20 == 0) {
             //TODO: remove this after we are ready to write into bq
@@ -5195,21 +5232,18 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let blockStats = this.getBlockStats(block, eventsRaw, evmBlock, evmReceipts);
         //console.log(`bn=${blockNumber}`, blockStats)
         this.blockRowsToInsert.push(cres)
-        if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXCMMessages.length > 0 || recentXcmMsgs.length > 0) {
-            this.add_recent_activity(recentExtrinsics, recentTransfers, recentXCMMessages, recentXcmMsgs)
+        if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXcmMsgs.length > 0) {
+            this.add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs)
         }
         return (blockStats);
     }
 
-    add_recent_activity(recentExtrinsics, recentTransfers, recentXCMMessages, recentXcmMsgs) {
+    add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs) {
         for (const r of recentExtrinsics) {
             this.recentExtrinsics.push(r);
         }
         for (const r of recentTransfers) {
             this.recentTransfers.push(r);
-        }
-        for (const r of recentXCMMessages) {
-            this.recentXCMMessages.push(r);
         }
         for (const r of recentXcmMsgs) {
             this.recentXcmMsgs.push(r);

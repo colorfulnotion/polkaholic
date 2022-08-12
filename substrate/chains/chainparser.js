@@ -879,19 +879,19 @@ module.exports = class ChainParser {
             let e = events[i]
             this.processIncomingXCMSignal(indexer, extrinsicID, e, i, finalized)
         }
-        if (this.mpReceived){
+        if (this.mpReceived) {
             let idxKeys = Object.keys(this.mpReceivedHashes)
             let prevIdx = 0;
 
             //TODO: blacklist: author, 0x6d6f646c70792f74727372790000000000000000 (modlpy/trsry)
             //conjecture: the last event prior to msgHash is typically the "fee" event either going to blockproducer or trsry
-            for (const idxKey of idxKeys){
+            for (const idxKey of idxKeys) {
                 this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx)
                 this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
                 let mpState = this.mpReceivedHashes[idxKey]
                 console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
                 let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
-                let eventRangeLengthWithoutFee = eventRange.length -1 // remove the fee event here
+                let eventRangeLengthWithoutFee = eventRange.length - 1 // remove the fee event here
                 for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
                     let e = eventRange[i]
                     let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
@@ -899,7 +899,7 @@ module.exports = class ChainParser {
                         indexer.updateXCMTransferDestCandidate(candidate, caller)
                     }
                 }
-                prevIdx = parseInt(idxKey)+1
+                prevIdx = parseInt(idxKey) + 1
             }
         }
     }
@@ -1249,7 +1249,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processIncomingXCMSignalStatus(e){
+    processIncomingXCMSignalStatus(e) {
         let sectionMethod = `${e.section}(${e.method})`
         let msgHash = e.data[0];
         let signalStatus = {
@@ -1260,28 +1260,28 @@ module.exports = class ChainParser {
         }
         let statusK
         let statusV;
-        if (e.data.length == 1){
-            if(sectionMethod == 'xcmpQueue(Success)'){
+        if (e.data.length == 1) {
+            if (sectionMethod == 'xcmpQueue(Success)') {
                 signalStatus.success = true
             }
             return signalStatus
-        }else if (e.data.length >= 2){
+        } else if (e.data.length >= 2) {
             let state = e.data[1]
             try {
                 let statusK = Object.keys(state)[0]
                 let statusV = state[statusK]
-                if (statusK == 'complete' || statusK == 'weight'){
+                if (statusK == 'complete' || statusK == 'weight') {
                     signalStatus.weight = paraTool.dechexToInt(statusV)
                     signalStatus.success = true
-                }else if (sectionMethod == 'xcmpQueue(Success)'){
+                } else if (sectionMethod == 'xcmpQueue(Success)') {
                     signalStatus.success = true
                     signalStatus.weight = paraTool.dechexToInt(state)
-                }else{
+                } else {
                     signalStatus.error = statusK
                     signalStatus.description = statusV
                 }
                 return signalStatus
-            }catch (err){
+            } catch (err) {
                 console.log(`processIncomingXCMSignalStatus failed ${err.toString()}`, err)
                 return signalStatus
             }
@@ -1734,9 +1734,9 @@ module.exports = class ChainParser {
                     sentAt: this.parserWatermark,
                 }
                 let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
-                if(isXCMAssetFound){
-                    if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                    if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                if (isXCMAssetFound) {
+                    if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                    if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                 }
                 if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
                 //console.log("processOutgoingXTokens xTokens", r);
@@ -1952,9 +1952,9 @@ module.exports = class ChainParser {
                             sentAt: this.parserWatermark,
                         }
                         let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
-                        if(isXCMAssetFound){
-                            if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                            if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                        if (isXCMAssetFound) {
+                            if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                            if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                         }
                         //console.log("processOutgoingXTokens xTokens", r);
                         outgoingXTokens.push(r)
@@ -2568,9 +2568,9 @@ module.exports = class ChainParser {
                                 sentAt: this.parserWatermark,
                             }
                             let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
-                            if(isXCMAssetFound){
-                                if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                                if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                            if (isXCMAssetFound) {
+                                if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                                if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                             }
                             if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingPolkadotXcm xcmPallet", r);
                             outgoingXcmPallet.push(r)
@@ -2805,9 +2805,9 @@ module.exports = class ChainParser {
                                 sentAt: this.parserWatermark,
                             }
                             let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
-                            if(isXCMAssetFound){
-                                if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                                if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                            if (isXCMAssetFound) {
+                                if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                                if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                             }
                             //if (this.debugLevel >= paraTool.debugVerbose) console.log("processOutgoingXcmPallet xcmPallet", r);
                             extrinsic.xcms.push(r)
@@ -4205,9 +4205,9 @@ module.exports = class ChainParser {
                 amountReceived: amountReceived,
                 msgHash: mpState.msgHash,
             }
-            if(isXCMAssetFound){
-                if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+            if (isXCMAssetFound) {
+                if (standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                if (standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
             }
             return [candidate, caller]
         } else {
@@ -4245,9 +4245,9 @@ module.exports = class ChainParser {
                 amountReceived: amountReceived,
                 msgHash: mpState.msgHash,
             }
-            if(isXCMAssetFound){
-                if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+            if (isXCMAssetFound) {
+                if (standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                if (standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
             }
             return [candidate, caller]
         } else {
@@ -4286,9 +4286,9 @@ module.exports = class ChainParser {
                 amountReceived: amountReceived,
                 msgHash: mpState.msgHash,
             }
-            if(isXCMAssetFound){
-                if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+            if (isXCMAssetFound) {
+                if (standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                if (standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
             }
             return [candidate, caller]
         } else {
@@ -4356,9 +4356,9 @@ module.exports = class ChainParser {
                     amountReceived: amountReceived,
                     msgHash: mpState.msgHash,
                 }
-                if(isXCMAssetFound){
-                    if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                    if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                if (isXCMAssetFound) {
+                    if (standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                    if (standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                 }
                 return [candidate, caller]
             } else {

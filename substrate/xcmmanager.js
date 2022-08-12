@@ -214,7 +214,7 @@ order by msgHash, diffSentAt, diffTS`
                 //enable this for debugging
                 //console.log("[Empty] match_xcm", sql)
             }
-            let vals = ["sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt", "sourceBlocknumber", "destBlocknumber", "matchDT"];
+            let vals = ["chainID", "chainIDDest", "sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt", "sourceBlocknumber", "destBlocknumber", "matchDT"];
             let out = [];
             for (let i = 0; i < xcmmatches.length; i++) {
                 let s = xcmmatches[i];
@@ -222,8 +222,8 @@ order by msgHash, diffSentAt, diffTS`
                 // Note in case of multiple matches, the "order by diffTS" in the SQL statment picks the FIRST one in time closest with the smallest diffTS
                 let k = `${s.msgHash}:${s.d_sentAt}`
                 if (matched[k] == undefined) {
-                    out.push(`('${s.msgHash}', ${s.s_blockNumber}, 0, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
-                    out.push(`('${s.msgHash}', ${s.d_blockNumber}, 1, ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
+                    out.push(`( '${s.msgHash}', ${s.s_blockNumber}, 0, '${s.chainID}', '${s.chainIDDest}', ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
+                    out.push(`( '${s.msgHash}', ${s.d_blockNumber}, 1, '${s.chainID}', '${s.chainIDDest}', ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
                     matched[k] = true;
                 } else {
                     numRecs++;
@@ -684,7 +684,7 @@ order by msgHash, diffSentAt, diffTS`
         let sql = `select msgHash, msgHex, blockNumber, sentAt, incoming, chainID, chainIDDest, msgStr, blockTS, assetChains, beneficiaries2, instructionFingerprints from xcmmessages where blockTS >= ${startTS} ${endWhere} order by blockTS desc`;
         let xcmRecs = await this.pool.query(sql);
         let out = [];
-        let vals = ["parentInclusionFingerprints", "instructionFingerprints", "assetChains", "beneficiaries2"];
+        let vals = ["chainID", "chainIDDest", "parentInclusionFingerprints", "instructionFingerprints", "assetChains", "beneficiaries2"];
         let parentIncFingerprints = [];
         console.log("computeXCMFingerprints:", xcmRecs.length, sql)
         for (let r = 0; r < xcmRecs.length; r++) {
@@ -709,7 +709,7 @@ order by msgHash, diffSentAt, diffTS`
                     }
                 }
 
-                out.push(`('${rec.msgHash}', '${rec.blockNumber}', '${rec.incoming}', '${JSON.stringify(parentInclusionFingerprints)}', '${JSON.stringify(instructionFingerprints)}', ${mysql.escape(JSON.stringify(assetChains))}, ${beneficiaries2})`);
+                out.push(`('${rec.msgHash}', '${rec.blockNumber}', '${rec.incoming}', '${rec.chainID}', '${rec.chainIDDest}', '${JSON.stringify(parentInclusionFingerprints)}', '${JSON.stringify(instructionFingerprints)}', ${mysql.escape(JSON.stringify(assetChains))}, ${beneficiaries2})`);
             } catch (err) {
                 console.log(err);
                 process.exit(0);
@@ -794,8 +794,15 @@ order by chainID, extrinsicHash, eventID, diffTS`;
             let assetsReceivedXCMTransfer = {};
             let prevEventID = false
             let prevDestMatch = false
+            let incoming = {};
+            let outgoing = {};
             for (const m of matches) {
-                let k = `${m.msgHash}-${m.blockNumber}`; //asset received is direction less
+                let k = `${m.msgHash}-${m.blockNumber}-${m.chainID}-${m.chainIDDest}`; //asset received is direction less
+                if (m.incoming == 1) {
+                    incoming[`${m.msgHash}-${m.blockNumber}`] = 1
+                } else {
+                    outgoing[`${m.msgHash}-${m.blockNumber}`] = 1
+                }
                 if (assetsReceived[k] == undefined) {
                     assetsReceived[k] = [];
                 }
@@ -872,20 +879,20 @@ order by chainID, extrinsicHash, eventID, diffTS`;
 
             let out = [];
             for (const k of Object.keys(assetsReceived)) {
-                let [msgHash, blockNumber] = k.split("-");
+                let [msgHash, blockNumber, chainID, chainIDDest] = k.split("-");
                 let r = assetsReceived[k];
                 let ar = JSON.stringify(r);
                 if (ar.length < 1024) {
                     let valueUSD = this.sum_assetsReceived(r);
                     // console.log("*****", valueUSD, r);
-                    out.push(`('${msgHash}', '${blockNumber}', '0', ${mysql.escape(ar)}, '${valueUSD}')`);
-                    out.push(`('${msgHash}', '${blockNumber}', '1', ${mysql.escape(ar)}, '${valueUSD}')`);
+                    if (outgoing[`${msgHash}-${blockNumber}`] != undefined) out.push(`('${msgHash}', '${blockNumber}', '0', ${mysql.escape(ar)}, '${valueUSD}', '${chainID}', '${chainIDDest}')`);
+                    if (incoming[`${msgHash}-${blockNumber}`] != undefined) out.push(`('${msgHash}', '${blockNumber}', '1', ${mysql.escape(ar)}, '${valueUSD}', '${chainID}', '${chainIDDest}')`);
                 } else {
                     console.log("LONG VAL", k, "RECS", ar.length, "assetsreceived=", ar);
                 }
             }
             console.log(out.length);
-            let vals = ["assetsReceived", "amountReceivedUSD"];
+            let vals = ["assetsReceived", "amountReceivedUSD", "chainID", "chainIDDest"];
             await this.upsertSQL({
                 "table": "xcmmessages",
                 "keys": ["msgHash", "blockNumber", "incoming"],

@@ -618,11 +618,6 @@ module.exports = class Manager extends AssetManager {
                 this.batchedSQL.push(sql)
                 await this.update_batchedSQL();
             }
-        } else if (tbl == "xcm") {
-            let ts = this.getCurrentTS() - 86400;
-            let sql = `delete from xcmmessagesrecent where ts < ${ts}`
-            this.batchedSQL.push(sql)
-            await this.update_batchedSQL();
         }
     }
 

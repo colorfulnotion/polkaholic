@@ -1,4 +1,5 @@
 let tableExtrinsics = null;
+let tableEVMTxs = null;
 let tableTransfers = null;
 let tableXCMTransfers = null;
 let tableRewards = null;
@@ -19,7 +20,7 @@ function showextrinsics(address, chainListStr = 'all') {
     let tableName = '#tableextrinsics'
     tableExtrinsics = $(tableName).DataTable({
         columnDefs: [{
-                "className": "dt-right",
+                "className": "dt-center",
                 "targets": [3, 4]
             },
             {
@@ -84,17 +85,24 @@ function showextrinsics(address, chainListStr = 'all') {
                         let out = "";
                         if (row.method !== undefined && row.extrinsicHash !== undefined) {
                             try {
-                                return cover_params(data, row.extrinsicHash);
-                            } catch (e) {}
+                                return presentInstructions(JSON.stringify(row.params), "e" + row.extrinsicHash, "Params");
+                            } catch (e) {
+                                console.log(e);
+                            }
                         } else if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
-                            return cover_params(row.decodedInput.params, row.transactionHash);
+                            return presentInstructions(row.decodedInput.params, row.transactionHash, "Params");
+
                         }
                         return "";
                     } else {
-                        if (row.method !== undefined) {
-                            return row.method;
-                        } else {
-                            return "-";
+                        if (row.method !== undefined && row.extrinsicHash !== undefined) {
+                            try {
+                                return JSON.stringify(row.params);
+                            } catch (e) {
+                                console.log(e);
+                            }
+                        } else if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
+                            return JSON.stringify(row.decodedInput.params);
                         }
                     }
                     return "";
@@ -141,6 +149,177 @@ function showextrinsics(address, chainListStr = 'all') {
                     }
                 }
             },
+        ]
+    });
+
+    loadData2(pathParams, tableName, true, "data", 'feed', 'Feeds')
+}
+
+
+var initevmtxs = false;
+
+function showevmtxs(address, chainListStr = 'all') {
+    if (initevmtxs) return;
+    else initevmtxs = true;
+    let pathParams = `account/${address}?group=extrinsics&chainfilters=${chainListStr}`
+    let tableName = '#tableevmtxs'
+    tableEVMTxs = $(tableName).DataTable({
+        columnDefs: [{
+            "className": "dt-right",
+            "targets": [7, 8]
+        }, {
+            "className": "dt-center",
+            "targets": [2, 3, 4]
+        }],
+        order: [
+            [4, "desc"]
+        ],
+        columns: [{
+                data: 'transactionHash',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        try {
+                            if (row.transactionHash != undefined) {
+                                let s = presentTxHash(row.transactionHash);
+                                return `${s}`
+                            } else if (row.extrinsicID != undefined && row.extrinsicHash != undefined) {
+                                let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
+                                return `Substrate ${presentChain(row.id, row.chainName)} (${s})`
+                            } else {
+                                console.log(row);
+                            }
+                        } catch (e) {
+                            console.log(row);
+                        }
+                    }
+                    if (row.extrinsicID != undefined) {
+                        return row.extrinsicID;
+                    }
+                    return "";
+                }
+            },
+            {
+                data: 'section',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        if (row.method !== undefined && row.section !== undefined && row.transactionHash !== undefined) {
+                            return '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.section + '</button>';
+                        } else if (row.method !== undefined && row.section !== undefined && row.extrinsicHash !== undefined) {
+                            return presentExtrinsic(row.id, row.section, row.method)
+                        } else if (row.method !== undefined) {
+                            return '<button type="button" class="btn btn-outline-primary">' + row.method + '</button>';
+                        } else {
+                            return "-";
+                        }
+                    } else {
+                        if (row.method !== undefined) {
+                            return data;
+                        } else {
+                            return "-";
+                        }
+                    }
+                    return data;
+                }
+            },
+            {
+                data: 'blockNumber',
+                render: function(data, type, row, meta) {
+                    return presentBlockNumber(row.chainID, "", row.blockNumber);
+                }
+            },
+            {
+                data: 'ts',
+                render: function(data, type, row, meta) {
+                    let x = 0
+                    if (type == 'display') {
+                        if (row.ts !== undefined) {
+                            return presentTS(row.ts);
+                        } else if (row.timestamp !== undefined) {
+                            return presentTS(row.timestamp);
+                        }
+                    } else {
+                        if (row.ts !== undefined) {
+                            return (row.ts);
+                        } else if (row.timestamp !== undefined) {
+                            return (row.timestamp);
+                        }
+                    }
+
+                }
+            },
+            {
+                data: 'result',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        let res = (row.result == 1) ? 'Success' : 'Failed'
+                        let txStatus = presentSuccessFailure(row.result, row.err)
+                        return txStatus;
+                    }
+                    return data;
+                }
+            },
+            {
+                data: 'from',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentAddress(data);
+                    }
+                    return "nfrom";
+                }
+            },
+            {
+                data: 'to',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentAddress(data);
+                    }
+                    return "ndest";
+                }
+            },
+            {
+                data: 'value',
+                render: function(data, type, row, meta) {
+                    if (row.value != undefined) {
+                        return row.value;
+                    } else {
+                        return 0;
+                    }
+                }
+            },
+            {
+                data: 'fee',
+                render: function(data, type, row, meta) {
+                    if (row.fee != undefined) {
+                        return row.fee;
+                    } else {
+                        return "nfee";
+                    }
+                }
+            },
+            /*,
+            {
+                data: 'params',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        let out = "";
+                        if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
+			    return presentInstructions(row.decodedInput.params, row.transactionHash, "Params");
+                        } else if (row.method !== undefined && row.extrinsicHash !== undefined) {
+                            try {
+                                return cover_params(data, row.extrinsicHash);
+                            } catch (e) {}
+                        } 
+                        return "";
+                    } else {
+                        if (row.method !== undefined) {
+                            return row.method;
+                        } else {
+                            return "-";
+                        }
+                    }
+                    return "";
+                }
+            }, */
         ]
     });
 
@@ -1029,6 +1208,10 @@ function showaccounttab(hash, chainListStr = 'all') {
             showextrinsics(address, chainListStr);
             setupapidocs("account", "extrinsics", address, chainListStr);
             break;
+        case "#evmtxs":
+            showevmtxs(address, chainListStr);
+            setupapidocs("account", "evmtxs", address, chainListStr);
+            break;
         case "#transfers":
             showtransfers(address, chainListStr);
             setupapidocs("account", "transfers", address, chainListStr);
@@ -1071,7 +1254,7 @@ function showaccounttab(hash, chainListStr = 'all') {
     }
 }
 
-function setuptabs(tabs, address, requestedChainAddress, chainListStr = 'all') {
+function setuptabs(tabs, address, requestedChainAddress, chainListStr = 'all', isEVM = 0) {
     if (chainListStr == '') chainListStr = 'all'
     console.log(`setuptabs chainListStr=${chainListStr}`)
     for (let i = 0; i < tabs.length; i++) {
@@ -1080,8 +1263,8 @@ function setuptabs(tabs, address, requestedChainAddress, chainListStr = 'all') {
         let tabEl = document.querySelector(id);
         tabEl.addEventListener('shown.mdb.tab', function(event) {
             const hash = $(this).attr("href");
-            //let newUrl = "/account/" + requestedChainAddress + hash;
-            let newUrl = "/account/" + requestedChainAddress + `?group=${t.target}&chainfilters=${chainListStr}`
+            let view = isEVM ? 'address' : 'account';
+            let newUrl = `/${view}/` + requestedChainAddress + `?group=${t.target}&chainfilters=${chainListStr}`
             console.log("shown.mdb.tab", hash, newUrl);
             setTimeout(() => {
                 showaccounttab(hash, chainListStr);
@@ -1090,15 +1273,17 @@ function setuptabs(tabs, address, requestedChainAddress, chainListStr = 'all') {
         })
     }
     let url = location.href.replace(/\/$/, "");
-    let hash = "#extrinsics";
+    let hash = isEVM ? "#evmtxs" : "#extrinsics";
     if (location.hash) {
         const urlhash = url.split("#");
         if (urlhash.length > 1) hash = "#" + urlhash[1];
     }
     const triggerEl = document.querySelector('#accountTab a[href="' + hash + '"]');
-    //console.log("CAUSE shownmdb.tab for", triggerEl, hash);
+    console.log("CAUSE shownmdb.tab for", triggerEl, hash);
     if (triggerEl) mdb.Tab.getInstance(triggerEl).show();
-    initTabs(address, chainListStr); //preemptively show the first page of every group
+    if (isEVM == 0) {
+        initTabs(address, chainListStr); //preemptively show the first page of every group
+    }
 }
 
 function show_unfinalized(address) {
@@ -1146,16 +1331,20 @@ function show_unfinalized(address) {
 
 
 
-function initTabs(address, chainListStr = 'all') {
-    //showextrinsics(address, chainListStr);
-    showunfinalized(address, chainListStr)
-    showtransfers(address, chainListStr);
-    showxcmtransfers(address, chainListStr);
-    showrewards(address, chainListStr);
-    showcrowdloans(address, chainListStr);
-    showss58h160(address, chainListStr);
-    //showoffers(address, chainListStr);
-    showrelated(address, chainListStr);
+function initTabs(address, chainListStr = 'all', isEVM = 0) {
+    if (isEVM == 1) {
+        showevmtxs(address, chainListStr);
+    } else {
+        showextrinsics(address, chainListStr);
+        showunfinalized(address, chainListStr)
+        showtransfers(address, chainListStr);
+        showxcmtransfers(address, chainListStr);
+        showrewards(address, chainListStr);
+        showcrowdloans(address, chainListStr);
+        showss58h160(address, chainListStr);
+        //showoffers(address, chainListStr);
+        showrelated(address, chainListStr);
+    }
 }
 var refreshIntervalMS = 6100;
 var unfinalizedUpdateIntervalId = false;
@@ -1220,4 +1409,4 @@ $('#chainIDfilter').on('change', function() {
     if (tableXCMTransfers) tableXCMTransfers.search(filter, true).draw();
 });
 
-setuptabs(tabs, address, requestedChainAddress, chainListStr);
+setuptabs(tabs, address, requestedChainAddress, chainListStr, isEVM);

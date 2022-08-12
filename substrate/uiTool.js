@@ -164,9 +164,22 @@ function account_link(id, allowCopy = true, shortHash = true) {
     return out;
 }
 
+function address_link(id, allowCopy = true, shortHash = true) {
+    let h = shortHash ? get_short_hash(id) : id;
+    let out = `<a href='/address/${id}'>` + h + `</a>`;
+    if (allowCopy) out += copyToClipboard(id);
+    return out;
+}
+
 function account_link_full(id, allowCopy = true) {
     let accountID = paraTool.getPubKey(id);
     let out = `<a href='/account/${accountID}'>` + id + `</a>`;
+    if (allowCopy) out += copyToClipboard(id);
+    return out;
+}
+
+function address_link_full(id, allowCopy = true) {
+    let out = `<a href='/address/${id}'>` + id + `</a>`;
     if (allowCopy) out += copyToClipboard(id);
     return out;
 }
@@ -399,6 +412,13 @@ module.exports = {
             return account_link(id)
         } else {
             return account_link_full(id)
+        }
+    },
+    presentAddress: function(id, shortHash = false) {
+        if (shortHash) {
+            return address_link(id)
+        } else {
+            return address_link_full(id)
         }
     },
     presentFullID: function(id) {

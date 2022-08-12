@@ -1,0 +1,55 @@
+<%- include('header', {chainInfo: chainInfo, title: "Query"}); %>
+<%- include('chainheader', { chain: chain, title }); %>
+<% if ( tbl == "xcmmessages" ) { %>
+<h5>XCM Messages</h5>
+    <table id="tablexcmmessages" class="display" style="width: 100%">
+      <thead>
+        <tr>
+	  <th>MsgHash</th>
+	  <th>Extrinsic</th>
+	  <th>Msg Type</th>
+	  <th>Sent</th>
+	  <th>Received</th>
+          <th>Assets Received/Instructions</th>
+          <th>Beneficiary</th>
+	  <th>Matched/Time</th>
+        </tr>
+      </thead>
+    </table>
+<% } else { %>
+    <h5>XCM Transfers</h5>
+    <table id="tablexcmtransfers" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Section:Method</th>
+          <th>Amount Sent</th>
+          <th>Value (USD)</th>
+          <th>Sender</th>
+          <th>Beneficiary</th>
+          <th>From Chain/Extrinsic ID</th>
+          <th>To Chain</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+<% } %>
+<script src="/chainui.js"></script>
+<script>
+var data = <%- JSON.stringify(data); %>
+$(document).ready(function() {
+<% if ( tbl == "xcmtransfers" ) { %>
+  showxcmtransfers(null);
+  let table = $("#tablexcmtransfers").DataTable();
+   table.clear();
+   table.rows.add(data)
+   table.draw();
+<% } else { %>    
+  showxcmmessages(null);
+  let table = $("#tablexcmmessages").DataTable();
+   table.clear();
+   table.rows.add(data)
+   table.draw();
+<% } %>    
+});
+</script>
+<%- include('footer', {apiUrl: apiUrl}); %>

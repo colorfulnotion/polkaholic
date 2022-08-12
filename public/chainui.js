@@ -1,14 +1,29 @@
-let initxcmmessages = false;
-async function showxcmmessages(chainID = null) {
-    let pathParams = 'xcmmessages'
-    if (chainID != null) {
-        pathParams += `?chainfilters=${chainID}`
+function build_filter_string(filter) {
+    if (!filter) return "";
+    let out = [];
+    if (filter.chainList != undefined && Array.isArray(filter.chainList) && filter.chainList.length > 0) {
+        out.push(`chainfilters=${filter.chainList.join(',')}`);
+    } else if (filter.chainID != undefined) {
+        out.push(`chainfilters=${filter.chainID}`);
     }
+    if (out.length > 0) {
+        let filterStr = "?" + out.join("&");
+        console.log("build_filter_string", filterStr);
+        return filterStr;
+    }
+    return "";
+}
+
+let xcmmessagesTable = null;
+let initxcmmessages = false;
+async function showxcmmessages(filter = {}) {
+    let pathParams = 'xcmmessages' + build_filter_string(filter)
     let tableName = '#tablexcmmessages'
     if (initxcmmessages) {
         // if table is already initiated, update the rows
         //loadData2(pathParams, tableName, true)
     } else {
+        console.log("INIT SETUP");
         initxcmmessages = true;
         xcmmessagesTable = $(tableName).DataTable({
             pageLength: 100,
@@ -50,9 +65,9 @@ async function showxcmmessages(chainID = null) {
                         if (type == 'display') {
                             let str = "";
                             if (row.extrinsicID && row.extrinsicHash) {
-                                str = `<BR>${row.chainName} Extrinsic: ` + presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                                str = `${row.chainName} Extrinsic: ` + presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
                             } else {
-                                str = `<BR>${row.chainName} Extrinsic: Unknown`;
+                                str = `${row.chainName} Extrinsic: Unknown`;
                             }
                             if (row.sectionMethod) {
                                 str += '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.sectionMethod + '</button>';
@@ -105,9 +120,7 @@ async function showxcmmessages(chainID = null) {
                             }
                         } else {
                             if (row.sourceTS != undefined && row.sourceTS > 0) {
-                                return data;
-                            } else {
-                                return data;
+                                return row.chainName + " " + data;
                             }
                         }
                         return 0;
@@ -126,9 +139,7 @@ async function showxcmmessages(chainID = null) {
                             }
                         } else {
                             if (row.destTS != undefined && row.destTS > 0) {
-                                return data;
-                            } else if (row.incoming == 1) {
-                                return data;
+                                return data + " " + row.chainDestName;
                             }
                             return "unmatched";
                         }
@@ -147,7 +158,6 @@ async function showxcmmessages(chainID = null) {
                                     //let assetsReceivedStr = JSON.stringify(row.assetsReceived);
                                     let symbols = [];
                                     ar.forEach((r) => {
-                                        console.log(`r`, r)
                                         if (r.symbol && !symbols.includes(r.symbol)) {
                                             symbols.push(r.symbol);
                                         }
@@ -211,9 +221,210 @@ async function showxcmmessages(chainID = null) {
     }
 
     //load data here: warning this function is technically async
-    await loadData2(pathParams, tableName, true)
-    const selectElement = document.querySelector('#relaychain');
-    if (selectElement) {
-        setchainfilter(selectElement.value);
+    if (filter) {
+        await loadData2(pathParams, tableName, true)
+        const selectElement = document.querySelector('#relaychain');
+        if (selectElement) {
+            setchainfilter(selectElement.value);
+        }
+    } else {
+        console.log("MANUAL SETUP");
+    }
+}
+
+
+let xcmtransfersTable = null;
+let initxcmtransfers = false;
+async function showxcmtransfers(filter = {}) {
+    let pathParams = `xcmtransfers` + build_filter_string(filter)
+    let tableName = '#tablexcmtransfers'
+    if (initxcmtransfers) {
+        // if table is already initiated, update the rows
+        //loadData2(pathParams, tableName, true)
+    } else {
+        initxcmtransfers = true;
+        let xcmtransfersTable = $(tableName).DataTable({
+            /*
+            [0] section (+method)
+            [1] amountSent (+symbol)
+            [2] amountSentUSD
+            [3] fromAddress
+            [4] destAddress
+            [5] id (+chainName)
+            [6] chainIDDest (+chainDestName)
+            [7] sourceTS
+            [8] relayChain
+            */
+            pageLength: 100,
+            lengthMenu: [
+                [10, 25, 50, 100],
+                [10, 25, 50, 100]
+            ],
+            columnDefs: [{
+                    "className": "dt-right",
+                    "targets": [1, 2, 3]
+                },
+                {
+                    "targets": [8],
+                    "visible": false
+                }
+            ],
+            order: [
+                [7, "desc"]
+            ],
+            columns: [{
+                    data: 'section',
+                    render: function(data, type, row, meta) {
+                        let sectionMethod = `${data}:${row.method}`
+                        if (type == 'display') {
+                            return '<button type="button" class="btn btn-outline-primary text-capitalize">' + sectionMethod + '</button>';
+                        }
+                        return sectionMethod;
+                    }
+                },
+                {
+                    data: 'amountSent',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            try {
+                                let parsedAsset = JSON.parse(row.asset);
+                                let symbol = parsedAsset.Token;
+                                let assetChain = row.asset + "~" + row.chainID;
+                                if (symbol !== undefined) {
+                                    return presentTokenCount(data) + " " + presentAsset(assetChain, symbol);
+                                } else {
+                                    return row.asset;
+                                }
+                            } catch (err) {
+                                console.log("row.asset", row.asset, err);
+                            }
+                        } else {
+                            try {
+                                let parsedAsset = JSON.parse(row.asset);
+                                let symbol = parsedAsset.Token;
+                                if (symbol !== undefined) {
+                                    return symbol
+                                } else {
+                                    return row.asset;
+                                }
+                            } catch (err) {
+                                return ""
+                            }
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'amountSentUSD',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            if (row.amountSentUSD !== undefined) {
+                                //
+                                return currencyFormat(row.amountSentUSD, row.priceUSD, row.priceUSDCurrent);
+                            } else {
+                                console.log("missing amountSentUSD", row);
+                                return "--";
+                            }
+                        } else {
+                            if (row.amountSentUSD !== undefined) {
+                                return data
+                            } else {
+                                return 0;
+                            }
+                        }
+                        return;
+                    }
+                },
+                {
+                    data: 'fromAddress',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            if (row.fromAddress !== undefined) {
+                                return presentID(data);
+                            } else {
+                                console.log("missing fromAddress", row);
+                            }
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'destAddress',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            if (row.destAddress !== undefined) {
+                                return presentID(data);
+                            } else {
+                                console.log("missing destAddress", row);
+                            }
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'id',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
+                            let timelineURL = `/timeline/${row.extrinsicHash}`
+                            let timelineLink = `<div class="explorer"><a href="${timelineURL}">timeline</a></div>`
+                            return `${presentChain(row.id, row.chainName)} (${s}) ` + timelineLink
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'chainIDDest',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            try {
+                                if (row.chainIDDest != undefined && row.chainDestName) {
+                                    if (row.incomplete !== undefined && row.incomplete > 0) {
+                                        return "Incomplete " + presentSuccessFailure(false);
+                                    } else if (row.blockNumberDest) {
+                                        return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest) + presentSuccessFailure(true);
+                                    } else {
+                                        return presentChain(row.idDest, row.chainDestName);
+                                    }
+                                } else {
+                                    return "-"
+                                }
+                            } catch (err) {
+                                console.log(err);
+                            }
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'sourceTS',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            if (row.sourceTS !== undefined) {
+                                let s = presentTS(row.sourceTS);
+                                return s;
+                            } else {
+                                return "--";
+                            }
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'relayChain', //this is the 'hidden' column that we use to supprt filter
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            return data;
+                        }
+                        return data;
+                    }
+                }
+            ]
+        });
+    }
+    if (filter) {
+        await loadData2(pathParams, tableName, true)
+    } else {
+        console.log("MANUAL SETUP");
     }
 }

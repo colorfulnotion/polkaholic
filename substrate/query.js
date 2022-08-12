@@ -785,7 +785,8 @@ module.exports = class Query extends AssetManager {
             let [rows] = await this.btHashes.getRows({
                 keys: [hash]
             });
-            rows.forEach((row) => {
+            for (let i = 0; i < rows.length; i++) {
+                let row = rows[i];
                 let rowData = row.data;
                 //priority: use feed then feedunfinalized/feedevmunfinalized
                 let blockcells = false;
@@ -799,6 +800,28 @@ module.exports = class Query extends AssetManager {
                     // finalized
                     data = rowData["feed"]
                     res.status = 'finalized'
+
+                    // **** SPECIAL CASE: EVM txhash ..
+                    try {
+                        if (data.tx != undefined && data.tx[0]) {
+                            const cell = data.tx[0];
+                            let c = JSON.parse(cell.value);
+                            if (c.gasLimit != undefined) {
+                                console.log("CELL", c);
+                                if (this.is_evm_xcmtransfer_input(c.input)) {
+                                    let substrateTXHash = c.substrate.extrinsicHash;
+                                    let substratetx = await this.getTransaction(substrateTXHash);
+                                    if (substratetx.xcmdest != undefined) {
+                                        res.status = "finalizeddest";
+                                        // bring this in!
+                                        res.xcmdest = substratetx.xcmdest;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (errS) {
+                        console.log(errS);
+                    }
                 } else if (rowData["feedunfinalized"]) {
                     data = rowData["feedunfinalized"]
                     res.status = 'unfinalized'
@@ -818,7 +841,7 @@ module.exports = class Query extends AssetManager {
                         this.check_tx_hash(hash, txcells, res)
                     }
                 }
-            });
+            }
         } catch (err) {
             if (err.code == 404) {
                 return res;
@@ -948,13 +971,18 @@ module.exports = class Query extends AssetManager {
         return s;
     }
 
-    async getXCMTransfers(address = false, limit = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async getXCMTransfers(filters = {}, limit = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-
+        let chainList = filters.chainList ? filters.chainList : [];
+        let blockNumber = filters.blockNumber ? parseInt(filters.blockNumber, 10) : null;
+        let address = filters.address ? filters.address : null;
         let out = [];
         try {
             let w = address ? `and fromAddress = '${address}'` : "";
+            if (blockNumber) {
+                w += ` and blockNumber = '${parseInt(blockNumber, 10)}'`
+            }
             let xcmtransfers = await this.poolREADONLY.query(`select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(asset) > 3 ${w} order by sourceTS desc limit ${limit}`);
             for (let i = 0; i < xcmtransfers.length; i++) {
                 let x = xcmtransfers[i];
@@ -1149,6 +1177,9 @@ module.exports = class Query extends AssetManager {
         return (false);
     }
 
+    is_evm_xcmtransfer_input(inp) {
+        return (inp.includes("0xb38c60fa") || inp.includes("0xb9f813ff"));
+    }
 
     async getTransaction(txHash, decorate = true, decorateExtra = ["usd", "address", "related", "data"]) {
         //console.log(`getTransaction txHash=${txHash}, decorate=${decorate}, decorateExtra=${decorateExtra}`)
@@ -1246,6 +1277,21 @@ module.exports = class Query extends AssetManager {
                                     }
                                 }
                             }
+                        }
+                    }
+                    if (this.is_evm_xcmtransfer_input(c.input) && c.substrate != undefined) {
+                        //  fetch substrate extrinsicHash
+                        try {
+                            let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
+                            console.log("FETCH XCMTRANSFER", substratetx);
+                            if (substratetx.xcmdest != undefined) {
+                                c.xcmdest = substratetx.xcmdest;
+                                console.log("SET XCMTDEST", c.xcmdest);
+                            }
+                        } catch (errS) {
+                            console.log("FETCH XCMTRANSFER ERR", errS);
+
+
                         }
                     }
                     return c;
@@ -1721,7 +1767,7 @@ module.exports = class Query extends AssetManager {
         if (chainID === false) return ([]);
         if (!startBN) startBN = chain.blocksCovered - limit;
         try {
-            let sql = `select blockNumber, if(blockDT is Null, 0, 1) as finalized, blockHash, blockDT, UNIX_TIMESTAMP(blockDT) as blockTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD from block${chainID} where blockNumber > ${startBN} order by blockNumber Desc limit ${limit}`
+            let sql = `select blockNumber, if(blockDT is Null, 0, 1) as finalized, blockHash, blockDT, UNIX_TIMESTAMP(blockDT) as blockTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, numXCMTransfersIn, numXCMTransfersOut, numXCMMessagesOut, numXCMMessagesIn, valueTransfersUSD from block${chainID} where blockNumber > ${startBN} order by blockNumber Desc limit ${limit}`
             let blocks = await this.poolREADONLY.query(sql);
             let blocksunfinalized = await this.poolREADONLY.query(`select blockNumber, blockHash, UNIX_TIMESTAMP(blockDT) as blockTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD from blockunfinalized where chainID = ${chainID} and blockNumber >= ${startBN}`);
             let bufData = {};
@@ -1869,6 +1915,18 @@ module.exports = class Query extends AssetManager {
             // TODO: check response
             let block = row.feed;
             block = await this.decorateBlock(row.feed, chainID, row.evmFullBlock, decorate, decorateExtra);
+
+            let sql = `select numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from block${chainID} where blockNumber = '${blockNumber}' limit 1`;
+            let blockStatsRecs = await this.poolREADONLY.query(sql);
+            if (blockStatsRecs.length == 1) {
+                let s = blockStatsRecs[0];
+                block.numXCMTransfersIn = s.numXCMTransfersIn;
+                block.numXCMMessagesIn = s.numXCMMessagesIn;
+                block.numXCMTransfersOut = s.numXCMTransfersOut;
+                block.numXCMMessagesOut = s.numXCMMessagesOut;
+                block.valXCMTransferIncomingUSD = s.valXCMTransferIncomingUSD;
+                block.valXCMTransferOutgoingUSD = s.valXCMTransferOutgoingUSD;
+            }
             return block;
         } catch (err) {
             if (err.code == 404) {
@@ -3056,6 +3114,7 @@ module.exports = class Query extends AssetManager {
         }
         return addressTopN;
     }
+
     async getAccount(rawAddress, accountGroup = "realtime", chainList = [], TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let maxRows = 1000;
@@ -3067,7 +3126,11 @@ module.exports = class Query extends AssetManager {
 
         // xcmtransfers comes from mysql "xcmtransfer" table
         if (accountGroup == "xcmtransfers") {
-            return await this.getXCMTransfers(address, 500, chainList, decorate, decorateExtra);
+            let filters = {
+                chainList,
+                address
+            };
+            return await this.getXCMTransfers(filters, maxRows, decorate, decorateExtra);
         }
         // xcmtransfers comes from mysql "xcmtransfer" table
         if (accountGroup == "feed") {
@@ -4397,15 +4460,18 @@ module.exports = class Query extends AssetManager {
 
     }
 
-    async getRecentXCMMessages(chainIDr, limit, chainList, decorate, decorateExtra) {
-        console.log("getRecentXCMMessages -- chainList", chainList);
+    async getRecentXCMMessages(filters, limit, decorate, decorateExtra) {
+        let chainList = (filters.chainList != undefined) ? filters.chainList : [];
+        let blockNumber = (filters.blockNumber != undefined) ? filters.blockNumber : null;
+        let beneficiaries = (filters.beneficiaries != undefined) ? filters.beneficiaries : null;
         let chainListFilter = "";
         if (chainList.length > 0) {
             chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
         }
-
-        // bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
-        let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber FROM xcmmessages where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour)) and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
+        console.log("getRecentXCMMessages -- filters", filters);
+        // if we don't have a blockNumber, bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
+        let w = (blockNumber) ? `( blockNumber = '${parseInt(blockNumber, 10)}' )` : "blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour))";
+        let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, sourceBlocknumber as blockNumberOutgoing, destBlocknumber as blockNumberIncoming FROM xcmmessages where ${w} and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
         console.log(mysqlQuery);
         let results = [];
         let recs = await this.poolREADONLY.query(mysqlQuery);
@@ -4446,29 +4512,9 @@ module.exports = class Query extends AssetManager {
             }
             if (r.matched == 0 && (included[r.msgHash] != undefined) && Math.abs(included[r.msgHash] - r.blockTS) < 30) {
                 // if we already included a matched message within 30s of this one, don't bother
-            } else if (r.matched == 0 || r.incoming == 1) {
+            } else if (included[r.msgHash] == undefined) {
                 results.push(r);
-                if (r.matched == 1) {
-                    included[r.msgHash] = r.blockTS;
-                }
-            } else if (r.incoming == 0) {
-                // store in the outgoingBlockNumber map, so we can fill in the matched = 1 / incoming = 1 results with this
-                blockNumberOutgoing[r.msgHash] = r.blockNumber;
-            } else if (r.incoming == 1) {
-                blockNumberIncoming[r.msgHash] = r.blockNumber;
-            }
-        }
-        // TODO: fill in matched records with outgoingBlockNumber data
-        for (let i = 0; i < results.length; i++) {
-            let msgHash = results[i].msgHash;
-            if (results[i].incoming == 1) {
-                if (blockNumberOutgoing[msgHash] != undefined) {
-                    results[i].blockNumberOutgoing = blockNumberOutgoing[msgHash];
-                }
-            } else if (results[i].incoming == 0) {
-                if (blockNumberIncoming[msgHash] != undefined) {
-                    results[i].blockNumberIncoming = blockNumberIncoming[msgHash];
-                }
+                included[r.msgHash] = r.blockTS;
             }
         }
         return (results);
@@ -4478,6 +4524,7 @@ module.exports = class Query extends AssetManager {
         return this.bq_query_xcmmessages("xcm", query, limit, decorate, decorateExtra);
     }
 
+    // TODO: reenable usage
     async bq_query_xcmmessages(tbl = "xcm", filters = {}, limit = 100) {
         const bigqueryClient = new BigQuery();
         let fullTable = this.getBQTable(tbl);
@@ -4643,7 +4690,7 @@ module.exports = class Query extends AssetManager {
             // Add rows from mysql "recent" table
             let numRecents = 0;
             if (fldsmysql.length > 0) {
-                let mysqlQuery = `SELECT ${fldsmysql} FROM xcmmessagesrecent WHERE ` + wr.join(" and ") + ` LIMIT ${limit}`;
+                let mysqlQuery = `SELECT ${fldsmysql} FROM xcmmessages WHERE ` + wr.join(" and ") + ` LIMIT ${limit}`;
                 let recs = await this.poolREADONLY.query(mysqlQuery);
                 for (let i = 0; i < recs.length; i++) {
                     let r = recs[i];

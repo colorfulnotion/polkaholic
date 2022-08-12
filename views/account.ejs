@@ -1,6 +1,6 @@
 <%- include('header', {chainInfo: chainInfo, title: "Account"}); %>
 <% let canClaim = false; // disabled for now
-let suggest = true; // disabled for now
+let suggest = false; // disabled for now
 %>
 <div class="card mb-3">
   <div class="row g-0">
@@ -414,6 +414,7 @@ let address = '<%= account.address; %>';
 let requestedChainAddress = '<%= account.requestedChainAddress; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
 let chainListStr = '<%= chainListStr; %>';
+let isEVM = 0;
 <% if ( canClaim ) { %>
 $('#btnClaim').on('click', function(e) {
   var message = new Date().getTime() + "|" + account.address;

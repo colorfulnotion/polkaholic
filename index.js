@@ -742,31 +742,29 @@ app.get('/evmtxs/:chainID_or_chainName/:s?/:m?', async (req, res) => {
     }
 })
 
-app.get('/xcmtransfers/:chainID_or_chainName?/:chainID_or_chainName2?', async (req, res) => {
-    let chainID_or_chainName = req.params["chainID_or_chainName"]
-    let chainID_or_chainName2 = req.params["chainID_or_chainName2"]
+app.get('/xcmtransfers', async (req, res) => {
     try {
-        let [chainID, id] = query.convertChainID(chainID_or_chainName)
-        let [chainIDDest, id2] = query.convertChainID(chainID_or_chainName2)
-        let chain = null;
-        let chains = await query.getChains(1, "chainName");
-        if (chainID_or_chainName == "all") {
-            chainID = "all";
-            chain = await query.getChain(0);
-        } else {
-            chain = await query.getChain(chainID);
+        let [chainID, id] = getHostChain(req)
+        if (id) {} else {
+            id = 'polkadot';
+            chainID = 0;
         }
-        if (chainID_or_chainName2 == "all") chainIDDest = "all";
-        res.render('query', {
-            tbl: "xcmtransfers",
-            chainID: chainID,
-            chainIDDest: chainIDDest,
-            chains: chains,
-            id: id,
-            iddest: id2,
-            fromAddress: "",
+        chain = await query.getChain(chainID);
+        let filters = {
+            chainList: chainFilterOptUI(req),
+            blockNumber: req.query.blockNumber ? req.query.blockNumber : null,
+        };
+        const maxRows = 1000;
+        let chains = await query.getChains(1, "chainName");
+        let xcmtransfers = await query.getXCMTransfers(filters, maxRows);
+        res.render('xcmtransfers', {
             chainInfo: query.getChainInfo(0),
-            chain: chain,
+            tbl: "xcmtransfers",
+            chains,
+            chainID,
+            fromAddress: "",
+            chain,
+            data: xcmtransfers,
             title: `XCM Transfers Query`,
             apiUrl: req.path,
             docsSection: "get-xcmtransfers"
@@ -778,32 +776,30 @@ app.get('/xcmtransfers/:chainID_or_chainName?/:chainID_or_chainName2?', async (r
     }
 })
 
-app.get('/xcmmessages/:chainID_or_chainName?/:chainID_or_chainName2?', async (req, res) => {
-    let chainID_or_chainName = req.params["chainID_or_chainName"] ? req.params["chainID_or_chainName"] : "all";
-    let chainID_or_chainName2 = req.params["chainID_or_chainName2"] ? req.params["chainID_or_chainName2"] : "all"
+app.get('/xcmmessages', async (req, res) => {
     try {
-        let [chainID, id] = query.convertChainID(chainID_or_chainName)
-        let [chainIDDest, id2] = query.convertChainID(chainID_or_chainName2)
-        let chain = null;
-        let chains = await query.getChains(1, "chainName");
-
-        if (chainID_or_chainName == "all") {
-            chainID = "all";
-            chain = await query.getChain(0);
-        } else {
-            chain = await query.getChain(chainID);
+        let [chainID, id] = getHostChain(req)
+        if (id) {} else {
+            id = 'polkadot';
+            chainID = 0;
         }
-        if (chainID_or_chainName2 == "all") chainIDDest = "all";
-        res.render('query', {
-            tbl: "xcmmessages",
-            chainID: chainID,
-            chainIDDest: chainIDDest,
-            chains: chains,
-            id: id,
-            iddest: id2,
-            fromAddress: "",
+        chain = await query.getChain(chainID);
+        let filters = {
+            chainList: chainFilterOptUI(req),
+            blockNumber: req.query.blockNumber ? req.query.blockNumber : null,
+        };
+        const maxRows = 1000;
+        let chains = await query.getChains(1, "chainName");
+        let xcmmessages = await query.getRecentXCMMessages(filters, maxRows);
+        console.log(filters, xcmmessages)
+        res.render('xcmtransfers', {
             chainInfo: query.getChainInfo(0),
-            chain: chain,
+            tbl: "xcmmessages",
+            chains,
+            chainID,
+            chain,
+            data: xcmmessages,
+            fromAddress: "",
             title: `XCM Messages Query`,
             apiUrl: req.path,
             docsSection: "get-xcmmessages"
@@ -898,7 +894,47 @@ app.get('/block/:chainID_or_chainName/:blockNumber', async (req, res) => {
         let [decorate, decorateExtra] = decorateOptUI(req)
         var b = await query.getBlock(chainID, blockNumber, blockHash, decorate, decorateExtra);
         if (b) {
-            res.render('block', {
+            let view = (chain.chainID == 2004 || chain.chainID == 22023) ? 'evmBlock' : 'block';
+            res.render(view, {
+                b: b,
+                blockNumber: blockNumber,
+                blockHash: blockHash,
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-block"
+            });
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "block",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/block/karura/1000000?blockhash=xxx&decorate=true&extra=address,usd
+app.get('/txs/:chainID_or_chainName/:blockNumber', async (req, res) => {
+    let chainID_or_chainName = req.params["chainID_or_chainName"]
+    try {
+        let [chainID, id] = query.convertChainID(chainID_or_chainName)
+        let chain = await query.getChain(chainID);
+        let blockNumber = parseInt(req.params["blockNumber"], 10);
+        let blockHash = (req.query.blockhash != undefined) ? req.query.blockhash : '';
+        let [decorate, decorateExtra] = decorateOptUI(req)
+        var b = await query.getBlock(chainID, blockNumber, blockHash, decorate, decorateExtra);
+        if (b) {
+            let view = (chain.isEVM == 1) ? 'evmtxs' : 'txs';
+            res.render(view, {
                 b: b,
                 blockNumber: blockNumber,
                 blockHash: blockHash,
@@ -1091,6 +1127,40 @@ app.get('/account/:address', async (req, res) => {
         // console.log(`getHostChain chainID=${requestedChainID}, id=${id}`)
         let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, decorate, decorateExtra);
         res.render('account', {
+            account: account,
+            chainInfo: query.getChainInfo(),
+            address: address,
+            claimed: false,
+            apiUrl: req.path,
+            fromAddress: fromAddress,
+            requestedChainID: requestedChainID,
+            chainListStr: chainList.join(','),
+            docsSection: "get-account"
+        });
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "account",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+app.get('/address/:address', async (req, res) => {
+    try {
+        let fromAddress = getHomePubkey(req);
+        let address = req.params["address"];
+        let [decorate, decorateExtra] = decorateOptUI(req)
+        let [requestedChainID, id] = getHostChain(req);
+        let chainList = chainFilterOptUI(req)
+        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, decorate, decorateExtra);
+        res.render('address', {
             account: account,
             chainInfo: query.getChainInfo(),
             address: address,

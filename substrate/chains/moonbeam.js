@@ -17,17 +17,17 @@ module.exports = class MoonbeamParser extends ChainParser {
             let e = events[i]
             super.processIncomingXCMSignal(indexer, extrinsicID, e, i, finalized)
         }
-        if (this.mpReceived){
+        if (this.mpReceived) {
             let idxKeys = Object.keys(this.mpReceivedHashes)
             let prevIdx = 0;
 
-            for (const idxKey of idxKeys){
+            for (const idxKey of idxKeys) {
                 this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx)
                 this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
                 let mpState = this.mpReceivedHashes[idxKey]
                 console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
                 let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
-                let eventRangeLengthWithoutFee = eventRange.length -1 // remove the fee event here
+                let eventRangeLengthWithoutFee = eventRange.length - 1 // remove the fee event here
                 for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
                     let e = eventRange[i]
                     let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
@@ -35,7 +35,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                         indexer.updateXCMTransferDestCandidate(candidate, caller)
                     }
                 }
-                prevIdx = parseInt(idxKey)+1
+                prevIdx = parseInt(idxKey) + 1
             }
         }
     }

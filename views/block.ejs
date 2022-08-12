@@ -56,6 +56,27 @@
     <td>Block Time</td>
     <td class='date'><%= uiTool.presentSecondsAgoTS(b.blockTS); %></td>
   </tr>
+    <% if ( b.numXCMTransfersOut ) { %>
+  <tr>
+    <td>XCM Transfers</td>
+    <td>
+    <a class="btn-sm btn-primary" href='/xcmtransfers?chainfilters=<%= id; %>&blockNumber=<%= blockNumber %>'><%= b.numXCMTransfersOut; %> XCM transfers</a>
+    </td>
+  </tr>
+    <% } %>
+  <% if ( b.numXCMMessagesIn > 0 || b.numXCMMessagesOut > 0 ) { %>
+  <tr>
+    <td>XCM Messages</td>
+    <td>
+    <% if ( b.numXCMMessagesIn > 0 ) { %>
+    <a class="btn-sm btn-primary" href='/xcmmessages?chainfilters=<%= id; %>&blockNumber=<%= blockNumber %>'><%= b.numXCMMessagesIn; %> XCM Incoming messages</a>
+    <% } %>
+    <% if ( b.numXCMMessagesOut > 0 ) { %>
+    <a class="btn-sm btn-primary" href='/xcmmessages?chainfilters=<%= id; %>&blockNumber=<%= blockNumber %>'><%= b.numXCMMessagesOut; %> XCM Outgoing messages</a>
+    <% } %>
+    </td>
+  </tr>
+  <% } %>
   <tr>
     <td>Spec Version</td>
     <td>
@@ -80,22 +101,7 @@
          %>
       <a href='<%- subscanURL; %>' target='_new'><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
       <% } %>
-      <% if ( chainID && (chainID == 2004 || chainID == 22023) && b.evmBlock != undefined ) {
-         let externalURL = (chainID == 2004)? `https://moonscan.io` : `https://moonriver.moonscan.io`
-         let imgURL = (chainID == 2004) ? "https://cdn.polkaholic.io/moonscan.svg" : "https://cdn.polkaholic.io/moonriverscan.svg"
-         let txURL = `${externalURL}/block/${b.evmBlock.hash}`;
-         %>
-      <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>
-      <% }%>
-      <% if ( chainID && (chainID == 2006 || chainID == 22007) && b.evmBlock != undefined ) {
-         let externalURL = (chainID == 2006)? `https://blockscout.com/astar` : `https://blockscout.com/shiden`
-         let imgURL = "https://cdn.polkaholic.io/blockscout.png"
-         let txURL = `${externalURL}/block/${b.evmBlock.hash}`;
-         %>
-      <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>
-      <% }%>
     </td>
-
   </tr>
 </table>
 
@@ -106,13 +112,6 @@ let tabs = [
 { title: "Extrinsics", target: "extrinsics" },
 { title: "Events", target: "events" }
 ]
-if ( b.evmBlock ) {
-   let evmtabs = [
-    { title: "EVM Transactions", target: "evmtxs" },
-    { title: "EVM Header", target: "evmheader" }
-   ];
-   tabs = evmtabs.concat(tabs);
-}
 
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
@@ -132,10 +131,7 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-content">
   <%
   let defHash = "#extrinsics";
-  if ( b.evmBlock ) {
-        defHash = "#evmtxs";   %>
-  <%- include("evmBlock", {block: b.evmBlock, chainID: chainID}); %>
-  <% } %>
+  %>
   <%- include("blockextrinsics", {chainID: chainID, id:id, extrinsics: b.extrinsics }); %>
   <%- include("blockevents", {chainID: chainID, id: id, extrinsics: b.extrinsics }); %>
 </div>
@@ -156,3 +152,7 @@ for (let i=0; i<tabs.length; i++) {
 </script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
+
+
+
+

@@ -217,8 +217,11 @@ app.get('/xcmtransfers', async (req, res) => {
     try {
         let limit = (req.query.limit != undefined) ? paraTool.parseInt(req.query.limit) : 1000
         let [decorate, decorateExtra] = decorateOpt(req)
-        let chainList = chainFilterOpt(req)
-        let xcmtransfers = await query.getXCMTransfers(false, limit, chainList, decorate, decorateExtra);
+        let filters = {
+            chainList: chainFilterOpt(req),
+            blockNumber: req.params["blockNumber"] ? req.params["blockNumber"] : null,
+        };
+        let xcmtransfers = await query.getXCMTransfers(filters, limit, decorate, decorateExtra);
         if (xcmtransfers) {
             res.write(JSON.stringify(xcmtransfers));
             await query.tallyAPIKey(getapikey(req));
@@ -238,8 +241,11 @@ app.get('/xcmmessages', async (req, res) => {
     try {
         let limit = (req.query.limit != undefined) ? paraTool.parseInt(req.query.limit) : 1000
         let [decorate, decorateExtra] = decorateOpt(req)
-        let chainList = chainFilterOpt(req)
-        let xcmmessages = await query.getRecentXCMMessages(false, limit, chainList, decorate, decorateExtra);
+        let filters = {
+            chainList: chainFilterOpt(req),
+            blockNumber: req.params["blockNumber"] ? req.params["blockNumber"] : null,
+        };
+        let xcmmessages = await query.getRecentXCMMessages(filters, limit, decorate, decorateExtra);
         if (xcmmessages) {
             res.write(JSON.stringify(xcmmessages));
             await query.tallyAPIKey(getapikey(req));
