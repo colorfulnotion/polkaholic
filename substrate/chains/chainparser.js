@@ -7,8 +7,8 @@ module.exports = class ChainParser {
     parserBlockHash = false;
     parserWatermark = 0;
     numParserErrors = 0;
-    umpReceivedFromParaID = {};
-    umpReceived = false;
+    mpReceived = false;
+    mpReceivedHashes = {};
     constructor() {
 
     }
@@ -29,8 +29,7 @@ module.exports = class ChainParser {
             if (this.parserWatermark != blockNumber) this.parserWatermark = 0
         }
         this.parserBlockHash = blockHash;
-        this.umpReceived = false;
-        this.umpReceivedFromParaID = {};
+        this.mpReceived = false;
     }
 
     tokens_to_string(tokens) {
@@ -867,22 +866,40 @@ module.exports = class ChainParser {
     }
 
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized = false) {
-        //IMPORTANT: reset umpReceived at the start of every unsigned extrinsic
-        this.umpReceived = false;
-        //console.log(`[${extrinsicID}] processIncomingXCM start`, `umpReceived=${this.umpReceived}`)
+        //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
+        this.mpReceived = false;
+        this.mpReceivedHashes = {};
+        //console.log(`[${extrinsicID}] processIncomingXCM start`, `mpReceived=${this.mpReceived}`)
 
         //step0. parse incoming messages (raw)
         this.processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, finalized)
 
         //step1. parse incoming transfer heuristically
-        for (const e of events) {
-            this.processIncomingXCMSignal(indexer, extrinsicID, e, finalized)
+        for (let i = 0; i < events.length; i++) {
+            let e = events[i]
+            this.processIncomingXCMSignal(indexer, extrinsicID, e, i, finalized)
         }
+        if (this.mpReceived){
+            let idxKeys = Object.keys(this.mpReceivedHashes)
+            let prevIdx = 0;
 
-        for (const e of events) {
-            let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, finalized)
-            if (candidate) {
-                indexer.updateXCMTransferDestCandidate(candidate, caller)
+            //TODO: blacklist: author, 0x6d6f646c70792f74727372790000000000000000 (modlpy/trsry)
+            //conjecture: the last event prior to msgHash is typically the "fee" event either going to blockproducer or trsry
+            for (const idxKey of idxKeys){
+                this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx)
+                this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
+                let mpState = this.mpReceivedHashes[idxKey]
+                console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
+                let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
+                let eventRangeLengthWithoutFee = eventRange.length -1 // remove the fee event here
+                for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
+                    let e = eventRange[i]
+                    let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
+                    if (candidate) {
+                        indexer.updateXCMTransferDestCandidate(candidate, caller)
+                    }
+                }
+                prevIdx = parseInt(idxKey)+1
             }
         }
     }
@@ -1232,7 +1249,32 @@ module.exports = class ChainParser {
         }
     }
 
-    processIncomingXCMSignal(indexer, extrinsicID, e, finalized = false) {
+    processIncomingXCMSignalStatus(e){
+        let sectionMethod = `${e.section}(${e.method})`
+        let msgHash = e.data[0];
+        let state = e.data[1]
+        let statusK = Object.keys(state)[0]
+        let signalStatus = {
+            sectionMethod: sectionMethod,
+            eventID: e.eventID,
+            msgHash: msgHash,
+            success: false,
+        }
+        let statusV = state[statusK]
+        if (statusK == 'complete' || statusK == 'weight'){
+            signalStatus.weight = paraTool.dechexToInt(statusV)
+            signalStatus.success = true
+        }else if (sectionMethod == 'xcmpQueue(Success)'){
+            signalStatus.success = true
+            signalStatus.weight = paraTool.dechexToInt(state)
+        }else{
+            signalStatus.error = statusK
+            signalStatus.description = statusV
+        }
+        return signalStatus
+    }
+
+    processIncomingXCMSignal(indexer, extrinsicID, e, idx, finalized = false) {
         // here we look for events of note
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         // enable this line to explore section:method
@@ -1240,39 +1282,42 @@ module.exports = class ChainParser {
         if (pallet == "ump" && method == "ExecutedUpward") {
             // parachain -> relaychain
             //console.log("processBlockEvent", pallet, method, e);
-            // https://kusama.subscan.io/block/12039596?tab=event has balances/Deposited
             // test case: indexPeriods 2  2022-03-30 21
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] ump:ExecutedUpward signal`)
-            let paraID = e.data[0];
-            this.umpReceived = true;
-            this.umpReceivedFromParaID[paraID]++;
+            let signalStatus = this.processIncomingXCMSignalStatus(e)
+            let msgHash = signalStatus.msgHash;
+            this.mpReceived = true;
+            this.mpReceivedHashes[idx] = signalStatus
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] ump:ExecutedUpward signal [msgHash=${msgHash}, idx=${idx}]`, signalStatus)
         } else if (pallet == "xcmpQueue" && method == "Success") {
             // this is the para <=> para case
             //console.log("processBlockEvent", pallet, method);
-            // https://bifrost.subscan.io/block/1539819?tab=event has currencies/Deposited
             // test case: indexPeriods 6 2022-03-30 21
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Success signal`)
-            this.umpReceived = true;
-            this.umpReceivedFromParaID['unknown']++;
+            let signalStatus = this.processIncomingXCMSignalStatus(e)
+            let msgHash = signalStatus.msgHash;
+            this.mpReceived = true;
+            this.mpReceivedHashes[idx] = signalStatus
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Success signal [msgHash=${msgHash}, idx=${idx}]`, signalStatus)
         } else if (pallet == "xcmpQueue" && method == "Fail") {
             // this is the para <=> para case
             //console.log("processBlockEvent", pallet, method);
-            // https://bifrost.subscan.io/block/1539819?tab=event has currencies/Deposited
             // test case: indexPeriods 6 2022-03-30 21
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Fail signal !!!`)
-            //this.umpReceived = true;
-            //this.umpReceivedFromParaID['unknown']++;
+            let signalStatus = this.processIncomingXCMSignalStatus(e)
+            let msgHash = signalStatus.msgHash;
+            this.mpReceived = true;
+            this.mpReceivedHashes[idx] = signalStatus
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] xcmpQueue:Fail signal !!! [msgHash=${msgHash}, idx=${idx}]`, signalStatus)
         } else if (pallet == "dmpQueue" && method == "ExecutedDownward") {
             // relaychain -> parachain (xcmPallet:reserveTransferAssets)
-            //https://acala.subscan.io/extrinsic/980484-1?event=980484-8
             //0x1983c30b091b39363a07c4a90be79b7ce4650742666f25e8378beff6f54a30f4
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] dmpqueue:ExecutedDownward signal`)
-            this.umpReceived = true;
-            this.umpReceivedFromParaID['unknown']++;
+            let signalStatus = this.processIncomingXCMSignalStatus(e)
+            let msgHash = signalStatus.msgHash;
+            this.mpReceived = true;
+            this.mpReceivedHashes[idx] = signalStatus
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsicID}] dmpqueue:ExecutedDownward signal [msgHash=${msgHash}, idx=${idx}]`, signalStatus)
         }
     }
 
-    processIncomingAssetSignal(indexer, extrinsicID, e, finalized = false) {
+    processIncomingAssetSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         let palletMethod = `${pallet}(${method})` //event
         let candidate = false;
@@ -1281,26 +1326,26 @@ module.exports = class ChainParser {
         switch (palletMethod) {
             case 'balances(Deposit)':
                 //kusama/polkadot format
-                if (this.umpReceived) {
-                    [candidate, caller] = this.processBalancesDepositSignal(indexer, extrinsicID, e, finalized)
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processBalancesDepositSignal(indexer, extrinsicID, e, mpState, finalized)
                 }
                 break;
             case 'currencies(Deposited)':
                 // acala/bifrost format
-                if (this.umpReceived) {
-                    [candidate, caller] = this.processCurrenciesDepositedSignal(indexer, extrinsicID, e, finalized)
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processCurrenciesDepositedSignal(indexer, extrinsicID, e, mpState, finalized)
                 }
                 break;
             case 'tokens(Deposited)':
                 // acala format?
-                if (this.umpReceived) {
-                    [candidate, caller] = this.processTokensDepositedSignal(indexer, extrinsicID, e, finalized)
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processTokensDepositedSignal(indexer, extrinsicID, e, mpState, finalized)
                 }
                 break;
             case 'assets(Issued)':
                 // parallel/moonbeam/astar format
-                if (this.umpReceived) {
-                    [candidate, caller] = this.processAssetsIssuedSignal(indexer, extrinsicID, e, finalized)
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processAssetsIssuedSignal(indexer, extrinsicID, e, mpState, finalized)
                 }
                 break;
             default:
@@ -1673,6 +1718,11 @@ module.exports = class ChainParser {
                     msgHash: '0x',
                     sentAt: this.parserWatermark,
                 }
+                let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                if(isXCMAssetFound){
+                    if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                    if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                }
                 if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
                 //console.log("processOutgoingXTokens xTokens", r);
                 console.log(`processOutgoingXTokensEvent`, r)
@@ -1885,6 +1935,11 @@ module.exports = class ChainParser {
                             isFeeItem: isFeeItem,
                             msgHash: '0x',
                             sentAt: this.parserWatermark,
+                        }
+                        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                        if(isXCMAssetFound){
+                            if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                            if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                         }
                         //console.log("processOutgoingXTokens xTokens", r);
                         outgoingXTokens.push(r)
@@ -2497,7 +2552,12 @@ module.exports = class ChainParser {
                                 msgHash: '0x',
                                 sentAt: this.parserWatermark,
                             }
-                            if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingXcmPallet xcmPallet", r);
+                            let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                            if(isXCMAssetFound){
+                                if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                                if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                            }
+                            if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingPolkadotXcm xcmPallet", r);
                             outgoingXcmPallet.push(r)
                             extrinsic.xcms.push(r)
                             //outgoingXcmList.push(r)
@@ -2728,6 +2788,11 @@ module.exports = class ChainParser {
                                 isFeeItem: isFeeItem,
                                 msgHash: '0x',
                                 sentAt: this.parserWatermark,
+                            }
+                            let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                            if(isXCMAssetFound){
+                                if(standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                                if(standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                             }
                             //if (this.debugLevel >= paraTool.debugVerbose) console.log("processOutgoingXcmPallet xcmPallet", r);
                             extrinsic.xcms.push(r)
@@ -4097,7 +4162,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processBalancesDepositSignal(indexer, extrinsicID, e, finalized) {
+    processBalancesDepositSignal(indexer, extrinsicID, e, mpState, finalized) {
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         let eventIndex = e.eventID.split('-')[3]
@@ -4107,10 +4172,9 @@ module.exports = class ChainParser {
         let rawAssetString = indexer.getNativeAsset();
         let fromAddress = paraTool.getPubKey(d[0]);
         let amountReceived = paraTool.dechexToInt(d[1]);
-
+        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal balances:Deposit`
-            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.umpReceivedFromParaID, caller);
             candidate = {
                 chainIDDest: indexer.chainID,
                 eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4124,7 +4188,11 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.umpReceivedFromParaID))
+                msgHash: mpState.msgHash,
+            }
+            if(isXCMAssetFound){
+                if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
             }
             return [candidate, caller]
         } else {
@@ -4133,7 +4201,7 @@ module.exports = class ChainParser {
         return [false, false]
     }
 
-    processCurrenciesDepositedSignal(indexer, extrinsicID, e, finalized) {
+    processCurrenciesDepositedSignal(indexer, extrinsicID, e, mpState, finalized) {
         if (this.debugLevel >= paraTool.debugTracing) console.log(`currencies(Deposited)`, e.data)
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
@@ -4142,11 +4210,11 @@ module.exports = class ChainParser {
         //let assetString = this.token_to_string(d[0]);
         let assetString = this.processGenericCurrencyID(indexer, d[0]);
         let rawAssetString = this.processRawGenericCurrencyID(indexer, d[0]);
+        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal currencies:Deposited`
-            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.umpReceivedFromParaID, caller);
             candidate = {
                 chainIDDest: indexer.chainID,
                 eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4160,7 +4228,11 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.umpReceivedFromParaID))
+                msgHash: mpState.msgHash,
+            }
+            if(isXCMAssetFound){
+                if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
             }
             return [candidate, caller]
         } else {
@@ -4169,7 +4241,7 @@ module.exports = class ChainParser {
         return [false, false]
     }
 
-    processTokensDepositedSignal(indexer, extrinsicID, e, finalized) {
+    processTokensDepositedSignal(indexer, extrinsicID, e, mpState, finalized) {
         if (this.debugLevel >= paraTool.debugTracing) console.log(`tokens(Deposited)`, e.data)
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
@@ -4178,12 +4250,12 @@ module.exports = class ChainParser {
         //let assetString = this.token_to_string(d[0]);
         let assetString = this.processGenericCurrencyID(indexer, d[0]);
         let rawAssetString = this.processRawGenericCurrencyID(indexer, d[0]);
+        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
         //console.log(`[${fromAddress}] ${assetString}`, amountReceived, `finalized=${finalized}`)
         if (paraTool.validAmount(amountReceived) && finalized) {
             let caller = `generic processIncomingAssetSignal tokens:Deposited`
-            //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.umpReceivedFromParaID, caller);
             candidate = {
                 chainIDDest: indexer.chainID,
                 eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4197,7 +4269,11 @@ module.exports = class ChainParser {
                 rawAsset: rawAssetString,
                 destTS: this.parserTS,
                 amountReceived: amountReceived,
-                paraIDs: JSON.stringify(Object.keys(this.umpReceivedFromParaID))
+                msgHash: mpState.msgHash,
+            }
+            if(isXCMAssetFound){
+                if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
             }
             return [candidate, caller]
         } else {
@@ -4206,7 +4282,7 @@ module.exports = class ChainParser {
         return [false, false]
     }
 
-    processAssetsIssuedSignal(indexer, extrinsicID, e, finalized = false) {
+    processAssetsIssuedSignal(indexer, extrinsicID, e, mpState, finalized = false) {
         /*
         data": [
           101,
@@ -4232,6 +4308,7 @@ module.exports = class ChainParser {
         }
         let rawAssetString = this.token_to_string(parsedAsset);
 
+
         //TODO: not sure here..
         //let assetString = this.processGenericCurrencyID(indexer, d[0]);
         //let rawAssetString = this.processRawGenericCurrencyID(indexer, d[0]);
@@ -4243,11 +4320,12 @@ module.exports = class ChainParser {
                 Token: assetInfo.symbol
             }
             let assetString = this.token_to_string(rAasset);
+            let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
+
             let eventIndex = e.eventID.split('-')[3]
             if (this.debugLevel >= paraTool.debugTracing) console.log(`processAssetIssued`, fromAddress, amountReceived, assetString)
             if (paraTool.validAmount(amountReceived) && finalized) {
                 let caller = `generic processIncomingAssetSignal assets:Issued`
-                //indexer.updateXCMTransferDestCandidate(this.parserBlockNumber, this.parserTS, extrinsicID, eventIndex, pallet, method, fromAddress, assetString, amountReceived, this.umpReceivedFromParaID, caller);
                 candidate = {
                     chainIDDest: indexer.chainID,
                     eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
@@ -4261,7 +4339,11 @@ module.exports = class ChainParser {
                     rawAsset: rawAssetString,
                     destTS: this.parserTS,
                     amountReceived: amountReceived,
-                    paraIDs: JSON.stringify(Object.keys(this.umpReceivedFromParaID))
+                    msgHash: mpState.msgHash,
+                }
+                if(isXCMAssetFound){
+                    if(standardizedXCMInfo.nativeAssetChain != undefined) candidate.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                    if(standardizedXCMInfo.xcmInteriorKey != undefined) candidate.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                 }
                 return [candidate, caller]
             } else {
