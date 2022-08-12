@@ -3906,6 +3906,11 @@ module.exports = class Indexer extends AssetManager {
                                 } else {
                                     fallbackRequired = true
                                 }
+                            }else if (xcm.innerCall != undefined){
+                                // lookup msgHash using innerCall
+                                let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcm.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash)
+                                if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
+                                //accept the fact that this xcm doesn not have destAddress
                             } else {
                                 console.log(`fallback Required [${rExtrinsic.extrinsicID}] [${rExtrinsic.extrinsicHash}] [${xcm.xcmIndex}-${xcm.transferIndex}]`)
                                 fallbackRequired = true

@@ -1230,17 +1230,17 @@ module.exports = {
     unique: function(x) {
         return unique(x)
     },
-    getParaIDfromChainID: function(x) {
-        return getParaIDfromChainID(x)
+    getParaIDfromChainID: function(chainID) {
+        return getParaIDfromChainID(chainID)
     },
-    getRelayChainID: function(x) {
-        return getRelayChainID(x)
+    getRelayChainID: function(relaychain) {
+        return getRelayChainID(relaychain)
     },
-    getParaIDExtra: function(x) {
-        return getParaIDExtra(x)
+    getParaIDExtra: function(relaychain) {
+        return getParaIDExtra(relaychain)
     },
-    getRelayChainByChainID: function(x) {
-        return getRelayChainByChainID(x)
+    getRelayChainByChainID: function(chainID) {
+        return getRelayChainByChainID(chainID)
     },
     toUSD: function(x, relayChain) {
         return toUSD(x, relayChain)
