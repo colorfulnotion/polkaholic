@@ -1252,24 +1252,39 @@ module.exports = class ChainParser {
     processIncomingXCMSignalStatus(e){
         let sectionMethod = `${e.section}(${e.method})`
         let msgHash = e.data[0];
-        let state = e.data[1]
-        let statusK = Object.keys(state)[0]
         let signalStatus = {
             sectionMethod: sectionMethod,
             eventID: e.eventID,
             msgHash: msgHash,
             success: false,
         }
-        let statusV = state[statusK]
-        if (statusK == 'complete' || statusK == 'weight'){
-            signalStatus.weight = paraTool.dechexToInt(statusV)
-            signalStatus.success = true
-        }else if (sectionMethod == 'xcmpQueue(Success)'){
-            signalStatus.success = true
-            signalStatus.weight = paraTool.dechexToInt(state)
-        }else{
-            signalStatus.error = statusK
-            signalStatus.description = statusV
+        let statusK
+        let statusV;
+        if (e.data.length == 1){
+            if(sectionMethod == 'xcmpQueue(Success)'){
+                signalStatus.success = true
+            }
+            return signalStatus
+        }else if (e.data.length >= 2){
+            let state = e.data[1]
+            try {
+                let statusK = Object.keys(state)[0]
+                let statusV = state[statusK]
+                if (statusK == 'complete' || statusK == 'weight'){
+                    signalStatus.weight = paraTool.dechexToInt(statusV)
+                    signalStatus.success = true
+                }else if (sectionMethod == 'xcmpQueue(Success)'){
+                    signalStatus.success = true
+                    signalStatus.weight = paraTool.dechexToInt(state)
+                }else{
+                    signalStatus.error = statusK
+                    signalStatus.description = statusV
+                }
+                return signalStatus
+            }catch (err){
+                console.log(`processIncomingXCMSignalStatus failed ${err.toString()}`, err)
+                return signalStatus
+            }
         }
         return signalStatus
     }

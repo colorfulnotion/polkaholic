@@ -23,7 +23,7 @@ module.exports = class XCMManager extends AssetManager {
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
         let sql = `select
-          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, xcmtransfer.asset, d.paraIDs,
+          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, xcmtransfer.asset,
           (d.destts - xcmtransfer.sourceTS) as diffTS,
           xcmtransfer.extrinsicID,
           xcmtransfer.amountSent,
@@ -245,15 +245,7 @@ order by msgHash, diffSentAt, diffTS`
     }
 
     async xcmAUSDUpdate() {
-        let kUSDTransferSql = `update xcmtransfer set nativeAssetChain = '{"Token":"KUSD"}~22000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and relaychain = 'kusama' and nativeAssetChain is null;`
-        let kUSDCandidateSql = `update xcmtransferdestcandidate set nativeAssetChain = '{"Token":"KUSD"}~22000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and (chainIDDest = 2 or chainIDDest > 20000) and nativeAssetChain is null;`
-        let aUSDTransferSql = `update xcmtransfer set nativeAssetChain = '{"Token":"AUSD"}~2000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and relaychain = 'polkadot' and nativeAssetChain is null;`
-        let aUSDCandidateSql = `update xcmtransferdestcandidate set nativeAssetChain = '{"Token":"AUSD"}~2000' where (asset like '{"Token":"%aUSD%"}' or asset like '{"Token":"%kUSD%"}') and asset not like "%-%" and (chainIDDest !=2 and chainIDDest < 10000) and nativeAssetChain is null;`
-        this.batchedSQL.push(kUSDTransferSql);
-        this.batchedSQL.push(kUSDCandidateSql);
-        this.batchedSQL.push(aUSDTransferSql);
-        this.batchedSQL.push(aUSDCandidateSql);
-        await this.update_batchedSQL();
+        // deleted
     }
 
     async xcm_init() {
