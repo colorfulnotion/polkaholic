@@ -2808,8 +2808,8 @@ module.exports = class Query extends AssetManager {
                                     t['priceUSD'] = priceUSD;
                                     t['priceUSDCurrent'] = priceUSDCurrent;
                                 }
-                                let relayChain = this.getRelayChainByChainID(parseInt(t['chainID'], 10))
-                                t['chainIDDest'] = this.getChainIDFromParaID(parseInt(t['paraID'], 10), relayChain);
+                                let relayChain = paraTool.getRelayChainByChainID(parseInt(t['chainID'], 10))
+                                t['chainIDDest'] = paraTool.getChainIDFromParaIDAndRelayChain(parseInt(t['paraID'], 10), relayChain);
 
                                 if (t['chainIDDest']) {
                                     t['chainDestName'] = this.getChainName(t['chainIDDest']);
@@ -4815,8 +4815,8 @@ module.exports = class Query extends AssetManager {
 
         for (let c = 0; c < crowdloans.length; c++) {
             let crowdloan = crowdloans[c];
-            let replayChain = this.getRelayChainByChainID(parseInt(crowdloan.chainID, 10))
-            let paraChainID = this.getChainIDFromParaID(crowdloan.paraID, replayChain)
+            let replayChain = paraTool.getRelayChainByChainID(parseInt(crowdloan.chainID, 10))
+            let paraChainID = paraTool.getChainIDFromParaIDAndRelayChain(crowdloan.paraID, replayChain)
             let paraChainName = this.getChainName(paraChainID);
             let relayChainName = this.getChainName(crowdloan.chainID);
             let relayChainAsset = this.getChainAsset(crowdloan.chainID);

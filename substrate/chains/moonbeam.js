@@ -200,14 +200,14 @@ module.exports = class MoonbeamParser extends ChainParser {
                 }
                 */
                 console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} here 1`)
-                let assetString = this.processGenericCurrencyID(indexer, a.currency_id) //inferred approach
-                let rawAssetString = this.processRawGenericCurrencyID(indexer, a.currency_id)
+                let asset = this.processGenericCurrencyID(indexer, a.currency_id) //inferred approach
+                let rawAsset = this.processRawGenericCurrencyID(indexer, a.currency_id)
                 console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} here 2`)
                 let chainID = indexer.chainID
                 let relayChain = indexer.relayChain
                 let chainIDDest = paraTool.getRelayChainID(relayChain)
-                let paraID = indexer.getParaIDfromChainID(chainID)
-                let paraIDDest = indexer.getParaIDfromChainID(chainIDDest)
+                let paraID = paraTool.getParaIDfromChainID(chainID)
+                let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
                 console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} here 3`)
                 let innerCall = (a.inner_call != undefined)? a.inner_call : 'notfound'
                 let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
@@ -251,7 +251,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
             }else if (section_method == "xcmTransactor:transactThroughSignedMultilocation" && false) {
-                let paraID = indexer.getParaIDfromChainID(indexer.chainID)
+                let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
                 let paraIDDest = -1;
                 let chainIDDest = -1;
                 //let amountSent = 0;
