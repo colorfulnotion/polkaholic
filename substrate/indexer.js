@@ -3937,13 +3937,15 @@ module.exports = class Indexer extends AssetManager {
                         if (this.debugLevel >= paraTool.debugInfo && !finalized) console.log(`safeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length}`)
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
-                            let msgHashCandidate;
-                            if (xcmtransfer.innerCall != undefined){
-                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, true)
-                            }else{
-                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, false)
+                            if (xcmtransfer.msgHash == undefined || xcmtransfer.msgHash.length != 66){
+                                let msgHashCandidate;
+                                if (xcmtransfer.innerCall != undefined){
+                                    msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, true)
+                                }else{
+                                    msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, false)
+                                }
+                                if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                             }
-                            if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                             this.stat.addressRows.xcmsend++;
                             this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized);
                             this.updateXCMTransferStorage(xcmtransfer); // store, flushed in flushXCM
