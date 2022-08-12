@@ -7,8 +7,6 @@ var xcmmessagesTable = null
 var addresstopnTable = null
 var refreshIntervalMS = 6100;
 var chainsUpdateIntervalId = false;
-var xcmtransferUpdateIntervalId = false;
-
 
 
 function filterchains(relaychain = "all") {
@@ -180,23 +178,7 @@ async function show_chains() {
     }
 }
 
-function stopxcmtransfers() {
-    if (xcmtransferUpdateIntervalId) {
-        clearInterval(xcmtransferUpdateIntervalId);
-        xcmtransferUpdateIntervalId = false
-    }
-}
-
-function showxcmtransfers() {
-    if (!xcmtransferUpdateIntervalId) {
-        show_xcmtransfers();
-    }
-    xcmtransferUpdateIntervalId = setInterval(function() {
-        show_xcmtransfers()
-    }, refreshIntervalMS);
-}
-
-async function show_xcmtransfers(relaychain) {
+async function showxcmtransfers() {
     let pathParams = 'xcmtransfers'
     let tableName = '#tablexcmtransfers'
     if (initxcmtransfers) {
@@ -386,7 +368,6 @@ async function show_xcmtransfers(relaychain) {
 
     $(tableName).on('page.dt', function() {
         setupcurrency();
-        stopxcmtransfers();
     });
 
     //load data here: warning this function is technically async
@@ -513,17 +494,14 @@ function showchainstab(hash) {
         case "#chains":
             setupapidocs("chains", "list");
             showchains();
-            stopxcmtransfers();
             break;
         case "#xcmtransfers":
             setupapidocs("xcmtransfers");
             showxcmtransfers();
-            stopchains();
             break;
         case "#xcmmessages":
             setupapidocs("xcmmessages");
             showxcmmessages();
-            stopchains();
             break;
         case "#addresstopn":
             setupapidocs("addresstopn");

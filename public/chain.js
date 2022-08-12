@@ -110,6 +110,22 @@ function show_recentblocks(chainID) {
                         }
                         return data;
                     }
+                },
+                {
+                    data: 'numXCMTransfersOut',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            let out = presentNumber(data);
+                            if (row.numXCMMessagesOut > 0 && row.numXCMMessagesOut > row.numXCMTransfers) {
+                                out += " + ${row.numXCMMessagesOut} additional outgoing XCM messages";
+                            }
+                            if (row.numXCMMessagesIn > 0) {
+                                out += " (${row.numXCMMessagesOut} incoming XCM messages)";
+                            }
+                            return out;
+                        }
+                        return data;
+                    }
                 }
             ]
         });

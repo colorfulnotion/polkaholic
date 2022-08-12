@@ -2,7 +2,7 @@
   <% if ( tx.decodeStatus == "success" ) { %>
   <%= uiTool.getEVMMethod(tx.signature) %>
   <% } else { %>
-  Unknown <%- tx.methodID; %>
+  <%- tx.methodID; %>
   <% } %>
 </button>
 <br />

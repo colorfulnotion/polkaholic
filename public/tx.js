@@ -1,5 +1,28 @@
 var showtxstatusIntervalId = 0;
 
+function setuptabs(tabs, chain_id, txHash, hash = "#overview") {
+    setupapidocs("tx", "", `${chain_id}/${txHash}`);
+    for (let i = 0; i < tabs.length; i++) {
+        let t = tabs[i];
+        let id = "#" + t.target + "-tab";
+        let tabEl = document.querySelector(id);
+        tabEl.addEventListener('shown.mdb.tab', function(event) {
+            const hash = $(this).attr("href");
+            let newUrl = `/tx/${chain_id}/${txHash}`
+            console.log("newUrl", newUrl, "chain_id", chain_id, "txHash", txHash);
+            //history.replaceState(null, null, newUrl);
+        })
+    }
+    let url = location.href.replace(/\/$/, "");
+    if (location.hash) {
+        const urlhash = url.split("#");
+        if (urlhash.length > 1) hash = "#" + urlhash[1];
+    }
+    const triggerEl = document.querySelector('#txTab a[href="' + hash + '"]');
+    mdb.Tab.getInstance(triggerEl).show();
+}
+
+
 function showtxstatus(extrinsicHash) {
     showtxstatusIntervalId = setInterval(function() {
         let url = `${baseURL}/hash/${extrinsicHash}`
@@ -24,3 +47,7 @@ function showtxstatus(extrinsicHash) {
         setupcurrency() // inject currency event listener
     }, 2500);
 }
+
+$(document).ready(function() {
+    setuptabs(tabs, chainID, txHash, defHash);
+});

@@ -898,7 +898,47 @@ app.get('/block/:chainID_or_chainName/:blockNumber', async (req, res) => {
         let [decorate, decorateExtra] = decorateOptUI(req)
         var b = await query.getBlock(chainID, blockNumber, blockHash, decorate, decorateExtra);
         if (b) {
-            res.render('block', {
+            let view = (chain.chainID == 2004 || chain.chainID == 22023) ? 'evmBlock' : 'block';
+            res.render(view, {
+                b: b,
+                blockNumber: blockNumber,
+                blockHash: blockHash,
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-block"
+            });
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "block",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/block/karura/1000000?blockhash=xxx&decorate=true&extra=address,usd
+app.get('/txs/:chainID_or_chainName/:blockNumber', async (req, res) => {
+    let chainID_or_chainName = req.params["chainID_or_chainName"]
+    try {
+        let [chainID, id] = query.convertChainID(chainID_or_chainName)
+        let chain = await query.getChain(chainID);
+        let blockNumber = parseInt(req.params["blockNumber"], 10);
+        let blockHash = (req.query.blockhash != undefined) ? req.query.blockhash : '';
+        let [decorate, decorateExtra] = decorateOptUI(req)
+        var b = await query.getBlock(chainID, blockNumber, blockHash, decorate, decorateExtra);
+        if (b) {
+            let view = (chain.isEVM == 1) ? 'evmtxs' : 'txs';
+            res.render(view, {
                 b: b,
                 blockNumber: blockNumber,
                 blockHash: blockHash,
@@ -1091,6 +1131,40 @@ app.get('/account/:address', async (req, res) => {
         // console.log(`getHostChain chainID=${requestedChainID}, id=${id}`)
         let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, decorate, decorateExtra);
         res.render('account', {
+            account: account,
+            chainInfo: query.getChainInfo(),
+            address: address,
+            claimed: false,
+            apiUrl: req.path,
+            fromAddress: fromAddress,
+            requestedChainID: requestedChainID,
+            chainListStr: chainList.join(','),
+            docsSection: "get-account"
+        });
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "account",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+app.get('/address/:address', async (req, res) => {
+    try {
+        let fromAddress = getHomePubkey(req);
+        let address = req.params["address"];
+        let [decorate, decorateExtra] = decorateOptUI(req)
+        let [requestedChainID, id] = getHostChain(req);
+        let chainList = chainFilterOptUI(req)
+        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, decorate, decorateExtra);
+        res.render('address', {
             account: account,
             chainInfo: query.getChainInfo(),
             address: address,

@@ -1,0 +1,152 @@
+<div class="tab-pane" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+<%
+let f = tx;
+let newDate = new Date();
+console.log("HOHO", f);
+newDate.setTime(f.timestamp*1000);
+let dateString = newDate.toUTCString();
+let txResult = (f.result != undefined)? f.result == 1: true //by default tx result is true (until we back fill it)
+let errStr = (f.err != undefined)? f.err: false //by default tx result is true (until we back fill it)
+%>
+
+<table class="table table-hover table-bordered">
+  <tbody>
+    <tr>
+      <td>Transaction Hash</td>
+      <td>
+        <code><%= f.transactionHash; %></code>
+      </td>
+    </tr>
+    <% if ( tx.substrate !== undefined ) { %>
+    <tr>
+      <td>Substrate Tx / Extrinsic ID</td>
+      <td><%- uiTool.presentFullTx(tx.substrate.extrinsicHash); %> <a href='/tx/<%= tx.substrate.extrinsicHash; %>'><%= f.chainName; %> <%= tx.substrate.extrinsicID; %></a></td>
+    </tr>
+    <% } %>
+<% if ( f.xcmdest != undefined ) { %>
+    <tr>
+      <td>Destination Status</td>
+      <td><%- include("xcmdest", {extrinsicHash: f.xcmdest.LextrinsicHash, xcmdest: f.xcmdest}); %></td>
+    </tr>
+<% } %>
+    <tr>
+      <td>Status</td>
+      <td><%- include("txResult", {success: txResult, errorMsg: errStr}); %></td>
+    </tr>
+    <tr>
+      <td>Finalized</td>
+      <td><span id="status"><%- include("finalized", {finalized: (f.status=="finalized")}); %></span></td>
+    </tr>
+    <tr>
+      <td>Block</td>
+      <td>
+        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.blockNumber}); %>
+      </td>
+    </tr>
+    <tr>
+      <td>Timestamp</td>
+      <td class='date'><%= uiTool.presentSecondsAgoTS(f.timestamp) %> (<%= dateString; %>) </td>
+    </tr>
+    <tr>
+      <td>From</td>
+      <td>
+	<%- uiTool.presentAddress(f.from) %>
+      </td>
+    </tr>
+    <tr>
+      <td>Interacted With (To)</td>
+      <td>
+	<%- uiTool.presentAddress(f.to) %>
+      </td>
+    </tr>
+<% if ( tx.transfers.length > 0 ) { %>
+    <tr>
+      <td>Tokens Transferred</td>
+      <td>
+        <table>
+	  <tr>
+	    <th>From</td>
+	    <th>To</td>
+      <th>Token</td>
+      <th>Value</td>
+	  </tr>
+	  <% for (let t = 0 ; t < tx.transfers.length; t++) {
+	    let tok = tx.transfers[t];
+	  %>
+	    <tr>
+	      <td><%- uiTool.presentID(tok.from); %></td>
+	      <td><%- uiTool.presentID(tok.to); %></td>
+	      <td><%- uiTool.presentERCToken(tok.tokenAddress, tok.assetInfo); %> <%- ; %></td>
+        <td><%- tok.value; %> (<%- uiTool.currencyFormat(tok.valueUSD, tok.priceUSD, tok.priceUSDCurrent); %> )</td>
+	    </tr>
+	  <% } %>
+	</table>
+      </td>
+    </tr>
+<% } %>
+    <tr>
+      <td>Value</td>
+      <td><%- tx.value; %> <%- tx.symbol %> (<%- uiTool.currencyFormat(tx.valueUSD, tx.priceUSD, tx.priceUSDCurrent);%> ) <% %> </td>
+    </tr>
+
+    <tr>
+      <td>Transaction Fee</td>
+      <td><%- tx.fee; %> <%- tx.symbol; %> (<%- uiTool.currencyFormat(tx.feeUSD, tx.priceUSD, tx.priceUSDCurrent); %> ) <% %> </td>
+    </tr>
+
+    <tr>
+      <td>Gas Limit</td>
+      <td><%- tx.gasLimit; %></td>
+    </tr>
+
+    <tr>
+      <td>Gas Used by Transaction</td>
+      <td><%- tx.gasUsed; %><%- ` (${uiTool.presentPercentage(tx.gasUsed/tx.gasLimit)})` %></td>
+    </tr>
+
+    <tr>
+      <td>Gas Price</td>
+      <td><%- tx.gasPrice; %></td>
+    </tr>
+
+    <tr>
+      <td><%- tx.symbol; %> Price</td>
+      <td><%- uiTool.currencyFormat(tx.priceUSD); %> </td>
+    </tr>
+
+    <tr>
+      <td>Nonce</td>
+      <td><%= f.nonce; %></td>
+    </tr>
+
+    <tr>
+      <td>Input Data</td>
+      <td>
+        <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
+	<div>
+  	  <textarea style="width: 800px; height: 300px"><%= tx.input; %></textarea>
+	</div>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Compare to</td>
+      <td>
+        <% if ( f.chainID && (f.chainID == 2004 || f.chainID == 22023)) {
+           let externalURL = (f.chainID == 2004)? `https://moonscan.io` : `https://moonriver.moonscan.io`
+           let imgURL = (f.chainID == 2004) ? "https://cdn.polkaholic.io/moonscan.svg" : "https://cdn.polkaholic.io/moonriverscan.svg" 
+           let txURL = `${externalURL}/tx/${f.transactionHash}`;
+           %>
+        <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>
+        <% }%>
+        <% if ( f.chainID && (f.chainID == 2006 || f.chainID == 22007)) {
+           let externalURL = (f.chainID == 2006)? `https://blockscout.com/astar` : `https://blockscout.com/shiden`
+           let imgURL = "https://cdn.polkaholic.io/blockscout.png"
+           let txURL = `${externalURL}/tx/${f.transactionHash}`;
+           %>
+        <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>
+        <% }%>
+      </td>
+    </tr>
+</table>
+</div>

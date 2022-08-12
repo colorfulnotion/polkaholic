@@ -785,7 +785,8 @@ module.exports = class Query extends AssetManager {
             let [rows] = await this.btHashes.getRows({
                 keys: [hash]
             });
-            rows.forEach((row) => {
+            for (let i = 0; i < rows.length; i++) {
+                let row = rows[i];
                 let rowData = row.data;
                 //priority: use feed then feedunfinalized/feedevmunfinalized
                 let blockcells = false;
@@ -799,6 +800,28 @@ module.exports = class Query extends AssetManager {
                     // finalized
                     data = rowData["feed"]
                     res.status = 'finalized'
+
+                    // **** SPECIAL CASE: EVM txhash ..
+                    try {
+                        if (data.tx != undefined && data.tx[0]) {
+                            const cell = data.tx[0];
+                            let c = JSON.parse(cell.value);
+                            if (c.gasLimit != undefined) {
+                                console.log("CELL", c);
+                                if (this.is_evm_xcmtransfer_input(c.input)) {
+                                    let substrateTXHash = c.substrate.extrinsicHash;
+                                    let substratetx = await this.getTransaction(substrateTXHash);
+                                    if (substratetx.xcmdest != undefined) {
+                                        res.status = "finalizeddest";
+                                        // bring this in!
+                                        res.xcmdest = substratetx.xcmdest;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (errS) {
+                        console.log(errS);
+                    }
                 } else if (rowData["feedunfinalized"]) {
                     data = rowData["feedunfinalized"]
                     res.status = 'unfinalized'
@@ -818,7 +841,7 @@ module.exports = class Query extends AssetManager {
                         this.check_tx_hash(hash, txcells, res)
                     }
                 }
-            });
+            }
         } catch (err) {
             if (err.code == 404) {
                 return res;
@@ -1149,6 +1172,9 @@ module.exports = class Query extends AssetManager {
         return (false);
     }
 
+    is_evm_xcmtransfer_input(inp) {
+        return (inp.includes("0xb38c60fa") || inp.includes("0xb9f813ff"));
+    }
 
     async getTransaction(txHash, decorate = true, decorateExtra = ["usd", "address", "related", "data"]) {
         //console.log(`getTransaction txHash=${txHash}, decorate=${decorate}, decorateExtra=${decorateExtra}`)
@@ -1246,6 +1272,21 @@ module.exports = class Query extends AssetManager {
                                     }
                                 }
                             }
+                        }
+                    }
+                    if (this.is_evm_xcmtransfer_input(c.input) && c.substrate != undefined) {
+                        //  fetch substrate extrinsicHash
+                        try {
+                            let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
+                            console.log("FETCH XCMTRANSFER", substratetx);
+                            if (substratetx.xcmdest != undefined) {
+                                c.xcmdest = substratetx.xcmdest;
+                                console.log("SET XCMTDEST", c.xcmdest);
+                            }
+                        } catch (errS) {
+                            console.log("FETCH XCMTRANSFER ERR", errS);
+
+
                         }
                     }
                     return c;
@@ -1721,7 +1762,7 @@ module.exports = class Query extends AssetManager {
         if (chainID === false) return ([]);
         if (!startBN) startBN = chain.blocksCovered - limit;
         try {
-            let sql = `select blockNumber, if(blockDT is Null, 0, 1) as finalized, blockHash, blockDT, UNIX_TIMESTAMP(blockDT) as blockTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD from block${chainID} where blockNumber > ${startBN} order by blockNumber Desc limit ${limit}`
+            let sql = `select blockNumber, if(blockDT is Null, 0, 1) as finalized, blockHash, blockDT, UNIX_TIMESTAMP(blockDT) as blockTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, numXCMTransfersIn, numXCMTransfersOut, numXCMMessagesOut, numXCMMessagesIn, valueTransfersUSD from block${chainID} where blockNumber > ${startBN} order by blockNumber Desc limit ${limit}`
             let blocks = await this.poolREADONLY.query(sql);
             let blocksunfinalized = await this.poolREADONLY.query(`select blockNumber, blockHash, UNIX_TIMESTAMP(blockDT) as blockTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD from blockunfinalized where chainID = ${chainID} and blockNumber >= ${startBN}`);
             let bufData = {};
@@ -1869,6 +1910,18 @@ module.exports = class Query extends AssetManager {
             // TODO: check response
             let block = row.feed;
             block = await this.decorateBlock(row.feed, chainID, row.evmFullBlock, decorate, decorateExtra);
+
+            let sql = `select numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from block${chainID} where blockNumber = '${blockNumber}' limit 1`;
+            let blockStatsRecs = await this.poolREADONLY.query(sql);
+            if (blockStatsRecs.length == 1) {
+                let s = blockStatsRecs[0];
+                block.numXCMTransfersIn = s.numXCMTransfersIn;
+                block.numXCMMessagesIn = s.numXCMMessagesIn;
+                block.numXCMTransfersOut = s.numXCMTransfersOut;
+                block.numXCMMessagesOut = s.numXCMMessagesOut;
+                block.valXCMTransferIncomingUSD = s.valXCMTransferIncomingUSD;
+                block.valXCMTransferOutgoingUSD = s.valXCMTransferOutgoingUSD;
+            }
             return block;
         } catch (err) {
             if (err.code == 404) {

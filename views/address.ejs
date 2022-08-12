@@ -1,0 +1,116 @@
+<%- include('header', {chainInfo: chainInfo, title: "Account"}); %>
+<div class="card mb-3">
+  <div class="row g-0">
+    <div class="col-md-2  text-center">
+      <img src="/identicon/<%= account.address; %>"  class="rounded-start"  width="128"  loading="lazy" class="card-img-center"/>
+    </div>
+    <div class="col-md-8">
+      <div class="card-body">
+        <h5 class="card-title"><%- account.requestedChainAddress;%></h5>
+        <h5 class="card-title"><B>Account Balance: <%= uiTool.currencyFormat(account.balanceUSD) %></B></h5>
+        <p class="card-text">
+	<% if ( account.nickname ) { suggest = false; %>
+	  <B><%= account.nickname %></B><br/>
+	<% } else if ( account.subName ) { suggest = false; %>
+	  <B><%= account.subName %></B>
+	  <% if ( account.parent ) { suggest = false; %>
+	  (<a href='/account/<%= account.parent; %>'>parent identity</a>)<br/>
+	  <% } %>
+        <% } %>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="unfinalized">
+</div>
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" style="font-size:1rem" id="accountTab" role="tablist">
+<%
+let tabs = [
+{ title: "Transactions", target: "evmtxs" },
+{ title: "Transfers", target: "transfers" },
+{ title: "XCM Transfers", target: "xcmtransfers" },
+];
+
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
+
+<!-- Tab panes -->
+<div class="tab-content">
+  <div class="tab-pane" id="evmtxs" role="tabpanel" aria-labelledby="evmtxs-tab">
+    <table id="tableevmtxs" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+      <th>Tx Hash</th>
+      <th>Method</th>
+      <th>Block</th>
+      <th>Age</th>
+      <th>Result</th>
+      <th>From</th>
+      <th>To</th>
+      <th>Value</th>
+      <th>Fee</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="transfers" role="tabpanel" aria-labelledby="transfers-tab">
+    <table id="tabletransfers" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Event ID</th>
+          <th>From</th>
+          <th>To</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Amount (USD)</th>
+          <th>Date</th>
+          <th>Chain</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
+    <table id="tablexcmtransfers" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Extrinsic</th>
+          <th>Amount Sent</th>
+          <th>Value (USD)</th>
+          <th>Sender</th>
+          <th>Beneficiary</th>
+          <th>From Chain</th>
+          <th>To Chain</th>
+          <th>Date</th>
+          <th>Chain</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+</div>
+
+<script>
+let address = '<%= account.address; %>';
+let requestedChainAddress = '<%= account.requestedChainAddress; %>';
+let tabs = <%- JSON.stringify(tabs); %>;
+let chainListStr = '<%= chainListStr; %>';
+let isEVM = 1;
+</script>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script src="/account.js"></script>

@@ -50,9 +50,9 @@ async function showxcmmessages(chainID = null) {
                         if (type == 'display') {
                             let str = "";
                             if (row.extrinsicID && row.extrinsicHash) {
-                                str = `<BR>${row.chainName} Extrinsic: ` + presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                                str = `${row.chainName} Extrinsic: ` + presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
                             } else {
-                                str = `<BR>${row.chainName} Extrinsic: Unknown`;
+                                str = `${row.chainName} Extrinsic: Unknown`;
                             }
                             if (row.sectionMethod) {
                                 str += '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.sectionMethod + '</button>';
@@ -105,9 +105,7 @@ async function showxcmmessages(chainID = null) {
                             }
                         } else {
                             if (row.sourceTS != undefined && row.sourceTS > 0) {
-                                return data;
-                            } else {
-                                return data;
+                                return row.chainName + " " + data;
                             }
                         }
                         return 0;
@@ -126,9 +124,7 @@ async function showxcmmessages(chainID = null) {
                             }
                         } else {
                             if (row.destTS != undefined && row.destTS > 0) {
-                                return data;
-                            } else if (row.incoming == 1) {
-                                return data;
+                                return data + " " + row.chainDestName;
                             }
                             return "unmatched";
                         }

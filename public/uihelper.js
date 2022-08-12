@@ -1,19 +1,34 @@
 //var baseURL is set at header
 
-function presentInstructions(msg, k, hdr = "Instructions") {
-    return `<div class="accordion  accordion-flush" style="width: 480px">
+function presentInstructions(msg, id, hdr = "Instructions", width = "600") {
+    let rjouter = "rjouter" + id;
+    let jhouter = "jhouter" + id;
+    let rj = "rj" + id;
+    let jh = "jh" + id;
+    let dec = "dec" + id;
+    let vc = "vc" + id;
+    let copyA = "ca" + id;
+    let copyB = "cb" + id;
+    return `<div class="accordion  accordion-flush" style="width: ${width}px">
   <div class="accordion-item">
-    <h2 class="accordion-header" id="heading${k}">
+    <h2 class="accordion-header" id="heading${id}">
       <button class="accordion-button collapsed" type="button" data-mdb-toggle="collapse"
-        data-mdb-target="#flush${k}" aria-expanded="true" aria-controls="flush${k}">
-       ${hdr}
-      </button>
+        data-mdb-target="#flush${id}" aria-expanded="true" aria-controls="flush${id}">${hdr}</button>
     </h2>
-    <div id="flush${k}" class="accordion-collapse collapse" aria-labelledby="heading${k}">
+    <div id="flush${id}" class="accordion-collapse collapse" aria-labelledby="heading${id}">
       <div class="accordion-body">
-        <div id="typ${k}" class="renderjson"></div>
-        <script>document.getElementById("typ${k}").appendChild(renderjson.set_show_to_level(10)(` + msg + `));</script>
-      </div>
+<div id="${rjouter}" style="display:none; overflow: hidden">
+  <div id="${rj}" class="renderjson" style="overflow-y: scroll; max-width: 800px; max-height: 600px"></div>
+  <button id="${dec}" type="button" class="btn btn-link">View Decoded</button>
+  <button id="${copyA}" type="button" class="btn btn-link">Copy</button>
+</div>
+<div id="${jhouter}" style="display: block; overflow: hidden">
+  <div id="${jh}" class="jsontable" style="overflow-y: scroll; max-width: 800px; max-height: 600px"></div>
+  <button id="${vc}" type="button" class="btn btn-link">View Raw</button>
+  <button id="${copyB}" type="button" class="btn btn-link">Copy</button>
+<div>
+<script>presentJSONObject(${msg}, "${id}");</script>
+</div>
     </div>
   </div>
 </div>`
@@ -200,15 +215,24 @@ function timeSince(seconds) {
 
     if (days >= 1) {
         let pl = (days > 1) ? "s" : ""
-        return days + " day" + pl;
+        let out = days + " day" + pl;
+        let pl2 = (hours > 1) ? "s" : ""
+        out += " " + hours + " hr" + pl2;
+        return out;
     }
     if (hours >= 1) {
         let pl = (hours > 1) ? "s" : ""
-        return hours + " hr" + pl;
+        let out = hours + " hr" + pl;
+        let pl2 = (minutes > 1) ? "s" : ""
+        out += " " + minutes + " min" + pl2;
+        return out;
     }
     if (minutes >= 1) {
         let pl = (minutes > 1) ? "s" : ""
-        return minutes + " min" + pl;
+        let out = minutes + " min" + pl;
+        let pl2 = (seconds > 1) ? "s" : "";
+        out += " " + seconds + " sec" + pl2;
+        return out;
     }
     return seconds + " secs";
 }
@@ -355,6 +379,10 @@ function presentAssetPair(assetChain, symbol, asset0, asset1, symbol0, symbol1, 
 
 function presentID(id) {
     return '<a href="/account/' + id + '">' + getShortHash(id) + '</a>';
+}
+
+function presentAddress(id) {
+    return '<a href="/address/' + id + '">' + getShortHash(id) + '</a>';
 }
 
 function presentOffer(offer) {
