@@ -192,26 +192,6 @@ app.get('/chains', async (req, res) => {
     }
 })
 
-// Usage: http://api.polkaholic.io/chainsadmin
-app.get('/chainsadmin/:crawling?', async (req, res) => {
-    try {
-        var crawling = req.params.crawling ? req.params.crawling : 0;
-        var chains = await query.getChainsForAdmin(crawling);
-        if (chains) {
-            res.write(JSON.stringify(chains));
-            await query.tallyAPIKey(getapikey(req));
-            return res.end();
-        } else {
-            return res.sendStatus(404);
-        }
-    } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
-    }
-})
-
-
 // Usage: http://api.polkaholic.io/xcmtransfers
 app.get('/xcmtransfers', async (req, res) => {
     try {

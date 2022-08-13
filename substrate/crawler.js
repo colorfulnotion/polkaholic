@@ -1016,7 +1016,7 @@ module.exports = class Crawler extends Indexer {
         var sql = `select chainID, indexTS from indexlog where indexed = 0 and readyForIndexing = 1 and chainID = '${chain.chainID}' and indexTS < UNIX_TIMESTAMP(Now()) - 3600 and attempted < 10 ${w} order by attempted, indexTS`;
         var indexlogs = await this.pool.query(sql);
         if (indexlogs.length == 0) {
-            console.log(`indexChain ${chain.chainID}: no work to do`)
+            console.log(`indexChain ${chain.chainID}: no work to do`, sql)
             return (false);
         }
         let indexPeriodProcessedCnt = 0
@@ -1238,7 +1238,7 @@ module.exports = class Crawler extends Indexer {
                     let [t, trace] = t_trace;
                     if (trace) {
                         let sql = `update block${chainID} set crawlTraceEVM = 0 where blockNumber = ${t.blockNumber}`
-                        this.mark_indexlog_dirty(chainID, t1.blockTS)
+                        this.mark_indexlog_dirty(chainID, t_trace.blockTS)
                         this.batchedSQL.push(sql)
                     } else {
                         let sql = `update block${chainID} set attempted = attempted + 1 where blockNumber = ${t.blockNumber}`

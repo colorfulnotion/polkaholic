@@ -45,12 +45,17 @@ for (let i=0; i<tabs.length; i++) {
       <th scope="col">Block #</th>
       <th scope="col">Block Hash</th>
       <th scope="col">Time</th>
+<% if ( chain.isEVM ) { %>
+      <th scope="col"># EVM Txs</th>
+      <th scope="col">Gas Used</th>
+<% } else { %>
       <th scope="col"># Extrinsics</th>
       <th scope="col"># Signed</th>
+<% } %>
+      <th scope="col"># XCM Txs</th>
       <th scole="col"># Events</th>
       <th scope="col"># Transfers</th>
-      <th scole="col">Value Transfers (USD)</th>
-      <th scope="col">XCM Activity</th>
+      <th scole="col">Value of Transfers (USD)</th>
     </tr>
   </thead>
 </table>

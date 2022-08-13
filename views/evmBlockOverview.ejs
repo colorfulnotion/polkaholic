@@ -43,10 +43,10 @@
     <td>XCM Messages</td>
     <td>
     <% if ( b.numXCMMessagesIn > 0 ) { %>
-    <a class="btn-sm btn-primary" href='/xcmmessages?chainfilters=<%= id; %>&<%= blockNumber %>'><%= b.numXCMMessagesIn; %> XCM Incoming messages</a>
+    <a class="btn-sm btn-primary" href='/xcmmessages?chainfilters=<%= id; %>&blockNumber=<%= blockNumber %>'><%= b.numXCMMessagesIn; %> XCM Incoming messages</a>
     <% } %>
     <% if ( b.numXCMMessagesOut > 0 ) { %>
-    <a class="btn-sm btn-primary" href='/xcmmessages?chainfilters=<%= id; %>&<%= blockNumber %>'><%= b.numXCMMessagesOut; %> XCM Outgoing messages</a>
+    <a class="btn-sm btn-primary" href='/xcmmessages?chainfilters=<%= id; %>&blockNumber=<%= blockNumber %>'><%= b.numXCMMessagesOut; %> XCM Outgoing messages</a>
     <% } %>
     </td>
   </tr>
@@ -106,6 +106,7 @@
       <%- uiTool.getFullHash(b.header.stateRoot); %>
     </td>
   </tr>
+<% if ( b.author ) { %>
   <tr>
     <td>Author</td>
     <td>
@@ -116,6 +117,7 @@
        <%- uiTool.showAccountInfo(b, "authorAddress") %>
      </td>
   </tr>
+<% } %>
   <tr>
     <td>Block Time</td>
     <td class='date'><%= uiTool.presentSecondsAgoTS(b.blockTS); %></td>

@@ -7,6 +7,7 @@
 <%
 let tabs = [
 { title: "Overview", target: "overview" },
+{ title: "Extrinsics", target: "extrinsics" },
 { title: "Events", target: "events" },
 ]
 for (let i=0; i<tabs.length; i++) {
@@ -27,6 +28,7 @@ let defHash = '#overview';
 
 <div class="tab-content">
   <%- include("evmBlockOverview", {chainID: chainID, id: id, block: b }); %>
+  <%- include("xcmtransactions", {chainID: chainID, id: id, extrinsics: b.extrinsics }); %>
   <%- include("blockevents", {chainID: chainID, id: id, extrinsics: b.extrinsics }); %>
 </div>
 

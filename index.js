@@ -894,7 +894,7 @@ app.get('/block/:chainID_or_chainName/:blockNumber', async (req, res) => {
         let [decorate, decorateExtra] = decorateOptUI(req)
         var b = await query.getBlock(chainID, blockNumber, blockHash, decorate, decorateExtra);
         if (b) {
-            let view = (chain.chainID == 2004 || chain.chainID == 22023) ? 'evmBlock' : 'block';
+            let view = (chain.isEVM == 1) ? 'evmBlock' : 'block';
             res.render(view, {
                 b: b,
                 blockNumber: blockNumber,

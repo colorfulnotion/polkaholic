@@ -69,7 +69,18 @@ function show_recentblocks(chainID) {
                     data: 'numExtrinsics',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentNumber(data); // TODO: right justify all the numbers
+                            // in the evm case, we show numTransactions
+                            if (row.numTransactionsEVM != undefined) {
+                                return `<a href='/txs/${chainID}/${row.blockNumber}'>` + presentNumber(row.numTransactionsEVM) + "</a>";
+                            } else {
+                                return presentNumber(data);
+                            }
+                        } else {
+                            if (row.numTransactionsEVM != undefined) {
+                                return row.numTransactionsEVM;
+                            } else {
+                                return data;
+                            }
                         }
                         return data;
                     }
@@ -78,9 +89,45 @@ function show_recentblocks(chainID) {
                     data: 'numSignedExtrinsics',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentNumber(data);
+                            if (row.gasUsed != undefined) {
+                                return presentNumber(row.gasUsed);
+                            } else {
+                                return presentNumber(data);
+                            }
+                        } else {
+                            if (row.gasUsed != undefined) {
+                                return row.gasUsed;
+                            } else {
+                                return data;
+                            }
                         }
                         return data;
+                    }
+                },
+                {
+                    data: 'numXCMTransfersOut',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            let out = [];
+                            let xcmtransfers = `/xcmtransfers?chainfilters=${chainID}&blockNumber=${row.blockNumber}`
+                            let xcmlink = `/xcmmessages?chainfilters=${chainID}&blockNumber=${row.blockNumber}`
+                            if (data > 0) {
+                                out.push(`<a href='${xcmtransfers}'>${data} XCM transfers</a>`);
+                                if (row.numXCMMessagesOut > 0 && row.numXCMMessagesOut > row.numXCMTransfers) {
+                                    out.push(`<a href='${xcmlink}'>${numXCMMessagesOut} additional outgoing XCMs</a>`);
+                                }
+                            } else {
+                                if (row.numXCMMessagesOut > 0) {
+                                    out.push(`<a href='${xcmlink}'>${row.numXCMMessagesOut} outgoing</a>`);
+                                }
+                            }
+                            if (row.numXCMMessagesIn > 0) {
+                                out.push(`<a href='${xcmlink}'>${row.numXCMMessagesIn} incoming XCM</a>`);
+                            }
+                            return out.join(", ");
+                        } else {
+                            return data + row.numXCMMessagesIn;
+                        }
                     }
                 },
                 {
@@ -110,25 +157,6 @@ function show_recentblocks(chainID) {
                         return data;
                     }
                 },
-                {
-                    data: 'numXCMTransfersOut',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            let out = "-";
-                            if (data > 0) {
-                                out = presentNumber(data) + " XCM transfer";
-                            }
-                            if (row.numXCMMessagesOut > 0 && row.numXCMMessagesOut > row.numXCMTransfers) {
-                                out += ` + ${row.numXCMMessagesOut} additional outgoing`;
-                            }
-                            if (row.numXCMMessagesIn > 0) {
-                                out += ` (${row.numXCMMessagesIn} incoming)`;
-                            }
-                            return out;
-                        }
-                        return data;
-                    }
-                }
             ]
         });
     }

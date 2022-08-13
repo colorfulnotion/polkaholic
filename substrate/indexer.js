@@ -2604,13 +2604,13 @@ module.exports = class Indexer extends AssetManager {
     }
 
     // find the msgHash given {BN, recipient}
-    getMsgHashCandidate(targetBN, destAddress = false, extrinsicID = false, extrinsicHash = false) {
+    getMsgHashCandidate(targetBN, destAddress = false, extrinsicID = false, extrinsicHash = false, isInnercall = false) {
         if (!destAddress) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}], dest MISSING`)
             return false
         }
         let rawDestAddr = destAddress.substr(2) // without the prefix 0x
-        if (rawDestAddr.length != 64 && rawDestAddr.length != 40) {
+        if (rawDestAddr.length != 64 && rawDestAddr.length != 40 && !isInnercall) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] Invalid destAddress`)
             return false
         }
@@ -3906,6 +3906,11 @@ module.exports = class Indexer extends AssetManager {
                                 } else {
                                     fallbackRequired = true
                                 }
+                            } else if (xcm.innerCall != undefined) {
+                                // lookup msgHash using innerCall
+                                let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcm.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, true)
+                                if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
+                                //accept the fact that this xcm doesn not have destAddress
                             } else {
                                 console.log(`fallback Required [${rExtrinsic.extrinsicID}] [${rExtrinsic.extrinsicHash}] [${xcm.xcmIndex}-${xcm.transferIndex}]`)
                                 fallbackRequired = true
@@ -3932,8 +3937,15 @@ module.exports = class Indexer extends AssetManager {
                         if (this.debugLevel >= paraTool.debugInfo && !finalized) console.log(`safeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length}`)
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
-                            let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash)
-                            if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
+                            if (xcmtransfer.msgHash == undefined || xcmtransfer.msgHash.length != 66) {
+                                let msgHashCandidate;
+                                if (xcmtransfer.innerCall != undefined) {
+                                    msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, true)
+                                } else {
+                                    msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, false)
+                                }
+                                if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
+                            }
                             this.stat.addressRows.xcmsend++;
                             this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized);
                             this.updateXCMTransferStorage(xcmtransfer); // store, flushed in flushXCM

@@ -737,6 +737,18 @@ order by msgHash, diffSentAt, diffTS`
 
     async xcmmatch2_matcher(startTS, endTS = null, lookbackSeconds = 120) {
         let endWhere = endTS ? `and xcmmessages.blockTS <= ${endTS} and xcmtransfer.sourceTS <= ${endTS}` : "";
+        /*
+        update xcmtransfer, xcmmessages
+          set xcmtransfer.msgHash = xcmmessages.msgHash
+          where xcmtransfer.chainID  = xcmmessages.chainID and
+                xcmtransfer.chainID in (61000) and
+                         xcmtransfer.msgHash is null and
+                         xcmmessages.blockTS >= ${startTS} and
+                         xcmtransfer.sourceTS >= ${startTS} and
+             xcmmessages.matched = 0 and
+             xcmtransfer.blockNumber = xcmmessages.blockNumber and  // HACK
+             xcmmessages.blockTS > ${startTS} ${endWhere}
+        */
         // set xcmmessages.{extrinsicID,extrinsicHash} based on xcmtransfer.msgHash / sentAt <= 4 difference
         let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash, xcmmessages.sectionMethod = xcmtransfer.sectionMethod, xcmmessages.amountSentUSD = xcmtransfer.amountSentUSD
                where xcmtransfer.msgHash = xcmmessages.msgHash and

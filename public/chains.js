@@ -49,9 +49,9 @@ async function show_chains() {
             [0] id
             [1] blocksCovered
             [2] blocksFinalized
-            [3] numSignedExtrinsics
-            [4] numTransfers
-            [5] numEvents
+            [3] numSignedExtrinsics 
+            [4] numXCMTransfersIn
+            [5] numXCMTransfersOut
             [6] relayChain
             */
             pageLength: -1,
@@ -61,15 +61,15 @@ async function show_chains() {
             ],
             columnDefs: [{
                     "className": "dt-right",
-                    "targets": [1, 2, 3, 4, 5, 6]
+                    "targets": [1, 2, 3, 4]
                 },
                 {
-                    "targets": [7],
+                    "targets": [5],
                     "visible": false
                 }
             ],
             order: [
-                [6, "desc"]
+                [3, "desc"]
             ],
             columns: [{
                     data: 'id',
@@ -114,39 +114,22 @@ async function show_chains() {
                     }
                 },
                 {
-                    data: 'numSignedExtrinsics7d',
+                    data: 'numXCMTransferIncoming7d',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentNumber(data);
+                            return presentNumber(data) + " " + currencyFormat(row.valXCMTransferIncomingUSD7d);
+                        } else {
+                            return row.valXCMTransferIncomingUSD7d;
                         }
-                        return data;
                     }
                 },
                 {
-                    data: 'numEvents7d',
+                    data: 'numXCMTransferOutgoing7d',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentNumber(data);
+                            return presentNumber(data) + " " + currencyFormat(row.valXCMTransferOutgoingUSD7d);
                         }
-                        return data;
-                    }
-                },
-                {
-                    data: 'numTransfers7d',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentNumber(data);
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'valueTransfersUSD7d',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return currencyFormat(data);
-                        }
-                        return data;
+                        return row.valXCMTransferOutgoingUSD7d;
                     }
                 },
                 {

@@ -1625,7 +1625,7 @@ module.exports = class ChainParser {
         let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
         let assetAndAmountSents = [];
 
-        let paraID = indexer.getParaIDfromChainID(indexer.chainID)
+        let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
         let paraIDDest = -1;
         let destAddress = null;
         // dest for parachain   {"v1":{"parents":1,"interior":{"x2":[{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]}}}
@@ -1770,7 +1770,7 @@ module.exports = class ChainParser {
                 let assetAndAmountSents = [];
 
                 let dest = a.dest;
-                let paraID = indexer.getParaIDfromChainID(indexer.chainID)
+                let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
                 let paraIDDest = -1;
                 let destAddress = null;
                 let relayChain = indexer.relayChain;
@@ -1980,7 +1980,11 @@ module.exports = class ChainParser {
         for (let i = 0; i < events.length; i++) {
             let e = events[i];
             let sectionMethod = `${e.section}(${e.method})`
-            if (sectionMethod == 'xTokens(TransferFailed)') {
+            if (sectionMethod == 'system(ExtrinsicFailed)') {
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
+                incomplete = 1
+                return incomplete;
+            } else if (sectionMethod == 'xTokens(TransferFailed)') {
                 if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
                 incomplete = 1
                 return incomplete;
@@ -2376,7 +2380,7 @@ module.exports = class ChainParser {
 
             if (section_method == "polkadotXcm:teleportAssets" || section_method == "polkadotXcm:limitedTeleportAssets" || section_method == "polkadotXcm:reserveTransferAssets" || section_method == "polkadotXcm:limitedReserveTransferAssets" || section_method == "polkadotXcm:send") {
 
-                let paraID = indexer.getParaIDfromChainID(indexer.chainID)
+                let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
                 let paraIDDest = -1;
                 let chainIDDest = -1;
                 //let amountSent = 0;
@@ -2600,7 +2604,7 @@ module.exports = class ChainParser {
             //0x22729316af52c146e6a0773bd6e119efa51f5dda1f678b2891b53a8f2e5a2521 xcmPallet:reserveTransferAssets
 
             if (section_method == "xcmPallet:teleportAssets" || section_method == "xcmPallet:limitedTeleportAssets" || section_method == "xcmPallet:reserveTransferAssets" || section_method == "xcmPallet:limitedReserveTransferAssets" || section_method == "xcmPallet:send") {
-                let paraID = indexer.getParaIDfromChainID(indexer.chainID)
+                let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
                 let paraIDDest = -1;
                 let chainIDDest = -1;
                 //let amountSent = 0;
@@ -4126,7 +4130,7 @@ module.exports = class ChainParser {
                 return this.getAssetRegistrySymbolAndDecimals(indexer, currency_id)
             } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
                 return this.getAssetRegistrySymbolAndDecimals(indexer, currency_id)
-            } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver) {
+            } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
                 //assets (default case)
                 let [symbols, decimals, assetString] = this.getDecHexCurrencyIDSymbolAndDecimals(indexer, currency_id)
                 if (symbols) {
@@ -4152,7 +4156,7 @@ module.exports = class ChainParser {
             return this.processAssetRegistryCurrencyID(indexer, currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.processAssetRegistryCurrencyID(indexer, currency_id)
-        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver) {
+        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
             //assets (default case)
             return this.processDecHexCurrencyID(indexer, currency_id)
         } else {
@@ -4168,7 +4172,7 @@ module.exports = class ChainParser {
             return this.token_to_string(currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.token_to_string(currency_id)
-        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver) {
+        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
             //assets (default case)
             return this.processRawDecHexCurrencyID(indexer, currency_id)
         } else {

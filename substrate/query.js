@@ -1767,7 +1767,8 @@ module.exports = class Query extends AssetManager {
         if (chainID === false) return ([]);
         if (!startBN) startBN = chain.blocksCovered - limit;
         try {
-            let sql = `select blockNumber, if(blockDT is Null, 0, 1) as finalized, blockHash, blockDT, UNIX_TIMESTAMP(blockDT) as blockTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, numXCMTransfersIn, numXCMTransfersOut, numXCMMessagesOut, numXCMMessagesIn, valueTransfersUSD from block${chainID} where blockNumber > ${startBN} order by blockNumber Desc limit ${limit}`
+            let evmflds = (chain.isEVM) ? ", numTransactionsEVM, numTransactionsInternalEVM, gasUsed" : "";
+            let sql = `select blockNumber, if(blockDT is Null, 0, 1) as finalized, blockHash, blockDT, UNIX_TIMESTAMP(blockDT) as blockTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, numXCMTransfersIn, numXCMTransfersOut, numXCMMessagesOut, numXCMMessagesIn, valueTransfersUSD ${evmflds} from block${chainID} where blockNumber > ${startBN} order by blockNumber Desc limit ${limit}`
             let blocks = await this.poolREADONLY.query(sql);
             let blocksunfinalized = await this.poolREADONLY.query(`select blockNumber, blockHash, UNIX_TIMESTAMP(blockDT) as blockTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD from blockunfinalized where chainID = ${chainID} and blockNumber >= ${startBN}`);
             let bufData = {};
@@ -1914,20 +1915,24 @@ module.exports = class Query extends AssetManager {
             let row = await this.fetch_block(chainID, blockNumber, families, true, blockHash);
             // TODO: check response
             let block = row.feed;
-            block = await this.decorateBlock(row.feed, chainID, row.evmFullBlock, decorate, decorateExtra);
+            if (block) {
+                block = await this.decorateBlock(row.feed, chainID, row.evmFullBlock, decorate, decorateExtra);
 
-            let sql = `select numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from block${chainID} where blockNumber = '${blockNumber}' limit 1`;
-            let blockStatsRecs = await this.poolREADONLY.query(sql);
-            if (blockStatsRecs.length == 1) {
-                let s = blockStatsRecs[0];
-                block.numXCMTransfersIn = s.numXCMTransfersIn;
-                block.numXCMMessagesIn = s.numXCMMessagesIn;
-                block.numXCMTransfersOut = s.numXCMTransfersOut;
-                block.numXCMMessagesOut = s.numXCMMessagesOut;
-                block.valXCMTransferIncomingUSD = s.valXCMTransferIncomingUSD;
-                block.valXCMTransferOutgoingUSD = s.valXCMTransferOutgoingUSD;
+                let sql = `select numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from block${chainID} where blockNumber = '${blockNumber}' limit 1`;
+                let blockStatsRecs = await this.poolREADONLY.query(sql);
+                if (blockStatsRecs.length == 1) {
+                    let s = blockStatsRecs[0];
+                    block.numXCMTransfersIn = s.numXCMTransfersIn;
+                    block.numXCMMessagesIn = s.numXCMMessagesIn;
+                    block.numXCMTransfersOut = s.numXCMTransfersOut;
+                    block.numXCMMessagesOut = s.numXCMMessagesOut;
+                    block.valXCMTransferIncomingUSD = s.valXCMTransferIncomingUSD;
+                    block.valXCMTransferOutgoingUSD = s.valXCMTransferOutgoingUSD;
+                }
+                return block;
+            } else {
+                throw new paraTool.NotFoundError(`Block not indexed yet: ${blockNumber}`)
             }
-            return block;
         } catch (err) {
             if (err.code == 404) {
                 throw new paraTool.NotFoundError(`Block not found: ${blockNumber}`)
@@ -2808,8 +2813,8 @@ module.exports = class Query extends AssetManager {
                                     t['priceUSD'] = priceUSD;
                                     t['priceUSDCurrent'] = priceUSDCurrent;
                                 }
-                                let relayChain = this.getRelayChainByChainID(parseInt(t['chainID'], 10))
-                                t['chainIDDest'] = this.getChainIDFromParaID(parseInt(t['paraID'], 10), relayChain);
+                                let relayChain = paraTool.getRelayChainByChainID(parseInt(t['chainID'], 10))
+                                t['chainIDDest'] = paraTool.getChainIDFromParaIDAndRelayChain(parseInt(t['paraID'], 10), relayChain);
 
                                 if (t['chainIDDest']) {
                                     t['chainDestName'] = this.getChainName(t['chainIDDest']);
@@ -4470,7 +4475,7 @@ module.exports = class Query extends AssetManager {
         }
         console.log("getRecentXCMMessages -- filters", filters);
         // if we don't have a blockNumber, bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
-        let w = (blockNumber) ? `( blockNumber = '${parseInt(blockNumber, 10)}' )` : "blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 12 hour))";
+        let w = (blockNumber) ? `( blockNumber = '${parseInt(blockNumber, 10)}' )` : "blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 10 day))";
         let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, sourceBlocknumber as blockNumberOutgoing, destBlocknumber as blockNumberIncoming FROM xcmmessages where ${w} and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
         console.log(mysqlQuery);
         let results = [];
@@ -4815,8 +4820,8 @@ module.exports = class Query extends AssetManager {
 
         for (let c = 0; c < crowdloans.length; c++) {
             let crowdloan = crowdloans[c];
-            let replayChain = this.getRelayChainByChainID(parseInt(crowdloan.chainID, 10))
-            let paraChainID = this.getChainIDFromParaID(crowdloan.paraID, replayChain)
+            let replayChain = paraTool.getRelayChainByChainID(parseInt(crowdloan.chainID, 10))
+            let paraChainID = paraTool.getChainIDFromParaIDAndRelayChain(crowdloan.paraID, replayChain)
             let paraChainName = this.getChainName(paraChainID);
             let relayChainName = this.getChainName(crowdloan.chainID);
             let relayChainAsset = this.getChainAsset(crowdloan.chainID);
@@ -5093,7 +5098,9 @@ module.exports = class Query extends AssetManager {
         filter.push(["extrinsics", "xcmPallet", "reserveTransferAssets"]);
         filter.push(["extrinsics", "xcmPallet", "limitedReserveTransferAssets"]);
         filter.push(["extrinsics", "xcmPallet", "send"]);
-        filter.push(["events", "xcmPallet", "Attempted", null, 'something']); //not helpful..
+
+        filter.push(["events", "xcmPallet", "Attempted", null, 'something']);
+        filter.push(["events", "xcmPallet", "AssetsTrapped", null, 'something']);
 
         //polkadotXcm //observed on statemine/statemint
         filter.push(["extrinsics", "polkadotXcm", ""]); //catch unknown case
@@ -5102,12 +5109,16 @@ module.exports = class Query extends AssetManager {
         filter.push(["extrinsics", "polkadotXcm", "reserveTransferAssets"]);
         filter.push(["extrinsics", "polkadotXcm", "limitedReserveTransferAssets"]);
         filter.push(["extrinsics", "polkadotXcm", "send"]);
+        filter.push(["extrinsics", "xcmTransactor", ""]); //catch all xcmTransactor events
+        filter.push(["extrinsics", "xcmTransactor", "transactThroughDerivative"]); //catch all xcmTransactor events
+
         filter.push(["events", "polkadotXcm", "Attempted"]); //not helpful..
         filter.push(["events", "polkadotXcm", "Notified"]);
 
         filter.push(["events", "xcmpQueue", ""]); //catch all xcmpQueue events
         filter.push(["events", "ump", ""]); //catch all ump events
         filter.push(["events", "dmpQueue", ""]); //catch all dmpQueue events
+        filter.push(["events", "xcmTransactor", "transactedDerivative", ""]); //catch all xcmTransactor events
 
         if (advanced) {
             filter.push(["extrinsics", "parachainSystem", "setValidationData"]);

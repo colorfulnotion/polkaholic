@@ -1,10 +1,12 @@
 <div class="card-group">
 
+<% if ( chain.isEVM ) { %>
+<%- include("stats", { name: "# EVM Txs", numTot: chain.numTransactionsEVM, num7d: chain.numTransactionsEVM7d, num30d: chain.numTransactionsEVM30d }) %>
+<% } else { %>
 <%- include("stats", { name: "Extrinsics", id: chain.id, numTot: chain.numExtrinsics, num7d: chain.numExtrinsics7d, num30d: chain.numExtrinsics30d }) %>
-
 <%- include("stats", { name: "Signed Ext", numTot: chain.numSignedExtrinsics, num7d: chain.numSignedExtrinsics7d, num30d: chain.numSignedExtrinsics30d }) %>
-
 <%- include("stats", { name: "Events", id: chain.id, numTot: chain.numEvents, num7d: chain.numEvents7d, num30d: chain.numEvents30d }) %>
+<% } %>
 <%- include("statsxcm", { name: "Transfers",
   numTot: chain.numTransfers,
   valUSDTot: chain.valueTransfersUSD,
@@ -14,11 +16,6 @@
   valUSD30d: chain.valueTransfersUSD30d
   }) %>
 
-<% if ( chain.isEVM ) { %>
-<%- include("stats", { name: "# EVM Txs", numTot: chain.numTransactionsEVM, num7d: chain.numTransactionsEVM7d, num30d: chain.numTransactionsEVM30d }) %>
-<%- include("stats", { name: "# EVM Receipts", numTot: chain.numReceiptsEVM, num7d: chain.numReceiptsEVM7d, num30d: chain.numReceiptsEVM30d }) %>
-<%- include("stats", { name: "Gas Used", numTot: chain.gasUsed, num7d: chain.gasUsed7d, num30d: chain.gasUsed }) %>
-<% } %>
 
 <%- include("statsxcm", { name: "XCM Incoming",
  numTot: chain.numXCMTransferIncoming,
@@ -46,16 +43,6 @@
 <% } %>
 
   <div style='height:50px'></div>
-
-<% if ( chain.parachainsURL ) { %>
-   <a class="btn-sm btn-outline-secondary" href="<%= chain.parachainsURL; %>" target="_new">parachains.info</a>
-<% } %>
-
-
-<% if ( chain.githubURL ) { %>
-   <a class="btn-sm btn-outline-secondary" href="<%= chain.githubURL; %>" target="_new">github</a>
-<% } %>
-
   </div>
 </div>
 

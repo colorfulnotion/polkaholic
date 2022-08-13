@@ -570,6 +570,11 @@ function getRelayChainID(relaychain = 'polkadot') {
     }
 }
 
+function getChainIDFromParaIDAndRelayChain(paraID, relayChain = 'polkadot') {
+    let paraIDExtra = getParaIDExtra(relayChain)
+    return paraIDExtra + paraID
+}
+
 function getParaIDfromChainID(chainID) {
     let paraID;
     if (chainID == 0 || chainID == 2 || chainID == 30000 || chainID == 40000 || chainID == 60000) {
@@ -1230,17 +1235,20 @@ module.exports = {
     unique: function(x) {
         return unique(x)
     },
-    getParaIDfromChainID: function(x) {
-        return getParaIDfromChainID(x)
+    getParaIDfromChainID: function(chainID) {
+        return getParaIDfromChainID(chainID)
     },
-    getRelayChainID: function(x) {
-        return getRelayChainID(x)
+    getChainIDFromParaIDAndRelayChain: function(chainID, relayChain) {
+        return getChainIDFromParaIDAndRelayChain(chainID, relayChain)
     },
-    getParaIDExtra: function(x) {
-        return getParaIDExtra(x)
+    getRelayChainID: function(relaychain) {
+        return getRelayChainID(relaychain)
     },
-    getRelayChainByChainID: function(x) {
-        return getRelayChainByChainID(x)
+    getParaIDExtra: function(relaychain) {
+        return getParaIDExtra(relaychain)
+    },
+    getRelayChainByChainID: function(chainID) {
+        return getRelayChainByChainID(chainID)
     },
     toUSD: function(x, relayChain) {
         return toUSD(x, relayChain)

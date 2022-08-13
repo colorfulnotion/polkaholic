@@ -410,53 +410,6 @@ module.exports = class PolkaholicDB {
         }
     }
 
-    getRelayChainByChainID(chainID) {
-        if (chainID === paraTool.chainIDKusama || (chainID >= 21000 && chainID <= 29999)) {
-            return 'kusama'
-        } else if (chainID === paraTool.chainIDPolkadot || (chainID >= 1000 && chainID <= 9999)) {
-            return 'polkadot'
-        } else {
-            console.log(`FATAL chainID=${paraID}`)
-            return 'unknown'
-        }
-    }
-
-    getParaIDfromChainID(chainID) {
-        //kusama/polkadot : 0
-        //polkadot-Parathread: 1000-9999
-        //kusama-Parathread: 21000-29999
-        if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
-            //relaychains has paraID = 0 (same for both polkadot and kusama)
-            return 0
-        } else if (chainID >= 21000 && chainID <= 29999) {
-            return chainID - 20000
-        } else if (chainID >= 1000 && chainID <= 9999) {
-            return chainID
-        } else {
-            console.log(`FATAL wrong chainID=${chainID}`)
-            return -1
-        }
-    }
-
-    getChainIDFromParaID(paraID, relayChain = 'polkadot') {
-        if (paraID === 0 && relayChain == 'polkadot') {
-            //kusama/polkadot uses chainID as paraID
-            return paraTool.chainIDPolkadot;
-        }
-        if (paraID === 0 && relayChain == 'kusama') {
-            //kusama/polkadot uses chainID as paraID
-            return paraTool.chainIDKusama;
-        }
-        if (relayChain == 'polkadot') {
-            return paraID
-        } else if (relayChain == 'kusama') {
-            return paraID + 20000
-        } else {
-            console.log(`FATAL para=${paraID}, relayChain=${relayChain}`)
-            return -1
-        }
-    }
-
     getNameByChainID(chainID) {
         if (this.chainInfos[chainID] != undefined) {
             // [chainID, id]
@@ -612,7 +565,7 @@ module.exports = class PolkaholicDB {
     // For internal API call: contains sensitive info
     // TODO: external api should call getChains_external instead
     async getChains(crawling = 1, orderBy = "valueTransfersUSD7d DESC") {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, blocksCovered, blocksFinalized, symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS, unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numHolders, relayChain, totalIssuance, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL from chain where crawling = ${crawling} order by ${orderBy}`);
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, blocksCovered, blocksFinalized, symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS, unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numHolders, relayChain, totalIssuance, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL from chain where crawling = ${crawling} order by ${orderBy}`);
         return (chains);
     }
 
@@ -629,7 +582,7 @@ module.exports = class PolkaholicDB {
 
     // For external API call: senstive info are NOT returned
     async get_chains_external(crawling = 1) {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, CONCAT(UPPER(SUBSTRING(chainName,1,1)),LOWER(SUBSTRING(chainName,2))) AS chainName, upper(symbol) as symbol, unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numHolders, relayChain, totalIssuance, isEVM, blocksCovered, blocksFinalized, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL from chain where crawling = ${crawling} order by relayChain, id, chainID;`);
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, CONCAT(UPPER(SUBSTRING(chainName,1,1)),LOWER(SUBSTRING(chainName,2))) AS chainName, upper(symbol) as symbol, unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numXCMTransferIncoming, numXCMTransferIncoming7d, numXCMTransferIncoming30d, numXCMTransferOutgoing, numXCMTransferOutgoing7d, numXCMTransferOutgoing30d, valXCMTransferIncomingUSD, valXCMTransferIncomingUSD7d, valXCMTransferIncomingUSD30d, valXCMTransferOutgoingUSD, valXCMTransferOutgoingUSD7d, valXCMTransferOutgoingUSD30d, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numHolders, relayChain, totalIssuance, isEVM, blocksCovered, blocksFinalized, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL from chain where crawling = ${crawling} order by relayChain, id, chainID;`);
         return (chains);
     }
 
