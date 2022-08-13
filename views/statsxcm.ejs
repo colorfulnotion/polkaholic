@@ -6,9 +6,9 @@
     <b>30d</b>: <%= uiTool.presentNumber(num30d); %> (<%= uiTool.currencyFormat(valUSD30d, 0); %>)<br>
     <b>Total</b>: <%= uiTool.presentNumber(numTot); %> (<%= uiTool.currencyFormat(valUSDTot, 0); %>)
 
-    <% if ( name == "XCM Incoming" ) { %>
+    <% if ( name == "XCM Incoming" && false ) { %>
       <br><a class="btn-outline-info btn-sm" href="/xcmtransfers/<%= id; %>/all">Search</a>
-    <% } else if ( name == "XCM Outgoing" ) { %>
+    <% } else if ( name == "XCM Outgoing" && false ) { %>
       <br><a class="btn-outline-info btn-sm" href="/xcmtransfers/all/<%= id; %>">Search</a>
     <% } else if ( name == "Transfers" ) { %>
       <br><a class="btn-outline-info btn-sm" href="/transfers/<%= id; %>">Search</a>

@@ -94,7 +94,7 @@ function chainFilterOpt(req) {
     return chainList
 }
 
-function decorateOpt(req) {
+function decorateOpt(req, section = null) {
     // default decorate is true
     let decorate = (req.query.decorate != undefined) ? paraTool.parseBool(req.query.decorate) : true
     let decorateExtra = []
@@ -108,7 +108,7 @@ function decorateOpt(req) {
       address: identity decoration
       related: proxy/related decoration
     */
-    let predefinedExtra = ["data", "usd", "address", "related"]
+    let predefinedExtra = ["data", "usd", "address", "related", "events"]
 
     try {
         if (req.query.extra != undefined) {
@@ -123,8 +123,12 @@ function decorateOpt(req) {
             }
             decorateExtra = extraList
         } else {
-            //default option: [true] usd, addr [false] related
-            decorateExtra = ["data", "usd", "address"]
+            if (section == "account") {
+                decorateExtra = ["data", "usd", "address"]
+            } else {
+                //default option: [true] usd, addr [false] related
+                decorateExtra = ["data", "usd", "address", "events"]
+            }
         }
     } catch (e) {
         console.log(`decorateOpt`, e.toString())
@@ -195,7 +199,14 @@ app.get('/chains', async (req, res) => {
 // Usage: http://api.polkaholic.io/xcmtransfers
 app.get('/xcmtransfers', async (req, res) => {
     try {
-        let limit = (req.query.limit != undefined) ? paraTool.parseInt(req.query.limit) : 1000
+        let hardLimit = 10000; // 100x [above this it takes too long] -- users should use date ranges to filter
+        let limit = (req.query.limit != undefined) ? parseInt(req.query.limit, 10) : 1000;
+        if (limit > hardLimit) {
+            return res.status(400).json({
+                error: `Search: 'limit' parameter must be less or equal to than ${hardLimit}`
+            });
+        }
+
         let [decorate, decorateExtra] = decorateOpt(req)
         let filters = {
             chainList: chainFilterOpt(req),
@@ -219,7 +230,13 @@ app.get('/xcmtransfers', async (req, res) => {
 // Usage: http://api.polkaholic.io/xcmmessages
 app.get('/xcmmessages', async (req, res) => {
     try {
-        let limit = (req.query.limit != undefined) ? paraTool.parseInt(req.query.limit) : 1000
+        let hardLimit = 10000;
+        let limit = (req.query.limit != undefined) ? parseInt(req.query.limit, 10) : 1000;
+        if (limit > hardLimit) {
+            return res.status(400).json({
+                error: `Search: 'limit' parameter must be less or equal to than ${hardLimit}`
+            });
+        }
         let [decorate, decorateExtra] = decorateOpt(req)
         let filters = {
             chainList: chainFilterOpt(req),
@@ -581,10 +598,19 @@ app.get('/account/:address', async (req, res) => {
         }
         let ts = null;
         //console.log(`${targetGroup} requested`)
-        let [decorate, decorateExtra] = decorateOpt(req)
+        let [decorate, decorateExtra] = decorateOpt(req, "account")
         let chainList = chainFilterOpt(req)
+        let maxLimit = 1000;
+        let hardLimit = 10000;
+        let maxRows = (req.query.limit != undefined) ? req.query.limit : maxLimit;
+        if (maxRows > hardLimit) {
+            return res.status(400).json({
+                error: `Search: 'limit' parameter must be less or equal to than ${hardLimit}`
+            });
+        }
+
         //console.log(`/account/ chainList`, chainList)
-        let account = await query.getAccount(address, targetGroup, chainList, ts, lookback, decorate, decorateExtra);
+        let account = await query.getAccount(address, targetGroup, chainList, maxRows, ts, lookback, decorate, decorateExtra);
         if (account) {
             res.write(JSON.stringify(account));
             await query.tallyAPIKey(getapikey(req));
@@ -608,11 +634,20 @@ app.get('/account/:accountGroup/:address', async (req, res) => {
         let chainList = chainFilterOpt(req)
         //console.log(`/account/ chainList`, chainList)
 
+        let maxLimit = 1000;
+        let hardLimit = 10000;
+        let maxRows = (req.query.limit != undefined) ? req.query.limit : maxLimit;
+        if (maxRows > hardLimit) {
+            return res.status(400).json({
+                error: `Search: 'limit' parameter must be less or equal to than ${hardLimit}`
+            });
+        }
+
         let ts = (req.query["ts"] != undefined) ? req.query["ts"] : null
         if (accountGroup == "feed") {
-            account = await query.getAccountFeed(address, 500, chainList, decorate, decorateExtra);
+            account = await query.getAccountFeed(address, chainList, maxRows, decorate, decorateExtra);
         } else {
-            account = await query.getAccount(address, accountGroup, chainList, ts, lookback);
+            account = await query.getAccount(address, accountGroup, chainList, maxRows, ts, lookback, decorate, decorateExtra);
         }
         if (account) {
             res.write(JSON.stringify(account));
