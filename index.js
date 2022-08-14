@@ -142,7 +142,7 @@ function chainFilterOptUI(req) {
     return chainList
 }
 
-function decorateOptUI(req) {
+function decorateOptUI(req, ctx = null) {
     // default decorate is true
     let decorate = (req.query.decorate != undefined) ? paraTool.parseBool(req.query.decorate) : true
     let decorateExtra = []
@@ -158,7 +158,7 @@ function decorateOptUI(req) {
       related: proxy/related decoration
     */
 
-    let predefinedExtra = ["data", "usd", "address", "related"]
+    let predefinedExtra = ["data", "usd", "address", "related", "events"]
     try {
         if (req.query.extra != undefined) {
             let extraList = []
@@ -172,8 +172,13 @@ function decorateOptUI(req) {
             }
             decorateExtra = extraList
         } else {
-            //default option: [true] usd, addr [false] related
-            decorateExtra = ["data", "usd", "address", "related"]
+            if (ctx == "account") {
+                // do not include events
+                decorateExtra = ["data", "usd", "address", "related"]
+            } else {
+                //default option: [true] usd, addr [false] related
+                decorateExtra = ["data", "usd", "address", "related", "events"]
+            }
         }
     } catch (e) {
         console.log(`decorateOpt`, e.toString())
@@ -1120,12 +1125,17 @@ app.get('/account/:address', async (req, res) => {
     try {
         let fromAddress = getHomePubkey(req);
         let address = req.params["address"];
-        let [decorate, decorateExtra] = decorateOptUI(req)
+        let [decorate, decorateExtra] = decorateOptUI(req, "account")
         let [requestedChainID, id] = getHostChain(req);
         let chainList = chainFilterOptUI(req)
+
+        let maxLimit = 1000;
+        let hardLimit = 100000; // 100x [above this it takes too long] -- users should use date ranges to filter
+        let maxRows = (req.query.limit != undefined) ? req.query.limit : maxLimit;
+
         // console.log(`UI /account/ chainList`, chainList)
         // console.log(`getHostChain chainID=${requestedChainID}, id=${id}`)
-        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, decorate, decorateExtra);
+        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, maxRows, decorate, decorateExtra);
         res.render('account', {
             account: account,
             chainInfo: query.getChainInfo(),
@@ -1159,7 +1169,7 @@ app.get('/address/:address', async (req, res) => {
         let [decorate, decorateExtra] = decorateOptUI(req)
         let [requestedChainID, id] = getHostChain(req);
         let chainList = chainFilterOptUI(req)
-        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, decorate, decorateExtra);
+        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, maxRows, decorate, decorateExtra);
         res.render('address', {
             account: account,
             chainInfo: query.getChainInfo(),

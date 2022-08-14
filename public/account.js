@@ -1337,13 +1337,12 @@ function initTabs(address, chainListStr = 'all', isEVM = 0) {
     } else {
         showextrinsics(address, chainListStr);
         showunfinalized(address, chainListStr)
-        showtransfers(address, chainListStr);
-        showxcmtransfers(address, chainListStr);
-        showrewards(address, chainListStr);
-        showcrowdloans(address, chainListStr);
-        showss58h160(address, chainListStr);
-        //showoffers(address, chainListStr);
-        showrelated(address, chainListStr);
+        //showtransfers(address, chainListStr);
+        //showxcmtransfers(address, chainListStr);
+        //showrewards(address, chainListStr);
+        //showcrowdloans(address, chainListStr);
+        //showss58h160(address, chainListStr);
+        //showrelated(address, chainListStr);
     }
 }
 var refreshIntervalMS = 6100;
