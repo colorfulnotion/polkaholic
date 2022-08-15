@@ -737,18 +737,6 @@ order by msgHash, diffSentAt, diffTS`
 
     async xcmmatch2_matcher(startTS, endTS = null, lookbackSeconds = 120) {
         let endWhere = endTS ? `and xcmmessages.blockTS <= ${endTS} and xcmtransfer.sourceTS <= ${endTS}` : "";
-        /*
-        update xcmtransfer, xcmmessages
-          set xcmtransfer.msgHash = xcmmessages.msgHash
-          where xcmtransfer.chainID  = xcmmessages.chainID and
-                xcmtransfer.chainID in (61000) and
-                         xcmtransfer.msgHash is null and
-                         xcmmessages.blockTS >= ${startTS} and
-                         xcmtransfer.sourceTS >= ${startTS} and
-             xcmmessages.matched = 0 and
-             xcmtransfer.blockNumber = xcmmessages.blockNumber and  // HACK
-             xcmmessages.blockTS > ${startTS} ${endWhere}
-        */
         // set xcmmessages.{extrinsicID,extrinsicHash} based on xcmtransfer.msgHash / sentAt <= 4 difference
         let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash, xcmmessages.sectionMethod = xcmtransfer.sectionMethod, xcmmessages.amountSentUSD = xcmtransfer.amountSentUSD
                where xcmtransfer.msgHash = xcmmessages.msgHash and
@@ -772,6 +760,7 @@ order by msgHash, diffSentAt, diffTS`
         console.log(sql2);
         await this.update_batchedSQL();
 
+	// update 
         // ((d.asset = xcmmessages.asset) or (d.nativeAssetChain = xcmmessages.nativeAssetChain and d.nativeAssetChain is not null)) and
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
         let fld = (this.getCurrentTS() % 2 == 0) ? "" : "2"
@@ -788,18 +777,22 @@ order by msgHash, diffSentAt, diffTS`
           xcmmessages.beneficiaries${fld},
           d.eventID, d.asset, d.rawAsset, d.nativeAssetChain, d.amountReceived, d.blockNumberDest, d.destTS
         from xcmmessages, xcmtransferdestcandidate as d
- where  d.fromAddress = xcmmessages.beneficiaries${fld} and
+ where  d.fromAddress = xcmmessages.beneficiaries and
         d.chainIDDest = xcmmessages.chainIDDest and
         d.sentAt - xcmmessages.sentAt >= 0 and d.sentAt - xcmmessages.sentAt <= 4 and
         xcmmessages.blockTS >= ${startTS} and
+        d.addDT is not null and 
         d.destTS >= ${startTS} and
         d.destTS - xcmmessages.blockTS >= 0 and
         d.destTS - xcmmessages.blockTS < ${lookbackSeconds} and
         xcmmessages.assetsReceived is Null and
         length(xcmmessages.extrinsicID) > 0  ${endWhere}
 order by chainID, extrinsicHash, eventID, diffTS`;
+	// unmatch with: 
+	//  update xcmmessages set assetsReceived = null, amountReceivedUSD = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
+	//  update xcmtransfer set assetsReceived = null, amountReceivedUSD2 = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
+	// rematch with: ./xcmmatch 45
         console.log(sql);
-        //	process.exit(0);
         try {
             let matches = await this.pool.query(sql);
             let assetsReceived = {};
@@ -1002,21 +995,22 @@ order by msgHash`
 
     async xcmanalytics_period(chain, t0, t1 = null) {
         // xcmmessages_match matches incoming=0 and incoming=1 records
-        let numRecs = await this.xcmmessages_match(t0, t1);
+        //let numRecs = await this.xcmmessages_match(t0, t1);
 
         // computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints, beneficiaries2}
-        let lastTS = await this.computeXCMFingerprints(t0, t1);
+        //let lastTS = await this.computeXCMFingerprints(t0, t1);
 
         // xcmmatch2_matcher computes assetsReceived by matching xcmmessages.beneficiaries(2) to xcmtransferdestcandidate
         await this.xcmmatch2_matcher(t0, t1)
 
         // marks duplicates in xcmmessages
-        await this.xcmmessages_dedup(t0, t1);
+        //await this.xcmmessages_dedup(t0, t1);
 
-        await this.xcmtransfer_match(t0, t1, .97);
+        //await this.xcmtransfer_match(t0, t1, .97);
 
         // do it again
-        numRecs = await this.xcmmessages_match(t0, t1);
+        //numRecs = await this.xcmmessages_match(t0, t1);
+	return [0, 0];
         return [numRecs, lastTS];
 
     }
