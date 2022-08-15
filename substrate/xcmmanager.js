@@ -740,11 +740,15 @@ order by msgHash, diffSentAt, diffTS`
         // set xcmmessages.{extrinsicID,extrinsicHash} based on xcmtransfer.msgHash / sentAt <= 4 difference
         let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash, xcmmessages.sectionMethod = xcmtransfer.sectionMethod, xcmmessages.amountSentUSD = xcmtransfer.amountSentUSD
                where xcmtransfer.msgHash = xcmmessages.msgHash and
+                 xcmtransfer.chainIDDest = xcmmessages.chainIDDest and xcmtransfer.chainID = xcmmessages.chainID and
                  xcmtransfer.msgHash is not null and
                  xcmmessages.blockTS >= ${startTS} and
                  xcmtransfer.sourceTS >= ${startTS} and
                  abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4 ${endWhere}`;
         this.batchedSQL.push(sql1);
+        let [logDT, hr] = paraTool.ts_to_logDT_hr(startTS)
+        let windowTS = (endTS != undefined)? endTS-startTS : 'NA'
+        console.log(`[${logDT} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}`)
         console.log(sql1);
         await this.update_batchedSQL();
 
@@ -752,6 +756,7 @@ order by msgHash, diffSentAt, diffTS`
         endWhere = endTS ? `and p.blockTS <= ${endTS} and c.blockTS <= ${endTS}` : "";
         let sql2 = `update xcmmessages as c, xcmmessages as p  set c.extrinsicID = p.extrinsicID, c.extrinsicHash = p.extrinsicHash where
             p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.childMsgHash and
+             c.chainID = p.chainIDDest and
              abs(c.sentAt - p.childSentAt) <= 4 and
              c.extrinsicID is null and
              p.blockTS >= ${startTS} and
@@ -798,7 +803,7 @@ order by chainID, extrinsicHash, eventID, diffTS`;
             let matches = await this.pool.query(sql);
             let assetsReceived = {};
             let assetsReceivedXCMTransfer = {};
-            let prevEventID = false
+            let prevEventK = false
             let prevDestMatch = false
             let incoming = {};
             let outgoing = {};
@@ -863,10 +868,10 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                 } else {
                     console.log(`OK destMatch`, destMatch)
                 }
-                let isNewEventID = false
-                let currEventID = m.eventID
-                if (prevEventID != currEventID) isNewEventID = true
-                if (isNewEventID) {
+                let isNewEventK = false; //let currEventID = m.eventID
+                let currEventK = `${m.candidateMsgHash}-${m.amountReceived}`
+                if (prevEventK != currEventK) isNewEventK = true
+                if (isNewEventK) {
                     assetsReceived[k].push(destMatch);
                 }
 
@@ -875,11 +880,11 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                     if (assetsReceivedXCMTransfer[k2] == undefined) {
                         assetsReceivedXCMTransfer[k2] = [];
                     }
-                    if (isNewEventID) {
+                    if (isNewEventK) {
                         assetsReceivedXCMTransfer[k2].push(destMatch);
                     }
                 }
-                prevEventID = currEventID
+                prevEventK = currEventK
                 prevDestMatch = destMatch
             }
 
