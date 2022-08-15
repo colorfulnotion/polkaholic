@@ -43,7 +43,7 @@ module.exports = class XCMManager extends AssetManager {
         d.chainIDDest = xcmtransfer.chainIDDest and
         ((d.asset = xcmtransfer.asset) or (d.nativeAssetChain = xcmtransfer.nativeAssetChain and d.nativeAssetChain is not null)) and
         xcmtransfer.sourceTS >= ${startTS} and
-
+        xcmtransfer.xcmInteriorKey = d.xcmInteriorKey and
         d.destTS >= ${startTS} and
         xcmtransfer.matched = 0 and
         d.matched = 0 and
@@ -103,23 +103,6 @@ order by chainID, extrinsicHash, diffTS`
                             console.log(`NativeAssetChain NOT FOUND [${m.extrinsicHash}] nativeAsset=${nativeAsset}, nativeChainID=${nativeChainID}, asset=${asset}, rawAsset=${rawAsset}`)
                         }
                     }
-
-                    /*
-                    let decimals = this.getAssetDecimal(d.asset, d.chainID)
-                    if (decimals === false) {
-                        decimals = this.getAssetDecimal(d.asset, d.chainIDDest)
-                    }
-                    if (decimals !== false) {
-                        let [_, priceUSDsourceTS, __] = await this.computeUSD(1.0, d.asset, d.chainID, d.sourceTS);
-                        if (priceUSDsourceTS > 0) {
-                            priceUSD = priceUSDsourceTS;
-                            let amountSent = parseFloat(d.amountSent) / 10 ** decimals;
-                            let amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
-                            amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
-                            amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
-                        }
-                    }
-                    */
                     let sql = `update xcmtransfer
             set blockNumberDest = ${d.blockNumberDest},
                 destTS = ${d.destTS},
@@ -131,7 +114,7 @@ order by chainID, extrinsicHash, diffTS`
                 matchedExtrinsicID = '${d.destExtrinsicID}',
                 matchedEventID = '${d.eventID}'
             where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
-                    console.log(sql);
+                    //console.log(sql);
                     this.batchedSQL.push(sql);
                     matches++;
                     // (a) with extrinsicID, we get both the fee (rat << 1) ANDthe transferred item for when one is isFeeItem=0 and another is isFeeItem=1; ... otherwise we get (b) with just the eventID
