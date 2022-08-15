@@ -760,7 +760,7 @@ order by msgHash, diffSentAt, diffTS`
         console.log(sql2);
         await this.update_batchedSQL();
 
-	// update 
+	// update
         // ((d.asset = xcmmessages.asset) or (d.nativeAssetChain = xcmmessages.nativeAssetChain and d.nativeAssetChain is not null)) and
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
         let fld = (this.getCurrentTS() % 2 == 0) ? "" : "2"
@@ -775,20 +775,21 @@ order by msgHash, diffSentAt, diffTS`
           xcmmessages.extrinsicID,
           xcmmessages.blockTS,
           xcmmessages.beneficiaries${fld},
-          d.eventID, d.asset, d.rawAsset, d.nativeAssetChain, d.amountReceived, d.blockNumberDest, d.destTS
+          d.eventID, d.asset, d.rawAsset, d.nativeAssetChain, d.amountReceived, d.blockNumberDest, d.destTS, d.msgHash as candidateMsgHash
         from xcmmessages, xcmtransferdestcandidate as d
  where  d.fromAddress = xcmmessages.beneficiaries and
         d.chainIDDest = xcmmessages.chainIDDest and
+        d.msgHash = xcmmessages.msgHash and
         d.sentAt - xcmmessages.sentAt >= 0 and d.sentAt - xcmmessages.sentAt <= 4 and
         xcmmessages.blockTS >= ${startTS} and
-        d.addDT is not null and 
+        d.addDT is not null and
         d.destTS >= ${startTS} and
         d.destTS - xcmmessages.blockTS >= 0 and
         d.destTS - xcmmessages.blockTS < ${lookbackSeconds} and
         xcmmessages.assetsReceived is Null and
         length(xcmmessages.extrinsicID) > 0  ${endWhere}
 order by chainID, extrinsicHash, eventID, diffTS`;
-	// unmatch with: 
+	// unmatch with:
 	//  update xcmmessages set assetsReceived = null, amountReceivedUSD = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
 	//  update xcmtransfer set assetsReceived = null, amountReceivedUSD2 = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
 	// rematch with: ./xcmmatch 45
