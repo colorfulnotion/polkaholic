@@ -1035,16 +1035,47 @@ order by msgHash`
     // this will be phased out soon
     async xcm_reanalytics(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200) {
         let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS}` : ""
-        let sql = `select chainID, chainIDDest, extrinsicHash, extrinsicID, asset, amountSent, amountReceived, transferIndex, xcmIndex, sourceTS from xcmtransfer
+        let sql = `select chainID, chainIDDest, extrinsicHash, extrinsicID, asset, rawAsset, amountSent, amountReceived, transferIndex, xcmIndex, sourceTS, destTS from xcmtransfer
  where  sourceTS >= ${startTS} and asset not like '%BTC%'  and incomplete = 0 ${endWhere}
 order by chainID, extrinsicHash`
-        console.log("match_reanalytics", sql)
+        let [logDT, hr] = paraTool.ts_to_logDT_hr(startTS)
+        let windowTS = (endTS != undefined)? endTS-startTS : 'NA'
+        console.log(`match_reanalytics [${logDT} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
+        console.log(sql)
         try {
             let xcmmatches = await this.poolREADONLY.query(sql);
             let out = [];
             let vals = ["amountSentUSD", "amountReceivedUSD"];
             for (let i = 0; i < xcmmatches.length; i++) {
                 let m = xcmmatches[i];
+                let chainID = m.chainID
+                let asset = m.asset
+                let rawAsset = m.rawAsset
+                let [isXCMAssetFound, standardizedXCMInfo] = this.getStandardizedXCMAssetInfo(chainID, asset, rawAsset)
+                if (isXCMAssetFound) {
+                    let decimals = standardizedXCMInfo.decimals;
+                    let nativeAssetChain = standardizedXCMInfo.nativeAssetChain;
+                    let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(standardizedXCMInfo.nativeAssetChain)
+                    if (this.assetInfo[nativeAssetChain]) {
+                        let priceTS = (m.destTS != undefined)? m.destTS : m.sourceTS
+                        let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, nativeAsset, nativeChainID, priceTS);
+                        if (priceUSD > 0) {
+                            let asset = m.asset;
+                            let amountSent = parseFloat(m.amountSent) / 10 ** decimals;
+                            let amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
+                            let amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
+                            let amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                            let sql = `update xcmtransfer set amountSentUSD = '${amountSentUSD}', amountReceivedUSD = '${amountReceivedUSD}' where extrinsicHash = '${m.extrinsicHash}' and  transferIndex = '${m.transferIndex}' and xcmIndex = '${m.xcmIndex}'`;
+                            console.log(sql);
+                            this.batchedSQL.push(sql);
+                            await this.update_batchedSQL()
+                        }
+                    } else {
+                        console.log(`NativeAssetChain NOT FOUND [${m.extrinsicHash}] nativeAsset=${nativeAsset}, nativeChainID=${nativeChainID}, asset=${asset}, rawAsset=${rawAsset}`)
+                    }
+                }
+
+                /*
                 let decimals = this.getAssetDecimal(m.asset, m.chainID)
                 if (decimals === false) {
                     decimals = this.getAssetDecimal(m.asset, m.chainIDDest)
@@ -1063,6 +1094,7 @@ order by chainID, extrinsicHash`
                         await this.update_batchedSQL()
                     }
                 }
+                */
             }
 
         } catch (err) {
