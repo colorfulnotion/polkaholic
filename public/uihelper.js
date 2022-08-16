@@ -132,6 +132,20 @@ function postData(pathParams, data, tableName, fld = false) {
 
 async function loadData2(pathParams, tableName, includeCurrency = true, fld = false, tabName = false, tabTitle = false, maxCap = 50) {
     let endpoints = `${baseURL}/${pathParams}`
+    var table = $(tableName).DataTable();
+    let info = table.page.info();
+    let limit = info.length;
+    let separator = pathParams.includes("?") ? "&" : "?";
+    if (limit >= 100) {
+        endpoints += separator + "limit=10000";
+    } else if (limit == 50) {
+        endpoints += separator + "limit=1000";
+    } else if (limit == 25) {
+        endpoints += separator + "limit=500";
+    } else {
+        endpoints += separator + "limit=" + limit;
+    }
+    console.log("loadData2", endpoints, info);
     var req = new Request(endpoints, {
         method: 'GET',
         headers: new Headers({
@@ -145,7 +159,6 @@ async function loadData2(pathParams, tableName, includeCurrency = true, fld = fa
             let dataLen = (data[fld] != undefined) ? data[fld].length : data.length
             if (fld) {
                 if (data[fld] != undefined) {
-                    var table = $(tableName).DataTable();
                     table.clear();
                     table.rows.add(data[fld])
                     table.draw();
@@ -154,7 +167,6 @@ async function loadData2(pathParams, tableName, includeCurrency = true, fld = fa
                     console.log(`selected fld=${fld} not found! endpoint:${endpoints}`)
                 }
             } else {
-                var table = $(tableName).DataTable();
                 table.clear();
                 table.rows.add(data)
                 table.draw();

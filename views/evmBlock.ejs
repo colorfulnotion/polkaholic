@@ -1,12 +1,13 @@
 <%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Block` }); %>
 <%- include('chainheader', { chain: chain, title: `Block ${blockNumber}` }); %>
 
-
 <!-- Nav tabs -->
 <ul class="nav nav-tabs" id="blockTab" role="tablist">
 <%
+let defHash = '#overview';
 let tabs = [
 { title: "Overview", target: "overview" },
+{ title: "Transactions", target: "evmtxs" },
 { title: "Extrinsics", target: "extrinsics" },
 { title: "Events", target: "events" },
 ]
@@ -22,31 +23,104 @@ for (let i=0; i<tabs.length; i++) {
   </li>
 <%
 }
-let defHash = '#overview';
 %>
 </ul>
 
 <div class="tab-content">
-  <%- include("evmBlockOverview", {chainID: chainID, id: id, block: b }); %>
-  <%- include("xcmtransactions", {chainID: chainID, id: id, extrinsics: b.extrinsics }); %>
-  <%- include("blockevents", {chainID: chainID, id: id, extrinsics: b.extrinsics }); %>
+<%- include("evmBlockOverview", {chainID: chainID, id: id, block: b }); %>
+
+<div class="tab-pane" id="evmtxs" role="tabpanel" aria-labelledby="evmtxs-tab">
+  <table id="tableevmtxs" class="display" style="width: 100%">
+    <tr>
+      <th>Tx Hash</th>
+      <th>Method</th>
+      <th>Block</th>
+      <th>Age</th>
+      <th>Result</th>
+      <th>From</th>
+      <th>To</th>
+      <th>Value</th>
+      <th>Fee</th>
+    </tr>
+  </table>
 </div>
 
-<script src="/evmblock.js"></script>
-<script>
-  let chainID = <%= chainID %> ;
-  let defHash = "<%= defHash %>";
-  let id = '<%- id; %>';
-  let blockNumber = <%= blockNumber %>;
-  let tabs = <%- JSON.stringify(tabs); %> ;
-  <% if ( ! b.finalized ) { %>
+<div class="tab-pane" id="extrinsics" role="tabpanel" aria-labelledby="extrinsics-tab">
+  <div class="form-check form-switch" style="float: right; padding: 20px">
+    <input class="form-check-input" id="showallextrinsics" type="checkbox" role="switch" id="flexSwitchCheckDefault" />
+    <label class="form-check-label" for="flexSwitchCheckDefault">Show all extrinsics</label>
+  </div>
+  <table id="tableevmblockextrinsics" class="display" style='width: 100%'>
+    <thead>
+      <tr>
+        <th>Extrinsic ID</th>
+        <th>Section/Method</th>
+        <th>Params</th>
+        <th>From</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+  </table>
+</div>
+
+<div class="tab-pane" id="events" role="tabpanel" aria-labelledby="events-tab">
+  <div class="form-check form-switch" style="float: right; padding: 20px">
+    <input class="form-check-input" id="showallevents" type="checkbox" role="switch" id="flexSwitchCheckDefault" />
+    <label class="form-check-label" for="flexSwitchCheckDefault">Show all events</label>
+  </div>
+  <table id="tableevmblockevents" class="display" style='width: 100%'>
+    <thead>
+      <tr>
+        <th>Event ID</th>
+        <th>Extrinsic ID</th>
+        <th>Action</th>
+        <th>Params</th>
+      </tr>
+    </thead>
+  </table>
+</div>
+
+</div>
+
+<script type="text/javascript">
+let chainID = <%= chainID %> ;
+let defHash = "<%= defHash %>";
+let id = '<%- id; %>';
+let blockNumber = <%= blockNumber %>;
+let tabs = <%- JSON.stringify(tabs); %> ;
+<% if ( ! b.finalized ) { %>
     let blockHash = '<%= blockHash %>';
     showblockstatus("<%= b.hash; %>");
-  <% } else { %>
+<% } else { %>
     let blockHash = '';
-  <% } %>
+<% } %>
+let evmtxs = <%- JSON.stringify(b.evmBlock.transactions); %>;
+let extrinsics = <%- JSON.stringify(b.extrinsics); %>;
+// extract events from extrinsics, and tally totalSubstrateSignedExtrinsics, totalEvents
+let events = [];
+let totalSubstrateSignedExtrinsics = 0;
+let totalEvents = 0;
+for (const extrinsic of extrinsics) {
+   let extrinsicEventIndex = 0; // this is the eventIndex within the extrinsic
+   let signed = ( ( extrinsic.signer == undefined ) || ( extrinsic.evm ) ) ? false : true;
+   if ( signed ) totalSubstrateSignedExtrinsics++;
+   for (const e of extrinsic.events) {
+        let pieces = e.eventID.split('-') //2-12039596-1-1
+        e.rawEventID = `${pieces[1]}-${pieces[3]}`
+        e.extrinsicID = extrinsic.extrinsicID
+        e.extrinsicHash = extrinsic.extrinsicHash
+        e.extrinsicEventIndex = extrinsicEventIndex
+	e.signed = signed;
+	extrinsicEventIndex++
+        if ( signed ) totalEvents++
+	events.push(e);
+   }
+}
+document.getElementById('evmtxs-tab').innerHTML = `Transactions (${evmtxs.length})`;
+document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
+document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
 </script>
-
+<script src="/evmblock.js"></script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
 

@@ -58,7 +58,7 @@ having ( ( rat > ${ratMin} and rat <= 1.0 ) or
 (asset = '{"Token":"KAR"}' and amountSent - amountReceived < 10000000000 ) )
 order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
-        let windowTS = (endTS != undefined)? endTS-startTS : 'NA'
+        let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
         console.log(`match_xcm [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
         console.log("match_xcm", sql)
         try {
@@ -761,7 +761,7 @@ order by msgHash, diffSentAt, diffTS`
                  abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4 ${endWhere}`;
         this.batchedSQL.push(sql1);
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
-        let windowTS = (endTS != undefined)? endTS-startTS : 'NA'
+        let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
         console.log(`[${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}`)
         console.log(sql1);
         await this.update_batchedSQL();
@@ -779,7 +779,7 @@ order by msgHash, diffSentAt, diffTS`
         console.log(sql2);
         await this.update_batchedSQL();
 
-	// update
+        // update
         // ((d.asset = xcmmessages.asset) or (d.nativeAssetChain = xcmmessages.nativeAssetChain and d.nativeAssetChain is not null)) and
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
         let fld = (this.getCurrentTS() % 2 == 0) ? "" : "2"
@@ -808,10 +808,10 @@ order by msgHash, diffSentAt, diffTS`
         xcmmessages.assetsReceived is Null and
         length(xcmmessages.extrinsicID) > 0  ${endWhere}
 order by chainID, extrinsicHash, eventID, diffTS`;
-	// unmatch with:
-	//  update xcmmessages set assetsReceived = null, amountReceivedUSD = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
-	//  update xcmtransfer set assetsReceived = null, amountReceivedUSD2 = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
-	// rematch with: ./xcmmatch 45
+        // unmatch with:
+        //  update xcmmessages set assetsReceived = null, amountReceivedUSD = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
+        //  update xcmtransfer set assetsReceived = null, amountReceivedUSD2 = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
+        // rematch with: ./xcmmatch 45
         console.log(sql);
         try {
             let matches = await this.pool.query(sql);
@@ -1052,7 +1052,7 @@ order by msgHash`
  where  sourceTS >= ${startTS} and asset not like '%BTC%'  and incomplete = 0 ${endWhere}
 order by chainID, extrinsicHash`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
-        let windowTS = (endTS != undefined)? endTS-startTS : 'NA'
+        let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
         console.log(`match_reanalytics [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
         console.log(sql)
         try {
@@ -1070,7 +1070,7 @@ order by chainID, extrinsicHash`
                     let nativeAssetChain = standardizedXCMInfo.nativeAssetChain;
                     let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(standardizedXCMInfo.nativeAssetChain)
                     if (this.assetInfo[nativeAssetChain]) {
-                        let priceTS = (m.destTS != undefined)? m.destTS : m.sourceTS
+                        let priceTS = (m.destTS != undefined) ? m.destTS : m.sourceTS
                         let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, nativeAsset, nativeChainID, priceTS);
                         if (priceUSD > 0) {
                             let asset = m.asset;

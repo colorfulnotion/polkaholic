@@ -3,7 +3,6 @@
   let prevBlockUrl = `/block/${id}/${blockNumber - 1}`;
   let nextBlockUrl = `/block/${id}/${blockNumber + 1}`;
   let block = b.evmBlock;
-  console.log(b);
 %>
  <table class="table table-hover table-bordered">
   <tr>
@@ -26,7 +25,7 @@
     <td>Transactions</td>
     <td>
 <% if ( block && block.transactions ) { %> 
-<a class="btn-sm btn-primary" href='/txs/<%= id; %>/<%= blockNumber %>'><%= block.transactions.length %> transactions</a>
+<a class="btn-sm btn-primary" href='javascript:jumpTab()'><%= block.transactions.length %> transactions</a>
 <% } else { %>
      Awaiting finalization
 <% } %>

@@ -5,6 +5,35 @@
 %>
 <%- include('chainheader', { chain: chain, title: `Block ${blockNumber}` }); %>
 
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" id="blockTab" role="tablist">
+  <%
+let tabs = [
+{ title: "Overview", target: "overview" },
+{ title: "Extrinsics", target: "extrinsics" },
+{ title: "Events", target: "events" }
+]
+
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+  <%
+}
+
+let defHash = "#extrinsics";
+%>
+</ul>
+<div class="tab-content">
+
+<div class="tab-pane" id="overview" role="tabpanel" aria-labelledby="overview-tab">
 <table class="table table-hover table-bordered">
   <tr>
     <td>Block</td>
@@ -104,51 +133,84 @@
     </td>
   </tr>
 </table>
+</div>
 
-<!-- Nav tabs -->
-<ul class="nav nav-tabs" id="blockTab" role="tablist">
-  <%
-let tabs = [
-{ title: "Extrinsics", target: "extrinsics" },
-{ title: "Events", target: "events" }
-]
+<div class="tab-pane" id="extrinsics" role="tabpanel" aria-labelledby="extrinsics-tab">
+  <div class="form-check form-switch" style="float: right; padding: 20px">
+    <input class="form-check-input" id="showallextrinsics" type="checkbox" role="switch" id="flexSwitchCheckDefault" />
+    <label class="form-check-label" for="flexSwitchCheckDefault">Show all extrinsics</label>
+  </div>
+  <table id="tableblockextrinsics"  style='width: 100%' class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>Extrinsic ID</th>
+        <th>Section/Method</th>
+        <th>Params</th>
+        <th>From</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody>
+    </tbody>
+  </table>
+</div>
 
-for (let i=0; i<tabs.length; i++) {
-  let t = tabs[i];
-  let title = t.title;
-  let target = t.target;
-  let id = target + "-tab";
-  let href = "#" + target;
-%>
-  <li class="nav-item" role="presentation">
-    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
-  </li>
-  <%
-}
+<div class="tab-pane" id="events" role="tabpanel" aria-labelledby="events-tab">
+  <div class="form-check form-switch" style="float: right; padding: 20px">
+    <input class="form-check-input" id="showallevents" type="checkbox" role="switch" id="flexSwitchCheckDefault" />
+    <label class="form-check-label" for="flexSwitchCheckDefault">Show all events</label>
+  </div>
+  <table id="tableblockevents" style='width: 100%' class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>Event ID</th>
+        <th>Extrinsic ID (Event Index#)</th>
+        <th>Action</th>
+        <th>Params</th>
+      </tr>
+    </thead>
+  </table>
+</div>
 
-%>
-</ul>
-<div class="tab-content">
-  <%
-  let defHash = "#extrinsics";
-  %>
-  <%- include("blockextrinsics", {chainID: chainID, id:id, extrinsics: b.extrinsics }); %>
-  <%- include("blockevents", {chainID: chainID, id: id, extrinsics: b.extrinsics }); %>
 </div>
 
 <script src="/block.js"></script>
 <script>
-  let chainID = <%= chainID %> ;
-  let defHash = "<%= defHash %>";
-  let id = '<%- id; %>';
-  let blockNumber = <%= blockNumber %>;
-  let tabs = <%- JSON.stringify(tabs); %> ;
-  <% if ( ! b.finalized ) { %>
-    let blockHash = '<%= blockHash %>';
-    showblockstatus("<%= b.hash; %>");
-  <% } else { %>
-    let blockHash = '';
-  <% } %>
+let chainID = <%= chainID %> ;
+let defHash = "<%= defHash %>";
+let id = '<%- id; %>';
+let blockNumber = <%= blockNumber %>;
+let tabs = <%- JSON.stringify(tabs); %> ;
+<% if ( ! b.finalized ) { %>
+let blockHash = '<%= blockHash %>';
+showblockstatus("<%= b.hash; %>");
+<% } else { %>
+let blockHash = '';
+<% } %>
+
+// extract events from extrinsics, and tally totalSubstrateSignedExtrinsics, totalEvents
+let extrinsics = <%- JSON.stringify(b.extrinsics); %>;
+let events = [];
+let totalSubstrateSignedExtrinsics = 0;
+let totalEvents = 0;
+for (const extrinsic of extrinsics) {
+   let extrinsicEventIndex = 0; // this is the eventIndex within the extrinsic
+   let signed = ( ( extrinsic.signer == undefined ) || ( extrinsic.evm ) ) ? false : true;
+   if ( signed ) totalSubstrateSignedExtrinsics++;
+   for (const e of extrinsic.events) {
+        let pieces = e.eventID.split('-') //2-12039596-1-1
+        e.rawEventID = `${pieces[1]}-${pieces[3]}`
+        e.extrinsicID = extrinsic.extrinsicID
+        e.extrinsicHash = extrinsic.extrinsicHash
+        e.extrinsicEventIndex = extrinsicEventIndex
+	e.signed = signed;
+	extrinsicEventIndex++
+        if ( signed ) totalEvents++
+	events.push(e);
+   }
+}
+document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
+document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
 </script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
