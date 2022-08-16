@@ -889,15 +889,34 @@ module.exports = class ChainParser {
                 this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx)
                 this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
                 let mpState = this.mpReceivedHashes[idxKey]
-                console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
                 let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
                 let eventRangeLengthWithoutFee = eventRange.length - 1 // remove the fee event here
-                for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
-                    let e = eventRange[i]
-                    let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
-                    if (candidate) {
-                        indexer.updateXCMTransferDestCandidate(candidate, caller)
+                //let lastEvent = eventRange[-1]
+                for (let i = 0; i < eventRange.length; i++) {
+                    let ev = eventRange[i]
+                    //filter on xcmpallet(AssetsTrapped) - need to mark mpState as fail
+                    let sectionMethod = `${ev.section}(${ev.method})`
+                    if (sectionMethod == 'xcmPallet(AssetsTrapped)'){
+                        //not sure what does the hash mean ...
+                        mpState.success = false
+                        mpState.error = ev.method
+                        mpState.description = ev.eventID
+                        this.mpReceivedHashes[idxKey] = mpState
+                        console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
                     }
+                }
+                console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
+                //only compute candiate mpState is successful
+                if (mpState.success === true){
+                    for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
+                        let e = eventRange[i]
+                        let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
+                        if (candidate) {
+                            indexer.updateXCMTransferDestCandidate(candidate, caller)
+                        }
+                    }
+                }else{
+                    console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.error})`)
                 }
                 prevIdx = parseInt(idxKey) + 1
             }
@@ -2855,6 +2874,15 @@ module.exports = class ChainParser {
     xTokensFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
         if (palletMethod == "xTokens(TransferredMultiAssets)") {
+            return true
+        } else {
+            return false;
+        }
+    }
+
+    xcmAssetTrapFilter(palletMethod) {
+        //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
+        if (palletMethod == "xcmPallet(AssetsTrapped)") {
             return true
         } else {
             return false;
