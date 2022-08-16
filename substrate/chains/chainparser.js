@@ -895,17 +895,19 @@ module.exports = class ChainParser {
                 for (let i = 0; i < eventRange.length; i++) {
                     let ev = eventRange[i]
                     //filter on xcmpallet(AssetsTrapped) - need to mark mpState as fail
-                    let sectionMethod = `${ev.section}(${ev.method})`
-                    if (sectionMethod == 'xcmPallet(AssetsTrapped)'){
+                    if (this.xcmAssetTrapFilter(`${ev.section}(${ev.method})`)){
                         //not sure what does the hash mean ...
                         mpState.success = false
-                        mpState.error = ev.method
-                        mpState.description = ev.eventID
+                        mpState.errorDesc = ev.method
+                        mpState.description = `Executed ${mpState.eventID}`
+                        mpState.eventID = ev.eventID // update eventID with AssetsTrapped
                         this.mpReceivedHashes[idxKey] = mpState
                         console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
                     }
                 }
                 console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
+                //update xcmMessages
+                indexer.updateMPState(mpState)
                 //only compute candiate mpState is successful
                 if (mpState.success === true){
                     for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
@@ -916,7 +918,7 @@ module.exports = class ChainParser {
                         }
                     }
                 }else{
-                    console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.error})`)
+                    console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
                 }
                 prevIdx = parseInt(idxKey) + 1
             }
@@ -1298,7 +1300,7 @@ module.exports = class ChainParser {
                     signalStatus.success = true
                     signalStatus.weight = paraTool.dechexToInt(state)
                 } else {
-                    signalStatus.error = statusK
+                    signalStatus.errorDesc = statusK
                     signalStatus.description = statusV
                 }
                 return signalStatus

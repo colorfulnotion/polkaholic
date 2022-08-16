@@ -43,6 +43,7 @@ module.exports = class Indexer extends AssetManager {
     tallyAsset = {};
     xcmtransfer = {};
     xcmtransferdestcandidate = {};
+    incomingXcmState = {}
 
     currentSessionValidators = [];
     currentSessionIndex = -1;
@@ -1086,8 +1087,8 @@ module.exports = class Indexer extends AssetManager {
             let numXCMTransfersOut = {}
             for (let i = 0; i < xcmtransferKeys.length; i++) {
                 let r = this.xcmtransfer[xcmtransferKeys[i]];
-                let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `'NULL'`
-                let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `'NULL'`
+                let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
+                let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
                 let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`, `'${r.chainID}'`, `'${r.chainIDDest}'`,
                     `'${r.blockNumber}'`, `'${r.fromAddress}'`, `'${r.asset}'`, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.rawAsset}', '${r.msgHash}', '${r.sentAt}'`, nativeAssetChain, xcmInteriorKey
                 ].join(",") + ")";
@@ -1136,8 +1137,8 @@ module.exports = class Indexer extends AssetManager {
             for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
                 let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
                 // ["chainIDDest", "eventID"] + ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT", "nativeAssetChain", "xcmInteriorKey"
-                let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `'NULL'`
-                let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `'NULL'`
+                let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
+                let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
                 let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.asset}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.rawAsset}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, nativeAssetChain, xcmInteriorKey].join(",") + ")";
                 if (this.validAsset(r.asset, r.chainIDDest, "xcmtransfer", t)) {
                     xcmtransferdestcandidates.push(t);
@@ -1161,7 +1162,6 @@ module.exports = class Indexer extends AssetManager {
                 console.log(err0);
             }
         }
-
     }
 
     fixOutgoingUnknownSentAt(sentAt) {
@@ -1187,15 +1187,28 @@ module.exports = class Indexer extends AssetManager {
             let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
             if (this.xcmTrailingKeyMap[xcmKey] == undefined) {
                 this.xcmTrailingKeyMap[xcmKey] = {
+                    chainID: xcmMsg.chainID,
+                    chainIDDest: xcmMsg.chainIDDest,
                     blockNumber: xcmMsg.blockNumber,
                     msgHex: xcmMsg.msgHex,
                     msgHash: xcmMsg.msgHash,
                     isFresh: true,
+                    matchable: true,
                 }
+                console.log(`updateXCMMsg ${Object.keys(this.xcmTrailingKeyMap)}`)
                 this.xcmmsgMap[xcmKey] = xcmMsg
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
                 if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
             } else {
+                /*
+                let trailingXcm = this.xcmTrailingKeyMap[xcmKey]
+                if (trailingXcm.canUpdate === true){
+                    trailingXcm.blockNumber = xcmMsg.blockNumber, //we observe the same "msgHash" at new blockNum
+                    trailingXcm.canUpdate = false
+                     this.xcmTrailingKeyMap[xcmKey] = trailingXcm
+                     if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg valid duplicates! ${xcmKey}`, trailingXcm)
+                }
+                */
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
             }
         }
@@ -1229,6 +1242,22 @@ module.exports = class Indexer extends AssetManager {
             }
         }else{
             if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
+        }
+    }
+
+    // update mpState
+    updateMPState(mpState){
+        //potentially add sentAt here, but it's 2-4
+        let k = `${mpState.msgHash}-${mpState.bn}` // it's nearly impossible to have collision even dropping the asset
+        let [xcmBN, chainID, chainIDDest] = this.getTrailingXcmInfo(mpState.msgHash, mpState.bn)
+        mpState.xcmBN = xcmBN
+        mpState.chainID = chainID
+        mpState.chainIDDest = chainIDDest
+        if (this.incomingXcmState[k] == undefined){
+            this.incomingXcmState[k] = mpState
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`mpState`, this.incomingXcmState[k]);
+        }else{
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`skip duplicate ${mpState.eventID}`);
         }
     }
 
@@ -2641,7 +2670,7 @@ module.exports = class Indexer extends AssetManager {
 
     // clean traling xcm
     cleanTrailingXcmMap(blockNumber) {
-        let trailingBlk = 25 // goal: keep xcmKey that's less than n block old so we don't write duplicate xcm from undispated queue
+        let trailingBlk = 10 // goal: keep xcmKey that's less than n block old so we don't write duplicate xcm from undispated queue
         let trailingBN = blockNumber - trailingBlk
         let updatedTrailingKeyMap = {}
         let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
@@ -2653,6 +2682,32 @@ module.exports = class Indexer extends AssetManager {
             }
         }
         this.xcmTrailingKeyMap = updatedTrailingKeyMap
+    }
+
+    // get traling bn
+    // xcmKey was `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
+    getTrailingXcmInfo(msgHash, currBN) {
+        let xcmBN = false
+        let chainID = false
+        let chainIDDest = false
+        let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
+        //console.log(`msgHash=${msgHash},trailingKeys`, trailingKeys)
+        for (const tk of trailingKeys) {
+            if (tk.includes(msgHash)){
+                let trailingXcm = this.xcmTrailingKeyMap[tk]
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`msgHash=${msgHash} included`, tk, trailingXcm)
+                let firstSeenBN = trailingXcm.blockNumber
+                if (trailingXcm.matchable && currBN >= firstSeenBN){
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`msgHash=${msgHash} [received=${firstSeenBN}, executed=${currBN}]`)
+                    xcmBN = firstSeenBN
+                    chainID = trailingXcm.chainID
+                    chainIDDest = trailingXcm.chainIDDest
+                    this.xcmTrailingKeyMap[tk].matchable = false
+                    return [xcmBN, chainID, chainIDDest]
+                }
+            }
+        }
+        return [xcmBN, chainID, chainIDDest]
     }
 
     // this is the xcmmessages table
@@ -2671,6 +2726,53 @@ module.exports = class Indexer extends AssetManager {
             });
             this.recentXcmMsgs = []
 
+            /*
+            {
+                sectionMethod: 'xcmpQueue(Fail)',
+                eventID: '2000-1626946-1-8',
+                sentAt: 11570241,
+                bn: 1626946,
+                msgHash: '0xd5416d6a4809dd80fc978845e5bbd8a1b64e10ddea383a158bf83195ea18aa8f',
+                success: false,
+                error: 'unroutable',
+                description: null
+            }
+            */
+            let incomingXcmStateKeys = Object.keys(this.incomingXcmState)
+            if (incomingXcmStateKeys.length > 0) {
+                let mpStates = [];
+                for (let i = 0; i < incomingXcmStateKeys.length; i++) {
+                    let r = this.incomingXcmState[incomingXcmStateKeys[i]];
+                    if (r.xcmBN && r.chainID !== false && r.chainIDDest !== false){
+                        // ["msgHash", "blockNumber", "incoming"] + ["destStatus", "executedEventID", "errorDesc"]
+                        let destStatus = (r.success === true)? '1' : '0'
+                        let errorDesc = (r.errorDesc != undefined) ? `'${r.errorDesc}'` : `NULL`
+                        //let executedEventID = (r.eventID != undefined) ? `'${r.eventID}'` : `NULL`
+                        let t = "(" + [`'${r.msgHash}'`, `'${r.xcmBN}'`, `'1'`, `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${destStatus}'`, `'${r.eventID}'`, errorDesc].join(",") + ")";
+                        console.log(`mpStates`, t)
+                        mpStates.push(t);
+                    }else{
+                        console.log(`[${r.msgHash}] xcmInfo missing! xcmBN=${r.xcmBN}, chainID=${r.chainID}, chainIDDest=${r.chainIDDest}`)
+                    }
+                }
+                this.incomingXcmState = {};
+                try {
+                    // these events we can't say for sure without matching to recent sends
+                    if (mpStates.length > 0) {
+                        let vals = ["chainID", "chainIDDest", "destStatus", "executedEventID", "errorDesc"];
+                        await this.upsertSQL({
+                            "table": "xcmmessages",
+                            "keys": ["msgHash", "blockNumber", "incoming"],
+                            "vals": vals,
+                            "data": mpStates,
+                            "replace": vals
+                        });
+                    }
+                } catch (err0) {
+                    console.log(err0);
+                }
+            }
+
             let out = [];
             for (const blockNumber of Object.keys(this.numXCMMessagesIn)) {
                 out.push(`('${blockNumber}', '${this.numXCMMessagesIn[blockNumber]}')`);
@@ -2684,6 +2786,7 @@ module.exports = class Indexer extends AssetManager {
                     "data": out,
                     "replace": vals
                 });
+                console.log("numXCMMessagesOut", this.numXCMMessagesOut);
                 this.numXCMMessagesIn = {};
             }
 
