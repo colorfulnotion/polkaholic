@@ -23,7 +23,7 @@ module.exports = class XCMManager extends AssetManager {
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
         let sql = `select
-          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, xcmtransfer.asset,
+          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, xcmtransfer.asset, xcmtransfer.rawAsset,
           (d.destts - xcmtransfer.sourceTS) as diffTS,
           xcmtransfer.extrinsicID,
           xcmtransfer.amountSent,
@@ -43,7 +43,7 @@ module.exports = class XCMManager extends AssetManager {
         d.chainIDDest = xcmtransfer.chainIDDest and
         ((d.asset = xcmtransfer.asset) or (d.nativeAssetChain = xcmtransfer.nativeAssetChain and d.nativeAssetChain is not null)) and
         xcmtransfer.sourceTS >= ${startTS} and
-
+        xcmtransfer.xcmInteriorKey = d.xcmInteriorKey and
         d.destTS >= ${startTS} and
         xcmtransfer.matched = 0 and
         d.matched = 0 and
@@ -57,7 +57,10 @@ having ( ( rat > ${ratMin} and rat <= 1.0 ) or
 (asset = '{"Token":"KSM"}' and amountSent - amountReceived < 1000000000) or
 (asset = '{"Token":"KAR"}' and amountSent - amountReceived < 10000000000 ) )
 order by chainID, extrinsicHash, diffTS`
-        //console.log("match_xcm", sql)
+        let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
+        let windowTS = (endTS != undefined)? endTS-startTS : 'NA'
+        console.log(`match_xcm [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
+        console.log("match_xcm", sql)
         try {
             let xcmmatches = await this.poolREADONLY.query(sql);
             let addressextrinsic = []
@@ -76,18 +79,28 @@ order by chainID, extrinsicHash, diffTS`
                     let priceUSD = 0;
                     let amountSentUSD = 0;
                     let amountReceivedUSD = 0;
-                    let decimals = this.getAssetDecimal(d.asset, d.chainID)
-                    if (decimals === false) {
-                        decimals = this.getAssetDecimal(d.asset, d.chainIDDest)
-                    }
-                    if (decimals !== false) {
-                        let [_, priceUSDsourceTS, __] = await this.computeUSD(1.0, d.asset, d.chainID, d.sourceTS);
-                        if (priceUSDsourceTS > 0) {
-                            priceUSD = priceUSDsourceTS;
-                            let amountSent = parseFloat(d.amountSent) / 10 ** decimals;
-                            let amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
-                            amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
-                            amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                    let chainID = d.chainID
+                    let asset = d.asset
+                    let rawAsset = d.rawAsset
+                    let [isXCMAssetFound, standardizedXCMInfo] = this.getStandardizedXCMAssetInfo(chainID, asset, rawAsset)
+                    if (isXCMAssetFound) {
+                        let priceTS = d.sourceTS
+                        let decimals = standardizedXCMInfo.decimals;
+                        let nativeAssetChain = standardizedXCMInfo.nativeAssetChain;
+                        let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(standardizedXCMInfo.nativeAssetChain)
+                        if (this.assetInfo[nativeAssetChain]) {
+                            if (decimals !== false) {
+                                let [_, priceUSDsourceTS, __] = await this.computeUSD(1.0, nativeAsset, nativeChainID, priceTS);
+                                if (priceUSDsourceTS > 0) {
+                                    priceUSD = priceUSDsourceTS;
+                                    let amountSent = parseFloat(d.amountSent) / 10 ** decimals;
+                                    let amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
+                                    amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
+                                    amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                                }
+                            }
+                        } else {
+                            console.log(`NativeAssetChain NOT FOUND [${m.extrinsicHash}] nativeAsset=${nativeAsset}, nativeChainID=${nativeChainID}, asset=${asset}, rawAsset=${rawAsset}`)
                         }
                     }
                     let sql = `update xcmtransfer
@@ -101,6 +114,7 @@ order by chainID, extrinsicHash, diffTS`
                 matchedExtrinsicID = '${d.destExtrinsicID}',
                 matchedEventID = '${d.eventID}'
             where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
+                    //console.log(sql);
                     this.batchedSQL.push(sql);
                     matches++;
                     // (a) with extrinsicID, we get both the fee (rat << 1) ANDthe transferred item for when one is isFeeItem=0 and another is isFeeItem=1; ... otherwise we get (b) with just the eventID
@@ -737,26 +751,18 @@ order by msgHash, diffSentAt, diffTS`
 
     async xcmmatch2_matcher(startTS, endTS = null, lookbackSeconds = 120) {
         let endWhere = endTS ? `and xcmmessages.blockTS <= ${endTS} and xcmtransfer.sourceTS <= ${endTS}` : "";
-        /*
-        update xcmtransfer, xcmmessages
-          set xcmtransfer.msgHash = xcmmessages.msgHash
-          where xcmtransfer.chainID  = xcmmessages.chainID and
-                xcmtransfer.chainID in (61000) and
-                         xcmtransfer.msgHash is null and
-                         xcmmessages.blockTS >= ${startTS} and
-                         xcmtransfer.sourceTS >= ${startTS} and
-             xcmmessages.matched = 0 and
-             xcmtransfer.blockNumber = xcmmessages.blockNumber and  // HACK
-             xcmmessages.blockTS > ${startTS} ${endWhere}
-        */
         // set xcmmessages.{extrinsicID,extrinsicHash} based on xcmtransfer.msgHash / sentAt <= 4 difference
         let sql1 = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash, xcmmessages.sectionMethod = xcmtransfer.sectionMethod, xcmmessages.amountSentUSD = xcmtransfer.amountSentUSD
                where xcmtransfer.msgHash = xcmmessages.msgHash and
+                 xcmtransfer.chainIDDest = xcmmessages.chainIDDest and xcmtransfer.chainID = xcmmessages.chainID and
                  xcmtransfer.msgHash is not null and
                  xcmmessages.blockTS >= ${startTS} and
                  xcmtransfer.sourceTS >= ${startTS} and
                  abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4 ${endWhere}`;
         this.batchedSQL.push(sql1);
+        let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
+        let windowTS = (endTS != undefined)? endTS-startTS : 'NA'
+        console.log(`[${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}`)
         console.log(sql1);
         await this.update_batchedSQL();
 
@@ -764,6 +770,7 @@ order by msgHash, diffSentAt, diffTS`
         endWhere = endTS ? `and p.blockTS <= ${endTS} and c.blockTS <= ${endTS}` : "";
         let sql2 = `update xcmmessages as c, xcmmessages as p  set c.extrinsicID = p.extrinsicID, c.extrinsicHash = p.extrinsicHash where
             p.childMsgHash is not null and p.extrinsicID is not null and c.msgHash = p.childMsgHash and
+             c.chainID = p.chainIDDest and
              abs(c.sentAt - p.childSentAt) <= 4 and
              c.extrinsicID is null and
              p.blockTS >= ${startTS} and
@@ -772,6 +779,7 @@ order by msgHash, diffSentAt, diffTS`
         console.log(sql2);
         await this.update_batchedSQL();
 
+	// update
         // ((d.asset = xcmmessages.asset) or (d.nativeAssetChain = xcmmessages.nativeAssetChain and d.nativeAssetChain is not null)) and
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
         let fld = (this.getCurrentTS() % 2 == 0) ? "" : "2"
@@ -786,25 +794,30 @@ order by msgHash, diffSentAt, diffTS`
           xcmmessages.extrinsicID,
           xcmmessages.blockTS,
           xcmmessages.beneficiaries${fld},
-          d.eventID, d.asset, d.rawAsset, d.nativeAssetChain, d.amountReceived, d.blockNumberDest, d.destTS
+          d.eventID, d.asset, d.rawAsset, d.nativeAssetChain, d.amountReceived, d.blockNumberDest, d.destTS, d.msgHash as candidateMsgHash
         from xcmmessages, xcmtransferdestcandidate as d
- where  d.fromAddress = xcmmessages.beneficiaries${fld} and
+ where  d.fromAddress = xcmmessages.beneficiaries and
         d.chainIDDest = xcmmessages.chainIDDest and
+        d.msgHash = xcmmessages.msgHash and
         d.sentAt - xcmmessages.sentAt >= 0 and d.sentAt - xcmmessages.sentAt <= 4 and
         xcmmessages.blockTS >= ${startTS} and
+        d.addDT is not null and
         d.destTS >= ${startTS} and
         d.destTS - xcmmessages.blockTS >= 0 and
         d.destTS - xcmmessages.blockTS < ${lookbackSeconds} and
         xcmmessages.assetsReceived is Null and
         length(xcmmessages.extrinsicID) > 0  ${endWhere}
 order by chainID, extrinsicHash, eventID, diffTS`;
+	// unmatch with:
+	//  update xcmmessages set assetsReceived = null, amountReceivedUSD = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
+	//  update xcmtransfer set assetsReceived = null, amountReceivedUSD2 = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
+	// rematch with: ./xcmmatch 45
         console.log(sql);
-        //	process.exit(0);
         try {
             let matches = await this.pool.query(sql);
             let assetsReceived = {};
             let assetsReceivedXCMTransfer = {};
-            let prevEventID = false
+            let prevEventK = false
             let prevDestMatch = false
             let incoming = {};
             let outgoing = {};
@@ -869,10 +882,10 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                 } else {
                     console.log(`OK destMatch`, destMatch)
                 }
-                let isNewEventID = false
-                let currEventID = m.eventID
-                if (prevEventID != currEventID) isNewEventID = true
-                if (isNewEventID) {
+                let isNewEventK = false; //let currEventID = m.eventID
+                let currEventK = `${m.candidateMsgHash}-${m.amountReceived}`
+                if (prevEventK != currEventK) isNewEventK = true
+                if (isNewEventK) {
                     assetsReceived[k].push(destMatch);
                 }
 
@@ -881,11 +894,11 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                     if (assetsReceivedXCMTransfer[k2] == undefined) {
                         assetsReceivedXCMTransfer[k2] = [];
                     }
-                    if (isNewEventID) {
+                    if (isNewEventK) {
                         assetsReceivedXCMTransfer[k2].push(destMatch);
                     }
                 }
-                prevEventID = currEventID
+                prevEventK = currEventK
                 prevDestMatch = destMatch
             }
 
@@ -1016,9 +1029,9 @@ order by msgHash`
         await this.xcmtransfer_match(t0, t1, .97);
 
         // do it again
+        //return [0, 0];
         numRecs = await this.xcmmessages_match(t0, t1);
         return [numRecs, lastTS];
-
     }
 
     async xcmanalytics(chain, lookbackDays) {
@@ -1035,32 +1048,43 @@ order by msgHash`
     // this will be phased out soon
     async xcm_reanalytics(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200) {
         let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS}` : ""
-        let sql = `select chainID, chainIDDest, extrinsicHash, extrinsicID, asset, amountSent, amountReceived, transferIndex, xcmIndex, sourceTS from xcmtransfer
+        let sql = `select chainID, chainIDDest, extrinsicHash, extrinsicID, asset, rawAsset, amountSent, amountReceived, transferIndex, xcmIndex, sourceTS, destTS from xcmtransfer
  where  sourceTS >= ${startTS} and asset not like '%BTC%'  and incomplete = 0 ${endWhere}
 order by chainID, extrinsicHash`
-        console.log("match_reanalytics", sql)
+        let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
+        let windowTS = (endTS != undefined)? endTS-startTS : 'NA'
+        console.log(`match_reanalytics [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
+        console.log(sql)
         try {
             let xcmmatches = await this.poolREADONLY.query(sql);
             let out = [];
             let vals = ["amountSentUSD", "amountReceivedUSD"];
             for (let i = 0; i < xcmmatches.length; i++) {
                 let m = xcmmatches[i];
-                let decimals = this.getAssetDecimal(m.asset, m.chainID)
-                if (decimals === false) {
-                    decimals = this.getAssetDecimal(m.asset, m.chainIDDest)
-                }
-                if (decimals !== false) {
-                    let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, m.asset, m.chainID, m.sourceTS);
-                    if (priceUSD > 0) {
-                        let asset = m.asset;
-                        let amountSent = parseFloat(m.amountSent) / 10 ** decimals;
-                        let amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
-                        let amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
-                        let amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
-                        let sql = `update xcmtransfer set amountSentUSD = '${amountSentUSD}', amountReceivedUSD = '${amountReceivedUSD}' where extrinsicHash = '${m.extrinsicHash}' and  transferIndex = '${m.transferIndex}' and xcmIndex = '${m.xcmIndex}'`;
-                        console.log(sql);
-                        this.batchedSQL.push(sql);
-                        await this.update_batchedSQL()
+                let chainID = m.chainID
+                let asset = m.asset
+                let rawAsset = m.rawAsset
+                let [isXCMAssetFound, standardizedXCMInfo] = this.getStandardizedXCMAssetInfo(chainID, asset, rawAsset)
+                if (isXCMAssetFound) {
+                    let decimals = standardizedXCMInfo.decimals;
+                    let nativeAssetChain = standardizedXCMInfo.nativeAssetChain;
+                    let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(standardizedXCMInfo.nativeAssetChain)
+                    if (this.assetInfo[nativeAssetChain]) {
+                        let priceTS = (m.destTS != undefined)? m.destTS : m.sourceTS
+                        let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, nativeAsset, nativeChainID, priceTS);
+                        if (priceUSD > 0) {
+                            let asset = m.asset;
+                            let amountSent = parseFloat(m.amountSent) / 10 ** decimals;
+                            let amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
+                            let amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
+                            let amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                            let sql = `update xcmtransfer set amountSentUSD = '${amountSentUSD}', amountReceivedUSD = '${amountReceivedUSD}' where extrinsicHash = '${m.extrinsicHash}' and  transferIndex = '${m.transferIndex}' and xcmIndex = '${m.xcmIndex}'`;
+                            console.log(sql);
+                            this.batchedSQL.push(sql);
+                            await this.update_batchedSQL()
+                        }
+                    } else {
+                        console.log(`NativeAssetChain NOT FOUND [${m.extrinsicHash}] nativeAsset=${nativeAsset}, nativeChainID=${nativeChainID}, asset=${asset}, rawAsset=${rawAsset}`)
                     }
                 }
             }

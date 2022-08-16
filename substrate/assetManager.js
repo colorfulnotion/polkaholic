@@ -1285,7 +1285,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                         await this.update_batchedSQL();
                     }
                 } else {
-                    console.log(`NativeAssetChain NOT FOUND [${xcm.extrinsicHash}] targetAsset=${targetAsset}, targetChainID=${targetChainID}, asset=${asset}, rawAsset=${rawAsset}`)
+                    console.log(`NativeAssetChain NOT FOUND [${xcm.extrinsicHash}] nativeAsset=${nativeAsset}, nativeChainID=${nativeChainID}, asset=${asset}, rawAsset=${rawAsset}`)
                 }
             } else {
                 console.log(`XCM Asset Not found chainID=${chainID}, asset=${asset}, rawAsset=${rawAsset}`)
