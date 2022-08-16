@@ -1171,10 +1171,10 @@ app.get('/address/:address', async (req, res) => {
         let chainList = chainFilterOptUI(req)
         let maxLimit = 1000;
         let hardLimit = 100000; // 100x [above this it takes too long] -- users should use date ranges to filter
-	let maxRows = (req.query.limit != undefined) ? req.query.limit : maxLimit;
-	if ( maxRows > hardLimit ) {
-	    maxRows = hardLimit;
-	}
+        let maxRows = (req.query.limit != undefined) ? req.query.limit : maxLimit;
+        if (maxRows > hardLimit) {
+            maxRows = hardLimit;
+        }
         let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, maxRows, decorate, decorateExtra);
         res.render('address', {
             account: account,

@@ -26,7 +26,7 @@ async function showxcmmessages(filter = {}) {
         console.log("INIT SETUP");
         initxcmmessages = true;
         xcmmessagesTable = $(tableName).DataTable({
-            pageLength: 100,
+            pageLength: 25,
             lengthMenu: [
                 [10, 25, 50, 100],
                 [10, 25, 50, 100]
@@ -255,7 +255,7 @@ async function showxcmtransfers(filter = {}) {
             [7] sourceTS
             [8] relayChain
             */
-            pageLength: 100,
+            pageLength: 25,
             lengthMenu: [
                 [10, 25, 50, 100],
                 [10, 25, 50, 100]

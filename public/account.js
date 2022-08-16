@@ -13,12 +13,20 @@ let tableRelated = null;
 
 var initextrinsics = false;
 
+function getLengthMenu() {
+    return [
+        [10, 20, 25, 50, 100, 500],
+        ["max 10", "max 20", "max 500 (25/page)", "max 1K (50/page)", "max 10K (100/page)", "max 10K (500/page)"]
+    ];
+}
+
 function showextrinsics(address, chainListStr = 'all') {
     if (initextrinsics) return;
     else initextrinsics = true;
     let pathParams = `account/${address}?group=extrinsics&chainfilters=${chainListStr}`
     let tableName = '#tableextrinsics'
     tableExtrinsics = $(tableName).DataTable({
+        lengthMenu: getLengthMenu(),
         columnDefs: [{
                 "className": "dt-center",
                 "targets": [3, 4]
@@ -91,7 +99,6 @@ function showextrinsics(address, chainListStr = 'all') {
                             }
                         } else if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
                             return presentInstructions(row.decodedInput.params, row.transactionHash, "Params");
-
                         }
                         return "";
                     } else {
@@ -152,6 +159,9 @@ function showextrinsics(address, chainListStr = 'all') {
         ]
     });
 
+    $(tableName).on('length.dt', function(e, settings, len) {
+        loadData2(pathParams, tableName, true, "data", 'feed', 'Feeds')
+    });
     loadData2(pathParams, tableName, true, "data", 'feed', 'Feeds')
 }
 
@@ -164,6 +174,7 @@ function showevmtxs(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=extrinsics&chainfilters=${chainListStr}`
     let tableName = '#tableevmtxs'
     tableEVMTxs = $(tableName).DataTable({
+        lengthMenu: getLengthMenu(),
         columnDefs: [{
             "className": "dt-right",
             "targets": [7, 8]
@@ -296,34 +307,13 @@ function showevmtxs(address, chainListStr = 'all') {
                     }
                 }
             },
-            /*,
-            {
-                data: 'params',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        let out = "";
-                        if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
-			    return presentInstructions(row.decodedInput.params, row.transactionHash, "Params");
-                        } else if (row.method !== undefined && row.extrinsicHash !== undefined) {
-                            try {
-                                return cover_params(data, row.extrinsicHash);
-                            } catch (e) {}
-                        } 
-                        return "";
-                    } else {
-                        if (row.method !== undefined) {
-                            return row.method;
-                        } else {
-                            return "-";
-                        }
-                    }
-                    return "";
-                }
-            }, */
         ]
     });
 
-    loadData2(pathParams, tableName, true, "data", 'feed', 'Feeds')
+    $(tableName).on('length.dt', function(e, settings, len) {
+        loadData2(pathParams, tableName, true, "data", 'evmtxs', 'EVM Txs')
+    });
+    loadData2(pathParams, tableName, true, "data", 'evmtxs', 'EVM Txs')
 }
 
 var initfeed = false;
@@ -334,8 +324,9 @@ function showfeed(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=feed&chainfilters=${chainListStr}`
     let tableName = '#tablefeed'
     tableFeed = $(tableName).DataTable({
+        lengthMenu: getLengthMenu(),
         columnDefs: [{
-                "className": "dt-right",
+                "className": "dt-center",
                 "targets": [3, 4, 5]
             },
             {
@@ -409,7 +400,7 @@ function showfeed(address, chainListStr = 'all') {
                 data: 'params',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        return cover_params(data, row.extrinsicHash);
+                        return presentInstructions(JSON.stringify(data), row.extrinsicHash, "Params");
                     } else {
                         if (row.method !== undefined) {
                             return row.method;
@@ -429,7 +420,11 @@ function showfeed(address, chainListStr = 'all') {
         ]
     });
 
-    loadData2(pathParams, tableName, true, "data", 'extrinsics', 'Extrinsics')
+    $(tableName).on('length.dt', function(e, settings, len) {
+        loadData2(pathParams, tableName, true, "data", 'feed', 'Feed')
+    });
+
+    loadData2(pathParams, tableName, true, "data", 'feed', 'Feed')
 }
 
 var inittransfers = false;
@@ -441,6 +436,7 @@ function showtransfers(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=transfers&chainfilters=${chainListStr}`
     let tableName = '#tabletransfers'
     tableTransfers = $(tableName).DataTable({
+        lengthMenu: getLengthMenu(),
         columnDefs: [{
                 "className": "dt-right",
                 "targets": [5, 6]
@@ -575,112 +571,17 @@ function showtransfers(address, chainListStr = 'all') {
             }
         ]
     });
+
+    $(tableName).on('length.dt', function(e, settings, len) {
+        loadData2(pathParams, tableName, true, "data", 'transfers', 'Transfers')
+    });
     $(tableName).on('page.dt', function() {
         setupcurrency();
     });
+
     loadData2(pathParams, tableName, true, "data", 'transfers', 'Transfers')
 }
 
-var inithistory = false;
-
-function showhistory(address, chainListStr = 'all') {
-    return;
-    if (inithistory) return;
-    else inithistory = true;
-    let pathParams = `account/${address}?group=history&chainfilters=${chainListStr}`
-    let tableName = '#tablehistory'
-    tableHistory = $(tableName).DataTable({
-        columnDefs: [{
-                "className": "align-top",
-                "targets": [0, 1]
-            },
-            {
-                "targets": [5],
-                "visible": false
-            }
-        ],
-        columns: [{
-                data: 'chainID',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.assetInfo !== undefined && row.assetInfo.chainID !== undefined && row.assetInfo.chainName !== undefined) {
-                            return presentChain(row.assetInfo.chainID, row.assetInfo.chainName);
-                        } else {
-                            return "unk";
-                        }
-                    } else {
-                        if (row.assetInfo !== undefined && row.assetInfo.chainID !== undefined && row.assetInfo.chainName !== undefined) {
-                            return row.assetInfo.chainName;
-                        }
-                    }
-                    return "";
-                }
-            },
-            {
-                data: 'asset',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.assetInfo.assetChain !== undefined && row.assetInfo.symbol !== undefined) {
-                            return presentAsset(row.assetInfo.assetChain, row.assetInfo.symbol);
-                        } else {
-                            return "unk";
-                        }
-                    } else {
-                        if (row.assetInfo.assetChain !== undefined && row.assetInfo.symbol !== undefined) {
-                            return row.assetInfo.symbol;
-                        } else {
-                            return "unk";
-                        }
-                    }
-                    return "";
-                }
-            },
-            {
-                data: 'states',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.states !== undefined) {
-                            let out = [];
-                            for (let s = 0; s < row.states.length; s++) {
-                                let tsState = row.states[s];
-                                if (tsState.length >= 2) {
-                                    let ts = tsState[0];
-                                    let state = tsState[1];
-                                    let extrinsicInfo = (tsState.length > 2) ? tsState[2] : false;
-                                    let d = new Date(ts * 1000);
-                                    let dateString = d.toISOString().substring(0, 16).replace("T", " ");
-                                    let stateString = "";
-                                    if (state.free !== undefined) {
-                                        stateString = "<td>" + presentTokenCount(state.free) + "</td>";
-                                        if (state.freeUSD !== undefined) {
-                                            stateString += "<td>" + currencyFormat(state.freeUSD, state.priceUSD, state.priceUSDCurrent) + "</td>";
-                                            if (typeof extrinsicInfo == "object") {
-                                                stateString += "<td>" + presentExtrinsicInfo(extrinsicInfo) + "</td>";
-                                            }
-                                        } else {
-                                            stateString += "<td></td>";
-                                        }
-                                    } else {
-                                        stateString = "<td>-</td>";
-                                    }
-                                    out.push("<tr><td>" + dateString + "</td>" + stateString + "</tr>");
-                                }
-                            }
-                            return "<table>" + out.join("") + "</table>";
-                        } else {
-                            return "unk";
-                        }
-                    }
-                    return "";
-                }
-            }
-        ]
-    });
-    $(tableName).on('page.dt', function() {
-        setupcurrency();
-    });
-    loadData2(pathParams, tableName, true, "data", "history", "History")
-}
 
 let initcurrent = false;
 
@@ -693,6 +594,7 @@ function showxcmtransfers(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=xcmtransfers&chainfilters=${chainListStr}`
     let tableName = '#tablexcmtransfers'
     tableXCMTransfers = $(tableName).DataTable({
+        lengthMenu: getLengthMenu(),
         columnDefs: [{
                 "className": "dt-right",
                 "targets": [1, 2, 3],
@@ -844,10 +746,13 @@ function showxcmtransfers(address, chainListStr = 'all') {
         ]
     });
 
-    loadData2(pathParams, tableName, true, false, 'xcmtransfers', "XCM Transfers")
     $(tableName).on('page.dt', function() {
         setupcurrency();
     });
+    $(tableName).on('length.dt', function(e, settings, len) {
+        loadData2(pathParams, tableName, true, false, 'xcmtransfers', "XCM Transfers")
+    });
+    loadData2(pathParams, tableName, true, false, 'xcmtransfers', "XCM Transfers")
 }
 
 var initrewards = false;
@@ -858,6 +763,7 @@ function showrewards(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=rewards&chainfilters=${chainListStr}`
     let tableName = '#tablerewards'
     tableRewards = $(tableName).DataTable({
+        lengthMenu: getLengthMenu(),
         columnDefs: [{
                 "className": "dt-right",
                 "targets": [2]
@@ -980,23 +886,25 @@ function showrewards(address, chainListStr = 'all') {
             }
         ]
     });
-    loadData2(pathParams, tableName, true, "data", "rewards", "Rewards")
     $(tableName).on('page.dt', function() {
         setupcurrency();
     });
+    $(tableName).on('length.dt', function(e, settings, len) {
+        loadData2(pathParams, tableName, true, "data", "rewards", "Rewards")
+    });
+    loadData2(pathParams, tableName, true, "data", "rewards", "Rewards")
 }
 
 
 var initcrowdloans = false;
-/*
-{"chainID":2,"blockNumber":8322280,"blockHash":"0x8b6598fd05fe8119abd7d6d0d5bcad14f8d630eb7cc61b11cc7a5dc31d3503c6","ts":1626157344,"eventID":"2-8322280-2-6","extrinsicID":"8322280-2","extrinsicHash":"0x6bf498a69a32b7d53c82a3cabd47e5a1dc5a422af41a0db0d8fdfb8d36fdbb3f","action":"crowdloan(Contributed)","account":"EkmdfH2Fc6XgPgDwMjye3Nsdj27CCSi9np8Kc7zYoCL2S3G","paraID":2004,"amount":2.03578933,"finalized":true,"genTS":1648901809,"source":"d10","chainName":"Kusama","asset":"{\"Token\":\"KSM\"}","amountUSD":392.95009226593,"priceUSD":193.021,"chainIDDest":"1284","chainDestName":"Moonbeam"}
-*/
+
 function showcrowdloans(address, chainListStr = 'all') {
     if (initcrowdloans) return;
     else initcrowdloans = true;
     let pathParams = `account/${address}?group=crowdloans&chainfilters=${chainListStr}`
     let tableName = '#tablecrowdloans'
     tableCrowdloans = $(tableName).DataTable({
+        lengthMenu: getLengthMenu(),
         columnDefs: [{
             "className": "dt-right",
             "targets": [2, 3]
@@ -1104,10 +1012,13 @@ function showcrowdloans(address, chainListStr = 'all') {
             }
         ]
     });
-    loadData2(pathParams, tableName, true, "data", 'crowdloans', 'Crowdloans')
+    $(tableName).on('length.dt', function(e, settings, len) {
+        loadData2(pathParams, tableName, true, "data", 'crowdloans', 'Crowdloans')
+    });
     $(tableName).on('page.dt', function() {
         setupcurrency();
     });
+    loadData2(pathParams, tableName, true, "data", 'crowdloans', 'Crowdloans')
 }
 
 var initnfts = false;
@@ -1201,9 +1112,35 @@ function showrelated(address, chainListStr = 'all') {
     loadData2(pathParams, tableName, true, false, "related", "Multisig/Proxy/Related", )
 }
 
+var inithistory = false;
+
+function showhistory(address, chainListStr = 'all') {
+    let url = `${baseURL}/account/${address}?group=balances`
+    console.log("showhistory", url);
+    Highcharts.getJSON(url, function(data) {
+        Highcharts.stockChart('container', {
+            rangeSelector: {
+                selected: 1
+            },
+            title: {
+                text: 'Account Balances (USD)'
+            },
+            series: [{
+                name: 'Balances',
+                data: data,
+                tooltip: {
+                    valueDecimals: 2
+                }
+            }]
+        });
+    });
+}
 
 function showaccounttab(hash, chainListStr = 'all') {
     switch (hash) {
+        case "#overview":
+            setupapidocs("account", "", address, chainListStr);
+            break;
         case "#extrinsics":
             showextrinsics(address, chainListStr);
             setupapidocs("account", "extrinsics", address, chainListStr);
@@ -1273,13 +1210,13 @@ function setuptabs(tabs, address, requestedChainAddress, chainListStr = 'all', i
         })
     }
     let url = location.href.replace(/\/$/, "");
-    let hash = isEVM ? "#evmtxs" : "#extrinsics";
+    let hash = isEVM ? "#evmtxs" : "#overview";
     if (location.hash) {
         const urlhash = url.split("#");
         if (urlhash.length > 1) hash = "#" + urlhash[1];
     }
     const triggerEl = document.querySelector('#accountTab a[href="' + hash + '"]');
-    console.log("CAUSE shownmdb.tab for", triggerEl, hash);
+    //console.log("CAUSE shownmdb.tab for", triggerEl, hash);
     if (triggerEl) mdb.Tab.getInstance(triggerEl).show();
     if (isEVM == 0) {
         initTabs(address, chainListStr); //preemptively show the first page of every group
@@ -1332,11 +1269,11 @@ function show_unfinalized(address) {
 
 
 function initTabs(address, chainListStr = 'all', isEVM = 0) {
+    showunfinalized(address, chainListStr)
     if (isEVM == 1) {
         showevmtxs(address, chainListStr);
     } else {
-        showextrinsics(address, chainListStr);
-        showunfinalized(address, chainListStr)
+        //showextrinsics(address, chainListStr);
         //showtransfers(address, chainListStr);
         //showxcmtransfers(address, chainListStr);
         //showrewards(address, chainListStr);
@@ -1390,6 +1327,7 @@ function submitSuggestion(address, nickname, submitter, addressType) {
     }
 
 }
+
 
 $('#submitSuggestion').on('click', function(e) {
     let nickname = document.getElementById("nickname").value;
