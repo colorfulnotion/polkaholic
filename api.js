@@ -596,7 +596,8 @@ app.get('/account/:address', async (req, res) => {
                 error: `group=${req.query["group"]} is not supprted`
             });
         }
-        let ts = null;
+        let ts = (req.query["ts"] != undefined) ? req.query["ts"] : null;
+        let pageIndex = (req.query["p"] != undefined) ? req.query["p"] : 0;
         //console.log(`${targetGroup} requested`)
         let [decorate, decorateExtra] = decorateOpt(req, "account")
         let chainList = chainFilterOpt(req)
@@ -610,7 +611,7 @@ app.get('/account/:address', async (req, res) => {
         }
 
         //console.log(`/account/ chainList`, chainList)
-        let account = await query.getAccount(address, targetGroup, chainList, maxRows, ts, lookback, decorate, decorateExtra);
+        let account = await query.getAccount(address, targetGroup, chainList, maxRows, ts, lookback, decorate, decorateExtra, pageIndex);
         if (account) {
             res.write(JSON.stringify(account));
             await query.tallyAPIKey(getapikey(req));
@@ -643,11 +644,12 @@ app.get('/account/:accountGroup/:address', async (req, res) => {
             });
         }
 
-        let ts = (req.query["ts"] != undefined) ? req.query["ts"] : null
+        let ts = (req.query["ts"] != undefined) ? req.query["ts"] : null;
+        let pageIndex = (req.query["p"] != undefined) ? req.query["p"] : 0;
         if (accountGroup == "feed") {
-            account = await query.getAccountFeed(address, chainList, maxRows, decorate, decorateExtra);
+            account = await query.getAccountFeed(address, chainList, maxRows, decorate, decorateExtra, pageIndex);
         } else {
-            account = await query.getAccount(address, accountGroup, chainList, maxRows, ts, lookback, decorate, decorateExtra);
+            account = await query.getAccount(address, accountGroup, chainList, maxRows, ts, lookback, decorate, decorateExtra, pageIndex);
         }
         if (account) {
             res.write(JSON.stringify(account));

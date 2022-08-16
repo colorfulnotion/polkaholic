@@ -2102,9 +2102,21 @@ module.exports = class Query extends AssetManager {
         return (unfinalized);
     }
 
+    page_params(ts, limit, p, chainList, decorate, decorateExtra) {
+        let out = `ts=${ts}&limit=${limit}`
+        if (p > 0) out += `&p=${p}`
+        if (chainList.length > 0) {
+            out += `&chainfilters=` + chainList.join(",");
+        }
+        if (decorate) {
+            out += `&decorateExtra=` + decorateExtra.join(",");
+        }
+        return out;
+    }
+
+
     async get_account_extrinsics_unfinalized(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let nextPage = null;
         let feedItems = 0;
         let isEVMAddr = paraTool.isValidEVMAddress(address)
         var decoratedFeeds = []
@@ -2162,21 +2174,25 @@ module.exports = class Query extends AssetManager {
     }
 
     //cbt read addressextrinsic prefix=0x109d58c19ac53a8cf9fe9793e0ae027d5dada0b79e6f6ee81a8fbe4cb0955649
-    async get_account_extrinsics(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async get_account_extrinsics(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"], TSStart = null, pageIndex = 0) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let feed = [];
-        let nextPage = null;
         let feedItems = 0;
         let isEVMAddr = paraTool.isValidEVMAddress(address)
         var decoratedFeeds = []
         let decorateEvents = decorateExtra.includes("events");
-
+        let p = 0;
+        let pTS = null;
         if (rows && rows.length > 0) {
             for (const row of rows) {
                 let rowData = row.data
                 if (rowData["feed"]) {
                     let [addressPiece, ts, extrinsicHashPiece] = paraTool.parse_addressExtrinsic_rowKey(row.id)
                     let extrinsics = rowData["feed"];
+                    if (pTS != ts) {
+                        p = 0;
+                        pTS = ts;
+                    }
                     for (const extrinsicHashEventID of Object.keys(extrinsics)) {
                         for (const cell of extrinsics[extrinsicHashEventID]) {
                             var t = JSON.parse(cell.value);
@@ -2246,7 +2262,21 @@ module.exports = class Query extends AssetManager {
                                         }
                                     }
                                 }
-                                decoratedFeeds.push(c)
+                                if (TSStart && (t['ts'] == TSStart) && (p < pageIndex)) {
+                                    console.log("SKIPPING (p<pageIndex)", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    // skip this until hitting pageIndex
+                                    p++;
+                                } else if (feedItems < maxRows) {
+                                    p++;
+                                    decoratedFeeds.push(c)
+                                    feedItems++;
+                                } else if (feedItems == maxRows) {
+                                    return {
+                                        data: decoratedFeeds,
+                                        nextPage: `/account/extrinsics/${address}?` + this.page_params(ts, maxRows, p, chainList, decorate, decorateExtra)
+                                    }
+                                    break;
+                                }
                             } else {
                                 if (t['extrinsicHash'] == undefined) {
                                     t['extrinsicHash'] = extrinsicHashPiece;
@@ -2265,17 +2295,23 @@ module.exports = class Query extends AssetManager {
                                         delete t['events'];
                                     }
                                 }
-                                if (feedItems < maxRows) {
+                                if (TSStart && (t['ts'] == TSStart) && (p < pageIndex)) {
+                                    console.log("SKIPPING (p<pageIndex)", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    // skip this until hitting pageIndex
+                                    p++;
+                                } else if (feedItems < maxRows) {
+                                    console.log("INCLUDING", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    p++;
                                     let d = await this.decorateExtrinsic(t, t.chainID, "", decorate, decorateExtra)
                                     decoratedFeeds.push(d)
                                     feedItems++;
                                 } else if (feedItems == maxRows) {
-                                    if (address) {
-                                        nextPage = `/account/extrinsics/${address}?ts=${ts}&limit=${maxRows}`
-                                        // TODO: add other params -- chainfilters, extra -- so that the nextPage response is the same except for the ts param
+                                    return {
+                                        data: decoratedFeeds,
+                                        nextPage: `/account/extrinsics/${address}?` + this.page_params(ts, maxRows, p, chainList, decorate, decorateExtra)
                                     }
+                                    break;
                                 }
-                                break;
                             }
                         }
                     }
@@ -2284,22 +2320,27 @@ module.exports = class Query extends AssetManager {
         }
         return {
             data: decoratedFeeds,
-            nextPage: nextPage
+            nextPage: null
         };
     }
 
-    async get_account_transfers(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async get_account_transfers(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"], TSStart = null, pageIndex = 0) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let nextPage = null;
         let feedTransfer = [];
         let feedTransferItems = 0;
+        let p = 0;
+        let pTS = null;
+        let prevKey = false;
         if (rows && rows.length > 0) {
             for (const row of rows) {
                 let rowData = row.data
-                let prevKey = false;
                 if (rowData["feedtransfer"]) {
                     let [accKey, ts, extrinsicHash] = paraTool.parse_addressExtrinsic_rowKey(row.id)
                     let extrinsicsTransfer = rowData["feedtransfer"]; // TODO: feedtransferunfinalized
+                    if (pTS != ts) {
+                        p = 0;
+                        pTS = ts;
+                    }
                     //transfer:extrinsicHash [rows]
                     //tranfers:extrinsicHash#eventID
                     //tranfers:0x0804ea6287afaf070b7717505770da790785b0b36d34529d51b5c9670ea49cb5#5-324497-0-0 @ 2022/02/01-16:47:48.000000
@@ -2328,20 +2369,28 @@ module.exports = class Query extends AssetManager {
                                 let [__, id] = this.convertChainID(t.chainID);
                                 t['id'] = id
                                 if (t.ts) t['ts'] = parseInt(t.ts, 10);
-                                if (feedTransferItems < maxRows) {
-                                    let tt = await this.decorateQueryFeedTransfer(t, t.chainID, decorate, decorateExtra)
-                                    let currKey = `${tt.extrinsicHash}|${tt.fromAddress}|${tt.toAddress}|${tt.rawAmount}` // it's probably "safe" to check without asset type here.
-                                    if (currKey != prevKey) {
-                                        feedTransfer.push(tt);
-                                        feedTransferItems++;
-                                        prevKey = currKey
-                                    } else {
-                                        //console.log(`skip duplicate [${tt.eventID}] (${tt.transferType}, ${currKey})`)
+
+                                let tt = await this.decorateQueryFeedTransfer(t, t.chainID, decorate, decorateExtra)
+                                let currKey = `${tt.extrinsicHash}|${tt.fromAddress}|${tt.toAddress}|${tt.rawAmount}` // it's probably "safe" to check without asset type here.
+                                if (currKey == prevKey) {
+                                    console.log(`skip duplicate [${tt.eventID}] (${tt.transferType}, ${currKey})`)
+                                } else if (TSStart && (t['ts'] == TSStart) && (p < pageIndex)) {
+                                    console.log("SKIPPING (p<pageIndex)", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    // skip this until hitting pageIndex
+                                    p++;
+                                } else if (feedTransferItems < maxRows) {
+                                    console.log("INCLUDING", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    p++;
+                                    feedTransfer.push(tt);
+                                    feedTransferItems++;
+                                } else if (feedTransferItems == maxRows) {
+                                    return {
+                                        data: feedTransfer,
+                                        nextPage: `/account/transfers/${address}?` + this.page_params(ts, maxRows, p, chainList, decorate, decorateExtra)
                                     }
-                                } else if (feedTransferItems == maxRows && (nextPage == null)) {
-                                    nextPage = `/account/transfers/${address}?ts=${ts}&limit=${maxRows}`
-                                    // TODO: add other params -- chainfilters, extra -- so that the nextPage response is the same except for the ts param
                                 }
+                                console.log("prevkey SET", currKey);
+                                prevKey = currKey
                             } catch (err) {
                                 // bad data
                                 console.log(err);
@@ -2354,7 +2403,7 @@ module.exports = class Query extends AssetManager {
         }
         return {
             data: feedTransfer,
-            nextPage: nextPage
+            nextPage: null
         }
     }
 
@@ -2724,7 +2773,6 @@ module.exports = class Query extends AssetManager {
         let minTS = 0;
         let logDT = false;
         let logDTStr = "";
-        let nextPage = null;
         let dailyhistory = {};
         if (rows && rows.length > 0) {
             for (const row of rows) {
@@ -2768,10 +2816,12 @@ module.exports = class Query extends AssetManager {
                                     }
                                     nHistoryItems++;
                                     minTS = ts
-                                } else if (nextPage == null) {
-                                    nextPage = `/account/history/${address}?ts=${ts}&limit=${maxRows}`
-                                    // TODO: add other params -- chainfilters, extra -- so that the nextPage response is the same except for the ts param
-
+                                } else if (nHistoryItems == maxRows) {
+                                    return {
+                                        data: history,
+                                        nextPage: `/account/history/${address}?` + this.page_params(ts, maxRows, p, chainList, decorate, decorateExtra),
+                                        minTS
+                                    }
                                 }
                                 break;
                             }
@@ -2782,16 +2832,17 @@ module.exports = class Query extends AssetManager {
         }
         return {
             data: history,
-            nextPage,
+            nextPage: null,
             minTS
         }
     }
 
-    async get_account_crowdloans(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async get_account_crowdloans(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"], TSStart = null, pageIndex = 0) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let crowdloans = [];
-        let nextPage = null;
         let numItems = 0;
+        let p = 0;
+        let pTS = null;
         if (rows && rows.length > 0) {
             //console.log(`address=${address}, row.length=${rows.length}`)
             for (const row of rows) {
@@ -2799,6 +2850,10 @@ module.exports = class Query extends AssetManager {
                 if (rowData["feedcrowdloan"]) {
                     let crowdloansData = rowData["feedcrowdloan"];
                     let [accKey, ts, extrinsicHash] = paraTool.parse_addressExtrinsic_rowKey(row.id)
+                    if (pTS != ts) {
+                        p = 0;
+                        pTS = ts;
+                    }
                     for (const extrinsicHashEventID of Object.keys(crowdloansData)) {
                         //feedcrowdloan:extrinsicHash#eventID
                         //feedcrowdloan:0x4d709ef89a0d8b1f9c65b74ca87726cc236a4f1255738f3015944e5a20d712c8#0-7652261-7-47
@@ -2831,12 +2886,19 @@ module.exports = class Query extends AssetManager {
                                         t['dappURL'] = this.chainInfos[t['chainIDDest']].dappURL;
                                         t['parachainsURL'] = this.chainInfos[t['chainIDDest']].parachainsURL;
                                     }
-                                    if (numItems < maxRows) {
+                                    if (TSStart && (t['ts'] == TSStart) && (p < pageIndex)) {
+                                        console.log("SKIPPING (p<pageIndex)", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                        // skip this until hitting pageIndex
+                                        p++;
+                                    } else if (numItems < maxRows) {
+                                        p++;
                                         crowdloans.push(t);
                                         numItems++;
-                                    } else if (nextPage == null) {
-                                        nextPage = `/account/crowdloans/${address}?ts=${ts}&limit=${maxRows}`
-                                        // TODO: add other params -- chainfilters, extra -- so that the nextPage response is the same except for the ts param
+                                    } else if (numItems == maxRows) {
+                                        return {
+                                            data: crowdloans,
+                                            nextPage: `/account/crowdloans/${address}?` + this.page_params(ts, maxRows, p, chainList, decorate, decorateExtra),
+                                        }
                                     }
                                 }
                                 break;
@@ -2852,20 +2914,26 @@ module.exports = class Query extends AssetManager {
         }
         return {
             data: crowdloans,
-            nextPage: nextPage
+            nextPage: null
         }
     }
 
-    async get_account_rewards(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async get_account_rewards(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"], TSStart = null, pageIndex = 0) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let rewards = [];
-        let nextPage = null;
         let numItems = 0;
+        let p = 0;
+        let pTS = null;
+
         if (rows && rows.length > 0) {
             for (const row of rows) {
                 let rowData = row.data
                 if (rowData["feedreward"]) {
                     let [accKey, ts, extrinsicHash] = paraTool.parse_addressExtrinsic_rowKey(row.id)
+                    if (pTS != ts) {
+                        p = 0;
+                        pTS = ts;
+                    }
                     let rewardsData = rowData["feedreward"];
                     for (const extrinsicHashEventID of Object.keys(rewardsData)) {
                         //feedreward:extrinsicHash#eventID
@@ -2890,12 +2958,20 @@ module.exports = class Query extends AssetManager {
                                     t['priceUSD'] = priceUSD;
                                     t['priceUSDCurrent'] = priceUSDCurrent;
                                 }
-                                if (numItems < maxRows) {
+                                if (TSStart && (t['ts'] == TSStart) && (p < pageIndex)) {
+                                    console.log("SKIPPING (p<pageIndex)", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    // skip this until hitting pageIndex
+                                    p++;
+                                } else if (numItems < maxRows) {
+                                    console.log("INCLUDING", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    p++;
                                     rewards.push(t);
                                     numItems++;
-                                } else if (nextPage == null) {
-                                    nextPage = `/account/rewards/${address}?ts=${ts}&limit=${maxRows}`
-                                    // TODO: add other params -- chainfilters, extra -- so that the nextPage response is the same except for the ts param
+                                } else if (numItems == maxRows) {
+                                    return {
+                                        data: rewards,
+                                        nextPage: `/account/rewards/${address}?` + this.page_params(ts, maxRows, p, chainList, decorate, decorateExtra),
+                                    }
                                 }
                                 break;
                             } catch (err) {
@@ -2908,7 +2984,7 @@ module.exports = class Query extends AssetManager {
         }
         return {
             data: rewards,
-            nextPage: nextPage
+            nextPage: null
         }
     }
 
@@ -2925,7 +3001,7 @@ module.exports = class Query extends AssetManager {
         return (o);
     }
 
-    async getAccountFeed(fromAddress, chainList = [], maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async getAccountFeed(fromAddress, chainList = [], maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"], pageIndex = 0) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
 
@@ -3129,7 +3205,7 @@ module.exports = class Query extends AssetManager {
         return addressTopN;
     }
 
-    async getAccount(rawAddress, accountGroup = "realtime", chainList = [], maxRows = 1000, TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    async getAccount(rawAddress, accountGroup = "realtime", chainList = [], maxRows = 1000, TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"], pageIndex = 0) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let address = paraTool.getPubKey(rawAddress)
         if (!this.validAddress(address)) {
@@ -3257,7 +3333,8 @@ module.exports = class Query extends AssetManager {
                     endRow = address + "#" + paraTool.inverted_ts_key(this.currentTS() - 3600 * 2);
                 }
                 try {
-                    [rows] = await this.btAddressExtrinsic.getRows({
+                    console.log("READING addressextrinsic", "startRow=", startRow, "endRow=", endRow, "TSStart=", TSStart)
+                    let x = await this.btAddressExtrinsic.getRows({
                         start: startRow,
                         end: endRow,
                         limit: maxRows + 1,
@@ -3266,10 +3343,14 @@ module.exports = class Query extends AssetManager {
                             cellLimit: 1
                         }]
                     });
+                    if (x.length > 0) {
+                        [rows] = x;
+                    }
                 } catch (err) {
                     if (err.code == 404) {
                         throw Error(`Account not found ${address}`);
                     }
+                    console.log(err);
                     this.logger.error({
                         "op": "query.getAccount",
                         address,
@@ -3326,6 +3407,7 @@ module.exports = class Query extends AssetManager {
                     });
                 }
             }
+
             switch (accountGroup) {
                 case "realtime":
                     if (row) {
@@ -3345,17 +3427,17 @@ module.exports = class Query extends AssetManager {
                     return await this.get_account_extrinsics_unfinalized(address, rows, maxRows, chainList, decorate, decorateExtra);
                 case "extrinsics":
                     //feed:extrinsicHash#chainID-extrinsicID
-                    return await this.get_account_extrinsics(address, rows, maxRows, chainList, decorate, decorateExtra);
+                    return await this.get_account_extrinsics(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
                 case "transfers":
                     // need to also bring in "feedtransferunfinalized" from the same table
                     //feedtransfer:extrinsicHash#eventID
-                    return await this.get_account_transfers(address, rows, maxRows, chainList, decorate, decorateExtra);
+                    return await this.get_account_transfers(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
                 case "crowdloans":
                     //feedcrowdloan:extrinsicHash#eventID
-                    return await this.get_account_crowdloans(address, rows, maxRows, chainList, decorate, decorateExtra);
+                    return await this.get_account_crowdloans(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
                 case "rewards":
                     //feedreward:extrinsicHash#eventID
-                    return await this.get_account_rewards(address, rows, maxRows, chainList, decorate, decorateExtra);
+                    return await this.get_account_rewards(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
                 case "history":
                     let relatedExtrinsicsMap = {}
                     let hist = await this.get_account_history(address, rows, maxRows, chainList, false)
@@ -3424,7 +3506,8 @@ module.exports = class Query extends AssetManager {
                         out.push(h);
                     }
                     return {
-                        data: out, nextPage: hist.nextPage
+                        data: out,
+                            nextPage: hist.nextPage
                     };
                 case "balances":
                     let historyObj = await this.get_account_history(address, rows, maxRows, chainList, true);
@@ -3472,6 +3555,7 @@ module.exports = class Query extends AssetManager {
             if (err instanceof paraTool.InvalidError || err instanceof paraTool.NotFoundError) {
                 throw err
             }
+            console.log(err);
             this.logger.error({
                 "op": "query.getAccount",
                 address,
