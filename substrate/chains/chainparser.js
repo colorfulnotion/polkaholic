@@ -3130,7 +3130,7 @@ module.exports = class ChainParser {
                     default:
                         break;
                 }
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`decorateAutoTraceXCM Processed`, `${pallet_section}`, o)
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`decorateAutoTraceXCM Processed`, `${pallet_section}`, o)
                 return
             }
         }
