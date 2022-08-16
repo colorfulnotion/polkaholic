@@ -1255,6 +1255,8 @@ module.exports = class ChainParser {
         let signalStatus = {
             sectionMethod: sectionMethod,
             eventID: e.eventID,
+            sentAt: this.parserWatermark,
+            bn: this.parserBlockNumber,
             msgHash: msgHash,
             success: false,
         }
