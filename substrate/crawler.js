@@ -1863,6 +1863,9 @@ create table talismanEndpoint (
             setInterval(this.crawlPendingExtrinsics, 1000, chain, this);
         }
 
+        //refresh asset contractABI every 720s
+        this.autoRefresh(720)
+
         if (chain.blocksFinalized) this.finalizedHashes[chain.blocksFinalized] = "known";
         const unsubscribeFinalizedHeads = await this.api.rpc.chain.subscribeFinalizedHeads(async (header) => {
             let bn = parseInt(header.number.toString(), 10);
