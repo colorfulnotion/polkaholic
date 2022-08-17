@@ -212,25 +212,13 @@ Rewards granted upon reasonable verification.  Important: PII info (Person) will
 <div id="unfinalized">
 </div>
 
-<div class="card mb-3">
-  <div class="row g-0">
-    <div class="col-md-12  text-center">
-<% for ( let i = 0; i < account.chains.length; i++ ) { %>
-<%- include('accountchainassets', {chainassets: account.chains[i], expanded: ( i == 0 ) }); %>
-<% } %>
-    </div>
-  </div>
-</div>
-
-
-<div id="container" class="chart"></div>
-
 <%- include('chainIDfilter', {accountchains: account.chains }); %>
 
 <!-- Nav tabs -->
 <ul class="nav nav-tabs" style="font-size:1rem" id="accountTab" role="tablist">
 <%
 let tabs = [
+{ title: "Overview", target: "overview" },
 { title: "Extrinsics", target: "extrinsics" },
 { title: "Transfers", target: "transfers" },
 { title: "XCM Transfers", target: "xcmtransfers" },
@@ -239,7 +227,7 @@ let tabs = [
 { title: "Feeds", target: "feed" },
 { title: "Multisig/Proxy/Related", target: "related" },
 { title: "SS58 Address", target: "ss58h160" },
-//{ title: "Offers", target: "offers" },
+{ title: "Chart", target: "history" }
 ];
 
 for (let i=0; i<tabs.length; i++) {
@@ -259,6 +247,22 @@ for (let i=0; i<tabs.length; i++) {
 
 <!-- Tab panes -->
 <div class="tab-content">
+  <div class="tab-pane" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+
+<div class="card mb-3">
+  <div class="row g-0">
+    <div class="col-md-12  text-center">
+<% for ( let i = 0; i < account.chains.length; i++ ) { %>
+<%- include('accountchainassets', {chainassets: account.chains[i], expanded: ( i == 0 ) }); %>
+<% } %>
+    </div>
+  </div>
+</div>
+
+  </div>
+  <div class="tab-pane" id="history" role="tabpanel" aria-labelledby="history-tab">
+    <div id="container" class="chart"></div>
+  </div>
   <div class="tab-pane" id="extrinsics" role="tabpanel" aria-labelledby="extrinsics-tab">
     <table id="tableextrinsics" class="display" style='width: 100%'>
       <thead>
@@ -399,17 +403,9 @@ for (let i=0; i<tabs.length; i++) {
       </thead>
     </table>
   </div>
-  <div class="tab-pane" id="offers" role="tabpanel" aria-labelledby="offers-tab">
-    <table id="tableoffers" class="display" style='width: 100%'>
-      <thead>
-        <tr>
-          <th>Offer</th>
-        </tr>
-      </thead>
-    </table>
-  </div>
 </div>
 <script>
+var baseURL = '<%= config.baseURL; %>'
 let address = '<%= account.address; %>';
 let requestedChainAddress = '<%= account.requestedChainAddress; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
@@ -422,6 +418,9 @@ $('#btnClaim').on('click', function(e) {
 });
 <% } %>
 </script>
-<%- include('accountbalanceschart', {address: account.address}); %>
+<script src="https://code.highcharts.com/stock/highstock.js"></script>
+<script src="https://code.highcharts.com/stock/modules/data.js"></script>
+<script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
+<script src="https://code.highcharts.com/stock/modules/export-data.js"></script>
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script src="/account.js"></script>
