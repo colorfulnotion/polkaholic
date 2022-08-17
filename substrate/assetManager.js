@@ -60,6 +60,18 @@ module.exports = class AssetManager extends PolkaholicDB {
         return s.replace('CDP_Supply', 'CDP');
     }
 
+    async autoRefresh(intervalSeconds = 900) {
+        while (1) {
+            await this.sleep(intervalSeconds * 1000);
+            console.log("autoRefresh assets...")
+            await this.assetManagerInit();
+            if (this.web3Api) {
+                console.log("autoRefresh contractABI...")
+                this.contractABIs = await this.getContractABI();
+            }
+        }
+    }
+
     async chainParserInit(chainID, debugLevel = 0) {
         if (this.chainParser && (this.chainParserChainID == chainID)) return;
         if (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala) {
@@ -140,6 +152,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         this.chainNames = chainNameMap
         this.specVersions = specVersionsMap
     }
+
 
     async assetManagerInit() {
         await this.init_chainInfos()
