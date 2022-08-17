@@ -5374,16 +5374,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         for (const e of events) {
             let eventID = e.eventID
             let [pallet, method] = this.parseEventSectionMethod(e)
-            let data = e.data
-            let resFeedTransferIn = await this.decorateFeedTransfer(pallet, method, data, feed, eventID, blockTS)
-            if (resFeedTransferIn) {
-                feedTransfers.push(resFeedTransferIn)
-                //let recFeedOut = resFeedTransferIn
-                // make a feedout record (setting)
-                // recFeedOut.isIncoming = 0
-                //feedTransfers.push(recFeedOut)
-
-            }
+            //STUB for now
         }
         return feedTransfers
     }
