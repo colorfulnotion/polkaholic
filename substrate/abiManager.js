@@ -182,6 +182,7 @@ module.exports = class ABIManager extends PolkaholicDB {
             //fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength
             let row = `('${data.fingerprintID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${numContracts}', '${data.topicLength}')`
             abiRows.push(row);
+            console.log(`[${data.name}] ${row}`)
         }
         console.log(abiRows.length + " records");
         await this.dump_contract_abis(abiRows)
