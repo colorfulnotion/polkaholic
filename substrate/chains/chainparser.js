@@ -1300,6 +1300,17 @@ module.exports = class ChainParser {
                 } else if (sectionMethod == 'xcmpQueue(Success)') {
                     signalStatus.success = true
                     signalStatus.weight = paraTool.dechexToInt(state)
+                } else if (sectionMethod == 'xcmpQueue(Fail)') {
+                    signalStatus.success = false
+                    state = e.data
+                    signalStatus.errorDesc = 'fail'
+                    if (Array.isArray(state) && state.length == 3){
+                        let failedReson = Object.keys(state[1])[0]
+                        signalStatus.description = failedReson
+                        signalStatus.weight = paraTool.dechexToInt(state[2])
+                    }else{
+                        signalStatus.description = statusV
+                    }
                 } else {
                     signalStatus.errorDesc = statusK
                     if (Array.isArray(statusV) && statusV.length == 2){
