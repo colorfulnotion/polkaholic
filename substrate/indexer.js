@@ -3355,7 +3355,7 @@ module.exports = class Indexer extends AssetManager {
                 era = rawFeedReward.era
             }
             // skip the "zero" payout here
-            if (rawFeedReward?.value > 0) {
+            if (rawFeedReward != undefined && rawFeedReward.value != undefined && rawFeedReward.value > 0) {
                 let feedReward = await this.decorateFeedReward(feed, rawFeedReward, blockTS, era)
                 feedRewards.push(feedReward)
                 // console.log(feedReward)
