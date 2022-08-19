@@ -22,65 +22,59 @@ function showextrinsics(filter) {
                 "targets": [3, 4]
             }],
             columns: [{
-                    data: 'section',
-                    render: function(data, type, row, meta) {
-                        try {
-                            if (type == 'display') {
-                                return presentExtrinsic(row.chainID, row.section, row.method)
-                            } else {
-                                return row.section + ":" + row.method;
-                            }
-                        } catch (e) {
-                            return "";
-                        }
-                    }
-                },
-                {
-                    data: 'extrinsicID',
-                    render: function(data, type, row, meta) {
+                data: 'section',
+                render: function(data, type, row, meta) {
+                    try {
                         if (type == 'display') {
-                            return presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                            return presentExtrinsic(row.chainID, row.section, row.method)
+                        } else {
+                            return row.section + ":" + row.method;
                         }
-                        return data;
-                    }
-                },
-                {
-                    data: 'extrinsicHash',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentTxHash(row.extrinsicHash);
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'fromAddress',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentIDRow(row, 'fromAddress');
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'result',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentSuccessFailure(data > 0);
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'blockTS',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentTS(data);
-                        }
-                        return data;
+                    } catch (e) {
+                        return "";
                     }
                 }
-            ]
+            }, {
+                data: 'extrinsicID',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'extrinsicHash',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentTxHash(row.extrinsicHash);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'fromAddress',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentIDRow(row, 'fromAddress');
+                    }
+                    return data;
+                }
+            }, {
+                data: 'result',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentSuccessFailure(data > 0);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'blockTS',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentTS(data);
+                    }
+                    return data;
+                }
+            }]
         });
     }
     let pathParams = `search/extrinsics`
@@ -109,79 +103,70 @@ function showtransfers(filter) {
                 [6, "desc"]
             ],
             columnDefs: [{
-                    "className": "dt-center",
-                    "targets": [1, 2, 3]
-                },
-                {
-                    "className": "dt-right",
-                    "targets": [4, 5]
-                },
-            ],
+                "className": "dt-center",
+                "targets": [1, 2, 3]
+            }, {
+                "className": "dt-right",
+                "targets": [4, 5]
+            }, ],
             columns: [{
-                    data: 'extrinsicID',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            let s = presentChain(row.chainID, row.chainName)
-                            return s + " " + presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
-                        }
-                        return data;
+                data: 'extrinsicID',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        let s = presentChain(row.chainID, row.chainName)
+                        return s + " " + presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
                     }
-                },
-                {
-                    data: 'section',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentExtrinsic(row.chainID, row.section, row.method)
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'fromAddress',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentIDRow(row, 'fromAddress');
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'toAddress',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentIDRow(row, 'toAddress');
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'amount',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentNumber(data) + " " + row.symbol;
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'amountUSD',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return currencyFormat(data);
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'blockTS',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentTS(data);
-                        }
-                        return data;
-                    }
+                    return data;
                 }
-            ]
+            }, {
+                data: 'section',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentExtrinsic(row.chainID, row.section, row.method)
+                    }
+                    return data;
+                }
+            }, {
+                data: 'fromAddress',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentIDRow(row, 'fromAddress');
+                    }
+                    return data;
+                }
+            }, {
+                data: 'toAddress',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentIDRow(row, 'toAddress');
+                    }
+                    return data;
+                }
+            }, {
+                data: 'amount',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentNumber(data) + " " + row.symbol;
+                    }
+                    return data;
+                }
+            }, {
+                data: 'amountUSD',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return currencyFormat(data);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'blockTS',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentTS(data);
+                    }
+                    return data;
+                }
+            }]
         });
     }
     let pathParams = `search/transfers`
@@ -213,67 +198,61 @@ function showevmtxs(filter) {
                 "targets": [4, 5]
             }],
             columns: [{
-                    data: 'method',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentExtrinsic(row.chainID, row.method, row.methodID, true)
-                        } else {
-                            return row.method + " " + row.methodID
-                        }
-                        return data;
+                data: 'method',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentExtrinsic(row.chainID, row.method, row.methodID, true)
+                    } else {
+                        return row.method + " " + row.methodID
                     }
-                },
-                {
-                    data: 'transactionHash',
-                    render: function(data, type, row, meta) {
-                        let transactionHash = "";
-                        if (type == 'display') {
-                            return presentTxHash(data);
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'fromAddress',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentIDRow(row, 'fromAddress');
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'toAddress',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            if (row.creates) {
-                                return "CONTRACT CREATES: " + presentID(row.creates);
-                            } else {
-                                return presentIDRow(row, 'toAddress');
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'result',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentSuccessFailure(data > 0);
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'blockTS',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentTS(data);
-                        }
-                        return data;
-                    }
+                    return data;
                 }
-            ]
+            }, {
+                data: 'transactionHash',
+                render: function(data, type, row, meta) {
+                    let transactionHash = "";
+                    if (type == 'display') {
+                        return presentTxHash(data);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'fromAddress',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentIDRow(row, 'fromAddress');
+                    }
+                    return data;
+                }
+            }, {
+                data: 'toAddress',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        if (row.creates) {
+                            return "CONTRACT CREATES: " + presentID(row.creates);
+                        } else {
+                            return presentIDRow(row, 'toAddress');
+                        }
+                    }
+                    return data;
+                }
+            }, {
+                data: 'result',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentSuccessFailure(data > 0);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'blockTS',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentTS(data);
+                    }
+                    return data;
+                }
+            }]
         });
     }
     let pathParams = `search/evmtxs`
@@ -283,55 +262,6 @@ function showevmtxs(filter) {
 
 var initevents = false;
 
-function rendereventdata(data, id = "datascope") {
-    var script = document.createElement("script");
-    document.getElementById(id).innerHTML = "";
-    script.innerHTML = `document.getElementById("${id}").appendChild(renderjson.set_show_to_level(5)(` + JSON.stringify(data) + `))`;
-    document.body.appendChild(script);
-}
-
-function fetcheventdata(eventID) {
-    let endpoint = `${baseURL}/event/${eventID}`
-    console.log(`requesting endpoint:${endpoint}`)
-    var req = new Request(endpoint, {
-        method: 'GET',
-        headers: new Headers({
-            "Content-Type": "application/json"
-        })
-    });
-    fetch(req)
-        .then((response) => response.json())
-        .then((data) => {
-            try {
-                rendereventdata(data, "data" + eventID);
-            } catch (err) {
-                console.log(err);
-            }
-        });
-}
-
-function parseEventID(eventID) {
-    let ida = eventID.split("-");
-    if (ida.length == 4) {
-        let extrinsicID = `${ida[1]}-${ida[2]}`
-        let eventIndex = ida[3];
-        return [extrinsicID, eventIndex];
-    }
-    return [null, null];
-}
-
-function presentEventDetails(eventID) {
-    let [extrinsicID, eventIndex] = parseEventID(eventID);
-    if (extrinsicID && eventIndex) {
-        title = `View ${extrinsicID} Event# ${eventIndex}`;
-    } else {
-        title = `View ${eventID}`
-    }
-    return `<div style='width:650px'>
-<a class="btn btn-outline-secondary btn-block text-capitalize" data-mdb-toggle="collapse" href="#data${eventID}" role="button" aria-control="data${eventID}" aria-expanded="false" style="text-align:left">${title}</a>
-<div class="collapse mt-3 renderjson" id="data${eventID}"></div>
-</div><script>document.getElementById('data${eventID}').addEventListener('show.bs.collapse', () => { fetcheventdata("${eventID}") } )</script>`;
-}
 
 function showevents(filter) {
     let tableName = '#tableevents'
@@ -356,71 +286,65 @@ function showevents(filter) {
                 "targets": [2, 3, 4]
             }],
             columns: [{
-                    data: 'section',
-                    render: function(data, type, row, meta) {
-                        try {
-                            if (type == 'display') {
-                                return presentExtrinsic(row.chainID, row.section, row.method)
-                            } else {
-                                return row.section + ":" + row.method
-                            }
-                            return data;
-                        } catch (e) {
-                            return "";
-                        }
-                    }
-                },
-                {
-                    data: 'eventID',
-                    render: function(data, type, row, meta) {
+                data: 'section',
+                render: function(data, type, row, meta) {
+                    try {
                         if (type == 'display') {
-                            return presentEventDetails(row.eventID)
+                            return presentExtrinsic(row.chainID, row.section, row.method)
+                        } else {
+                            return row.section + ":" + row.method
                         }
                         return data;
-                    }
-                },
-                {
-                    data: 'extrinsicID',
-                    render: function(data, type, row, meta) {
-                        try {
-                            let [extrinsicID, _] = parseEventID(row.eventID);
-                            if (type == 'display') {
-                                return presentExtrinsicIDHash(extrinsicID, row.extrinsicHash);
-                            }
-                            return extrinsicID;
-                        } catch (e) {
-                            return "";
-                        }
-                    }
-                },
-                {
-                    data: 'extrinsicHash',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentTxHash(row.extrinsicHash);
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'blockNumber',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentBlockNumber(row.chainID, false, data);
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'blockTS',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentTS(data);
-                        }
-                        return data;
+                    } catch (e) {
+                        return "";
                     }
                 }
-            ]
+            }, {
+                data: 'eventID',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentEventDetails(row.eventID)
+                    }
+                    return data;
+                }
+            }, {
+                data: 'extrinsicID',
+                render: function(data, type, row, meta) {
+                    try {
+                        let [extrinsicID, _] = parseEventID(row.eventID);
+                        if (type == 'display') {
+                            return presentExtrinsicIDHash(extrinsicID, row.extrinsicHash);
+                        }
+                        return extrinsicID;
+                    } catch (e) {
+                        return "";
+                    }
+                }
+            }, {
+                data: 'extrinsicHash',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentTxHash(row.extrinsicHash);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'blockNumber',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentBlockNumber(row.chainID, false, data);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'blockTS',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentTS(data);
+                    }
+                    return data;
+                }
+            }]
         });
     }
     let pathParams = `search/events`

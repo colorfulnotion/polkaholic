@@ -60,88 +60,80 @@ async function show_chains() {
                 [10, 25, 50, "All"]
             ],
             columnDefs: [{
-                    "className": "dt-right",
-                    "targets": [1, 2, 3, 4]
-                },
-                {
-                    "targets": [5],
-                    "visible": false
-                }
-            ],
+                "className": "dt-right",
+                "targets": [1, 2, 3, 4]
+            }, {
+                "targets": [5],
+                "visible": false
+            }],
             order: [
                 [3, "desc"]
             ],
             columns: [{
-                    data: 'id',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            let subexplorerURL = `https://${row.id}.polkaholic.io`;
-                            let links = [`<a href='${subexplorerURL}'>explorer</a>`];
-                            if (row.dappURL) {
-                                links.push(`<a href='${row.dappURL}' target='_new'>app</a>`);
-                            }
-                            return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus) + `<div class="explorer">` + links.join(" | ") + `</div>`
+                data: 'id',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        let subexplorerURL = `https://${row.id}.polkaholic.io`;
+                        let links = [`<a href='${subexplorerURL}'>explorer</a>`];
+                        if (row.dappURL) {
+                            links.push(`<a href='${row.dappURL}' target='_new'>app</a>`);
                         }
-                        return row.chainName;
+                        return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus) + `<div class="explorer">` + links.join(" | ") + `</div>`
                     }
-                },
-                {
-                    data: 'blocksCovered',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            try {
-                                let s = "<BR>" + presentTS(row.lastCrawlTS);
-                                return presentBlockNumber(row.id, "", row.blocksCovered) + s;
-                            } catch {
-                                return "-"
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'blocksFinalized',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            try {
-                                let s = "<BR>" + presentTS(row.lastFinalizedTS);
-                                return presentBlockNumber(row.id, "", row.blocksFinalized) + s;
-                            } catch {
-                                return "-"
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'numXCMTransferIncoming7d',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentNumber(data) + " " + currencyFormat(row.valXCMTransferIncomingUSD7d);
-                        } else {
-                            return row.valXCMTransferIncomingUSD7d;
+                    return row.chainName;
+                }
+            }, {
+                data: 'blocksCovered',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        try {
+                            let s = "<BR>" + presentTS(row.lastCrawlTS);
+                            return presentBlockNumber(row.id, "", row.blocksCovered) + s;
+                        } catch {
+                            return "-"
                         }
                     }
-                },
-                {
-                    data: 'numXCMTransferOutgoing7d',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentNumber(data) + " " + currencyFormat(row.valXCMTransferOutgoingUSD7d);
+                    return data;
+                }
+            }, {
+                data: 'blocksFinalized',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        try {
+                            let s = "<BR>" + presentTS(row.lastFinalizedTS);
+                            return presentBlockNumber(row.id, "", row.blocksFinalized) + s;
+                        } catch {
+                            return "-"
                         }
-                        return row.valXCMTransferOutgoingUSD7d;
                     }
-                },
-                {
-                    data: 'relayChain', //this is the 'hidden' column that we use to supprt filter
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return data;
-                        }
-                        return data;
+                    return data;
+                }
+            }, {
+                data: 'numXCMTransferIncoming7d',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentNumber(data) + " " + currencyFormat(row.valXCMTransferIncomingUSD7d);
+                    } else {
+                        return row.valXCMTransferIncomingUSD7d;
                     }
                 }
-            ]
+            }, {
+                data: 'numXCMTransferOutgoing7d',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentNumber(data) + " " + currencyFormat(row.valXCMTransferOutgoingUSD7d);
+                    }
+                    return row.valXCMTransferOutgoingUSD7d;
+                }
+            }, {
+                data: 'relayChain', //this is the 'hidden' column that we use to supprt filter
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return data;
+                    }
+                    return data;
+                }
+            }]
         });
     }
 
@@ -182,68 +174,64 @@ async function showaddresstopn() {
                 [0, "asc"]
             ],
             columns: [{
-                    data: 'N',
-                    render: function(data, type, row, meta) {
-                        let sectionMethod = `${data}:${row.method}`
-                        if (type == 'display') {
-                            return data;
-                        }
+                data: 'N',
+                render: function(data, type, row, meta) {
+                    let sectionMethod = `${data}:${row.method}`
+                    if (type == 'display') {
                         return data;
                     }
-                },
-                {
-                    data: 'address',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            try {
-                                return presentIDRow(row, "address");
-                            } catch (err) {
-                                console.log("row.asset", row.asset, err);
-                            }
-                        } else {
-                            try {
-                                return data;
-                            } catch (err) {
-                                return ""
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'balanceUSD',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            if (row.balanceUSD !== undefined) {
-                                return currencyFormat(data);
-                            } else {
-                                console.log("missing balanceUSD", row);
-                                return "--";
-                            }
-                        } else {
-                            if (row.balanceUSD !== undefined) {
-                                return data
-                            } else {
-                                return 0;
-                            }
-                        }
-                        return;
-                    }
-                },
-                {
-                    data: 'val',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            if (filtertype == "currency") {
-                                return currencyFormat(data);
-                            } else {
-                                return presentNumber(data);
-                            }
-                        }
-                        return data;
-                    }
+                    return data;
                 }
-            ]
+            }, {
+                data: 'address',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        try {
+                            return presentIDRow(row, "address");
+                        } catch (err) {
+                            console.log("row.asset", row.asset, err);
+                        }
+                    } else {
+                        try {
+                            return data;
+                        } catch (err) {
+                            return ""
+                        }
+                    }
+                    return data;
+                }
+            }, {
+                data: 'balanceUSD',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        if (row.balanceUSD !== undefined) {
+                            return currencyFormat(data);
+                        } else {
+                            console.log("missing balanceUSD", row);
+                            return "--";
+                        }
+                    } else {
+                        if (row.balanceUSD !== undefined) {
+                            return data
+                        } else {
+                            return 0;
+                        }
+                    }
+                    return;
+                }
+            }, {
+                data: 'val',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        if (filtertype == "currency") {
+                            return currencyFormat(data);
+                        } else {
+                            return presentNumber(data);
+                        }
+                    }
+                    return data;
+                }
+            }]
         });
     }
 

@@ -204,7 +204,7 @@ order by chainID, extrinsicHash, diffTS`
         let endWhere = endTS ? `and s.blockTS < ${endTS} and d.blockTS < ${endTS+lookbackSeconds}` : ""
 
         let sql = `select
-          s.msgHash, s.blockNumber as s_blockNumber, d.blockNumber as d_blockNumber, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, abs(d.blockTS - s.blockTS) as diffTS, (d.sentAt - s.sentAt) as diffSentAt
+          s.msgHash, s.blockNumber as s_blockNumber, d.blockNumber as d_blockNumber, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, abs(d.blockTS - s.blockTS) as diffTS, (d.sentAt - s.sentAt) as diffSentAt, d.errorDesc as d_errorDesc, d.destStatus as d_destStatus, d.executedEventID as d_executedEventID
         from xcmmessages as s, xcmmessages as d
  where  d.msgHash = s.msgHash and
         d.chainID = s.chainID and
@@ -212,12 +212,13 @@ order by chainID, extrinsicHash, diffTS`
         s.incoming = 0 and
         d.incoming = 1 and
         s.blockTS >= ${startTS} and
-        d.blockTS >= ${startTS} and
-        s.matched = 0 and
-        d.matched = 0 ${endWhere}
+        d.blockTS >= ${startTS}
+         ${endWhere}
 having (diffSentAt >= 0 and diffSentAt <= 4)
 order by msgHash, diffSentAt, diffTS`
         //console.log("xcmmessages_match", sql)
+	/* and s.matched = 0 and
+        d.matched = 0*/
         try {
             let xcmmatches = await this.pool.query(sql);
             let matched = {}
@@ -228,7 +229,7 @@ order by msgHash, diffSentAt, diffTS`
                 //enable this for debugging
                 //console.log("[Empty] match_xcm", sql)
             }
-            let vals = ["chainID", "chainIDDest", "sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt", "sourceBlocknumber", "destBlocknumber", "matchDT"];
+            let vals = ["chainID", "chainIDDest", "sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt", "sourceBlocknumber", "destBlocknumber", "matchDT", "errorDesc", "destStatus", "executedEventID"];
             let out = [];
             for (let i = 0; i < xcmmatches.length; i++) {
                 let s = xcmmatches[i];
@@ -236,8 +237,8 @@ order by msgHash, diffSentAt, diffTS`
                 // Note in case of multiple matches, the "order by diffTS" in the SQL statment picks the FIRST one in time closest with the smallest diffTS
                 let k = `${s.msgHash}:${s.d_sentAt}`
                 if (matched[k] == undefined) {
-                    out.push(`( '${s.msgHash}', ${s.s_blockNumber}, 0, '${s.chainID}', '${s.chainIDDest}', ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
-                    out.push(`( '${s.msgHash}', ${s.d_blockNumber}, 1, '${s.chainID}', '${s.chainIDDest}', ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now())`)
+                    out.push(`( '${s.msgHash}', ${s.s_blockNumber}, 0, '${s.chainID}', '${s.chainIDDest}', ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now(), ${mysql.escape(s.d_errorDesc)}, ${mysql.escape(s.d_destStatus)}, ${mysql.escape(s.d_executedEventID)} )`)
+                    out.push(`( '${s.msgHash}', ${s.d_blockNumber}, 1, '${s.chainID}', '${s.chainIDDest}', ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now(), ${mysql.escape(s.d_errorDesc)}, ${mysql.escape(s.d_destStatus)}, ${mysql.escape(s.d_executedEventID)} )`)
                     matched[k] = true;
                 } else {
                     numRecs++;
@@ -794,6 +795,9 @@ order by msgHash, diffSentAt, diffTS`
           xcmmessages.extrinsicID,
           xcmmessages.blockTS,
           xcmmessages.beneficiaries${fld},
+          xcmmessages.executedEventID,
+          xcmmessages.destStatus,
+          xcmmessages.errorDesc,
           d.eventID, d.asset, d.rawAsset, d.nativeAssetChain, d.amountReceived, d.blockNumberDest, d.destTS, d.msgHash as candidateMsgHash
         from xcmmessages, xcmtransferdestcandidate as d
  where  d.fromAddress = xcmmessages.beneficiaries and
@@ -808,15 +812,12 @@ order by msgHash, diffSentAt, diffTS`
         xcmmessages.assetsReceived is Null and
         length(xcmmessages.extrinsicID) > 0  ${endWhere}
 order by chainID, extrinsicHash, eventID, diffTS`;
-        // unmatch with:
-        //  update xcmmessages set assetsReceived = null, amountReceivedUSD = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
-        //  update xcmtransfer set assetsReceived = null, amountReceivedUSD2 = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
-        // rematch with: ./xcmmatch 45
         console.log(sql);
         try {
             let matches = await this.pool.query(sql);
             let assetsReceived = {};
             let assetsReceivedXCMTransfer = {};
+            let statusXCMTransfer = {};
             let prevEventK = false
             let prevDestMatch = false
             let incoming = {};
@@ -873,7 +874,6 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                     decimal: decimals,
                     amountReceived: amountReceived,
                     amountReceivedUSD: amountReceivedUSD,
-                    eventID: m.eventID,
                     blockNumber: m.blockNumber,
                     ts: m.destTS
                 };
@@ -896,6 +896,11 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                     }
                     if (isNewEventK) {
                         assetsReceivedXCMTransfer[k2].push(destMatch);
+                    }
+                    statusXCMTransfer[k2] = {
+                        destStatus: m.destStatus,
+                        errorDesc: m.errorDesc,
+                        executedEventID: m.executedEventID,
                     }
                 }
                 prevEventK = currEventK
@@ -933,7 +938,12 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                 let ar = JSON.stringify(r);
                 if (ar.length < 1024) {
                     let valueUSD = this.sum_assetsReceived(r);
-                    let sql = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)}, amountReceivedUSD2 = ${valueUSD} where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
+                    const {
+                        destStatus,
+                        errorDesc,
+                        executedEventID
+                    } = statusXCMTransfer[k];
+                    let sql = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)}, amountReceivedUSD2 = '${valueUSD}', destStatus = '${destStatus}', errorDesc = ${mysql.escape(errorDesc)}, executedEventID = ${mysql.escape(executedEventID)} where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
                     //console.log(sql);
                     this.batchedSQL.push(sql);
                     await this.update_batchedSQL();

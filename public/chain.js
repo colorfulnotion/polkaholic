@@ -38,126 +38,117 @@ function show_recentblocks(chainID) {
                 "targets": "_all"
             }],
             columns: [{
-                    data: 'blockNumber',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentBlockNumber(chainID, false, data)
-                        }
-                        return data;
+                data: 'blockNumber',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentBlockNumber(chainID, false, data)
                     }
-                },
-                {
-                    data: 'blockHash',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            let f = (row.finalized == 0) ? presentFinalized(false) : "";
-                            return f + " " + presentBlockHash(chainID, false, row.blockNumber, data);
-                        }
-                        return data;
+                    return data;
+                }
+            }, {
+                data: 'blockHash',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        let f = (row.finalized == 0) ? presentFinalized(false) : "";
+                        return f + " " + presentBlockHash(chainID, false, row.blockNumber, data);
                     }
-                },
-                {
-                    data: 'blockTS',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentTS(data);
-                        }
-                        return data;
+                    return data;
+                }
+            }, {
+                data: 'blockTS',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentTS(data);
                     }
-                },
-                {
-                    data: 'numExtrinsics',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            // in the evm case, we show numTransactions
-                            if (row.numTransactionsEVM != undefined) {
-                                return `<a href='/txs/${chainID}/${row.blockNumber}'>` + presentNumber(row.numTransactionsEVM) + "</a>";
-                            } else {
-                                return presentNumber(data);
-                            }
+                    return data;
+                }
+            }, {
+                data: 'numExtrinsics',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        // in the evm case, we show numTransactions
+                        if (row.numTransactionsEVM != undefined) {
+                            return `<a href='/txs/${chainID}/${row.blockNumber}'>` + presentNumber(row.numTransactionsEVM) + "</a>";
                         } else {
-                            if (row.numTransactionsEVM != undefined) {
-                                return row.numTransactionsEVM;
-                            } else {
-                                return data;
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'numSignedExtrinsics',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            if (row.gasUsed != undefined) {
-                                return presentNumber(row.gasUsed);
-                            } else {
-                                return presentNumber(data);
-                            }
-                        } else {
-                            if (row.gasUsed != undefined) {
-                                return row.gasUsed;
-                            } else {
-                                return data;
-                            }
-                        }
-                        return data;
-                    }
-                },
-                {
-                    data: 'numXCMTransfersOut',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            let out = [];
-                            let xcmtransfers = `/xcmtransfers?chainfilters=${chainID}&blockNumber=${row.blockNumber}`
-                            let xcmlink = `/xcmmessages?chainfilters=${chainID}&blockNumber=${row.blockNumber}`
-                            if (data > 0) {
-                                out.push(`<a href='${xcmtransfers}'>${data} XCM transfers</a>`);
-                                if (row.numXCMMessagesOut > 0 && row.numXCMMessagesOut > row.numXCMTransfers) {
-                                    out.push(`<a href='${xcmlink}'>${numXCMMessagesOut} additional outgoing XCMs</a>`);
-                                }
-                            } else {
-                                if (row.numXCMMessagesOut > 0) {
-                                    out.push(`<a href='${xcmlink}'>${row.numXCMMessagesOut} outgoing</a>`);
-                                }
-                            }
-                            if (row.numXCMMessagesIn > 0) {
-                                out.push(`<a href='${xcmlink}'>${row.numXCMMessagesIn} incoming XCM</a>`);
-                            }
-                            return out.join(", ");
-                        } else {
-                            return data + row.numXCMMessagesIn;
-                        }
-                    }
-                },
-                {
-                    data: 'numEvents',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
                             return presentNumber(data);
                         }
-                        return data;
+                    } else {
+                        if (row.numTransactionsEVM != undefined) {
+                            return row.numTransactionsEVM;
+                        } else {
+                            return data;
+                        }
                     }
-                },
-                {
-                    data: 'numTransfers',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
+                    return data;
+                }
+            }, {
+                data: 'numSignedExtrinsics',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        if (row.gasUsed != undefined) {
+                            return presentNumber(row.gasUsed);
+                        } else {
                             return presentNumber(data);
                         }
-                        return data;
-                    }
-                },
-                {
-                    data: 'valueTransfersUSD',
-                    render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return currencyFormat(data);
+                    } else {
+                        if (row.gasUsed != undefined) {
+                            return row.gasUsed;
+                        } else {
+                            return data;
                         }
-                        return data;
                     }
-                },
-            ]
+                    return data;
+                }
+            }, {
+                data: 'numXCMTransfersOut',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        let out = [];
+                        let xcmtransfers = `/xcmtransfers?chainfilters=${chainID}&blockNumber=${row.blockNumber}`
+                        let xcmlink = `/xcmmessages?chainfilters=${chainID}&blockNumber=${row.blockNumber}`
+                        if (data > 0) {
+                            out.push(`<a href='${xcmtransfers}'>${data} XCM transfers</a>`);
+                            if (row.numXCMMessagesOut > 0 && row.numXCMMessagesOut > row.numXCMTransfers) {
+                                out.push(`<a href='${xcmlink}'>${numXCMMessagesOut} additional outgoing XCMs</a>`);
+                            }
+                        } else {
+                            if (row.numXCMMessagesOut > 0) {
+                                out.push(`<a href='${xcmlink}'>${row.numXCMMessagesOut} outgoing</a>`);
+                            }
+                        }
+                        if (row.numXCMMessagesIn > 0) {
+                            out.push(`<a href='${xcmlink}'>${row.numXCMMessagesIn} incoming XCM</a>`);
+                        }
+                        return out.join(", ");
+                    } else {
+                        return data + row.numXCMMessagesIn;
+                    }
+                }
+            }, {
+                data: 'numEvents',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentNumber(data);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'numTransfers',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentNumber(data);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'valueTransfersUSD',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return currencyFormat(data);
+                    }
+                    return data;
+                }
+            }, ]
         });
     }
 
@@ -181,42 +172,38 @@ function showspecversions(chainID) {
             "targets": "_all"
         }],
         columns: [{
-                data: 'specVersion',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentSpecVersion(chainID, data)
-                    }
-                    return data;
+            data: 'specVersion',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentSpecVersion(chainID, data)
                 }
-            },
-            {
-                data: 'blockNumber',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentBlockNumber(chainID, false, data)
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'blockHash',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentBlockHash(chainID, false, row.blockNumber, data);
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'firstSeenTS',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentTS(data);
-                    }
-                    return data;
-                }
+                return data;
             }
-        ]
+        }, {
+            data: 'blockNumber',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentBlockNumber(chainID, false, data)
+                }
+                return data;
+            }
+        }, {
+            data: 'blockHash',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentBlockHash(chainID, false, row.blockNumber, data);
+                }
+                return data;
+            }
+        }, {
+            data: 'firstSeenTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentTS(data);
+                }
+                return data;
+            }
+        }]
     });
     loadData2(pathParams, tableName, false)
 }
@@ -253,117 +240,108 @@ function showassets(chainID, address) {
             "targets": [1, 2, 3]
         }],
         columns: [{
-                data: 'symbol',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.assetType == "ERC20LP") {
-                            return presentAssetPair(row.assetChain, row.symbol, row.token0, row.token1, row.token0Symbol, row.token1Symbol, chainID);
-                        } else if (row.assetType == "Loan") {
-                            return presentLoan(row.assetChain, row.asset);
-                        } else {
-                            return presentAsset(row.assetChain, row.symbol);
-                        }
+            data: 'symbol',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.assetType == "ERC20LP") {
+                        return presentAssetPair(row.assetChain, row.symbol, row.token0, row.token1, row.token0Symbol, row.token1Symbol, chainID);
+                    } else if (row.assetType == "Loan") {
+                        return presentLoan(row.assetChain, row.asset);
+                    } else {
+                        return presentAsset(row.assetChain, row.symbol);
                     }
-                    return data;
                 }
-            },
-            {
-                data: 'decimals',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.assetType == "ERC20LP") {
-                            return row.token0Decimals + "/" + row.token1Decimals;
-                        } else {
-                            return data;
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'assetType',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
+                return data;
+            }
+        }, {
+            data: 'decimals',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.assetType == "ERC20LP") {
+                        return row.token0Decimals + "/" + row.token1Decimals;
+                    } else {
                         return data;
                     }
+                }
+                return data;
+            }
+        }, {
+            data: 'assetType',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
                     return data;
                 }
-            },
-            {
-                data: 'numHolders',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentNumber(data);
-                    }
-                    return data;
+                return data;
+            }
+        }, {
+            data: 'numHolders',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
                 }
-            },
-            {
-                data: 'priceUSD',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return currencyFormat(data);
-                    }
-                    return data;
+                return data;
+            }
+        }, {
+            data: 'priceUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
                 }
-            },
-            {
-                data: 'totalFree',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.totalFree !== undefined) {
-                            return presentTokenCount(data);
-                        }
-                    }
+                return data;
+            }
+        }, {
+            data: 'totalFree',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
                     if (row.totalFree !== undefined) {
-                        return data;
-                    } else {
-                        return 0;
+                        return presentTokenCount(data);
                     }
                 }
-            },
-            {
-                data: 'tvl',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.tvl != undefined) {
-                            return currencyFormat(data);
-                        }
-                    } else {
-                        if (row.tvl != undefined) {
-                            return data;
-                        }
-                    }
-                    return 0;
-                }
-            },
-            {
-                data: 'accountState',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-
-                        if (row.accountState !== undefined && row.accountState.free !== undefined) {
-                            return presentTokenCount(row.accountState.free);
-                        }
-                        return 0
-                    }
-                    return 0;
-                }
-            },
-            {
-                data: 'balanceUSD',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-
-                        if (row.accountState !== undefined && row.accountState.freeUSD !== undefined) {
-                            return currencyFormat(row.accountState.freeUSD);
-                        }
-                        return 0
-                    }
+                if (row.totalFree !== undefined) {
+                    return data;
+                } else {
                     return 0;
                 }
             }
-        ]
+        }, {
+            data: 'tvl',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.tvl != undefined) {
+                        return currencyFormat(data);
+                    }
+                } else {
+                    if (row.tvl != undefined) {
+                        return data;
+                    }
+                }
+                return 0;
+            }
+        }, {
+            data: 'accountState',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+
+                    if (row.accountState !== undefined && row.accountState.free !== undefined) {
+                        return presentTokenCount(row.accountState.free);
+                    }
+                    return 0
+                }
+                return 0;
+            }
+        }, {
+            data: 'balanceUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+
+                    if (row.accountState !== undefined && row.accountState.freeUSD !== undefined) {
+                        return currencyFormat(row.accountState.freeUSD);
+                    }
+                    return 0
+                }
+                return 0;
+            }
+        }]
     });
     loadData2(pathParams, tableName, true)
 }

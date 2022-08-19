@@ -85,105 +85,98 @@ function showobjects(objects) {
                 [4, "asc"]
             ],
             columnDefs: [{
-                    "className": "dt-left",
-                    "targets": [1, 2, 3]
-                },
-                {
-                    "targets": [4],
-                    "visible": true
-                }
-            ],
+                "className": "dt-left",
+                "targets": [1, 2, 3]
+            }, {
+                "targets": [4],
+                "visible": true
+            }],
 
             columns: [{
-                    data: 'type',
-                    render: function(data, type, row, meta) {
-                        return data;
-                    }
-                },
-                {
-                    data: 'id',
-                    render: function(data, type, row, meta) {
+                data: 'type',
+                render: function(data, type, row, meta) {
+                    return data;
+                }
+            }, {
+                data: 'id',
+                render: function(data, type, row, meta) {
 
-                        let str = "";
-                        if (row.id != undefined && row.chainName != undefined && row.blockNumber != undefined) {
-                            let id = get_object_name(row);
-                            return id;
-                        } else {
-                            console.log(row);
-                        }
-                        return (str);
+                    let str = "";
+                    if (row.id != undefined && row.chainName != undefined && row.blockNumber != undefined) {
+                        let id = get_object_name(row);
+                        return id;
+                    } else {
+                        console.log(row);
                     }
-                },
-                {
-                    data: 'section',
-                    render: function(data, type, row, meta) {
-                        if (row.obj != undefined) {
-                            let obj = row.obj;
-                            let typ = row.type;
-                            let sectionMethod = ""
-                            let cls = "btn-outline-secondary";
-                            if (typ == "extrinsic") {
-                                let section = (obj.section != undefined) ? obj.section : "unk";
-                                let method = (obj.method != undefined) ? obj.method : "unk";
-                                cls = "btn-primary";
-                                sectionMethod = `${section}:${method}`;
-                            } else if (typ == "event") {
-                                let section = (obj.section != undefined) ? obj.section : "unk";
-                                cls = "btn-secondary";
-                                let method = (obj.method != undefined) ? obj.method : "unk";
-                                sectionMethod = `${section}:${method}`;
-                            } else if (typ == "trace") {
-                                let section = (obj.p != undefined) ? obj.p : "unk";
-                                let method = (obj.s != undefined) ? obj.s : "unk";
-                                sectionMethod = `${section}:${method}`;
-                            }
-                            if (type == 'display') {
-                                let str = `<button type="button" class="btn ${cls} text-capitalize">${sectionMethod}</button>`;
-                                return str;
-                            } else {
-                                return sectionMethod;
-                            }
+                    return (str);
+                }
+            }, {
+                data: 'section',
+                render: function(data, type, row, meta) {
+                    if (row.obj != undefined) {
+                        let obj = row.obj;
+                        let typ = row.type;
+                        let sectionMethod = ""
+                        let cls = "btn-outline-secondary";
+                        if (typ == "extrinsic") {
+                            let section = (obj.section != undefined) ? obj.section : "unk";
+                            let method = (obj.method != undefined) ? obj.method : "unk";
+                            cls = "btn-primary";
+                            sectionMethod = `${section}:${method}`;
+                        } else if (typ == "event") {
+                            let section = (obj.section != undefined) ? obj.section : "unk";
+                            cls = "btn-secondary";
+                            let method = (obj.method != undefined) ? obj.method : "unk";
+                            sectionMethod = `${section}:${method}`;
+                        } else if (typ == "trace") {
+                            let section = (obj.p != undefined) ? obj.p : "unk";
+                            let method = (obj.s != undefined) ? obj.s : "unk";
+                            sectionMethod = `${section}:${method}`;
                         }
+                        if (type == 'display') {
+                            let str = `<button type="button" class="btn ${cls} text-capitalize">${sectionMethod}</button>`;
+                            return str;
+                        } else {
+                            return sectionMethod;
+                        }
+                    }
+                    return "";
+                }
+            }, {
+                data: 'obj',
+                render: function(data, type, row, meta) {
+                    if (row.obj != undefined) {
+                        let obj = row.obj;
+                        let out = "";
+                        if (type == "display") {
+                            try {
+                                let id = get_object_id(row);
+                                let title = row.type
+                                out = presentObject(id, title, obj)
+                            } catch {
+                                out += obj;
+                            }
+                            return out;
+                        } else {
+                            return JSON.stringify(obj);
+                        }
+                    } else {
                         return "";
                     }
-                },
-                {
-                    data: 'obj',
-                    render: function(data, type, row, meta) {
-                        if (row.obj != undefined) {
-                            let obj = row.obj;
-                            let out = "";
-                            if (type == "display") {
-                                try {
-                                    let id = get_object_id(row);
-                                    let title = row.type
-                                    out = presentObject(id, title, obj)
-                                } catch {
-                                    out += obj;
-                                }
-                                return out;
-                            } else {
-                                return JSON.stringify(obj);
-                            }
-                        } else {
-                            return "";
-                        }
-                    }
-                },
-                {
-                    data: 'ts',
-                    render: function(data, type, row, meta) {
-                        if (row.ts != undefined) {
-                            if (type == "display") {
-                                return shorttimeConverter(Math.round(row.ts));
-                            } else {
-                                return row.ts;
-                            }
-                        }
-                        return 0;
-                    }
                 }
-            ]
+            }, {
+                data: 'ts',
+                render: function(data, type, row, meta) {
+                    if (row.ts != undefined) {
+                        if (type == "display") {
+                            return shorttimeConverter(Math.round(row.ts));
+                        } else {
+                            return row.ts;
+                        }
+                    }
+                    return 0;
+                }
+            }]
         });
     }
     var table = $(tableName).DataTable();

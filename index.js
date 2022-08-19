@@ -96,6 +96,26 @@ function getHostChain(req) {
         let chainID = 0;
         let host = "polkadot"
         let sa = fullhost.split(".");
+        if (sa.length >= 2) {
+            let domain = sa[sa.length - 2];
+            let subdomain = (sa.length > 2) ? sa[sa.length - 3] : "";
+            if (domain == "astarscan") {
+                if (subdomain == "shiden") {
+                    return [22007, subdomain];
+                } else if (domain == "shibuya") {
+                    return [81000, "shibuya"];
+                }
+                return [2006, "astar"];
+            }
+            if (domain == "xcmscan") {
+                if (subdomain == "moonriver") {
+                    return [22023, subdomain];
+                } else if (domain == "moonbase") {
+                    return [61000, subdomain];
+                }
+                return [2004, "moonbeam"];
+            }
+        }
         if (sa.length > 2) {
             host = sa[0];
         } else {
