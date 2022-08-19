@@ -2747,6 +2747,9 @@ module.exports = class Indexer extends AssetManager {
                         // ["msgHash", "blockNumber", "incoming"] + ["destStatus", "executedEventID", "errorDesc"]
                         let destStatus = (r.success === true) ? '1' : '0'
                         let errorDesc = (r.errorDesc != undefined) ? `'${r.errorDesc}'` : `NULL`
+                        if (r.errorDesc != undefined && r.description != undefined){
+                            errorDesc = `'${r.errorDesc}:${r.description}'`
+                        }
                         //let executedEventID = (r.eventID != undefined) ? `'${r.eventID}'` : `NULL`
                         let t = "(" + [`'${r.msgHash}'`, `'${r.xcmBN}'`, `'1'`, `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${destStatus}'`, `'${r.eventID}'`, errorDesc].join(",") + ")";
                         console.log(`mpStates`, t)
