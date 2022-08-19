@@ -1321,6 +1321,9 @@ module.exports = class ChainParser {
                         signalStatus.weight = paraTool.dechexToInt(statusV[0])
                         let failedReson = Object.keys(statusV[1])[0]
                         signalStatus.description = failedReson
+                    }else if (typeof statusV === 'object'){
+                        let failedReson = Object.keys(statusV)[0]
+                        signalStatus.description = failedReson
                     }else{
                         signalStatus.description = statusV
                     }
