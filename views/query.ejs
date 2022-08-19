@@ -197,11 +197,12 @@ let [startDate, endDate] = uiTool.getRecentDateRange(3);
 </div>
 <% if ( tbl == "extrinsics" ) { %>
 <h5>Extrinsics</h5>
-<table id="tableextrinsics" class="table table-striped table-hover">
+<table id="tableextrinsics" class="table table-striped table-hover" width="100%">
   <thead>
     <tr>
       <th scope="col">Section/Method</th>
       <th scope="col">Extrinsic ID</th>
+      <th scope="col">Extrinsic Hash</th>
       <th scope="col">From</th>
       <th scope="col">Result</th>
       <th scope="col">Time</th>
@@ -210,12 +211,13 @@ let [startDate, endDate] = uiTool.getRecentDateRange(3);
 </table>
 <% } else if ( tbl == "events" ) { %>
 <h5>Events</h5>
-<table id="tableevents" class="table table-striped table-hover">
+<table id="tableevents" class="table table-striped table-hover" width="100%">
   <thead>
     <tr>
       <th scope="col">Section/Method</th>
       <th scope="col">Event ID</th>
       <th scope="col">Extrinsic ID</th>
+      <th scope="col">Extrinsic Hash</th>
       <th scope="col">Block #</th>
       <th scope="col">Time</th>
     </tr>
@@ -223,7 +225,7 @@ let [startDate, endDate] = uiTool.getRecentDateRange(3);
 </table>
 <% } else if ( tbl == "transfers" ) { %>
 <h5>Transfers</h5>
-<table id="tabletransfers" class="table table-striped table-hover">
+<table id="tabletransfers" class="table table-striped table-hover" width="100%">
   <thead>
     <tr>
       <th scope="col">Extrinsic ID</th>
@@ -238,7 +240,7 @@ let [startDate, endDate] = uiTool.getRecentDateRange(3);
 </table>
 <% } else if ( tbl == "evmtxs" ) { %>
 <h5>EVM TXs</h5>
-<table id="tableevmtxs" class="table table-striped table-hover">
+<table id="tableevmtxs" class="table table-striped table-hover" width="100%">
   <thead>
     <tr>
       <th scope="col">Section/Method</th>

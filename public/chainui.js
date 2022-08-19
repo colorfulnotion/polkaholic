@@ -23,9 +23,17 @@ async function showxcmmessages(filter = {}) {
         // if table is already initiated, update the rows
         //loadData2(pathParams, tableName, true)
     } else {
-        console.log("INIT SETUP");
         initxcmmessages = true;
         xcmmessagesTable = $(tableName).DataTable({
+            dom: 'lfrtipB',
+            buttons: [{
+                extend: 'csv',
+                text: 'Download CSV',
+                filename: `xcmmessages`,
+                exportOptions: {
+                    orthogonal: 'export'
+                }
+            }],
             pageLength: 25,
             lengthMenu: [
                 [10, 25, 50, 100],
@@ -255,6 +263,15 @@ async function showxcmtransfers(filter = {}) {
             [7] sourceTS
             [8] relayChain
             */
+            dom: 'lfrtipB',
+            buttons: [{
+                extend: 'csv',
+                text: 'Download CSV',
+                filename: `xcmtransfers`,
+                exportOptions: {
+                    orthogonal: 'export'
+                }
+            }],
             pageLength: 25,
             lengthMenu: [
                 [10, 25, 50, 100],
@@ -303,9 +320,9 @@ async function showxcmtransfers(filter = {}) {
                                 let parsedAsset = JSON.parse(row.asset);
                                 let symbol = parsedAsset.Token;
                                 if (symbol !== undefined) {
-                                    return symbol
+                                    return data + " " + symbol
                                 } else {
-                                    return row.asset;
+                                    return data + " " + row.asset;
                                 }
                             } catch (err) {
                                 return ""
@@ -369,8 +386,13 @@ async function showxcmtransfers(filter = {}) {
                             let timelineURL = `/timeline/${row.extrinsicHash}`
                             let timelineLink = `<div class="explorer"><a href="${timelineURL}">timeline</a></div>`
                             return `${presentChain(row.id, row.chainName)} (${s}) ` + timelineLink
+                        } else {
+                            try {
+                                return data + " " + row.extrinsicID + " " + row.extrinsicHash;
+                            } catch (e) {
+                                return ""
+                            }
                         }
-                        return data;
                     }
                 },
                 {
@@ -392,8 +414,17 @@ async function showxcmtransfers(filter = {}) {
                             } catch (err) {
                                 console.log(err);
                             }
+                        } else {
+                            try {
+                                if ((row.incomplete !== undefined && row.incomplete > 0)) {
+                                    return row.idDest + " Incomplete"
+                                } else {
+                                    return row.idDest + " " + row.blockNumberDest;
+                                }
+                            } catch (e) {
+                                return ""
+                            }
                         }
-                        return data;
                     }
                 },
                 {

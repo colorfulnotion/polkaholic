@@ -5,8 +5,17 @@ function showextrinsics(filter) {
     if (initextrinsics) {} else {
         initextrinsics = true;
         var table = $(tableName).DataTable({
+            dom: 'lfrtipB',
+            buttons: [{
+                extend: 'csv',
+                text: 'Download CSV',
+                filename: `extrinsics`,
+                exportOptions: {
+                    orthogonal: 'export'
+                }
+            }],
             order: [
-                [4, "desc"]
+                [5, "desc"]
             ],
             columnDefs: [{
                 "className": "dt-center",
@@ -15,10 +24,15 @@ function showextrinsics(filter) {
             columns: [{
                     data: 'section',
                     render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentExtrinsic(row.chainID, row.section, row.method)
+                        try {
+                            if (type == 'display') {
+                                return presentExtrinsic(row.chainID, row.section, row.method)
+                            } else {
+                                return row.section + ":" + row.method;
+                            }
+                        } catch (e) {
+                            return "";
                         }
-                        return data;
                     }
                 },
                 {
@@ -26,6 +40,15 @@ function showextrinsics(filter) {
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
                             return presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'extrinsicHash',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            return presentTxHash(row.extrinsicHash);
                         }
                         return data;
                     }
@@ -73,6 +96,15 @@ function showtransfers(filter) {
         inittransfers = true;
 
         var table = $(tableName).DataTable({
+            dom: 'lfrtipB',
+            buttons: [{
+                extend: 'csv',
+                text: 'Download CSV',
+                filename: `transfers`,
+                exportOptions: {
+                    orthogonal: 'export'
+                }
+            }],
             order: [
                 [6, "desc"]
             ],
@@ -164,6 +196,15 @@ function showevmtxs(filter) {
     if (initevmtxs) {} else {
         initevmtxs = true;
         var table = $(tableName).DataTable({
+            dom: 'lfrtipB',
+            buttons: [{
+                extend: 'csv',
+                text: 'Download CSV',
+                filename: `transactions`,
+                exportOptions: {
+                    orthogonal: 'export'
+                }
+            }],
             order: [
                 [5, "desc"]
             ],
@@ -269,12 +310,22 @@ function fetcheventdata(eventID) {
         });
 }
 
-function presentEventDetails(eventID) {
-    let title = eventID;
+function parseEventID(eventID) {
     let ida = eventID.split("-");
     if (ida.length == 4) {
         let extrinsicID = `${ida[1]}-${ida[2]}`
-        title = `View ${extrinsicID} Event#` + ida[3];
+        let eventIndex = ida[3];
+        return [extrinsicID, eventIndex];
+    }
+    return [null, null];
+}
+
+function presentEventDetails(eventID) {
+    let [extrinsicID, eventIndex] = parseEventID(eventID);
+    if (extrinsicID && eventIndex) {
+        title = `View ${extrinsicID} Event# ${eventIndex}`;
+    } else {
+        title = `View ${eventID}`
     }
     return `<div style='width:650px'>
 <a class="btn btn-outline-secondary btn-block text-capitalize" data-mdb-toggle="collapse" href="#data${eventID}" role="button" aria-control="data${eventID}" aria-expanded="false" style="text-align:left">${title}</a>
@@ -288,6 +339,15 @@ function showevents(filter) {
         initevents = true;
 
         var table = $(tableName).DataTable({
+            dom: 'lfrtipB',
+            buttons: [{
+                extend: 'csv',
+                text: 'Download CSV',
+                filename: `events`,
+                exportOptions: {
+                    orthogonal: 'export'
+                }
+            }],
             order: [
                 [4, "desc"]
             ],
@@ -298,20 +358,39 @@ function showevents(filter) {
             columns: [{
                     data: 'section',
                     render: function(data, type, row, meta) {
-                        if (type == 'display') {
-                            return presentExtrinsic(row.chainID, row.section, row.method)
+                        try {
+                            if (type == 'display') {
+                                return presentExtrinsic(row.chainID, row.section, row.method)
+                            } else {
+                                return row.section + ":" + row.method
+                            }
+                            return data;
+                        } catch (e) {
+                            return "";
                         }
-                        return data;
                     }
                 },
                 {
                     data: 'eventID',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            // return presentExtrinsicIDHash(row.eventID, row.extrinsicHash);
                             return presentEventDetails(row.eventID)
                         }
                         return data;
+                    }
+                },
+                {
+                    data: 'extrinsicID',
+                    render: function(data, type, row, meta) {
+                        try {
+                            let [extrinsicID, _] = parseEventID(row.eventID);
+                            if (type == 'display') {
+                                return presentExtrinsicIDHash(extrinsicID, row.extrinsicHash);
+                            }
+                            return extrinsicID;
+                        } catch (e) {
+                            return "";
+                        }
                     }
                 },
                 {
