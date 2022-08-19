@@ -165,7 +165,7 @@ async function signMessageWithAccount(message) {
 
             // this injector object has a signer and a signRaw method
             // to be able to sign raw bytes
-            const signRaw = injector?.signer?.signRaw;
+            const signRaw = injector ? .signer ? .signRaw;
 
             if (!!signRaw) {
                 // after making sure that signRaw is defined
@@ -211,7 +211,7 @@ $('#walletModal').on('show.bs.modal', async function(event) {
     // Update the modal's content. We'll use jQuery here, but you could use a data binding library or other methods instead.
     var modal = $(this)
 
-    if (accounts?.length > 0) {
+    if (accounts ? .length > 0) {
         //accounts?.map(account => console.log(`Address: ${account.address}\t(pubkey: ${getPubkey(account)})`));
         var out = accounts.map((w, idx) => {
             let address = getPolkadotAddress(w)
@@ -227,7 +227,7 @@ $('#walletModal').on('show.bs.modal', async function(event) {
         out = '<div class="d-grid gap-2">' + out.join("") + '</div>';
         $("#walletModal .modal-body").html(out);
         // register click handlers
-        accounts?.forEach(async (w, idx) => {
+        accounts ? .forEach(async (w, idx) => {
             let walletid = "wallet" + idx;
             $('#' + walletid).on('click', async function(e) {
                 let acctAddr = getPolkadotAddress(w)

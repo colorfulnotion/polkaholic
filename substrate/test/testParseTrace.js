@@ -57,28 +57,26 @@ async function main() {
     }];
 
     testCases = [{
-            bn: 4952128,
-            blockHash: '0x15f1f3345b328593ed03a2e3301e2457a7d1e2ef5da41c8d6bf9525e275c4ccf',
-            p: 'Balances',
-            s: 'TotalIssuance',
-            totalIssuance: 3.270328286747133e+38,
-            asset: '{"Token":"DOT"}',
-            k: 'c2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80',
-            v: '01f6083b543ec2b0940000000000000000',
-            traceType: "subscribeStorage",
-        },
-        {
-            bn: 4952128,
-            blockHash: '0x15f1f3345b328593ed03a2e3301e2457a7d1e2ef5da41c8d6bf9525e275c4ccf',
-            p: 'Balances',
-            s: 'TotalIssuance',
-            totalIssuance: 3.270328286747133e+38,
-            asset: '{"Token":"DOT"}',
-            k: 'c2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80',
-            v: '01f6083b543ec2b0940000000000000000',
-            traceType: "state_traceBlock",
-        }
-    ];
+        bn: 4952128,
+        blockHash: '0x15f1f3345b328593ed03a2e3301e2457a7d1e2ef5da41c8d6bf9525e275c4ccf',
+        p: 'Balances',
+        s: 'TotalIssuance',
+        totalIssuance: 3.270328286747133e+38,
+        asset: '{"Token":"DOT"}',
+        k: 'c2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80',
+        v: '01f6083b543ec2b0940000000000000000',
+        traceType: "subscribeStorage",
+    }, {
+        bn: 4952128,
+        blockHash: '0x15f1f3345b328593ed03a2e3301e2457a7d1e2ef5da41c8d6bf9525e275c4ccf',
+        p: 'Balances',
+        s: 'TotalIssuance',
+        totalIssuance: 3.270328286747133e+38,
+        asset: '{"Token":"DOT"}',
+        k: 'c2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80',
+        v: '01f6083b543ec2b0940000000000000000',
+        traceType: "state_traceBlock",
+    }];
     for (let i = 0; i < testCases.length; i++) {
         let e = testCases[i];
         let chain = await indexer.getChain(e.chainID);

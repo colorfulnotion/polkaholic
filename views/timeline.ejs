@@ -54,16 +54,30 @@ let timelineRows = uiTool.getTimelineRows(timeline);
      <% if ( xcm.receivedTS ) { %>
         <B>Received:</B> <%= uiTool.presentTS(xcm.receivedTS) %> <br/>
      <% } %>
-     <B>Status: </B>%>
+     <B>Delivery Status: </B>
      <% if ( xcm.receivedTS && xcm.sentTS) { %>
        Delivered
      <% } else if (xcm.sentTS){%>
        Sent: msg has been successfully sent but not yet received by the destination chain
      <% } else if (xcm.receivedTS && xcm.sentTS == undefined){ %>
        Delivered: msg is received by destination chain but origination is missing
-     <% } else{ %>
+     <% } else { %>
        Pending/Unknown
-     <% } %>
+     <% } %><br/>
+     <B>Execution Status:</B>
+        <% if ( xcm.destStatus == -1 ) { %>
+	    <button type="button" class="btn btn-warning text-capitalize">Unknown</button>
+	<% } else if ( xcm.destStatus == 0 ) { %>
+        <% if ( xcm.errorDesc ) { %>
+	    <button type="button" class="btn btn-danger text-capitalize"><%= xcm.errorDesc %></button>
+	<% } %>
+	<% } else if ( xcm.destStatus == 1 ) { %>
+	    <button type="button" class="btn btn-success text-capitalize">Success</button>
+	<% } %>
+	<br/>
+	<% if ( xcm.executedEventID ) { %>
+        <%- include("eventaccordion", {eventID: xcm.executedEventID}); %>
+	<% } %>
     <br/>
      <% if ( xcm.parentMsgHash ) { %>
        <br> <B>Parent</B>: <br> <a href='/timeline/<%= xcm.parentMsgHash %>/xcm/<%= xcm.parentBlocknumber %>'><%- uiTool.getShortHash(xcm.parentMsgHash, false); %></a> sentAt: <%= xcm.parentSentAt; %>

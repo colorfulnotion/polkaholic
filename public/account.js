@@ -37,135 +37,127 @@ function showextrinsics(address, chainListStr = 'all') {
         }],
         lengthMenu: getLengthMenu(),
         columnDefs: [{
-                "className": "dt-center",
-                "targets": [3, 4]
-            },
-            {
-                "targets": [5],
-                "visible": false
-            }
-        ],
+            "className": "dt-center",
+            "targets": [3, 4]
+        }, {
+            "targets": [5],
+            "visible": false
+        }],
         order: [
             [4, "desc"]
         ],
         columns: [{
-                data: 'extrinsicID',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        try {
-                            if (row.extrinsicID != undefined && row.extrinsicHash != undefined) {
-                                let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
-                                return `${presentChain(row.id, row.chainName)} (${s})`
-                            } else if (row.transactionHash != undefined) {
-                                let s = presentTxHash(row.transactionHash);
-                                return `${presentChain(row.id, row.chainName)} (${s})`
-                            } else {
-                                console.log(row);
-                            }
-                        } catch (e) {
+            data: 'extrinsicID',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    try {
+                        if (row.extrinsicID != undefined && row.extrinsicHash != undefined) {
+                            let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
+                            return `${presentChain(row.id, row.chainName)} (${s})`
+                        } else if (row.transactionHash != undefined) {
+                            let s = presentTxHash(row.transactionHash);
+                            return `${presentChain(row.id, row.chainName)} (${s})`
+                        } else {
                             console.log(row);
                         }
+                    } catch (e) {
+                        console.log(row);
                     }
-                    if (row.extrinsicID != undefined) {
-                        return data;
-                    }
-                    return "";
                 }
-            },
-            {
-                data: 'section',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.method !== undefined && row.section !== undefined && row.extrinsicHash !== undefined) {
-                            return presentExtrinsic(row.id, row.section, row.method)
-                        } else if (row.method !== undefined && row.section !== undefined && row.transactionHash !== undefined) {
-                            return '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.section + '</button>';
-                        } else if (row.method !== undefined) {
-                            return '<button type="button" class="btn btn-outline-primary">' + row.method + '</button>';
-                        } else {
-                            return "-";
-                        }
-                    } else {
-                        if (row.method !== undefined) {
-                            return `${row.section}:${row.method}`
-                        } else {
-                            return "-";
-                        }
-                    }
+                if (row.extrinsicID != undefined) {
                     return data;
                 }
-            },
-            {
-                data: 'params',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        let out = "";
-                        if (row.method !== undefined && row.extrinsicHash !== undefined) {
-                            try {
-                                return presentInstructions(JSON.stringify(row.params), "e" + row.extrinsicHash, "Params");
-                            } catch (e) {
-                                console.log(e);
-                            }
-                        } else if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
-                            return presentInstructions(row.decodedInput.params, row.transactionHash, "Params");
-                        }
-                        return "";
+                return "";
+            }
+        }, {
+            data: 'section',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.method !== undefined && row.section !== undefined && row.extrinsicHash !== undefined) {
+                        return presentExtrinsic(row.id, row.section, row.method)
+                    } else if (row.method !== undefined && row.section !== undefined && row.transactionHash !== undefined) {
+                        return '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.section + '</button>';
+                    } else if (row.method !== undefined) {
+                        return '<button type="button" class="btn btn-outline-primary">' + row.method + '</button>';
                     } else {
-                        if (row.method !== undefined && row.extrinsicHash !== undefined) {
-                            try {
-                                return JSON.stringify(row.params);
-                            } catch (e) {
-                                console.log(e);
-                            }
-                        } else if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
-                            return JSON.stringify(row.decodedInput.params);
+                        return "-";
+                    }
+                } else {
+                    if (row.method !== undefined) {
+                        return `${row.section}:${row.method}`
+                    } else {
+                        return "-";
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'params',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let out = "";
+                    if (row.method !== undefined && row.extrinsicHash !== undefined) {
+                        try {
+                            return presentInstructions(JSON.stringify(row.params), "e" + row.extrinsicHash, "Params");
+                        } catch (e) {
+                            console.log(e);
                         }
+                    } else if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
+                        return presentInstructions(row.decodedInput.params, row.transactionHash, "Params");
                     }
                     return "";
-                }
-            },
-            {
-                data: 'result',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        //let res = (row.result == 1) ? 'Success' : 'Failed'
-                        let txStatus = presentSuccessFailure(row.result, row.err)
-                        return txStatus;
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'ts',
-                render: function(data, type, row, meta) {
-                    let x = 0
-                    if (type == 'display') {
-                        if (row.ts !== undefined) {
-                            return presentTS(row.ts);
-                        } else if (row.timestamp !== undefined) {
-                            return presentTS(row.timestamp);
+                } else {
+                    if (row.method !== undefined && row.extrinsicHash !== undefined) {
+                        try {
+                            return JSON.stringify(row.params);
+                        } catch (e) {
+                            console.log(e);
                         }
-                    } else {
-                        if (row.ts !== undefined) {
-                            return (row.ts);
-                        } else if (row.timestamp !== undefined) {
-                            return (row.timestamp);
-                        }
+                    } else if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
+                        return JSON.stringify(row.decodedInput.params);
                     }
+                }
+                return "";
+            }
+        }, {
+            data: 'result',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    //let res = (row.result == 1) ? 'Success' : 'Failed'
+                    let txStatus = presentSuccessFailure(row.result, row.err)
+                    return txStatus;
+                }
+                return data;
+            }
+        }, {
+            data: 'ts',
+            render: function(data, type, row, meta) {
+                let x = 0
+                if (type == 'display') {
+                    if (row.ts !== undefined) {
+                        return presentTS(row.ts);
+                    } else if (row.timestamp !== undefined) {
+                        return presentTS(row.timestamp);
+                    }
+                } else {
+                    if (row.ts !== undefined) {
+                        return (row.ts);
+                    } else if (row.timestamp !== undefined) {
+                        return (row.timestamp);
+                    }
+                }
 
+            }
+        }, {
+            data: 'id',
+            render: function(data, type, row, meta) {
+                if (row.id) {
+                    return data;
+                } else {
+                    return "";
                 }
-            },
-            {
-                data: 'id',
-                render: function(data, type, row, meta) {
-                    if (row.id) {
-                        return data;
-                    } else {
-                        return "";
-                    }
-                }
-            },
-        ]
+            }
+        }, ]
     });
 
     $(tableName).on('length.dt', function(e, settings, len) {
@@ -195,128 +187,119 @@ function showevmtxs(address, chainListStr = 'all') {
             [4, "desc"]
         ],
         columns: [{
-                data: 'transactionHash',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        try {
-                            if (row.transactionHash != undefined) {
-                                let s = presentTxHash(row.transactionHash);
-                                return `${s}`
-                            } else if (row.extrinsicID != undefined && row.extrinsicHash != undefined) {
-                                let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
-                                return `Substrate ${presentChain(row.id, row.chainName)} (${s})`
-                            } else {
-                                console.log(row);
-                            }
-                        } catch (e) {
+            data: 'transactionHash',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    try {
+                        if (row.transactionHash != undefined) {
+                            let s = presentTxHash(row.transactionHash);
+                            return `${s}`
+                        } else if (row.extrinsicID != undefined && row.extrinsicHash != undefined) {
+                            let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
+                            return `Substrate ${presentChain(row.id, row.chainName)} (${s})`
+                        } else {
                             console.log(row);
                         }
+                    } catch (e) {
+                        console.log(row);
                     }
-                    if (row.extrinsicID != undefined) {
-                        return row.extrinsicID;
-                    }
-                    return "";
                 }
-            },
-            {
-                data: 'section',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.method !== undefined && row.section !== undefined && row.transactionHash !== undefined) {
-                            return '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.section + '</button>';
-                        } else if (row.method !== undefined && row.section !== undefined && row.extrinsicHash !== undefined) {
-                            return presentExtrinsic(row.id, row.section, row.method)
-                        } else if (row.method !== undefined) {
-                            return '<button type="button" class="btn btn-outline-primary">' + row.method + '</button>';
-                        } else {
-                            return "-";
-                        }
+                if (row.extrinsicID != undefined) {
+                    return row.extrinsicID;
+                }
+                return "";
+            }
+        }, {
+            data: 'section',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.method !== undefined && row.section !== undefined && row.transactionHash !== undefined) {
+                        return '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.section + '</button>';
+                    } else if (row.method !== undefined && row.section !== undefined && row.extrinsicHash !== undefined) {
+                        return presentExtrinsic(row.id, row.section, row.method)
+                    } else if (row.method !== undefined) {
+                        return '<button type="button" class="btn btn-outline-primary">' + row.method + '</button>';
                     } else {
-                        if (row.method !== undefined) {
-                            return data;
-                        } else {
-                            return "-";
-                        }
+                        return "-";
                     }
-                    return data;
-                }
-            },
-            {
-                data: 'blockNumber',
-                render: function(data, type, row, meta) {
-                    return presentBlockNumber(row.chainID, "", row.blockNumber);
-                }
-            },
-            {
-                data: 'ts',
-                render: function(data, type, row, meta) {
-                    let x = 0
-                    if (type == 'display') {
-                        if (row.ts !== undefined) {
-                            return presentTS(row.ts);
-                        } else if (row.timestamp !== undefined) {
-                            return presentTS(row.timestamp);
-                        }
+                } else {
+                    if (row.method !== undefined) {
+                        return data;
                     } else {
-                        if (row.ts !== undefined) {
-                            return (row.ts);
-                        } else if (row.timestamp !== undefined) {
-                            return (row.timestamp);
-                        }
+                        return "-";
                     }
+                }
+                return data;
+            }
+        }, {
+            data: 'blockNumber',
+            render: function(data, type, row, meta) {
+                return presentBlockNumber(row.chainID, "", row.blockNumber);
+            }
+        }, {
+            data: 'ts',
+            render: function(data, type, row, meta) {
+                let x = 0
+                if (type == 'display') {
+                    if (row.ts !== undefined) {
+                        return presentTS(row.ts);
+                    } else if (row.timestamp !== undefined) {
+                        return presentTS(row.timestamp);
+                    }
+                } else {
+                    if (row.ts !== undefined) {
+                        return (row.ts);
+                    } else if (row.timestamp !== undefined) {
+                        return (row.timestamp);
+                    }
+                }
 
+            }
+        }, {
+            data: 'result',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let res = (row.result == 1) ? 'Success' : 'Failed'
+                    let txStatus = presentSuccessFailure(row.result, row.err)
+                    return txStatus;
                 }
-            },
-            {
-                data: 'result',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        let res = (row.result == 1) ? 'Success' : 'Failed'
-                        let txStatus = presentSuccessFailure(row.result, row.err)
-                        return txStatus;
-                    }
-                    return data;
+                return data;
+            }
+        }, {
+            data: 'from',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentAddress(data);
                 }
-            },
-            {
-                data: 'from',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentAddress(data);
-                    }
-                    return "nfrom";
+                return "nfrom";
+            }
+        }, {
+            data: 'to',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentAddress(data);
                 }
-            },
-            {
-                data: 'to',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentAddress(data);
-                    }
-                    return "ndest";
+                return "ndest";
+            }
+        }, {
+            data: 'value',
+            render: function(data, type, row, meta) {
+                if (row.value != undefined) {
+                    return row.value;
+                } else {
+                    return 0;
                 }
-            },
-            {
-                data: 'value',
-                render: function(data, type, row, meta) {
-                    if (row.value != undefined) {
-                        return row.value;
-                    } else {
-                        return 0;
-                    }
+            }
+        }, {
+            data: 'fee',
+            render: function(data, type, row, meta) {
+                if (row.fee != undefined) {
+                    return row.fee;
+                } else {
+                    return "nfee";
                 }
-            },
-            {
-                data: 'fee',
-                render: function(data, type, row, meta) {
-                    if (row.fee != undefined) {
-                        return row.fee;
-                    } else {
-                        return "nfee";
-                    }
-                }
-            },
-        ]
+            }
+        }, ]
     });
 
     $(tableName).on('length.dt', function(e, settings, len) {
@@ -335,98 +318,89 @@ function showfeed(address, chainListStr = 'all') {
     tableFeed = $(tableName).DataTable({
         lengthMenu: getLengthMenu(),
         columnDefs: [{
-                "className": "dt-center",
-                "targets": [3, 4, 5]
-            },
-            {
-                "targets": [6],
-                "visible": false
-            }
-        ],
+            "className": "dt-center",
+            "targets": [3, 4, 5]
+        }, {
+            "targets": [6],
+            "visible": false
+        }],
         order: [
             [2, "desc"]
         ],
         columns: [{
-                data: 'fromAddress',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentIDwithIdenticon(data)
-                    }
-                    return data;
+            data: 'fromAddress',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentIDwithIdenticon(data)
                 }
-            },
-            {
-                data: 'blockNumber',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentBlockNumber(row.chainID, row.chainName, data)
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'ts',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return timeConverter(data);
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'result',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        //let res = (row.result == 1) ? 'Success' : 'Failed'
-                        let txStatus = presentSuccessFailure(row.result, row.err)
-                        return txStatus;
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'section',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.method !== undefined && row.section !== undefined) {
-                            return presentExtrinsic(row.id, row.method, row.section)
-                        } else if (row.method !== undefined) {
-                            return '<button type="button" class="btn btn-outline-primary">' + row.method + '</button>';
-                        } else {
-                            return "-";
-                        }
-                    } else {
-                        if (row.method !== undefined) {
-                            return data;
-                        } else {
-                            return "-";
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'params',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentInstructions(JSON.stringify(data), row.extrinsicHash, "Params");
-                    } else {
-                        if (row.method !== undefined) {
-                            return row.method;
-                        } else {
-                            return "-";
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'id',
-                render: function(data, type, row, meta) {
-                    return data;
-                }
+                return data;
             }
-        ]
+        }, {
+            data: 'blockNumber',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentBlockNumber(row.chainID, row.chainName, data)
+                }
+                return data;
+            }
+        }, {
+            data: 'ts',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return timeConverter(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'result',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    //let res = (row.result == 1) ? 'Success' : 'Failed'
+                    let txStatus = presentSuccessFailure(row.result, row.err)
+                    return txStatus;
+                }
+                return data;
+            }
+        }, {
+            data: 'section',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.method !== undefined && row.section !== undefined) {
+                        return presentExtrinsic(row.id, row.method, row.section)
+                    } else if (row.method !== undefined) {
+                        return '<button type="button" class="btn btn-outline-primary">' + row.method + '</button>';
+                    } else {
+                        return "-";
+                    }
+                } else {
+                    if (row.method !== undefined) {
+                        return data;
+                    } else {
+                        return "-";
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'params',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentInstructions(JSON.stringify(data), row.extrinsicHash, "Params");
+                } else {
+                    if (row.method !== undefined) {
+                        return row.method;
+                    } else {
+                        return "-";
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'id',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }]
     });
 
     $(tableName).on('length.dt', function(e, settings, len) {
@@ -456,142 +430,132 @@ function showtransfers(address, chainListStr = 'all') {
         }],
         lengthMenu: getLengthMenu(),
         columnDefs: [{
-                "className": "dt-right",
-                "targets": [4, 5]
-            },
-            {
-                "targets": [7],
-                "visible": false
-            }
-        ],
+            "className": "dt-right",
+            "targets": [4, 5]
+        }, {
+            "targets": [7],
+            "visible": false
+        }],
         order: [
             [6, "desc"]
         ],
         columns: [{
-                data: 'eventID',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        let eventID = false;
-                        if (row.eventID != undefined) {
-                            //"eventID": "2012-1185872-5-21",
-                            let eventIDPieces = row.eventID.split('-')
-                            if (eventIDPieces.length == 4) {
-                                eventID = `${eventIDPieces[1]}-${eventIDPieces[3]}`
-                            }
-                        }
-                        let s = presentExtrinsicIDHash(eventID, row.extrinsicHash, false);
-                        return `${presentChain(row.chainID, row.chainName)} (${s})`
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'from',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentIDRow(row, 'from');
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'to',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentIDRow(row, 'to');
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'transferType',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.transferType == 'incoming') {
-                            return '<button type="button" class="btn transfer" style="background-color:rgba(0,201,167,.2); color:#02977e">' + "IN" + '</button>';
-                        } else {
-                            return '<button type="button" class="btn transfer" style="background-color:rgba(219,154,4,.2); color:#b47d00">' + "OUT" + '</button>';
+            data: 'eventID',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let eventID = false;
+                    if (row.eventID != undefined) {
+                        //"eventID": "2012-1185872-5-21",
+                        let eventIDPieces = row.eventID.split('-')
+                        if (eventIDPieces.length == 4) {
+                            eventID = `${eventIDPieces[1]}-${eventIDPieces[3]}`
                         }
                     }
-                    return data;
+                    let s = presentExtrinsicIDHash(eventID, row.extrinsicHash, false);
+                    return `${presentChain(row.chainID, row.chainName)} (${s})`
                 }
-            },
-            {
-                data: 'rawAmount',
-                render: function(data, type, row, meta) {
-                    try {
-                        let val = ""; //dechexToInt(data);
-                        let dData = row.decodedData
-                        if (dData != undefined) {
-                            if (dData.symbol != undefined && dData.dataRaw != undefined) {
-                                val = dData.dataRaw + " " + dData.symbol
-                            } else {
-                                val = `${row.rawAmount} Asset (decimal unknown)`
-                            }
-                        }
-                        return val; // data + " " + symbol;
-                    } catch (e) {
-                        return "";
+                return data;
+            }
+        }, {
+            data: 'from',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentIDRow(row, 'from');
+                }
+                return data;
+            }
+        }, {
+            data: 'to',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentIDRow(row, 'to');
+                }
+                return data;
+            }
+        }, {
+            data: 'transferType',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.transferType == 'incoming') {
+                        return '<button type="button" class="btn transfer" style="background-color:rgba(0,201,167,.2); color:#02977e">' + "IN" + '</button>';
+                    } else {
+                        return '<button type="button" class="btn transfer" style="background-color:rgba(219,154,4,.2); color:#b47d00">' + "OUT" + '</button>';
                     }
                 }
-            },
-            {
-                data: 'amountUSD',
-                render: function(data, type, row, meta) {
-                    let val = null;
-                    let priceUSD = null;
-                    let priceUSDCurrent = null;
+                return data;
+            }
+        }, {
+            data: 'rawAmount',
+            render: function(data, type, row, meta) {
+                try {
+                    let val = ""; //dechexToInt(data);
                     let dData = row.decodedData
                     if (dData != undefined) {
                         if (dData.symbol != undefined && dData.dataRaw != undefined) {
-                            if (dData.dataUSD !== undefined) {
-                                val = dData.dataUSD;
-                                priceUSD = dData.priceUSD;
-                                priceUSDCurrent = dData.priceUSDCurrent;
-                            }
+                            val = dData.dataRaw + " " + dData.symbol
+                        } else {
+                            val = `${row.rawAmount} Asset (decimal unknown)`
                         }
                     }
-                    if (type == 'display') {
-                        if (val) {
-                            return currencyFormat(val, priceUSD, priceUSDCurrent)
-                        }
-                    } else {
-                        if (val) {
-                            return (val);
-                        }
-                    }
-                    return 0;
-                }
-            },
-            {
-                data: 'ts',
-                render: function(data, type, row, meta) {
-                    if (type == 'export') {
-                        return data;
-                    }
-                    let tinyms = 0;
-                    let eventID = row.eventID
-                    if (eventID != undefined) {
-                        //"eventID": "2012-1185872-5-21",
-                        let eventIDPieces = eventID.split('-')
-                        if (eventIDPieces.length == 4) {
-                            tinyms = 0.001 * eventIDPieces[3]
-                        }
-
-                    }
-                    if (type == 'display') {
-                        return presentTS(data);
-                    }
-                    return (data + tinyms);
-                }
-            },
-            {
-                data: 'id',
-                render: function(data, type, row, meta) {
-                    return data;
+                    return val; // data + " " + symbol;
+                } catch (e) {
+                    return "";
                 }
             }
-        ]
+        }, {
+            data: 'amountUSD',
+            render: function(data, type, row, meta) {
+                let val = null;
+                let priceUSD = null;
+                let priceUSDCurrent = null;
+                let dData = row.decodedData
+                if (dData != undefined) {
+                    if (dData.symbol != undefined && dData.dataRaw != undefined) {
+                        if (dData.dataUSD !== undefined) {
+                            val = dData.dataUSD;
+                            priceUSD = dData.priceUSD;
+                            priceUSDCurrent = dData.priceUSDCurrent;
+                        }
+                    }
+                }
+                if (type == 'display') {
+                    if (val) {
+                        return currencyFormat(val, priceUSD, priceUSDCurrent)
+                    }
+                } else {
+                    if (val) {
+                        return (val);
+                    }
+                }
+                return 0;
+            }
+        }, {
+            data: 'ts',
+            render: function(data, type, row, meta) {
+                if (type == 'export') {
+                    return data;
+                }
+                let tinyms = 0;
+                let eventID = row.eventID
+                if (eventID != undefined) {
+                    //"eventID": "2012-1185872-5-21",
+                    let eventIDPieces = eventID.split('-')
+                    if (eventIDPieces.length == 4) {
+                        tinyms = 0.001 * eventIDPieces[3]
+                    }
+
+                }
+                if (type == 'display') {
+                    return presentTS(data);
+                }
+                return (data + tinyms);
+            }
+        }, {
+            data: 'id',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }]
     });
 
     $(tableName).on('length.dt', function(e, settings, len) {
@@ -627,162 +591,149 @@ function showxcmtransfers(address, chainListStr = 'all') {
         }],
         lengthMenu: getLengthMenu(),
         columnDefs: [{
-                "className": "dt-right",
-                "targets": [1, 2, 3],
-                "searchable": false,
-            },
-            {
-                "targets": [4, 5, 6, 7],
-                "searchable": false,
-            },
-            {
-                "targets": [8, 9],
-                "visible": false,
-                "searchable": true,
-            }
-        ],
+            "className": "dt-right",
+            "targets": [1, 2, 3],
+            "searchable": false,
+        }, {
+            "targets": [4, 5, 6, 7],
+            "searchable": false,
+        }, {
+            "targets": [8, 9],
+            "visible": false,
+            "searchable": true,
+        }],
         order: [
             [4, "desc"]
         ],
         columns: [{
-                data: 'section',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentExtrinsic(row.id, row.section, row.method);
-                    }
-                    return data;
+            data: 'section',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentExtrinsic(row.id, row.section, row.method);
                 }
-            },
-            {
-                data: 'amountSent',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        try {
-                            let parsedAsset = JSON.parse(row.asset);
-                            let symbol = parsedAsset.Token;
-                            let assetChain = row.asset + "~" + row.chainID;
-                            if (symbol !== undefined) {
-                                return presentTokenCount(data) + " " + presentAsset(assetChain, symbol);
-                            } else {
-                                return row.asset;
-                            }
-                        } catch (err) {
-                            return "unk";
-                        }
-                    } else {
-                        try {
-                            let parsedAsset = JSON.parse(row.asset);
-                            let symbol = parsedAsset.Token;
-                            return data + " " + symbol;
-                        } catch (err) {
-                            return "unk";
-                        }
-                        return data;
-                    }
-                }
-            },
-            {
-                data: 'amountSentUSD',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.amountSentUSD !== undefined) {
-                            return currencyFormat(row.amountSentUSD, row.priceUSD, row.priceUSDCurrent);
+                return data;
+            }
+        }, {
+            data: 'amountSent',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    try {
+                        let parsedAsset = JSON.parse(row.asset);
+                        let symbol = parsedAsset.Token;
+                        let assetChain = row.asset + "~" + row.chainID;
+                        if (symbol !== undefined) {
+                            return presentTokenCount(data) + " " + presentAsset(assetChain, symbol);
                         } else {
-                            console.log("missing amountSentUSD", row);
-                            return "--";
+                            return row.asset;
                         }
+                    } catch (err) {
+                        return "unk";
                     }
-                    return data;
-                }
-            },
-            {
-                data: 'fromAddress',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.fromAddress !== undefined) {
-                            return presentID(data);
-                        } else {
-                            console.log("missing fromAddress", row);
-                        }
+                } else {
+                    try {
+                        let parsedAsset = JSON.parse(row.asset);
+                        let symbol = parsedAsset.Token;
+                        return data + " " + symbol;
+                    } catch (err) {
+                        return "unk";
                     }
-                    return data;
-                }
-            },
-            {
-                data: 'destAddress',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.destAddress !== undefined) {
-                            return presentID(data);
-                        } else {
-                            console.log("missing destAddress", row);
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'id',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
-                        let timelineURL = `/timeline/${row.extrinsicHash}`
-                        let timelineLink = `<div class="explorer"><a href="${timelineURL}">timeline</a></div>`
-                        return `${presentChain(row.id, row.chainName)} (${s})` + timelineLink;
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'chainIDDest',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        try {
-                            if (row.chainIDDest != undefined && row.chainDestName) {
-                                if (row.incomplete !== undefined && row.incomplete > 0) {
-                                    return "INCOMPLETE";
-                                } else if (row.blockNumberDest) {
-                                    return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest);
-                                } else {
-                                    return presentChain(row.idDest, row.chainDestName);
-                                }
-                            } else {
-                                return "-"
-                            }
-                        } catch (err) {
-                            console.log(err);
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'sourceTS',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.sourceTS !== undefined) {
-                            let s = presentTS(row.sourceTS);
-                            return s;
-                        } else {
-                            return "--";
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'id',
-                render: function(data, type, row, meta) {
-                    return data;
-                }
-            },
-            {
-                data: 'idDest',
-                render: function(data, type, row, meta) {
                     return data;
                 }
             }
-        ]
+        }, {
+            data: 'amountSentUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.amountSentUSD !== undefined) {
+                        return currencyFormat(row.amountSentUSD, row.priceUSD, row.priceUSDCurrent);
+                    } else {
+                        console.log("missing amountSentUSD", row);
+                        return "--";
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'fromAddress',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.fromAddress !== undefined) {
+                        return presentID(data);
+                    } else {
+                        console.log("missing fromAddress", row);
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'destAddress',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.destAddress !== undefined) {
+                        return presentID(data);
+                    } else {
+                        console.log("missing destAddress", row);
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'id',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                    let timelineURL = `/timeline/${row.extrinsicHash}`
+                    let timelineLink = `<div class="explorer"><a href="${timelineURL}">timeline</a></div>`
+                    return `${presentChain(row.id, row.chainName)} (${s})` + timelineLink;
+                }
+                return data;
+            }
+        }, {
+            data: 'chainIDDest',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    try {
+                        if (row.chainIDDest != undefined && row.chainDestName) {
+                            if (row.incomplete !== undefined && row.incomplete > 0) {
+                                return "INCOMPLETE";
+                            } else if (row.blockNumberDest) {
+                                return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest);
+                            } else {
+                                return presentChain(row.idDest, row.chainDestName);
+                            }
+                        } else {
+                            return "-"
+                        }
+                    } catch (err) {
+                        console.log(err);
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'sourceTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.sourceTS !== undefined) {
+                        let s = presentTS(row.sourceTS);
+                        return s;
+                    } else {
+                        return "--";
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'id',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }, {
+            data: 'idDest',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }]
     });
 
     $(tableName).on('page.dt', function() {
@@ -813,126 +764,116 @@ function showrewards(address, chainListStr = 'all') {
         }],
         lengthMenu: getLengthMenu(),
         columnDefs: [{
-                "className": "dt-right",
-                "targets": [2]
-            },
-            {
-                "targets": [7],
-                "visible": false
-            }
-        ],
+            "className": "dt-right",
+            "targets": [2]
+        }, {
+            "targets": [7],
+            "visible": false
+        }],
         order: [
             [4, "desc"]
         ],
         columns: [{
-                data: 'asset',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        try {
-                            let parsedAsset = JSON.parse(row.asset);
-                            let symbol = parsedAsset.Token;
-                            let assetChain = row.asset + "~" + row.chainID;
-                            if (symbol !== undefined) {
-                                return presentAsset(assetChain, symbol);
-                            } else {
-                                return row.asset;
-                            }
-                        } catch (err) {
-                            console.log("row.asset", row.asset, err);
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'amount',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        try {
-                            return presentTokenCount(data);
-                        } catch (err) {
-                            console.log(err);
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'amountUSD',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.amountUSD !== undefined) {
-                            return currencyFormat(row.amountUSD, row.priceUSD, row.priceUSDCurrent);
-                        } else {
-                            console.log("missing amountUSD", row);
-                            return "--";
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'extrinsicHash',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
-                        return `${presentChain(row.chainID, row.chainName)} (${s})`
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'section',
-                render: function(data, type, row, meta) {
+            data: 'asset',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
                     try {
-                        if (row.section && row.method) {
-                            return `${row.section}(${row.method})`
+                        let parsedAsset = JSON.parse(row.asset);
+                        let symbol = parsedAsset.Token;
+                        let assetChain = row.asset + "~" + row.chainID;
+                        if (symbol !== undefined) {
+                            return presentAsset(assetChain, symbol);
+                        } else {
+                            return row.asset;
                         }
+                    } catch (err) {
+                        console.log("row.asset", row.asset, err);
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'amount',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    try {
+                        return presentTokenCount(data);
                     } catch (err) {
                         console.log(err);
                     }
-                    return "";
                 }
-            },
-            {
-                data: 'ts',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.ts !== undefined) {
-                            let s = presentTS(row.ts);
-                            return s;
-                        } else {
-                            return "--";
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'era',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.era !== undefined) {
-                            return row.era;
-                        } else {
-                            return "--";
-                        }
+                return data;
+            }
+        }, {
+            data: 'amountUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.amountUSD !== undefined) {
+                        return currencyFormat(row.amountUSD, row.priceUSD, row.priceUSDCurrent);
                     } else {
-                        if (row.era !== undefined) {
-                            return row.era;
-                        } else {
-                            return "--";
-                        }
+                        console.log("missing amountUSD", row);
+                        return "--";
                     }
                 }
-            },
-            {
-                data: 'id',
-                render: function(data, type, row, meta) {
-                    return data;
+                return data;
+            }
+        }, {
+            data: 'extrinsicHash',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
+                    return `${presentChain(row.chainID, row.chainName)} (${s})`
+                }
+                return data;
+            }
+        }, {
+            data: 'section',
+            render: function(data, type, row, meta) {
+                try {
+                    if (row.section && row.method) {
+                        return `${row.section}(${row.method})`
+                    }
+                } catch (err) {
+                    console.log(err);
+                }
+                return "";
+            }
+        }, {
+            data: 'ts',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.ts !== undefined) {
+                        let s = presentTS(row.ts);
+                        return s;
+                    } else {
+                        return "--";
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'era',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.era !== undefined) {
+                        return row.era;
+                    } else {
+                        return "--";
+                    }
+                } else {
+                    if (row.era !== undefined) {
+                        return row.era;
+                    } else {
+                        return "--";
+                    }
                 }
             }
-        ]
+        }, {
+            data: 'id',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }]
     });
     $(tableName).on('page.dt', function() {
         setupcurrency();
@@ -970,104 +911,98 @@ function showcrowdloans(address, chainListStr = 'all') {
             [5, "desc"]
         ],
         columns: [{
-                data: 'chainIDDest',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.chainDestName !== undefined) {
-                            let subexplorerURL = `https://${row.id}.polkaholic.io`;
-                            let links = [`<a href='${subexplorerURL}'>explorer</a>`];
-                            if (row.dappURL) {
-                                links.push(`<a href='${row.dappURL}'>app</a>`);
-                            }
-                            if (row.parachainsURL) {
-                                links.push(`<a href='${row.parachainsURL}'>parachains.info</a>`);
-                            }
-                            let links_str = "<div class='explorer'>" + links.join(" | ") + "</div>";
-                            return presentChain(row.chainIDDest, row.chainDestName, row.iconUrl) + links_str;
-                        } else {
-                            return row.chainIDDest;
+            data: 'chainIDDest',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.chainDestName !== undefined) {
+                        let subexplorerURL = `https://${row.id}.polkaholic.io`;
+                        let links = [`<a href='${subexplorerURL}'>explorer</a>`];
+                        if (row.dappURL) {
+                            links.push(`<a href='${row.dappURL}'>app</a>`);
                         }
+                        if (row.parachainsURL) {
+                            links.push(`<a href='${row.parachainsURL}'>parachains.info</a>`);
+                        }
+                        let links_str = "<div class='explorer'>" + links.join(" | ") + "</div>";
+                        return presentChain(row.chainIDDest, row.chainDestName, row.iconUrl) + links_str;
                     } else {
-                        if (row.chainIDDest !== undefined) {
-                            return row.chainIDDest;
-                        } else {
-                            return "--";
-                        }
+                        return row.chainIDDest;
                     }
-                }
-            },
-            {
-                data: 'asset',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        try {
-                            let parsedAsset = JSON.parse(row.asset);
-                            let symbol = parsedAsset.Token;
-                            let assetChain = row.asset + "~" + row.chainID;
-                            if (symbol !== undefined) {
-                                return presentAsset(assetChain, symbol);
-                            } else {
-                                return row.asset;
-                            }
-                        } catch (err) {
-                            console.log("row.asset", row.asset, err);
-                        }
+                } else {
+                    if (row.chainIDDest !== undefined) {
+                        return row.chainIDDest;
+                    } else {
+                        return "--";
                     }
-                    return data;
-                }
-            },
-            {
-                data: 'amount',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        try {
-                            return presentTokenCount(data);
-                        } catch (err) {
-                            console.log(err);
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'amountUSD',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.amountUSD !== undefined) {
-                            return currencyFormat(row.amountUSD, row.priceUSD, row.priceUSDCurrent);
-                        } else {
-                            console.log("missing amountUSD", row);
-                            return "--";
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'extrinsicHash',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
-                        return `${presentChain(row.chainID, row.chainName)} (${s})`
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'ts',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.ts !== undefined) {
-                            let s = presentTS(row.ts);
-                            return s;
-                        } else {
-                            return "--";
-                        }
-                    }
-                    return data;
                 }
             }
-        ]
+        }, {
+            data: 'asset',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    try {
+                        let parsedAsset = JSON.parse(row.asset);
+                        let symbol = parsedAsset.Token;
+                        let assetChain = row.asset + "~" + row.chainID;
+                        if (symbol !== undefined) {
+                            return presentAsset(assetChain, symbol);
+                        } else {
+                            return row.asset;
+                        }
+                    } catch (err) {
+                        console.log("row.asset", row.asset, err);
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'amount',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    try {
+                        return presentTokenCount(data);
+                    } catch (err) {
+                        console.log(err);
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'amountUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.amountUSD !== undefined) {
+                        return currencyFormat(row.amountUSD, row.priceUSD, row.priceUSDCurrent);
+                    } else {
+                        console.log("missing amountUSD", row);
+                        return "--";
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'extrinsicHash',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
+                    return `${presentChain(row.chainID, row.chainName)} (${s})`
+                }
+                return data;
+            }
+        }, {
+            data: 'ts',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.ts !== undefined) {
+                        let s = presentTS(row.ts);
+                        return s;
+                    } else {
+                        return "--";
+                    }
+                }
+                return data;
+            }
+        }]
     });
     $(tableName).on('length.dt', function(e, settings, len) {
         loadData2(pathParams, tableName, true, "data", 'crowdloans', 'Crowdloans')

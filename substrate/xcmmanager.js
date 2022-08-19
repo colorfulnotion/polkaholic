@@ -794,6 +794,9 @@ order by msgHash, diffSentAt, diffTS`
           xcmmessages.extrinsicID,
           xcmmessages.blockTS,
           xcmmessages.beneficiaries${fld},
+          xcmmessages.executedEventID,
+          xcmmessages.destStatus,
+          xcmmessages.errorDesc,
           d.eventID, d.asset, d.rawAsset, d.nativeAssetChain, d.amountReceived, d.blockNumberDest, d.destTS, d.msgHash as candidateMsgHash
         from xcmmessages, xcmtransferdestcandidate as d
  where  d.fromAddress = xcmmessages.beneficiaries and
@@ -808,15 +811,12 @@ order by msgHash, diffSentAt, diffTS`
         xcmmessages.assetsReceived is Null and
         length(xcmmessages.extrinsicID) > 0  ${endWhere}
 order by chainID, extrinsicHash, eventID, diffTS`;
-        // unmatch with:
-        //  update xcmmessages set assetsReceived = null, amountReceivedUSD = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
-        //  update xcmtransfer set assetsReceived = null, amountReceivedUSD2 = 0 where sourceTS >= unix_timestamp("2022-07-01") and sourceTS < unix_timestamp("2022-08-14 00:00")
-        // rematch with: ./xcmmatch 45
         console.log(sql);
         try {
             let matches = await this.pool.query(sql);
             let assetsReceived = {};
             let assetsReceivedXCMTransfer = {};
+            let statusXCMTransfer = {};
             let prevEventK = false
             let prevDestMatch = false
             let incoming = {};
@@ -873,7 +873,6 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                     decimal: decimals,
                     amountReceived: amountReceived,
                     amountReceivedUSD: amountReceivedUSD,
-                    eventID: m.eventID,
                     blockNumber: m.blockNumber,
                     ts: m.destTS
                 };
@@ -896,6 +895,11 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                     }
                     if (isNewEventK) {
                         assetsReceivedXCMTransfer[k2].push(destMatch);
+                    }
+                    statusXCMTransfer[k2] = {
+                        destStatus: m.destStatus,
+                        errorDesc: m.errorDesc,
+                        executedEventID: m.executedEventID,
                     }
                 }
                 prevEventK = currEventK
@@ -933,7 +937,12 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                 let ar = JSON.stringify(r);
                 if (ar.length < 1024) {
                     let valueUSD = this.sum_assetsReceived(r);
-                    let sql = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)}, amountReceivedUSD2 = ${valueUSD} where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
+                    const {
+                        destStatus,
+                        errorDesc,
+                        executedEventID
+                    } = statusXCMTransfer[k];
+                    let sql = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)}, amountReceivedUSD2 = '${valueUSD}', destStatus = '${destStatus}', errorDesc = ${mysql.escape(errorDesc)}, executedEventID = '${executedEventID}' where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
                     //console.log(sql);
                     this.batchedSQL.push(sql);
                     await this.update_batchedSQL();

@@ -16,45 +16,42 @@ function showassetholders(assetChain) {
             "targets": [1, 2]
         }],
         columns: [{
-                data: 'holder',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentFullAddress(row.holder);
-                    }
-                    return data;
+            data: 'holder',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentFullAddress(row.holder);
                 }
-            },
-            {
-                data: 'free',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.free !== undefined) {
-                            return presentTokenCount(row.free);
-                        }
-                    } else {
-                        if (row.free !== undefined) {
-                            return row.free;
-                        }
-                    }
-                    return 0;
-                }
-            },
-            {
-                data: 'balanceUSD',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.balanceUSD !== undefined) {
-                            return currencyFormat(row.balanceUSD);
-                        }
-                    } else {
-                        if (row.balanceUSD !== undefined) {
-                            return row.balanceUSD;
-                        }
-                    }
-                    return 0;
-                }
+                return data;
             }
-        ]
+        }, {
+            data: 'free',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.free !== undefined) {
+                        return presentTokenCount(row.free);
+                    }
+                } else {
+                    if (row.free !== undefined) {
+                        return row.free;
+                    }
+                }
+                return 0;
+            }
+        }, {
+            data: 'balanceUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.balanceUSD !== undefined) {
+                        return currencyFormat(row.balanceUSD);
+                    }
+                } else {
+                    if (row.balanceUSD !== undefined) {
+                        return row.balanceUSD;
+                    }
+                }
+                return 0;
+            }
+        }]
     });
     loadData2(pathParams, tableName, true)
 }
@@ -76,76 +73,70 @@ function showassetsrelated(assetChain) {
             "targets": [1, 2, 3, 4]
         }],
         columns: [{
-                data: 'symbol',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.assetType == "ERC20LP") {
-                            return presentAssetPair(row.assetChain, row.symbol, row.token0, row.token1, row.token0Symbol, row.token1Symbol, row.chainID);
-                        } else {
-                            return presentAsset(row.assetChain, row.symbol);
-                        }
+            data: 'symbol',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.assetType == "ERC20LP") {
+                        return presentAssetPair(row.assetChain, row.symbol, row.token0, row.token1, row.token0Symbol, row.token1Symbol, row.chainID);
+                    } else {
+                        return presentAsset(row.assetChain, row.symbol);
                     }
-                    return data;
                 }
-            },
-            {
-                data: 'decimals',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.assetType == "ERC20LP") {
-                            return row.token0Decimals + "/" + row.token1Decimals;
-                        } else {
-                            return data;
-                        }
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'assetType',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
+                return data;
+            }
+        }, {
+            data: 'decimals',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.assetType == "ERC20LP") {
+                        return row.token0Decimals + "/" + row.token1Decimals;
+                    } else {
                         return data;
                     }
-                    return data;
                 }
-            },
-            {
-                data: 'numHolders',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        return presentNumber(data);
-                    }
-                    return data;
-                }
-            },
-            {
-                data: 'accountState',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-
-                        if (row.accountState !== undefined && row.accountState.free !== undefined) {
-                            return presentTokenCount(row.accountState.free);
-                        }
-                        return 0
-                    }
-                    return 0;
-                }
-            },
-            {
-                data: 'balanceUSD',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-
-                        if (row.accountState !== undefined && row.accountState.freeUSD !== undefined) {
-                            return currencyFormat(row.accountState.freeUSD);
-                        }
-                        return 0
-                    }
-                    return 0;
-                }
+                return data;
             }
-        ]
+        }, {
+            data: 'assetType',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'numHolders',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'accountState',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+
+                    if (row.accountState !== undefined && row.accountState.free !== undefined) {
+                        return presentTokenCount(row.accountState.free);
+                    }
+                    return 0
+                }
+                return 0;
+            }
+        }, {
+            data: 'balanceUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+
+                    if (row.accountState !== undefined && row.accountState.freeUSD !== undefined) {
+                        return currencyFormat(row.accountState.freeUSD);
+                    }
+                    return 0
+                }
+                return 0;
+            }
+        }]
     });
     loadData2(pathParams, tableName, true)
 }

@@ -1020,100 +1020,100 @@ module.exports = class AssetManager extends PolkaholicDB {
                 return [val * priceUSD, priceUSD, priceUSDCurrent];
             }
             break;
-            case paraTool.assetTypeERC20LiquidityPair:
-            /*
-            	    if WGLMR is $2.13 and GLINT is $0.003049, how much is 1 WGLMR/GLINT
-            total lp0(WGLMR): 267712
-            total lp1(GLINT): 128949000
-            total LP issuance WGLMR/GLINT: 5770310
+        case paraTool.assetTypeERC20LiquidityPair:
+        /*
+        	    if WGLMR is $2.13 and GLINT is $0.003049, how much is 1 WGLMR/GLINT
+        total lp0(WGLMR): 267712
+        total lp1(GLINT): 128949000
+        total LP issuance WGLMR/GLINT: 5770310
 
-            1 share of WGLMR/GLINT is 267712/5770310 ~ 0.04639473442 WGLMR + 128949000/5770310  ~ 22.346979625 GLINT
-            ~= 2.13*0.04639473442 + 22.346979625*0.003049
-            ~= 0.09882078431 + 0.06813594087
-            	    ~= 0.16695672518
-            */
-            {
-                let dexRec = await this.getDexRec(asset, chainID, ts);
-                if (dexRec == undefined) {
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned assetChain=${assetChain}`);
-                    return [false, false, false];
-                }
-                let priceUSD0 = await this.getTokenPriceUSD(assetInfo.token0, chainID, ts);
-                let priceUSD1 = await this.getTokenPriceUSD(assetInfo.token1, chainID, ts);
-                let priceUSD0Current = await this.getTokenPriceUSD(assetInfo.token0, chainID, currentTS);
-                let priceUSD1Current = await this.getTokenPriceUSD(assetInfo.token1, chainID, currentTS);
-                let issuance = dexRec.issuance;
-                let x0 = dexRec.lp0 / issuance;
-                let x1 = dexRec.lp1 / issuance;
-                let priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
-                let priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeERC20LiquidityPair returned`, "priceUSD0", priceUSD0, "priceUSD1", priceUSD1, "issuance", issuance, "x0", x0, "x1", x1, "p0", p0, "p1", p1, "priceUSD", priceUSD);
+        1 share of WGLMR/GLINT is 267712/5770310 ~ 0.04639473442 WGLMR + 128949000/5770310  ~ 22.346979625 GLINT
+        ~= 2.13*0.04639473442 + 22.346979625*0.003049
+        ~= 0.09882078431 + 0.06813594087
+        	    ~= 0.16695672518
+        */
+        {
+            let dexRec = await this.getDexRec(asset, chainID, ts);
+            if (dexRec == undefined) {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned assetChain=${assetChain}`);
+                return [false, false, false];
+            }
+            let priceUSD0 = await this.getTokenPriceUSD(assetInfo.token0, chainID, ts);
+            let priceUSD1 = await this.getTokenPriceUSD(assetInfo.token1, chainID, ts);
+            let priceUSD0Current = await this.getTokenPriceUSD(assetInfo.token0, chainID, currentTS);
+            let priceUSD1Current = await this.getTokenPriceUSD(assetInfo.token1, chainID, currentTS);
+            let issuance = dexRec.issuance;
+            let x0 = dexRec.lp0 / issuance;
+            let x1 = dexRec.lp1 / issuance;
+            let priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
+            let priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeERC20LiquidityPair returned`, "priceUSD0", priceUSD0, "priceUSD1", priceUSD1, "issuance", issuance, "x0", x0, "x1", x1, "p0", p0, "p1", p1, "priceUSD", priceUSD);
+            return [val * priceUSD, priceUSD, priceUSDCurrent];
+        }
+        break;
+        case paraTool.assetTypeLiquidityPair: {
+            let dexRec = await this.getDexRec(asset, chainID, ts);
+            if (!dexRec) {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned assetChain=${assetChain}`);
+                return [false, false, false];
+            }
+
+            let priceUSD0 = await this.getTokenPriceUSD(assetInfo.token0, chainID, ts);
+            let priceUSD1 = await this.getTokenPriceUSD(assetInfo.token1, chainID, ts);
+            // special cases
+            if (priceUSD0 == 1 && (priceUSD1 == 0)) {
+                priceUSD1 = dexRec.lp0 / dexRec.lp1;
+            }
+            if (priceUSD0 == 0 && (priceUSD1 == 1)) {
+                priceUSD0 = dexRec.lp1 / dexRec.lp0;
+            }
+
+            let priceUSD0Current = await this.getTokenPriceUSD(assetInfo.token0, chainID, currentTS);
+            let priceUSD1Current = await this.getTokenPriceUSD(assetInfo.token1, chainID, currentTS);
+            let issuance = dexRec.issuance;
+            let x0 = dexRec.lp0 / issuance;
+            let x1 = dexRec.lp1 / issuance;
+            let priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
+            let priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeLiquidityPair returned`, "priceUSD0", priceUSD0, "priceUSD1", priceUSD1, "issuance", issuance, "x0", x0, "x1", x1, "priceUSD", priceUSD);
+            return [val * priceUSD, priceUSD, priceUSDCurrent];
+        }
+        break;
+        case paraTool.assetTypeLoan: {
+            let parsedAsset = JSON.parse(asset);
+            if (parsedAsset.Loan !== undefined) {
+                let loanedAsset = JSON.stringify(parsedAsset.Loan);
+                let priceUSD = await this.getTokenPriceUSD(loanedAsset, chainID, ts); //this is actually collateral..
+                let priceUSDCurrent = await this.getTokenPriceUSD(loanedAsset, chainID, currentTS); //this is actually collateral..
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeLoan returned, priceUSD=${priceUSD}, priceUSDCurrent=${priceUSDCurrent}`)
                 return [val * priceUSD, priceUSD, priceUSDCurrent];
             }
-            break;
-            case paraTool.assetTypeLiquidityPair: {
-                let dexRec = await this.getDexRec(asset, chainID, ts);
-                if (!dexRec) {
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned assetChain=${assetChain}`);
-                    return [false, false, false];
-                }
-
-                let priceUSD0 = await this.getTokenPriceUSD(assetInfo.token0, chainID, ts);
-                let priceUSD1 = await this.getTokenPriceUSD(assetInfo.token1, chainID, ts);
-                // special cases
-                if (priceUSD0 == 1 && (priceUSD1 == 0)) {
-                    priceUSD1 = dexRec.lp0 / dexRec.lp1;
-                }
-                if (priceUSD0 == 0 && (priceUSD1 == 1)) {
-                    priceUSD0 = dexRec.lp1 / dexRec.lp0;
-                }
-
-                let priceUSD0Current = await this.getTokenPriceUSD(assetInfo.token0, chainID, currentTS);
-                let priceUSD1Current = await this.getTokenPriceUSD(assetInfo.token1, chainID, currentTS);
-                let issuance = dexRec.issuance;
-                let x0 = dexRec.lp0 / issuance;
-                let x1 = dexRec.lp1 / issuance;
-                let priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
-                let priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeLiquidityPair returned`, "priceUSD0", priceUSD0, "priceUSD1", priceUSD1, "issuance", issuance, "x0", x0, "x1", x1, "priceUSD", priceUSD);
-                return [val * priceUSD, priceUSD, priceUSDCurrent];
+        }
+        break;
+        case paraTool.assetTypeCDPSupply: {
+            let parsedAsset = JSON.parse(asset);
+            if (parsedAsset.CDP_Supply !== undefined) {
+                let suppliedAsset = JSON.stringify(parsedAsset.CDP_Supply);
+                let x = await this.computeUSD(val, suppliedAsset, chainID, ts);
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeCDPSupply`, x)
+                return x;
             }
-            break;
-            case paraTool.assetTypeLoan: {
-                let parsedAsset = JSON.parse(asset);
-                if (parsedAsset.Loan !== undefined) {
-                    let loanedAsset = JSON.stringify(parsedAsset.Loan);
-                    let priceUSD = await this.getTokenPriceUSD(loanedAsset, chainID, ts); //this is actually collateral..
-                    let priceUSDCurrent = await this.getTokenPriceUSD(loanedAsset, chainID, currentTS); //this is actually collateral..
-                    if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeLoan returned, priceUSD=${priceUSD}, priceUSDCurrent=${priceUSDCurrent}`)
-                    return [val * priceUSD, priceUSD, priceUSDCurrent];
-                }
+        }
+        break;
+        case paraTool.assetTypeCDPBorrow: {
+            let parsedAsset = JSON.parse(asset);
+            if (parsedAsset.CDP_Borrow !== undefined) {
+                let borrowedAsset = JSON.stringify(parsedAsset.CDP_Borrow);
+                let x = await this.computeUSD(val, borrowedAsset, chainID, ts);
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeCDPBorrow returned`, x)
+                return x;
             }
-            break;
-            case paraTool.assetTypeCDPSupply: {
-                let parsedAsset = JSON.parse(asset);
-                if (parsedAsset.CDP_Supply !== undefined) {
-                    let suppliedAsset = JSON.stringify(parsedAsset.CDP_Supply);
-                    let x = await this.computeUSD(val, suppliedAsset, chainID, ts);
-                    if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeCDPSupply`, x)
-                    return x;
-                }
-            }
-            break;
-            case paraTool.assetTypeCDPBorrow: {
-                let parsedAsset = JSON.parse(asset);
-                if (parsedAsset.CDP_Borrow !== undefined) {
-                    let borrowedAsset = JSON.stringify(parsedAsset.CDP_Borrow);
-                    let x = await this.computeUSD(val, borrowedAsset, chainID, ts);
-                    if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeCDPBorrow returned`, x)
-                    return x;
-                }
-            }
-            break;
-            default: {
-                if (this.debugLevel >= paraTool.debugInfo) console.log("not implemented:", assetInfo.assetType);
-            }
-            break;
+        }
+        break;
+        default: {
+            if (this.debugLevel >= paraTool.debugInfo) console.log("not implemented:", assetInfo.assetType);
+        }
+        break;
         }
         return [0, 0, 0];
     }
