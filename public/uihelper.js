@@ -1,5 +1,56 @@
 //var baseURL is set at header
 
+function rendereventdata(data, id = "datascope") {
+    var script = document.createElement("script");
+    document.getElementById(id).innerHTML = "";
+    script.innerHTML = `document.getElementById("${id}").appendChild(renderjson.set_show_to_level(5)(` + JSON.stringify(data) + `))`;
+    document.body.appendChild(script);
+}
+
+function fetcheventdata(eventID) {
+    let endpoint = `${baseURL}/event/${eventID}`
+    console.log(`requesting endpoint:${endpoint}`)
+    var req = new Request(endpoint, {
+        method: 'GET',
+        headers: new Headers({
+            "Content-Type": "application/json"
+        })
+    });
+    fetch(req)
+        .then((response) => response.json())
+        .then((data) => {
+            try {
+                rendereventdata(data, "data" + eventID);
+            } catch (err) {
+                console.log(err);
+            }
+        });
+}
+
+
+function parseEventID(eventID) {
+    let ida = eventID.split("-");
+    if (ida.length == 4) {
+        let extrinsicID = `${ida[1]}-${ida[2]}`
+        let eventIndex = ida[3];
+        return [extrinsicID, eventIndex];
+    }
+    return [null, null];
+}
+
+function presentEventDetails(eventID) {
+    let [extrinsicID, eventIndex] = parseEventID(eventID);
+    if (extrinsicID && eventIndex) {
+        title = `View ${extrinsicID} Event# ${eventIndex}`;
+    } else {
+        title = `View ${eventID}`
+    }
+    return `<div style='width:650px'>
+<a class="btn btn-outline-secondary btn-block text-capitalize" data-mdb-toggle="collapse" href="#data${eventID}" role="button" aria-control="data${eventID}" aria-expanded="false" style="text-align:left">${title}</a>
+<div class="collapse mt-3 renderjson" id="data${eventID}"></div>
+</div><script>document.getElementById('data${eventID}').addEventListener('show.bs.collapse', () => { fetcheventdata("${eventID}") } )</script>`;
+}
+
 function presentInstructions(msg, id, hdr = "Instructions", width = "600") {
     let rjouter = "rjouter" + id;
     let jhouter = "jhouter" + id;

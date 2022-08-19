@@ -1726,289 +1726,289 @@ module.exports = class Indexer extends AssetManager {
                 }
                 break;
 
-                case paraTool.assetTypeLoan:
-                    if (isFullPeriod) {
-                        let r = {
-                            issuance: 0,
-                            debitExchangeRate: 0,
-                            source: assetInfo.assetSource,
-                        };
-                        let upd = false;
-                        if (assetInfo.issuance) {
-                            r.issuance = assetInfo.issuance;
-                            assetInfo.issuance = 0;
-                            upd = true;
-                        }
-                        if (assetInfo.debitExchangeRate) {
-                            r.debitExchangeRate = assetInfo.debitExchangeRate;
-                            assetInfo.debitExchangeRate = 0;
-                            upd = true;
-                        }
-                        if (upd) {
-                            let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.issuance}', '${r.debitExchangeRate}')`
-                            if (this.debugLevel >= paraTool.debugInfo) console.log(`Loan`, o)
-                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o) && this.validDouble(r, assetInfo.assetType, o) && this.validDecimal(r, assetInfo.assetType, o)) {
-                                assetlogLoans.push(o);
-                            }
-                        }
+            case paraTool.assetTypeLoan:
+                if (isFullPeriod) {
+                    let r = {
+                        issuance: 0,
+                        debitExchangeRate: 0,
+                        source: assetInfo.assetSource,
+                    };
+                    let upd = false;
+                    if (assetInfo.issuance) {
+                        r.issuance = assetInfo.issuance;
+                        assetInfo.issuance = 0;
+                        upd = true;
                     }
-                    break;
-                case paraTool.assetTypeCDP:
-                    if (isFullPeriod) {
-                        let r = {
-                            //issuance: 0,
-                            supplyExchangeRate: 0,
-                            borrowExchangeRate: 0,
-                            source: assetInfo.assetSource,
-                        };
-                        let upd = false;
-                        /*
-                        if (assetInfo.issuance) {
-                            r.issuance = assetInfo.issuance;
-                            upd = true;
-                        }
-                        */
-                        if (assetInfo.supplyExchangeRate && assetInfo.borrowExchangeRate) {
-                            r.supplyExchangeRate = assetInfo.supplyExchangeRate;
-                            r.borrowExchangeRate = assetInfo.borrowExchangeRate;
-                            assetInfo.supplyExchangeRate = 0;
-                            assetInfo.borrowExchangeRate = 0;
-                            upd = true;
-                        }
-                        if (upd) {
-                            let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.supplyExchangeRate}', '${r.borrowExchangeRate}')`
-                            console.log(`CDP`, o)
-                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o) && this.validDouble(r, assetInfo.assetType, o) && this.validDecimal(r, assetInfo.assetType, o)) {
-                                assetlogCDPs.push(o);
-                            }
-                        }
+                    if (assetInfo.debitExchangeRate) {
+                        r.debitExchangeRate = assetInfo.debitExchangeRate;
+                        assetInfo.debitExchangeRate = 0;
+                        upd = true;
                     }
-                    break;
-                case paraTool.assetTypeLiquidityPair:
-                    if (isFullPeriod) {
-                        let r = {
-                            low: 0,
-                            high: 0,
-                            open: 0,
-                            close: 0,
-                            lp0: 0,
-                            lp1: 0,
-                            token0In: 0,
-                            token1In: 0,
-                            token0Out: 0,
-                            token1Out: 0,
-                            token0Volume: 0,
-                            token1Volume: 0,
-                            token0Fee: 0,
-                            token1Fee: 0,
-                            issuance: 0,
-                            source: assetInfo.assetSource,
-                        };
-                        let upd = false;
-
-                        if (assetInfo.rat !== undefined && assetInfo.rat.length > 0) {
-                            r.low = Math.min(...assetInfo.rat);
-                            r.high = Math.max(...assetInfo.rat);
-                            r.open = assetInfo.rat[0];
-                            r.close = assetInfo.rat[assetInfo.rat.length - 1];
-                            upd = true;
+                    if (upd) {
+                        let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.issuance}', '${r.debitExchangeRate}')`
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`Loan`, o)
+                        if (this.validAsset(asset, this.chainID, assetInfo.assetType, o) && this.validDouble(r, assetInfo.assetType, o) && this.validDecimal(r, assetInfo.assetType, o)) {
+                            assetlogLoans.push(o);
                         }
-                        if (assetInfo.lp0 !== undefined && assetInfo.lp1 !== undefined && assetInfo.lp0.length > 0 && assetInfo.lp1.length > 0) {
-                            r.lp0 = assetInfo.lp0[assetInfo.lp0.length - 1];
-                            r.lp1 = assetInfo.lp1[assetInfo.lp1.length - 1];
-                            upd = true;
-                        }
-                        if (assetInfo.issuance !== undefined) {
-                            r.issuance = assetInfo.issuance;
-                            assetInfo.issuance = 0;
-                        }
-                        if (assetInfo.token0In > 0 || assetInfo.token1In > 0) {
-                            r.token0In = assetInfo.token0In
-                            r.token1In = assetInfo.token1In
-                            r.token0Out = assetInfo.token0Out
-                            r.token1Out = assetInfo.token1Out
-                            r.token0Volume = assetInfo.token0In
-                            r.token1Volume = assetInfo.token1In
-                            r.token0Fee = assetInfo.token0In - assetInfo.token0Out
-                            r.token1Fee = assetInfo.token1In - assetInfo.token1Out
-                            upd = true;
-                        }
-
-                        if (upd) {
-                            this.tallyAsset[assetChain].lp0 = [];
-                            this.tallyAsset[assetChain].lp1 = [];
-                            this.tallyAsset[assetChain].rat = [];
-
-
-                            // clear volume tally
-                            this.tallyAsset[assetChain].token0In = 0;
-                            this.tallyAsset[assetChain].token1In = 0;
-                            this.tallyAsset[assetChain].token0Out = 0;
-                            this.tallyAsset[assetChain].token1Out = 0;
-
-                            //(asset, chainID, indexTS, source, open, close, low, high, lp0, lp1, issuance, token0Volume, token1Volume, state )
-                            let state = JSON.stringify(r)
-                            let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.open}', '${r.close}', '${r.low}', '${r.high}', '${r.lp0}', '${r.lp1}', '${r.issuance}', '${r.token0Volume}', '${r.token1Volume}', '${state}')`
-                            if (this.debugLevel >= paraTool.debugInfo) console.log(`LP update`, o)
-                            if (this.validAsset(asset, this.chainID, assetInfo.assetType, o) && this.validDouble(r, assetInfo.assetType, o) && this.validDecimal(r, assetInfo.assetType, o)) {
-                                assetlogLiquidityPairs.push(o);
-                            }
-                        }
-                    }
-                    break;
-                case paraTool.assetTypeERC20LiquidityPair:
-                    /*
-                        let res = await this.processAssetTypeERC20LiquidityPair(web3Api, chainID, assetChain, ts, blockNumber, isFullPeriod)
-                        if (res) {
-                            assetlogLiquidityPairs.push(res)
-                        }
-                    */
-                    break;
-                case paraTool.assetTypeNFTToken: {
-                    let sqlAssetKey = assetInfo.nftClass; // String eg {"NFTClass":3}
-                    let tokenID = assetInfo.tokenID; // String eg {"NFTToken":0}
-                    let holder = assetInfo.holder;
-                    let tokenURI = assetInfo.tokenURI;
-                    let free = assetInfo.free;
-                    let meta = (assetInfo.metadata !== undefined) ? assetInfo.metadata : "";
-
-                    /*
-                      {
-                      assetType: 'NFTToken',
-                      metadata: {
-                      metadata: '0x62616679626569646a6e737675366b62776c6f6b646b636b7670626d6c32696369736f793778776e6d6a346d717062776268676d677635336b7375',
-                      owner: '21t2T25Mc3XxTsqZSz4EyqhsM7LJiKrUKBE26ajwvNGq94w1',
-                      data: { deposit: 235400000000, attributes: {} }
-                      }
-                      }
-                    */
-                    let sql1 = `('${sqlAssetKey}', '${chainID}', '${tokenID}', '${holder}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(meta)}, '${tokenURI}', '${free}')`;
-                    if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql1)) {
-                        erc721tokens.push(sql1);
                     }
                 }
                 break;
-
-                case paraTool.assetTypeNFT:
+            case paraTool.assetTypeCDP:
+                if (isFullPeriod) {
+                    let r = {
+                        //issuance: 0,
+                        supplyExchangeRate: 0,
+                        borrowExchangeRate: 0,
+                        source: assetInfo.assetSource,
+                    };
+                    let upd = false;
                     /*
-                      {
-                      assetType: 'NFT',
-                      metadata: {
-                      metadata: '0x62616679626569646a6e737675366b62776c6f6b646b636b7670626d6c32696369736f793778776e6d6a346d717062776268676d677635336b7375',
-                      totalIssuance: 1,
-                      owner: '23M5ttkmR6KcnsARyoGv5Ymnr1YYkFMkN6rNMD8Df8BUHcQe',
-                      data: { deposit: 50035400000000, properties: 15, attributes: {} }
-                      }
-                      }
+                    if (assetInfo.issuance) {
+                        r.issuance = assetInfo.issuance;
+                        upd = true;
+                    }
                     */
-                    var sql = ''; //(asset, chainID, assetType, totalSupply, lastUpdateDT, lastUpdateBN, metadata, lastState, erc721isMetadata, erc721isEnumerable, tokenBaseURI)
-                    if (assetInfo.metadata != undefined) {
-                        //acala nft format unified with erc721
-                        let deposit = assetInfo.deposit ? assetInfo.deposit : 0;
-                        let sqlAssetKey = asset;
-                        let creator = (assetInfo.creator !== undefined) ? assetInfo.creator : "";
-                        let createdAtTx = (assetInfo.createdAtTx !== undefined) ? assetInfo.createdAtTx : "";
-                        let isEnumerable = (assetInfo.isEnumerable !== undefined && assetInfo.isEnumerable) ? 1 : 0;
-                        let isMetadataSupported = (assetInfo.isMetadataSupported !== undefined && assetInfo.isMetadataSupported) ? 1 : 0;
-                        let metadata = assetInfo.metadata;
-                        let baseURI = (assetInfo.baseURI !== undefined) ? assetInfo.baseURI : "";
-                        let ipfsUrl = (assetInfo.ipfsUrl !== undefined) ? assetInfo.ipfsUrl : "";
-                        let imageUrl = (assetInfo.imageUrl !== undefined) ? assetInfo.imageUrl : "";
-                        let totalSupply = ethTool.validate_bigint(assetInfo.totalIssuance);
-                        // sql will continue using contract address as asset key
-                        let sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.assetType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
-                        if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql)) {
-                            erc721classes.push(sql);
+                    if (assetInfo.supplyExchangeRate && assetInfo.borrowExchangeRate) {
+                        r.supplyExchangeRate = assetInfo.supplyExchangeRate;
+                        r.borrowExchangeRate = assetInfo.borrowExchangeRate;
+                        assetInfo.supplyExchangeRate = 0;
+                        assetInfo.borrowExchangeRate = 0;
+                        upd = true;
+                    }
+                    if (upd) {
+                        let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.supplyExchangeRate}', '${r.borrowExchangeRate}')`
+                        console.log(`CDP`, o)
+                        if (this.validAsset(asset, this.chainID, assetInfo.assetType, o) && this.validDouble(r, assetInfo.assetType, o) && this.validDecimal(r, assetInfo.assetType, o)) {
+                            assetlogCDPs.push(o);
                         }
                     }
-                    break;
-                case paraTool.assetTypeERC721:
-                    /*
-                      {
-                      blockNumber: 575292,
-                      tokenAddress: '...',
-                      tokenType: 'ERC721',
-                      isMetadataSupported: true,
-                      isEnumerable: true,
-                      metadata: { name: 'Moon Monkeys', symbol: 'MM', baseURI: null },
-                      totalSupply: '7353',
-                      numHolders: 0
-                      }
-                    */
-                    if (assetInfo.tokenAddress != undefined) {
-                        let sql = '';
-                        //erc721
-                        let sqlAssetKey = assetInfo.tokenAddress.toLowerCase();
-                        let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
-                        let createdAtTx = assetInfo.createdAtTx ? assetInfo.createdAtTx : "";
-                        let isEnumerable = (assetInfo.isEnumerable) ? 1 : 0
-                        let isMetadataSupported = (assetInfo.isMetadataSupported) ? 1 : 0
-                        let metadata = assetInfo.metadata
-                        let baseURI = 'Null'
-                        let ipfsUrl = 'Null'
-                        let imageUrl = 'Null'
-                        let totalSupply = ethTool.validate_bigint(assetInfo.totalSupply);
-                        if (isMetadataSupported) {
-                            if (metadata.baseURI != undefined) baseURI = `${metadata.baseURI}`
-                            if (metadata.ipfsUrl != undefined) ipfsUrl = `${metadata.ipfsUrl}`
-                            if (metadata.imageUrl != undefined) imageUrl = `${metadata.imageUrl}`
-                        }
-                        // sql will continue using contract address as asset key
-                        if (isMetadataSupported) {
-                            //(asset, chainID, assetType, assetName, symbol, totalSupply, lastUpdateDT, lastUpdateBN, metadata, erc721isMetadata, erc721isEnumerable, tokenBaseURI, ipfsUrl, imageUrl, createDT, creator, createdAtTx)
-                            sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', ${mysql.escape(this.clip_string(metadata.name))}, ${mysql.escape(this.clip_string(metadata.symbol))}, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(JSON.stringify(metadata))},  '${isMetadataSupported}', '${isEnumerable}', '${baseURI}', '${ipfsUrl}', '${imageUrl}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
-                        } else {
-                            sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
-                        }
-                        if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql)) {
-                            erc721classes.push(sql);
+                }
+                break;
+            case paraTool.assetTypeLiquidityPair:
+                if (isFullPeriod) {
+                    let r = {
+                        low: 0,
+                        high: 0,
+                        open: 0,
+                        close: 0,
+                        lp0: 0,
+                        lp1: 0,
+                        token0In: 0,
+                        token1In: 0,
+                        token0Out: 0,
+                        token1Out: 0,
+                        token0Volume: 0,
+                        token1Volume: 0,
+                        token0Fee: 0,
+                        token1Fee: 0,
+                        issuance: 0,
+                        source: assetInfo.assetSource,
+                    };
+                    let upd = false;
+
+                    if (assetInfo.rat !== undefined && assetInfo.rat.length > 0) {
+                        r.low = Math.min(...assetInfo.rat);
+                        r.high = Math.max(...assetInfo.rat);
+                        r.open = assetInfo.rat[0];
+                        r.close = assetInfo.rat[assetInfo.rat.length - 1];
+                        upd = true;
+                    }
+                    if (assetInfo.lp0 !== undefined && assetInfo.lp1 !== undefined && assetInfo.lp0.length > 0 && assetInfo.lp1.length > 0) {
+                        r.lp0 = assetInfo.lp0[assetInfo.lp0.length - 1];
+                        r.lp1 = assetInfo.lp1[assetInfo.lp1.length - 1];
+                        upd = true;
+                    }
+                    if (assetInfo.issuance !== undefined) {
+                        r.issuance = assetInfo.issuance;
+                        assetInfo.issuance = 0;
+                    }
+                    if (assetInfo.token0In > 0 || assetInfo.token1In > 0) {
+                        r.token0In = assetInfo.token0In
+                        r.token1In = assetInfo.token1In
+                        r.token0Out = assetInfo.token0Out
+                        r.token1Out = assetInfo.token1Out
+                        r.token0Volume = assetInfo.token0In
+                        r.token1Volume = assetInfo.token1In
+                        r.token0Fee = assetInfo.token0In - assetInfo.token0Out
+                        r.token1Fee = assetInfo.token1In - assetInfo.token1Out
+                        upd = true;
+                    }
+
+                    if (upd) {
+                        this.tallyAsset[assetChain].lp0 = [];
+                        this.tallyAsset[assetChain].lp1 = [];
+                        this.tallyAsset[assetChain].rat = [];
+
+
+                        // clear volume tally
+                        this.tallyAsset[assetChain].token0In = 0;
+                        this.tallyAsset[assetChain].token1In = 0;
+                        this.tallyAsset[assetChain].token0Out = 0;
+                        this.tallyAsset[assetChain].token1Out = 0;
+
+                        //(asset, chainID, indexTS, source, open, close, low, high, lp0, lp1, issuance, token0Volume, token1Volume, state )
+                        let state = JSON.stringify(r)
+                        let o = `('${asset}', '${this.chainID}', '${ts}', '${r.source}', '${r.open}', '${r.close}', '${r.low}', '${r.high}', '${r.lp0}', '${r.lp1}', '${r.issuance}', '${r.token0Volume}', '${r.token1Volume}', '${state}')`
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`LP update`, o)
+                        if (this.validAsset(asset, this.chainID, assetInfo.assetType, o) && this.validDouble(r, assetInfo.assetType, o) && this.validDecimal(r, assetInfo.assetType, o)) {
+                            assetlogLiquidityPairs.push(o);
                         }
                     }
-                    break;
+                }
+                break;
+            case paraTool.assetTypeERC20LiquidityPair:
+                /*
+                    let res = await this.processAssetTypeERC20LiquidityPair(web3Api, chainID, assetChain, ts, blockNumber, isFullPeriod)
+                    if (res) {
+                        assetlogLiquidityPairs.push(res)
+                    }
+                */
+                break;
+            case paraTool.assetTypeNFTToken: {
+                let sqlAssetKey = assetInfo.nftClass; // String eg {"NFTClass":3}
+                let tokenID = assetInfo.tokenID; // String eg {"NFTToken":0}
+                let holder = assetInfo.holder;
+                let tokenURI = assetInfo.tokenURI;
+                let free = assetInfo.free;
+                let meta = (assetInfo.metadata !== undefined) ? assetInfo.metadata : "";
 
-                case paraTool.assetTypeERC721Token: {
-                    /*
-                      {
-                      blockNumber: 576837,
-                      tokenAddress: '...',
-                      tokenType: 'ERC721Token',
-                      isMetadataSupported: true,
-                      tokenID: '14700877701539379516299095288040297463165322513409438848687442933988920671445',
-                      tokenURI: 'https://app.domainchain.network/api/nftdomains/metadata/lending.moon',
-                      owner: '0x53Fc1bf99217d981721a52eAbe1A2F39A049aBfb'
-                      }
-                    */
+                /*
+                  {
+                  assetType: 'NFTToken',
+                  metadata: {
+                  metadata: '0x62616679626569646a6e737675366b62776c6f6b646b636b7670626d6c32696369736f793778776e6d6a346d717062776268676d677635336b7375',
+                  owner: '21t2T25Mc3XxTsqZSz4EyqhsM7LJiKrUKBE26ajwvNGq94w1',
+                  data: { deposit: 235400000000, attributes: {} }
+                  }
+                  }
+                */
+                let sql1 = `('${sqlAssetKey}', '${chainID}', '${tokenID}', '${holder}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(meta)}, '${tokenURI}', '${free}')`;
+                if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql1)) {
+                    erc721tokens.push(sql1);
+                }
+            }
+            break;
+
+            case paraTool.assetTypeNFT:
+                /*
+                  {
+                  assetType: 'NFT',
+                  metadata: {
+                  metadata: '0x62616679626569646a6e737675366b62776c6f6b646b636b7670626d6c32696369736f793778776e6d6a346d717062776268676d677635336b7375',
+                  totalIssuance: 1,
+                  owner: '23M5ttkmR6KcnsARyoGv5Ymnr1YYkFMkN6rNMD8Df8BUHcQe',
+                  data: { deposit: 50035400000000, properties: 15, attributes: {} }
+                  }
+                  }
+                */
+                var sql = ''; //(asset, chainID, assetType, totalSupply, lastUpdateDT, lastUpdateBN, metadata, lastState, erc721isMetadata, erc721isEnumerable, tokenBaseURI)
+                if (assetInfo.metadata != undefined) {
+                    //acala nft format unified with erc721
+                    let deposit = assetInfo.deposit ? assetInfo.deposit : 0;
+                    let sqlAssetKey = asset;
+                    let creator = (assetInfo.creator !== undefined) ? assetInfo.creator : "";
+                    let createdAtTx = (assetInfo.createdAtTx !== undefined) ? assetInfo.createdAtTx : "";
+                    let isEnumerable = (assetInfo.isEnumerable !== undefined && assetInfo.isEnumerable) ? 1 : 0;
+                    let isMetadataSupported = (assetInfo.isMetadataSupported !== undefined && assetInfo.isMetadataSupported) ? 1 : 0;
+                    let metadata = assetInfo.metadata;
+                    let baseURI = (assetInfo.baseURI !== undefined) ? assetInfo.baseURI : "";
+                    let ipfsUrl = (assetInfo.ipfsUrl !== undefined) ? assetInfo.ipfsUrl : "";
+                    let imageUrl = (assetInfo.imageUrl !== undefined) ? assetInfo.imageUrl : "";
+                    let totalSupply = ethTool.validate_bigint(assetInfo.totalIssuance);
+                    // sql will continue using contract address as asset key
+                    let sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.assetType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                    if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql)) {
+                        erc721classes.push(sql);
+                    }
+                }
+                break;
+            case paraTool.assetTypeERC721:
+                /*
+                  {
+                  blockNumber: 575292,
+                  tokenAddress: '...',
+                  tokenType: 'ERC721',
+                  isMetadataSupported: true,
+                  isEnumerable: true,
+                  metadata: { name: 'Moon Monkeys', symbol: 'MM', baseURI: null },
+                  totalSupply: '7353',
+                  numHolders: 0
+                  }
+                */
+                if (assetInfo.tokenAddress != undefined) {
+                    let sql = '';
+                    //erc721
                     let sqlAssetKey = assetInfo.tokenAddress.toLowerCase();
-                    let erc721TokenID = assetInfo.tokenID
-                    let holder = assetInfo.owner
-                    let tokenURI = assetInfo.tokenURI
-                    let free = 0;
-                    let meta = (assetInfo.metadata != undefined) ? JSON.stringify(assetInfo.metadata) : "";
-                    let sql1 = `('${sqlAssetKey}', '${chainID}', '${erc721TokenID}', '${holder}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(meta)}, '${tokenURI}', '${free}')`;
-                    if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql1)) {
-                        erc721tokens.push(sql1);
-                    }
-                }
-                break;
-                case paraTool.assetTypeERC1155:
-                    break;
-                case paraTool.assetTypeERC1155Token:
-                    break;
-                case paraTool.assetTypeContract:
-                //{"blockNumber":534657,"tokenAddress":"...","tokenType":"ERC20","name":"Stella LP","symbol":"STELLA LP","decimal":"18","totalSupply":142192.4834495356}
-                {
-                    let assetKey = assetInfo.tokenAddress.toLowerCase();
                     let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
                     let createdAtTx = assetInfo.createdAtTx ? assetInfo.createdAtTx : "";
-                    let o = `('${assetKey}', '${chainID}', '${assetInfo.assetType}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
-                    if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
-                        contracts.push(o);
+                    let isEnumerable = (assetInfo.isEnumerable) ? 1 : 0
+                    let isMetadataSupported = (assetInfo.isMetadataSupported) ? 1 : 0
+                    let metadata = assetInfo.metadata
+                    let baseURI = 'Null'
+                    let ipfsUrl = 'Null'
+                    let imageUrl = 'Null'
+                    let totalSupply = ethTool.validate_bigint(assetInfo.totalSupply);
+                    if (isMetadataSupported) {
+                        if (metadata.baseURI != undefined) baseURI = `${metadata.baseURI}`
+                        if (metadata.ipfsUrl != undefined) ipfsUrl = `${metadata.ipfsUrl}`
+                        if (metadata.imageUrl != undefined) imageUrl = `${metadata.imageUrl}`
+                    }
+                    // sql will continue using contract address as asset key
+                    if (isMetadataSupported) {
+                        //(asset, chainID, assetType, assetName, symbol, totalSupply, lastUpdateDT, lastUpdateBN, metadata, erc721isMetadata, erc721isEnumerable, tokenBaseURI, ipfsUrl, imageUrl, createDT, creator, createdAtTx)
+                        sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', ${mysql.escape(this.clip_string(metadata.name))}, ${mysql.escape(this.clip_string(metadata.symbol))}, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(JSON.stringify(metadata))},  '${isMetadataSupported}', '${isEnumerable}', '${baseURI}', '${ipfsUrl}', '${imageUrl}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                    } else {
+                        sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                    }
+                    if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql)) {
+                        erc721classes.push(sql);
                     }
                 }
                 break;
-                default:
-                    console.log("TODO: flush - unknown assetType", assetInfo.assetType);
-                    break;
+
+            case paraTool.assetTypeERC721Token: {
+                /*
+                  {
+                  blockNumber: 576837,
+                  tokenAddress: '...',
+                  tokenType: 'ERC721Token',
+                  isMetadataSupported: true,
+                  tokenID: '14700877701539379516299095288040297463165322513409438848687442933988920671445',
+                  tokenURI: 'https://app.domainchain.network/api/nftdomains/metadata/lending.moon',
+                  owner: '0x53Fc1bf99217d981721a52eAbe1A2F39A049aBfb'
+                  }
+                */
+                let sqlAssetKey = assetInfo.tokenAddress.toLowerCase();
+                let erc721TokenID = assetInfo.tokenID
+                let holder = assetInfo.owner
+                let tokenURI = assetInfo.tokenURI
+                let free = 0;
+                let meta = (assetInfo.metadata != undefined) ? JSON.stringify(assetInfo.metadata) : "";
+                let sql1 = `('${sqlAssetKey}', '${chainID}', '${erc721TokenID}', '${holder}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(meta)}, '${tokenURI}', '${free}')`;
+                if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql1)) {
+                    erc721tokens.push(sql1);
+                }
+            }
+            break;
+            case paraTool.assetTypeERC1155:
+                break;
+            case paraTool.assetTypeERC1155Token:
+                break;
+            case paraTool.assetTypeContract:
+            //{"blockNumber":534657,"tokenAddress":"...","tokenType":"ERC20","name":"Stella LP","symbol":"STELLA LP","decimal":"18","totalSupply":142192.4834495356}
+            {
+                let assetKey = assetInfo.tokenAddress.toLowerCase();
+                let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
+                let createdAtTx = assetInfo.createdAtTx ? assetInfo.createdAtTx : "";
+                let o = `('${assetKey}', '${chainID}', '${assetInfo.assetType}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
+                    contracts.push(o);
+                }
+            }
+            break;
+            default:
+                console.log("TODO: flush - unknown assetType", assetInfo.assetType);
+                break;
             }
         }
 

@@ -580,11 +580,11 @@ module.exports = class ChainParser {
                         this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
                     }
                 }
-            default:
-                dInstructionV[instructionK] = instructionV
-                dXcmMsg[version] = dInstructionV
-                break
-                break;
+                default:
+                    dInstructionV[instructionK] = instructionV
+                    dXcmMsg[version] = dInstructionV
+                    break
+                    break;
         }
     }
 
@@ -603,11 +603,11 @@ module.exports = class ChainParser {
                         this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
                     }
                 }
-            default:
-                dInstructionV[instructionK] = instructionV
-                dXcmMsg[version] = dInstructionV
-                break
-                break;
+                default:
+                    dInstructionV[instructionK] = instructionV
+                    dXcmMsg[version] = dInstructionV
+                    break
+                    break;
         }
     }
 

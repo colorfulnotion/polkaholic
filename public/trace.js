@@ -46,92 +46,88 @@ function showtraces(id, blockNumber, blockHash) {
             "targets": [1, 2, 3]
         }],
         columns: [{
-                data: 'traceID',
-                render: function(data, type, row, meta) {
-                    return data.replace(`${blockNumber}-`, "");
+            data: 'traceID',
+            render: function(data, type, row, meta) {
+                return data.replace(`${blockNumber}-`, "");
+            }
+        }, {
+            data: 'section',
+            render: function(data, type, row, meta) {
+                let section = (row.section != undefined) ? row.section : "unk";
+                let storage = (row.storage != undefined) ? row.storage : "unk";
+                let sectionStorage = `${section}:${storage}`;
+                if (type == 'display') {
+                    let str = `<button type="button" class="btn btn-outline-secondary text-capitalize">${sectionStorage}</button>`;
+                    return str;
                 }
-            },
-            {
-                data: 'section',
-                render: function(data, type, row, meta) {
-                    let section = (row.section != undefined) ? row.section : "unk";
-                    let storage = (row.storage != undefined) ? row.storage : "unk";
-                    let sectionStorage = `${section}:${storage}`;
-                    if (type == 'display') {
-                        let str = `<button type="button" class="btn btn-outline-secondary text-capitalize">${sectionStorage}</button>`;
-                        return str;
-                    }
-                    return sectionStorage;
-                }
-            },
-            {
-                data: 'k',
-                render: function(data, type, row, meta) {
-                    if (row.k != undefined) {
-                        let pkExtra = row.pkExtra != undefined ? row.pkExtra : "";
-                        if (type == "display") {
-                            let out = getShortHash(row.k);
-                            if (pkExtra != "") {
-                                try {
-                                    let x = JSON.parse(pkExtra);
-                                    out += "<BR>" + cover_params(x, "k" + row.traceID);
-                                } catch {
-                                    out += "<BR>" + "SIMPLE" + pkExtra;
-                                }
-                            }
-                            return out;
-                        } else {
-                            return row.k + pkExtra;
-                        }
-                    } else {
-                        return "";
-                    }
-                }
-            },
-            {
-                data: 'v',
-                render: function(data, type, row, meta) {
-                    let msgs = "";
-                    let msgs_display = "";
-                    if (row.msgHashes != undefined || (row.xcmMessages != undefined)) {
-                        if (type == "display") {
+                return sectionStorage;
+            }
+        }, {
+            data: 'k',
+            render: function(data, type, row, meta) {
+                if (row.k != undefined) {
+                    let pkExtra = row.pkExtra != undefined ? row.pkExtra : "";
+                    if (type == "display") {
+                        let out = getShortHash(row.k);
+                        if (pkExtra != "") {
                             try {
-                                for (let i = 0; i < row.msgHashes.length; i++) {
-                                    let x = row.msgHashes[i];
-                                    let idx = (row.msgHashes.length > 1) ? " " + i.toString() : "";
-                                    msgs_display += `<BR><B>XCM Message Hash${idx}</B>: <code>${x}</code><BR>`;
-                                    msgs_display += `XCM Message${idx}:<br>` + cover_params(JSON.parse(row.xcmMessages[i], "m" + x))
-                                }
-                            } catch (err) {
-                                console.log(err);
+                                let x = JSON.parse(pkExtra);
+                                out += "<BR>" + cover_params(x, "k" + row.traceID);
+                            } catch {
+                                out += "<BR>" + "SIMPLE" + pkExtra;
                             }
-                        } else {
-                            msgs = "msgHashes:" + JSON.stringify(row.msgHashes);
-                            msgs += "XCM:" + JSON.stringify(row.xcmMessages);
                         }
-                    }
-                    if (row.v != undefined) {
-                        let pv = row.pv != undefined ? row.pv : "";
-                        if (type == "display") {
-                            let out = getShortHash(row.v);
-                            if (pv != "") {
-                                try {
-                                    let x = JSON.parse(pv)
-                                    out += "<br>" + cover_params(x, row.traceID)
-                                } catch {
-                                    out += "<br><B>" + pv + "</B>";
-                                }
-                            }
-                            return out + msgs_display;
-                        } else {
-                            return row.pv + pv + msgs;
-                        }
+                        return out;
                     } else {
-                        return "";
+                        return row.k + pkExtra;
                     }
+                } else {
+                    return "";
                 }
             }
-        ],
+        }, {
+            data: 'v',
+            render: function(data, type, row, meta) {
+                let msgs = "";
+                let msgs_display = "";
+                if (row.msgHashes != undefined || (row.xcmMessages != undefined)) {
+                    if (type == "display") {
+                        try {
+                            for (let i = 0; i < row.msgHashes.length; i++) {
+                                let x = row.msgHashes[i];
+                                let idx = (row.msgHashes.length > 1) ? " " + i.toString() : "";
+                                msgs_display += `<BR><B>XCM Message Hash${idx}</B>: <code>${x}</code><BR>`;
+                                msgs_display += `XCM Message${idx}:<br>` + cover_params(JSON.parse(row.xcmMessages[i], "m" + x))
+                            }
+                        } catch (err) {
+                            console.log(err);
+                        }
+                    } else {
+                        msgs = "msgHashes:" + JSON.stringify(row.msgHashes);
+                        msgs += "XCM:" + JSON.stringify(row.xcmMessages);
+                    }
+                }
+                if (row.v != undefined) {
+                    let pv = row.pv != undefined ? row.pv : "";
+                    if (type == "display") {
+                        let out = getShortHash(row.v);
+                        if (pv != "") {
+                            try {
+                                let x = JSON.parse(pv)
+                                out += "<br>" + cover_params(x, row.traceID)
+                            } catch {
+                                out += "<br><B>" + pv + "</B>";
+                            }
+                        }
+                        return out + msgs_display;
+                    } else {
+                        return row.pv + pv + msgs;
+                    }
+                } else {
+                    return "";
+                }
+            }
+        }],
     });
     loadDataTrace(pathParams, tableName);
 }
