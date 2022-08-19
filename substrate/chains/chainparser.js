@@ -898,8 +898,10 @@ module.exports = class ChainParser {
                     if (this.xcmAssetTrapFilter(`${ev.section}(${ev.method})`)) {
                         //not sure what does the hash mean ...
                         mpState.success = false
-                        mpState.errorDesc = ev.method
-                        mpState.description = `Executed ${mpState.eventID}`
+                        mpState.errorDesc = `complete`
+                        mpState.description = `${ev.method}`
+                        mpState.defaultEventID = `${mpState.eventID}` // original eventID
+                        //mpState.description = `Executed ${mpState.eventID}`
                         mpState.eventID = ev.eventID // update eventID with AssetsTrapped
                         this.mpReceivedHashes[idxKey] = mpState
                         console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
