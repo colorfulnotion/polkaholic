@@ -2759,6 +2759,7 @@ module.exports = class Indexer extends AssetManager {
                     }
                 }
                 this.incomingXcmState = {};
+                let sqlDebug = true
                 try {
                     // these events we can't say for sure without matching to recent sends
                     if (mpStates.length > 0) {
@@ -2769,7 +2770,7 @@ module.exports = class Indexer extends AssetManager {
                             "vals": vals,
                             "data": mpStates,
                             "replace": vals
-                        });
+                        }, sqlDebug);
                     }
                 } catch (err0) {
                     console.log(err0);

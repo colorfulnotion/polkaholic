@@ -1279,6 +1279,7 @@ module.exports = class ChainParser {
             sentAt: this.parserWatermark,
             bn: this.parserBlockNumber,
             msgHash: msgHash,
+            weight: 0,
             success: false,
         }
         let statusK
@@ -1301,7 +1302,13 @@ module.exports = class ChainParser {
                     signalStatus.weight = paraTool.dechexToInt(state)
                 } else {
                     signalStatus.errorDesc = statusK
-                    signalStatus.description = statusV
+                    if (Array.isArray(statusV) && statusV.length == 2){
+                        signalStatus.weight = paraTool.dechexToInt(statusV[0])
+                        let failedReson = Object.keys(statusV[1])[0]
+                        signalStatus.description = failedReson
+                    }else{
+                        signalStatus.description = statusV
+                    }
                 }
                 return signalStatus
             } catch (err) {
