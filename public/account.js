@@ -26,6 +26,15 @@ function showextrinsics(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=extrinsics&chainfilters=${chainListStr}`
     let tableName = '#tableextrinsics'
     tableExtrinsics = $(tableName).DataTable({
+        dom: 'lfrtipB',
+        buttons: [{
+            extend: 'csv',
+            text: 'Download CSV',
+            filename: `${address}-extrinsics`,
+            exportOptions: {
+                orthogonal: 'export'
+            }
+        }],
         lengthMenu: getLengthMenu(),
         columnDefs: [{
                 "className": "dt-center",
@@ -78,7 +87,7 @@ function showextrinsics(address, chainListStr = 'all') {
                         }
                     } else {
                         if (row.method !== undefined) {
-                            return data;
+                            return `${row.section}:${row.method}`
                         } else {
                             return "-";
                         }
@@ -436,10 +445,19 @@ function showtransfers(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=transfers&chainfilters=${chainListStr}`
     let tableName = '#tabletransfers'
     tableTransfers = $(tableName).DataTable({
+        dom: 'lfrtipB',
+        buttons: [{
+            extend: 'csv',
+            text: 'Download CSV',
+            filename: `${address}-transfers`,
+            exportOptions: {
+                orthogonal: 'export'
+            }
+        }],
         lengthMenu: getLengthMenu(),
         columnDefs: [{
                 "className": "dt-right",
-                "targets": [5, 6]
+                "targets": [4, 5]
             },
             {
                 "targets": [7],
@@ -501,8 +519,8 @@ function showtransfers(address, chainListStr = 'all') {
             {
                 data: 'rawAmount',
                 render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        let val = "TODO"; //dechexToInt(data);
+                    try {
+                        let val = ""; //dechexToInt(data);
                         let dData = row.decodedData
                         if (dData != undefined) {
                             if (dData.symbol != undefined && dData.dataRaw != undefined) {
@@ -511,9 +529,10 @@ function showtransfers(address, chainListStr = 'all') {
                                 val = `${row.rawAmount} Asset (decimal unknown)`
                             }
                         }
-                        return val;
+                        return val; // data + " " + symbol;
+                    } catch (e) {
+                        return "";
                     }
-                    return data;
                 }
             },
             {
@@ -547,6 +566,9 @@ function showtransfers(address, chainListStr = 'all') {
             {
                 data: 'ts',
                 render: function(data, type, row, meta) {
+                    if (type == 'export') {
+                        return data;
+                    }
                     let tinyms = 0;
                     let eventID = row.eventID
                     if (eventID != undefined) {
@@ -594,6 +616,15 @@ function showxcmtransfers(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=xcmtransfers&chainfilters=${chainListStr}`
     let tableName = '#tablexcmtransfers'
     tableXCMTransfers = $(tableName).DataTable({
+        dom: 'lfrtipB',
+        buttons: [{
+            extend: 'csv',
+            text: 'Download CSV',
+            filename: `${address}-xcmtransfers`,
+            exportOptions: {
+                orthogonal: 'export'
+            }
+        }],
         lengthMenu: getLengthMenu(),
         columnDefs: [{
                 "className": "dt-right",
@@ -638,8 +669,16 @@ function showxcmtransfers(address, chainListStr = 'all') {
                         } catch (err) {
                             return "unk";
                         }
+                    } else {
+                        try {
+                            let parsedAsset = JSON.parse(row.asset);
+                            let symbol = parsedAsset.Token;
+                            return data + " " + symbol;
+                        } catch (err) {
+                            return "unk";
+                        }
+                        return data;
                     }
-                    return data;
                 }
             },
             {
@@ -763,6 +802,15 @@ function showrewards(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=rewards&chainfilters=${chainListStr}`
     let tableName = '#tablerewards'
     tableRewards = $(tableName).DataTable({
+        dom: 'lfrtipB',
+        buttons: [{
+            extend: 'csv',
+            text: 'Download CSV',
+            filename: `${address}-rewards`,
+            exportOptions: {
+                orthogonal: 'export'
+            }
+        }],
         lengthMenu: getLengthMenu(),
         columnDefs: [{
                 "className": "dt-right",
@@ -904,6 +952,15 @@ function showcrowdloans(address, chainListStr = 'all') {
     let pathParams = `account/${address}?group=crowdloans&chainfilters=${chainListStr}`
     let tableName = '#tablecrowdloans'
     tableCrowdloans = $(tableName).DataTable({
+        dom: 'lfrtipB',
+        buttons: [{
+            extend: 'csv',
+            text: 'Download CSV',
+            filename: `${address}-crowdloans`,
+            exportOptions: {
+                orthogonal: 'export'
+            }
+        }],
         lengthMenu: getLengthMenu(),
         columnDefs: [{
             "className": "dt-right",

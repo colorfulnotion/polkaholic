@@ -895,7 +895,7 @@ module.exports = class ChainParser {
                 for (let i = 0; i < eventRange.length; i++) {
                     let ev = eventRange[i]
                     //filter on xcmpallet(AssetsTrapped) - need to mark mpState as fail
-                    if (this.xcmAssetTrapFilter(`${ev.section}(${ev.method})`)){
+                    if (this.xcmAssetTrapFilter(`${ev.section}(${ev.method})`)) {
                         //not sure what does the hash mean ...
                         mpState.success = false
                         mpState.errorDesc = ev.method
@@ -909,7 +909,7 @@ module.exports = class ChainParser {
                 //update xcmMessages
                 indexer.updateMPState(mpState)
                 //only compute candiate mpState is successful
-                if (mpState.success === true){
+                if (mpState.success === true) {
                     for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
                         let e = eventRange[i]
                         let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
@@ -917,7 +917,7 @@ module.exports = class ChainParser {
                             indexer.updateXCMTransferDestCandidate(candidate, caller)
                         }
                     }
-                }else{
+                } else {
                     console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
                 }
                 prevIdx = parseInt(idxKey) + 1

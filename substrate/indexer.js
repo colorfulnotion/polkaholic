@@ -1246,17 +1246,17 @@ module.exports = class Indexer extends AssetManager {
     }
 
     // update mpState
-    updateMPState(mpState){
+    updateMPState(mpState) {
         //potentially add sentAt here, but it's 2-4
         let k = `${mpState.msgHash}-${mpState.bn}` // it's nearly impossible to have collision even dropping the asset
         let [xcmBN, chainID, chainIDDest] = this.getTrailingXcmInfo(mpState.msgHash, mpState.bn)
         mpState.xcmBN = xcmBN
         mpState.chainID = chainID
         mpState.chainIDDest = chainIDDest
-        if (this.incomingXcmState[k] == undefined){
+        if (this.incomingXcmState[k] == undefined) {
             this.incomingXcmState[k] = mpState
             if (this.debugLevel >= paraTool.debugInfo) console.log(`mpState`, this.incomingXcmState[k]);
-        }else{
+        } else {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`skip duplicate ${mpState.eventID}`);
         }
     }
@@ -2693,11 +2693,11 @@ module.exports = class Indexer extends AssetManager {
         let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
         //console.log(`msgHash=${msgHash},trailingKeys`, trailingKeys)
         for (const tk of trailingKeys) {
-            if (tk.includes(msgHash)){
+            if (tk.includes(msgHash)) {
                 let trailingXcm = this.xcmTrailingKeyMap[tk]
                 if (this.debugLevel >= paraTool.debugTracing) console.log(`msgHash=${msgHash} included`, tk, trailingXcm)
                 let firstSeenBN = trailingXcm.blockNumber
-                if (trailingXcm.matchable && currBN >= firstSeenBN){
+                if (trailingXcm.matchable && currBN >= firstSeenBN) {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`msgHash=${msgHash} [received=${firstSeenBN}, executed=${currBN}]`)
                     xcmBN = firstSeenBN
                     chainID = trailingXcm.chainID
@@ -2743,15 +2743,15 @@ module.exports = class Indexer extends AssetManager {
                 let mpStates = [];
                 for (let i = 0; i < incomingXcmStateKeys.length; i++) {
                     let r = this.incomingXcmState[incomingXcmStateKeys[i]];
-                    if (r.xcmBN && r.chainID !== false && r.chainIDDest !== false){
+                    if (r.xcmBN && r.chainID !== false && r.chainIDDest !== false) {
                         // ["msgHash", "blockNumber", "incoming"] + ["destStatus", "executedEventID", "errorDesc"]
-                        let destStatus = (r.success === true)? '1' : '0'
+                        let destStatus = (r.success === true) ? '1' : '0'
                         let errorDesc = (r.errorDesc != undefined) ? `'${r.errorDesc}'` : `NULL`
                         //let executedEventID = (r.eventID != undefined) ? `'${r.eventID}'` : `NULL`
                         let t = "(" + [`'${r.msgHash}'`, `'${r.xcmBN}'`, `'1'`, `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${destStatus}'`, `'${r.eventID}'`, errorDesc].join(",") + ")";
                         console.log(`mpStates`, t)
                         mpStates.push(t);
-                    }else{
+                    } else {
                         console.log(`[${r.msgHash}] xcmInfo missing! xcmBN=${r.xcmBN}, chainID=${r.chainID}, chainIDDest=${r.chainIDDest}`)
                     }
                 }
