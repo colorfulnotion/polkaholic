@@ -1304,10 +1304,12 @@ module.exports = class ChainParser {
                     signalStatus.success = false
                     state = e.data
                     signalStatus.errorDesc = 'fail'
-                    if (Array.isArray(state) && state.length == 3){
+                    if (Array.isArray(state) && state.length >= 2){
                         let failedReson = Object.keys(state[1])[0]
                         signalStatus.description = failedReson
-                        signalStatus.weight = paraTool.dechexToInt(state[2])
+                        if (state.length == 3){
+                            signalStatus.weight = paraTool.dechexToInt(state[2])
+                        }
                     }else{
                         signalStatus.description = statusV
                     }
