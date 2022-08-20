@@ -287,7 +287,7 @@ $.fn.dataTable.ext.search.push(
 		return(true);
 	    }
 	    // we are not showing all extrinsics
-	    if ( rowData.signer == undefined && false) {
+	    if ( rowData.signer == undefined) {
 		return(false);
 	    } else if ( rowData.evm ) {
 		return(false);
