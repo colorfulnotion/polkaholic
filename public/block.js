@@ -300,7 +300,7 @@ $.fn.dataTable.ext.search.push(
 	    if ( checked ) {
 		return(true);
 	    }
-        if ((rowData.section == 'system' && (rowData.method == 'ExtrinsicsSuccess' || rowData.method == 'ExtrinsicFailed')) ){
+        if ((rowData.section == 'system' && (rowData.method == 'ExtrinsicSuccess' || rowData.method == 'ExtrinsicFailed')) ){
             return(false);
         }
         return(true);
