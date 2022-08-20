@@ -3400,140 +3400,140 @@ module.exports = class Query extends AssetManager {
                     } else {
                         return await this.get_account_realtime(address, false, chainList)
                     }
-                    case "ss58h160":
-                        let relatedData = false
-                        if (row && row.data["related"] != undefined) {
-                            relatedData = row.data["related"]
-                        }
-                        return await this.get_hashes_related(address, relatedData, "address")
-                    case "unfinalized":
-                        //feed:extrinsicHash#chainID-extrinsicID
-                        return await this.get_account_extrinsics_unfinalized(address, rows, maxRows, chainList, decorate, decorateExtra);
-                    case "extrinsics":
-                        //feed:extrinsicHash#chainID-extrinsicID
-                        return await this.get_account_extrinsics(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
-                    case "transfers":
-                        // need to also bring in "feedtransferunfinalized" from the same table
-                        //feedtransfer:extrinsicHash#eventID
-                        return await this.get_account_transfers(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
-                    case "crowdloans":
-                        //feedcrowdloan:extrinsicHash#eventID
-                        return await this.get_account_crowdloans(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
-                    case "rewards":
-                        //feedreward:extrinsicHash#eventID
-                        return await this.get_account_rewards(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
-                    case "history":
-                        let relatedExtrinsicsMap = {}
-                        let hist = await this.get_account_history(address, rows, maxRows, chainList, false)
-                        try {
-                            //MK: history has family "history" but we are calling "feed" family here??
-                            let [extrinsics] = await this.btAddressExtrinsic.getRows({
-                                start: startRow,
-                                end: address + "#" + paraTool.inverted_ts_key(hist.minTS) + "#ZZZ",
-                                filter: [{
-                                    //family: families,
-                                    family: ["feed"],
-                                    cellLimit: 1
-                                }],
-                                limit: maxRows
-                            });
-                            if (extrinsics && extrinsics.length > 0) {
-                                for (const ext of extrinsics) {
-                                    let [addressPiece, ts, extrinsicHashPiece] = paraTool.parse_addressExtrinsic_rowKey(ext.id)
-                                    let out = {};
-                                    let rowData = ext.data
-                                    if (rowData["feed"]) {
-                                        let extrinsics = rowData["feed"];
-                                        for (const extrinsicHashEventID of Object.keys(extrinsics)) {
-                                            for (const cell of extrinsics[extrinsicHashEventID]) {
-                                                let t = JSON.parse(cell.value);
-                                                // here we copy just a FEW of the flds over for recognitions sake
-                                                let flds = ["chainID", "blockNumber", "extrinsicHash", "extrinsicID", "section", "method"];
-                                                for (const fld of flds) {
-                                                    if (t[fld] !== undefined) {
-                                                        if (fld == "chainID" || fld == "blockNumber") {
-                                                            out[fld] = parseInt(t[fld], 10); // can we avoid this step?
-                                                        } else {
-                                                            out[fld] = t[fld];
-                                                        }
-
+                case "ss58h160":
+                    let relatedData = false
+                    if (row && row.data["related"] != undefined) {
+                        relatedData = row.data["related"]
+                    }
+                    return await this.get_hashes_related(address, relatedData, "address")
+                case "unfinalized":
+                    //feed:extrinsicHash#chainID-extrinsicID
+                    return await this.get_account_extrinsics_unfinalized(address, rows, maxRows, chainList, decorate, decorateExtra);
+                case "extrinsics":
+                    //feed:extrinsicHash#chainID-extrinsicID
+                    return await this.get_account_extrinsics(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
+                case "transfers":
+                    // need to also bring in "feedtransferunfinalized" from the same table
+                    //feedtransfer:extrinsicHash#eventID
+                    return await this.get_account_transfers(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
+                case "crowdloans":
+                    //feedcrowdloan:extrinsicHash#eventID
+                    return await this.get_account_crowdloans(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
+                case "rewards":
+                    //feedreward:extrinsicHash#eventID
+                    return await this.get_account_rewards(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
+                case "history":
+                    let relatedExtrinsicsMap = {}
+                    let hist = await this.get_account_history(address, rows, maxRows, chainList, false)
+                    try {
+                        //MK: history has family "history" but we are calling "feed" family here??
+                        let [extrinsics] = await this.btAddressExtrinsic.getRows({
+                            start: startRow,
+                            end: address + "#" + paraTool.inverted_ts_key(hist.minTS) + "#ZZZ",
+                            filter: [{
+                                //family: families,
+                                family: ["feed"],
+                                cellLimit: 1
+                            }],
+                            limit: maxRows
+                        });
+                        if (extrinsics && extrinsics.length > 0) {
+                            for (const ext of extrinsics) {
+                                let [addressPiece, ts, extrinsicHashPiece] = paraTool.parse_addressExtrinsic_rowKey(ext.id)
+                                let out = {};
+                                let rowData = ext.data
+                                if (rowData["feed"]) {
+                                    let extrinsics = rowData["feed"];
+                                    for (const extrinsicHashEventID of Object.keys(extrinsics)) {
+                                        for (const cell of extrinsics[extrinsicHashEventID]) {
+                                            let t = JSON.parse(cell.value);
+                                            // here we copy just a FEW of the flds over for recognitions sake
+                                            let flds = ["chainID", "blockNumber", "extrinsicHash", "extrinsicID", "section", "method"];
+                                            for (const fld of flds) {
+                                                if (t[fld] !== undefined) {
+                                                    if (fld == "chainID" || fld == "blockNumber") {
+                                                        out[fld] = parseInt(t[fld], 10); // can we avoid this step?
+                                                    } else {
+                                                        out[fld] = t[fld];
                                                     }
+
                                                 }
                                             }
                                         }
                                     }
-                                    relatedExtrinsicsMap[ts] = out;
+                                }
+                                relatedExtrinsicsMap[ts] = out;
+                            }
+                        }
+                    } catch (err) {
+                        this.logger.error({
+                            "op": "query.getAccount",
+                            address,
+                            accountGroup,
+                            err
+                        });
+                    }
+                    // console.log("*** relatedExtrinsicMap ** ", relatedExtrinsicsMap);
+                    let out = [];
+                    for (const assetChain of Object.keys(hist.data)) {
+                        let h = hist.data[assetChain];
+                        let states = hist.data[assetChain].states;
+                        for (let i = 0; i < states.length; i++) {
+                            // each of these is a pair [indexTS, state] ... but we can push a POTENTIAL extrinsicHash IF they happen to be the SAME ts
+                            if (states[i].length == 2) {
+                                let [indexTS, _] = states[i];
+                                if (relatedExtrinsicsMap[indexTS] !== undefined) {
+                                    states[i].push(this.clean_extrinsic_object(relatedExtrinsicsMap[indexTS]));
                                 }
                             }
-                        } catch (err) {
-                            this.logger.error({
-                                "op": "query.getAccount",
-                                address,
-                                accountGroup,
-                                err
-                            });
                         }
-                        // console.log("*** relatedExtrinsicMap ** ", relatedExtrinsicsMap);
-                        let out = [];
-                        for (const assetChain of Object.keys(hist.data)) {
-                            let h = hist.data[assetChain];
-                            let states = hist.data[assetChain].states;
-                            for (let i = 0; i < states.length; i++) {
-                                // each of these is a pair [indexTS, state] ... but we can push a POTENTIAL extrinsicHash IF they happen to be the SAME ts
-                                if (states[i].length == 2) {
-                                    let [indexTS, _] = states[i];
-                                    if (relatedExtrinsicsMap[indexTS] !== undefined) {
-                                        states[i].push(this.clean_extrinsic_object(relatedExtrinsicsMap[indexTS]));
-                                    }
-                                }
-                            }
-                            out.push(h);
-                        }
-                        return {
-                            data: out,
-                                nextPage: hist.nextPage
-                        };
-                    case "balances":
-                        let historyObj = await this.get_account_history(address, rows, maxRows, chainList, true);
-                        let h = historyObj.data
-                        let balances = [];
-                        let currentTS = this.currentTS();
-                        let startTS = currentTS - 86400 * lookback;
-                        for (let ts = startTS; ts <= currentTS; ts += 86400) {
+                        out.push(h);
+                    }
+                    return {
+                        data: out,
+                            nextPage: hist.nextPage
+                    };
+                case "balances":
+                    let historyObj = await this.get_account_history(address, rows, maxRows, chainList, true);
+                    let h = historyObj.data
+                    let balances = [];
+                    let currentTS = this.currentTS();
+                    let startTS = currentTS - 86400 * lookback;
+                    for (let ts = startTS; ts <= currentTS; ts += 86400) {
 
-                            let totalUSDVal = 0;
-                            for (const assetChain of Object.keys(h)) {
-                                let assetInfo = this.assetInfo[assetChain];
-                                if (assetInfo !== undefined) {
-                                    let assetType = assetInfo.assetType;
-                                    let chainID = assetInfo.chainID;
-                                    let flds = this.get_assetType_flds(assetType);
-                                    let states = h[assetChain].states; // each of these is a pair [indexTS, state]
-                                    let state = false;
-                                    for (let i = 0; i < states.length; i++) {
-                                        if (states[i].length == 2) {
-                                            let [indexTS, stateAt] = states[i];
-                                            if (ts >= indexTS && (state == false)) {
-                                                state = stateAt;
-                                                // can we break here?
-                                            }
+                        let totalUSDVal = 0;
+                        for (const assetChain of Object.keys(h)) {
+                            let assetInfo = this.assetInfo[assetChain];
+                            if (assetInfo !== undefined) {
+                                let assetType = assetInfo.assetType;
+                                let chainID = assetInfo.chainID;
+                                let flds = this.get_assetType_flds(assetType);
+                                let states = h[assetChain].states; // each of these is a pair [indexTS, state]
+                                let state = false;
+                                for (let i = 0; i < states.length; i++) {
+                                    if (states[i].length == 2) {
+                                        let [indexTS, stateAt] = states[i];
+                                        if (ts >= indexTS && (state == false)) {
+                                            state = stateAt;
+                                            // can we break here?
                                         }
                                     }
-                                    if (state) {
-                                        let USDval = await this.decorate_assetState(assetInfo, state, flds, ts);
-                                        totalUSDVal += USDval
-                                    }
-                                } else {
-                                    console.log("failed to find: ", assetChain);
                                 }
+                                if (state) {
+                                    let USDval = await this.decorate_assetState(assetInfo, state, flds, ts);
+                                    totalUSDVal += USDval
+                                }
+                            } else {
+                                console.log("failed to find: ", assetChain);
                             }
-
-                            balances.push([ts * 1000, totalUSDVal]);
                         }
-                        return (balances);
-                    default:
-                        return false;
-                        break;
+
+                        balances.push([ts * 1000, totalUSDVal]);
+                    }
+                    return (balances);
+                default:
+                    return false;
+                    break;
             }
         } catch (err) {
             if (err instanceof paraTool.InvalidError || err instanceof paraTool.NotFoundError) {
@@ -3945,37 +3945,37 @@ module.exports = class Query extends AssetManager {
             }
             break;
 
-        case "crowdloan:Contributed": //accountID, paraID, balance
-        {
-            let paraInfo = this.getParaInfo(event.data[1], chainID)
-            decodedData[1].projectName = paraInfo.name
-            decodedData[1].relayChain = paraInfo.relayChain
-            var chainSymbol = this.getChainSymbol(chainID)
-            var chainDecimals = this.getChainDecimal(chainID)
-            var targetAsset = `{"Token":"${chainSymbol}"}`
-            var bal = paraTool.dechexToInt(event.data[2])
+            case "crowdloan:Contributed": //accountID, paraID, balance
+            {
+                let paraInfo = this.getParaInfo(event.data[1], chainID)
+                decodedData[1].projectName = paraInfo.name
+                decodedData[1].relayChain = paraInfo.relayChain
+                var chainSymbol = this.getChainSymbol(chainID)
+                var chainDecimals = this.getChainDecimal(chainID)
+                var targetAsset = `{"Token":"${chainSymbol}"}`
+                var bal = paraTool.dechexToInt(event.data[2])
 
-            if (paraTool.isFloat(bal)) {
-                // already float
-            } else if (paraTool.isInt(bal)) {
-                bal = bal / 10 ** chainDecimals // always get here
-            }
-
-            if (decorateUSD) {
-                let [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(bal, targetAsset, chainID, ts)
-                decodedData[2].symbol = chainSymbol
-                decodedData[2].dataRaw = bal
-                if (balanceUSD) {
-                    decodedData[2].dataUSD = balanceUSD
-                    decodedData[2].priceUSD = priceUSD
-                    decodedData[2].priceUSDCurrent = priceUSDCurrent
+                if (paraTool.isFloat(bal)) {
+                    // already float
+                } else if (paraTool.isInt(bal)) {
+                    bal = bal / 10 ** chainDecimals // always get here
                 }
-            } else {
-                decodedData[idx].symbol = chainSymbol
-                decodedData[idx].dataRaw = bal
+
+                if (decorateUSD) {
+                    let [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(bal, targetAsset, chainID, ts)
+                    decodedData[2].symbol = chainSymbol
+                    decodedData[2].dataRaw = bal
+                    if (balanceUSD) {
+                        decodedData[2].dataUSD = balanceUSD
+                        decodedData[2].priceUSD = priceUSD
+                        decodedData[2].priceUSDCurrent = priceUSDCurrent
+                    }
+                } else {
+                    decodedData[idx].symbol = chainSymbol
+                    decodedData[idx].dataRaw = bal
+                }
             }
-        }
-        break;
+            break;
         }
         if (decorateData) dEvent.decodedData = decodedData
         return dEvent

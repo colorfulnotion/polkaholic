@@ -82,7 +82,7 @@ module.exports = class Crawler extends Indexer {
         let chain = await this.getChain(chainID, withSpecVersions);
         await this.setupAPI(chain, backfill);
 
-	
+
         this.relayChain = chain.relayChain;
         return (chain);
     }
@@ -1258,7 +1258,7 @@ module.exports = class Crawler extends Indexer {
     // for any missing traces, this refetches the dataset
     async crawlTraces(chainID, techniqueParams = ["mod", 0, 1], lookback = 1000) {
         let chain = await this.setupChainAndAPI(chainID);
-	await this.check_chain_endpoint_correctness(chain);
+        await this.check_chain_endpoint_correctness(chain);
         let done = false;
         let syncState = await this.api.rpc.system.syncState();
         do {
@@ -1856,31 +1856,31 @@ create table talismanEndpoint (
     }
 
     async check_chain_endpoint_correctness(chain) {
-	let bn = chain.blocksFinalized - 100;
-	let sql = `select blockNumber, blockHash, parentHash from block${chain.chainID} where blockNumber >= ${bn} limit 20`
-	let blocks = await this.poolREADONLY.query(sql);
-	if ( blocks.length > 0 ) {
-	    let bHash = blocks[0].blockHash;
-	    let header = await this.api.rpc.chain.getHeader(bHash);
-	    let parentHash = header.parentHash.toString();
-	    let success = ( blocks[0].parentHash == parentHash );
-	    if ( success == false ) {
-		console.log(`FATAL: FAILED to match chain @ blockNumber: ${blocks[0].blockNumber} expected ${blocks[0].parentHash} got ${parentHash}`);
-		process.exit(0);
-	    } else {
-		console.log(`PASSED check`)
-	    }
-	}
+        let bn = chain.blocksFinalized - 100;
+        let sql = `select blockNumber, blockHash, parentHash from block${chain.chainID} where blockNumber >= ${bn} limit 20`
+        let blocks = await this.poolREADONLY.query(sql);
+        if (blocks.length > 0) {
+            let bHash = blocks[0].blockHash;
+            let header = await this.api.rpc.chain.getHeader(bHash);
+            let parentHash = header.parentHash.toString();
+            let success = (blocks[0].parentHash == parentHash);
+            if (success == false) {
+                console.log(`FATAL: FAILED to match chain @ blockNumber: ${blocks[0].blockNumber} expected ${blocks[0].parentHash} got ${parentHash}`);
+                process.exit(0);
+            } else {
+                console.log(`PASSED check`)
+            }
+        }
     }
-    
+
     async crawlBlocks(chainID) {
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
             this.readyToCrawlParachains = true;
         }
         // Subscribe to chain updates and log the current block number on update.
         let chain = await this.setupChainAndAPI(chainID);
-	await this.check_chain_endpoint_correctness(chain);
-	
+        await this.check_chain_endpoint_correctness(chain);
+
         await this.setup_chainParser(chain, paraTool.debugNoLog, true);
         if (chain.WSEndpointSelfHosted == 1) {
             setInterval(this.crawlPendingExtrinsics, 1000, chain, this);

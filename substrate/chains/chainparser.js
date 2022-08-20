@@ -580,11 +580,11 @@ module.exports = class ChainParser {
                         this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
                     }
                 }
-                default:
-                    dInstructionV[instructionK] = instructionV
-                    dXcmMsg[version] = dInstructionV
-                    break
-                    break;
+            default:
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break
+                break;
         }
     }
 
@@ -603,11 +603,11 @@ module.exports = class ChainParser {
                         this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
                     }
                 }
-                default:
-                    dInstructionV[instructionK] = instructionV
-                    dXcmMsg[version] = dInstructionV
-                    break
-                    break;
+            default:
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break
+                break;
         }
     }
 
@@ -1306,25 +1306,25 @@ module.exports = class ChainParser {
                     signalStatus.success = false
                     state = e.data
                     signalStatus.errorDesc = 'fail'
-                    if (Array.isArray(state) && state.length >= 2){
+                    if (Array.isArray(state) && state.length >= 2) {
                         let failedReson = Object.keys(state[1])[0]
                         signalStatus.description = failedReson
-                        if (state.length == 3){
+                        if (state.length == 3) {
                             signalStatus.weight = paraTool.dechexToInt(state[2])
                         }
-                    }else{
+                    } else {
                         signalStatus.description = statusV
                     }
                 } else {
                     signalStatus.errorDesc = statusK
-                    if (Array.isArray(statusV) && statusV.length == 2){
+                    if (Array.isArray(statusV) && statusV.length == 2) {
                         signalStatus.weight = paraTool.dechexToInt(statusV[0])
                         let failedReson = Object.keys(statusV[1])[0]
                         signalStatus.description = failedReson
-                    }else if (typeof statusV === 'object'){
+                    } else if (typeof statusV === 'object') {
                         let failedReson = Object.keys(statusV)[0]
                         signalStatus.description = failedReson
-                    }else{
+                    } else {
                         signalStatus.description = statusV
                     }
                 }
