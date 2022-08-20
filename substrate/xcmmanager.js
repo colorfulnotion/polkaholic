@@ -212,13 +212,12 @@ order by chainID, extrinsicHash, diffTS`
         s.incoming = 0 and
         d.incoming = 1 and
         s.blockTS >= ${startTS} and
-        d.blockTS >= ${startTS}
-         ${endWhere}
+        d.blockTS >= ${startTS} and
+        s.matched = 0 and
+        d.matched = 0 ${endWhere}
 having (diffSentAt >= 0 and diffSentAt <= 4)
 order by msgHash, diffSentAt, diffTS`
         //console.log("xcmmessages_match", sql)
-	/* and s.matched = 0 and
-        d.matched = 0*/
         try {
             let xcmmatches = await this.pool.query(sql);
             let matched = {}

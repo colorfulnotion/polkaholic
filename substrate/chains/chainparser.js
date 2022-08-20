@@ -580,11 +580,11 @@ module.exports = class ChainParser {
                         this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
                     }
                 }
-                default:
-                    dInstructionV[instructionK] = instructionV
-                    dXcmMsg[version] = dInstructionV
-                    break
-                    break;
+            default:
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break
+                break;
         }
     }
 
@@ -603,11 +603,11 @@ module.exports = class ChainParser {
                         this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
                     }
                 }
-                default:
-                    dInstructionV[instructionK] = instructionV
-                    dXcmMsg[version] = dInstructionV
-                    break
-                    break;
+            default:
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break
+                break;
         }
     }
 
@@ -898,8 +898,10 @@ module.exports = class ChainParser {
                     if (this.xcmAssetTrapFilter(`${ev.section}(${ev.method})`)) {
                         //not sure what does the hash mean ...
                         mpState.success = false
-                        mpState.errorDesc = ev.method
-                        mpState.description = `Executed ${mpState.eventID}`
+                        mpState.errorDesc = `complete`
+                        mpState.description = `${ev.method}`
+                        mpState.defaultEventID = `${mpState.eventID}` // original eventID
+                        //mpState.description = `Executed ${mpState.eventID}`
                         mpState.eventID = ev.eventID // update eventID with AssetsTrapped
                         this.mpReceivedHashes[idxKey] = mpState
                         console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
@@ -1279,6 +1281,7 @@ module.exports = class ChainParser {
             sentAt: this.parserWatermark,
             bn: this.parserBlockNumber,
             msgHash: msgHash,
+            weight: 0,
             success: false,
         }
         let statusK
@@ -1299,9 +1302,31 @@ module.exports = class ChainParser {
                 } else if (sectionMethod == 'xcmpQueue(Success)') {
                     signalStatus.success = true
                     signalStatus.weight = paraTool.dechexToInt(state)
+                } else if (sectionMethod == 'xcmpQueue(Fail)') {
+                    signalStatus.success = false
+                    state = e.data
+                    signalStatus.errorDesc = 'fail'
+                    if (Array.isArray(state) && state.length >= 2) {
+                        let failedReson = Object.keys(state[1])[0]
+                        signalStatus.description = failedReson
+                        if (state.length == 3) {
+                            signalStatus.weight = paraTool.dechexToInt(state[2])
+                        }
+                    } else {
+                        signalStatus.description = statusV
+                    }
                 } else {
                     signalStatus.errorDesc = statusK
-                    signalStatus.description = statusV
+                    if (Array.isArray(statusV) && statusV.length == 2) {
+                        signalStatus.weight = paraTool.dechexToInt(statusV[0])
+                        let failedReson = Object.keys(statusV[1])[0]
+                        signalStatus.description = failedReson
+                    } else if (typeof statusV === 'object') {
+                        let failedReson = Object.keys(statusV)[0]
+                        signalStatus.description = failedReson
+                    } else {
+                        signalStatus.description = statusV
+                    }
                 }
                 return signalStatus
             } catch (err) {

@@ -48,7 +48,7 @@ let f = xcm;
       <td>Relayed At</td>
       <td>
         <a href='/chain/<%= f.relayChain; %>'><%= uiTool.capitalizeFirstLetter(f.relayChain); %></a>
-        <%- include("blockNumber", {chainID: uiTool.capitalizeFirstLetter(f.relayChain), blockNumber: f.sentAt}); %>
+        <%- include("blockNumber", {chainID: f.relayChain, blockNumber: f.sentAt}); %>
       </td>
     </tr>
 

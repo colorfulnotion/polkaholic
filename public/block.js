@@ -287,7 +287,7 @@ $.fn.dataTable.ext.search.push(
 		return(true);
 	    }
 	    // we are not showing all extrinsics
-	    if ( rowData.signer == undefined ) {
+	    if ( rowData.signer == undefined) {
 		return(false);
 	    } else if ( rowData.evm ) {
 		return(false);
@@ -300,7 +300,11 @@ $.fn.dataTable.ext.search.push(
 	    if ( checked ) {
 		return(true);
 	    }
-	    return( rowData.signed );
+        if ((rowData.section == 'system' && (rowData.method == 'ExtrinsicSuccess' || rowData.method == 'ExtrinsicFailed')) ){
+            return(false);
+        }
+        return(true);
+	    //return( rowData.signed );
 	} else {
             return true;
         }
