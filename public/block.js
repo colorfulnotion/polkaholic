@@ -300,7 +300,11 @@ $.fn.dataTable.ext.search.push(
 	    if ( checked ) {
 		return(true);
 	    }
-	    return( rowData.signed );
+        if ((rowData.section == 'system' && (rowData.method == 'ExtrinsicsSuccess' || rowData.method == 'ExtrinsicFailed')) ){
+            return(false);
+        }
+        return(true);
+	    //return( rowData.signed );
 	} else {
             return true;
         }

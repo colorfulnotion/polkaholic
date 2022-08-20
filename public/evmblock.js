@@ -463,9 +463,13 @@ $.fn.dataTable.ext.search.push(
 	} else if (settings.nTable.id == 'tableevmblockevents') {
 	    let checked = document.getElementById('showallevents').checked;
 	    if ( checked ) {
-		return(true);
+		   return(true);
 	    }
-	    return( rowData.signed );
+        if ((rowData.section == 'evm') || (rowData.section == 'ethereum') || (rowData.section == 'system' && (rowData.method == 'ExtrinsicSuccess' || rowData.method == 'ExtrinsicFailed')) ){
+            return(false);
+        }
+        return(true);
+	    //return( rowData.signed );
 	} else {
             return true;
         }
