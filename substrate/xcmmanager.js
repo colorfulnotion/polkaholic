@@ -1055,30 +1055,30 @@ order by msgHash`
     }
 
     async writeBTHashes_feedxcmmessages(startTS, endTS = null) {
-      // write to hashes bigtable
-      let sql = `select msgHash, chainID, chainIDDest, msgType, msgStr, relayChain, version, path, executedEventID, destStatus, errorDesc, extrinsicHash, extrinsicID, sectionMethod, assetChains,
+        // write to hashes bigtable
+        let sql = `select msgHash, chainID, chainIDDest, msgType, msgStr, relayChain, version, path, executedEventID, destStatus, errorDesc, extrinsicHash, extrinsicID, sectionMethod, assetChains,
       parentMsgHash, parentSentAt, parentBlockNumber, childMsgHash, childSentAt, childBlocknumber, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, descBlocknumber, beneficiaries, assetsReceived, amountReceivedUSD
       from xcmmessages where blockTS >= ${startTS} and blockTS <= ${endTS} and matched = 1 limit 1`
-      let hashesRowsToInsert = [];
-      let messages = await this.poolREADONLY.query(sql)
-      for (let i= 0; i < messages.length; i++) {
-        let s = messages[i]
-          let hashrec = {};
-	  let col = `${s.chainID}:${s.chainIDDest}:${s.sourceBlocknumber}:${s.destBlocknumber}`
-        hashrec[col] = {
-            value: JSON.stringify(s),
-            timestamp: s.sourceTS*1000
-        };
-        let msgHashRec = {
-            key: msgHash,
-            data: {},
+        let hashesRowsToInsert = [];
+        let messages = await this.poolREADONLY.query(sql)
+        for (let i = 0; i < messages.length; i++) {
+            let s = messages[i]
+            let hashrec = {};
+            let col = `${s.chainID}:${s.chainIDDest}:${s.sourceBlocknumber}:${s.destBlocknumber}`
+            hashrec[col] = {
+                value: JSON.stringify(s),
+                timestamp: s.sourceTS * 1000
+            };
+            let msgHashRec = {
+                key: msgHash,
+                data: {},
+            }
+            msgHashRec.data["feedxcmmessages"] = hashrec
+            hashesRowsToInsert.push(msgHashRec)
         }
-        msgHashRec.data["feedxcmmessages"] = hashrec
-        hashesRowsToInsert.push(msgHashRec)
-      }
-      if ( hashesRowsToInsert.length > 0 ) {
-        await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
-      }
+        if (hashesRowsToInsert.length > 0) {
+            await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+        }
     }
 
     // xcmtransfer_match matches cross transfers between SENDING events held in "xcmtransfer"  and CANDIDATE destination events (from various xcm received messages on a destination chain)
