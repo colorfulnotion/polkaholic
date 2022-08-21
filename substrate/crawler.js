@@ -1857,7 +1857,7 @@ create table talismanEndpoint (
 
     async check_chain_endpoint_correctness(chain) {
         let bn = chain.blocksFinalized - 100;
-        let sql = `select blockNumber, blockHash, parentHash from block${chain.chainID} where blockNumber >= ${bn} limit 20`
+        let sql = `select blockNumber, blockHash, parentHash from block${chain.chainID} where blockNumber >= ${bn} and blockHash is not null limit 20`
         let blocks = await this.poolREADONLY.query(sql);
         if (blocks.length > 0) {
             let bHash = blocks[0].blockHash;

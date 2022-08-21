@@ -4202,7 +4202,7 @@ module.exports = class Indexer extends AssetManager {
         return (block.blockTS);
     }
 
-    getBlockStats(block, events, evmBlock = false, evmReceipts = false) {
+    getBlockStats(block, events, evmBlock = false, evmReceipts = false, autoTraces = false) {
         let blockStats = {
             numExtrinsics: block.extrinsics.length,
             numSignedExtrinsics: 0,
@@ -4210,6 +4210,9 @@ module.exports = class Indexer extends AssetManager {
             numEvents: events.length,
             valueTransfersUSD: 0
         }
+	if ( autoTraces && Array.isArray(autoTraces) ) {
+	    blockStats.numTraceRecords = autoTraces.length
+	}
         if (evmBlock) {
             blockStats.blockHashEVM = evmBlock.hash;
             blockStats.parentHashEVM = evmBlock.parentHash;
@@ -5351,7 +5354,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (write_bqlog) {
             this.write_bqlog_block(block.extrinsics, blockNumber, blockTS);
         }
-        let blockStats = this.getBlockStats(block, eventsRaw, evmBlock, evmReceipts);
+        let blockStats = this.getBlockStats(block, eventsRaw, evmBlock, evmReceipts, autoTraces);
         //console.log(`bn=${blockNumber}`, blockStats)
         this.blockRowsToInsert.push(cres)
         if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXcmMsgs.length > 0) {
@@ -5970,12 +5973,18 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             } else {
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
+		if ( r.autotrace.length == 0 ) {
+		    // console.log("autotrace generation ", blockNumber);
+                    autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
+		} else {
+		    // SKIP PROCESSING since we covered autotrace generation already
+		    autoTraces = r.autotrace;
+		}
                 for (const t of autoTraces) {
                     if (this.debugLevel >= paraTool.debugTracing) console.log(`[autoTraces ${t.traceID}]`, t)
                     //TODO: write this to chain table
                 }
-                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // TODO: use result from rawtrace to decorate
+                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // use result from rawtrace to decorate
                 //await this.processTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api);
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
                 //console.log(`index_chain_block_row: processTrace`, processTraceTS);
@@ -6672,6 +6681,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     let numSignedExtrinsics = blockStats && blockStats.numSignedExtrinsics ? blockStats.numSignedExtrinsics : 0
                     let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
                     let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
+		    let numTraceRecords = blockStats && blockStats.numTraceRecords ? blockStats.numTraceRecords : 0;
                     let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
                     this.setLoggingContext({
                         chainID: chain.chainID,
@@ -6684,7 +6694,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     if (!parentHash) {
                         console.log("missing parentHash", blockNumber, r.block.header);
                     } else if (blockTS) {
-                        let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', FROM_UNIXTIME('${feedTS}'), 0)`
+                        let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${numTraceRecords}', FROM_UNIXTIME('${feedTS}'), 0)`
                         statRows.push(sql);
                     }
                     if (r != undefined) r = null
@@ -6828,9 +6838,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             await this.upsertSQL({
                 "table": `block${chainID}`,
                 "keys": ["blockNumber"],
-                "vals": ["blockHash", "parentHash", "blockDT", "numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "lastFeedDT", "crawlFeed"],
+                "vals": ["blockHash", "parentHash", "blockDT", "numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "numTraceRecords", "lastFeedDT", "crawlFeed"],
                 "data": statRows.slice(i, j),
-                "replace": ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "blockHash", "parentHash", "lastFeedDT", "crawlFeed"],
+                "replace": ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "blockHash", "parentHash", "numTraceRecords", "lastFeedDT", "crawlFeed"],
                 "replaceIfNull": ["blockDT"]
             });
         }
