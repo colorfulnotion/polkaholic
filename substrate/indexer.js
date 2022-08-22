@@ -5974,14 +5974,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
                 if (r.autotrace === false || r.autotrace == undefined || ( r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0 )) {
-                    console.log(`[${blockNumber}] autotrace generation`);
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
                     autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
                 } else {
                     // SKIP PROCESSING since we covered autotrace generation already
-                    console.log(`[${blockNumber}] autotrace already covered`);
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
                     autoTraces = r.autotrace;
                 }
-                console.log(`[${blockNumber}] autoTraces`, autoTraces)
                 for (const t of autoTraces) {
                     if (this.debugLevel >= paraTool.debugTracing) console.log(`[autoTraces ${t.traceID}]`, t)
                     //TODO: write this to chain table
@@ -6600,7 +6599,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
             console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end}), indexTS=${indexTS} [${logDT} ${hr}] [${batchN}/${totalBatch}]`)
 
-            let families = ["finalized", "trace", "blockraw", "events", "n"]
+            let families = ["finalized", "trace", "autotrace", "blockraw", "events", "n"]
             if (chain.isEVM > 0) {
                 families.push("blockrawevm");
             }
