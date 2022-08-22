@@ -297,6 +297,26 @@ app.get('/specversions/:chainID_or_chainName', async (req, res) => {
     }
 })
 
+
+// Usage: https://api.polkaholic.io/chainlog/acala
+app.get('/chainlog/:chainID_or_chainName', async (req, res) => {
+    try {
+        let chainID_or_chainName = req.params["chainID_or_chainName"]
+        let chainlog = await query.getChainLog(chainID_or_chainName);
+        if (chainlog) {
+            res.write(JSON.stringify(chainlog));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 // Usage: https://api.polkaholic.io/specversion/polkadot/100
 app.get('/specversion/:chainID_or_chainName/:specVersion', async (req, res) => {
     try {

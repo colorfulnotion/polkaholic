@@ -17,6 +17,7 @@ let tabs = [
 { title: "XCM Transfers", target: "xcmtransfers" },
 { title: "XCM Messages", target: "xcmmessages" },
 { title: "Top Assets", target: "assets" },
+{ title: "Daily Log", target: "chainlog" },
 { title: "Spec Versions", target: "specversions" },
 { title: "Chain Info", target: "chaininfo" }
 ];
@@ -123,6 +124,26 @@ for (let i=0; i<tabs.length; i++) {
           <th>Result</th>
           <th>From</th>
           <th>Params</th>
+        </tr>
+    </thead>
+  </table>
+</div>
+
+<div class="tab-pane" id="chainlog" role="tabpanel" aria-labelledby="chainlog-tab">
+  <table id="tablechainlog" class="display" style='width: 100%'>
+    <thead>
+        <tr>
+          <th>Date</th>
+          <th># Active Accounts</th>
+          <th># Holders</th>
+          <th># Signed Extrinsics</th>
+          <th># EVM Txs</th>
+          <th>Value Transfers USD</th>
+          <th>Fees</th>
+          <th>XCM Transfers In</th>
+          <th>XCM Transfers Out</th>
+          <th>XCM Messages In</th>
+          <th>XCM Messages Out</th>
         </tr>
     </thead>
   </table>

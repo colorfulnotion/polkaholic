@@ -51,8 +51,9 @@ function showextrinsics(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     try {
+			let ve = presentVerifyExtrinsic(row.id, row.blockNumber, row.extrinsicID, row.extrinsicHash, row.params);
                         if (row.extrinsicID != undefined && row.extrinsicHash != undefined) {
-                            let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
+                            let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false) + ve;
                             return `${presentChain(row.id, row.chainName)} (${s})`
                         } else if (row.transactionHash != undefined) {
                             let s = presentTxHash(row.transactionHash);
@@ -452,6 +453,9 @@ function showtransfers(address, chainListStr = 'all') {
                         }
                     }
                     let s = presentExtrinsicIDHash(eventID, row.extrinsicHash, false);
+		    if ( eventID ) {
+			s += presentVerifyEvent(row.id, row.blockNumber, eventID);
+		    }
                     return `${presentChain(row.chainID, row.chainName)} (${s})`
                 }
                 return data;

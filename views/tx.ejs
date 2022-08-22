@@ -129,7 +129,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
     <tr>
     <td>Compare to</td>
     <td>
-      <% if ( chain.subscanURL) {
+      <% if ( chain.subscanURL ) {
          let subscanURL = (f.signer)? `${chain.subscanURL}/extrinsic/${f.extrinsicHash}` : `${chain.subscanURL}/extrinsic/${f.extrinsicID}`;
          %>
       <a href="<%= subscanURL; %>" target="_new"><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
@@ -137,10 +137,14 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
     </td>
     </tr>
     <tr>
+      <td>Verify</td>
+      <td><%- include("verifyExtrinsic", {id: f.id, blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID}); %></td>
+    </tr>
+    <tr>
       <td>Events</td>
       <td>
         <% if ( f.events ) { %>
-        <%- include("events", {events: f.events, chainID: f.chainID}); %>
+        <%- include("events", {events: f.events, blockNumber: f.blockNumber, chainID: f.chainID}); %>
         <% } else { %>
         None
         <% } %>
@@ -149,6 +153,10 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
 </table>
 
 <script>
+let tabs = [];
+let txHash = '<%= tx.extrinsicHash; %>';
+let chainID = '<%= f.chainID; %>';
+let defHash = "#overview";
 showtxstatus("<%= tx.extrinsicHash %>");
 </script>
 

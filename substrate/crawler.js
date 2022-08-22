@@ -1781,6 +1781,7 @@ create table talismanEndpoint (
                 let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
                 let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
                 let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
+		let fees = blockStats && blockStats.fees ? blockStats.fees : 0;
                 let eflds = "";
                 let evals = "";
                 let eupds = "";
@@ -1795,7 +1796,7 @@ create table talismanEndpoint (
                     evals = `, '${blockHashEVM}', '${parentHashEVM}', '${numTransactionsEVM}', '${numReceiptsEVM}', '${gasUsed}', '${gasLimit}', ${crawlBlockEVM}, ${crawlReceiptsEVM}, ${crawlTraceEVM}`;
                     eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), numReceiptsEVM = values(numReceiptsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit), crawlBlockEVM = values(crawlBlockEVM), crawlReceiptsEVM = values(crawlReceiptsEVM), crawlTraceEVM = values(crawlTraceEVM)";
                 }
-                let sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, blockDT, crawlBlock, crawlTrace ${eflds}) values ('${bn}', '${finalizedHash}', '${parentHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', FROM_UNIXTIME('${blockTS}'), '${crawlBlock}', '${crawlTrace}' ${evals}) on duplicate key update blockHash=values(blockHash), parentHash = values(parentHash), blockDT=values(blockDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace) ${eupds}`;
+                let sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, fees, blockDT, crawlBlock, crawlTrace ${eflds}) values ('${bn}', '${finalizedHash}', '${parentHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', FROM_UNIXTIME('${blockTS}'), '${crawlBlock}', '${crawlTrace}' ${evals}) on duplicate key update blockHash=values(blockHash), parentHash = values(parentHash), blockDT=values(blockDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), fees = values(fees), crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace) ${eupds}`;
                 this.batchedSQL.push(sql);
                 // mark that the PREVIOUS hour is ready for indexing, since this block is FINALIZED, so that continuously running "indexChain" job can index the newly finalized hour
                 this.markFinalizedReadyForIndexing(chainID, blockTS);
@@ -2002,7 +2003,9 @@ create table talismanEndpoint (
                             let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
                             let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
                             let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
-                            sql = `insert into block${chainID} (blockNumber, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, lastTraceDT) values ('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', from_unixtime(${blockTS})) on duplicate key update lastTraceDT=values(lastTraceDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD)`;
+			    let fees = blockStats && blockStats.fees ? blockStats.fees : 0
+			    
+                            sql = `insert into block${chainID} (blockNumber, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, fees, lastTraceDT) values ('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS})) on duplicate key update lastTraceDT=values(lastTraceDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), fees = values(fees)`;
                             this.batchedSQL.push(sql);
 
                             //store unfinalized blockHashes in a single table shared across chains

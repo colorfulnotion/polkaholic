@@ -11,6 +11,7 @@ function getPolkadotAddress(w) {
     return address
 }
 
+
 async function selectWalletAccount() {
     // on EVERY page load, we do this to set up the "accounts" variable, which is used to populate the walletModal
     (async () => {
@@ -55,146 +56,152 @@ function getWalletAccount() {
     return (false);
 }
 
-async function transfer(to = '16DWzViTodXg48SJzRRcqTQbSvFBxJEQ9Y2F4pNsrXueH4Nz', amt = 2) {
-
-    afterWalletSelected = async () => {
-        try {
-            // we sign and send with this selected account
-            let account = getWalletAccount();
-
-            // to be able to retrieve the signer interface from this account
-            // we can use web3FromSource which will return an InjectedExtension type
-            const injector = await polkadot_extension_dapp.web3FromSource(account.meta.source);
-
-            // connect provider
-            const wsProvider = await new window.api.WsProvider("wss://rpc.polkadot.io");
-            await wsProvider.isReady;
-
-            // connect API
-            let myapi = await window.api.ApiPromise.create({
-                provider: wsProvider
-            });
-            await myapi.isReady;
-
-            // here we use the api to create a balance transfer to some account of a value
-            const transferExtrinsic = myapi.tx.balances.transfer(to, amt);
-            console.log("transfer-Extrinsic", transferExtrinsic);
-
-            // passing the injected account address as the first argument of signAndSend
-            // will allow the api to retrieve the signer and the user will see the extension
-            // popup asking to sign the balance transfer transaction
-            transferExtrinsic.signAndSend(account.address, {
-                signer: injector.signer
-            }, ({
-                status
-            }) => {
-                if (status.isInBlock) {
-                    launchToast(`Completed at block hash #${status.asInBlock.toString()}`);
-                } else {
-                    launchToast(`Current status: ${status.type}`);
-                }
-            });
-        } catch (err) {
-            console.log(err);
-        }
+function getWSEndpoint(chainID_or_id) {
+    let wsEndpoints = [
+	{"chainID": 0, id: "polkadot", WSEndpoint: "wss://rpc.polkadot.io"},
+	{"chainID": 2, id: "kusama", WSEndpoint: "wss://kusama-rpc.polkadot.io"},
+	{"chainID": 2000, id: "acala", WSEndpoint: "wss://acala-rpc-3.aca-api.network/ws"},
+	{"chainID": 2012, id: "parallel", WSEndpoint: "wss://parallel.api.onfinality.io/public-ws"},
+	{"chainID": 22000, id: "karura", WSEndpoint: " wss://karura-rpc-0.aca-api.network"},
+	{"chainID": 2006, id: "astar", WSEndpoint: "wss://rpc.astar.network"},
+	{"chainID": 22007, id: "shiden", WSEndpoint: "wss://shiden.api.onfinality.io/public-ws"},
+	{"chainID": 2004, id: "moonbeam", WSEndpoint: "wss://wss.api.moonbeam.network"},
+    ]
+    console.log("getWSEndpoint", chainID_or_id);
+    for ( let i = 0; i < wsEndpoints.length; i++) {
+	let ws = wsEndpoints[i];
+	if ( ws.chainID == chainID_or_id || ws.id == chainID_or_id ) {
+	    return ws.WSEndpoint;
+	}
     }
-    await selectWalletAccount();
+    return null;
+}
+
+async function getAPI(chainID_or_id) {
+    let WSEndpoint = getWSEndpoint(chainID_or_id)
+    if ( ! WSEndpoint ) return(null);
+    const wsProvider = await new window.api.WsProvider(WSEndpoint);
+    await wsProvider.isReady;
+    
+    // connect API
+    let myapi = await window.api.ApiPromise.create({
+        provider: wsProvider
+    });
+    await myapi.isReady;
+    return myapi;
+}
+
+async function verifyXCMMessage(xcm) {
+    let chainID = xcm.chainID;
+    let blockNumberOutgoing = xcm.blockNumberOutgoing;
+    let msgHash = xcm.msgHash;
+    
+    let chainIDDest = xcm.chainIDDest;
+    let executedEventID = xcm.executedEventID;
+
+    console.log("verifyXCMMessage", chainID, blockNumberOutgoing, msgHash, chainIDDest, executedEventID, xcm)
+    let chainIDapi = await getAPI(chainID);
+    if ( ! chainIDapi ) {
+	console.log("could not getAPI of sending chain", chainID);
+	return(false);
+    }
+    // TODO: fetch blockNumberOutgoing, find msgHash, decode XCM message
+    let chainIDDestapi = await getAPI(chainIDDest);
+    if ( ! chainIDDestapi ) {
+	console.log("could not getAPI of dest chain", chainIDDest);
+	return(false);
+    }
+    // TODO: get block out of executedEventID to find block, check for event
 }
 
 
-async function transferNFT(to = '16DWzViTodXg48SJzRRcqTQbSvFBxJEQ9Y2F4pNsrXueH4Nz', classID = 3, tokenID = 0) {
-
-    afterWalletSelected = async () => {
-        try {
-            console.log("GOAL: transferNFT", to, classID, tokenID);
-            // we sign and send with this selected account
-            let account = getWalletAccount();
-
-            // to be able to retrieve the signer interface from this account
-            // we can use web3FromSource which will return an InjectedExtension type
-            const injector = await polkadot_extension_dapp.web3FromSource(account.meta.source);
-
-            // connect provider
-            const wsProvider = await new window.api.WsProvider("wss://acala-rpc-0.aca-api.network");
-            await wsProvider.isReady;
-
-            // connect API to Acala
-            let myapi = await window.api.ApiPromise.create({
-                provider: wsProvider
-            });
-            await myapi.isReady;
-
-            console.log("transfer-Extrinsic", myapi.tx.nft);
-            const transferExtrinsic = myapi.tx.nft.transfer(to, [classID, tokenID]);
-
-            // passing the injected account address as the first argument of signAndSend
-            // will allow the api to retrieve the signer and the user will see the extension
-            // popup asking to sign the balance transfer transaction
-            transferExtrinsic.signAndSend(account.address, {
-                signer: injector.signer
-            }, ({
-                status
-            }) => {
-                if (status.isInBlock) {
-                    launchToast(`Completed at block hash #${status.asInBlock.toString()}`);
-                } else {
-                    launchToast(`Current status: ${status.type}`);
-                }
-            });
-        } catch (err) {
-            console.log(err);
-        }
+async function verifyBlock(id, blockNumber, params) {
+    let myapi = await getAPI(id);
+    if ( ! myapi ) return(null); // TODO: provide notification
+    try {
+        let header = await myapi.rpc.chain.getBlockHash(blockNumber);
+        let blockHash = header.toHex();
+        const signedBlock = await myapi.rpc.chain.getBlock(blockHash);
+        let block = signedBlock.block;
+	console.log(block.toHuman());
+	// TODO: check that params match
+    } catch (err) {
+	console.log(err)
     }
-    await selectWalletAccount();
 }
 
-async function signMessageWithAccount(message) {
-    // after a wallet is selected, this function is called, which asks the user to sign the message
-    afterWalletSelected = async () => {
-        try {
-            let account = getWalletAccount();
-            if (!account) {
-                console.log("signMessageWithAccount NO ACCOUNT");
-                return (false);
-            }
-            console.log("signMessageWithAccount account", account);
-            // to be able to retrieve the signer interface from this account
-            // we can use web3FromSource which will return an InjectedExtension type
-            const injector = await polkadot_extension_dapp.web3FromSource(account.meta.source);
-            console.log("signMessageWithAccount injector", injector);
-
-            // this injector object has a signer and a signRaw method
-            // to be able to sign raw bytes
-            const signRaw = injector?.signer?.signRaw;
-
-            if (!!signRaw) {
-                // after making sure that signRaw is defined
-                // we can use it to sign our message
-                const {
-                    signature
-                } = await signRaw({
-                    address: account.address,
-                    data: message,
-                    type: 'bytes'
-                });
-                launchToast(`"Signed [${message}] = [${signature}]`);
-                let url = "/claimaddress/" + encodeURIComponent(address) + '/' + encodeURIComponent(message) + "/" + encodeURIComponent(signature);
-                $.ajax({
-                    url: url
-                }).done(function() {
-                    console.log("claimaddress DONE", url);
-                });
-                return (true);
-            } else {
-                return (false);
-            }
-        } catch (e) {
-            console.log("signMessageWithAccount ERR", e);
-            return (false);
-        }
+async function verifyEvent(id, blockNumber, eventID, params) {
+    let ida = eventID.split("-");
+    let chainID, eventNo, myapi = null;
+    console.log("verifyEvent", eventID);
+    if ( ida.length == 4 ) {
+	chainID = parseInt(ida[0], 10);
+	blockNumber = parseInt(ida[1], 10);
+	eventNo = parseInt(ida[3], 10);
+	myapi = await getAPI(chainID);
+    } else if ( ida.length == 2 ) {
+	eventNo = parseInt(ida[1], 10);
+	myapi = await getAPI(id);
     }
+    
+    if ( ! myapi ) return(null); // TODO: provide notification
+    try {
+        let header = await myapi.rpc.chain.getBlockHash(blockNumber);
+        let blockHash = header.toHex();
+        const signedBlock = await myapi.rpc.chain.getBlock(blockHash);
+        let block = signedBlock.block;
+        let eventsRaw = await myapi.query.system.events.at(blockHash);
+        let e = eventsRaw[eventNo];
+	let event = e.event;
+	console.log(event.toHuman());
+	console.log(event.toJSON());
+	// TODO: check that the event parameters match
+    } catch (err) {
+	console.log(err)
+    }
+}
 
-    await selectWalletAccount();
+async function verifyExtrinsic(id, blockNumber, extrinsicID, extrinsicHash, params) {
+    let myapi = await getAPI(id);
+    if ( ! myapi ) {
+	// TODO: provide notification
+	console.log("unable to get API for", id);
+	return(null);
+    }
+    try {
+        let header = await myapi.rpc.chain.getBlockHash(blockNumber);
+        let blockHash = header.toHex();
+        const signedBlock = await myapi.rpc.chain.getBlock(blockHash);
+        let block = signedBlock.block;
+	let ida = extrinsicID.split("-");
+	let extrinsicNo = parseInt(ida[1], 10);
+        let ex = block.extrinsics[extrinsicNo];
+        let exj = ex.method.toJSON();
+        let exh = ex.method.toHuman()
+	console.log(exj, exh);
+	// TODO: check that the extrinsic params match
+    } catch (err) {
+	console.log(err)
+    }
+}
+
+async function verifyAccount(id, address = "121Rs6fKm8nguHnvPfG1Cq3ctFuNAVZGRmghwkJwHpKxKjbx") {
+    let myapi = await getAPI(id);
+    if ( ! myapi ) {
+	// TODO: provide notification
+	console.log("unable to get API for", id);
+	return(null);
+    }
+    try {
+	let result = await myapi.query.system.account(address);
+	let data = result.data;
+	console.log("free toString", data.free.toString());
+	console.log("free toHuman", data.free.toHuman());
+	console.log("free toJSON", data.free.toJSON());
+	// TODO: check that the account params match
+    } catch (err) {
+	console.log(err)
+    }
 }
 
 $('#walletClear').on('click', function(e) {

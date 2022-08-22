@@ -1014,6 +1014,10 @@ function setupapidocs(major = "", minor = "", input = "", chainfilterStr = false
                     apiUrl = `/chain/assets/${input}`;
                     docsSection = "get-chain-assets";
                     break;
+                case "chainlog":
+                    apiUrl = `/chainlog/${input}`;
+                    docsSection = "get-chain-log";
+                    break;
                 case "specversions":
                     apiUrl = `/specversions/${input}`;
                     docsSection = "get-chain-specversions";
@@ -1386,3 +1390,29 @@ function renderjsontable(data) {
     out += "</tbody></table>";
     return (out);
 }
+
+function verifyIcon() {
+    return `<i class="fa-solid fa-question"></i>`;
+}
+
+function presentVerifyXCMMessage(row) {
+    let r = JSON.stringify(row);
+    let s = `<script>$('#vxcm${row.msgHash}').on('click', function(e) { verifyXCMMessage(${r}) })</script>`
+    return `<a class="btn btn-sm text-capitalize" id="vxcm${row.msgHash}">${verifyIcon()}</a>` + s;
+}
+
+function presentVerifyExtrinsic(id, blockNumber, extrinsicID, extrinsicHash, params = null) {
+    // TODO: add params
+    return `<a class="btn btn-sm text-capitalize" href="javascript:verifyExtrinsic('${id}', '${blockNumber}', '${extrinsicID}', '${extrinsicHash}')">${verifyIcon()}</a>`;
+}
+
+function presentVerifyEvent(id, blockNumber, eventID, params = null) {
+     // TODO: add params
+    return `<a class="btn btn-sm text-capitalize" href="javascript:verifyEvent('${id}', '${blockNumber}', '${eventID}')">${verifyIcon()}</a>`;
+}
+
+function presentVerifyBlock(id, blockNumber, params = null) {
+     // TODO: add params
+    return `<a class="btn btn-sm text-capitalize" href="javascript:verifyBlock('${id}', '${blockNumber}')">${verifyIcon()}</a>`;
+}
+

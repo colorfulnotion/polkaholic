@@ -16,7 +16,9 @@
      %>
   <tr class="table-primary">
     <th>Event #<%- eventIdx %></th>
-    <td><a href='/events/<%= chainID %>/<%= pallet; %>/<%- method %>' class="btn btn-outline-primary" style="text-transform: unset !important;" data-mdb-toggle="tooltip" title="<%= docs; %>"><%= pallet_method; %></a></td>
+    <td><a href='/events/<%= chainID %>/<%= pallet; %>/<%- method %>' class="btn btn-outline-primary" style="text-transform: unset !important;" data-mdb-toggle="tooltip" title="<%= docs; %>"><%= pallet_method; %></a>
+    <%- include("verifyEvent", { id, blockNumber, eventID: e.eventID } ) %>
+    </td>
   </tr>
   <%  if ( ( decodedDataArr ) && ( decodedDataArr.length > 0 ) ) { %>
   <% for ( let j = 0; j < decodedDataArr.length; j++) {

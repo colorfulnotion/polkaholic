@@ -4208,7 +4208,8 @@ module.exports = class Indexer extends AssetManager {
             numSignedExtrinsics: 0,
             numTransfers: 0,
             numEvents: events.length,
-            valueTransfersUSD: 0
+            valueTransfersUSD: 0,
+	    fees: 0,
         }
         if (autoTraces && Array.isArray(autoTraces)) {
             blockStats.numTraceRecords = autoTraces.length
@@ -4225,6 +4226,9 @@ module.exports = class Indexer extends AssetManager {
         }
         block.extrinsics.forEach((extrinsic, index) => {
             if (this.isExtrinsicSigned(extrinsic)) blockStats.numSignedExtrinsics++;
+	    if ( extrinsic.fee != undefined && extrinsic.fee > 0 ) {
+		blockStats.fees += extrinsic.fee;
+	    }
             let numTransfers = extrinsic.transfers ? extrinsic.transfers.length : 0;
             let valueTransfersUSD = 0;
             if (numTransfers > 0) {
@@ -6061,7 +6065,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (!parentHash) {
                 console.log("missing parentHash", blockNumber, r.block.header);
             } else if (blockTS) {
-                let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', FROM_UNIXTIME('${feedTS}'), 0)`
+                let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', FROM_UNIXTIME('${feedTS}'), 0)`
                 statRows.push(sql);
             }
             this.dump_update_block_stats(chain.chainID, statRows, indexTS)
@@ -6142,7 +6146,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 evals = ", sum(numTransactionsEVM), sum(numReceiptsEVM), sum(gasUsed), sum(gasLimit), sum(if(blockHashEVM is Null, 0, 1))";
             }
 
-            let sql = `insert into blocklog (chainID, logDT, startBN, endBN, numTraces, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD ${eflds} ) (select ${chainID} as chainID, date(blockDT) as logDT, min(blockNumber), max(blockNumber), sum(if(crawlTrace=0, 1, 0)), sum(numExtrinsics), sum(numEvents), sum(numTransfers), sum(numSignedExtrinsics), sum(valueTransfersUSD) ${evals} from block${chainID} where blockDT is Not Null and blockDT >= date(date_sub(now(), INTERVAL ${daysago} DAY))  group by chainID, logDT) on duplicate key update startBN = values(startBN), endBN = values(endBN), numExtrinsics = values(numExtrinsics), numEvents = values(numEvents), numTransfers = values(numTransfers), numSignedExtrinsics = values(numSignedExtrinsics), valueTransfersUSD = values(valueTransfersUSD), numTraces = values(numTraces) ` + eupds;
+            let sql = `insert into blocklog (chainID, logDT, startBN, endBN, numTraces, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD, numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD, fees ${eflds} ) (select ${chainID} as chainID, date(blockDT) as logDT, min(blockNumber), max(blockNumber), sum(if(crawlTrace=0, 1, 0)), sum(numExtrinsics), sum(numEvents), sum(numTransfers), sum(numSignedExtrinsics), sum(valueTransfersUSD), sum(numXCMTransfersIn), sum(numXCMMessagesIn), sum(numXCMTransfersOut), sum(numXCMMessagesOut), sum(valXCMTransferIncomingUSD), sum(valXCMTransferOutgoingUSD), sum(fees) ${evals} from block${chainID} where blockDT is Not Null and blockDT >= date(date_sub(now(), INTERVAL ${daysago} DAY))  group by chainID, logDT) on duplicate key update startBN = values(startBN), endBN = values(endBN), numExtrinsics = values(numExtrinsics), numEvents = values(numEvents), numTransfers = values(numTransfers), numSignedExtrinsics = values(numSignedExtrinsics), valueTransfersUSD = values(valueTransfersUSD), numTraces = values(numTraces), numXCMTransfersIn = values(numXCMTransfersIn), numXCMMessagesIn = values(numXCMMessagesIn), numXCMTransfersOut = values(numXCMTransfersOut), valXCMTransferIncomingUSD = values(valXCMTransferIncomingUSD), valXCMTransferOutgoingUSD = values(valXCMTransferOutgoingUSD), fees = values(fees) ` + eupds;
+	    console.log(sql);
             this.batchedSQL.push(sql);
             await this.update_batchedSQL(10.0);
 

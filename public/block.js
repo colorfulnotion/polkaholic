@@ -11,10 +11,6 @@ function showblockextrinsics(objects) {
         columnDefs: [{
                 "className": "dt-center",
                 "targets": [3, 4]
-            },
-            {
-                "targets": [5],
-                "visible": false
             }
         ],
         order: [
@@ -111,6 +107,7 @@ function showblockextrinsics(objects) {
                     if (type == 'display') {
                         //let res = (row.result == 1) ? 'Success' : 'Failed'
                         let txStatus = presentSuccessFailure(row.result, row.err)
+			// TODO: params
                         return txStatus;
                     }
                     return data;
@@ -119,6 +116,10 @@ function showblockextrinsics(objects) {
             {
                 data: 'id',
                 render: function(data, type, row, meta) {
+		    if ( type == 'display' ) {
+			let vb = presentVerifyExtrinsic(id, row.blockNumber, row.extrinsicID, row.extrinsicHash, null);
+			return vb;
+		    }
                     if (row.id) {
                         return data;
                     } else {
@@ -159,7 +160,13 @@ function showblockevents(objects) {
                         } catch (e) {
                             console.log(e);
                         }
-                    }
+                    } else {
+			let ida = row.rawEventID.split("-")
+			if ( ida.length > 1 ) {
+			    return parseInt(ida[1], 10);
+			}
+			return row.rawEventID;
+		    }
                     return data;
                 }
             },
@@ -215,6 +222,23 @@ function showblockevents(objects) {
                         } catch (e) {
                             console.log(e);
                         }
+                    }
+                    return "";
+                }
+            },
+            {
+                data: 'blockNumber',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+			try {
+		  	    let ve = presentVerifyEvent(row.id, row.blockNumber, row.eventID, null);
+			    return ve;
+                        } catch (e) {
+                            console.log(e);
+                        }
+                        return "";
+                    } else {
+                        console.log(row);
                     }
                     return "";
                 }

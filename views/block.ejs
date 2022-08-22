@@ -130,6 +130,12 @@ let defHash = "#overview";
          %>
       <a href='<%- subscanURL; %>' target='_new'><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
       <% } %>
+
+  </tr>
+  <tr>
+    <td>Verify</td>
+    <td>
+      <%- include("verifyBlock", {id, blockNumber}) %>
     </td>
   </tr>
 </table>
@@ -148,6 +154,7 @@ let defHash = "#overview";
         <th>Params</th>
         <th>From</th>
         <th>Result</th>
+	<th>Verify</th>
       </tr>
     </thead>
     <tbody>
@@ -167,6 +174,7 @@ let defHash = "#overview";
         <th>Extrinsic ID (Event Index#)</th>
         <th>Action</th>
         <th>Params</th>
+	<th>Verify</th>
       </tr>
     </thead>
   </table>

@@ -210,7 +210,7 @@ async function showxcmmessages(filter = {}) {
                         if (row.pending != undefined) {
                             return "Pending";
                         } else {
-                            console.log(row.destStatus, row.errorDesc);
+
                             if (row.destStatus == -1) {
                                 return `<button type="button" class="btn btn-warning text-capitalize">Unknown</button>`;
                             } else if (row.destStatus == 0) {
@@ -220,7 +220,8 @@ async function showxcmmessages(filter = {}) {
                                     return `<button type="button" class="btn btn-danger text-capitalize">FAIL</button>`;
                                 }
                             } else if (row.destStatus == 1) {
-                                return `<button type="button" class="btn btn-success text-capitalize">Success</button>`;
+				let vm = presentVerifyXCMMessage(row);
+                                return `<button type="button" class="btn btn-success text-capitalize">Success</button>` + vm;
                             }
                         }
                     }

@@ -36,7 +36,7 @@ const path = require('path');
 const {
     BigQuery
 } = require('@google-cloud/bigquery');
-
+const bqDir = "/disk1/"
 module.exports = class Manager extends AssetManager {
     constructor() {
         super("manager")
@@ -468,6 +468,195 @@ module.exports = class Manager extends AssetManager {
         await this.update_batchedSQL();
     }
 
+    async updateChainlogNumAccountsActive(chainID = null, lookback = 100) {
+        await this.assetManagerInit();
+	let whereChain = ( chainID >= 0 ) ? ` and chainID = ${chainID}` : "";
+	let sql =`select UNIX_TIMESTAMP(logDT) as logTS, chainID from blocklog where logDT >= date_sub(Now(), interval ${lookback} DAY) and logDT < date_sub(Now(), interval 1 day) and  numAccountsActiveLastUpdateDT is null ${whereChain} order by rand() limit 20`;
+	let chainlog = await this.poolREADONLY.query(sql)
+	for (let i =0; i < chainlog.length; i++) {
+	    let [logDT, hr] = paraTool.ts_to_logDT_hr(chainlog[i].logTS);
+	    await this.update_chainlog_numAccountsActive(chainlog[i].chainID, logDT);
+	}
+    }
+
+    async scan_active_signers(chainID, startBN, endBN, address, isEVM = 0)
+    {
+        const tableChain = this.getTableChain(chainID);
+        let start = paraTool.blockNumberToHex(startBN);
+        let end = paraTool.blockNumberToHex(endBN);
+        let families = ["feed", "trace", "finalized"]
+	if ( isEVM ) families.push("feedevm");
+        const filter = {
+            start,
+            end,
+            family: families
+        };
+        let [rows] = await tableChain.getRows(filter)
+        let out = [];
+        rows.forEach(async (row) => {
+            try {
+                let bn = parseInt(row.id.substring(2), 16);
+                let rowData = row.data;
+                let finalizedData = rowData["finalized"];
+                let feedData = rowData["feed"];
+		let feedevmData = rowData["feedevm"];
+		let feesCovered = false;
+		let txsCovered = false;
+                if (finalizedData) {
+                    for (const h of Object.keys(finalizedData)) {
+			if (feedData && feedData[h] && feesCovered == false) {
+			    try {
+				let cell  = feedData[h][0];
+				let feed = JSON.parse(cell.value);
+				if ( feed.extrinsics && feed.extrinsics.length > 0 ) {
+				    for (let i =0; i < feed.extrinsics.length; i++) {
+					let ext = feed.extrinsics[i];
+					if ( ext.signer ) {
+					    address[ext.signer] = 1;
+					} 
+				    }
+				    feesCovered = true
+				}
+			    } catch (e) {
+				console.log(e);
+			    }
+			}
+			if ( isEVM && feedevmData && feedevmData[h] && txsCovered == false) {
+			    try {
+				let cell  = feedevmData[h][0];
+				let feedevm = JSON.parse(cell.value);
+				if ( feedevm.transactions && feedevm.transactions.length > 0 ) {
+				    for (let i =0; i < feedevm.transactions.length; i++) {
+					let tx = feedevm.transactions[i];
+					if ( tx.from ) {
+					    address[tx.from] = 1;
+					} 
+				    }
+				    txsCovered = true;
+				}
+			    } catch (e) {
+				console.log(e);
+			    }
+			}
+			break;
+                    }
+                }
+            } catch (err) {
+                console.log(`audit_chain_raw`, err)
+            }
+        });
+    }
+    
+    async update_chainlog_numAccountsActive(chainID, logDT) {
+	console.log("update_chainlog_numAccountsActive", chainID, logDT);
+        let chains = await this.poolREADONLY.query(`select chainID, WSEndpoint, numHolders isEVM from chain where chainID = ${chainID}`);
+        if (chains.length == 0) {
+            console.log("No chain found ${chainID}")
+            return false;
+        }
+        let chain = chains[0];
+        let wsEndpoint = chain.WSEndpoint;
+	let isEVM = chain.isEVM;
+        let prev_numHolders = chain.numHolders;
+	let sql0 = `select min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT >= '${logDT} 00:00:00' and blockDT <= '${logDT} 23:59:59' limit 1`;
+        let blocks = await this.poolREADONLY.query(sql0)
+        if (blocks.length == 0) {
+            console.log("No blocks found ${chainID}")
+            return false;
+        }
+	let startBN = blocks[0].startBN;
+	let endBN = blocks[0].endBN;
+	let address = {};
+	let jmp = 500;
+	for ( let i = startBN; i <= endBN; i+= jmp) {
+	    let i0 = i;
+	    let i1 = i + jmp;
+	    if ( i1 > endBN ) i1 = endBN;
+	    await this.scan_active_signers(chainID, i0, i1, address, isEVM);
+	    let numAccountsActive = Object.keys(address).length;
+	    console.log(i, numAccountsActive);
+	}
+	let numAccountsActive = Object.keys(address).length;
+        // create xcm directory
+        let chainlogdir = path.join(bqDir, "chainlog", `${logDT}`);
+        if (!fs.existsSync(chainlogdir)) {
+            await fs.mkdirSync(chainlogdir);
+        }
+	let chainlogfn = path.join(chainlogdir, `${chainID}-active.json`)
+        await fs.writeFileSync(chainlogfn, JSON.stringify(Object.keys(address)));
+	
+	let sql = `update blocklog set numAccountsActive = '${numAccountsActive}', numAccountsActiveLastUpdateDT = Now() where chainID = '${chainID}' and logDT = '${logDT}'`
+	console.log(chainlogfn, sql);
+	this.batchedSQL.push(sql);
+	await this.update_batchedSQL();
+    }
+
+    async updateChainlogNumAddresses(chainID = null, lookback = 100) {
+        await this.assetManagerInit();
+	let whereChain = ( chainID >= 0 ) ? ` and chainID = ${chainID}` : "";
+	let sql =`select UNIX_TIMESTAMP(logDT) as logTS, chainID from blocklog where logDT >= date_sub(Now(), interval ${lookback} DAY) and logDT < date_sub(Now(), interval 1 day) and  numAddressesLastUpdateDT is null ${whereChain} order by rand() limit 20`;
+	let chainlog = await this.poolREADONLY.query(sql)
+	console.log(sql, chainlog);
+	for (let i =0; i < chainlog.length; i++) {
+	    let [logDT, hr] = paraTool.ts_to_logDT_hr(chainlog[i].logTS);
+	    await this.update_chainlog_numAddresses(chainlog[i].chainID, logDT);
+	}
+    }
+    
+    async update_chainlog_numAddresses(chainID, logDT) {
+	console.log("update_chainlog_numAddresses", chainID, logDT);
+        let chains = await this.poolREADONLY.query(`select chainID, WSEndpoint, numHolders from chain where chainID = ${chainID}`);
+        if (chains.length == 0) {
+            console.log("No chain found ${chainID}")
+            return false;
+        }
+        let chain = chains[0];
+        let wsEndpoint = chain.WSEndpoint;
+        let prev_numHolders = chain.numHolders;
+	let sql0 = `select blockHash from block${chainID} where blockDT >= '${logDT} 00:00:00' and blockDT <= '${logDT} 23:59:59' order by blockDT desc limit 1`;
+	console.log(sql0);
+        let blocks = await this.poolREADONLY.query(sql0)
+        if (blocks.length == 0) {
+            console.log("No blocks found ${chainID}")
+            return false;
+        }
+	
+	const finalizedBlockHash = blocks[0].blockHash;
+	console.log(chainID, "blockHash", finalizedBlockHash);
+        const provider = new WsProvider(wsEndpoint);
+        const api = await ApiPromise.create({
+            provider
+        });
+        const rawChainInfo = await api.registry.getChainProperties()
+        var chainInfo = JSON.parse(rawChainInfo);
+        const prefix = chainInfo.ss58Format
+
+        let apiAt = await api.at(finalizedBlockHash)
+        let last_key = '';
+	let perPagelimit = 1000;
+	let numAddresses = 0;
+        while (true) {
+            let query = await apiAt.query.system.account.entriesPaged({
+                args: [],
+                pageSize: perPagelimit,
+                startKey: last_key
+            })
+            if (query.length == 0) {
+                console.log(`Query Completed: total ${numAddresses} accounts`)
+                break
+            }
+            for (const user of query) {
+                numAddresses++;
+                last_key = user[0];
+            }
+	    console.log("numAddresses", chainID, logDT, numAddresses);
+        }
+	let sql = `update blocklog set numAddresses = '${numAddresses}', numAddressesLastUpdateDT = Now() where chainID = '${chainID}' and logDT = '${logDT}'`
+	this.batchedSQL.push(sql);
+	await this.update_batchedSQL();
+	
+    }
+    
     generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn) {
         let newState = {
             free: free_balance,

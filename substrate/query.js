@@ -2549,7 +2549,7 @@ module.exports = class Query extends AssetManager {
             let chainID = a.assetInfo.chainID;
             if (chainsMap[chainID] == undefined) {
                 let chainInfo = this.chainInfos[chainID];
-                var id, chainName, ss58Format, ss58Address, iconUrl, subscanURL, dappURL;
+                var id, chainName, ss58Format, ss58Address, iconUrl, subscanURL, dappURL, WSEndpoint;
                 if (chainInfo !== undefined) {
                     chainName = this.getChainName(chainID);
                     id = chainInfo.id;
@@ -2558,6 +2558,7 @@ module.exports = class Query extends AssetManager {
                     iconUrl = this.chainInfos[chainID].iconUrl;
                     subscanURL = this.chainInfos[chainID].subscanURL;
                     dappURL = this.chainInfos[chainID].dappURL;
+		    WSEndpoint = this.chainInfos[chainID].WSEndpoint;
                 }
                 chainsMap[chainID] = {
                     chainID,
@@ -2568,6 +2569,7 @@ module.exports = class Query extends AssetManager {
                     iconUrl,
                     subscanURL,
                     dappURL,
+		    WSEndpoint,
                     assets: [],
                     balanceUSD: 0
                 };
@@ -2704,7 +2706,6 @@ module.exports = class Query extends AssetManager {
                 }
             }
         }
-
         return (account);
     }
 
@@ -4856,9 +4857,26 @@ module.exports = class Query extends AssetManager {
                 err
             });
         }
-
         return false;
+    }
 
+    async getChainLog(chainID_or_chainName, lookback = 90) {
+        let [chainID, id] = this.convertChainID(chainID_or_chainName)
+        if (chainID === false) {
+            throw new paraTool.InvalidError(`Invalid chain: ${chainID_or_chainName}`)
+        }
+        try {
+            var sql = `select logDT, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD, numTransactionsEVM, numAccountsActive, numAddresses, fees, numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from blocklog where chainID = '${chainID}' and logDT >= date_sub(Now(), interval ${lookback} DAY) order by logDT desc`;
+            let recs = await this.poolREADONLY.query(sql);
+            return (recs);
+        } catch (err) {
+            this.logger.error({
+                "op": "query.getChainLog",
+                chainID,
+                err
+            });
+        }
+        return false;
     }
 
     async getExtrinsicDocs(chainID_or_chainName, s, m) {

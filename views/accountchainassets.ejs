@@ -30,7 +30,7 @@ let cls2 = ( expanded ) ? "show" : "";
   <% if ( chainassets.dappURL ) { %>
   <a class='btn-sm btn-primary' href="<%= chainassets.dappURL; %>" target="_new">APP</a>
   <% } %>
-  Prefix: <%= chainassets.ss58Format; %>
+  <a href='javascript:verifyAccount("<%= chainassets.id %>", "<%= chainassets.ss58Address; %>")'>Verify</a> Prefix: <%= chainassets.ss58Format; %>
   </td>
 </tr>
 <% } %>
