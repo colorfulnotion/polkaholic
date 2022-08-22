@@ -4210,9 +4210,9 @@ module.exports = class Indexer extends AssetManager {
             numEvents: events.length,
             valueTransfersUSD: 0
         }
-	if ( autoTraces && Array.isArray(autoTraces) ) {
-	    blockStats.numTraceRecords = autoTraces.length
-	}
+        if (autoTraces && Array.isArray(autoTraces)) {
+            blockStats.numTraceRecords = autoTraces.length
+        }
         if (evmBlock) {
             blockStats.blockHashEVM = evmBlock.hash;
             blockStats.parentHashEVM = evmBlock.parentHash;
@@ -5973,13 +5973,14 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             } else {
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-		if ( r.autotrace.length == 0 ) {
-		    // console.log("autotrace generation ", blockNumber);
+                if (r.autotrace === false || r.autotrace == undefined || ( r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0 )) {
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
                     autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
-		} else {
-		    // SKIP PROCESSING since we covered autotrace generation already
-		    autoTraces = r.autotrace;
-		}
+                } else {
+                    // SKIP PROCESSING since we covered autotrace generation already
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
+                    autoTraces = r.autotrace;
+                }
                 for (const t of autoTraces) {
                     if (this.debugLevel >= paraTool.debugTracing) console.log(`[autoTraces ${t.traceID}]`, t)
                     //TODO: write this to chain table
@@ -6598,7 +6599,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
             console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end}), indexTS=${indexTS} [${logDT} ${hr}] [${batchN}/${totalBatch}]`)
 
-            let families = ["finalized", "trace", "blockraw", "events", "n"]
+            let families = ["finalized", "trace", "autotrace", "blockraw", "events", "n"]
             if (chain.isEVM > 0) {
                 families.push("blockrawevm");
             }
@@ -6681,7 +6682,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     let numSignedExtrinsics = blockStats && blockStats.numSignedExtrinsics ? blockStats.numSignedExtrinsics : 0
                     let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
                     let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
-		    let numTraceRecords = blockStats && blockStats.numTraceRecords ? blockStats.numTraceRecords : 0;
+                    let numTraceRecords = blockStats && blockStats.numTraceRecords ? blockStats.numTraceRecords : 0;
                     let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
                     this.setLoggingContext({
                         chainID: chain.chainID,
