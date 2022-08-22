@@ -5973,13 +5973,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             } else {
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                if (r.autotrace.length == 0) {
-                    // console.log("autotrace generation ", blockNumber);
+                if (r.autotrace === false || r.autotrace == undefined || ( r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0 )) {
+                    console.log(`[${blockNumber}] autotrace generation`);
                     autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
                 } else {
                     // SKIP PROCESSING since we covered autotrace generation already
+                    console.log(`[${blockNumber}] autotrace already covered`);
                     autoTraces = r.autotrace;
                 }
+                console.log(`[${blockNumber}] autoTraces`, autoTraces)
                 for (const t of autoTraces) {
                     if (this.debugLevel >= paraTool.debugTracing) console.log(`[autoTraces ${t.traceID}]`, t)
                     //TODO: write this to chain table

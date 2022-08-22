@@ -92,10 +92,18 @@ let tabs = <%- JSON.stringify(tabs); %> ;
     let blockHash = '<%= blockHash %>';
     showblockstatus("<%= b.hash; %>");
 <% } else { %>
-    let blockHash = '';
+let blockHash = '';
 <% } %>
+<% if (b.evmBlock != undefined && b.evmBlock.transactions !=undefined) { %>
 let evmtxs = <%- JSON.stringify(b.evmBlock.transactions); %>;
+<% } else { %>
+let evmtxs = '[]';
+<% } %>
+<% if (b.extrinsics != undefined) { %>
 let extrinsics = <%- JSON.stringify(b.extrinsics); %>;
+<% } else { %>
+let extrinsics = '[]';
+<% } %>
 // extract events from extrinsics, and tally totalSubstrateSignedExtrinsics, totalEvents
 let events = [];
 let totalSubstrateSignedExtrinsics = 0;
@@ -123,4 +131,3 @@ document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
 <script src="/evmblock.js"></script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
-
