@@ -5377,10 +5377,12 @@ module.exports = class Query extends AssetManager {
                 let s = `${f.p.toLowerCase()}`
                 let m = `${f.s.toLowerCase()}`
                 let sm = `${s}:${m}`
+                let fv = `${f.v}`
                 if (matcher["trace"][sm] || matcher["trace"][s] || matcher["trace"][m]) {
                     // pass the data "f" through the filtering function
                     let func = (matcher["trace"][sm] != undefined && matcher["trace"][sm] != true) ? matcher["trace"][sm] : null;
                     let pass = (func) ? func(f) : true;
+                    if (fv == '0x' || fv == '0x0400') pass = false
                     if (pass) {
                         if (features[sm] != undefined) {
                             if (features[sm] == "watermark" && f.pv != undefined) {
