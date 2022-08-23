@@ -63,6 +63,33 @@ let f = xcm;
       </td>
     </tr>
 
+    <tr>
+      <td>Execution Status</td>
+      <td>
+          <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
+          <% if ( f.executedEventID) {
+          let executionBN = f.executedEventID.split('-')[1] %>
+          <%- include("blockNumber", {chainID: f.chainID, blockNumber: executionBN}); %>
+          <% if ( f.sourceTS && f.sourceBlocknumber == executionBN) { %>
+          <%=` `%> Executed: <%= uiTool.presentTS(f.sourceTS); %>
+          <% } %>
+          <br/>
+          <% } %>
+        <% if ( f.destStatus == -1 ) { %>
+	    <button type="button" class="btn btn-warning text-capitalize">Unknown</button>
+	<% } else if ( f.destStatus == 0 ) { %>
+        <% if ( f.errorDesc ) { %>
+	    <button type="button" class="btn btn-danger text-capitalize"><%= f.errorDesc %></button>
+	<% } %>
+	<% } else if ( f.destStatus == 1 ) { %>
+	    <button type="button" class="btn btn-success text-capitalize">Success</button>
+	<% } %>
+	<% if ( f.executedEventID ) { %>
+        <%- include("eventaccordion", {eventID: f.executedEventID}); %>
+	<% } %>
+      </td>
+    </tr>
+
 <% if ( f.extrinsicHash ) { %>
     <tr>
       <td>Extrinsic</td>
@@ -84,23 +111,6 @@ let f = xcm;
     </tr>
 <% } %>
 
-    <tr>
-      <td>Execution Status</td>
-      <td>
-        <% if ( f.destStatus == -1 ) { %>
-	    <button type="button" class="btn btn-warning text-capitalize">Unknown</button>
-	<% } else if ( f.destStatus == 0 ) { %>
-        <% if ( f.errorDesc ) { %>
-	    <button type="button" class="btn btn-danger text-capitalize"><%= f.errorDesc %></button>
-	<% } %>
-	<% } else if ( f.destStatus == 1 ) { %>
-	    <button type="button" class="btn btn-success text-capitalize">Success</button>
-	<% } %>
-	<% if ( f.executedEventID ) { %>
-        <%- include("eventaccordion", {eventID: f.executedEventID}); %>
-	<% } %>
-      </td>
-    </tr>
     <tr>
       <td>Dest Address</td>
       <td>
