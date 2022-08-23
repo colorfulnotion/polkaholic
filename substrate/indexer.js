@@ -3213,9 +3213,13 @@ module.exports = class Indexer extends AssetManager {
         }
         let withdrawFee = 0 // if set, transaction is paid in native currency
         let totalDepositFee = 0 // if set, should equal to withdrawTxFee, including the 20% deposit to treasury
+        let depositFeeList = [];
         let treasuryFee = 0 // usaullly 20% of the withdrawTxFee
         let parsedEvents = extrinsic.events
         let errorSet = false
+        let [exp, exm] = this.parseExtrinsicSectionMethod(extrinsic)
+        let extrinsicSectionMethod = `${exp}:${exm}`
+        let isUnsignedHead = (extrinsicSectionMethod == 'parachainSystem:setValidationData' || extrinsicSectionMethod == 'paraInherent:enter')? true : false
         for (const evt of parsedEvents) {
             let data = JSON.parse(JSON.stringify(evt.data))
             let dataType = evt.dataType
@@ -3233,9 +3237,11 @@ module.exports = class Indexer extends AssetManager {
                     if (data != undefined && Array.isArray(data)) {
                         try {
                             let withdrawTxFee = paraTool.dechexToInt(data[1])
-                            withdrawFee = withdrawTxFee
-                            //console.log('withdrawFee', withdrawTxFee)
-                            res.fee = withdrawFee
+                            if (!isUnsignedHead){
+                                withdrawFee = withdrawTxFee
+                                //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
+                                res.fee = withdrawFee
+                            }
                         } catch (e) {
                             console.log('unable to compute Withdraw fees!!', data, e)
                         }
@@ -3245,8 +3251,11 @@ module.exports = class Indexer extends AssetManager {
                     if (data != undefined && Array.isArray(data)) {
                         try {
                             let depositfee = paraTool.dechexToInt(data[1])
-                            //console.log('depositfee', depositfee)
-                            totalDepositFee += depositfee
+                            if (!isUnsignedHead){
+                                //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] depositfee=${depositfee}`)
+                                totalDepositFee += depositfee
+                                depositFeeList.push(depositfee)
+                            }
                         } catch (e) {
                             console.log('unable to compute Deposit fees!!', data, e)
                         }
@@ -3256,8 +3265,22 @@ module.exports = class Indexer extends AssetManager {
                     if (data != undefined && Array.isArray(data)) {
                         try {
                             let tFee = paraTool.dechexToInt(data[0])
-                            //console.log('treasuryFee', tFee)
+                            //console.log(`[${extrinsicID}] ${extrinsicHash} tFee=${tFee}`)
                             treasuryFee += tFee
+                        } catch (e) {
+                            console.log('unable to compute treasury fees!!', data, e)
+                        }
+                    }
+                }
+                if (pallet_method == 'transactionPayment:TransactionFeePaid') {
+                    if (data != undefined && Array.isArray(data) && data.length == 4) {
+                        try {
+                            let actualFee = paraTool.dechexToInt(data[1])
+                            let actualTip = paraTool.dechexToInt(data[2])
+                            let actualSurplus = paraTool.dechexToInt(data[3])
+                            let fee = actualFee+actualSurplus-actualTip
+                            //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] actualFee=${actualFee}, actualTip=${actualTip}, actualSurplus=${actualSurplus}, fee=${fee}`)
+                            res.fee = fee
                         } catch (e) {
                             console.log('unable to compute treasury fees!!', data, e)
                         }
@@ -3328,7 +3351,17 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
         }
-        if (withdrawFee == 0) {
+        if (extrinsicSectionMethod == 'ethereum:transact'){
+            let surplus = (depositFeeList.length > 0)? depositFeeList[0] : 0
+            res.fee = withdrawFee - surplus
+            //console.log(`[${extrinsicID}] ${extrinsicHash} EVM fee=${res.fee}, depositFeeList=${depositFeeList}`)
+        }
+        if (isUnsignedHead){
+            res.fee = 0
+            //res.fee = depositFeeList[depositFeeList.length - 1]
+            //console.log(`[${extrinsicID}] ${extrinsicHash} potential XCM fee=${res.fee}, depositFeeList=${depositFeeList}`)
+        }
+        if (withdrawFee == 0 && !isUnsignedHead) {
             // unusual extrinsic - (1) not paid by native token? (2) xcmPallet (3) partially paid?
             // use the highest fee computed
             res.fee = Math.max(withdrawFee, totalDepositFee, treasuryFee)
@@ -3904,6 +3937,7 @@ module.exports = class Indexer extends AssetManager {
         }
 
         // "rExtrinsic" cleaned output - same output should be used for storing block-extrinsics + feed, and any additional processing (processExtrinsicEvents/processXCMTransfer)
+        let [exSection, exMethod] = this.parseExtrinsicSectionMethod(extrinsic)
         let rExtrinsic = {
             chainID: this.chainID,
             ts: blockTS,
@@ -3920,8 +3954,8 @@ module.exports = class Indexer extends AssetManager {
             fee: txFee,
             result: txResult,
             err: null,
-            section: extrinsic.method.pallet,
-            method: extrinsic.method.method, //replacing the original method object format
+            section: exSection,
+            method: exMethod,
             params: extrinsic.args,
             events: extrinsic.events,
         }
