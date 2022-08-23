@@ -66,12 +66,12 @@ let f = xcm;
     <tr>
       <td>Execution Status</td>
       <td>
-          <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
+          <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
           <% if ( f.executedEventID) {
           let executionBN = f.executedEventID.split('-')[1] %>
-          <%- include("blockNumber", {chainID: f.chainID, blockNumber: executionBN}); %>
-          <% if ( f.sourceTS && f.sourceBlocknumber == executionBN) { %>
-          <%=` `%> Executed: <%= uiTool.presentTS(f.sourceTS); %>
+          <%- include("blockNumber", {chainID: f.chainIDDest, blockNumber: executionBN}); %>
+          <% if ( f.sourceTS && f.destBlocknumber == executionBN) { %>
+          <%=` `%> Executed: <%= uiTool.presentTS(f.destTS); %>
           <% } %>
           <br/>
           <% } %>
