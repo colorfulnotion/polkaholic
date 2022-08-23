@@ -5389,6 +5389,9 @@ module.exports = class Query extends AssetManager {
                                 extra[f.s] = f.pv;
                             }
                         }
+                        //delete k, v if s,k, PV is known
+                        if (f.pv != undefined) delete f.v
+                        if (f.p != undefined && f.s != undefined) delete f.k
                         out.push({
                             "chainID": chainID,
                             "id": id,
