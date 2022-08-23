@@ -3199,7 +3199,7 @@ module.exports = class Indexer extends AssetManager {
         return errMsg
     }
 
-    checkExtrinsicStatusAndFee(apiAt, extrinsic, extrinsicHash, extrinsicID, isSigned) {
+    checkExtrinsicStatusAndFee(apiAt, extrinsic, extrinsicHash, extrinsicID, isSigned, signer = false) {
         let res = {
             fee: 0,
             success: 1,
@@ -3219,7 +3219,8 @@ module.exports = class Indexer extends AssetManager {
         let errorSet = false
         let [exp, exm] = this.parseExtrinsicSectionMethod(extrinsic)
         let extrinsicSectionMethod = `${exp}:${exm}`
-        let isUnsignedHead = (extrinsicSectionMethod == 'parachainSystem:setValidationData' || extrinsicSectionMethod == 'paraInherent:enter')? true : false
+        //let isUnsignedHead = (extrinsicSectionMethod == 'parachainSystem:setValidationData' || extrinsicSectionMethod == 'paraInherent:enter' || extrinsicSectionMethod == 'timestamp:set')? true : false
+        let isUnsignedHead = !isSigned
         for (const evt of parsedEvents) {
             let data = JSON.parse(JSON.stringify(evt.data))
             let dataType = evt.dataType
@@ -3237,7 +3238,7 @@ module.exports = class Indexer extends AssetManager {
                     if (data != undefined && Array.isArray(data)) {
                         try {
                             let withdrawTxFee = paraTool.dechexToInt(data[1])
-                            if (!isUnsignedHead){
+                            if (!isUnsignedHead && signer == data[0]){
                                 withdrawFee = withdrawTxFee
                                 //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
                                 res.fee = withdrawFee
@@ -3351,11 +3352,13 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
         }
+        /*
         if (extrinsicSectionMethod == 'ethereum:transact'){
             let surplus = (depositFeeList.length > 0)? depositFeeList[0] : 0
             res.fee = withdrawFee - surplus
             //console.log(`[${extrinsicID}] ${extrinsicHash} EVM fee=${res.fee}, depositFeeList=${depositFeeList}`)
         }
+        */
         if (isUnsignedHead){
             res.fee = 0
             //res.fee = depositFeeList[depositFeeList.length - 1]
@@ -3863,7 +3866,15 @@ module.exports = class Indexer extends AssetManager {
         let success = false;
         extrinsic.events = eventsRaw
 
-        let res = this.checkExtrinsicStatusAndFee(api, extrinsic, extrinsicHash, extrinsicID, isSigned)
+        //(ed25519 and sr25519 do not have id?)
+        let signer = false
+        if (extrinsic.signature.signer.id != undefined) {
+            signer = extrinsic.signature.signer.id
+        } else if (extrinsic.signature.signer != undefined) {
+            signer = extrinsic.signature.signer
+        }
+
+        let res = this.checkExtrinsicStatusAndFee(api, extrinsic, extrinsicHash, extrinsicID, isSigned, signer)
         let chainDecimal = this.getChainDecimal(this.chainID)
         if (isSigned) {
             extrinsic.signature.tip = extrinsic.signature.tip / 10 ** chainDecimal
@@ -3899,14 +3910,6 @@ module.exports = class Indexer extends AssetManager {
         }
         if (!(extrinsic.signature)) {
             return (extrinsic);
-        }
-
-        //(ed25519 and sr25519 do not have id?)
-        let signer = false
-        if (extrinsic.signature.signer.id != undefined) {
-            signer = extrinsic.signature.signer.id
-        } else if (extrinsic.signature.signer != undefined) {
-            signer = extrinsic.signature.signer
         }
 
         // fromAddress is pubkey representation common to ALL substrate chains
@@ -6179,7 +6182,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (chain.isEVM) {
                 evals = ", sum(numTransactionsEVM), sum(numReceiptsEVM), sum(gasUsed), sum(gasLimit), sum(if(blockHashEVM is Null, 0, 1))";
             }
-	    
+
 	    this.batchedSQL.push(`insert into blocklog (logDT, chainID, numXCMMessagesOut) ( select DATE(from_unixtime(sourceTS)) as logDT, chainID, count(*) as numXCMMessagesOut from xcmmessages where chainID = ${chain.chainID} and sourceTS >= UNIX_TIMESTAMP(date_sub(Now(), interval ${daysago} DAY)) and sourceTS > 0 group by logDT, chainID having logDT is not null ) on duplicate key update numXCMMessagesOut = values(numXCMMessagesOut)`);
             this.batchedSQL.push(`insert into blocklog (logDT, chainID, numXCMMessagesIn) ( select DATE(from_unixtime(destTS)) as logDT, chainIDDest, count(*) as numXCMMessagesIn from xcmmessages where chainIDDest = ${chain.chainID} and destTS >= UNIX_TIMESTAMP(date_sub(Now(), interval ${daysago} DAY)) and destTS > 0 group by logDT, chainIDDest having logDT is not null ) on duplicate key update numXCMMessagesIn = values(numXCMMessagesIn) `)
             this.batchedSQL.push(`insert into blocklog (logDT, chainID, numXCMTransfersOut, valXCMTransferOutgoingUSD) ( select DATE(from_unixtime(sourceTS)) as logDT, chainID, count(*) as numXCMTransfersOut, sum(amountSentUSD) as valXCMTransferOutgoingUSD from xcmtransfer where chainID = ${chain.chainID} and sourceTS >= UNIX_TIMESTAMP(date_sub(Now(),interval ${daysago} DAY)) and incomplete = 0 and sourceTS > 0 group by logDT, chainID having logDT is not null ) on duplicate key update numXCMTransfersOut = values(numXCMTransfersOut), valXCMTransferOutgoingUSD = values(valXCMTransferOutgoingUSD)`);
