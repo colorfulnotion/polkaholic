@@ -1335,6 +1335,7 @@ module.exports = class Query extends AssetManager {
                             if (decimals !== false) {
                                 xcm.amountSent = xcm.amountSent / 10 ** decimals;
                                 xcm.amountReceived = xcm.amountReceived / 10 ** decimals;
+                                xcm.fee = xcm.amountSent - xcm.amountReceived
                                 /*await this.decorateUSD(xcm, "amountSent", xcm.asset, xcm.chainID, xcm.destTS, decorateUSD)
                                 if (decorateUSD){
                                   xcm.amountReceivedUSD = xcm.priceUSD * xcm.amountReceived;
@@ -1344,6 +1345,7 @@ module.exports = class Query extends AssetManager {
                                     let [amountSentUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(xcm.amountSent, xcm.asset, xcm.chainID, xcm.destTS);
                                     xcm.amountSentUSD = amountSentUSD;
                                     xcm.amountReceivedUSD = priceUSD * xcm.amountReceived;
+                                    xcm.feeUSD = priceUSD * xcm.fee
                                     xcm.priceUSD = priceUSD;
                                     xcm.priceUSDCurrent = priceUSDCurrent;
                                 }
