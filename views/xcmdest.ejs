@@ -14,9 +14,9 @@ let symbol = ( xcmdest.symbol ) ? xcmdest.symbol : "";
     <% if (xcmdest.msgHash && xcmdest.msgHash != '0x'){  %>
       <b>Msg Hash</b>:<a href='/xcmmessage/<%= xcmdest.msgHash; %>'><%- uiTool.getShortHash(xcmdest.msgHash, false, false)%></a><br>
     <% } %>
-    <b>Amount Sent</b>: <%= uiTool.presentNumber(xcmdest.amountSent); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountSentUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
-    <b>Amount Received</b>: <%= uiTool.presentNumber(xcmdest.amountReceived); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountReceivedUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
-    <b>Fee</b>: <%= uiTool.presentNumber(xcmdest.fee); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.feeUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
+    <b>Asset Sent</b>: <%= uiTool.presentNumber(xcmdest.amountSent); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountSentUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
+    <b>Asset Received</b>: <%= uiTool.presentNumber(xcmdest.amountReceived); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.amountReceivedUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
+    <b>XCM Fees</b>: <%= uiTool.presentNumber(xcmdest.fee); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.feeUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
     <b>Confirmed at Block</b>: <%- uiTool.presentBlock(xcmdest.chainIDDest, xcmdest.blockNumberDest); %> (<%- uiTool.presentSecondsAgoTS(xcmdest.destTS); %>)<br/>
     <b>Confirmed Time</b>: <%= uiTool.presentTS(xcmdest.destTS); %><br>
     <a href='/timeline/<%= extrinsicHash; %>'>XCM timeline</a>
