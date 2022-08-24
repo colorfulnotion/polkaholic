@@ -559,6 +559,7 @@ module.exports = class Manager extends AssetManager {
 	let isEVM = chain.isEVM;
         let prev_numHolders = chain.numHolders;
 	let sql0 = `select min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT >= '${logDT} 00:00:00' and blockDT <= '${logDT} 23:59:59' limit 1`;
+	console.log(sql0);
         let blocks = await this.poolREADONLY.query(sql0)
         if (blocks.length == 0) {
             console.log("No blocks found ${chainID}")
@@ -567,7 +568,7 @@ module.exports = class Manager extends AssetManager {
 	let startBN = blocks[0].startBN;
 	let endBN = blocks[0].endBN;
 	let address = {};
-	let jmp = 500;
+	let jmp = 100;
 	for ( let i = startBN; i <= endBN; i+= jmp) {
 	    let i0 = i;
 	    let i1 = i + jmp;

@@ -124,7 +124,8 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
     </tr>
     <tr>
       <td>Params</td>
-      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params}); %></td>
+      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params,
+      verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID } }); %></td>
     </tr>
     <tr>
     <td>Compare to</td>
@@ -135,10 +136,6 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <a href="<%= subscanURL; %>" target="_new"><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
       <% }%>
     </td>
-    </tr>
-    <tr>
-      <td>Verify</td>
-      <td><%- include("verifyExtrinsic", {id: f.id, blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID}); %></td>
     </tr>
     <tr>
       <td>Events</td>

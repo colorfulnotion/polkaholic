@@ -45,7 +45,7 @@ let defHash = "#overview";
   </tr>
   <tr>
     <td>Finalized</td>
-    <td><span id="status"><%- include("finalized", {finalized: b.finalized}); %></span></td>
+    <td><span id="status"><%- include("finalized", {finalized: b.finalized}); %></span><%- include("verifyBlock", {id, blockNumber}) %></td>
   </tr>
   <tr>
     <td>Hash</td>
@@ -132,12 +132,7 @@ let defHash = "#overview";
       <% } %>
 
   </tr>
-  <tr>
-    <td>Verify</td>
-    <td>
-      <%- include("verifyBlock", {id, blockNumber}) %>
-    </td>
-  </tr>
+
 </table>
 </div>
 
@@ -154,7 +149,6 @@ let defHash = "#overview";
         <th>Params</th>
         <th>From</th>
         <th>Result</th>
-	<th>Verify</th>
       </tr>
     </thead>
     <tbody>
@@ -174,7 +168,6 @@ let defHash = "#overview";
         <th>Extrinsic ID (Event Index#)</th>
         <th>Action</th>
         <th>Params</th>
-	<th>Verify</th>
       </tr>
     </thead>
   </table>

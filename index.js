@@ -1277,6 +1277,7 @@ app.get('/tx/:txhash', async (req, res) => {
             }
             let chain = await query.getChain(tx.chainID);
             res.render(txview, {
+		id: chain.id,
                 txHash: txHash,
                 tx: tx,
                 chain: chain,

@@ -70,7 +70,7 @@ function showblockextrinsics(objects) {
                         let out = "";
                         if (row.method !== undefined && row.extrinsicHash !== undefined) {
                             try {
-                                return presentInstructions(JSON.stringify(row.params), "e" + row.extrinsicHash, "Params");
+                                return presentInstructions(JSON.stringify(row.params), "e" + row.extrinsicHash, "Params", {verification: "extrinsic", obj: row.params, extrinsicID: row.extrinsicID, extrinsicHash: row.extrinsicHash});
                             } catch (e) {
                                 console.log(e);
                             }
@@ -111,20 +111,6 @@ function showblockextrinsics(objects) {
                         return txStatus;
                     }
                     return data;
-                }
-            },
-            {
-                data: 'id',
-                render: function(data, type, row, meta) {
-		    if ( type == 'display' ) {
-			let vb = presentVerifyExtrinsic(id, row.blockNumber, row.extrinsicID, row.extrinsicHash, null);
-			return vb;
-		    }
-                    if (row.id) {
-                        return data;
-                    } else {
-                        return "";
-                    }
                 }
             },
         ]
@@ -211,7 +197,7 @@ function showblockevents(objects) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         try {
-			    return presentInstructions(JSON.stringify(row), row.eventID, row.extrinsicID + " Event #" + row.extrinsicEventIndex, 900);
+			    return presentInstructions(JSON.stringify(row), row.eventID, row.extrinsicID + " Event #" + row.extrinsicEventIndex, {}, 900);
                         } catch (e) {
                             console.log(e);
                         }
@@ -222,23 +208,6 @@ function showblockevents(objects) {
                         } catch (e) {
                             console.log(e);
                         }
-                    }
-                    return "";
-                }
-            },
-            {
-                data: 'blockNumber',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-			try {
-		  	    let ve = presentVerifyEvent(row.id, row.blockNumber, row.eventID, null);
-			    return ve;
-                        } catch (e) {
-                            console.log(e);
-                        }
-                        return "";
-                    } else {
-                        console.log(row);
                     }
                     return "";
                 }

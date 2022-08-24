@@ -51,7 +51,7 @@ function presentEventDetails(eventID) {
 </div><script>document.getElementById('data${eventID}').addEventListener('show.bs.collapse', () => { fetcheventdata("${eventID}") } )</script>`;
 }
 
-function presentInstructions(msg, id, hdr = "Instructions", width = "600") {
+function presentInstructions(msg, id, hdr = "Instructions", verify = null, width = "600") {
     let rjouter = "rjouter" + id;
     let jhouter = "jhouter" + id;
     let rj = "rj" + id;
@@ -60,6 +60,8 @@ function presentInstructions(msg, id, hdr = "Instructions", width = "600") {
     let vc = "vc" + id;
     let copyA = "ca" + id;
     let copyB = "cb" + id;
+    let verifyA = "va" + id;
+    let verifyB = "vb" + id;
     return `<div class="accordion  accordion-flush" style="width: ${width}px">
   <div class="accordion-item">
     <h2 class="accordion-header" id="heading${id}">
@@ -72,20 +74,22 @@ function presentInstructions(msg, id, hdr = "Instructions", width = "600") {
   <div id="${rj}" class="renderjson" style="overflow-y: scroll; max-width: 800px; max-height: 600px"></div>
   <button id="${dec}" type="button" class="btn btn-link">View Decoded</button>
   <button id="${copyA}" type="button" class="btn btn-link">Copy</button>
+  <button id="${verifyA}" type="button" class="btn btn-link">Verify</button>
 </div>
 <div id="${jhouter}" style="display: block; overflow: hidden">
   <div id="${jh}" class="jsontable" style="overflow-y: scroll; max-width: 800px; max-height: 600px"></div>
   <button id="${vc}" type="button" class="btn btn-link">View Raw</button>
   <button id="${copyB}" type="button" class="btn btn-link">Copy</button>
+  <button id="${verifyB}" type="button" class="btn btn-link">Verify</button>
 <div>
-<script>presentJSONObject(${msg}, "${id}");</script>
+<script>presentJSONObject(${msg}, "${id}", ${JSON.stringify(verify)});</script>
 </div>
     </div>
   </div>
 </div>`
 }
 
-function presentJSONObject(obj, id) {
+function presentJSONObject(obj, id, verify = null) {
     let renderjsonIDOuter = "rjouter" + id;
     let jsontableIDOuter = "jhouter" + id;
     let renderjsonID = "rj" + id;
@@ -94,6 +98,8 @@ function presentJSONObject(obj, id) {
     let viewcodeButtonID = "vc" + id;
     let copyAButtonID = "ca" + id;
     let copyBButtonID = "cb" + id;
+    let verifyAButtonID = "va" + id;
+    let verifyBButtonID = "vb" + id;
     if ((Array.isArray(obj) && obj.length == 0) || Object.keys.length == 0) {
         document.getElementById(renderjsonID).style.display = "none";
         document.getElementById(jsontableID).style.display = "none";
@@ -115,6 +121,14 @@ function presentJSONObject(obj, id) {
     });
     document.getElementById(renderjsonID).appendChild(renderjson.set_show_to_level(3)(obj));
     document.getElementById(jsontableID).innerHTML = JSONToHTMLTable(obj);
+//    if ( verify ) {
+	$(`#${verifyAButtonID}`).on('click', function(e) {
+	    console.log("verifyA", obj)
+	});
+	$(`#${verifyBButtonID}`).on('click', function(e) {
+	    console.log("verifyB", obj)
+	});
+//    }
 }
 
 function JSONToHTMLTable(data) {
