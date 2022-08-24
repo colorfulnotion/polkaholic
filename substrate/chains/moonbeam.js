@@ -1,4 +1,6 @@
 const paraTool = require("../paraTool");
+const ethTool = require("../ethTool");
+
 const ChainParser = require("./chainparser");
 
 module.exports = class MoonbeamParser extends ChainParser {
