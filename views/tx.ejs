@@ -127,6 +127,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <td><%- include("decode", {id: f.extrinsicHash, obj: f.params}); %></td>
     </tr>
     <tr>
+<% if ( f.xcmdest == undefined && false) { %>
     <td>Compare to</td>
     <td>
       <% if ( chain.subscanURL ) {
@@ -135,6 +136,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <a href="<%= subscanURL; %>" target="_new"><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
       <% }%>
     </td>
+<% } %>
     </tr>
     <tr>
       <td>Verify</td>
