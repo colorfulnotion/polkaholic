@@ -1335,6 +1335,7 @@ module.exports = class Query extends AssetManager {
                             if (decimals !== false) {
                                 xcm.amountSent = xcm.amountSent / 10 ** decimals;
                                 xcm.amountReceived = xcm.amountReceived / 10 ** decimals;
+                                xcm.fee = xcm.amountSent - xcm.amountReceived
                                 /*await this.decorateUSD(xcm, "amountSent", xcm.asset, xcm.chainID, xcm.destTS, decorateUSD)
                                 if (decorateUSD){
                                   xcm.amountReceivedUSD = xcm.priceUSD * xcm.amountReceived;
@@ -1344,6 +1345,7 @@ module.exports = class Query extends AssetManager {
                                     let [amountSentUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(xcm.amountSent, xcm.asset, xcm.chainID, xcm.destTS);
                                     xcm.amountSentUSD = amountSentUSD;
                                     xcm.amountReceivedUSD = priceUSD * xcm.amountReceived;
+                                    xcm.feeUSD = priceUSD * xcm.fee
                                     xcm.priceUSD = priceUSD;
                                     xcm.priceUSDCurrent = priceUSDCurrent;
                                 }
@@ -5377,16 +5379,21 @@ module.exports = class Query extends AssetManager {
                 let s = `${f.p.toLowerCase()}`
                 let m = `${f.s.toLowerCase()}`
                 let sm = `${s}:${m}`
+                let fv = `${f.v}`
                 if (matcher["trace"][sm] || matcher["trace"][s] || matcher["trace"][m]) {
                     // pass the data "f" through the filtering function
                     let func = (matcher["trace"][sm] != undefined && matcher["trace"][sm] != true) ? matcher["trace"][sm] : null;
                     let pass = (func) ? func(f) : true;
+                    if (fv == '0x' || fv == '0x0400') pass = false
                     if (pass) {
                         if (features[sm] != undefined) {
                             if (features[sm] == "watermark" && f.pv != undefined) {
                                 extra[f.s] = f.pv;
                             }
                         }
+                        //delete k, v if s,k, PV is known
+                        if (f.pv != undefined) delete f.v
+                        if (f.p != undefined && f.s != undefined) delete f.k
                         out.push({
                             "chainID": chainID,
                             "id": id,

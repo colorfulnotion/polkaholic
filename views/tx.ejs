@@ -128,6 +128,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID } }); %></td>
     </tr>
     <tr>
+<% if ( f.xcmdest == undefined && false) { %>
     <td>Compare to</td>
     <td>
       <% if ( chain.subscanURL ) {
@@ -136,6 +137,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <a href="<%= subscanURL; %>" target="_new"><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
       <% }%>
     </td>
+<% } %>
     </tr>
     <tr>
       <td>Events</td>
