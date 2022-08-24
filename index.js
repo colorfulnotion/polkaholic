@@ -255,6 +255,23 @@ app.post('/login/', async (req, res) => {
     }
 })
 
+// Usage: https://polkaholic.io/verify
+app.post('/verify/', async (req, res) => {
+    try {
+        let verify = JSON.parse(req.body.verify);
+        let obj = JSON.parse(req.body.obj);
+        res.render('verify', {
+	    verify,
+	    obj,
+            chainInfo: query.getChainInfo()
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 app.get('/logout', async (req, res) => {
     req.session.destroy();
     res.redirect("/");

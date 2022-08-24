@@ -130,7 +130,7 @@ function showblockevents(objects) {
 	initblockevents = true;
         tableBlockEvents = $(tableName).DataTable({
         columnDefs: [{
-                "className": "dt-center",
+                "className": "dt-left",
                 "targets": [3]
             }
         ],

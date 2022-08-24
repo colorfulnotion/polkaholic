@@ -30,7 +30,6 @@ let cls2 = ( expanded ) ? "show" : "";
   <% if ( chainassets.dappURL ) { %>
   <a class='btn-sm btn-primary' href="<%= chainassets.dappURL; %>" target="_new">APP</a>
   <% } %>
-  <a href='javascript:verifyAccount("<%= chainassets.id %>", "<%= chainassets.ss58Address; %>")'>Verify</a> Prefix: <%= chainassets.ss58Format; %>
   </td>
 </tr>
 <% } %>
@@ -38,8 +37,20 @@ let cls2 = ( expanded ) ? "show" : "";
 <%    let a = chainassets.assets[i]; %>
 <% if ( a.state.balance ) { %>
 <tr style="border-top: 1px solid gray;">
- <td width="40%" align=left valign=top><B><%= a.assetName; %></B> Balance:<br><%- include("assetinfobutton", {assetChain: a.assetChain, assetType: a.assetType}); %></td>
- <td width="60%" align=right><%= uiTool.presentFloat(a.state.balance) %> <%= a.assetName; %><br/><small><%= uiTool.currencyFormat(a.state.balanceUSD); %></small></td>
+ <td width="40%" align=left valign=top>
+  <B><%= a.assetName; %></B> Balance:<br>
+  <a id="verifyaccount-<%= chainassets.id %>" class="btn btn-link">Verify</a>
+ <script>
+  $("#verifyaccount-<%= chainassets.id %>").on('click', function (e) {
+     verifyExec({"verification": "account", "id": "<%= chainassets.id %>", "address": "<%= chainassets.ss58Address; %>"}, <%- JSON.stringify(a.state); %>);
+   });
+ </script>
+ </td>
+ <td width="60%" align=right>
+  <%= uiTool.presentFloat(a.state.balance) %> <%= a.assetName; %><br/>
+  <small><%= uiTool.currencyFormat(a.state.balanceUSD); %></small>
+
+ </td>
 </tr>
 <% } else if ( a.state.adjustedVoucherUSD ) { %>
 <tr style="border-top: 1px solid gray;">
@@ -71,7 +82,8 @@ let cls2 = ( expanded ) ? "show" : "";
 <% if ( a.state.transferable && ( a.state.transferable != a.state.balance ) ) { %>
 <tr>
  <td width="40%" align=left>Transferable:</td>
- <td width="60%" align=right><%= uiTool.presentFloat(a.state.transferable) %> <%= a.assetName; %><br/><small><%= uiTool.currencyFormat(a.state.transferableUSD); %></small></td>
+ <td width="60%" align=right><%= uiTool.presentFloat(a.state.transferable) %> <%= a.assetName; %><br/><small><%= uiTool.currencyFormat(a.state.transferableUSD); %></small>
+ </td>
 </tr>
 <% } %>
 

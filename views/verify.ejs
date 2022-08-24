@@ -1,0 +1,39 @@
+<%- include('header', {chainInfo: chainInfo, title: "About Polkaholic"}); %>
+
+
+<div class="card">
+  <div class="card-body">
+   <h5 class="card-title">Verifier</h5>
+   <div>
+   <b>Verify:</b><br/>
+   <% if ( verify.verification == "extrinsic" ) {
+         let id = verify.id;
+	 let blockNumber = verify.blockNumber;
+         let extrinsicID = verify.extrinsicID;
+	 let extrinsicHash = verify.extrinsicHash;
+	 %>
+	 Verify ExtrinsicID <%= extrinsicID; %> (<%= extrinsicHash %>) on chain <%= id %>
+         <script>verifyExtrinsic('<%= id %>', '<%= blockNumber %>', '<%= extrinsicID %>', '<%= extrinsicHash %>', <%- obj %>)</script>
+   <% } %>
+   <% if ( verify.verification == "event" ) {
+         let id = verify.id;
+         let eventID = verify.eventID;
+	 let blockNumber = verify.blockNumber;
+	 %>
+	 Verify EventID <%= eventID; %> on chain <%= id; %>
+   <% } %>
+   <br/>
+   <textarea style='width:800px'><%- JSON.stringify(verify); %></textarea>
+   </div>
+
+   <div>
+   <b>Object:</b><br/>
+   <textarea style='width:800px'>
+   <%- JSON.stringify(obj); %>
+   </textarea>
+   </div>
+  </div>
+</div>
+
+<script src="/verify.js"></script>
+<%- include('footer'); %>
