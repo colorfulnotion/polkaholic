@@ -24,7 +24,7 @@
   <tr>
     <td>Transactions</td>
     <td>
-<% if ( block && block.transactions ) { %> 
+<% if ( block && block.transactions ) { %>
 <a class="btn-sm btn-primary" href='javascript:jumpTab()'><%= block.transactions.length %> transactions</a>
 <% } else { %>
      Awaiting finalization
@@ -105,7 +105,7 @@
       <%- uiTool.getFullHash(b.header.stateRoot); %>
     </td>
   </tr>
-<% if ( b.author ) { %>
+<% if ( b.author != undefined && b.miner != undefined && b.author.toLowerCase() != block.miner.toLowerCase()) { %>
   <tr>
     <td>Author</td>
     <td>
@@ -135,5 +135,3 @@
   </tr>
  </table>
 </div>
-
-
