@@ -1,4 +1,5 @@
 const paraTool = require("../paraTool");
+const ethTool = require("../ethTool");
 
 module.exports = class ChainParser {
     debugLevel = paraTool.debugNoLog;

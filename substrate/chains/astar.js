@@ -58,7 +58,7 @@ module.exports = class AstarParser extends ChainParser {
                 break;
             case 'ethereum':
                 if (module_method == 'transact'){
-                    let isEthereumXCM = this.etherumXCMFilter(args)
+                    let isEthereumXCM = this.etherumXCMFilter(indexer, args)
                     if (isEthereumXCM){
                         console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
                         let outgoingXcmList3 = this.processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args)
@@ -86,7 +86,7 @@ module.exports = class AstarParser extends ChainParser {
     signatureRaw: assets_withdraw(address[],uint256[],bytes32,bool,uint256,uint256)
     */
 
-    etherumXCMFilter(args){
+    etherumXCMFilter(indexer, args){
         if (args.transaction != undefined) {
             let evmTx = false;
             if (args.transaction.eip1559 != undefined) {
@@ -98,15 +98,13 @@ module.exports = class AstarParser extends ChainParser {
             if (evmTx && evmTx.input != undefined) {
                 let txInput = evmTx.input
                 if (txInput.substr(0,10) == "0xecf766ff" || txInput.substr(0,10) == "0x019054d0"){
+                    let output = ethTool.decodeTransactionInput(evmTx, indexer.contractABIs, indexer.contractABISignatures)
+                    console.log(`output >>`, output)
+                    if (output != undefined) {
+                        args.decodedEvmInput = output
+                    }
                     return true
                 }
-                /*
-                let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
-                console.log(`output`, output)
-                if (output != undefined) {
-                    args.decodedEvmInput = output
-                }
-                */
             }
         }
         return false
