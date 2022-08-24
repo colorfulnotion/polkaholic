@@ -106,7 +106,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 
     <tr>
       <td>Gas Price</td>
-      <td><%- tx.gasPrice; %></td>
+      <td><%- `${tx.gasPrice} Gwei`; %></td>
     </tr>
 
     <tr>
@@ -134,7 +134,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td>
         <% if ( f.chainID && (f.chainID == 2004 || f.chainID == 22023)) {
            let externalURL = (f.chainID == 2004)? `https://moonscan.io` : `https://moonriver.moonscan.io`
-           let imgURL = (f.chainID == 2004) ? "https://cdn.polkaholic.io/moonscan.svg" : "https://cdn.polkaholic.io/moonriverscan.svg" 
+           let imgURL = (f.chainID == 2004) ? "https://cdn.polkaholic.io/moonscan.svg" : "https://cdn.polkaholic.io/moonriverscan.svg"
            let txURL = `${externalURL}/tx/${f.transactionHash}`;
            %>
         <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>

@@ -63,7 +63,7 @@
     <tr>
       <td>Gas Used</td>
       <td>
-        <%= uiTool.presentNumber(block.gasUsed); %>
+        <%= uiTool.presentNumber(block.gasUsed); %><%- ` (${uiTool.presentPercentage(block.gasUsed/block.gasLimit)})` %>
       </td>
     </tr>
     <tr>
