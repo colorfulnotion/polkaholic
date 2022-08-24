@@ -101,7 +101,13 @@ module.exports = class AstarParser extends ChainParser {
                 let txInput = evmTx.input
                 if (txInput.substr(0,10) == "0xecf766ff" || txInput.substr(0,10) == "0x019054d0"){
                     let output = ethTool.decodeTransactionInput(evmTx, indexer.contractABIs, indexer.contractABISignatures)
-                    console.log(`output >>`, output)
+                    let xcmInput = {}
+                    for (let i = 0; i < output.params.length; i++) {
+                        let input = output.params[i]
+                        xcmInput[input.name] = input.value
+                    }
+                    output.params = xcmInput
+                    console.log(`output >>`, JSON.stringify(output, null, 2))
                     if (output != undefined) {
                         args.decodedEvmInput = output
                     }
@@ -157,7 +163,49 @@ module.exports = class AstarParser extends ChainParser {
         if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereum start`)
 
 
-
+        /*
+        {
+            "decodeStatus": "success",
+            "methodID": "0x019054d0",
+            "signature": "assets_withdraw(address[] asset_id, uint256[] asset_amount, bytes32 recipient_account_id, bool is_relay, uint256 parachain_id, uint256 fee_index)",
+            "params": [
+                {
+                    "name": "asset_id",
+                    "value": [
+                        "0xffffffffffffffffffffffffffffffffffffffff"
+                    ],
+                    "type": "address[]"
+                },
+                {
+                    "name": "asset_amount",
+                    "value": [
+                        "319770000000"
+                    ],
+                    "type": "uint256[]"
+                },
+                {
+                    "name": "recipient_account_id",
+                    "value": "0x221ed4fa0489b3f47c6a3f51761f66f93eefb8aff7f6d035365b564579ae7135",
+                    "type": "bytes32"
+                },
+                {
+                    "name": "is_relay",
+                    "value": true,
+                    "type": "bool"
+                },
+                {
+                    "name": "parachain_id",
+                    "value": "0",
+                    "type": "uint256"
+                },
+                {
+                    "name": "fee_index",
+                    "value": "0",
+                    "type": "uint256"
+                }
+            ]
+        }
+        */
         return
         let assetString = false
         let a = args
