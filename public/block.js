@@ -11,10 +11,6 @@ function showblockextrinsics(objects) {
         columnDefs: [{
                 "className": "dt-center",
                 "targets": [3, 4]
-            },
-            {
-                "targets": [5],
-                "visible": false
             }
         ],
         order: [
@@ -74,7 +70,7 @@ function showblockextrinsics(objects) {
                         let out = "";
                         if (row.method !== undefined && row.extrinsicHash !== undefined) {
                             try {
-                                return presentInstructions(JSON.stringify(row.params), "e" + row.extrinsicHash, "Params");
+                                return presentInstructions(JSON.stringify(row.params), "e" + row.extrinsicHash, "Params", {verification: "extrinsic", obj: row.params, extrinsicID: row.extrinsicID, extrinsicHash: row.extrinsicHash});
                             } catch (e) {
                                 console.log(e);
                             }
@@ -111,19 +107,10 @@ function showblockextrinsics(objects) {
                     if (type == 'display') {
                         //let res = (row.result == 1) ? 'Success' : 'Failed'
                         let txStatus = presentSuccessFailure(row.result, row.err)
+			// TODO: params
                         return txStatus;
                     }
                     return data;
-                }
-            },
-            {
-                data: 'id',
-                render: function(data, type, row, meta) {
-                    if (row.id) {
-                        return data;
-                    } else {
-                        return "";
-                    }
                 }
             },
         ]
@@ -143,7 +130,7 @@ function showblockevents(objects) {
 	initblockevents = true;
         tableBlockEvents = $(tableName).DataTable({
         columnDefs: [{
-                "className": "dt-center",
+                "className": "dt-left",
                 "targets": [3]
             }
         ],
@@ -159,7 +146,13 @@ function showblockevents(objects) {
                         } catch (e) {
                             console.log(e);
                         }
-                    }
+                    } else {
+			let ida = row.rawEventID.split("-")
+			if ( ida.length > 1 ) {
+			    return parseInt(ida[1], 10);
+			}
+			return row.rawEventID;
+		    }
                     return data;
                 }
             },
@@ -204,7 +197,7 @@ function showblockevents(objects) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         try {
-			    return presentInstructions(JSON.stringify(row), row.eventID, row.extrinsicID + " Event #" + row.extrinsicEventIndex, 900);
+			    return presentInstructions(JSON.stringify(row), row.eventID, row.extrinsicID + " Event #" + row.extrinsicEventIndex, {}, 900);
                         } catch (e) {
                             console.log(e);
                         }

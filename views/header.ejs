@@ -92,7 +92,7 @@
           <li class="nav-item">
   	         <a class="nav-link" href="/apikeys">API Keys</a>
           </li>
-        <% if ( req.session.email ) { %>
+        <% if ( req && req.session && req.session.email ) { %>
           <li class="nav-item">
             <a class="nav-link" href="/logout">Logout</a>
           </li>

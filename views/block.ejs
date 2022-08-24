@@ -45,7 +45,11 @@ let defHash = "#overview";
   </tr>
   <tr>
     <td>Finalized</td>
-    <td><span id="status"><%- include("finalized", {finalized: b.finalized}); %></span></td>
+    <td><span id="status"><%- include("finalized", {finalized: b.finalized}); %></span>
+    <% if ( uiTool.verifierEnabled() ) { %>
+    <%- include("verifyBlock", {id, blockNumber}) %>
+    <% } %>
+    </td>
   </tr>
   <tr>
     <td>Hash</td>
@@ -130,8 +134,9 @@ let defHash = "#overview";
          %>
       <a href='<%- subscanURL; %>' target='_new'><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
       <% } %>
-    </td>
+
   </tr>
+
 </table>
 </div>
 

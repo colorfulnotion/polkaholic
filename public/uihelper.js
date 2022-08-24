@@ -51,7 +51,7 @@ function presentEventDetails(eventID) {
 </div><script>document.getElementById('data${eventID}').addEventListener('show.bs.collapse', () => { fetcheventdata("${eventID}") } )</script>`;
 }
 
-function presentInstructions(msg, id, hdr = "Instructions", width = "600") {
+function presentInstructions(msg, id, hdr = "Instructions", verify = null, width = "600") {
     let rjouter = "rjouter" + id;
     let jhouter = "jhouter" + id;
     let rj = "rj" + id;
@@ -60,6 +60,10 @@ function presentInstructions(msg, id, hdr = "Instructions", width = "600") {
     let vc = "vc" + id;
     let copyA = "ca" + id;
     let copyB = "cb" + id;
+    let verifyA = "va" + id;
+    let verifyB = "vb" + id;
+    let verifyAButton = verify ? `<button id="${verifyA}" type="button" class="btn btn-link">Verify</button>` : "";
+    let verifyBButton = verify ? `<button id="${verifyB}" type="button" class="btn btn-link">Verify</button>` : "";
     return `<div class="accordion  accordion-flush" style="width: ${width}px">
   <div class="accordion-item">
     <h2 class="accordion-header" id="heading${id}">
@@ -72,20 +76,39 @@ function presentInstructions(msg, id, hdr = "Instructions", width = "600") {
   <div id="${rj}" class="renderjson" style="overflow-y: scroll; max-width: 800px; max-height: 600px"></div>
   <button id="${dec}" type="button" class="btn btn-link">View Decoded</button>
   <button id="${copyA}" type="button" class="btn btn-link">Copy</button>
+  ${verifyAButton}
 </div>
 <div id="${jhouter}" style="display: block; overflow: hidden">
   <div id="${jh}" class="jsontable" style="overflow-y: scroll; max-width: 800px; max-height: 600px"></div>
   <button id="${vc}" type="button" class="btn btn-link">View Raw</button>
   <button id="${copyB}" type="button" class="btn btn-link">Copy</button>
+  ${verifyBButton}
 <div>
-<script>presentJSONObject(${msg}, "${id}");</script>
+<script>presentJSONObject(${msg}, "${id}", ${JSON.stringify(verify)});</script>
+<form id="verifyForm${id}" method="POST" action="/verify" target="VW${id}"><input type="hidden" name="verify" value=""/><input type="hidden" name="obj" value=""/></form>
 </div>
     </div>
   </div>
 </div>`
 }
 
-function presentJSONObject(obj, id) {
+function verifyExec(id, verify, obj) {
+    console.log("verifyExec", id, "obj", obj, "verify", verify)
+    if ( verify ) {
+	// https://stackoverflow.com/questions/3951768/window-open-and-pass-parameters-by-post-method
+	window.open('', `VW${id}`);
+	var f = document.getElementById(`verifyForm${id}`);
+	if ( f ) {
+	    f[`verify`].value = JSON.stringify(verify);
+	    f[`obj`].value = JSON.stringify(obj);
+	    document.getElementById(`verifyForm${id}`).submit();
+	} else {
+	    console.log(`verifyForm${id} not found`);
+	}
+    }
+}
+
+function presentJSONObject(obj, id, verify = null) {
     let renderjsonIDOuter = "rjouter" + id;
     let jsontableIDOuter = "jhouter" + id;
     let renderjsonID = "rj" + id;
@@ -94,6 +117,8 @@ function presentJSONObject(obj, id) {
     let viewcodeButtonID = "vc" + id;
     let copyAButtonID = "ca" + id;
     let copyBButtonID = "cb" + id;
+    let verifyAButtonID = "va" + id;
+    let verifyBButtonID = "vb" + id;
     if ((Array.isArray(obj) && obj.length == 0) || Object.keys.length == 0) {
         document.getElementById(renderjsonID).style.display = "none";
         document.getElementById(jsontableID).style.display = "none";
@@ -115,7 +140,16 @@ function presentJSONObject(obj, id) {
     });
     document.getElementById(renderjsonID).appendChild(renderjson.set_show_to_level(3)(obj));
     document.getElementById(jsontableID).innerHTML = JSONToHTMLTable(obj);
+    if ( verify ) {
+	$(`#${verifyAButtonID}`).on('click', function(e) {
+	    verifyExec(id, verify, obj);
+	});
+	$(`#${verifyBButtonID}`).on('click', function(e) {
+	    verifyExec(id, verify, obj);
+	});
+    }
 }
+
 
 function JSONToHTMLTable(data) {
     let mid = Object.keys(data).map((k) => {
@@ -1014,6 +1048,10 @@ function setupapidocs(major = "", minor = "", input = "", chainfilterStr = false
                     apiUrl = `/chain/assets/${input}`;
                     docsSection = "get-chain-assets";
                     break;
+                case "chainlog":
+                    apiUrl = `/chainlog/${input}`;
+                    docsSection = "get-chain-log";
+                    break;
                 case "specversions":
                     apiUrl = `/specversions/${input}`;
                     docsSection = "get-chain-specversions";
@@ -1386,3 +1424,29 @@ function renderjsontable(data) {
     out += "</tbody></table>";
     return (out);
 }
+
+function verifyIcon() {
+    return `<i class="fa-solid fa-question"></i>`;
+}
+
+function presentVerifyXCMMessage(row) {
+    let r = JSON.stringify(row);
+    let s = `<script>$('#vxcm${row.msgHash}').on('click', function(e) { verifyXCMMessage(${r}) })</script>`
+    return `<a class="btn btn-sm text-capitalize" id="vxcm${row.msgHash}">${verifyIcon()}</a>` + s;
+}
+
+function presentVerifyExtrinsic(id, blockNumber, extrinsicID, extrinsicHash, params = null) {
+    // TODO: add params
+    return `<a class="btn btn-sm text-capitalize" href="javascript:verifyExtrinsic('${id}', '${blockNumber}', '${extrinsicID}', '${extrinsicHash}')">${verifyIcon()}</a>`;
+}
+
+function presentVerifyEvent(id, blockNumber, eventID, params = null) {
+     // TODO: add params
+    return `<a class="btn btn-sm text-capitalize" href="javascript:verifyEvent('${id}', '${blockNumber}', '${eventID}')">${verifyIcon()}</a>`;
+}
+
+function presentVerifyBlock(id, blockNumber, params = null) {
+     // TODO: add params
+    return `<a class="btn btn-sm text-capitalize" href="javascript:verifyBlock('${id}', '${blockNumber}')">${verifyIcon()}</a>`;
+}
+

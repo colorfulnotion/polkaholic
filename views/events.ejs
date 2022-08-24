@@ -14,58 +14,10 @@
      let dataTypeArr = e.dataType;
      let decodedDataArr = e.decodedData;
      %>
-  <tr class="table-primary">
-    <th>Event #<%- eventIdx %></th>
-    <td><a href='/events/<%= chainID %>/<%= pallet; %>/<%- method %>' class="btn btn-outline-primary" style="text-transform: unset !important;" data-mdb-toggle="tooltip" title="<%= docs; %>"><%= pallet_method; %></a></td>
-  </tr>
-  <%  if ( ( decodedDataArr ) && ( decodedDataArr.length > 0 ) ) { %>
-  <% for ( let j = 0; j < decodedDataArr.length; j++) {
-          let dData = decodedDataArr[j];
-          let data = dData.data
-          let isCurrency = false
-          if ( typeof data === 'object' && !Array.isArray(data) && data !== null) {
-            data = JSON.stringify(data)
-          }
-
-          //let dataType = dataTypeArr && dataTypeArr[j] ? dataTypeArr[j] : false;
-          if (dData.dataRaw!= undefined && dData.symbol != undefined){
-            data = `${dData.dataRaw} ${dData.symbol}`
-            if (dData.dataUSD != undefined){
-              data =  `${data} (` + uiTool.currencyFormat(dData.dataUSD, dData.priceUSD, dData.priceUSDCurrent) + ` )`;
-              isCurrency = true
-            }
-          }
-          if (dData.projectName != undefined && dData.relayChain != undefined){
-            data = `${dData.projectName} (${dData.data})`
-          }
-	  let typeDef = (dData.typeDef != undefined) ? dData.typeDef : false;
-	  let name = (dData.name != undefined) ? dData.name : false; %>
-  <tr>
-    <td><% if ( name && typeDef ) { %><%= name; %>(
-     <% if ( uiTool.isJSONString(typeDef) ) { %>
-      <div id="typ<%= j; %>" class="renderjson"></div>
-      <script>document.getElementById("typ<%= j; %>").appendChild(renderjson.set_show_to_level(3)(<%- typeDef %>));</script>
-     <% } else { %>
-     <%= typeDef; %>
-     <% }  %>
-     )
-    <% } else { %> - <% } %></td>
-    
-    <td><% if ( typeDef == "AccountId32" ) {
-      let address = paraTool.getPubKey(data); %><a href='/account/<%= address; %>'><%- uiTool.getShortHash(data, false); %></a>
-      <%- uiTool.showAccountInfo(dData, "address") %>
-    <% } else if (isCurrency){ %>
-      <%- data; %>
-    <% } else if ( (typeof data === 'object') && (data !== null) ) { %>
-      <%- include("decode", {"id": "ev" + i + "-" + j, "obj": data } ) %>
-    <% } else if ( uiTool.isJSONString(data) ) { %>
-      <%- include("decode", {"id": "ev" + i + "-" + j, "obj": JSON.parse(data) } ) %>
-    <% } else { %>
-      <%= data; %>
-    <% } %>
-    </td>
-  </tr>
-  <% } %>
-  <% } %>
+    <tr>
+      <td>Event <%= e.eventID %></td>
+      <td><a href='/events/<%= chainID %>/<%= pallet; %>/<%- method %>' class="btn btn-outline-primary" style="text-transform: unset !important;" data-mdb-toggle="tooltip" title="<%= docs; %>"><%= pallet_method; %></a></td>
+      <td><%- include("decode", {id: e.eventID, obj: decodedDataArr, verify: { verification: "event", blockNumber: blockNumber, eventID: e.eventID } }); %></td>
+    </tr>
   <% } %>
 </table>

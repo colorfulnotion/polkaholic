@@ -204,13 +204,13 @@ async function showxcmmessages(filter = {}) {
 
                 }
             }, {
-                data: 'blockTS',
+                data: 'relayChain',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         if (row.pending != undefined) {
                             return "Pending";
                         } else {
-                            console.log(row.destStatus, row.errorDesc);
+
                             if (row.destStatus == -1) {
                                 return `<button type="button" class="btn btn-warning text-capitalize">Unknown</button>`;
                             } else if (row.destStatus == 0) {
@@ -224,7 +224,11 @@ async function showxcmmessages(filter = {}) {
                             }
                         }
                     }
-                    return data;
+		    if ( row.relayChain ) {
+			return row.relayChain;
+		    } else {
+			return "";
+		    }
                 }
             }]
         });
@@ -253,7 +257,7 @@ async function showxcmtransfers(filter = {}) {
         //loadData2(pathParams, tableName, true)
     } else {
         initxcmtransfers = true;
-        let xcmtransfersTable = $(tableName).DataTable({
+        xcmtransfersTable = $(tableName).DataTable({
             /*
             [0] section (+method)
             [1] amountSent (+symbol)
@@ -449,4 +453,32 @@ async function showxcmtransfers(filter = {}) {
     } else {
         console.log("MANUAL SETUP");
     }
+}
+
+function filterchains(relaychain = "all") {
+
+    if (relaychain == "kusama" || relaychain == "polkadot") {
+	console.log("filterchains", relaychain);
+        if (chainsTable) chainsTable.column(5).search(relaychain).draw();
+        if (xcmtransfersTable) xcmtransfersTable.column(8).search(relaychain).draw();
+        if (xcmmessagesTable) xcmmessagesTable.column(7).search(relaychain).draw();
+    } else {
+        // empty search effectively removes the filter
+        if (chainsTable) chainsTable.search('').columns().search('').draw();
+        if (xcmtransfersTable) xcmtransfersTable.search('').columns().search('').draw();
+        if (xcmmessagesTable) xcmmessagesTable.search('').columns().search('').draw();
+    }
+}
+
+function setchainfilter(relaychain) {
+    relaychainfilter = relaychain;
+    filterchains(relaychainfilter);
+}
+
+
+const selectElement = document.querySelector('#relaychain');
+if (selectElement) {
+    selectElement.addEventListener('change', (event) => {
+        setchainfilter(event.target.value);
+    });
 }

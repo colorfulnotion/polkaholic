@@ -1335,6 +1335,7 @@ module.exports = class Query extends AssetManager {
                             if (decimals !== false) {
                                 xcm.amountSent = xcm.amountSent / 10 ** decimals;
                                 xcm.amountReceived = xcm.amountReceived / 10 ** decimals;
+                                xcm.fee = xcm.amountSent - xcm.amountReceived
                                 /*await this.decorateUSD(xcm, "amountSent", xcm.asset, xcm.chainID, xcm.destTS, decorateUSD)
                                 if (decorateUSD){
                                   xcm.amountReceivedUSD = xcm.priceUSD * xcm.amountReceived;
@@ -1344,6 +1345,7 @@ module.exports = class Query extends AssetManager {
                                     let [amountSentUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(xcm.amountSent, xcm.asset, xcm.chainID, xcm.destTS);
                                     xcm.amountSentUSD = amountSentUSD;
                                     xcm.amountReceivedUSD = priceUSD * xcm.amountReceived;
+                                    xcm.feeUSD = priceUSD * xcm.fee
                                     xcm.priceUSD = priceUSD;
                                     xcm.priceUSDCurrent = priceUSDCurrent;
                                 }
@@ -2549,7 +2551,7 @@ module.exports = class Query extends AssetManager {
             let chainID = a.assetInfo.chainID;
             if (chainsMap[chainID] == undefined) {
                 let chainInfo = this.chainInfos[chainID];
-                var id, chainName, ss58Format, ss58Address, iconUrl, subscanURL, dappURL;
+                var id, chainName, ss58Format, ss58Address, iconUrl, subscanURL, dappURL, WSEndpoint;
                 if (chainInfo !== undefined) {
                     chainName = this.getChainName(chainID);
                     id = chainInfo.id;
@@ -2558,6 +2560,7 @@ module.exports = class Query extends AssetManager {
                     iconUrl = this.chainInfos[chainID].iconUrl;
                     subscanURL = this.chainInfos[chainID].subscanURL;
                     dappURL = this.chainInfos[chainID].dappURL;
+		    WSEndpoint = this.chainInfos[chainID].WSEndpoint;
                 }
                 chainsMap[chainID] = {
                     chainID,
@@ -2568,6 +2571,7 @@ module.exports = class Query extends AssetManager {
                     iconUrl,
                     subscanURL,
                     dappURL,
+		    WSEndpoint,
                     assets: [],
                     balanceUSD: 0
                 };
@@ -2704,7 +2708,6 @@ module.exports = class Query extends AssetManager {
                 }
             }
         }
-
         return (account);
     }
 
@@ -4553,7 +4556,7 @@ module.exports = class Query extends AssetManager {
         }
         // if we don't have a blockNumber, bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
         let w = (blockNumber) ? `( blockNumber = '${parseInt(blockNumber, 10)}' )` : "blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 10 day))";
-        let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, sourceBlocknumber as blockNumberOutgoing, destBlocknumber as blockNumberIncoming, executedEventID, destStatus, errorDesc FROM xcmmessages where ${w} and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
+        let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, sourceBlocknumber as blockNumberOutgoing, destBlocknumber as blockNumberIncoming, executedEventID, destStatus, errorDesc, relayChain FROM xcmmessages where ${w} and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
         console.log(mysqlQuery);
         let results = [];
         let recs = await this.poolREADONLY.query(mysqlQuery);
@@ -4856,9 +4859,30 @@ module.exports = class Query extends AssetManager {
                 err
             });
         }
-
         return false;
+    }
 
+    async getChainLog(chainID_or_chainName, lookback = 90) {
+        let [chainID, id] = this.convertChainID(chainID_or_chainName)
+        if (chainID === false) {
+            throw new paraTool.InvalidError(`Invalid chain: ${chainID_or_chainName}`)
+        }
+        try {
+            var sql = `select logDT, UNIX_TIMESTAMP(logDT) as logTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD, numTransactionsEVM, numAccountsActive, numAddresses, fees, numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from blocklog where chainID = '${chainID}' and logDT >= date_sub(Now(), interval ${lookback} DAY) order by logDT desc`;
+            let recs = await this.poolREADONLY.query(sql);
+	    for ( let i = 0; i < recs.length ; i++) {
+		let [logDT, _] = paraTool.ts_to_logDT_hr(recs[i].logTS);
+		recs[i].logDT = logDT;
+	    }
+            return (recs);
+        } catch (err) {
+            this.logger.error({
+                "op": "query.getChainLog",
+                chainID,
+                err
+            });
+        }
+        return false;
     }
 
     async getExtrinsicDocs(chainID_or_chainName, s, m) {
@@ -5359,16 +5383,21 @@ module.exports = class Query extends AssetManager {
                 let s = `${f.p.toLowerCase()}`
                 let m = `${f.s.toLowerCase()}`
                 let sm = `${s}:${m}`
+                let fv = `${f.v}`
                 if (matcher["trace"][sm] || matcher["trace"][s] || matcher["trace"][m]) {
                     // pass the data "f" through the filtering function
                     let func = (matcher["trace"][sm] != undefined && matcher["trace"][sm] != true) ? matcher["trace"][sm] : null;
                     let pass = (func) ? func(f) : true;
+                    if (fv == '0x' || fv == '0x0400') pass = false
                     if (pass) {
                         if (features[sm] != undefined) {
                             if (features[sm] == "watermark" && f.pv != undefined) {
                                 extra[f.s] = f.pv;
                             }
                         }
+                        //delete k, v if s,k, PV is known
+                        if (f.pv != undefined) delete f.v
+                        if (f.p != undefined && f.s != undefined) delete f.k
                         out.push({
                             "chainID": chainID,
                             "id": id,

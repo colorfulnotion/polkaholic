@@ -1,5 +1,6 @@
 var initrecentblocks = false;
 var initassets = false;
+var initchainlog = false;
 var initspecversions = false;
 var refreshIntervalMS = 5000;
 var recentBlocksIntervalId = false;
@@ -350,6 +351,141 @@ function showchaininfo(chainID) {
     // no datatable
 }
 
+function showchainlog(chainID, address) {
+    if (initchainlog) return;
+    else initchainlog = true;
+    let pathParams = `chainlog/${chainID}`
+
+    let tableName = '#tablechainlog'
+    var table = $(tableName).DataTable({
+        order: [
+            [0, "desc"]
+        ],
+        columnDefs: [{
+            "className": "dt-right",
+            "targets": [6, 7, 10, 11]
+        }, {
+            "className": "dt-center",
+            "targets": [1, 2, 3, 4, 5, 8, 9, 12, 13]
+        }],
+        columns: [{
+            data: 'logDT',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data
+                }
+                return data;
+            }
+        }, {
+            data: 'numAccountsActive',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'numAddresses',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'numSignedExtrinsics',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'numTransactionsEVM',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'numTransfers',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'valueTransfersUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'fees',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentTokenCount(data);
+                } else {
+                    return data;
+                }
+            }
+        }, {
+            data: 'numXCMTransfersIn',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+		    return data;
+                } else {
+		    return data;
+                }
+            }
+        }, {
+            data: 'numXCMTransfersOut',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'valXCMTransferIncomingUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'valXCMTransferOutgoingUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'numXCMMessagesIn',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'numXCMMessagesOut',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, true)
+}
 
 function showchaintab(hash) {
     switch (hash) {
@@ -366,6 +502,10 @@ function showchaintab(hash) {
             showxcmmessages({
                 chainID: id
             });
+            break;
+        case "#chainlog":
+            showchainlog(id);
+            setupapidocs("chain", "chainlog", `${id}`);
             break;
         case "#specversions":
             showspecversions(id);

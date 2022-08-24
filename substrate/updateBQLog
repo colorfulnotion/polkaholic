@@ -7,7 +7,7 @@ var paraTool = require("./paraTool");
 
 async function main() {
     var manager = new Manager();
-    let startts = manager.getCurrentTS() - 86400;
+    let startts = manager.getCurrentTS() - 86400*7;
     let [startDT, _] = paraTool.ts_to_logDT_hr(startts);
     let endts = manager.getCurrentTS();
     let [endDT, __] = paraTool.ts_to_logDT_hr(endts);
