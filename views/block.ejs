@@ -45,7 +45,11 @@ let defHash = "#overview";
   </tr>
   <tr>
     <td>Finalized</td>
-    <td><span id="status"><%- include("finalized", {finalized: b.finalized}); %></span><%- include("verifyBlock", {id, blockNumber}) %></td>
+    <td><span id="status"><%- include("finalized", {finalized: b.finalized}); %></span>
+    <% if ( uiTool.verifierEnabled() ) { %>
+    <%- include("verifyBlock", {id, blockNumber}) %>
+    <% } %>
+    </td>
   </tr>
   <tr>
     <td>Hash</td>

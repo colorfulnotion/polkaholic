@@ -634,5 +634,8 @@ module.exports = {
             endpoints.push(chain.WSEndpoint3);
         }
         return endpoints;
+    },
+    verifierEnabled: function() {
+	return false;
     }
 };

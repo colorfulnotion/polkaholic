@@ -93,13 +93,19 @@ function presentInstructions(msg, id, hdr = "Instructions", verify = null, width
 }
 
 function verifyExec(id, verify, obj) {
-    console.log("verifyExec", obj, verify)
-    // https://stackoverflow.com/questions/3951768/window-open-and-pass-parameters-by-post-method
-    window.open('', `VW${id}`);
-    var f = document.getElementById(`verifyForm${id}`);
-    f[`verify`].value = JSON.stringify(verify);
-    f[`obj`].value = JSON.stringify(obj);
-    document.getElementById(`verifyForm${id}`).submit();
+    console.log("verifyExec", id, "obj", obj, "verify", verify)
+    if ( verify ) {
+	// https://stackoverflow.com/questions/3951768/window-open-and-pass-parameters-by-post-method
+	window.open('', `VW${id}`);
+	var f = document.getElementById(`verifyForm${id}`);
+	if ( f ) {
+	    f[`verify`].value = JSON.stringify(verify);
+	    f[`obj`].value = JSON.stringify(obj);
+	    document.getElementById(`verifyForm${id}`).submit();
+	} else {
+	    console.log(`verifyForm${id} not found`);
+	}
+    }
 }
 
 function presentJSONObject(obj, id, verify = null) {

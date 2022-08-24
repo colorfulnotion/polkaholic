@@ -153,12 +153,14 @@ let f = xcm;
         <%- include("decode", {"obj": f.msg, "id": "instructions"}) %>
       </td>
     </tr>
+<% if ( uiTool.verifierEnabled() ) { %>
     <tr>
       <td>Verify</td>
       <td>
         <%- include("verifyXCMMessage", {"xcm": f}); %>
       </td>
     </tr>
+<% } %>
 </table>
 
 <%- include('footer', {apiUrl: apiUrl}); %>

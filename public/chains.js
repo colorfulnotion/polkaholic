@@ -6,19 +6,6 @@ var refreshIntervalMS = 6100;
 var chainsUpdateIntervalId = false;
 
 
-function filterchains(relaychain = "all") {
-
-    if (relaychain == "kusama" || relaychain == "polkadot") {
-        if (chainsTable) chainsTable.column(7).search(relaychain).draw();
-        //if (xcmTable) xcmTable.column(8).search(relaychain).draw();
-        //if (xcmmessagesTable) xcmmessagesTable.column(1).search(relaychain).draw();
-    } else {
-        // empty search effectively removes the filter
-        if (chainsTable) chainsTable.search('').columns().search('').draw();
-        // if (xcmTable) xcmTable.search('').columns().search('').draw();
-        // if (xcmmessagesTable) xcmmessagesTable.search('').columns().search('').draw();
-    }
-}
 
 function stopchains() {
     if (chainsUpdateIntervalId) {
@@ -306,18 +293,6 @@ function setuptabs(tabs) {
 }
 
 
-function setchainfilter(relaychain) {
-    relaychainfilter = relaychain;
-    filterchains(relaychainfilter);
-}
-
-
-const selectElement = document.querySelector('#relaychain');
-if (selectElement) {
-    selectElement.addEventListener('change', (event) => {
-        setchainfilter(event.target.value);
-    });
-}
 const topNElement = document.querySelector('#topN');
 if (topNElement) {
     topNElement.addEventListener('change', (event) => {

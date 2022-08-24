@@ -1,9 +1,9 @@
 <%- include('header', {chainInfo: chainInfo, title: "About Polkaholic"}); %>
 
-
 <div class="card">
   <div class="card-body">
    <h5 class="card-title">Verifier</h5>
+<% if ( uiTool.verifierEnabled() ) { %>
    <div>
    <b>Verify:</b><br/>
    <% if ( verify.verification == "extrinsic" ) {
@@ -32,6 +32,11 @@
    <%- JSON.stringify(obj); %>
    </textarea>
    </div>
+<% } else { %>
+  <div class="alert" role="alert" data-mdb-color="warning">
+   <i class="fas fa-exclamation-triangle"></i>Verification of blocks, extrinsics, events and XCM messages is under active development.
+  </div>
+<% } %>
   </div>
 </div>
 

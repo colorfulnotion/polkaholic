@@ -363,10 +363,10 @@ function showchainlog(chainID, address) {
         ],
         columnDefs: [{
             "className": "dt-right",
-            "targets": [4, 5, 6, 7, 8]
+            "targets": [6, 7, 10, 11]
         }, {
             "className": "dt-center",
-            "targets": [1, 2, 3]
+            "targets": [1, 2, 3, 4, 5, 8, 9, 12, 13]
         }],
         columns: [{
             data: 'logDT',
@@ -409,6 +409,14 @@ function showchainlog(chainID, address) {
                 return data;
             }
         }, {
+            data: 'numTransfers',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
             data: 'valueTransfersUSD',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
@@ -439,6 +447,22 @@ function showchainlog(chainID, address) {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'valXCMTransferIncomingUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'valXCMTransferOutgoingUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
                 }
                 return data;
             }
