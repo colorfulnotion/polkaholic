@@ -56,11 +56,60 @@ module.exports = class AstarParser extends ChainParser {
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM polkadotXcm`, outgoingXcmList3)
                 //return outgoingXcmList
                 break;
+            case 'ethereum':
+                if (module_method == 'transact'){
+                    let isEthereumXCM = this.etherumXCMFilter(args)
+                    if (isEthereumXCM){
+                        console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
+                        let outgoingXcmList3 = this.processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args)
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM ethereum`, outgoingXcmList3)
+                        //return outgoingXcmList
+                    }
+                }
+                break;
             default:
                 //console.log(`unknown`)
                 //return outgoingXcmList
                 break;
         }
+    }
+
+    /*
+    name: Assets_withdraw
+    fingerprintID: 0xecf766ff (account20)
+    signatureID: 0xecf766ff
+    signatureRaw: assets_withdraw(address[],uint256[],address,bool,uint256,uint256)
+
+    name: Assets_withdraw (ss58)
+    fingerprintID: 0x019054d0
+    signatureID: 0x019054d0
+    signatureRaw: assets_withdraw(address[],uint256[],bytes32,bool,uint256,uint256)
+    */
+
+    etherumXCMFilter(args){
+        if (args.transaction != undefined) {
+            let evmTx = false;
+            if (args.transaction.eip1559 != undefined) {
+                evmTx = args.transaction.eip1559
+            } else if (args.transaction.legacy != undefined) {
+                evmTx = args.transaction.legacy
+            }
+            //console.log(`evmTx`, evmTx)
+            if (evmTx && evmTx.input != undefined) {
+                let txInput = evmTx.input
+                if (txInput.substr(0,10) == "0xecf766ff" || txInput.substr(0,10) == "0x019054d0"){
+                    return true
+                }
+                /*
+                let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
+                console.log(`output`, output)
+                if (output != undefined) {
+                    args.decodedEvmInput = output
+                }
+                */
+            }
+        }
+        return false
     }
 
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
@@ -97,6 +146,50 @@ module.exports = class AstarParser extends ChainParser {
             }
         }
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXTokens DONE`, outgoingXcmList)
+        extrinsic.xcms = outgoingXcmList
+        return outgoingXcmList
+    }
+
+
+
+    processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args) {
+        // need additional processing for currency_id part
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereum start`)
+
+
+
+        return
+        let assetString = false
+        let a = args
+        if (a.currency_id != undefined) {
+            assetString = this.processDecHexCurrencyID(indexer, a.currency_id)
+        }
+        /* 0xb64a6325b5374ed3efca6628337aab00aff1febff06d6977bc6f192690126996
+        currency_id": {
+          "selfReserve": null
+        }
+        */
+        if (!assetString) {
+            if (a.currency_id != undefined && a.currency_id.selfReserve !== undefined) {
+                assetString = indexer.getNativeAsset();
+            }
+        }
+        //let generalOutgoingXcmList = super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress)
+        super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
+        let generalOutgoingXcmList = (extrinsic.xcms != undefined) ? extrinsic.xcms : []
+        let outgoingXcmList = []
+        for (var xcmtransfer of generalOutgoingXcmList) {
+            if (xcmtransfer == undefined) {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingEthereum missing`)
+            } else if (assetString) {
+                xcmtransfer.asset = assetString
+                outgoingXcmList.push(xcmtransfer)
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingEthereum assetString missing`)
+                outgoingXcmList.push(xcmtransfer)
+            }
+        }
+        if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingEthereum DONE`, outgoingXcmList)
         extrinsic.xcms = outgoingXcmList
         return outgoingXcmList
     }
