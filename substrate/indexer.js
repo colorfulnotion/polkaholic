@@ -79,6 +79,8 @@ module.exports = class Indexer extends AssetManager {
     recentExtrinsics = [];
     recentTransfers = [];
 
+    wasmContractMap = {};
+
     addressBalanceRequest = {}
 
     context = {};
@@ -675,6 +677,7 @@ module.exports = class Indexer extends AssetManager {
             this.flushBlockRows(),
             this.flush_addressExtrinsicMap(),
             this.flushProxy(),
+            this.flushWasmContracts(),
             await this.flushXCM()
         ])
         await statusesPromise
@@ -790,6 +793,47 @@ module.exports = class Indexer extends AssetManager {
             "data": multisigAccounts,
             "replace": ["threshold", "signatories", "signatorycnt"],
         });
+    }
+
+    async flushWasmContracts() {
+        let wasmCodes = []
+        let wasmContracts = []
+        for (const k of Object.keys(this.wasmContractMap)) {
+            let w = this.wasmContractMap[k]
+            if (w.withCode){
+                //["codeHash", "chainID"] + ["wasm", "codeStoredBN", "codeStoredTS"]
+                let c = `('${w.codeHash}', '${w.chainID}', '${w.code}', '${w.blockNumber}', '${w.blockTS}')`
+                wasmCodes.push(c)
+            }
+            //["address", "chainID"] + ["extrinsicHash", "extrinsicID", "instantiateBN", "codeHash", "constructor", "salt", "blockTS", "deployer"]
+            let t = `('${w.contractAddress}', '${w.chainID}', '${w.extrinsicHash}', '${w.extrinsicID}', '${w.blockNumber}', '${w.codeHash}', '${w.constructor}', '${w.salt}', '${w.blockTS}', '${w.deployer}')`
+            wasmContracts.push(t)
+        }
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`flushWasmContracts wasmCodes`, wasmCodes)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`flushWasmContracts wasmContracts`, wasmContracts)
+
+        this.wasmContractMap = {};
+
+        // --- multiaccount no update
+        let sqlDebug = true
+
+        let wasmCodeVal = ["wasm", "codeStoredBN", "codeStoredTS"]
+        await this.upsertSQL({
+            "table": `wasmCode`,
+            "keys": ["codeHash", "chainID"],
+            "vals": wasmCodeVal,
+            "data": wasmCodes,
+            "replace": wasmCodeVal,
+        }, sqlDebug);
+
+        let wasmContractVal = ["extrinsicHash", "extrinsicID", "instantiateBN", "codeHash", "constructor", "salt", "blockTS", "deployer"]
+        await this.upsertSQL({
+            "table": `contract`,
+            "keys": ["address", "chainID"],
+            "vals": wasmContractVal,
+            "data": wasmContracts,
+            "replace": wasmContractVal,
+        }, sqlDebug);
     }
 
     async flushProxy() {
@@ -1213,6 +1257,11 @@ module.exports = class Indexer extends AssetManager {
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
             }
         }
+    }
+
+    addWasmContract(wasmContract, withCode = false) {
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`addWasmContract withCode=${withCode}`)
+        this.wasmContractMap[wasmContract.extrinsicHash] = wasmContract
     }
 
     updateXCMChannelMsg(xcmChannelMsg, blockNumber, blockTS) {
@@ -4036,6 +4085,11 @@ module.exports = class Indexer extends AssetManager {
                     feed["transfers"] = this.map_feedTransfers_to_transfers(feedTransfers);
                 }
 
+                //TODO: add shibuya testnet later
+                if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya) {
+                    this.chainParser.processWasmContracts(this, rExtrinsic, feed, fromAddress, false, false, false);
+                }
+
                 //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
                 this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
 
@@ -5956,7 +6010,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 console.log(`Fetch assetRegistry:currencyIdToLocations`)
                 await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
-        } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden ||
+        } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya ||
             this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbase ||
             this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
             this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint ||
@@ -5974,7 +6028,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 console.log(`fetch assetManager:assetIdType`)
                 await this.chainParser.fetchXCMAssetIdType(this)
             }
-            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden ||
+            if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya ||
                 this.chainID == paraTool.chainIDCalamari) {
                 console.log(`fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
                 await this.chainParser.fetchXCMAssetIdToLocation(this)
@@ -6021,7 +6075,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
                 } else {
                     // SKIP PROCESSING since we covered autotrace generation already
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
+                    if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
                     autoTraces = r.autotrace;
                 }
                 for (const t of autoTraces) {
