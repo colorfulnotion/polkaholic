@@ -831,6 +831,11 @@ module.exports = class ChainParser {
             }
         }
         switch (module_section) {
+            case 'xTransfer':
+                let outgoingXcmList0 = this.processOutgoingXTransfer(indexer, extrinsic, feed, fromAddress, section_method, args)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTransfer`, outgoingXcmList0)
+                //return outgoingXcmList
+                break;
             case 'xTokens':
                 let outgoingXcmList1 = this.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTokens`, outgoingXcmList1)
@@ -1798,6 +1803,198 @@ module.exports = class ChainParser {
             }
         }
 
+    }
+
+    processDest(dest, relayChain){
+        let paraIDDest = -1;
+        let chainIDDest = -1;
+        let destAddress = null;
+        if (dest.v1 !== undefined && dest.v1.interior !== undefined) {
+            let destV1Interior = dest.v1.interior;
+            // dest for relaychain
+            if (destV1Interior.x1 !== undefined) {
+                // {"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}
+                [paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
+            } else if (destV1Interior.x2 !== undefined) {
+                // dest for parachain, add 20000 for kusama-relay
+                // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
+                [paraIDDest, chainIDDest, destAddress] = this.processX2(destV1Interior.x2, relayChain)
+            }
+        } else if (dest.x2 != undefined) {
+            //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
+            [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
+        } else if (dest.x3 != undefined) {
+            //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
+            [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
+        } else if (dest.interior !== undefined) {
+            let destInterior = dest.interior;
+            // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
+            if (destInterior.x1 !== undefined) {
+                [paraIDDest, chainIDDest, destAddress] = this.processX1(destInterior.x1, relayChain)
+            } else if (destInterior.x2 !== undefined) {
+                // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
+                // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
+                [paraIDDest, chainIDDest, destAddress] = this.processX2(destInterior.x2, relayChain)
+            } else if (destInterior.x3 !== undefined) {
+                // 0x4508d07a10c09203fd9c9687712e3654a409ee2c6d023255a673c98d9812ea23
+                // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
+                [paraIDDest, chainIDDest, destAddress] = this.processX3(destInterior.x3, relayChain)
+            } else {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`Unknown dest.interior`, JSON.stringify(dest, null, 2))
+            }
+        } else {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`Unknown dest`, JSON.stringify(dest, null, 2))
+        }
+        return [paraIDDest, chainIDDest, destAddress]
+    }
+
+
+    processOutgoingXTransfer(indexer, extrinsic, feed, fromAddress, section_method, args) {
+        //return
+        let outgoingXTransfer = []
+        try {
+            if (section_method == "xTransfer:transfer") {
+                // test case: indexPeriods 2035 2022-08-25 10
+                // 0xc1af594726fc296d9eb795ed0c2f63b64c71dd12e50da7c0e8ee6e126304521e | xTransfer:transfer
+                //let a = feed.params;
+                /*
+                {
+                  "asset": {
+                    "id": {
+                      "concrete": {
+                        "parents": 1,
+                        "interior": {
+                          "x2": [
+                            {
+                              "parachain": 2004
+                            },
+                            {
+                              "palletInstance": 10
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "fun": {
+                      "fungible": "0x000000000000000002aa1efb94e00000"
+                    }
+                  },
+                  "dest": {
+                    "parents": 1,
+                    "interior": {
+                      "x2": [
+                        {
+                          "parachain": 2004
+                        },
+                        {
+                          "accountKey20": {
+                            "network": {
+                              "any": null
+                            },
+                            "key": "0xef46c7649270c912704fb09b75097f6e32208b85"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "dest_weight": 1000000000
+                }
+                */
+                let a = args
+                let assetAndAmountSents = [];
+                let dest = a.dest;
+                let relayChain = indexer.relayChain;
+                let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
+                /*
+                let paraIDDest = -1;
+                let chainIDDest = -1;
+                let destAddress = null;
+                */
+                let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
+                if (chainIDDest == -1 || paraIDDest == -1){
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
+                    return
+                }
+
+                // dest for parachain   {"v1":{"parents":1,"interior":{"x2":[{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]}}}
+                // dest for relaychain  {"v1":{"parents":1,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}}}}
+
+                if (section_method == 'xTransfer:transfer') {
+                    //asset processing
+                    let asset = a.asset
+                    if (asset != undefined && asset.fun !== undefined && asset.fun.fungible !== undefined) {
+                        let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
+                        let aa = {
+                            asset: targetedAsset,
+                            rawAsset: rawTargetedAsset,
+                            amountSent: paraTool.dechexToInt(asset.fun.fungible),
+                            transferIndex: 0,
+                            isFeeItem: 1,
+                        }
+                        assetAndAmountSents.push(aa)
+                    } else {
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log("xTransfer:transfer asset unknown", a);
+                        asset = false;
+                    }
+                } else {
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset unknown case`, section_method)
+                }
+
+                for (const assetAndAmountSent of assetAndAmountSents) {
+                    let asset = assetAndAmountSent.asset
+                    let rawAsset = assetAndAmountSent.rawAsset
+                    let amountSent = assetAndAmountSent.amountSent
+                    let transferIndex = assetAndAmountSent.transferIndex
+                    let isFeeItem = assetAndAmountSent.isFeeItem
+                    if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent)) {
+                        let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
+                        if (extrinsic.xcms == undefined) extrinsic.xcms = []
+                        let xcmIndex = extrinsic.xcms.length
+                        let r = {
+                            sectionMethod: section_method,
+                            extrinsicHash: feed.extrinsicHash,
+                            extrinsicID: feed.extrinsicID,
+                            transferIndex: transferIndex,
+                            xcmIndex: xcmIndex,
+                            relayChain: relayChain,
+                            chainID: indexer.chainID,
+                            chainIDDest: chainIDDest,
+                            paraID: paraID,
+                            paraIDDest: paraIDDest,
+                            blockNumber: this.parserBlockNumber,
+                            fromAddress: fromAddress,
+                            destAddress: destAddress,
+                            asset: asset,
+                            rawAsset: rawAsset,
+                            sourceTS: feed.ts,
+                            amountSent: amountSent,
+                            incomplete: incomplete,
+                            isFeeItem: isFeeItem,
+                            msgHash: '0x',
+                            sentAt: this.parserWatermark,
+                        }
+                        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                        if (isXCMAssetFound) {
+                            if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                            if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                        }
+                        console.log("processOutgoingXTokens xTokens", r);
+                        outgoingXTransfer.push(r)
+                        extrinsic.xcms.push(r)
+                    } else {
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTransfer xTokens unknown asset/amountSent`);
+                    }
+                }
+
+            } else {
+                // TODO: tally errors in logger
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processOutgoingXTransfer Unknown`, `module:${section_method}`);
+            }
+        } catch (e) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXTransfer error`, e)
+        }
+        return outgoingXTransfer;
     }
 
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
