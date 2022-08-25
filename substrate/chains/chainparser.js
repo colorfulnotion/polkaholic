@@ -1674,52 +1674,22 @@ module.exports = class ChainParser {
         let evetnData = event.data
         let transferIndex = 0;
         let xcmIndex = extrinsic.xcms.length
-        let relayChain = indexer.relayChain
+
         let fromAddress = paraTool.getPubKey(evetnData[0])
         let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
         let assetAndAmountSents = [];
 
-        let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
-        let paraIDDest = -1;
-        let destAddress = null;
         // dest for parachain   {"v1":{"parents":1,"interior":{"x2":[{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]}}}
         // dest for relaychain  {"v1":{"parents":1,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}}}}
-        let chainIDDest = -1;
 
+        let relayChain = indexer.relayChain
+        let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
         let dest = evetnData[3] //XcmV1MultilocationJunctions
-        //MK: not sure about v1?
-        if (dest.v1 !== undefined && dest.v1.interior !== undefined) {
-            let destV1Interior = dest.v1.interior;
-            // dest for relaychain
-            if (destV1Interior.x1 !== undefined) {
-                // {"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}
-                [paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
-            } else if (destV1Interior.x2 !== undefined) {
-                // dest for parachain, add 20000 for kusama-relay
-                // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
-                [paraIDDest, chainIDDest, destAddress] = this.processX2(destV1Interior.x2, relayChain)
-            }
-        } else if (dest.x2 != undefined) {
-            //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
-            [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
-        } else if (dest.x3 != undefined) {
-            //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
-            [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
-        } else if (dest.interior !== undefined) {
-            let destInterior = dest.interior;
-            // looks like it's getting here
-            // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
-            if (destInterior.x1 !== undefined) {
-                [paraIDDest, chainIDDest, destAddress] = this.processX1(destInterior.x1, relayChain)
-            } else if (destInterior.x2 !== undefined) {
-                // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
-                // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
-                [paraIDDest, chainIDDest, destAddress] = this.processX2(destInterior.x2, relayChain)
-            } else {
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent section_method=${section_method} Unknown dest.interior`, JSON.stringify(dest, null, 2))
-            }
-        } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent section_method=${section_method} Unknown dest`, JSON.stringify(dest, null, 2))
+        let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
+        if (chainIDDest == -1 || paraIDDest == -1){
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
+            return
         }
 
         let aAsset = evetnData[1] //Vec<XcmV1MultiAsset>
@@ -1905,20 +1875,12 @@ module.exports = class ChainParser {
                 let dest = a.dest;
                 let relayChain = indexer.relayChain;
                 let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
-                /*
-                let paraIDDest = -1;
-                let chainIDDest = -1;
-                let destAddress = null;
-                */
                 let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
                 if (chainIDDest == -1 || paraIDDest == -1){
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
                     return
                 }
-
-                // dest for parachain   {"v1":{"parents":1,"interior":{"x2":[{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]}}}
-                // dest for relaychain  {"v1":{"parents":1,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}}}}
 
                 if (section_method == 'xTransfer:transfer') {
                     //asset processing
@@ -2010,50 +1972,22 @@ module.exports = class ChainParser {
                 // 0x11fbddaf7d2f0b4451bb85fab337d1d61c94234c4b9e5562d481a268236c5a7f | xTokens:transfer
                 // 0x5f68eb1f1640447764d11ddda660c02989197b474a6e991adc203bb80fa510b4 | xTokens:transferMulticurrencies  (TODO)
 
-
                 //let a = feed.params;
                 let a = args
                 let assetAndAmountSents = [];
 
                 let dest = a.dest;
                 let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
-                let paraIDDest = -1;
-                let destAddress = null;
                 let relayChain = indexer.relayChain;
+
                 // dest for parachain   {"v1":{"parents":1,"interior":{"x2":[{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]}}}
                 // dest for relaychain  {"v1":{"parents":1,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}}}}
-                let chainIDDest = -1;
-                if (dest.v1 !== undefined && dest.v1.interior !== undefined) {
-                    let destV1Interior = dest.v1.interior;
-                    // dest for relaychain
-                    if (destV1Interior.x1 !== undefined) {
-                        // {"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}
-                        [paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
-                    } else if (destV1Interior.x2 !== undefined) {
-                        // dest for parachain, add 20000 for kusama-relay
-                        // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
-                        [paraIDDest, chainIDDest, destAddress] = this.processX2(destV1Interior.x2, relayChain)
-                    }
-                } else if (dest.x2 != undefined) {
-                    //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
-                    [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
-                } else if (dest.x3 != undefined) {
-                    //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
-                    [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
-                } else if (dest.interior !== undefined) {
-                    let destInterior = dest.interior;
-                    // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
-                    if (destInterior.x1 !== undefined) {
-                        [paraIDDest, chainIDDest, destAddress] = this.processX1(destInterior.x1, relayChain)
-                    } else if (destInterior.x2 !== undefined) {
-                        // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
-                        // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
-                        [paraIDDest, chainIDDest, destAddress] = this.processX2(destInterior.x2, relayChain)
-                    } else {
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest.interior`, JSON.stringify(dest, null, 2))
-                    }
-                } else {
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown dest`, JSON.stringify(dest, null, 2))
+
+                let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
+                if (chainIDDest == -1 || paraIDDest == -1){
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
+                    return
                 }
 
                 if (section_method == "xTokens:transfer") {
@@ -2067,14 +2001,6 @@ module.exports = class ChainParser {
                     */
                     let assetString = this.processGenericCurrencyID(indexer, a.currency_id) //inferred approach
                     let rawAssetString = this.processRawGenericCurrencyID(indexer, a.currency_id)
-                    /*
-                    if (!assetString) {
-                        if (a.currency_id != undefined && a.currency_id.selfReserve !== undefined) {
-                            assetString = indexer.getNativeAsset();
-                            rawAssetString = JSON.stringify(a.currency_id)
-                        }
-                    }
-                    */
 
                     let aa = {
                         asset: assetString,
