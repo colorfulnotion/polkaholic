@@ -62,7 +62,7 @@ module.exports = class AstarParser extends ChainParser {
                 if (module_method == 'transact'){
                     let isEthereumXCM = this.etherumXCMFilter(indexer, args, feed.events)
                     if (isEthereumXCM){
-                        console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
                         let outgoingXcmList3 = this.processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM ethereum`, outgoingXcmList3)
                         //return outgoingXcmList
@@ -168,122 +168,127 @@ module.exports = class AstarParser extends ChainParser {
 
     processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, a) {
         // need additional processing for currency_id part
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereum start`)
-        /*
-        {
-            "decodeStatus": "success",
-            "methodID": "0x019054d0",
-            "signature": "assets_withdraw(address[] asset_id, uint256[] asset_amount, bytes32 recipient_account_id, bool is_relay, uint256 parachain_id, uint256 fee_index)",
-            "params": {
-                "asset_id": [
-                    "0xffffffffffffffffffffffffffffffffffffffff"
-                ],
-                "asset_amount": [
-                    "319770000000"
-                ],
-                "recipient_account_id": "0x221ed4fa0489b3f47c6a3f51761f66f93eefb8aff7f6d035365b564579ae7135",
-                "is_relay": true,
-                "parachain_id": "0",
-                "fee_index": "0"
+        try {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereum start`)
+            /*
+            {
+                "decodeStatus": "success",
+                "methodID": "0x019054d0",
+                "signature": "assets_withdraw(address[] asset_id, uint256[] asset_amount, bytes32 recipient_account_id, bool is_relay, uint256 parachain_id, uint256 fee_index)",
+                "params": {
+                    "asset_id": [
+                        "0xffffffffffffffffffffffffffffffffffffffff"
+                    ],
+                    "asset_amount": [
+                        "319770000000"
+                    ],
+                    "recipient_account_id": "0x221ed4fa0489b3f47c6a3f51761f66f93eefb8aff7f6d035365b564579ae7135",
+                    "is_relay": true,
+                    "parachain_id": "0",
+                    "fee_index": "0"
+                }
+                "fromAddress": "0xf09a89daf59b238d9698fe400880db92dc45ac36da08241be7decd27a5deaf53"
+            */
+            let params = a.params
+            //console.log(`a`, a)
+            //console.log(`params`, params)
+            let assetAndAmountSents = [];
+            let feeIdx = paraTool.dechexToInt(params.fee_index)
+            let transferIndex = 0
+            if (params.asset_id.length != params.asset_amount.length){
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] Invalid EVM asset Input`)
+                return
             }
-            "fromAddress": "0xf09a89daf59b238d9698fe400880db92dc45ac36da08241be7decd27a5deaf53"
-        */
-        let params = a.params
-        //console.log(`a`, a)
-        //console.log(`params`, params)
-        let assetAndAmountSents = [];
-        let feeIdx = paraTool.dechexToInt(params.fee_index)
-        let transferIndex = 0
-        if (params.asset_id.length != params.asset_amount.length){
-            console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] Invalid EVM asset Input`)
+            for (let i = 0; i < params.asset_id.length; i++){
+                let rawAssetID = `${params.asset_id[i]}` //"0xffffffffffffffffffffffffffffffffffffffff"
+                if (rawAssetID.substr(0,2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
+                let assetString = this.processGenericCurrencyID(indexer, rawAssetID);
+                let rawAssetString = this.processRawGenericCurrencyID(indexer, rawAssetID);
+                let assetAmount = paraTool.dechexToInt(params.asset_amount[i])
+                let aa = {
+                    asset: assetString,
+                    rawAsset: rawAssetString,
+                    amountSent: assetAmount,
+                    transferIndex: transferIndex,
+                    isFeeItem: (feeIdx == i)? 1: 0,
+                }
+                assetAndAmountSents.push(aa)
+                transferIndex++
+            }
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(assetAndAmountSents)
+            let outgoingEtherumXCM = []
+            if (extrinsic.xcms == undefined) extrinsic.xcms = []
+            let xcmIndex = extrinsic.xcms.length
+            let destAddress = '0x' //unknown
+            let relayChain = indexer.relayChain
+            let paraIDExtra = paraTool.getParaIDExtra(relayChain)
+            let chainID = indexer.chainID
+            let paraID = paraTool.getParaIDfromChainID(chainID)
+            let chainIDDest = null;
+            let paraIDDest = null;
+            if (params.is_relay){
+                paraIDDest = 0
+                chainIDDest = paraTool.getRelayChainID(relayChain)
+            }else{
+                paraIDDest = paraTool.dechexToInt(params.parachain_id)
+                chainIDDest = paraIDExtra+paraIDDest
+            }
+            if (params.recipient_account_id != undefined) destAddress = params.recipient_account_id
+            if (a.fromAddress != undefined) fromAddress = a.fromAddress
+            let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID); //?
+
+            let evmMethod = `${a.signature.split('(')[0]}:${a.methodID}`
+
+            for (const assetAndAmountSent of assetAndAmountSents) {
+                let asset = assetAndAmountSent.asset
+                let rawAsset = assetAndAmountSent.rawAsset
+                let amountSent = assetAndAmountSent.amountSent
+                let transferIndex = assetAndAmountSent.transferIndex
+                let isFeeItem = assetAndAmountSent.isFeeItem
+                if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent)) {
+                    if (extrinsic.xcms == undefined) extrinsic.xcms = []
+                    let xcmIndex = extrinsic.xcms.length
+                    let r = {
+                        sectionMethod: evmMethod,
+                        extrinsicHash: feed.extrinsicHash,
+                        extrinsicID: feed.extrinsicID,
+                        transferIndex: transferIndex,
+                        xcmIndex: xcmIndex,
+                        relayChain: relayChain,
+                        chainID: indexer.chainID,
+                        chainIDDest: chainIDDest,
+                        paraID: paraID,
+                        paraIDDest: paraIDDest,
+                        blockNumber: this.parserBlockNumber,
+                        fromAddress: fromAddress,
+                        destAddress: destAddress,
+                        asset: asset,
+                        rawAsset: rawAsset,
+                        sourceTS: feed.ts,
+                        amountSent: amountSent,
+                        incomplete: incomplete,
+                        isFeeItem: isFeeItem,
+                        msgHash: '0x',
+                        sentAt: this.parserWatermark,
+                    }
+                    let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
+                    if (isXCMAssetFound) {
+                        if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
+                        if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                    }
+                    //if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
+                    console.log(`processOutgoingEthereum`, r)
+                    extrinsic.xcms.push(r)
+                    outgoingEtherumXCM.push(r)
+                } else {
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingEthereum unknown asset/amountSent`);
+                }
+            }
+            return outgoingEtherumXCM
+        }catch(e){
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] ${e.toString()}`)
             return
         }
-        for (let i = 0; i < params.asset_id.length; i++){
-            let rawAssetID = `${params.asset_id[i]}` //"0xffffffffffffffffffffffffffffffffffffffff"
-            if (rawAssetID.substr(0,2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
-            let assetString = this.processGenericCurrencyID(indexer, rawAssetID);
-            let rawAssetString = this.processRawGenericCurrencyID(indexer, rawAssetID);
-            let assetAmount = paraTool.dechexToInt(params.asset_amount[i])
-            let aa = {
-                asset: assetString,
-                rawAsset: rawAssetString,
-                amountSent: assetAmount,
-                transferIndex: transferIndex,
-                isFeeItem: (feeIdx == i)? 1: 0,
-            }
-            assetAndAmountSents.push(aa)
-            transferIndex++
-        }
-        console.log(assetAndAmountSents)
-        let outgoingEtherumXCM = []
-        if (extrinsic.xcms == undefined) extrinsic.xcms = []
-        let xcmIndex = extrinsic.xcms.length
-        let destAddress = '0x' //unknown
-        let relayChain = indexer.relayChain
-        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
-        let chainID = indexer.chainID
-        let paraID = paraTool.getParaIDfromChainID(chainID)
-        let chainIDDest = null;
-        let paraIDDest = null;
-        if (params.is_relay){
-            paraIDDest = 0
-            chainIDDest = paraTool.getRelayChainID(relayChain)
-        }else{
-            paraIDDest = paraTool.dechexToInt(params.parachain_id)
-            chainIDDest = paraIDExtra+paraIDDest
-        }
-        if (params.recipient_account_id != undefined) destAddress = params.recipient_account_id
-        if (a.fromAddress != undefined) fromAddress = a.fromAddress
-        let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID); //?
-
-        let evmMethod = `${a.signature.split('(')[0]}:${a.methodID}`
-
-        for (const assetAndAmountSent of assetAndAmountSents) {
-            let asset = assetAndAmountSent.asset
-            let rawAsset = assetAndAmountSent.rawAsset
-            let amountSent = assetAndAmountSent.amountSent
-            let transferIndex = assetAndAmountSent.transferIndex
-            let isFeeItem = assetAndAmountSent.isFeeItem
-            if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent)) {
-                if (extrinsic.xcms == undefined) extrinsic.xcms = []
-                let xcmIndex = extrinsic.xcms.length
-                let r = {
-                    sectionMethod: evmMethod,
-                    extrinsicHash: feed.extrinsicHash,
-                    extrinsicID: feed.extrinsicID,
-                    transferIndex: transferIndex,
-                    xcmIndex: xcmIndex,
-                    relayChain: relayChain,
-                    chainID: indexer.chainID,
-                    chainIDDest: chainIDDest,
-                    paraID: paraID,
-                    paraIDDest: paraIDDest,
-                    blockNumber: this.parserBlockNumber,
-                    fromAddress: fromAddress,
-                    destAddress: destAddress,
-                    asset: asset,
-                    rawAsset: rawAsset,
-                    sourceTS: feed.ts,
-                    amountSent: amountSent,
-                    incomplete: incomplete,
-                    isFeeItem: isFeeItem,
-                    msgHash: '0x',
-                    sentAt: this.parserWatermark,
-                }
-                let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
-                if (isXCMAssetFound) {
-                    if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                    if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
-                }
-                //if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
-                console.log(`processOutgoingEthereum`, r)
-                extrinsic.xcms.push(r)
-                outgoingEtherumXCM.push(r)
-            } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingEthereum unknown asset/amountSent`);
-            }
-        }
-        return outgoingEtherumXCM
     }
 
     processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args) {

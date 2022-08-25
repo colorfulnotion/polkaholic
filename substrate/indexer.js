@@ -1082,7 +1082,6 @@ module.exports = class Indexer extends AssetManager {
     async flushXCM() {
         // flush xcmtransfer
         let xcmtransferKeys = Object.keys(this.xcmtransfer)
-        console.log(`[${this.chainParser.parserBlockNumber}] xcmtransferKeys`,xcmtransferKeys)
         if (xcmtransferKeys.length > 0) {
             let xcmtransfers = [];
             let numXCMTransfersOut = {}
@@ -1104,8 +1103,7 @@ module.exports = class Indexer extends AssetManager {
                     numXCMTransfersOut[r.blockNumber]++;
                 }
             }
-            console.log(`[${this.chainParser.parserBlockNumber}] xcmtransfers`,xcmtransfers)
-            let sqlDebug = true
+            let sqlDebug = false
             this.xcmtransfer = {};
             // alter table xcmtransfer change column txHash extrinsicHash varchar(67)
             await this.upsertSQL({
@@ -1230,7 +1228,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     updateXCMTransferStorage(xcmtransfer) {
-        console.log(`adding xcmtransfer`, xcmtransfer)
+        //console.log(`adding xcmtransfer`, xcmtransfer)
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
     }
 
