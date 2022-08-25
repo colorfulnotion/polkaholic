@@ -566,9 +566,9 @@ var polkadotEndpoints = [
         info: 'efinity',
         homepage: 'https://efinity.io',
         paraId: 2021,
-        text: t('archive.rpc.polkadot.efinity', 'Efinity', { ns: 'apps-config' }),
+        text: t('rpc.polkadot.efinity', 'Efinity', { ns: 'apps-config' }),
         providers: {
-          Efinity: 'wss://archive.rpc.efinity.io',
+          Efinity: 'wss://rpc.efinity.io',
           Dwellir: 'wss://efinity-rpc.dwellir.com',
           OnFinality: 'wss://efinity.api.onfinality.io/public-ws'
         }
