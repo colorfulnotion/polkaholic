@@ -39,13 +39,14 @@ let cls2 = ( expanded ) ? "show" : "";
 <tr style="border-top: 1px solid gray;">
  <td width="40%" align=left valign=top>
   <B><%= a.assetName; %></B> Balance:<br>
-<% if ( uiTool.verifierEnabled() ) { %>
+<% if ( false ) { %>
   <a id="verifyaccount-<%= chainassets.id %>" class="btn btn-link">Verify</a>
  <script>
   $("#verifyaccount-<%= chainassets.id %>").on('click', function (e) {
-     verifyExec({"verification": "account", "id": "<%= chainassets.id %>", "address": "<%= chainassets.ss58Address; %>"}, <%- JSON.stringify(a.state); %>);
+     verifyExec("<%= chainassets.id %>", {"verification": "account", "id": "<%= chainassets.id %>", "address": "<%= chainassets.ss58Address; %>"}, <%- JSON.stringify(a.state); %>);
    });
  </script>
+<form id="verifyForm<%= chainassets.id; %>" method="POST" action="/verify" target="VW<%= chainassets.id %>"><input type="hidden" name="verify" value=""/><input type="hidden" name="obj" value=""/></form>
 <% } else { %>
 <%- include("assetinfobutton", {assetChain: a.assetChain, assetType: a.assetType}); %>
 <% } %>

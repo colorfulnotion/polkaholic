@@ -258,10 +258,20 @@ app.post('/login/', async (req, res) => {
 // Usage: https://polkaholic.io/verify
 app.post('/verify/', async (req, res) => {
     try {
+	let chains = await query.getChains();
+	let wsEndpoints = [];
+	for ( let i=0; i<chains.length; i++) {
+	    let c = chains[i];
+	    let endpoints = uiTool.getPublicWSEndpoints(c);
+	    if ( endpoints.length > 0 ) {
+		wsEndpoints.push({ id: c.id, chainID: c.chainID, WSEndpoint: endpoints[0] } );
+	    }
+	}
         let verify = req.body.verify ? JSON.parse(req.body.verify) : {};
         let obj = req.body.obj ? JSON.parse(req.body.obj) : {};
         res.render('verify', {
 	    verify,
+	    wsEndpoints,
 	    obj,
             chainInfo: query.getChainInfo()
         });
