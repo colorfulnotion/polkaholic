@@ -51,13 +51,13 @@ module.exports = class AstarParser extends ChainParser {
                 //0x7e020cd122a51d4f037f95a86761f6af33228d0a8c68f8f79fd1f27c17885914
                 let wasmWithoutCode = this.processContractsInstantiate(indexer, extrinsic, feed, fromAddress, section_method, args)
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiate`, wasmWithoutCode)
-                indexer.addWasmContract(wasmWithoutCode, false);
+                indexer.addWasmContract(wasmWithoutCode, wasmWithoutCode.withCode);
                 break;
             case 'contracts:instantiateWithCode': //contract deploy with wasm code
                 //0x2c986a6cb47b94a9e50f5d3f660e0f37177989594eb087bf7309c2e15e2340c8
                 let wasmWithCode = this.processContractsInstantiateWithCode(indexer, extrinsic, feed, fromAddress, section_method, args)
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiateWithCode`, wasmWithCode)
-                indexer.addWasmContract(wasmWithCode, true);
+                indexer.addWasmContract(wasmWithCode, wasmWithCode.withCode);
                 break;
             default:
                 if (section_method.includes('contracts:')){
@@ -259,7 +259,7 @@ module.exports = class AstarParser extends ChainParser {
             storageDepositLimit: args.storage_deposit_limit,
             code: args.code,
             withCode: false,
-            codeHash: null,
+            codeHash: '0x'+paraTool.blake2_256_from_hex(args.code),
             deployer: null,
             constructor: args.data, // The input data to pass to the contract constructor
             salt: args.salt,        // Used for the address derivation. See [`Pallet::contract_address`]??

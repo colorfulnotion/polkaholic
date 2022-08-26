@@ -801,8 +801,8 @@ module.exports = class Indexer extends AssetManager {
         for (const k of Object.keys(this.wasmContractMap)) {
             let w = this.wasmContractMap[k]
             if (w.withCode){
-                //["codeHash", "chainID"] + ["wasm", "codeStoredBN", "codeStoredTS"]
-                let c = `('${w.codeHash}', '${w.chainID}', '${w.code}', '${w.blockNumber}', '${w.blockTS}')`
+                //["codeHash", "chainID"] + ["extrinsicHash", "extrinsicID", "wasm", "codeStoredBN", "codeStoredTS", "storer"]
+                let c = `('${w.codeHash}', '${w.chainID}', '${w.extrinsicHash}', '${w.extrinsicID}', '${w.code}', '${w.blockNumber}', '${w.blockTS}', '${w.deployer}')`
                 wasmCodes.push(c)
             }
             //["address", "chainID"] + ["extrinsicHash", "extrinsicID", "instantiateBN", "codeHash", "constructor", "salt", "blockTS", "deployer"]
@@ -817,7 +817,7 @@ module.exports = class Indexer extends AssetManager {
         // --- multiaccount no update
         let sqlDebug = true
 
-        let wasmCodeVal = ["wasm", "codeStoredBN", "codeStoredTS"]
+        let wasmCodeVal = ["extrinsicHash", "extrinsicID", "wasm", "codeStoredBN", "codeStoredTS", "storer"]
         await this.upsertSQL({
             "table": `wasmCode`,
             "keys": ["codeHash", "chainID"],
