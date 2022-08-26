@@ -14,7 +14,7 @@ let verifyB = "vb" + id;
   <div id="<%= rj; %>" class="renderjson" style="overflow-y: scroll; max-width: 800px; max-height: 600px"></div>
   <button id="<%= dec %>" type="button" class="btn btn-link">View Decoded</button>
   <button id="<%= copyA %>" type="button" class="btn btn-link">Copy</button>
-<% if ( uiTool.verifierEnabled() ) { %>
+<% if ( uiTool.verifierEnabled() && verify != undefined ) { %>
   <button id="<%= verifyA %>" type="button" class="btn btn-link">Verify</button>
 <% } %>
 </div>
@@ -22,7 +22,7 @@ let verifyB = "vb" + id;
   <div id="<%= jh; %>" class="jsontable" style="overflow-y: scroll; max-width: 800px; max-height: 600px"></div>
   <button id="<%= vc %>" type="button" class="btn btn-link">View Raw</button>
   <button id="<%= copyB %>" type="button" class="btn btn-link">Copy</button>
-<% if ( uiTool.verifierEnabled() ) { %>
+<% if ( uiTool.verifierEnabled() && verify ) { %>
   <button id="<%= verifyB %>" type="button" class="btn btn-link">Verify</button>
 <% } %>
 <div>

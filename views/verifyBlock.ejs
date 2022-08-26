@@ -1,1 +1,10 @@
-<a class="btn btn-link" href="/verify/block/<%= id %>/<%= blockNumber %>">Verify</a>
+<a id="verifyButton<%= blockNumber %>" class="btn btn-link">Verify</a>
+<script>
+$(`#verifyButton<%= blockNumber; %>`).on('click', function(e) {
+    verifyExec("<%= blockNumber %>", { verification: "block", blockNumber: <%= blockNumber; %> }, <%- JSON.stringify(obj) %>);
+});
+</script>
+<form id="verifyForm<%= blockNumber %>" method="POST" action="/verify" target="VW<%= blockNumber %>">
+ <input type="hidden" name="verify" value=""/>
+ <input type="hidden" name="obj" value=""/>
+</form>

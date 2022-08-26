@@ -124,8 +124,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
     </tr>
     <tr>
       <td>Params</td>
-      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params,
-      verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID } }); %></td>
+      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID } }); %></td>
     </tr>
     <tr>
 <% if ( f.xcmdest == undefined && false) { %>

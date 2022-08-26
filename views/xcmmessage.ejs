@@ -142,7 +142,7 @@ let f = xcm;
           let ac = assetChains[i]
           let acID = `msgAc${i}`
           %>
-          <%- include("decode", {"obj": ac, "id": `asset${i}`}) %>
+          <%- include("decode", {"obj": ac, "id": `asset${i}`, "verify": null}) %>
         <% } %>
       </td>
     </tr>
@@ -150,10 +150,10 @@ let f = xcm;
     <tr>
       <td>Instructions</td>
       <td>
-        <%- include("decode", {"obj": f.msg, "id": "instructions"}) %>
+        <%- include("decode", {"obj": f.msg, "id": "instructions", "verify": null}) %>
       </td>
     </tr>
-<% if ( uiTool.verifierEnabled() ) { %>
+<% if ( false ) { %>
     <tr>
       <td>Verify</td>
       <td>

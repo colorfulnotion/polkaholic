@@ -1,4 +1,5 @@
 const paraTool = require("../paraTool");
+const ethTool = require("../ethTool");
 
 module.exports = class ChainParser {
     debugLevel = paraTool.debugNoLog;
@@ -2426,7 +2427,7 @@ module.exports = class ChainParser {
             //let module_method = extrinsic.method;
             //let section_method = `${module_section}:${module_method}`
 
-            if (section_method == "polkadotXcm:teleportAssets" || section_method == "polkadotXcm:limitedTeleportAssets" || section_method == "polkadotXcm:reserveTransferAssets" || section_method == "polkadotXcm:limitedReserveTransferAssets" || section_method == "polkadotXcm:send") {
+            if (section_method == "polkadotXcm:teleportAssets" || section_method == "polkadotXcm:limitedTeleportAssets" || section_method == "polkadotXcm:reserveTransferAssets" || section_method == "polkadotXcm:limitedReserveTransferAssets" || section_method == "polkadotXcm:send" || section_method == "polkadotXcm:reserveWithdrawAssets") {
 
                 let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
                 let paraIDDest = -1;
