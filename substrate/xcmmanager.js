@@ -12,7 +12,7 @@ module.exports = class XCMManager extends AssetManager {
 
     lastupdateTS = 0
 
-    async getXCMToken(){
+    async updateXcmInteriorOut(isRawAsset = false){
         let xcmListRecs = await this.poolREADONLY.query("select relayChain, chainID, rawAsset, asset, xcmInteriorKey, count(*) cnt from xcmtransfer where xcmInteriorKey is not null group by chainID, rawAsset, asset, xcmInteriorKey, relaychain order by chainID, xcmInteriorKey;");
         let xcmList = {};
         for (let i = 0; i < xcmListRecs.length; i++) {
@@ -29,8 +29,7 @@ module.exports = class XCMManager extends AssetManager {
                 matched: false,
                 cnt: rec.cnt,
             }
-            //let k2 = a.outKey
-            let k2 = a.outKey2
+            let k2 = (isRawAsset)? a.outKey: a.outKey2
             xcmList[k2] = a
         }
         console.log(`xcmList len=${Object.keys(xcmList).length}`, xcmList)
@@ -102,14 +101,32 @@ module.exports = class XCMManager extends AssetManager {
                 }
             }
         }
+
+        let xcmInteriorUpdates = []
         for (const k2 of Object.keys(xcmList)){
             let xcmRec = xcmList[k2]
             if (!xcmRec.matched){
                 noMatch[k2] = xcmRec
+            }else{
+                //["asset", "chainID"] + ["xcmInteriorKey"]
+                let [assetUnparsed, chainID] = paraTool.parseAssetChain(xcmRec.originalKey)
+                let c = `('${assetUnparsed}', '${chainID}', '${xcmRec.extrinsicHash}')`
+                xcmInteriorUpdates.push(c)
+                console.log(c)
             }
         }
+        return
         console.log(`exactMatch len=${Object.keys(exactMatch).length}`, exactMatch)
         console.log(`noMatch len=${Object.keys(noMatch).length}`, noMatch)
+        let sqlDebug = true
+        let xcmInteriorKeyVal = ["xcmInteriorKey"]
+        await this.upsertSQL({
+            "table": `asset`,
+            "keys": ["asset", "chainID"],
+            "vals": xcmInteriorKeyVal,
+            "data": xcmInteriorUpdates,
+            "replace": xcmInteriorKeyVal,
+        }, sqlDebug);
 
     }
 

@@ -2,7 +2,6 @@
  // Usage:  xcmmatch [lookbackDays]
 var XCMManager = require("./xcmmanager");
 
-
 async function main() {
     let lookbackDays = 1;
     process.argv.forEach(function(val, index, array) {
@@ -10,9 +9,9 @@ async function main() {
             lookbackDays = parseInt(val, 10);
         }
     });
-
     var manager = new XCMManager();
-    await manager.getXCMToken()
+    await manager.updateXcmInteriorOut(true)
+    await manager.updateXcmInteriorOut(false)
 }
 
 
