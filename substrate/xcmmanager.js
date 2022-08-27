@@ -115,7 +115,6 @@ module.exports = class XCMManager extends AssetManager {
                 console.log(c)
             }
         }
-        return
         console.log(`exactMatch len=${Object.keys(exactMatch).length}`, exactMatch)
         console.log(`noMatch len=${Object.keys(noMatch).length}`, noMatch)
         let sqlDebug = true
