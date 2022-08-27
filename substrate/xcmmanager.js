@@ -110,7 +110,7 @@ module.exports = class XCMManager extends AssetManager {
             }else{
                 //["asset", "chainID"] + ["xcmInteriorKey"]
                 let [assetUnparsed, chainID] = paraTool.parseAssetChain(xcmRec.originalKey)
-                let c = `('${assetUnparsed}', '${chainID}', '${xcmRec.extrinsicHash}')`
+                let c = `('${assetUnparsed}', '${chainID}', '${xcmRec.xcmInteriorKey}')`
                 xcmInteriorUpdates.push(c)
                 console.log(c)
             }
