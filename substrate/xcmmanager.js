@@ -12,6 +12,124 @@ module.exports = class XCMManager extends AssetManager {
 
     lastupdateTS = 0
 
+    async updateXcmInteriorOut(isRawAsset = false){
+        let xcmListRecs = await this.poolREADONLY.query("select relayChain, chainID, rawAsset, asset, xcmInteriorKey, count(*) cnt from xcmtransfer where xcmInteriorKey is not null group by chainID, rawAsset, asset, xcmInteriorKey, relaychain order by chainID, xcmInteriorKey;");
+        let xcmList = {};
+        for (let i = 0; i < xcmListRecs.length; i++) {
+            let rec = xcmListRecs[i]
+            let a = {
+                relayChain: rec.relayChain,
+                chainID: rec.chainID,
+                rawAsset: rec.rawAsset,
+                asset: rec.asset,
+                xcmInteriorKey: rec.xcmInteriorKey,
+                outKey: paraTool.makeAssetChain(rec.asset, rec.chainID),
+                outKey2: paraTool.makeAssetChain(rec.rawAsset, rec.chainID),
+                originalKey: null,
+                matched: false,
+                cnt: rec.cnt,
+            }
+            let k2 = (isRawAsset)? a.outKey: a.outKey2
+            xcmList[k2] = a
+        }
+        console.log(`xcmList len=${Object.keys(xcmList).length}`, xcmList)
+
+        let chainAssetList = {}
+        let assetList = {};
+        let assetRecs = await this.poolREADONLY.query("select chainID, asset, assetname, symbol, decimals, xcmInteriorKey from asset where assetType = 'Token' and symbol is not null");
+        for (let i = 0; i < assetRecs.length; i++) {
+            let rec = assetRecs[i]
+            let a = {
+                chainID: rec.chainID,
+                asset: rec.asset,
+                assetname: rec.assetname,
+                symbol: rec.symbol,
+                decimals: rec.decimals,
+                xcmInteriorKey: rec.xcmInteriorKey,
+                originalKey: paraTool.makeAssetChain(rec.asset, rec.chainID)
+            }
+            let k1 = a.originalKey
+            let chainID = a.chainID
+            assetList[k1] = a
+            if (chainAssetList[chainID]== undefined) chainAssetList[chainID] = []
+            chainAssetList[chainID].push(a)
+        }
+        //console.log(`assetList len=${Object.keys(assetList).length}`, assetList)
+        //console.log(`chainAssetList len=${Object.keys(chainAssetList).length}`, chainAssetList)
+        for (const chainID of Object.keys(chainAssetList)){
+            console.log(`${chainID} len=${chainAssetList[chainID].length}`, chainAssetList[chainID])
+        }
+
+        let exactMatch = {}
+        let noMatch = {}
+
+        for (const k2 of Object.keys(xcmList)){
+            let xcmRec = xcmList[k2]
+
+            if (assetList[k2] != undefined){
+                let aRec = assetList[k2]
+                aRec.xcmInteriorKey = xcmRec.xcmInteriorKey
+                xcmRec.originalKey = aRec.originalKey
+                xcmRec.matched = true
+                console.log(`exact match ${k2}`)
+                assetList[k2] = aRec
+                xcmList[k2] = xcmRec
+                exactMatch[k2] = xcmRec
+            }else{
+                //console.log(`no match on ${k2}...`)
+                let chainSpecificAssetList = chainAssetList[xcmRec.chainID]
+                let chainSpecificRelayChain = paraTool.getRelayChainByChainID(xcmRec.chainID)
+                let recoveredMatch = false
+                for (const chainSpecificAsset of chainSpecificAssetList){
+                    let aRecSymbol = paraTool.toUSD(chainSpecificAsset.symbol, chainSpecificRelayChain) // standardized ?
+                    let aRecSymbolAsset = JSON.stringify({Token:aRecSymbol})
+                    let recoveredKey = paraTool.makeAssetChain(aRecSymbolAsset, chainSpecificAsset.chainID) //k3
+                    if (k2 == recoveredKey){
+                        console.log(`recovered match ${k2} -> ${chainSpecificAsset.originalKey}`)
+                        chainSpecificAsset.xcmInteriorKey = xcmRec.xcmInteriorKey
+                        xcmRec.originalKey = chainSpecificAsset.originalKey
+                        xcmRec.matched = true
+                        assetList[chainSpecificAsset.originalKey] = chainSpecificAsset
+                        xcmList[k2] = xcmRec
+                        exactMatch[k2] = xcmRec
+                        recoveredMatch = true
+                        continue
+                    }
+                }
+                if (!recoveredMatch){
+                    console.log(`no match on ${k2} using recoveredKey`)
+                }
+            }
+        }
+
+        let xcmInteriorUpdates = []
+        for (const k2 of Object.keys(xcmList)){
+            let xcmRec = xcmList[k2]
+            if (!xcmRec.matched){
+                noMatch[k2] = xcmRec
+            }else{
+                //["asset", "chainID"] + ["xcmInteriorKey"]
+                let [assetUnparsed, chainID] = paraTool.parseAssetChain(xcmRec.originalKey)
+                let c = `('${assetUnparsed}', '${chainID}', '${xcmRec.xcmInteriorKey}')`
+                xcmInteriorUpdates.push(c)
+                console.log(c)
+            }
+        }
+        console.log(`exactMatch len=${Object.keys(exactMatch).length}`, exactMatch)
+        console.log(`noMatch len=${Object.keys(noMatch).length}`, noMatch)
+        let sqlDebug = true
+        let xcmInteriorKeyVal = ["xcmInteriorKey"]
+        await this.upsertSQL({
+            "table": `asset`,
+            "keys": ["asset", "chainID"],
+            "vals": xcmInteriorKeyVal,
+            "data": xcmInteriorUpdates,
+            "replace": xcmInteriorKeyVal,
+        }, sqlDebug);
+
+    }
+
+
     // xcmtransfer_match matches cross transfers between SENDING events held in "xcmtransfer"  and CANDIDATE destination events (from various xcm received messages on a destination chain)
     // this will be phased out soon
     async xcmtransfer_match(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200) {

@@ -788,9 +788,9 @@ from chain where chainID = '${chainID}' limit 1`);
                 types: typesDef.pontemDefinitions.types,
                 rpc: typesDef.pontemDefinitions.rpc
             });
-        } else if (chainID == paraTool.chainIDUnique) {
+        } else if (chainID == paraTool.chainIDUnique && false) {
             // https://github.com/UniqueNetwork/unique-types-js/tree/fe923e4112ec03f8c8c680cc043da69ef33efa27
-            const typesDef = require("@unique-nft/types");
+            const typesDef = require("@unique-nft/unique-mainnet-types"); // problematic dependency
             api = await ApiPromise.create({
                 provider: provider,
                 types: typesDef

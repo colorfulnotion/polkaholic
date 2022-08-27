@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+ // Usage:  xcmmatch [lookbackDays]
+var XCMManager = require("./xcmmanager");
+
+async function main() {
+    let lookbackDays = 1;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            lookbackDays = parseInt(val, 10);
+        }
+    });
+    var manager = new XCMManager();
+    await manager.updateXcmInteriorOut(true)
+    await manager.updateXcmInteriorOut(false)
+}
+
+
+main()
+    .then(() => {
+        console.log("finishing...")
+
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
