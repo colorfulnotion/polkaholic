@@ -515,6 +515,9 @@ function getParaIDExtra(relaychain = 'polkadot') {
         case 'moonbase-relay':
             return 60000
             break;
+        case 'shibuya-relay':
+            return 80000
+            break;
         default:
             //unknown
             return 90000
@@ -541,6 +544,8 @@ function getRelayChainByChainID(chainID = 0) {
             return 'rococo';
         case 6:
             return 'moonbase-relay';
+        case 8:
+            return 'shibuya-relay';
         default:
             return 'unknown';
     }
@@ -564,6 +569,9 @@ function getRelayChainID(relaychain = 'polkadot') {
         case 'moonbase-relay':
             return 60000
             break;
+        case 'shibuya-relay':
+            return 80000
+            break;
         default:
             return 90000
             break;
@@ -577,7 +585,7 @@ function getChainIDFromParaIDAndRelayChain(paraID, relayChain = 'polkadot') {
 
 function getParaIDfromChainID(chainID) {
     let paraID;
-    if (chainID == 0 || chainID == 2 || chainID == 30000 || chainID == 40000 || chainID == 60000) {
+    if (chainID == 0 || chainID == 2 || chainID == 30000 || chainID == 40000 || chainID == 60000 || chainID == 80000) {
         paraID = 0
     } else {
         paraID = chainID % 10000
@@ -795,6 +803,9 @@ module.exports = {
     chainIDLaminar: 11,
     chainIDMoonbase: 61000,
     chainIDMoonbaseRelay: 60000,
+
+    chainIDShibuya: 81000, //TODO: (Q:where is shibuya relay?)
+    chainIDShibuyaRelay: 80000,
 
     // polkadot/kusama
     chainIDPolkadot: 0,

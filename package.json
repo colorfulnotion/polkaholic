@@ -18,6 +18,7 @@
     "@phala/typedefs": "^0.2.30",
     "@plasm/types": "^1.5.4-3",
     "@polkadot/api": "^8.3.1",
+    "@polkadot/api-contract": "^9.2.3",
     "@polkadot/keyring": "^9.1.1",
     "@polkadot/types": "^8.3.1",
     "@polkadot/util": "^9.1.1",
