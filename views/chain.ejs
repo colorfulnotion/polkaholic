@@ -14,9 +14,9 @@
 <%
 let tabs = [
 { title: "Recent Blocks", target: "recentblocks" },
+{ title: "XCM Assets", target: "xcmassets", func: "showxcmassets" },
 { title: "XCM Transfers", target: "xcmtransfers" },
 { title: "XCM Messages", target: "xcmmessages" },
-{ title: "Top Assets", target: "assets" },
 { title: "Daily Log", target: "chainlog" },
 { title: "Spec Versions", target: "specversions" },
 { title: "Chain Info", target: "chaininfo" }
@@ -97,19 +97,17 @@ for (let i=0; i<tabs.length; i++) {
     </table>
 </div>
 
-<div class="tab-pane" id="assets" role="tabpanel" aria-labelledby="assets-tab">
-<table id="tableassets" class="display" style='width: 100%'>
+<div class="tab-pane" id="xcmassets" role="tabpanel" aria-labelledby="xcmassets-tab">
+<table id="tablexcmassets" class="display" style='width: 100%'>
   <thead>
     <tr>
       <th scope="col">Asset</th>
-      <th scope="col">Decimals</th>
-      <th scope="col">AssetType</th>
+      <th scope="col">Chain-Specific Holdings</th>
+      <th scope="col">CurrencyID</th>
       <th scope="col"># Holders</th>
       <th scope="col">Price</th>
       <th scope="col">Total Free</th>
       <th scope="col">TVL</th>
-      <th scope="col">Your # Tokens</th>
-      <th scope="col">Your Balance USD</th>
     </tr>
   </thead>
 </table>
@@ -237,7 +235,8 @@ var chainID = '<%- chainID; %>';
 var id = '<%- id; %>';
 var address = '<%- address; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
-
+var account = <%- JSON.stringify(account); %>;
 </script>
-<script src="/chain.js"></script>
 <script src="/chainui.js"></script>
+<script src="/chain.js"></script>
+

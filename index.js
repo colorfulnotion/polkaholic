@@ -299,7 +299,7 @@ app.get('/verify/', async (req, res) => {
 	console.log("verify GET ERR", err);
         return res.status(400).json({
             error: err.toString()
-        }); 
+        });
     }
 })
 */
@@ -505,12 +505,16 @@ async function handleChains(req, res) {
     try {
         var relaychain = req.params.relaychain ? req.params.relaychain : "";
         var chains = await query.getChains();
+        var homePubkey = getHomePubkey(req);
+        let account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+
         let topNfilters = query.getAddressTopNFilters();
         res.render('chains', {
             chains: chains,
             chainInfo: query.getChainInfo(),
             relaychain: relaychain,
             topNfilters: topNfilters,
+            account: account,
             topN: "balanceUSD",
             apiUrl: '/chains',
             docsSection: "get-all-chains"
@@ -598,10 +602,12 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
         if (chain) {
             var blocks = await query.getChainRecentBlocks(chainID);
             var homePubkey = getHomePubkey(req);
+            let account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
             res.render('chain', {
                 blocks: blocks,
                 chainID: chainID,
                 address: homePubkey,
+		account: account,
                 id: id,
                 chainInfo: query.getChainInfo(chainID),
                 chain: chain,
@@ -1271,18 +1277,47 @@ app.get('/address/:address', async (req, res) => {
     }
 })
 
-app.get('/asset/:assetChain', async (req, res) => {
+// Shows a table of a specific symbol (eg KAR) with the # of holders on each chainID
+// along with (a) local pricing (if available)
+// (b) the users holdings on each chain [ keyed in by nativeAssetChain using accountrealtime ], and
+// (c) "XCM Transfer" button on each line which enables the user to move their assets from one chain to the other.
+// Any chain-specific asset links to /asset/:chainID/:assetOrCurrencyID.  Any chain mention links to /chain/:chainID_or_chainName#xcmassets
+app.get('/symbol/:symbol', async (req, res) => {
     try {
         let homePubkey = getHomePubkey(req);
-        let assetChain0 = req.params["assetChain"];
-        let assetChain = decodeURIComponent(assetChain0);
-        let asset = await query.getAsset(assetChain, homePubkey);
-
-        res.render('asset', {
-            asset: asset,
+        let symbol = req.params["symbol"];
+        let chains = await query.getSymbolAssets(symbol);
+        let account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+        res.render('symbol', {
+            symbol: symbol,
             chainInfo: query.getChainInfo(),
             address: homePubkey,
-            assetChain: assetChain,
+	    account: account,
+            chains: chains,
+            apiUrl: req.path,
+            docsSection: "get-symbol"
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/asset/:chainID/:currencyID', async (req, res) => {
+    try {
+        let homePubkey = getHomePubkey(req);
+        let chainID = req.params["chainID"];
+        let currencyID = decodeURIComponent(req.params["currencyID"]);
+	console.log("asset call", chainID, currencyID);
+        let asset = await query.getAsset(currencyID, chainID, homePubkey);
+	console.log(asset);
+        res.render('asset', {
+	    asset: asset,
+            currencyID: currencyID,
+            chainID: chainID,
+            chainInfo: query.getChainInfo(),
+            address: homePubkey,
             apiUrl: req.path,
             docsSection: "get-asset"
         });

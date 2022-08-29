@@ -400,10 +400,11 @@ app.get('/asset/pricefeed/:assetChain', async (req, res) => {
 })
 
 // Usage: https://api.polkaholic.io/asset/holders/0x89f52002e544585b42f8c7cf557609ca4c8ce12a%231285
-app.get('/asset/holders/:assetChain', async (req, res) => {
+app.get('/asset/holders/:chainID/:asset', async (req, res) => {
     try {
-        let assetChain = req.params["assetChain"];
-        let holders = await query.getAssetHolders(assetChain);
+        let asset = req.params["asset"];
+        let chainID = req.params["chainID"];
+        let holders = await query.getAssetHolders(chainID, asset);
         if (holders) {
             res.write(JSON.stringify(holders));
             await query.tallyAPIKey(getapikey(req));
@@ -419,11 +420,12 @@ app.get('/asset/holders/:assetChain', async (req, res) => {
 })
 
 // Usage: https://api.polkaholic.io/asset/related/0x89f52002e544585b42f8c7cf557609ca4c8ce12a%231285
-app.get('/asset/related/:assetChain/:homePubkey?', async (req, res) => {
+app.get('/asset/related/:chainID/:asset/:homePubkey?', async (req, res) => {
     try {
-        let assetChain = req.params["assetChain"];
+        let chainID = req.params["chainID"];
+        let asset = req.params["asset"];
         let homePubkey = req.params["homePubkey"] ? req.params["homePubkey"] : false;
-        let assetsRelated = await query.getAssetsRelated(assetChain, homePubkey);
+        let assetsRelated = await query.getAssetsRelated(chainID, asset, homePubkey);
         if (assetsRelated) {
             res.write(JSON.stringify(assetsRelated));
             await query.tallyAPIKey(getapikey(req));

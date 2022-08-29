@@ -468,7 +468,7 @@ module.exports = class Manager extends AssetManager {
         await this.update_batchedSQL();
     }
 
-    async updateChainlogNumAccountsActive(chainID = null, lookback = 100) {
+    async updateChainlogNumAccountsActive(chainID = null, lookback = 7) {
         await this.assetManagerInit();
 	let whereChain = ( chainID >= 0 ) ? ` and chainID = ${chainID}` : "";
 	let sql =`select UNIX_TIMESTAMP(logDT) as logTS, chainID from blocklog where logDT >= date_sub(Now(), interval ${lookback} DAY) and logDT < date_sub(Now(), interval 1 day) and  numAccountsActiveLastUpdateDT is null ${whereChain} order by rand() limit 20`;
@@ -592,7 +592,7 @@ module.exports = class Manager extends AssetManager {
 	await this.update_batchedSQL();
     }
 
-    async updateChainlogNumAddresses(chainID = null, lookback = 100) {
+    async updateChainlogNumAddresses(chainID = null, lookback = 7) {
         await this.assetManagerInit();
 	let whereChain = ( chainID >= 0 ) ? ` and chainID = ${chainID}` : "";
 	let sql =`select UNIX_TIMESTAMP(logDT) as logTS, chainID from blocklog where logDT >= date_sub(Now(), interval ${lookback} DAY) and logDT < date_sub(Now(), interval 1 day) and  numAddressesLastUpdateDT is null ${whereChain} order by rand() limit 20`;

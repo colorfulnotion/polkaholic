@@ -1,5 +1,4 @@
 var initrecentblocks = false;
-var initassets = false;
 var initchainlog = false;
 var initspecversions = false;
 var refreshIntervalMS = 5000;
@@ -223,130 +222,6 @@ function presentLoan(assetChain, assetString) {
     }
 }
 
-function showassets(chainID, address) {
-    if (initassets) return;
-    else initassets = true;
-    let pathParams = `chain/assets/${chainID}/${address}`
-
-    let tableName = '#tableassets'
-    var table = $(tableName).DataTable({
-        order: [
-            [3, "desc"]
-        ],
-        columnDefs: [{
-            "className": "dt-right",
-            "targets": [4, 5, 6, 7, 8]
-        }, {
-            "className": "dt-center",
-            "targets": [1, 2, 3]
-        }],
-        columns: [{
-            data: 'symbol',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-                    if (row.assetType == "ERC20LP") {
-                        return presentAssetPair(row.assetChain, row.symbol, row.token0, row.token1, row.token0Symbol, row.token1Symbol, chainID);
-                    } else if (row.assetType == "Loan") {
-                        return presentLoan(row.assetChain, row.asset);
-                    } else {
-                        return presentAsset(row.assetChain, row.symbol);
-                    }
-                }
-                return data;
-            }
-        }, {
-            data: 'decimals',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-                    if (row.assetType == "ERC20LP") {
-                        return row.token0Decimals + "/" + row.token1Decimals;
-                    } else {
-                        return data;
-                    }
-                }
-                return data;
-            }
-        }, {
-            data: 'assetType',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-                    return data;
-                }
-                return data;
-            }
-        }, {
-            data: 'numHolders',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-                    return presentNumber(data);
-                }
-                return data;
-            }
-        }, {
-            data: 'priceUSD',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-                    return currencyFormat(data);
-                }
-                return data;
-            }
-        }, {
-            data: 'totalFree',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-                    if (row.totalFree !== undefined) {
-                        return presentTokenCount(data);
-                    }
-                }
-                if (row.totalFree !== undefined) {
-                    return data;
-                } else {
-                    return 0;
-                }
-            }
-        }, {
-            data: 'tvl',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-                    if (row.tvl != undefined) {
-                        return currencyFormat(data);
-                    }
-                } else {
-                    if (row.tvl != undefined) {
-                        return data;
-                    }
-                }
-                return 0;
-            }
-        }, {
-            data: 'accountState',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-
-                    if (row.accountState !== undefined && row.accountState.free !== undefined) {
-                        return presentTokenCount(row.accountState.free);
-                    }
-                    return 0
-                }
-                return 0;
-            }
-        }, {
-            data: 'balanceUSD',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-
-                    if (row.accountState !== undefined && row.accountState.freeUSD !== undefined) {
-                        return currencyFormat(row.accountState.freeUSD);
-                    }
-                    return 0
-                }
-                return 0;
-            }
-        }]
-    });
-    loadData2(pathParams, tableName, true)
-}
-
 function showchaininfo(chainID) {
     // no datatable
 }
@@ -489,8 +364,8 @@ function showchainlog(chainID, address) {
 
 function showchaintab(hash) {
     switch (hash) {
-        case "#assets":
-            showassets(id, address);
+        case "#xcmassets":
+            showxcmassets(id, address);
             setupapidocs("chain", "assets", `${id}`);
             break;
         case "#xcmtransfers":

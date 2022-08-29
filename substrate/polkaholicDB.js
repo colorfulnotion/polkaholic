@@ -211,6 +211,7 @@ module.exports = class PolkaholicDB {
     }
 
     get_btTableRealtime() {
+
         return ["accountrealtime", this.btAccountRealtime];
     }
     get_btTableHistory() {
@@ -562,13 +563,15 @@ module.exports = class PolkaholicDB {
         await this.update_batchedSQL(sqlMax);
     }
 
-    // For internal API call: contains sensitive info
-    // TODO: external api should call getChains_external instead
     async getChains(crawling = 1, orderBy = "valueTransfersUSD7d DESC") {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, blocksCovered, blocksFinalized, symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS, unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numHolders, relayChain, totalIssuance, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL from chain where crawling = ${crawling} order by ${orderBy}`);
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, chain.chainName, blocksCovered, blocksFinalized, asset.symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS, 
+unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, 
+valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numAccountsActive, numAccountsActive7d, numAccountsActive30d, asset.numHolders, relayChain, totalIssuance, lastUpdateChainAssetsTS, 
+onfinalityID, onfinalityStatus, isEVM, chain.asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange 
+from chain  left join asset on chain.chainID = asset.chainID and chain.asset = asset.asset where crawling = ${crawling} order by ${orderBy}`);
         return (chains);
     }
-
+    
     async getChainsForAdmin(crawling = 1) {
         let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, symbol, iconUrl, relayChain, onfinalityID, onfinalityStatus, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, paraID from chain where crawling = ${crawling} order by chainID`);
         return (chains);
@@ -580,16 +583,20 @@ module.exports = class PolkaholicDB {
         return (chains[0]);
     }
 
-    // For external API call: senstive info are NOT returned
     async get_chains_external(crawling = 1) {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, CONCAT(UPPER(SUBSTRING(chainName,1,1)),LOWER(SUBSTRING(chainName,2))) AS chainName, upper(symbol) as symbol, unix_timestamp(lastFinalizedDT) as lastFinalizedTS, iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numXCMTransferIncoming, numXCMTransferIncoming7d, numXCMTransferIncoming30d, numXCMTransferOutgoing, numXCMTransferOutgoing7d, numXCMTransferOutgoing30d, valXCMTransferIncomingUSD, valXCMTransferIncomingUSD7d, valXCMTransferIncomingUSD30d, valXCMTransferOutgoingUSD, valXCMTransferOutgoingUSD7d, valXCMTransferOutgoingUSD30d, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numHolders, relayChain, totalIssuance, isEVM, blocksCovered, blocksFinalized, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL from chain where crawling = ${crawling} order by relayChain, id, chainID;`);
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, CONCAT(UPPER(SUBSTRING(chain.chainName,1,1)),LOWER(SUBSTRING(chain.chainName,2))) AS chainName, asset.symbol, unix_timestamp(lastFinalizedDT) as lastFinalizedTS, iconUrl, 
+numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, 
+numXCMTransferIncoming, numXCMTransferIncoming7d, numXCMTransferIncoming30d, numXCMTransferOutgoing, numXCMTransferOutgoing7d, numXCMTransferOutgoing30d, valXCMTransferIncomingUSD, valXCMTransferIncomingUSD7d, valXCMTransferIncomingUSD30d, valXCMTransferOutgoingUSD, 
+valXCMTransferOutgoingUSD7d, valXCMTransferOutgoingUSD30d, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, asset.numHolders, numAccountsActive, numAccountsActive7d, numAccountsActive30d, relayChain, totalIssuance, isEVM, blocksCovered, blocksFinalized, 
+crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, chain.asset, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange 
+from chain left join asset on chain.chainID = asset.chainID and chain.asset = asset.asset where crawling = ${crawling} order by relayChain, id, chainID;`);
         return (chains);
     }
 
     async getChain(chainID, withSpecVersions = false) {
         var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmRPC, evmRPCInternal, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus,
 numExtrinsics, numExtrinsics7d, numExtrinsics30d,
-numSignedExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d,
+numSignedExtrinsics, numSignedExtrinsics7d, numdfSignedExtrinsics30d,
 numTransfers, numTransfers7d, numTransfers30d,
 numEvents, numEvents7d, numEvents30d,
 numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d,

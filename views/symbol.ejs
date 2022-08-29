@@ -1,0 +1,59 @@
+<%- include('header', {chainInfo: chainInfo, title: "Asset"}); %>
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/chains#xcmassets">Polkaholic XCM Assets</a></li>
+    <li class="breadcrumb-item active" aria-current="page"><%= symbol; %></li>
+  </ol>
+</nav>
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" id="symbolTab" role="tablist">
+<%
+let tabs = [
+  { title: "Chains with Symbol", target: "chains" },
+];
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
+
+<!-- Tab panes -->
+<div class="tab-content">
+  <div class="tab-pane" id="chains" role="tabpanel" aria-labelledby="chains-tab">
+    <table id="tablechains" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Chain</th>
+          <th>Your Holdings</th>
+          <th>CurrencyID</th>
+          <th># Holders</th>
+          <th>Price</th>
+          <th>Total Free</th>
+          <th>TVL</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+</div>
+
+<script>
+var symbol = '<%- symbol; %>';
+var address = '<%- address; %>';
+let tabs = <%- JSON.stringify(tabs); %>;
+let account = <%- JSON.stringify(account); %>;
+let chains = <%- JSON.stringify(chains); %>;
+</script>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script src="/symbol.js"></script>

@@ -1,0 +1,58 @@
+<%- include('header', {chainInfo: chainInfo, title: "Account"}); %>
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" style="font-size:1rem" id="accountTab" role="tablist">
+<%
+let tabs = [
+{ title: "Overview", target: "overview" },
+{ title: "Code", target: "code" }
+];
+
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
+
+<!-- Tab panes -->
+<div class="tab-content">
+  <div class="tab-pane" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+
+<div class="card mb-3">
+  <div class="row g-0">
+    <div class="col-md-12  text-center">
+     <%- include('contractOverview', {contract: contract}); %>
+    </div>
+  </div>
+</div>
+
+  </div>
+  <div class="tab-pane" id="contract" role="tabpanel" aria-labelledby="contract-tab">
+  </div>
+
+</div>
+<script>
+var baseURL = '<%= config.baseURL; %>'
+let address = '<%= contract.address; %>';
+let tabs = <%- JSON.stringify(tabs); %>;
+let chainListStr = '<%= chainListStr; %>';
+let isEVM = 0;
+<% if ( canClaim ) { %>
+$('#btnClaim').on('click', function(e) {
+  var message = new Date().getTime() + "|" + account.address;
+  signMessageWithAccount(message);
+});
+<% } %>
+</script>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script src="/contract.js"></script>

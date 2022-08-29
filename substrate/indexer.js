@@ -6267,13 +6267,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             var ranges = [7, 30, 99999];
             for (const range of ranges) {
                 let f = (range > 9999) ? "" : `${range}d`;
-                let sql0 = `select sum(numTraces) as numTraces, sum(numExtrinsics) as numExtrinsics, sum(numEvents) as numEvents, sum(numTransfers) as numTransfers, sum(numSignedExtrinsics) as numSignedExtrinsics, sum(valueTransfersUSD) as valueTransfersUSD, sum(numTransactionsEVM) as numTransactionsEVM, sum(numReceiptsEVM) as numReceiptsEVM, sum(gasUsed) as gasUsed, sum(gasLimit) as gasLimit, sum(numEVMBlocks) as numEVMBlocks from blocklog where logDT >= date_sub(Now(),interval ${range} DAY) and chainID = ${chain.chainID}`
+                let sql0 = `select sum(numTraces) as numTraces, sum(numExtrinsics) as numExtrinsics, sum(numEvents) as numEvents, sum(numTransfers) as numTransfers, sum(numSignedExtrinsics) as numSignedExtrinsics, sum(valueTransfersUSD) as valueTransfersUSD, sum(numTransactionsEVM) as numTransactionsEVM, sum(numReceiptsEVM) as numReceiptsEVM, sum(gasUsed) as gasUsed, sum(gasLimit) as gasLimit, sum(numEVMBlocks) as numEVMBlocks, avg(numAccountsActive) as numAccountsActive, sum(numXCMTransfersIn) as numXCMTransferIncoming, sum(valXCMTransferIncomingUSD) as valXCMTransferIncomingUSD, sum(numXCMTransfersOut) as numXCMTransferOutgoing, sum(valXCMTransferOutgoingUSD) as valXCMTransferOutgoingUSD from blocklog where logDT >= date_sub(Now(),interval ${range} DAY) and chainID = ${chain.chainID}`
                 let stats = await this.poolREADONLY.query(sql0)
                 let out = [];
                 for (const s of stats) {
-                    out.push([`('${chain.chainID}', ${s.numTraces}, ${s.numExtrinsics}, ${s.numEvents}, ${s.numTransfers}, ${s.numSignedExtrinsics}, ${s.valueTransfersUSD}, ${s.numTransactionsEVM}, ${s.numReceiptsEVM}, ${s.gasUsed}, ${s.gasLimit}, ${s.numEVMBlocks})`])
+                    let valIncoming = s.valXCMTransferIncomingUSD ? s.valXCMTransferIncomingUSD : 0;
+		    let valOutgoing = s.valXCMTransferOutgoingUSD ? s.valXCMTransferOutgoingUSD: 0;
+                    out.push([`('${chain.chainID}', ${s.numTraces}, ${s.numExtrinsics}, ${s.numEvents}, ${s.numTransfers}, ${s.numSignedExtrinsics}, ${s.valueTransfersUSD}, ${s.numTransactionsEVM}, ${s.numReceiptsEVM}, ${s.gasUsed}, ${s.gasLimit}, ${s.numEVMBlocks}, ${s.numAccountsActive}, '${s.numXCMTransferIncoming}', '${valIncoming}', '${s.numXCMTransferOutgoing}', '${valOutgoing}')`])
                 }
-                let vals = [`numTraces${f}`, `numExtrinsics${f}`, `numEvents${f}`, `numTransfers${f}`, `numSignedExtrinsics${f}`, `valueTransfersUSD${f}`, `numTransactionsEVM${f}`, `numReceiptsEVM${f}`, `gasUsed${f}`, `gasLimit${f}`, `numEVMBlocks${f}`]
+                let vals = [`numTraces${f}`, `numExtrinsics${f}`, `numEvents${f}`, `numTransfers${f}`, `numSignedExtrinsics${f}`, `valueTransfersUSD${f}`, `numTransactionsEVM${f}`, `numReceiptsEVM${f}`, `gasUsed${f}`, `gasLimit${f}`, `numEVMBlocks${f}`, `numAccountsActive${f}`, `numXCMTransferIncoming${f}`, `valXCMTransferIncomingUSD${f}`, `numXCMTransferOutgoing${f}`, `valXCMTransferOutgoingUSD${f}`]
                 await this.upsertSQL({
                     "table": "chain",
                     "keys": ["chainID"],
@@ -6282,27 +6284,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     "replace": vals
                 });
             }
-            var ranges = [7, 30, 99999];
-            for (const range of ranges) {
-                let f = (range > 9999) ? "" : `${range}d`;
-                let out = [];
-                let sql0 = `select sum(numXCMTransfersIn) as numXCMTransferIncoming, sum(valXCMTransferIncomingUSD) as valXCMTransferIncomingUSD, sum(numXCMTransfersOut) as numXCMTransferOutgoing, sum(valXCMTransferOutgoingUSD) as valXCMTransferOutgoingUSD from blocklog where chainID = ${chain.chainID} and logDT >= DATE(date_sub(Now(),interval ${range} DAY))`
-                let stats0 = await this.poolREADONLY.query(sql0)
-                for (const s of stats0) {
-                    let valIncoming = s.valXCMTransferIncomingUSD ? s.valXCMTransferIncomingUSD : 0;
-		    let valOutgoing = s.valXCMTransferOutgoingUSD ? s.valXCMTransferOutgoingUSD: 0;
-                    out.push([`('${chain.chainID}', '${s.numXCMTransferIncoming}', '${valIncoming}', '${s.numXCMTransferOutgoing}', '${valOutgoing}')`])
-                }
-                let vals0 = [`numXCMTransferIncoming${f}`, `valXCMTransferIncomingUSD${f}`, `numXCMTransferOutgoing${f}`, `valXCMTransferOutgoingUSD${f}`]
-                await this.upsertSQL({
-                    "table": "chain",
-                    "keys": ["chainID"],
-                    "vals": vals0,
-                    "data": out,
-                    "replace": vals0
-                });
-            }
-
             this.batchedSQL.push(`update chain set lastUpdateChainAssetsTS = FROM_UNIXTIME(Now()) where chainID = ${chain.chainID}`);
             await this.update_batchedSQL(10.0);
             return (true);

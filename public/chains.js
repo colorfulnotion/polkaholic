@@ -23,6 +23,28 @@ function showchains() {
     }, refreshIntervalMS);
 }
 
+function get_accountBalanceOnChain(chainID, assetChain) {
+    try {
+	let balanceUSD = 0;
+	for ( let i = 0; i < account.chains.length; i++ ) {
+	    let c = account.chains[i];
+	    if ( c.chainID == chainID ) {
+		for (let j= 0; j < c.assets.length; j++) {
+		    let a = c.assets[j];
+		    if ( a.state.balanceUSD > 0 ) {
+			//console.log(a);
+			balanceUSD += a.state.balanceUSD;
+		    }
+		}
+	    }
+	}
+	return balanceUSD;
+    } catch (err) {
+	console.log(err);
+    }
+    return 0;
+}
+
 async function show_chains() {
     let pathParams = 'chains'
     let tableName = '#tablechains'
@@ -36,7 +58,7 @@ async function show_chains() {
             [0] id
             [1] blocksCovered
             [2] blocksFinalized
-            [3] numSignedExtrinsics 
+            [3] numSignedExtrinsics
             [4] numXCMTransfersIn
             [5] numXCMTransfersOut
             [6] relayChain
@@ -48,13 +70,14 @@ async function show_chains() {
             ],
             columnDefs: [{
                 "className": "dt-right",
-                "targets": [1, 2, 3, 4]
+                "targets": [2, 3, 4, 5, 6, 7]
             }, {
-                "targets": [5],
+                "targets": [8],
                 "visible": false
             }],
             order: [
-                [3, "desc"]
+                [2, "desc"],
+                [5, "desc"],
             ],
             columns: [{
                 data: 'id',
@@ -70,6 +93,37 @@ async function show_chains() {
                     return row.chainName;
                 }
             }, {
+		data: 'priceUSD',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        try {
+			    // show symbol + price (linking to /symbol/:symbol)
+			    let symbol = row.symbol;
+			    return `<a href='/symbol/${symbol}'>${symbol}</a> ` + currencyFormat(row.priceUSD);
+                        } catch {
+			    
+                            return "-"
+                        }
+                    }
+                    return data;
+                }
+	    }, {
+		data: 'balanceUSD',
+                render: function(data, type, row, meta) {
+                    try {
+			// show account holdings summary on chain (linking to /chain/:chain#assets)
+			let balanceUSD = get_accountBalanceOnChain(row.chainID);
+			if (type == 'display') {
+			    return currencyFormat(balanceUSD);
+                        } else {
+			    return balanceUSD;
+			}
+		    } catch {
+                        return "-"
+                    }
+                    return 0;
+                }
+	    }, {
                 data: 'blocksCovered',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
@@ -94,6 +148,18 @@ async function show_chains() {
                         }
                     }
                     return data;
+                }
+            }, {
+                data: 'numAccountsActive7d',
+                render: function(data, type, row, meta) {
+                    try {
+			if (type == 'display') {
+                            return presentNumber(data);
+                        }
+			return data;
+		    } catch {
+                            return "-"
+                    }
                 }
             }, {
                 data: 'numXCMTransferIncoming7d',
@@ -246,7 +312,11 @@ function showchainstab(hash) {
         case "#chains":
             setupapidocs("chains", "list");
             showchains();
-            break;
+        break;
+    case "#xcmassets":
+            setupapidocs("chains", "list");
+        showxcmassets(null, account);
+	break;
         case "#xcmtransfers":
             setupapidocs("xcmtransfers");
             showxcmtransfers();
@@ -286,6 +356,7 @@ function setuptabs(tabs) {
     }
     const triggerEl = document.querySelector('#chainsTab a[href="' + hash + '"]');
     if (triggerEl) {
+	console.log("SHOWING" , hash);
         mdb.Tab.getInstance(triggerEl).show();
     } else {
         console.log("missing tab:", hash);
