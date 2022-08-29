@@ -258,25 +258,29 @@ app.post('/login/', async (req, res) => {
 // Usage: https://polkaholic.io/verify
 app.post('/verify/', async (req, res) => {
     try {
-	let chains = await query.getChains();
-	let wsEndpoints = [];
-	for ( let i=0; i<chains.length; i++) {
-	    let c = chains[i];
-	    let endpoints = uiTool.getPublicWSEndpoints(c);
-	    if ( endpoints.length > 0 ) {
-		wsEndpoints.push({ id: c.id, chainID: c.chainID, WSEndpoint: endpoints[0] } );
-	    }
-	}
+        let chains = await query.getChains();
+        let wsEndpoints = [];
+        for (let i = 0; i < chains.length; i++) {
+            let c = chains[i];
+            let endpoints = uiTool.getPublicWSEndpoints(c);
+            if (endpoints.length > 0) {
+                wsEndpoints.push({
+                    id: c.id,
+                    chainID: c.chainID,
+                    WSEndpoint: endpoints[0]
+                });
+            }
+        }
         let verify = req.body.verify ? JSON.parse(req.body.verify) : {};
         let obj = req.body.obj ? JSON.parse(req.body.obj) : {};
         res.render('verify', {
-	    verify,
-	    wsEndpoints,
-	    obj,
+            verify,
+            wsEndpoints,
+            obj,
             chainInfo: query.getChainInfo()
         });
     } catch (err) {
-	console.log("verify POST ERR", err);
+        console.log("verify POST ERR", err);
         /*return res.status(400).json({
             error: err.toString()
         }); */
@@ -299,7 +303,7 @@ app.get('/verify/', async (req, res) => {
 	console.log("verify GET ERR", err);
         return res.status(400).json({
             error: err.toString()
-        }); 
+        });
     }
 })
 */
@@ -505,12 +509,16 @@ async function handleChains(req, res) {
     try {
         var relaychain = req.params.relaychain ? req.params.relaychain : "";
         var chains = await query.getChains();
+        var homePubkey = getHomePubkey(req);
+        let account = homePubkey ? await query.getAccountAssetsRealtimeByChain(null, homePubkey) : {};
+
         let topNfilters = query.getAddressTopNFilters();
         res.render('chains', {
             chains: chains,
             chainInfo: query.getChainInfo(),
             relaychain: relaychain,
             topNfilters: topNfilters,
+            account: account,
             topN: "balanceUSD",
             apiUrl: '/chains',
             docsSection: "get-all-chains"
@@ -598,10 +606,12 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
         if (chain) {
             var blocks = await query.getChainRecentBlocks(chainID);
             var homePubkey = getHomePubkey(req);
+            let account = homePubkey ? await query.getAccountAssetsRealtimeByChain(null, homePubkey) : "";
             res.render('chain', {
                 blocks: blocks,
                 chainID: chainID,
                 address: homePubkey,
+                account: account,
                 id: id,
                 chainInfo: query.getChainInfo(chainID),
                 chain: chain,
@@ -1271,18 +1281,47 @@ app.get('/address/:address', async (req, res) => {
     }
 })
 
-app.get('/asset/:assetChain', async (req, res) => {
+// Shows a table of a specific symbol (eg KAR) with the # of holders on each chainID
+// along with (a) local pricing (if available)
+// (b) the users holdings on each chain [ keyed in by nativeAssetChain using accountrealtime ], and
+// (c) "XCM Transfer" button on each line which enables the user to move their assets from one chain to the other.
+// Any chain-specific asset links to /asset/:chainID/:assetOrCurrencyID.  Any chain mention links to /chain/:chainID_or_chainName#xcmassets
+app.get('/symbol/:symbol', async (req, res) => {
     try {
         let homePubkey = getHomePubkey(req);
-        let assetChain0 = req.params["assetChain"];
-        let assetChain = decodeURIComponent(assetChain0);
-        let asset = await query.getAsset(assetChain, homePubkey);
+        let symbol = req.params["symbol"];
+        let chains = await query.getSymbolAssets(symbol);
+        let account = homePubkey ? await query.getAccountAssetsRealtimeByChain(null, homePubkey) : {};
+        res.render('symbol', {
+            symbol: symbol,
+            chainInfo: query.getChainInfo(),
+            address: homePubkey,
+            account: account,
+            chains: chains,
+            apiUrl: req.path,
+            docsSection: "get-symbol"
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/asset/:chainID/:currencyID', async (req, res) => {
+    try {
+        let homePubkey = getHomePubkey(req);
+        let chainID = req.params["chainID"];
+        let currencyID = decodeURIComponent(req.params["currencyID"]);
+
+        let asset = await query.getAsset(currencyID, chainID, homePubkey);
 
         res.render('asset', {
             asset: asset,
+            currencyID: currencyID,
+            chainID: chainID,
             chainInfo: query.getChainInfo(),
             address: homePubkey,
-            assetChain: assetChain,
             apiUrl: req.path,
             docsSection: "get-asset"
         });
@@ -1326,7 +1365,7 @@ app.get('/tx/:txhash', async (req, res) => {
             }
             let chain = await query.getChain(tx.chainID);
             res.render(txview, {
-		id: chain.id,
+                id: chain.id,
                 txHash: txHash,
                 tx: tx,
                 chain: chain,

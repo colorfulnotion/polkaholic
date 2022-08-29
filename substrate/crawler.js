@@ -1781,7 +1781,7 @@ create table talismanEndpoint (
                 let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
                 let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
                 let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
-		let fees = blockStats && blockStats.fees ? blockStats.fees : 0;
+                let fees = blockStats && blockStats.fees ? blockStats.fees : 0;
                 let eflds = "";
                 let evals = "";
                 let eupds = "";
@@ -2003,8 +2003,8 @@ create table talismanEndpoint (
                             let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
                             let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
                             let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
-			    let fees = blockStats && blockStats.fees ? blockStats.fees : 0
-			    
+                            let fees = blockStats && blockStats.fees ? blockStats.fees : 0
+
                             sql = `insert into block${chainID} (blockNumber, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, fees, lastTraceDT) values ('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS})) on duplicate key update lastTraceDT=values(lastTraceDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), fees = values(fees)`;
                             this.batchedSQL.push(sql);
 

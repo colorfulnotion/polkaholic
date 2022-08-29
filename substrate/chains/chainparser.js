@@ -1687,7 +1687,7 @@ module.exports = class ChainParser {
         let dest = evetnData[3] //XcmV1MultilocationJunctions
         let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
         if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
-        if (chainIDDest == -1 || paraIDDest == -1){
+        if (chainIDDest == -1 || paraIDDest == -1) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
             return
         }
@@ -1775,7 +1775,7 @@ module.exports = class ChainParser {
 
     }
 
-    processDest(dest, relayChain){
+    processDest(dest, relayChain) {
         let paraIDDest = -1;
         let chainIDDest = -1;
         let destAddress = null;
@@ -1877,7 +1877,7 @@ module.exports = class ChainParser {
                 let paraID = paraTool.getParaIDfromChainID(indexer.chainID)
                 let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
-                if (chainIDDest == -1 || paraIDDest == -1){
+                if (chainIDDest == -1 || paraIDDest == -1) {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
                     return
                 }
@@ -1985,7 +1985,7 @@ module.exports = class ChainParser {
 
                 let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
-                if (chainIDDest == -1 || paraIDDest == -1){
+                if (chainIDDest == -1 || paraIDDest == -1) {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
                     return
                 }

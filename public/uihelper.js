@@ -94,17 +94,17 @@ function presentInstructions(msg, id, hdr = "Instructions", verify = null, width
 
 function verifyExec(id, verify, obj) {
     console.log("verifyExec", id, "obj", obj, "verify", verify)
-    if ( verify ) {
-	// https://stackoverflow.com/questions/3951768/window-open-and-pass-parameters-by-post-method
-	window.open('', `VW${id}`);
-	var f = document.getElementById(`verifyForm${id}`);
-	if ( f ) {
-	    f[`verify`].value = JSON.stringify(verify);
-	    f[`obj`].value = JSON.stringify(obj);
-	    document.getElementById(`verifyForm${id}`).submit();
-	} else {
-	    console.log(`verifyForm${id} not found`);
-	}
+    if (verify) {
+        // https://stackoverflow.com/questions/3951768/window-open-and-pass-parameters-by-post-method
+        window.open('', `VW${id}`);
+        var f = document.getElementById(`verifyForm${id}`);
+        if (f) {
+            f[`verify`].value = JSON.stringify(verify);
+            f[`obj`].value = JSON.stringify(obj);
+            document.getElementById(`verifyForm${id}`).submit();
+        } else {
+            console.log(`verifyForm${id} not found`);
+        }
     }
 }
 
@@ -140,13 +140,13 @@ function presentJSONObject(obj, id, verify = null) {
     });
     document.getElementById(renderjsonID).appendChild(renderjson.set_show_to_level(3)(obj));
     document.getElementById(jsontableID).innerHTML = JSONToHTMLTable(obj);
-    if ( verify ) {
-	$(`#${verifyAButtonID}`).on('click', function(e) {
-	    verifyExec(id, verify, obj);
-	});
-	$(`#${verifyBButtonID}`).on('click', function(e) {
-	    verifyExec(id, verify, obj);
-	});
+    if (verify) {
+        $(`#${verifyAButtonID}`).on('click', function(e) {
+            verifyExec(id, verify, obj);
+        });
+        $(`#${verifyBButtonID}`).on('click', function(e) {
+            verifyExec(id, verify, obj);
+        });
     }
 }
 
@@ -1441,12 +1441,11 @@ function presentVerifyExtrinsic(id, blockNumber, extrinsicID, extrinsicHash, par
 }
 
 function presentVerifyEvent(id, blockNumber, eventID, params = null) {
-     // TODO: add params
+    // TODO: add params
     return `<a class="btn btn-sm text-capitalize" href="javascript:verifyEvent('${id}', '${blockNumber}', '${eventID}')">${verifyIcon()}</a>`;
 }
 
 function presentVerifyBlock(id, blockNumber, params = null) {
-     // TODO: add params
+    // TODO: add params
     return `<a class="btn btn-sm text-capitalize" href="javascript:verifyBlock('${id}', '${blockNumber}')">${verifyIcon()}</a>`;
 }
-

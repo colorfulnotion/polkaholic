@@ -13,8 +13,9 @@
 <%
 let tabs = [
 { title: "Chains", target: "chains", func: "showchains", stopfunc: "stopxcmtransfers" },
-{ title: "XCM Transfers", target: "xcmtransfers", func: "showxcmtransfers", stopfunc: "stopchains" },
-{ title: "XCM Messages", target: "xcmmessages", func: "showxcmmessages", stopfunc: "stopchains" },
+{ title: "XCM Assets", target: "xcmassets", func: "showxcmassets" },
+{ title: "XCM Transfers", target: "xcmtransfers", func: "showxcmtransfers" },
+{ title: "XCM Messages", target: "xcmmessages", func: "showxcmmessages" },
 { title: "Top Accounts", target: "addresstopn", func: "showaddresstopn" }
 ];
 
@@ -40,14 +41,36 @@ for (let i=0; i<tabs.length; i++) {
       <thead>
         <tr>
           <th>Chain</th>
+          <th>Symbol/Price</th>
+          <th>Your Holdings</th>
           <th>Latest Block</th>
           <th>Latest Finalized</th>
+          <th>Avg DAU (7d)</th>
           <th>XCM Transfers In (7d)</th>
           <th>XCM Transfers Out (7d)</th>
+          <th>Relay</th>
         </tr>
       </thead>
     </table>
   </div>
+
+  <div class="tab-pane" id="xcmassets" role="tabpanel" aria-labelledby="xcmassets-tab">
+    <table id="tablexcmassets" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th scope="col">Asset</th>
+          <th scope="col">Holdings</th>
+          <th scope="col">Chain</th>
+          <th scope="col"># Holders</th>
+          <th scope="col">Price</th>
+          <th scope="col">Total Free</th>
+          <th scope="col">TVL</th>
+          <th scope="col">Relay Chain</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+
   <div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
     <table id="tablexcmtransfers" class="display" style='width: 100%'>
       <thead>
@@ -83,7 +106,7 @@ for (let i=0; i<tabs.length; i++) {
   </div>
   <div class="tab-pane" id="addresstopn" role="tabpanel" aria-labelledby="addresstopn-tab">
     <select class="select" id="topN">
-        <% for ( const f of topNfilters ) { 
+        <% for ( const f of topNfilters ) {
 	   let sel = ( f.filter == topN ) ? " SELECTED" : ""; %>
 	     <option value="<%= f.filter %>"<%= sel; %>><%= f.display; %></option>
 	<% } %>
@@ -107,9 +130,7 @@ for (let i=0; i<tabs.length; i++) {
 var relaychainfilter = "";
 var topNfilters = <%- JSON.stringify(topNfilters) %>;
 let tabs = <%- JSON.stringify(tabs); %>;
-$(document).ready(function() {
-//    setchainfilter("<%= relaychain %>");
-});
+let account = <%- JSON.stringify(account); %>;
 </script>
 <script src="/chains.js"></script>
 <script src="/chainui.js"></script>

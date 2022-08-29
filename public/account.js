@@ -58,7 +58,7 @@ function showextrinsics(address, chainListStr = 'all') {
                             let s = presentTxHash(row.transactionHash);
                             return `${presentChain(row.id, row.chainName)} (${s})`
                         } else {
-                            console.log(row);
+                            // console.log(row);
                         }
                     } catch (e) {
                         console.log(e);
@@ -98,8 +98,14 @@ function showextrinsics(address, chainListStr = 'all') {
                     let out = "";
                     if (row.method !== undefined && row.extrinsicHash !== undefined) {
                         try {
-                            return presentInstructions(JSON.stringify(row.params), "e" + row.extrinsicHash, "Params", {verification: "extrinsic", obj: row.params, id: row.id, extrinsicID: row.extrinsicID, extrinsicHash: row.extrinsicHash});
-			} catch (e) {
+                            return presentInstructions(JSON.stringify(row.params), "e" + row.extrinsicHash, "Params", {
+                                verification: "extrinsic",
+                                obj: row.params,
+                                id: row.id,
+                                extrinsicID: row.extrinsicID,
+                                extrinsicHash: row.extrinsicHash
+                            });
+                        } catch (e) {
                             console.log(e);
                         }
                     } else if (row.decodedInput !== undefined && row.transactionHash !== undefined && row.decodedInput.params !== undefined) {
@@ -198,7 +204,7 @@ function showevmtxs(address, chainListStr = 'all') {
                             let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
                             return `Substrate ${presentChain(row.id, row.chainName)} (${s})`
                         } else {
-                            console.log(row);
+                            //console.log(row);
                         }
                     } catch (e) {
                         console.log(row);
@@ -497,8 +503,11 @@ function showtransfers(address, chainListStr = 'all') {
                             val = `${row.rawAmount} Asset (decimal unknown)`
                         }
                     }
-		    console.log(row);
-                    return presentInstructions(JSON.stringify(row.data), "e" + row.eventID, val, {verification: "event", id: row.id, eventID: row.eventID});
+                    return presentInstructions(JSON.stringify(row.data), "e" + row.eventID, val, {
+                        verification: "event",
+                        id: row.id,
+                        eventID: row.eventID
+                    });
                 } catch (e) {
                     return "";
                 }

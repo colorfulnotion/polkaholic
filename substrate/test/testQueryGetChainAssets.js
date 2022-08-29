@@ -7,14 +7,18 @@ async function main() {
     let debugLevel = 0
     var query = new Query(debugLevel);
     await query.init();
-    let chainID = ParaTool.chainIDKarura;
+    let chainID = ParaTool.chainIDPolkadot;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = parseInt(val, 10);
         }
     });
-    var a = await query.getChainAssets(chainID);
-    console.log(JSON.stringify(a));
+    let address = "";
+    var chainassets = await query.getChainAssets(chainID, address);
+    console.log(JSON.stringify(chainassets));
+
+    var symbolassets = await query.getSymbolAssets("DOT", address);
+    console.log(JSON.stringify(symbolassets));
 }
 
 main()

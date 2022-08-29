@@ -646,7 +646,6 @@ module.exports = class Query extends AssetManager {
     }
 
     getChainInfo(chainID = paraTool.chainIDPolkadot) {
-        // TODO: fill in stub -- use ChainID to get from data structure created in init
         return this.getChainFullInfo(chainID)
     }
 
@@ -1402,24 +1401,25 @@ module.exports = class Query extends AssetManager {
         return (false);
     }
 
-    async getAssetQuery(assetChain, queryType = "pricefeed", homeAddress = false, querylimit = 3000) {
+    async getAssetQuery(chainID, asset, queryType = "pricefeed", homeAddress = false, querylimit = 3000) {
         switch (queryType) {
             case "pricefeed":
                 if (querylimit > 3000) querylimit = 3000
-                return await this.getAssetPriceFeed(assetChain, querylimit)
+                return await this.getAssetPriceFeed(chainID, asset, querylimit)
             case "holders":
                 if (querylimit > 3000) querylimit = 1000
-                return await this.getAssetHolders(assetChain, querylimit)
+                return await this.getAssetHolders(chainID, asset, querylimit)
             case "related":
                 if (querylimit > 3000) querylimit = 100
-                return await this.getAssetsRelated(assetChain, homeAddress = false, querylimit)
+                return await this.getAssetsRelated(chainID, asset, homeAddress = false, querylimit)
             default:
                 return false;
                 break;
         }
     }
 
-    async getAssetPriceFeed(assetChain, limit = 3000) {
+    async getAssetPriceFeed(chainID, asset, limit = 3000) {
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
         if (this.assetInfo[assetChain] == undefined) {
             throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
         }
@@ -1527,8 +1527,8 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-
-    async getAssetHolders(assetChain, limit = 1000) {
+    async getAssetHolders(chainID, asset, limit = 1000) {
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
         if (this.assetInfo[assetChain] == undefined) {
             throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
         }
@@ -1537,7 +1537,6 @@ module.exports = class Query extends AssetManager {
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
             let sql = `select holder, free, reserved, miscFrozen, frozen  from assetholder${chainID} where asset = '${asset}' ${w} order by free desc limit ${limit}`
             let holders = await this.poolREADONLY.query(sql);
-
             let ts = this.currentTS();
             for (let i = 0; i < holders.length; i++) {
                 holders[i].free = parseFloat(holders[i].free);
@@ -1572,20 +1571,19 @@ module.exports = class Query extends AssetManager {
 
     }
 
-    async getAsset(assetChain, address = false, limit = 20) {
+    async getAsset(currencyID, chainID, address = false) {
         try {
-            let [asset, chainID] = paraTool.parseAssetChain(assetChain)
-            let assets = await this.poolREADONLY.query(`select asset.*, chain.chainName from asset, chain where asset.asset = '${asset}' and asset.chainID = chain.chainID and asset.numHolders > 0 order by asset.numHolders desc limit ${limit}`);
-            let realtime = (address) ? await this.getRealtimeAsset(address) : false;
-
-            for (let i = 0; i < assets.length; i++) {
-                let a = assets[i];
-                let accountState = this.getHoldingsState(realtime, a.asset, a.chainID);
-                if (accountState !== undefined) {
-                    assets[i].accountState = this.getHoldingsState(realtime, a.asset, a.chainID);
-                }
+            let assets = await this.poolREADONLY.query(`select asset.* from asset where chainID = '${chainID}' and currencyID = '${currencyID}' order by numHolders desc limit 1`);
+            if (assets.length == 0) {
+                throw new paraTool.InvalidError(`Invalid currencyID: ${currencyID}`)
             }
-            return (assets);
+            let chainInfo = this.chainInfos[chainID];
+            let [__, id] = this.convertChainID(chainID)
+            let chainName = this.getChainName(chainID);
+            assets[0].id = id;
+            assets[0].chainName = chainName;
+            assets[0].iconUrl = chainInfo.iconUrl;
+            return (assets[0]);
         } catch (err) {
             this.logger.error({
                 "op": "query.getAsset",
@@ -1609,7 +1607,8 @@ module.exports = class Query extends AssetManager {
         return (undefined);
     }
 
-    async getAssetsRelated(assetChain, address = false, limit = 100) {
+    async getAssetsRelated(chainID, asset, address = false, limit = 100) {
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
         if (this.assetInfo[assetChain] == undefined) {
             throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
         }
@@ -1651,31 +1650,116 @@ module.exports = class Query extends AssetManager {
         return (assets);
     }
 
-    async getChainAssets(chainID_or_chainName, address = false) {
-        let [chainID, id] = this.convertChainID(chainID_or_chainName)
-        if (chainID === false) throw new NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
-        let chain = await this.getChain(chainID)
+    async getSymbolAssets(symbol, address = false) {
+        let sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.symbol as localSymbol, asset.chainName, asset.currencyID, numHolders, totalFree from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey and xcmasset.symbol = '${symbol}' order by numHolders desc;`
+        let assets = await this.poolREADONLY.query(sql)
+        if (assets.length == 0) {
+            throw new NotFoundError(`Invalid symbol: ${symbol}`)
+        }
+
+        let holdings = null
+        try {
+            holdings = (this.validAddress(address)) ? await this.getRealtimeAsset(address) : false;
+        } catch (err) {
+            // its ok to have an miss here, no need to log it
+        }
+        console.log("holdings", address, holdings);
+        let ts = this.getCurrentTS();
+        for (let i = 0; i < assets.length; i++) {
+            let v = assets[i];
+            let [__, id] = this.convertChainID(v.chainID)
+            let chainName = this.getChainName(v.chainID);
+            let a = {
+                assetType: v.assetType,
+                assetName: v.assetName,
+                numHolders: v.numHolders,
+                asset: v.asset,
+                symbol: v.symbol,
+                decimals: v.decimals,
+                chainID: v.chainID,
+                chainName: v.chainName,
+                currencyID: v.currencyID,
+                id,
+                chainName,
+                localSymbol: v.localSymbol,
+                priceUSD: 0,
+                tvl: 0
+            };
+            let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, v.chainID, ts);
+            a.priceUSD = priceUSDCurrent;
+            if (a.priceUSD == null) a.priceUSD = 0
+            if (a.totalFree == null) a.totalFree = 0
+            a.totalFree = parseFloat(v.totalFree)
+            a.tvl = a.priceUSD * a.totalFree
+
+            let assetType = (a.assetType) ? a.assetType : false;
+            if (holdings[assetType] !== undefined) {
+                let h = holdings[assetType];
+                console.log("H", h);
+                for (let j = 0; j < h.length; j++) {
+                    let b = h[j];
+                    if ((b.assetInfo.asset == a.asset) && (b.assetInfo.chainID == a.chainID)) {
+                        a.accountState = b.state;
+                    }
+                }
+            }
+            assets[i] = a
+        }
+        return assets;
+    }
+
+    async getChainAssets(chainID_or_chainName = "all", address = false) {
+        var chainID = null,
+            id = null,
+            chain = {};
+        if (chainID_or_chainName == "all") {
+
+        } else {
+            [chainID, id] = this.convertChainID(chainID_or_chainName)
+            if (chainID === false) throw new NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
+            chain = await this.getChain(chainID)
+        }
         let assets = [];
         let holdings = null
         try {
             holdings = (this.validAddress(address)) ? await this.getRealtimeAsset(address) : false;
         } catch (err) {
-            // its ok to have an error, no need to log it
+            // its ok to have an miss here, no need to log it
         }
+
         try {
-            var sql = `select assetType, assetName, numHolders, asset, chainID, priceUSD, symbol, decimals, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply from asset where assetType not in ('Unknown', 'NFT') and chainID = '${chainID}' and numHolders > 0 order by numHolders desc, asset limit 500`
+            let w = "";
+            // get xcmassets of a chain or relaychain
+            if (chainID == null) {
+                // no restriction
+            } else if (chainID == 0) {
+                w = "and xcmasset.relayChain = 'polkadot'";
+            } else if (chainID == 2) {
+                w = "and xcmasset.relayChain = 'kusama'";
+            } else if (chainID > 2) {
+                w = `and asset.chainID = ${chainID}`
+            }
+
+            let sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w}  order by numHolders desc;`
+            console.log(sql);
             assets = await this.poolREADONLY.query(sql);
+            if (assets.length == 0) {
+                // TODO: throw NotFound error
+            }
+
             let ts = this.getCurrentTS();
             for (let i = 0; i < assets.length; i++) {
                 let v = assets[i];
                 let a = {};
-                let assetChain = paraTool.makeAssetChain(v.asset, chainID);
-
+                let assetChain = paraTool.makeAssetChain(v.asset, v.chainID);
+                let [__, id] = this.convertChainID(v.chainID)
+                let chainName = this.getChainName(v.chainID);
                 if (v.assetType == 'LiquidityPair' || v.assetType == 'ERC20LP') { //'ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special'
                     a = {
                         assetType: v.assetType,
                         assetName: v.assetName,
                         numHolders: v.numHolders,
+                        id,
                         asset: v.asset,
                         symbol: v.symbol,
                         token0: v.token0,
@@ -1709,7 +1793,11 @@ module.exports = class Query extends AssetManager {
                         symbol: v.symbol,
                         decimals: v.decimals,
                         chainID: v.chainID,
-                        chainName: v.chainName,
+                        chainName,
+                        id,
+                        currencyID: v.currencyID,
+                        localSymbol: v.localSymbol,
+                        relayChain: v.relayChain,
                         assetChain: assetChain,
                         priceUSD: 0,
                         tvl: 0
@@ -2560,7 +2648,7 @@ module.exports = class Query extends AssetManager {
                     iconUrl = this.chainInfos[chainID].iconUrl;
                     subscanURL = this.chainInfos[chainID].subscanURL;
                     dappURL = this.chainInfos[chainID].dappURL;
-		    WSEndpoint = this.chainInfos[chainID].WSEndpoint;
+                    WSEndpoint = this.chainInfos[chainID].WSEndpoint;
                 }
                 chainsMap[chainID] = {
                     chainID,
@@ -2571,7 +2659,7 @@ module.exports = class Query extends AssetManager {
                     iconUrl,
                     subscanURL,
                     dappURL,
-		    WSEndpoint,
+                    WSEndpoint,
                     assets: [],
                     balanceUSD: 0
                 };
@@ -3568,6 +3656,7 @@ module.exports = class Query extends AssetManager {
         }
         var hrstart = process.hrtime()
         try {
+            console.log("reading: ", rawAddress);
             let [tblName, tblRealtime] = this.get_btTableRealtime()
             const filter = [{
                 column: {
@@ -3578,7 +3667,8 @@ module.exports = class Query extends AssetManager {
                 ],
                 limit: maxRows
             }];
-            const [row] = await this.tblRealtime.row(address).get({
+
+            const [row] = await tblRealtime.row(address).get({
                 filter
             });
 
@@ -3618,6 +3708,7 @@ module.exports = class Query extends AssetManager {
             if (err.code == 404) {
                 throw Error("Account not found");
             }
+            console.log(err);
             this.logger.error({
                 "op": "query.getRealtimeAsset",
                 address,
@@ -4870,10 +4961,10 @@ module.exports = class Query extends AssetManager {
         try {
             var sql = `select logDT, UNIX_TIMESTAMP(logDT) as logTS, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD, numTransactionsEVM, numAccountsActive, numAddresses, fees, numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from blocklog where chainID = '${chainID}' and logDT >= date_sub(Now(), interval ${lookback} DAY) order by logDT desc`;
             let recs = await this.poolREADONLY.query(sql);
-	    for ( let i = 0; i < recs.length ; i++) {
-		let [logDT, _] = paraTool.ts_to_logDT_hr(recs[i].logTS);
-		recs[i].logDT = logDT;
-	    }
+            for (let i = 0; i < recs.length; i++) {
+                let [logDT, _] = paraTool.ts_to_logDT_hr(recs[i].logTS);
+                recs[i].logDT = logDT;
+            }
             return (recs);
         } catch (err) {
             this.logger.error({
@@ -6212,4 +6303,61 @@ module.exports = class Query extends AssetManager {
             ];
         }
     }
+    /*
++--------------+-------------+------+-----+---------+-------+
+| Field        | Type        | Null | Key | Default | Extra |
++--------------+-------------+------+-----+---------+-------+
+| codeHash     | varchar(67) | NO   | PRI | NULL    |       |
+| chainID      | int(11)     | NO   | PRI | NULL    |       |
+| wasm         | mediumblob  | YES  |     | NULL    |       |
+| codeStoredBN | int(11)     | YES  |     | NULL    |       |
+| codeStoredTS | int(11)     | YES  |     | NULL    |       |
+| metadata     | blob        | YES  |     | NULL    |       |
++--------------+-------------+------+-----+---------+-------+
+// add extrinsicHash, extrinsicID, storer to wasmCode
+6 rows in set (0.00 sec)
+*/
+    async getWASMCode(codeHash, chainID = null) {
+        let sql = `select codeHash, chainID, wasm, codeStoredBN, codeStoredTS, metadata from wasmCode where codeHash = '${codeHash}'`
+        let wasmCode = await this.poolREADONLY(sql);
+        // TODO: add chainID filtering
+        if (wasmCode.length == 0) {
+            // return not found error
+            throw new paraTool.NotFoundError(`CodeHash not found: ${codeHash}`)
+            return (false);
+        }
+        return wasmCode[0];
+    }
+
+    /*
+mysql> desc contract;
++---------------+-------------+------+-----+---------+-------+
+| Field         | Type        | Null | Key | Default | Extra |
++---------------+-------------+------+-----+---------+-------+
+| address       | varchar(67) | NO   | PRI | NULL    |       |
+| chainID       | int(11)     | NO   | PRI | NULL    |       |
+| extrinsichash | varchar(67) | YES  |     | NULL    |       |
+| extrinsicID   | varchar(32) | YES  |     | NULL    |       |
+| instantiateBN | int(11)     | YES  |     | NULL    |       |
+| codeHash      | varchar(67) | YES  | MUL | NULL    |       |
+| constructor   | blob        | YES  |     | NULL    |       |
+| salt          | blob        | YES  |     | NULL    |       |
+| blockTS       | int(11)     | YES  | MUL | NULL    |       |
+| deployer      | varchar(67) | YES  | MUL | NULL    |       |
+| metadata      | blob        | YES  |     | NULL    |       |
++---------------+-------------+------+-----+---------+-------+
+11 rows in set (0.00 sec)
+*/
+    async getContract(address, chainID = null) {
+        let sql = `select address, chainID, extrinsicHash, extrinsicID, instantiateBN, codeHash, constructor, salt, blockTS, deployer, metadata from contract where address = '${address}'`
+        let contract = await this.poolREADONLY(sql);
+        // TODO: add chainID filtering
+        if (contract.length == 0) {
+            // return not found error
+            throw new paraTool.NotFoundError(`Contract not found: ${address}`)
+            return (false);
+        }
+        return contract[0];
+    }
+
 }

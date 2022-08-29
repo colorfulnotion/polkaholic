@@ -636,6 +636,6 @@ module.exports = {
         return endpoints;
     },
     verifierEnabled: function() {
-	return true;
+        return true;
     }
 };

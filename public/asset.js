@@ -1,10 +1,11 @@
 var initassetholders = false;
 var initassetsrelated = false;
 
-function showassetholders(assetChain) {
+function showassetholders(asset, chainID) {
     if (initassetholders) return;
     else initassetholders = true;
-    let pathParams = `asset/holders/${encodeURIComponent2(assetChain)}`
+
+    let pathParams = `asset/holders/${chainID}/${encodeURIComponent2(asset)}`
 
     let tableName = '#tableassetholders'
     var table = $(tableName).DataTable({
@@ -56,10 +57,10 @@ function showassetholders(assetChain) {
     loadData2(pathParams, tableName, true)
 }
 
-function showassetsrelated(assetChain) {
+function showassetsrelated(asset, chainID) {
     if (initassetsrelated) return;
     else initassetsrelated = true;
-    let pathParams = `asset/related/${encodeURIComponent(assetChain)}`
+    let pathParams = `asset/related/${chainID}/${encodeURIComponent(asset)}`
     let tableName = '#tableassetsrelated'
     var table = $(tableName).DataTable({
         order: [
@@ -145,23 +146,23 @@ function showassettab(hash) {
     switch (hash) {
         case "#assetsrelated":
             setupapidocs("asset", "assetsrelated");
-            showassetsrelated(assetChain);
+            showassetsrelated(asset, chainID);
             break;
         case "#assetholders":
             setupapidocs("asset", "assetholders");
-            showassetholders(assetChain);
+            showassetholders(asset, chainID);
             break;
     }
 }
 
-function setuptabs(tabs, assetChain) {
+function setuptabs(tabs, asset, chainID) {
     for (let i = 0; i < tabs.length; i++) {
         let t = tabs[i];
         let id = "#" + t.target + "-tab";
         let tabEl = document.querySelector(id);
         tabEl.addEventListener('shown.mdb.tab', function(event) {
             const hash = $(this).attr("href");
-            let newUrl = "/asset/" + assetChain + hash;
+            let newUrl = "/asset/" + chainID + "/" + currencyID + hash;
             //console.log("shown.mdb.tab", hash, newUrl);
             setTimeout(() => {
                 showassettab(hash);
@@ -180,4 +181,4 @@ function setuptabs(tabs, assetChain) {
     mdb.Tab.getInstance(triggerEl).show();
 }
 
-setuptabs(tabs, assetChain);
+setuptabs(tabs, asset, chainID);

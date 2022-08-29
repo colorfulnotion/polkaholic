@@ -1,6 +1,12 @@
 <%- include('header', {chainInfo: chainInfo, title: "Asset"}); %>
-<h4>Asset</h4>
-<div id="container" class="chart"></div>
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/">Polkaholic</a></li>
+    <li class="breadcrumb-item"><img src="<%= asset.iconUrl; %>" width="20"/><a href='/chain/<%= asset.id; %>#xcmassets'><%= asset.chainName; %> [Chain <%= asset.chainID %> : <%= asset.id %>]</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Currency <%= currencyID; %></li>
+  </ol>
+</nav>
 
 <div class="row">
 <%
@@ -15,8 +21,8 @@ for ( let k = 0; k < asset.length ; k++) {
 <%
 }
 
-if ( asset.length > 0 && ( asset[0].assetType == "ERC20LP" || asset[0].assetType == "LiquidityPair" ) ) {
-   let a = asset[0];
+let a = asset;
+if ( a.assetType == "ERC20LP" || a.assetType == "LiquidityPair" ) {
 %>
   <div class="col-sm-2">
    <%- include("assetpair", { chainID: a.chainID, asset: a.token0, symbol: a.token0Symbol, decimals: a.token0Decimals, supply: a.token0Supply }); %>
@@ -42,7 +48,7 @@ if ( asset.length > 0 && ( asset[0].assetType == "ERC20LP" || asset[0].assetType
 <%
 let tabs = [
   { title: "Top 1K Holders", target: "assetholders" },
-  { title: "Related", target: "assetsrelated" }
+//  { title: "Related", target: "assetsrelated" }
 ];
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
@@ -72,6 +78,9 @@ for (let i=0; i<tabs.length; i++) {
       </thead>
     </table>
   </div>
+  <div class="tab-pane" id="assethistory" role="tabpanel" aria-labelledby="history-tab">
+    <div id="container" class="chart"></div>
+  </div>
   <div class="tab-pane" id="assetsrelated" role="tabpanel" aria-labelledby="assetsrelated-tab">
     <table id="tableassetsrelated" class="display" style='width: 100%'>
     <thead>
@@ -92,10 +101,12 @@ for (let i=0; i<tabs.length; i++) {
 </div>
 
 <script>
-var assetChain = '<%- assetChain; %>';
+var chainID = '<%- chainID; %>';
+var currencyID = '<%- currencyID; %>';
+var asset = '<%- asset.asset; %>';
 var address = '<%- address; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
+
 </script>
-<%- include('assethistorychart', {assetChain: assetChain, symbol}); %>
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script src="/asset.js"></script>

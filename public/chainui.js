@@ -224,11 +224,11 @@ async function showxcmmessages(filter = {}) {
                             }
                         }
                     }
-		    if ( row.relayChain ) {
-			return row.relayChain;
-		    } else {
-			return "";
-		    }
+                    if (row.relayChain) {
+                        return row.relayChain;
+                    } else {
+                        return "";
+                    }
                 }
             }]
         });
@@ -455,16 +455,189 @@ async function showxcmtransfers(filter = {}) {
     }
 }
 
+var initassets = false;
+let xcmassetsTable = null;
+
+function showxcmassets(chainID, address) {
+    if (initassets) return;
+    else initassets = true;
+    let chainIDstr = (chainID == undefined) ? "all" : chainID.toString();
+    let pathParams = `chain/assets/${chainIDstr}`
+
+    let tableName = '#tablexcmassets'
+    xcmassetsTable = $(tableName).DataTable({
+        order: [
+            [1, "desc"],
+            [6, "desc"],
+        ],
+        columnDefs: [{
+            "className": "dt-right",
+            "targets": [1, 3, 4, 5, 6]
+        }, {
+            "className": "dt-left",
+            "targets": [2]
+        }, {
+            "targets": [7],
+            "visible": false
+        }],
+        columns: [{
+            data: 'symbol',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.assetType == "ERC20LP") {
+                        return presentAssetPair(row.assetChain, row.symbol, row.token0, row.token1, row.token0Symbol, row.token1Symbol, chainID);
+                    } else if (row.assetType == "Loan") {
+                        return presentLoan(row.assetChain, row.asset);
+                    } else {
+                        return `<A href="/symbol/${row.symbol}">${row.symbol}</A>`;
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'asset',
+            render: function(data, type, row, meta) {
+                if (row.asset != undefined) {
+                    try {
+                        let str = (row.localSymbol != undefined && row.localSymbol) ? row.localSymbol : "";
+                        let [accountState, balanceUSD] = get_accountState(row.asset, row.chainID, row.assetChain);
+                        if (!accountState) {
+                            if (type == 'display') {
+                                if (balanceUSD == null) {
+                                    return `-Connect Wallet [${str}]-`
+                                } else {
+                                    return "-";
+                                }
+                            } else {
+                                return 0;
+                            }
+                        } else if (accountState && accountState.free !== undefined) {
+                            if (type == 'display') {
+                                return presentTokenCount(accountState.free) + " " + str + " (" + currencyFormat(accountState.freeUSD) + ")";
+                            } else {
+                                if (accountState.freeUSD != undefined) {
+                                    return accountState.freeUSD
+                                }
+                                return 0;
+                            }
+                            return 0;
+                        } else {
+                            if (type == 'display') {
+                                return str;
+                            }
+                        }
+                        return 0;
+                    } catch (err) {
+                        console.log(err);
+                        return "-"
+                    }
+                }
+            }
+        }, {
+            data: 'chainID',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.chainID != undefined && row.currencyID != undefined) {
+                        return `<a href='/asset/${row.chainID}/${row.currencyID}'>${row.currencyID}</a>`
+                    } else {
+                        //console.log(row);
+                        return `<a href='/chain/${row.chainID}#xcmassets'>${row.chainName} ${row.symbol}</a>`
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'numHolders',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'priceUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'totalFree',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.totalFree !== undefined) {
+                        return presentTokenCount(data);
+                    }
+                }
+                if (row.totalFree !== undefined) {
+                    return data;
+                } else {
+                    return 0;
+                }
+            }
+        }, {
+            data: 'tvl',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.tvl != undefined) {
+                        return currencyFormat(data);
+                    }
+                } else {
+                    if (row.tvl != undefined) {
+                        return data;
+                    }
+                }
+                return 0;
+            }
+        }, {
+            data: 'relayChain',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, true)
+}
+
+// returns null if balance 
+function get_accountState(asset, chainID, assetChain) {
+    if (!account) return [null, null];
+    if (account.chains == undefined) return [null, null];
+    try {
+        for (let i = 0; i < account.chains.length; i++) {
+            let c = account.chains[i];
+            if (c.chainID == chainID) {
+                for (let j = 0; j < c.assets.length; j++) {
+                    let a = c.assets[j];
+                    if (a.asset == asset) {
+                        let state = a.state;
+                        let balanceUSD = state.balanceUSD;
+
+                        return [state, balanceUSD];
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.log(err);
+    }
+    return [null, 0];
+}
+
+
 function filterchains(relaychain = "all") {
 
     if (relaychain == "kusama" || relaychain == "polkadot") {
-	console.log("filterchains", relaychain);
-        if (chainsTable) chainsTable.column(5).search(relaychain).draw();
+        console.log("filterchains", relaychain);
+        if (chainsTable) chainsTable.column(8).search(relaychain).draw();
+        if (xcmassetsTable) xcmassetsTable.column(7).search(relaychain).draw();
         if (xcmtransfersTable) xcmtransfersTable.column(8).search(relaychain).draw();
         if (xcmmessagesTable) xcmmessagesTable.column(7).search(relaychain).draw();
     } else {
         // empty search effectively removes the filter
         if (chainsTable) chainsTable.search('').columns().search('').draw();
+        if (xcmassetsTable) xcmassetsTable.search('').columns().search('').draw();
         if (xcmtransfersTable) xcmtransfersTable.search('').columns().search('').draw();
         if (xcmmessagesTable) xcmmessagesTable.search('').columns().search('').draw();
     }

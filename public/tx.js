@@ -19,7 +19,7 @@ function setuptabs(tabs, chain_id, txHash, hash = "#overview") {
         if (urlhash.length > 1) hash = "#" + urlhash[1];
     }
     const triggerEl = document.querySelector('#txTab a[href="' + hash + '"]');
-    if ( triggerEl ) mdb.Tab.getInstance(triggerEl).show();
+    if (triggerEl) mdb.Tab.getInstance(triggerEl).show();
 }
 
 

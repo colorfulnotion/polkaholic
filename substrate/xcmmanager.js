@@ -12,7 +12,7 @@ module.exports = class XCMManager extends AssetManager {
 
     lastupdateTS = 0
 
-    async updateXcmInteriorOut(isRawAsset = false){
+    async updateXcmInteriorOut(isRawAsset = false) {
         let xcmListRecs = await this.poolREADONLY.query("select relayChain, chainID, rawAsset, asset, xcmInteriorKey, count(*) cnt from xcmtransfer where xcmInteriorKey is not null group by chainID, rawAsset, asset, xcmInteriorKey, relaychain order by chainID, xcmInteriorKey;");
         let xcmList = {};
         for (let i = 0; i < xcmListRecs.length; i++) {
@@ -29,7 +29,7 @@ module.exports = class XCMManager extends AssetManager {
                 matched: false,
                 cnt: rec.cnt,
             }
-            let k2 = (isRawAsset)? a.outKey: a.outKey2
+            let k2 = (isRawAsset) ? a.outKey : a.outKey2
             xcmList[k2] = a
         }
         console.log(`xcmList len=${Object.keys(xcmList).length}`, xcmList)
@@ -51,22 +51,22 @@ module.exports = class XCMManager extends AssetManager {
             let k1 = a.originalKey
             let chainID = a.chainID
             assetList[k1] = a
-            if (chainAssetList[chainID]== undefined) chainAssetList[chainID] = []
+            if (chainAssetList[chainID] == undefined) chainAssetList[chainID] = []
             chainAssetList[chainID].push(a)
         }
         //console.log(`assetList len=${Object.keys(assetList).length}`, assetList)
         //console.log(`chainAssetList len=${Object.keys(chainAssetList).length}`, chainAssetList)
-        for (const chainID of Object.keys(chainAssetList)){
+        for (const chainID of Object.keys(chainAssetList)) {
             console.log(`${chainID} len=${chainAssetList[chainID].length}`, chainAssetList[chainID])
         }
 
         let exactMatch = {}
         let noMatch = {}
 
-        for (const k2 of Object.keys(xcmList)){
+        for (const k2 of Object.keys(xcmList)) {
             let xcmRec = xcmList[k2]
 
-            if (assetList[k2] != undefined){
+            if (assetList[k2] != undefined) {
                 let aRec = assetList[k2]
                 aRec.xcmInteriorKey = xcmRec.xcmInteriorKey
                 xcmRec.originalKey = aRec.originalKey
@@ -75,16 +75,18 @@ module.exports = class XCMManager extends AssetManager {
                 assetList[k2] = aRec
                 xcmList[k2] = xcmRec
                 exactMatch[k2] = xcmRec
-            }else{
+            } else {
                 //console.log(`no match on ${k2}...`)
                 let chainSpecificAssetList = chainAssetList[xcmRec.chainID]
                 let chainSpecificRelayChain = paraTool.getRelayChainByChainID(xcmRec.chainID)
                 let recoveredMatch = false
-                for (const chainSpecificAsset of chainSpecificAssetList){
+                for (const chainSpecificAsset of chainSpecificAssetList) {
                     let aRecSymbol = paraTool.toUSD(chainSpecificAsset.symbol, chainSpecificRelayChain) // standardized ?
-                    let aRecSymbolAsset = JSON.stringify({Token:aRecSymbol})
+                    let aRecSymbolAsset = JSON.stringify({
+                        Token: aRecSymbol
+                    })
                     let recoveredKey = paraTool.makeAssetChain(aRecSymbolAsset, chainSpecificAsset.chainID) //k3
-                    if (k2 == recoveredKey){
+                    if (k2 == recoveredKey) {
                         console.log(`recovered match ${k2} -> ${chainSpecificAsset.originalKey}`)
                         chainSpecificAsset.xcmInteriorKey = xcmRec.xcmInteriorKey
                         xcmRec.originalKey = chainSpecificAsset.originalKey
@@ -96,18 +98,18 @@ module.exports = class XCMManager extends AssetManager {
                         continue
                     }
                 }
-                if (!recoveredMatch){
+                if (!recoveredMatch) {
                     console.log(`no match on ${k2} using recoveredKey`)
                 }
             }
         }
 
         let xcmInteriorUpdates = []
-        for (const k2 of Object.keys(xcmList)){
+        for (const k2 of Object.keys(xcmList)) {
             let xcmRec = xcmList[k2]
-            if (!xcmRec.matched){
+            if (!xcmRec.matched) {
                 noMatch[k2] = xcmRec
-            }else{
+            } else {
                 //["asset", "chainID"] + ["xcmInteriorKey"]
                 let [assetUnparsed, chainID] = paraTool.parseAssetChain(xcmRec.originalKey)
                 let c = `('${assetUnparsed}', '${chainID}', '${xcmRec.xcmInteriorKey}')`

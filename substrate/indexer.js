@@ -800,7 +800,7 @@ module.exports = class Indexer extends AssetManager {
         let wasmContracts = []
         for (const k of Object.keys(this.wasmContractMap)) {
             let w = this.wasmContractMap[k]
-            if (w.withCode){
+            if (w.withCode) {
                 //["codeHash", "chainID"] + ["extrinsicHash", "extrinsicID", "wasm", "codeStoredBN", "codeStoredTS", "storer"]
                 let c = `('${w.codeHash}', '${w.chainID}', '${w.extrinsicHash}', '${w.extrinsicID}', '${w.code}', '${w.blockNumber}', '${w.blockTS}', '${w.deployer}')`
                 wasmCodes.push(c)
@@ -1156,7 +1156,7 @@ module.exports = class Indexer extends AssetManager {
                 "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash", "sentAt", "nativeAssetChain", "xcmInteriorKey"],
                 "data": xcmtransfers,
                 "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "asset", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "rawAsset", "msgHash", "sentAt", "nativeAssetChain", "xcmInteriorKey"]
-            },sqlDebug);
+            }, sqlDebug);
 
 
             let out = [];
@@ -3289,7 +3289,7 @@ module.exports = class Indexer extends AssetManager {
                     if (data != undefined && Array.isArray(data)) {
                         try {
                             let withdrawTxFee = paraTool.dechexToInt(data[1])
-                            if (!isUnsignedHead && signer == data[0]){
+                            if (!isUnsignedHead && signer == data[0]) {
                                 withdrawFee = withdrawTxFee
                                 //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
                                 res.fee = withdrawFee
@@ -3303,7 +3303,7 @@ module.exports = class Indexer extends AssetManager {
                     if (data != undefined && Array.isArray(data)) {
                         try {
                             let depositfee = paraTool.dechexToInt(data[1])
-                            if (!isUnsignedHead){
+                            if (!isUnsignedHead) {
                                 //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] depositfee=${depositfee}`)
                                 totalDepositFee += depositfee
                                 depositFeeList.push(depositfee)
@@ -3330,7 +3330,7 @@ module.exports = class Indexer extends AssetManager {
                             let actualFee = paraTool.dechexToInt(data[1])
                             let actualTip = paraTool.dechexToInt(data[2])
                             let actualSurplus = paraTool.dechexToInt(data[3])
-                            let fee = actualFee+actualSurplus-actualTip
+                            let fee = actualFee + actualSurplus - actualTip
                             //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] actualFee=${actualFee}, actualTip=${actualTip}, actualSurplus=${actualSurplus}, fee=${fee}`)
                             res.fee = fee
                         } catch (e) {
@@ -3410,7 +3410,7 @@ module.exports = class Indexer extends AssetManager {
             //console.log(`[${extrinsicID}] ${extrinsicHash} EVM fee=${res.fee}, depositFeeList=${depositFeeList}`)
         }
         */
-        if (isUnsignedHead){
+        if (isUnsignedHead) {
             res.fee = 0
             //res.fee = depositFeeList[depositFeeList.length - 1]
             //console.log(`[${extrinsicID}] ${extrinsicHash} potential XCM fee=${res.fee}, depositFeeList=${depositFeeList}`)
@@ -4302,7 +4302,7 @@ module.exports = class Indexer extends AssetManager {
             numTransfers: 0,
             numEvents: events.length,
             valueTransfersUSD: 0,
-	    fees: 0,
+            fees: 0,
         }
         if (autoTraces && Array.isArray(autoTraces)) {
             blockStats.numTraceRecords = autoTraces.length
@@ -4319,9 +4319,9 @@ module.exports = class Indexer extends AssetManager {
         }
         block.extrinsics.forEach((extrinsic, index) => {
             if (this.isExtrinsicSigned(extrinsic)) blockStats.numSignedExtrinsics++;
-	    if ( extrinsic.fee != undefined && extrinsic.fee > 0 ) {
-		blockStats.fees += extrinsic.fee;
-	    }
+            if (extrinsic.fee != undefined && extrinsic.fee > 0) {
+                blockStats.fees += extrinsic.fee;
+            }
             let numTransfers = extrinsic.transfers ? extrinsic.transfers.length : 0;
             let valueTransfersUSD = 0;
             if (numTransfers > 0) {
@@ -6070,7 +6070,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             } else {
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                if (r.autotrace === false || r.autotrace == undefined || ( r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0 )) {
+                if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0)) {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
                     autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
                 } else {
@@ -6239,15 +6239,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 evals = ", sum(numTransactionsEVM), sum(numReceiptsEVM), sum(gasUsed), sum(gasLimit), sum(if(blockHashEVM is Null, 0, 1))";
             }
 
-	    this.batchedSQL.push(`insert into blocklog (logDT, chainID, numXCMMessagesOut) ( select DATE(from_unixtime(sourceTS)) as logDT, chainID, count(*) as numXCMMessagesOut from xcmmessages where chainID = ${chain.chainID} and sourceTS >= UNIX_TIMESTAMP(date_sub(Now(), interval ${daysago} DAY)) and sourceTS > 0 and incoming = 0 and matched = 1 group by logDT, chainID having logDT is not null ) on duplicate key update numXCMMessagesOut = values(numXCMMessagesOut)`);
+            this.batchedSQL.push(`insert into blocklog (logDT, chainID, numXCMMessagesOut) ( select DATE(from_unixtime(sourceTS)) as logDT, chainID, count(*) as numXCMMessagesOut from xcmmessages where chainID = ${chain.chainID} and sourceTS >= UNIX_TIMESTAMP(date_sub(Now(), interval ${daysago} DAY)) and sourceTS > 0 and incoming = 0 and matched = 1 group by logDT, chainID having logDT is not null ) on duplicate key update numXCMMessagesOut = values(numXCMMessagesOut)`);
             this.batchedSQL.push(`insert into blocklog (logDT, chainID, numXCMMessagesIn) ( select DATE(from_unixtime(destTS)) as logDT, chainIDDest, count(*) as numXCMMessagesIn from xcmmessages where chainIDDest = ${chain.chainID} and destTS >= UNIX_TIMESTAMP(date_sub(Now(), interval ${daysago} DAY)) and destTS > 0 and incoming = 1 and matched = 1 group by logDT, chainIDDest having logDT is not null ) on duplicate key update numXCMMessagesIn = values(numXCMMessagesIn) `)
             this.batchedSQL.push(`insert into blocklog (logDT, chainID, numXCMTransfersOut, valXCMTransferOutgoingUSD) ( select DATE(from_unixtime(sourceTS)) as logDT, chainID, count(*) as numXCMTransfersOut, sum(amountSentUSD) as valXCMTransferOutgoingUSD from xcmtransfer where chainID = ${chain.chainID} and sourceTS >= UNIX_TIMESTAMP(date_sub(Now(),interval ${daysago} DAY)) and incomplete = 0 and sourceTS > 0 group by logDT, chainID having logDT is not null ) on duplicate key update numXCMTransfersOut = values(numXCMTransfersOut), valXCMTransferOutgoingUSD = values(valXCMTransferOutgoingUSD)`);
-	    let sql0 = `insert into blocklog (logDT, chainID, numXCMTransfersIn, valXCMTransferIncomingUSD) ( select DATE(from_unixtime(destTS)) as logDT, chainIDDest, count(*) as numXCMTransfersIn, sum(amountReceivedUSD) as valXCMTransferIncomingUSD from xcmtransfer where chainIDDest = ${chain.chainID} and sourceTS >= UNIX_TIMESTAMP(date_sub(Now(),interval ${daysago} DAY)) and incomplete = 0 and destTS > 0 group by logDT, chainIDDest having logDT is not null) on duplicate key update numXCMTransfersIn = values(numXCMTransfersIn), valXCMTransferIncomingUSD = values(valXCMTransferIncomingUSD) `
+            let sql0 = `insert into blocklog (logDT, chainID, numXCMTransfersIn, valXCMTransferIncomingUSD) ( select DATE(from_unixtime(destTS)) as logDT, chainIDDest, count(*) as numXCMTransfersIn, sum(amountReceivedUSD) as valXCMTransferIncomingUSD from xcmtransfer where chainIDDest = ${chain.chainID} and sourceTS >= UNIX_TIMESTAMP(date_sub(Now(),interval ${daysago} DAY)) and incomplete = 0 and destTS > 0 group by logDT, chainIDDest having logDT is not null) on duplicate key update numXCMTransfersIn = values(numXCMTransfersIn), valXCMTransferIncomingUSD = values(valXCMTransferIncomingUSD) `
             this.batchedSQL.push(sql0);
             await this.update_batchedSQL(10.0);
 
             let sql = `insert into blocklog (chainID, logDT, startBN, endBN, numTraces, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD, fees ${eflds} ) (select ${chainID} as chainID, date(blockDT) as logDT, min(blockNumber), max(blockNumber), sum(if(crawlTrace=0, 1, 0)), sum(numExtrinsics), sum(numEvents), sum(numTransfers), sum(numSignedExtrinsics), sum(valueTransfersUSD), sum(fees) ${evals} from block${chainID} where blockDT is Not Null and blockDT >= date(date_sub(now(), INTERVAL ${daysago} DAY))  group by chainID, logDT) on duplicate key update startBN = values(startBN), endBN = values(endBN), numExtrinsics = values(numExtrinsics), numEvents = values(numEvents), numTransfers = values(numTransfers), numSignedExtrinsics = values(numSignedExtrinsics), valueTransfersUSD = values(valueTransfersUSD), numTraces = values(numTraces), fees = values(fees) ` + eupds;
-	    console.log(sql);
+            console.log(sql);
             this.batchedSQL.push(sql);
             await this.update_batchedSQL(10.0);
 
@@ -6267,13 +6267,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             var ranges = [7, 30, 99999];
             for (const range of ranges) {
                 let f = (range > 9999) ? "" : `${range}d`;
-                let sql0 = `select sum(numTraces) as numTraces, sum(numExtrinsics) as numExtrinsics, sum(numEvents) as numEvents, sum(numTransfers) as numTransfers, sum(numSignedExtrinsics) as numSignedExtrinsics, sum(valueTransfersUSD) as valueTransfersUSD, sum(numTransactionsEVM) as numTransactionsEVM, sum(numReceiptsEVM) as numReceiptsEVM, sum(gasUsed) as gasUsed, sum(gasLimit) as gasLimit, sum(numEVMBlocks) as numEVMBlocks from blocklog where logDT >= date_sub(Now(),interval ${range} DAY) and chainID = ${chain.chainID}`
+                let sql0 = `select sum(numTraces) as numTraces, sum(numExtrinsics) as numExtrinsics, sum(numEvents) as numEvents, sum(numTransfers) as numTransfers, sum(numSignedExtrinsics) as numSignedExtrinsics, sum(valueTransfersUSD) as valueTransfersUSD, sum(numTransactionsEVM) as numTransactionsEVM, sum(numReceiptsEVM) as numReceiptsEVM, sum(gasUsed) as gasUsed, sum(gasLimit) as gasLimit, sum(numEVMBlocks) as numEVMBlocks, avg(numAccountsActive) as numAccountsActive, sum(numXCMTransfersIn) as numXCMTransferIncoming, sum(valXCMTransferIncomingUSD) as valXCMTransferIncomingUSD, sum(numXCMTransfersOut) as numXCMTransferOutgoing, sum(valXCMTransferOutgoingUSD) as valXCMTransferOutgoingUSD from blocklog where logDT >= date_sub(Now(),interval ${range} DAY) and chainID = ${chain.chainID}`
                 let stats = await this.poolREADONLY.query(sql0)
                 let out = [];
                 for (const s of stats) {
-                    out.push([`('${chain.chainID}', ${s.numTraces}, ${s.numExtrinsics}, ${s.numEvents}, ${s.numTransfers}, ${s.numSignedExtrinsics}, ${s.valueTransfersUSD}, ${s.numTransactionsEVM}, ${s.numReceiptsEVM}, ${s.gasUsed}, ${s.gasLimit}, ${s.numEVMBlocks})`])
+                    let valIncoming = s.valXCMTransferIncomingUSD ? s.valXCMTransferIncomingUSD : 0;
+                    let valOutgoing = s.valXCMTransferOutgoingUSD ? s.valXCMTransferOutgoingUSD : 0;
+                    out.push([`('${chain.chainID}', ${s.numTraces}, ${s.numExtrinsics}, ${s.numEvents}, ${s.numTransfers}, ${s.numSignedExtrinsics}, ${s.valueTransfersUSD}, ${s.numTransactionsEVM}, ${s.numReceiptsEVM}, ${s.gasUsed}, ${s.gasLimit}, ${s.numEVMBlocks}, ${s.numAccountsActive}, '${s.numXCMTransferIncoming}', '${valIncoming}', '${s.numXCMTransferOutgoing}', '${valOutgoing}')`])
                 }
-                let vals = [`numTraces${f}`, `numExtrinsics${f}`, `numEvents${f}`, `numTransfers${f}`, `numSignedExtrinsics${f}`, `valueTransfersUSD${f}`, `numTransactionsEVM${f}`, `numReceiptsEVM${f}`, `gasUsed${f}`, `gasLimit${f}`, `numEVMBlocks${f}`]
+                let vals = [`numTraces${f}`, `numExtrinsics${f}`, `numEvents${f}`, `numTransfers${f}`, `numSignedExtrinsics${f}`, `valueTransfersUSD${f}`, `numTransactionsEVM${f}`, `numReceiptsEVM${f}`, `gasUsed${f}`, `gasLimit${f}`, `numEVMBlocks${f}`, `numAccountsActive${f}`, `numXCMTransferIncoming${f}`, `valXCMTransferIncomingUSD${f}`, `numXCMTransferOutgoing${f}`, `valXCMTransferOutgoingUSD${f}`]
                 await this.upsertSQL({
                     "table": "chain",
                     "keys": ["chainID"],
@@ -6282,27 +6284,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     "replace": vals
                 });
             }
-            var ranges = [7, 30, 99999];
-            for (const range of ranges) {
-                let f = (range > 9999) ? "" : `${range}d`;
-                let out = [];
-                let sql0 = `select sum(numXCMTransfersIn) as numXCMTransferIncoming, sum(valXCMTransferIncomingUSD) as valXCMTransferIncomingUSD, sum(numXCMTransfersOut) as numXCMTransferOutgoing, sum(valXCMTransferOutgoingUSD) as valXCMTransferOutgoingUSD from blocklog where chainID = ${chain.chainID} and logDT >= DATE(date_sub(Now(),interval ${range} DAY))`
-                let stats0 = await this.poolREADONLY.query(sql0)
-                for (const s of stats0) {
-                    let valIncoming = s.valXCMTransferIncomingUSD ? s.valXCMTransferIncomingUSD : 0;
-		    let valOutgoing = s.valXCMTransferOutgoingUSD ? s.valXCMTransferOutgoingUSD: 0;
-                    out.push([`('${chain.chainID}', '${s.numXCMTransferIncoming}', '${valIncoming}', '${s.numXCMTransferOutgoing}', '${valOutgoing}')`])
-                }
-                let vals0 = [`numXCMTransferIncoming${f}`, `valXCMTransferIncomingUSD${f}`, `numXCMTransferOutgoing${f}`, `valXCMTransferOutgoingUSD${f}`]
-                await this.upsertSQL({
-                    "table": "chain",
-                    "keys": ["chainID"],
-                    "vals": vals0,
-                    "data": out,
-                    "replace": vals0
-                });
-            }
-
             this.batchedSQL.push(`update chain set lastUpdateChainAssetsTS = FROM_UNIXTIME(Now()) where chainID = ${chain.chainID}`);
             await this.update_batchedSQL(10.0);
             return (true);
