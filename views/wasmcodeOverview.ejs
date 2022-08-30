@@ -1,0 +1,64 @@
+<%
+let f = code;
+%>
+<table class="table table-hover table-bordered">
+  <tbody>
+    <tr>
+      <td width="200">Code Hash</td>
+      <td><code><%- uiTool.getShortHash(f.codeHash, false) %></code>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Created</td>
+      <td>
+	<%= uiTool.presentTS(f.codeStoredTS); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Language</td>
+      <td><%= f.language %></td>
+    </tr>
+
+    <tr>
+      <td>Compiler</td>
+      <td><%= f.compiler %></td>
+    </tr>
+
+    <tr>
+      <td>Storer</td>
+      <td><%- uiTool.presentID(f.storer) %></td>
+    </tr>
+
+    <tr>
+      <td>Chain</td>
+      <td>
+        <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
+        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.sourceBlocknumber}); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Stored At</td>
+      <td>
+        <a href='/chain/<%= f.id; %>'><%= uiTool.capitalizeFirstLetter(f.chainName); %></a>
+        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.codeStoredBN}); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Created At</td>
+      <td>
+        <%- uiTool.presentFullTx(f.extrinsicHash); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>WASM</td>
+      <td>
+          <textarea style='width: 800px; height: 400px'><%- code.wasm %></textarea>
+      </td>
+    </tr>
+  </tbody>
+</table>

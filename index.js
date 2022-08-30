@@ -17,6 +17,7 @@
 const dotenv = require('dotenv').config();
 const express = require('express')
 const app = express()
+var os = require('os')
 var session = require('express-session')
 const paraTool = require('./substrate/paraTool');
 const util = require("util");
@@ -27,6 +28,7 @@ const port = 3000;
 const Query = require("./substrate/query");
 const cookieParser = require("cookie-parser");
 const ini = require('node-ini');
+const fileUpload = require('express-fileupload');
 
 var debugLevel = paraTool.debugTracing
 var query = new Query(debugLevel);
@@ -50,6 +52,7 @@ if (process.env.NODE_ENV == "development") {
         maxAge: '5m'
     }))
 }
+app.use(fileUpload());
 app.use(cookieParser());
 app.set('view engine', 'ejs');
 app.use(express.urlencoded({
@@ -604,6 +607,7 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
         let [chainID, id] = query.convertChainID(chainID_or_chainName)
         let chain = await query.getChain(chainID);
         if (chain) {
+            console.log(chain);
             var blocks = await query.getChainRecentBlocks(chainID);
             var homePubkey = getHomePubkey(req);
             let account = homePubkey ? await query.getAccountAssetsRealtimeByChain(null, homePubkey) : "";
@@ -1332,6 +1336,48 @@ app.get('/asset/:chainID/:currencyID', async (req, res) => {
     }
 })
 
+// Usage: /wasmcontract/0xfa4c7e407f86e24770b9b7b5826457350df83eab1122bb398f4a5a4892ff98cb
+app.get('/wasmcontract/:address/:chainID?', async (req, res) => {
+    try {
+        let homePubkey = getHomePubkey(req);
+        let address = req.params["address"];
+        let chainID = req.params["chainID"] ? req.params["chainID"] : null;
+        let contract = await query.getWASMContract(address, chainID);
+        res.render('wasmcontract', {
+            address: address,
+            chainInfo: query.getChainInfo(),
+            contract: contract,
+            apiUrl: req.path,
+            docsSection: "get-wasmcontract"
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+// Usage: /wasmcode/0xfa4c7e407f86e24770b9b7b5826457350df83eab1122bb398f4a5a4892ff98cb
+app.get('/wasmcode/:codeHash/:chainID?', async (req, res) => {
+    try {
+        let codeHash = req.params["codeHash"];
+        let chainID = req.params["chainID"] ? req.params["chainID"] : null;
+        let code = await query.getWASMCode(codeHash, chainID);
+        console.log(code);
+        res.render('wasmcode', {
+            codeHash: codeHash,
+            chainInfo: query.getChainInfo(),
+            apiUrl: req.path,
+            code: code,
+            docsSection: "get-wasmcode"
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 app.post('/search/', async (req, res) => {
     try {
         let search = req.body.search.trim();
@@ -1443,6 +1489,27 @@ app.get('/timeline/:hash/:hashType?/:blockNumber?', async (req, res) => {
             error: err.toString()
         });
     }
+})
+
+
+app.post('/uploadcontract/:address', async (req, res) => {
+    if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).send('No contract file was uploaded.');
+    }
+    let address = req.params['address'];
+    // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
+    let contractFile = req.files.contractFile;
+    console.log(contractFile.name, contractFile.size, contractFile.data.toString());
+
+    await query.updateWASMContract(address, contractFile.data.toString());
+    // Use the mv() method to place the file somewhere on your server
+    contractFile.mv(`/tmp/${address}.contract`, function(err) {
+        if (err) {
+            return res.status(500).send(err);
+        }
+        res.send('File uploaded!');
+    });
+
 })
 
 app.get('/about', async (req, res) => {

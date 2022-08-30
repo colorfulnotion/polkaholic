@@ -277,6 +277,46 @@ app.get('/addresstopn/:topN', async (req, res) => {
     }
 })
 
+// Used: https://api.polkaholic.io/code/shiden
+app.get('/wasmcode/:chainID_or_chainName', async (req, res) => {
+    try {
+        let chainID_or_chainName = req.params["chainID_or_chainName"]
+        let code = await query.getChainWASMCode(chainID_or_chainName);
+        if (code) {
+            res.write(JSON.stringify(code));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+
+// Usage: https://api.polkaholic.io/contracts/shiden
+app.get('/wasmcontracts/:chainID_or_chainName', async (req, res) => {
+    try {
+        let chainID_or_chainName = req.params["chainID_or_chainName"]
+        let contracts = await query.getChainWASMContracts(chainID_or_chainName);
+        if (contracts) {
+            res.write(JSON.stringify(contracts));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+
 // Usage: https://api.polkaholic.io/specversions/polkadot
 app.get('/specversions/:chainID_or_chainName', async (req, res) => {
     try {

@@ -21,6 +21,10 @@ let tabs = [
 { title: "Spec Versions", target: "specversions" },
 { title: "Chain Info", target: "chaininfo" }
 ];
+if ( chain.isWASM ) {
+  tabs.splice(1, 0, { title: "Contracts", target: "wasmcontracts", func: "showwasmcontracts" });
+  tabs.splice(2, 0, { title: "Code", target: "wasmcode", func: "showwasmcode" });
+}
 
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
@@ -61,6 +65,39 @@ for (let i=0; i<tabs.length; i++) {
   </thead>
 </table>
 </div>
+
+<% if ( chain.isWASM ) { %>
+<div class="tab-pane" id="wasmcontracts" role="tabpanel" aria-labelledby="wasmcontracts-tab">
+    <table id="tablewasmcontracts" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Contract Address</th>
+          <th>Status</th>
+          <th>Deployer</th>
+          <th>Code Hash</th>
+          <th>Instantiated</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+</div>
+
+<div class="tab-pane" id="wasmcode" role="tabpanel" aria-labelledby="wasmcode-tab">
+    <table id="tablewasmcode" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Code Hash</th>
+          <th>Status</th>
+          <th>Storer</th>
+          <th>Stored</th>
+          <th>Language</th>
+          <th>Compiler</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+    </table>
+</div>
+<% } %>
 
 <div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
     <table id="tablexcmtransfers" class="display" style='width: 100%'>

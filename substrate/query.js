@@ -924,7 +924,7 @@ module.exports = class Query extends AssetManager {
             numXCMTransferOutgoing, numXCMTransferOutgoing7d, numXCMTransferOutgoing30d,
             valXCMTransferIncomingUSD, valXCMTransferIncomingUSD7d, valXCMTransferIncomingUSD30d,
             valXCMTransferOutgoingUSD, valXCMTransferOutgoingUSD7d, valXCMTransferOutgoingUSD30d,
-            subscanURL, dappURL, githubURL, parachainsURL, isEVM from chain where chainID = ${chainID}`)
+            subscanURL, dappURL, githubURL, parachainsURL, isEVM, isWASM from chain where chainID = ${chainID}`)
             if (chains.length == 1) {
                 let chainInfo = chains[0]
                 if (chainInfo.isEVM) {
@@ -6303,61 +6303,143 @@ module.exports = class Query extends AssetManager {
             ];
         }
     }
-    /*
-+--------------+-------------+------+-----+---------+-------+
-| Field        | Type        | Null | Key | Default | Extra |
-+--------------+-------------+------+-----+---------+-------+
-| codeHash     | varchar(67) | NO   | PRI | NULL    |       |
-| chainID      | int(11)     | NO   | PRI | NULL    |       |
-| wasm         | mediumblob  | YES  |     | NULL    |       |
-| codeStoredBN | int(11)     | YES  |     | NULL    |       |
-| codeStoredTS | int(11)     | YES  |     | NULL    |       |
-| metadata     | blob        | YES  |     | NULL    |       |
-+--------------+-------------+------+-----+---------+-------+
-// add extrinsicHash, extrinsicID, storer to wasmCode
-6 rows in set (0.00 sec)
-*/
+
     async getWASMCode(codeHash, chainID = null) {
-        let sql = `select codeHash, chainID, wasm, codeStoredBN, codeStoredTS, metadata from wasmCode where codeHash = '${codeHash}'`
-        let wasmCode = await this.poolREADONLY(sql);
-        // TODO: add chainID filtering
-        if (wasmCode.length == 0) {
-            // return not found error
-            throw new paraTool.NotFoundError(`CodeHash not found: ${codeHash}`)
-            return (false);
+        try {
+            let w = (chainID) ? ` and chainID = '${chainID}'` : "";
+            let sql = `select codeHash, chainID, wasm, codeStoredBN, codeStoredTS, extrinsicID, extrinsicHash, language, compiler, storer, metadata, status from wasmCode where codeHash = '${codeHash}' ${w}`
+            let wasmCodes = await this.poolREADONLY.query(sql);
+            if (wasmCodes.length == 0) {
+                // return not found error
+                throw new paraTool.NotFoundError(`WASM Code Hash not found: ${codeHash}`)
+                return (false);
+            }
+            let wasmCode = wasmCodes[0];
+            wasmCode.wasm = wasmCode.wasm.toString();
+            wasmCode.metadata = wasmCode.metadata ? wasmCode.metadata.toString() : null;
+            let [_, id] = this.convertChainID(wasmCode.chainID)
+            let chainName = this.getChainName(wasmCode.chainID);
+            wasmCode.id = id;
+            wasmCode.chainName = chainName;
+            return wasmCode
+        } catch {
+            console.log(err)
         }
-        return wasmCode[0];
     }
 
-    /*
-mysql> desc contract;
-+---------------+-------------+------+-----+---------+-------+
-| Field         | Type        | Null | Key | Default | Extra |
-+---------------+-------------+------+-----+---------+-------+
-| address       | varchar(67) | NO   | PRI | NULL    |       |
-| chainID       | int(11)     | NO   | PRI | NULL    |       |
-| extrinsichash | varchar(67) | YES  |     | NULL    |       |
-| extrinsicID   | varchar(32) | YES  |     | NULL    |       |
-| instantiateBN | int(11)     | YES  |     | NULL    |       |
-| codeHash      | varchar(67) | YES  | MUL | NULL    |       |
-| constructor   | blob        | YES  |     | NULL    |       |
-| salt          | blob        | YES  |     | NULL    |       |
-| blockTS       | int(11)     | YES  | MUL | NULL    |       |
-| deployer      | varchar(67) | YES  | MUL | NULL    |       |
-| metadata      | blob        | YES  |     | NULL    |       |
-+---------------+-------------+------+-----+---------+-------+
-11 rows in set (0.00 sec)
-*/
-    async getContract(address, chainID = null) {
-        let sql = `select address, chainID, extrinsicHash, extrinsicID, instantiateBN, codeHash, constructor, salt, blockTS, deployer, metadata from contract where address = '${address}'`
-        let contract = await this.poolREADONLY(sql);
-        // TODO: add chainID filtering
-        if (contract.length == 0) {
+    async getWASMContract(address, chainID = null) {
+        let w = (chainID) ? ` and chainID = '${chainID}'` : "";
+        let sql = `select address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, constructor, salt, blockTS, deployer, wasm, codeStoredBN, codeStoredTS, metadata from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
+        let contracts = await this.poolREADONLY.query(sql);
+        if (contracts.length == 0) {
             // return not found error
-            throw new paraTool.NotFoundError(`Contract not found: ${address}`)
+            throw new paraTool.NotFoundError(`WASM Contract not found: ${address}`)
             return (false);
         }
-        return contract[0];
+        let contract = contracts[0];
+        try {
+            let [_, id] = this.convertChainID(contract.chainID)
+            let chainName = this.getChainName(contract.chainID);
+            contract.id = id;
+            contract.chainName = chainName;
+            contract.constructor = contract.constructor.toString();
+            contract.salt = contract.salt.toString();
+            contract.wasm = contract.wasm.toString();
+            contract.metadata = contract.metadata ? contract.metadata.toString() : null;
+        } catch (e) {
+            console.log(e)
+
+        }
+        return contract;
+    }
+
+    async getChainWASMContracts(chainID_or_chainName) {
+        let [chainID, id] = this.convertChainID(chainID_or_chainName)
+        let chainName = this.getChainName(chainID);
+        let sql = `select address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, blockTS, deployer, status, language, compiler
+ from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where contract.chainID = '${chainID}' order by blockTS desc`
+        let contracts = await this.poolREADONLY.query(sql);
+        for (let i = 0; i < contracts.length; i++) {
+            let contract = contracts[i];
+            try {
+                contract.id = id;
+                contract.chainID = chainID;
+                contract.chainName = chainName;
+            } catch (e) {
+                console.log(e)
+            }
+        }
+        return contracts;
+    }
+
+    async getChainWASMCode(chainID_or_chainName) {
+        let [chainID, id] = this.convertChainID(chainID_or_chainName)
+        let chainName = this.getChainName(chainID);
+        let sql = `select chainID, extrinsicHash, extrinsicID, codeHash, codeStoredBN, storer, status, codeStoredTS, language, compiler from wasmCode where chainID = '${chainID}' order by codeStoredTS desc`
+        let code = await this.poolREADONLY.query(sql);
+        for (let i = 0; i < code.length; i++) {
+            let c = code[i];
+            try {
+                c.id = id;
+                c.chainID = chainID;
+                c.chainName = chainName;
+            } catch (e) {
+                console.log(e)
+            }
+        }
+        return code;
+    }
+
+    async updateWASMContract(address, contractData) {
+        // fetch address codeHash's metadata
+        let contract = await this.getContract(address)
+        if (contract.metadata && contract.metadata.length > 0) {
+            // throw exception if there is metadata already
+            throw new paraTool.InvalidError(`Contract metadata exists already for Address ${address}`)
+        }
+        let metadata = JSON.parse(contractData);
+        let source = metadata.source;
+        let claimedHash = source.hash;
+        let wasm = source.wasm;
+        let language = source.language;
+        let compiler = source.compiler;
+        let actualHash = "0x" + paraTool.blake2_256_from_hex(wasm);
+        if (claimedHash != actualHash) {
+            throw new paraTool.InvalidError(`Hash error in .contract: file has hash ${claimedHash} but actual hash is ${actualHash}`)
+        }
+        if (contract.codeHash != actualHash) {
+            throw new paraTool.InvalidError(`Code hash is ${contract.codeHash} but hash of supplied code is ${actualHash}`)
+        }
+        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata 
+        let sql = `update wasmCode set metadata = ${mysql.escape(contractData)}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)} where codeHash = '${contract.codeHash}'`
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
+    }
+
+    async updateWASMCode(codeHash, contractData) {
+        // fetch address codeHash's metadata
+        let code = await this.getWASMCode(codeHash)
+        if (code.metadata && code.metadata.length > 0) {
+            // throw exception if there is metadata already
+            throw new paraTool.InvalidError(`Code hash metadata exists already for codeHash ${codeHash}`)
+        }
+        let metadata = JSON.parse(contractData);
+        let source = metadata.source;
+        let claimedHash = source.hash;
+        let wasm = source.wasm;
+        let language = source.language;
+        let compiler = source.compiler;
+        let actualHash = "0x" + paraTool.blake2_256_from_hex(wasm);
+        if (claimedHash != actualHash) {
+            throw new paraTool.InvalidError(`Hash error in .contract: file has hash ${claimedHash} but actual hash is ${actualHash}`)
+        }
+        if (code.codeHash != actualHash) {
+            throw new paraTool.InvalidError(`Code hash is ${contract.codeHash} but hash of supplied code is ${actualHash}`)
+        }
+        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata 
+        let sql = `update wasmCode set metadata = ${mysql.escape(contractData)}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)} where codeHash = '${contract.codeHash}'`
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
     }
 
 }

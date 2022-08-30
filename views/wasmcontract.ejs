@@ -1,0 +1,83 @@
+<%- include('header', {chainInfo: chainInfo, title: "WASM Contract"}); %>
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" style="font-size:1rem" id="wasmcontractTab" role="tablist">
+<%
+let tabs = [
+{ title: "Overview", target: "overview" },
+];
+let metadata = JSON.parse(contract.metadata);
+let spec = metadata && metadata.V3 && metadata.V3.spec ? metadata.V3.spec : null;
+let types = metadata && metadata.types ? metadata.types : null;
+var constructors, events, messages, readMessages = [], writeMessages = [];
+if ( spec ) {
+   constructors = spec.constructors;
+   events = spec.events;
+   messages = spec.messages;
+   readMessages = messages.filter( (m) => {
+     return ! m.mutates;
+   });
+   writeMessages = messages.filter( (m) => {
+     return m.mutates;
+  });
+}
+
+if ( contract.metadata ) {
+  tabs.push({ title: "Read Contract", target: "read" });
+  tabs.push({ title: "Write Contract", target: "write" });
+}
+tabs.push({ title: "Upload Contract", target: "upload" });
+
+  
+
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
+
+
+<!-- Tab panes -->
+<div class="tab-content">
+  <div class="tab-pane" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+     <%- include('wasmcontractOverview', {contract: contract}); %>
+  </div>
+
+  <div class="tab-pane" id="read" role="tabpanel" aria-labelledby="read-tab">
+  <% for (let i = 0; i < readMessages.length; i++) { %>
+     <%- include("wasmcontractMessage", {m: readMessages[i]}) %>
+  <% } %>
+  </div>
+
+  <div class="tab-pane" id="write" role="tabpanel" aria-labelledby="write-tab">
+  <% for (let i = 0; i < writeMessages.length; i++) { %>
+     <%- include("wasmcontractMessage", {m: writeMessages[i]}) %>
+  <% } %>
+  </div>
+
+  <div class="tab-pane" id="upload" role="tabpanel" aria-labelledby="upload-tab">
+    <form method="post" action="/uploadcontract/<%= address; %>" enctype="multipart/form-data">
+      <label class="form-label" for="customFile">Upload .contract data</label>
+      <input type="file" class="form-control" name="contractFile" id="contractFile" />
+      <input type='submit'>
+    </form>
+  </div>
+</div>
+<script>
+var baseURL = '<%= config.baseURL; %>'
+let address = '<%= contract.address; %>';
+let tabs = <%- JSON.stringify(tabs); %>;
+let isEVM = 0;
+</script>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script src="/wasmcontract.js"></script>
