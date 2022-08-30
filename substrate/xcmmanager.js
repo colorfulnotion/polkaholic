@@ -131,6 +131,63 @@ module.exports = class XCMManager extends AssetManager {
 
     }
 
+    async updateXcAssetContractAddr() {
+        let xcAssetRecs = await this.poolREADONLY.query(`select chainID, asset, assetname, symbol, decimals, xcmInteriorKey from asset where assetType = "Token" and chainID in (${paraTool.chainIDMoonbeam},${paraTool.chainIDMoonriver},${paraTool.chainIDMoonbase},${paraTool.chainIDAstar},${paraTool.chainIDShiden},${paraTool.chainIDShibuya}) order by chainID`);
+        let xcAssetList = [];
+        let xcContractAddrUpdates = []
+        let xcInteriorKeyUpdates = []
+
+        for (const xc of xcAssetRecs){
+            try {
+                let asset = JSON.parse(xc.asset)
+                if (asset.Token == xc.symbol) continue //GLMR/MOVR/DEV/SDN/ASTR/SBY etc..
+                let xcAssetID = asset.Token
+                let xcContractAddress = paraTool.xcAssetIDToContractAddr(xcAssetID).toLowerCase()
+                let xcAsset = {
+                    chainID: xc.chainID,
+                    asset: xc.asset,
+                    xcContractAddress: xcContractAddress,
+                    xcmInteriorKey: xc.xcmInteriorKey,
+                }
+                xcAssetList.push(xcAsset)
+            } catch(err){
+                console.log(`updateXcAssetContractAddr error:${err.toString()}`)
+            }
+        }
+        for (const xcAsset of xcAssetList){
+            //["asset", "chainID"] + ["xcContractAddress"]
+            let c = `('${xcAsset.asset}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}')`
+            xcContractAddrUpdates.push(c)
+
+            //["asset", "chainID"] + ["xcContractAddress", "xcmInteriorKey"]
+            let xcmInteriorKey = (xcAsset.xcmInteriorKey != undefined) ? `'${xcAsset.xcmInteriorKey}'` : `NULL`
+            let x = `('${xcAsset.xcContractAddress}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}', ${xcmInteriorKey})`
+            xcInteriorKeyUpdates.push(x)
+        }
+
+        console.log(xcContractAddrUpdates)
+        console.log(xcInteriorKeyUpdates)
+
+        let sqlDebug = true
+        let xcContractAddressVal = ["xcContractAddress"]
+        await this.upsertSQL({
+            "table": `asset`,
+            "keys": ["asset", "chainID"],
+            "vals": xcContractAddressVal,
+            "data": xcContractAddrUpdates,
+            "replace": xcContractAddressVal,
+        }, sqlDebug);
+
+        let xcInteriorKeyVal = ["xcContractAddress", "xcmInteriorKey"]
+        await this.upsertSQL({
+            "table": `asset`,
+            "keys": ["asset", "chainID"],
+            "vals": xcInteriorKeyVal,
+            "data": xcInteriorKeyUpdates,
+            "replace": xcInteriorKeyVal,
+        }, sqlDebug);
+    }
+
 
     // xcmtransfer_match matches cross transfers between SENDING events held in "xcmtransfer"  and CANDIDATE destination events (from various xcm received messages on a destination chain)
     // this will be phased out soon

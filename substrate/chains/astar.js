@@ -476,7 +476,7 @@ module.exports = class AstarParser extends ChainParser {
                 return
             }
             for (let i = 0; i < params.asset_id.length; i++) {
-                let rawAssetID = `${params.asset_id[i]}` //"0xffffffffffffffffffffffffffffffffffffffff"
+                let rawAssetID = `${params.asset_id[i]}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
                 if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
                 let assetString = this.processGenericCurrencyID(indexer, rawAssetID);
                 let rawAssetString = this.processRawGenericCurrencyID(indexer, rawAssetID);
