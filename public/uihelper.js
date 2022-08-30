@@ -1449,3 +1449,11 @@ function presentVerifyBlock(id, blockNumber, params = null) {
     // TODO: add params
     return `<a class="btn btn-sm text-capitalize" href="javascript:verifyBlock('${id}', '${blockNumber}')">${verifyIcon()}</a>`;
 }
+
+function presentWASMCodeHash(codeHash) {
+    return `<a href='/wasmcode/${codeHash}'>` + getShortHash(codeHash) + `</a>`
+}
+
+function presentWASMContract(contractAddress) {
+    return `<a href='/wasmcontract/${contractAddress}'>` + getShortHash(contractAddress) + `</a>`
+}

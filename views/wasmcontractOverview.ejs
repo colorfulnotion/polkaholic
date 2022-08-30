@@ -1,9 +1,18 @@
+<%
+let f = contract;
+%>
 <table class="table table-hover table-bordered">
   <tbody>
     <tr>
+      <td width="200">Contract Address</td>
+      <td><code><%- uiTool.getShortHash(f.address, false) %></code>
+      </td>
+    </tr>
+
+    <tr>
       <td width="200">Code Hash</td>
       <td>
-        <%- uiTool.getShortHash(f.codeHash, false) %>
+        <a href='/wasmcode/<%= f.codeHash %>'><%- uiTool.getShortHash(f.codeHash, false) %></a>
       </td>
     </tr>
 
@@ -21,7 +30,7 @@
 
     <tr>
       <td>Deployer</td>
-      <td><%= f.deployer %></td>
+      <td><%- uiTool.presentID(f.deployer) %></td>
     </tr>
 
     <tr>
@@ -41,35 +50,17 @@
     </tr>
 
     <tr>
-      <td>Destination</td>
-      <td>
-        <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
-        <%- include("blockNumber", {chainID: f.idDest, blockNumber: f.destBlocknumber}); %>
-      </td>
-    </tr>
-
-    <tr>
-      <td>Code</td>
-      <td>
-          <textarea>TODO
-	  </textarea>
-      </td>
-    </tr>
-
-    <tr>
       <td>Constructor</td>
       <td>
-          <textarea>TODO
-	  </textarea>
+          <code><%- contract.constructor %></code>
       </td>
     </tr>
 
     <tr>
-      <td>Metadata</td>
+      <td>WASM</td>
       <td>
-          <textarea>TODO
-	  </textarea>
+          <textarea style='width: 800px; height: 400px'><%- contract.wasm %></textarea>
       </td>
     </tr>
-
+  </tbody>
 </table>

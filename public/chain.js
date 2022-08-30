@@ -1,6 +1,8 @@
 var initrecentblocks = false;
 var initchainlog = false;
 var initspecversions = false;
+var initwasmcontracts = false;
+var initwasmcode = false;
 var refreshIntervalMS = 5000;
 var recentBlocksIntervalId = false;
 
@@ -208,6 +210,140 @@ function showspecversions(chainID) {
     loadData2(pathParams, tableName, false)
 }
 
+function showwasmcontracts(chainID) {
+    if (initwasmcontracts) return;
+    else initwasmcontracts = true;
+    let pathParams = `wasmcontracts/${chainID}`
+    let tableName = '#tablewasmcontracts'
+    var table = $(tableName).DataTable({
+        order: [
+            [5, "desc"]
+        ],
+        columnDefs: [{
+            "className": "dt-center",
+            "targets": "_all"
+        }],
+        columns: [{
+            data: 'address',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentWASMContract(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'status',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'deployer',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentID(data)
+                }
+                return data;
+            }
+        }, {
+            data: 'codeHash',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentWASMCodeHash(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'instantiateBN',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                }
+                return data;
+            }
+        }, {
+            data: 'blockTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentTS(data);
+                }
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, false)
+}
+
+function showwasmcode(chainID) {
+    if (initwasmcode) return;
+    else initwasmcode = true;
+    let pathParams = `wasmcode/${chainID}`
+    let tableName = '#tablewasmcode'
+    var table = $(tableName).DataTable({
+        order: [
+            [6, "desc"]
+        ],
+        columnDefs: [{
+            "className": "dt-center",
+            "targets": "_all"
+        }],
+        columns: [{
+            data: 'codeHash',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentWASMCodeHash(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'status',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'storer',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentID(data)
+                }
+                return data;
+            }
+        }, {
+            data: 'codeStoredBN',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                }
+                return data;
+            }
+        }, {
+            data: 'language',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }, {
+            data: 'compiler',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }, {
+            data: 'codeStoredTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentTS(data);
+                }
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, false)
+}
+
 function presentLoan(assetChain, assetString) {
     let asset = JSON.parse(assetString)
     let symbol = "UNK";
@@ -385,6 +521,14 @@ function showchaintab(hash) {
         case "#specversions":
             showspecversions(id);
             setupapidocs("chain", "specversions", `${id}`);
+            break;
+        case "#wasmcontracts":
+            showwasmcontracts(id);
+            setupapidocs("chain", "wasmcontracts", `${id}`);
+            break;
+        case "#wasmcode":
+            showwasmcode(id);
+            setupapidocs("chain", "wasmcode", `${id}`);
             break;
         case "#recentblocks":
             showrecentblocks(id);
