@@ -111,7 +111,6 @@ module.exports = class Crawler extends Indexer {
             })
 	    */
             let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' ${chain.RPCBackfill}`
-            console.log(cmd);
             const {
                 stdout,
                 stderr
@@ -146,14 +145,15 @@ module.exports = class Crawler extends Indexer {
         return false;
     }
 
-    async crawlEvmTrace(chain, blockHash, timeoutMS = 20000) {
+    async crawlEvmTrace(chain, blockNumber, timeoutMS = 20000) {
         if (!chain.RPCBackfill) {
             return (false);
         }
         if (chain.RPCBackfill.length == 0) {
             return (false);
         }
-        let cmd = `curl --silent -H "Content-Type: application/json;charset=utf-8" --max-time 90 --connect-timeout 10 -d '{"id":1,"jsonrpc":"2.0","method":"debug_traceBlockByHash","params":["${blockHash}", {"tracer": "callTracer"}]}' ${chain.RPCBackfill}`
+        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
+        let cmd = `curl ${chain.evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}", {"tracer": "callTracer"}],"id":1,"jsonrpc":"2.0"}'`
         try {
             const {
                 stdout,
@@ -162,7 +162,12 @@ module.exports = class Crawler extends Indexer {
                 maxBuffer: 1024 * 64000
             });
             let traceData = JSON.parse(stdout);
-            return (traceData);
+            if (traceData.result) {
+                console.log(blockNumber, traceData.result.length, cmd);
+                return (traceData.result);
+            }
+            console.log(cmd);
+            return (null);
         } catch (error) {
             this.logger.warn({
                 "op": "crawlEvmTrace",
@@ -233,7 +238,7 @@ module.exports = class Crawler extends Indexer {
                 }
                 if (crawlTraceEVM) {
                     if (!evmBlock) evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
-                    evmTrace = await this.crawlEvmTrace(chain, evmBlock.hash)
+                    evmTrace = await this.crawlEvmTrace(chain, bn);
                 }
             }
 
@@ -293,17 +298,17 @@ module.exports = class Crawler extends Indexer {
 
     // crawl_trace fetches a block
     async crawl_trace_evm(chain, t, api = false) {
-        let blockHashEVM = t.blockHashEVM;
+        let bn = t.blockNumber;
         let attemptNumber = t.attempted;
         try {
-            let trace = await this.crawlEvmTrace(chain, blockHashEVM, 60000 * (attemptNumber + 1));
-            let success = await this.save_trace_evm(chain.chainID, t, trace, "debug_traceBlockByHash");
+            let trace = await this.crawlEvmTrace(chain, bn, 60000 * (attemptNumber + 1));
+            let success = await this.save_trace_evm(chain.chainID, t, trace, "debug_traceBlockByNumber");
             return [t, trace];
         } catch (err) {
             this.logger.warn({
                 "op": "crawl_trace_evm",
                 "chainID": chain.chainID,
-                "blockHash": blockHash,
+                "bn": bn,
                 "err": err
             })
             console.log("failure!", err);
@@ -456,7 +461,7 @@ module.exports = class Crawler extends Indexer {
             };
             save = true;
         }
-        //console.log(`save_evm_block: cbt read chain${chainID} prefix=${paraTool.blockNumberToHex(bn)} evmTrace`, evmTrace);
+        console.log(`save_evm_block: cbt read chain${chainID} prefix=${paraTool.blockNumberToHex(bn)} evmTrace`, evmTrace);
         // flush out BT updates
         if (save) {
             try {
@@ -1210,7 +1215,7 @@ module.exports = class Crawler extends Indexer {
         let chain = await this.setupChainAndAPI(chainID);
         let done = false;
         do {
-            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, blockHashEVM, attempted from block${chainID} where crawlTraceEVM > 0 and length(blockHash) > 0 and blockDT >= date_sub(Now(), interval ${lookback} DAY) and attempted < ${maxTraceAttempts} order by crawlTraceEVM desc,attempted, blockNumber desc limit 1000`
+            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, blockHashEVM, attempted from block${chainID} where crawlTraceEVM > 0 and length(blockHash) > 0 and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} and blockDT >= date_sub(Now(), interval ${lookback} DAY) and attempted < ${maxTraceAttempts} order by crawlTraceEVM desc,attempted, blockNumber desc limit 1000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
                 let endBN = techniqueParams[2];
@@ -1223,7 +1228,6 @@ module.exports = class Crawler extends Indexer {
                 let j = i + jmp;
                 if (j > tasks.length) j = tasks.length;
                 let pieces = tasks.slice(i, j);
-
                 let res = pieces.map((t1) => {
                     let t2 = {
                         chainID: chainID,
@@ -1737,7 +1741,8 @@ create table talismanEndpoint (
                 if (this.web3Api) {
                     let evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
                     let evmReceipts = await ethTool.crawlEvmReceipts(this.web3Api, evmBlock) // this is using the result from previous call
-                    let evmTrace = (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver) ? await this.crawlEvmTrace(chain, evmBlock.hash) : false;
+                    let evmTrace = (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver) ? await this.crawlEvmTrace(chain, bn) : false;
+
                     await this.save_evm_block(chainID, bn, finalizedHash, evmBlock, evmReceipts, evmTrace)
                     rRow.evmBlock = evmBlock;
                     rRow.evmReceipts = evmReceipts;
@@ -1978,15 +1983,6 @@ create table talismanEndpoint (
                             let signedExtrinsicBlock = block
                             signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
 
-                            /*
-                            if (this.web3Api) {
-                                //this call is potentially problematic - because we don't know the evmBlockHash associated with a certain subsrate blockhash
-                                evmBlock = await ethTool.crawlEvmBlock(this.web3Api, blockNumber)
-                                evmReceipts = await ethTool.crawlEvmReceipts(this.web3Api, evmBlock) // this is using the result from previous call
-                                evmTrace = (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver) ? await this.crawlEvmTrace(chain, evmBlock.hash) : false;
-                                await this.save_evm_block(chainID, blockNumber, blockHash, evmBlock, evmReceipts, evmTrace)
-                            }
-                            */
                             //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
                             let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts); // autotrace, finalized, write_bq_log are all false
 

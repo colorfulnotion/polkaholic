@@ -12,6 +12,8 @@ module.exports = class XCMManager extends AssetManager {
 
     lastupdateTS = 0
 
+
+
     async updateXcmInteriorOut(isRawAsset = false) {
         let xcmListRecs = await this.poolREADONLY.query("select relayChain, chainID, rawAsset, asset, xcmInteriorKey, count(*) cnt from xcmtransfer where xcmInteriorKey is not null group by chainID, rawAsset, asset, xcmInteriorKey, relaychain order by chainID, xcmInteriorKey;");
         let xcmList = {};
@@ -129,6 +131,14 @@ module.exports = class XCMManager extends AssetManager {
             "replace": xcmInteriorKeyVal,
         }, sqlDebug);
 
+
+    }
+
+
+    async updateXcmTransferRoute() {
+        let sqlroute = `insert into xcmtransferroute ( asset, assetDest, symbol, chainID, chainIDDest, cnt) (select asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest, count(*) as cnt from xcmtransfer, xcmasset, asset, asset as assetDest where xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey and xcmasset.xcmInteriorKey = asset.xcmInteriorKey and asset.chainID = xcmtransfer.chainID and xcmasset.xcmInteriorKey = assetDest.xcmInteriorKey and assetDest.chainID = xcmtransfer.chainIDDest and sourceTS > UNIX_TIMESTAMP(date_sub(Now(), interval 30 day)) and assetDest.assetType = "Token" and asset.assetType = "Token" group by asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest) on duplicate key update asset = values(asset), assetDest = values(assetDest), cnt = values(cnt);`
+        this.batchedSQL.push(sqlroute);
+        await this.update_batchedSQL();
     }
 
     async updateXcAssetContractAddr() {

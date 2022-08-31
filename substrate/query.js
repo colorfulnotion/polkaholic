@@ -1781,7 +1781,7 @@ module.exports = class Query extends AssetManager {
                         priceUSD: 0,
                         tvl: 0
                     }
-                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, chainID, ts)
+                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, v.chainID, ts)
                     a.priceUSD = priceUSDCurrent;
                     let latestDexRec = await this.getDexRec(v.asset, v.chainID, ts);
                     a.token0Supply = latestDexRec.lp0;
@@ -1808,7 +1808,7 @@ module.exports = class Query extends AssetManager {
                         priceUSD: 0,
                         tvl: 0
                     }
-                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, chainID, ts);
+                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, v.chainID, ts);
                     a.priceUSD = priceUSD;
                     if (a.priceUSD == null) a.priceUSD = 0
                     if (v.assetType == "ERC20") {

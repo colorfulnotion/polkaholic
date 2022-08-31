@@ -5,15 +5,23 @@ var Crawler = require("./crawler");
 async function main() {
     var chainID = -1;
     var crawler = new Crawler();
+    let n = 0;
+    let nmax = 1;
     crawler.exitOnDisconnect = true;
     await crawler.assetManagerInit();
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = parseInt(val, 10);
         }
+        if (index == 3 && val.length > 0) {
+            n = parseInt(val, 10);
+        }
+        if (index == 4 && val.length > 0) {
+            nmax = parseInt(val, 10);
+        }
     });
     if (chainID >= 0) {
-        await crawler.crawlTracesEVM(chainID, ["mod", 0, 1]);
+        await crawler.crawlTracesEVM(chainID, ["mod", n, nmax]);
     } else {
 	do {
             await crawler.crawlTracesRandom();

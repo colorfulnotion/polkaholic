@@ -101,9 +101,9 @@ module.exports = class AssetManager extends PolkaholicDB {
     // reads all the decimals from the chain table and then the asset mysql table
     async init_chainInfos() {
         //TODO: adjust getSystemProperties to handle case where chain that does not have a "asset" specified (or use left join here) will get one
-        var chains = await this.poolREADONLY.query(`select id, chain.chainID, chain.chainName, relayChain, paraID, ss58Format, isEVM, chain.iconUrl, 
-asset.asset, asset.symbol, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange, 
-githubURL, subscanURL, parachainsURL, dappURL, WSEndpoint 
+        var chains = await this.poolREADONLY.query(`select id, chain.chainID, chain.chainName, relayChain, paraID, ss58Format, isEVM, chain.iconUrl,
+asset.asset, asset.symbol, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange,
+githubURL, subscanURL, parachainsURL, dappURL, WSEndpoint
 from chain left join asset on chain.chainID = asset.chainID and chain.asset = asset.asset where ( crawling = 1 or paraID > 0 and id is not null);`);
         var specVersions = await this.poolREADONLY.query(`select chainID, blockNumber, specVersion from specVersions order by chainID, blockNumber`);
         var assets = await this.poolREADONLY.query(`select asset, chainID, symbol, decimals from asset where decimals is not Null and asset not like '0x%' `);
@@ -544,7 +544,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
     }
 
     async init_asset_info() {
-        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.asset, asset.symbol, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.chainName, asset.isUSD, priceUSDpaths, nativeAssetChain, currencyID from asset, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow') order by chainID, assetType, asset");
+        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.asset, asset.symbol, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.chainName, asset.isUSD, priceUSDpaths, asset.routeDisabled, nativeAssetChain, currencyID from asset, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow') order by chainID, assetType, asset");
 
         let nassets = 0;
         let assetInfo = {};
@@ -575,7 +575,8 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     assetChain: assetChain,
                     isUSD: v.isUSD,
                     priceUSDpaths: priceUSDpaths,
-                    nativeAssetChain: v.nativeAssetChain
+                    nativeAssetChain: v.nativeAssetChain,
+                    routeDisabled: v.routeDisabled
                 }
             } else {
                 //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
@@ -591,7 +592,8 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     assetChain: assetChain,
                     isUSD: v.isUSD,
                     priceUSDpaths: priceUSDpaths,
-                    nativeAssetChain: v.nativeAssetChain
+                    nativeAssetChain: v.nativeAssetChain,
+                    routeDisabled: v.routeDisabled
                 }
             }
             assetInfo[assetChain] = a;
@@ -1147,21 +1149,30 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         let priceUSDpath = assetInfo.priceUSDpaths[0];
         let v = 1.0;
         let dexRecFound = false
-        if (this.debugLevel >= paraTool.debugTracing) console.log("DEX model", asset, priceUSDpaths);
+        //if (this.debugLevel >= paraTool.debugTracing) console.log("DEX model", asset, priceUSDpaths);
         for (let j = priceUSDpath.length - 1; j > 0; j--) {
             let r = priceUSDpath[j];
-            let dexrec = await this.getDexRec(r.route, chainID, ts);
-            if (dexrec) {
-                let s = parseInt(r.s, 10);
-                if (s == 1) {
-                    dexRecFound = true
-                    v *= dexrec.close;
-                } else {
-                    dexRecFound = true
-                    v /= dexrec.close;
-                }
+            // route is an assetChain now
+            let [route, chainID] = paraTool.parseAssetChain(r.route);
+            let routeParsed = paraTool.isJSONString(route) ? JSON.parse(route) : route;
+            if (routeParsed.xcAsset || routeParsed.xcmtransfer) {
+                // identity for xc20 assets (moonbeam, astar) or when xcmtransfer happen between chains
+                dexRecFound = true;
             } else {
-                //if (this.debugLevel >= paraTool.debugTracing) console.log("getTokenPriceUSD - MISSING route", r.route, "ts", ts, "asset", asset, "assetChain", assetChain, "assetInfo", assetInfo);
+                let dexrec = await this.getDexRec(route, chainID, ts);
+                if (dexrec) {
+                    let s = parseInt(r.s, 10);
+                    if (s == 1) {
+                        dexRecFound = true
+                        v *= dexrec.close;
+                    } else {
+                        dexRecFound = true
+                        v /= dexrec.close;
+                    }
+                } else {
+                    //if (this.debugLevel >= paraTool.debugTracing)
+                    console.log("getTokenPriceUSD - MISSING route", r.route, "ts", ts, "asset", asset, "assetChain", assetChain, "assetInfo", assetInfo);
+                }
             }
         }
         if (this.debugLevel >= paraTool.debugTracing) console.log(`asset=${asset}, price=${v}, dexRecFound=${dexRecFound}`)

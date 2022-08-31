@@ -59,136 +59,212 @@ module.exports = class PriceManager extends Query {
         return (false);
     }
 
-    getPathExtensions(path, chainID = paraTool.chainIDMoonbeam) {
+    get_symbol(assetChain) {
+        if (this.assetInfo[assetChain] != undefined) {
+            return this.assetInfo[assetChain].symbol;
+        }
+        return null;
+    }
+    getPathExtensions(path) {
         let extensions = [];
-        let tailAsset = path[path.length - 1].dest; // the last element
-        if (tailAsset == undefined) {
+        let tailAssetChain = path[path.length - 1].dest; // the last element, which is an assetChain
+        if (tailAssetChain == undefined) {
             return (extensions);
         }
-
+        let [tailAsset, tailAssetChainID] = paraTool.parseAssetChain(tailAssetChain);
         for (const assetChain of Object.keys(this.assetInfo)) {
             let [asset, cID] = paraTool.parseAssetChain(assetChain);
-            if (cID == chainID) {
-                let assetInfo = this.assetInfo[assetChain];
-                if ((assetInfo.assetType == paraTool.assetTypeERC20LiquidityPair || assetInfo.assetType == paraTool.assetTypeLiquidityPair) && (assetInfo.token0 && assetInfo.token1)) {
-                    if (assetInfo.token0 == tailAsset && this.explored[assetInfo.token1] == undefined) {
-                        // extend with a.token1
-                        let newpath = [...path];
-                        newpath.push({
-                            route: assetInfo.asset,
-                            dest: assetInfo.token1,
-                            symbol: assetInfo.symbol,
-                            token0Symbol: assetInfo.token0Symbol,
-                            token1Symbol: assetInfo.token1Symbol,
-                            s: 1
-                        });
-                        extensions.push(newpath);
-                        this.explored[assetInfo.token1] = true;
-                    } else if (assetInfo.token1 == tailAsset && this.explored[assetInfo.token0] == undefined) {
-                        // extend with a.token0
-                        let newpath = [...path];
-                        newpath.push({
-                            route: assetInfo.asset,
-                            dest: assetInfo.token0,
-                            symbol: assetInfo.symbol,
-                            token0Symbol: assetInfo.token0Symbol,
-                            token1Symbol: assetInfo.token1Symbol,
-                            s: 0
-                        });
-                        extensions.push(newpath);
-                        this.explored[assetInfo.token0] = true;
-                    }
+            let assetInfo = this.assetInfo[assetChain];
+            if (assetInfo.routeDisabled) {
+                // aUSD hack
+            } else if ((assetInfo.assetType == paraTool.assetTypeERC20LiquidityPair || assetInfo.assetType == paraTool.assetTypeLiquidityPair || assetInfo.assetType == paraTool.assetTypeXCAsset || assetInfo.assetType == paraTool.assetTypeXCMTransfer) && (assetInfo.token0 && assetInfo.token1)) {
+                let chainIDDest = null;
+                if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
+                    chainIDDest = assetInfo.chainIDDest;
                 }
-		// TODO: add xc paths extensions with route=system 1:1 to cover Moonbeam/Astar xc asset
-		// (1) {"route":"system","dest":"0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080","symbol":"xcDOT/xcDOT","token0Symbol":"xcDOT","token1Symbol":"xcDOT","s":0}]
-		// (2) {"route":"system","dest":"{"Token":"42259045809535163221576417993425387648"}","symbol":"xcDOT/xcDOT","token0Symbol":"xcDOT","token1Symbol":"xcDOT","s":1}]
-		/*if ( let currencyID = this.is_xc_asset_contractAddress(tailAsset) )  {
-		    newpath.push({
-			route: "system",
-			dest: JSON.stringify({"Token": currencyID}),
-			symbol: `${sym}/${sym}`,
-			token0Symbol: `${sym}`,
-			token1Symbol: `${sym}`,
-			s: 1
-		    })
-		} else if ( let asset = this.is_xc_asset_currencyID(tailAsset) ) {
-		    newpath.push({
-			route: "system",
-			dest: asset,
-			symbol: `${sym}/${sym}`,
-			token0Symbol: `${sym}`,
-			token1Symbol: `${sym}`,
-			s: 0
-		    })
-		} */
-            } else {
-		// (2) for actually observed xcmtransfers from chainID to chainIDDest..., add paths -- this requires chainID to be present in the tailAsset
-		/*
-		  newpath.push({
-		     route: "xcm",
-		     symbol: `${sym}/${sym}`
-		     token0Symbol: `${sym}`,
-		     token1Symbol: `${sym}`,
-                  })
-		*/
-	    }
+                let debug = (assetInfo.assetType == paraTool.assetTypeXCMTransfer);
 
+                let token0chain = paraTool.makeAssetChain(assetInfo.token0, assetInfo.chainID);
+                let token1chain = paraTool.makeAssetChain(assetInfo.token1, assetInfo.chainID);
+                if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
+                    let x = JSON.parse(asset)
+                    if (x.xcmtransfer) {
+                        let symbol = x.xcmtransfer.symbol;
+                        let chainIDDest = x.xcmtransfer.chainIDDest;
+                        token0chain = paraTool.makeAssetChain(assetInfo.token0, cID);
+                        token1chain = paraTool.makeAssetChain(assetInfo.token1, chainIDDest);
+                        if ((cID == tailAssetChainID) && this.explored[token1chain] == undefined && (symbol == this.get_symbol(tailAssetChain))) {
+                            // extend with a.token1
+                            let newpath = [...path];
+                            newpath.push({
+                                route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                                dest: token1chain,
+                                symbol: assetInfo.symbol,
+                                token0Symbol: assetInfo.token0Symbol,
+                                token1Symbol: assetInfo.token1Symbol,
+                                s: 1
+                            });
+                            if (debug) {
+                                console.log("extending0 xcmtransfer", assetChain, newpath);
+                            }
+                            extensions.push(newpath);
+                            this.explored[token1chain] = true;
+                        } else if ((chainIDDest == tailAssetChainID) && this.explored[token0chain] == undefined && (symbol == this.get_symbol(tailAssetChain))) {
+                            // extend with a.token0
+                            let newpath = [...path];
+                            newpath.push({
+                                route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                                dest: token0chain,
+                                symbol: assetInfo.symbol,
+                                token0Symbol: assetInfo.token0Symbol,
+                                token1Symbol: assetInfo.token1Symbol,
+                                s: 0
+                            });
+                            if (debug) {
+                                console.log("extending1 xcmtransfer", assetChain, newpath);
+                            }
+                            extensions.push(newpath);
+                            this.explored[token0chain] = true;
+                        }
+                    }
+                } else if (assetInfo.token0 == tailAsset && (cID == tailAssetChainID) && this.explored[token1chain] == undefined) {
+                    // extend with a.token1
+                    let newpath = [...path];
+                    newpath.push({
+                        route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                        dest: token1chain,
+                        symbol: assetInfo.symbol,
+                        token0Symbol: assetInfo.token0Symbol,
+                        token1Symbol: assetInfo.token1Symbol,
+                        s: 1
+                    });
+                    extensions.push(newpath);
+                    this.explored[token1chain] = true;
+                } else if (assetInfo.token1 == tailAsset && (cID == tailAssetChainID) && this.explored[token0chain] == undefined) {
+                    // extend with a.token0
+                    let newpath = [...path];
+                    newpath.push({
+                        route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                        dest: token0chain,
+                        symbol: assetInfo.symbol,
+                        token0Symbol: assetInfo.token0Symbol,
+                        token1Symbol: assetInfo.token1Symbol,
+                        s: 0
+                    });
+                    extensions.push(newpath);
+                    this.explored[token0chain] = true;
+                }
+            }
         }
         return (extensions);
     }
 
-    async computePriceUSDPaths(chainID = -1) {
-        let chains = await this.getChains();
-        if (chainID == -1) {
-            for (var i = 0; i < chains.length; i++) {
-                await this.compute_priceUSDPaths(chains[i].chainID);
+    async load_xc_assetInfo() {
+        let sql = `select asset, chainID, xcContractAddress, symbol from asset where xcContractAddress is not null and assetType = 'Token' and routeDisabled = 0 order by chainID, asset;`
+        let routes = await this.poolREADONLY.query(sql)
+        for (let i = 0; i < routes.length; i++) {
+            let r = routes[i];
+            let asset = JSON.stringify({
+                "xcAsset": r.symbol
+            });
+            let assetChain = paraTool.makeAssetChain(asset, r.chainID);
+            let xcAsset = {
+                assetType: paraTool.assetTypeXCAsset,
+                asset: asset, // this is the virtual "mapper" 
+                chainID: r.chainID,
+                token0: r.asset, // {"Token":...} which is NOT the same!
+                token1: r.xcContractAddress, // 0x... which not the same as token0!
+                token0Symbol: r.symbol,
+                token1Symbol: r.symbol,
+                symbol: r.symbol
             }
-        } else {
-            await this.compute_priceUSDPaths(chainID);
+            /*
+{
+  assetType: 'XCAsset',
+  chainID: 2004,
+  token0: '{"Token":"42259045809535163221576417993425387648"}',
+  token1: '0xffffffff1fcacbd218edc0eba20fc2308c778080',
+  token0Symbol: 'xcDOT',
+  token1Symbol: 'xcDOT',
+  symbol: 'xcDOT'
+}
+*/
+            console.log(assetChain, xcAsset);
+            this.assetInfo[assetChain] = xcAsset;
         }
+        // for actually observed xcmtransfers from chainID to chainIDDest, add assetInfo
+        /* insert into xcmtransferroute ( asset, assetDest, symbol, chainID, chainIDDest, cnt) (select asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest, count(*) as cnt  from xcmtransfer,  xcmasset, asset, asset as assetDest  where xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey and        xcmasset.xcmInteriorKey = asset.xcmInteriorKey and asset.chainID = xcmtransfer.chainID and        xcmasset.xcmInteriorKey = assetDest.xcmInteriorKey and assetDest.chainID = xcmtransfer.chainIDDest and        sourceTS > UNIX_TIMESTAMP(date_sub(Now(), interval 30 day)) and assetDest.assetType = "Token" and asset.assetType = "Token" group by asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest) on duplicate key update asset = values(asset), assetDest = values(assetDest), cnt = values(cnt); */
+        let sql2 = `select asset, assetDest, symbol, chainID, chainIDDest from xcmtransferroute where cnt > 0 and routeDisabled = 0`
+        let xcmroutes = await this.poolREADONLY.query(sql2)
+        for (let i = 0; i < xcmroutes.length; i++) {
+            let r = xcmroutes[i];
+            let bridge = {
+                "xcmtransfer": {
+                    symbol: r.symbol,
+                    chainIDDest: r.chainIDDest
+                }
+            };
+            let asset = JSON.stringify(bridge);
+            let assetChain = paraTool.makeAssetChain(asset, r.chainID);
+            let xcmtransfer = {
+                assetType: paraTool.assetTypeXCMTransfer,
+                asset: asset, // this is the virtual "mapper"
+                chainID: r.chainID,
+                chainIDDest: r.chainIDDest,
+                token0: r.asset,
+                token1: r.assetDest,
+                token0Symbol: r.symbol, // could be the symbol name on chainID     (e.g. xcDOT) instead of the "universal" one (DOT) 
+                token1Symbol: r.symbol, // could be the symbol name on chainIDDest
+                symbol: r.symbol
+            }
+            this.assetInfo[assetChain] = xcmtransfer;
+        }
+
     }
 
-    async compute_priceUSDPaths(chainID = paraTool.chainIDMoonbeam) {
+    async computePriceUSDPaths() {
         await this.init(); /// sets up this.assetInfo
 
+        await this.load_xc_assetInfo();
         // add the roots:
         for (const assetChain of Object.keys(this.assetInfo)) {
-            let [asset, cID] = paraTool.parseAssetChain(assetChain);
-            if (cID == chainID) {
-                let assetInfo = this.assetInfo[assetChain];
-                if (assetInfo.isUSD && (cID == chainID)) {
-                    this.enqueue([{
-                        dest: assetInfo.asset,
-                        symbol: assetInfo.symbol
-                    }]);
-                    this.explored[assetInfo.asset] = true;
-                }
+            let assetInfo = this.assetInfo[assetChain];
+            if (assetInfo.routeDisabled) {
+                console.log("DISABLED", assetInfo);
+            } else if (assetInfo.isUSD) {
+                console.log("ENABLED", assetChain);
+                this.enqueue([{
+                    dest: assetChain,
+                    symbol: assetInfo.symbol
+                }]);
+                this.explored[assetChain] = true;
             }
         }
+
         let path = false;
         while (path = this.dequeue()) {
-            let extensions = this.getPathExtensions(path, chainID);
-
+            let extensions = this.getPathExtensions(path);
             for (let e = 0; e < extensions.length; e++) {
                 let p = extensions[e];
-                let tailAsset = p[p.length - 1].dest;
-                if (tailAsset == undefined) {
+                let tailAssetChain = p[p.length - 1].dest;
+                if (tailAssetChain == undefined) {
                     console.log("FAIL xxx", p);
                     process.exit(1);
                 }
-                if (this.resultPaths[tailAsset] == undefined) {
-                    this.resultPaths[tailAsset] = [];
+                if (this.resultPaths[tailAssetChain] == undefined) {
+                    this.resultPaths[tailAssetChain] = [];
                 }
-                this.resultPaths[tailAsset].push(extensions[e]);
+                this.resultPaths[tailAssetChain].push(extensions[e]);
                 this.enqueue(extensions[e]);
             }
         }
         let cnt = 0;
-        for (const asset of Object.keys(this.resultPaths)) {
-            let paths = this.resultPaths[asset];
+        for (const assetChain of Object.keys(this.resultPaths)) {
+            let paths = this.resultPaths[assetChain];
             let pathsString = JSON.stringify(paths);
+            let [asset, chainID] = paraTool.parseAssetChain(assetChain);
             let sql = `update asset set priceUSDpaths = ` + mysql.escape(pathsString) + ` where asset = '${asset}' and chainID = '${chainID}'`
-            console.log("RESULT", asset, paths, sql);
+            console.log("RESULT", assetChain, paths, sql);
             this.batchedSQL.push(sql);
             cnt++;
         }

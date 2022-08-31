@@ -24,6 +24,7 @@ async function main() {
     let startTS = manager.currentTS() - 3600;
     const lookbackSeconds = 120;
     let numRecs = 0;
+    let lastGeneralUpdateTS = manager.getCurrentTS();
     do {
         // startTS that comes back is the last message unix timestamp
         [numRecs, startTS] = await manager.xcmanalytics_period(chain, startTS - 3600);
@@ -42,7 +43,15 @@ async function main() {
             console.log(`update assetManager now`)
             lastUpdateTS = manager.getCurrentTS()
             await manager.assetManagerInit();
-        }
+            let lastGeneralUpdateTSAgo = manager.getCurrentTS() - lastGeneralUpdateTS
+	    if ( lastGeneralUpdateTSAgo > 14400 ) {
+		await manager.updateXcmInteriorOut(true)
+		await manager.updateXcmInteriorOut(false)
+		await manager.updateXcAssetContractAddr()
+		await manager.updateXcmTransferRoute();
+		lastGeneralUpdateTS = manager.getCurrentTS();
+	    }
+	}
     } while (true);
 }
 
