@@ -220,7 +220,7 @@ function getLoginEmail(req) {
 // Usage: https://polkaholic.io/login
 app.get('/login', async (req, res) => {
     try {
-        var chains = await query.getChains();
+        var chains = await query.getChaisn();
         res.render('login', {
             chains: chains,
             chainInfo: query.getChainInfo(),
@@ -479,10 +479,12 @@ app.get('/', async (req, res) => {
             if (chain) {
                 var blocks = await query.getChainRecentBlocks(chainID);
                 var homePubkey = getHomePubkey(req);
+                let account = homePubkey ? await query.getAccountAssetsRealtimeByChain(null, homePubkey) : {};
                 res.render('chain', {
                     blocks: blocks,
                     chainID: chainID,
                     address: homePubkey,
+                    account: account,
                     id: id,
                     chainInfo: query.getChainInfo(chainID),
                     chain: chain,
@@ -1497,17 +1499,33 @@ app.post('/uploadcontract/:address', async (req, res) => {
         return res.status(400).send('No contract file was uploaded.');
     }
     let address = req.params['address'];
-    // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
     let contractFile = req.files.contractFile;
     console.log(contractFile.name, contractFile.size, contractFile.data.toString());
 
     await query.updateWASMContract(address, contractFile.data.toString());
-    // Use the mv() method to place the file somewhere on your server
     contractFile.mv(`/tmp/${address}.contract`, function(err) {
         if (err) {
             return res.status(500).send(err);
         }
-        res.send('File uploaded!');
+        res.send('Contract File uploaded!');
+    });
+
+})
+
+app.post('/uploadcode/:codeHash', async (req, res) => {
+    if (!req.files || Object.keys(req.files).length === 0) {
+        return res.status(400).send('No contract file was uploaded.');
+    }
+    let codeHash = req.params['codeHash'];
+    let contractFile = req.files.contractFile;
+    console.log(contractFile.name, contractFile.size, contractFile.data.toString());
+
+    await query.updateWASMCode(codeHash, contractFile.data.toString());
+    contractFile.mv(`/tmp/${codeHash}.contract`, function(err) {
+        if (err) {
+            return res.status(500).send(err);
+        }
+        res.send('Code File uploaded!');
     });
 
 })

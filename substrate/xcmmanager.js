@@ -137,7 +137,7 @@ module.exports = class XCMManager extends AssetManager {
         let xcContractAddrUpdates = []
         let xcInteriorKeyUpdates = []
 
-        for (const xc of xcAssetRecs){
+        for (const xc of xcAssetRecs) {
             try {
                 let asset = JSON.parse(xc.asset)
                 if (asset.Token == xc.symbol) continue //GLMR/MOVR/DEV/SDN/ASTR/SBY etc..
@@ -150,11 +150,11 @@ module.exports = class XCMManager extends AssetManager {
                     xcmInteriorKey: xc.xcmInteriorKey,
                 }
                 xcAssetList.push(xcAsset)
-            } catch(err){
+            } catch (err) {
                 console.log(`updateXcAssetContractAddr error:${err.toString()}`)
             }
         }
-        for (const xcAsset of xcAssetList){
+        for (const xcAsset of xcAssetList) {
             //["asset", "chainID"] + ["xcContractAddress"]
             let c = `('${xcAsset.asset}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}')`
             xcContractAddrUpdates.push(c)

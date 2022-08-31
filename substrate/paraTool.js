@@ -623,13 +623,13 @@ function VSTokenToToken(tokenStr) {
 //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
 // 340282366920938463463374607431768211455 -> 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF
 // 42259045809535163221576417993425387648  -> 0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080
-function xcAssetIDToContractAddr(xcAssetID){
+function xcAssetIDToContractAddr(xcAssetID) {
     let xcAssetAddress = '0x'
     try {
         let h = bnToHex(`${xcAssetID}`)
         let assetAddress = "0xFFFFFFFF" + h.substr(2).padStart(32, '0')
         xcAssetAddress = web3.utils.toChecksumAddress(assetAddress)
-    }catch(err){
+    } catch (err) {
         console.log(`xcAssetIDToContractAddr error=${err.toString()}`)
     }
     return xcAssetAddress
@@ -637,12 +637,12 @@ function xcAssetIDToContractAddr(xcAssetID){
 
 // 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF -> 340282366920938463463374607431768211455
 // 0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080 -> 42259045809535163221576417993425387648
-function contractAddrToXcAssetID(xcAssetAddress){
+function contractAddrToXcAssetID(xcAssetAddress) {
     let xcAssetID = false
     try {
         let rawAssetID = '0x' + xcAssetAddress.substr(10)
         xcAssetID = dechexAssetID(rawAssetID)
-    }catch(err){
+    } catch (err) {
         console.log(`contractAddrToXcAssetID error=${err.toString()}`)
     }
     return xcAssetID

@@ -78,9 +78,9 @@ function showassetsrelated(asset, chainID) {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     if (row.assetType == "ERC20LP") {
-                        return presentAssetPair(row.assetChain, row.symbol, row.token0, row.token1, row.token0Symbol, row.token1Symbol, row.chainID);
+                        return presentAssetPair(row);
                     } else {
-                        return presentAsset(row.assetChain, row.symbol);
+                        return presentAsset(row);
                     }
                 }
                 return data;

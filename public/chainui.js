@@ -538,11 +538,21 @@ function showxcmassets(chainID, address) {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     if (row.chainID != undefined && row.currencyID != undefined) {
-                        return `<a href='/asset/${row.chainID}/${row.currencyID}'>${row.currencyID}</a>`
+
+                        let str = `${row.chainName} ${row.localSymbol}`;
+                        if (row.currencyID != row.localSymbol && row.currencyID != row.symbol) {
+                            str += ` (${row.currencyID})`
+                        }
+                        return `<a href='/asset/${row.chainID}/${row.currencyID}'>${str}</a>`
                     } else {
                         //console.log(row);
                         return `<a href='/chain/${row.chainID}#xcmassets'>${row.chainName} ${row.symbol}</a>`
                     }
+                } else {
+                    if (row.chainID == 2004) {
+                        console.log(row);
+                    }
+                    return row.assetName;
                 }
                 return data;
             }

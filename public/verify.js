@@ -90,14 +90,13 @@ async function verifyBlock(id, blockNumber, params) {
 	}
 	document.getElementById("comparison").innerHTML = str;
 
-	/*
         try {
-	    let bh0 = myapi.createType("BlockHash", blockHash);
-	    let proof = await myapi.rpc.grandpa.proveFinality(bh0, bh0);
+	    let proof = await myapi.rpc.grandpa.proveFinality(blockNumber);
+	    console.log(proof);
 	} catch (err ) {
 	    console.log(err)
 	}
-	*/
+
     } catch (err) {
 	console.log(err)
     }

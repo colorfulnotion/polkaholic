@@ -99,7 +99,40 @@ module.exports = class PriceManager extends Query {
                         this.explored[assetInfo.token0] = true;
                     }
                 }
-            }
+		// TODO: add xc paths extensions with route=system 1:1 to cover Moonbeam/Astar xc asset
+		// (1) {"route":"system","dest":"0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080","symbol":"xcDOT/xcDOT","token0Symbol":"xcDOT","token1Symbol":"xcDOT","s":0}]
+		// (2) {"route":"system","dest":"{"Token":"42259045809535163221576417993425387648"}","symbol":"xcDOT/xcDOT","token0Symbol":"xcDOT","token1Symbol":"xcDOT","s":1}]
+		/*if ( let currencyID = this.is_xc_asset_contractAddress(tailAsset) )  {
+		    newpath.push({
+			route: "system",
+			dest: JSON.stringify({"Token": currencyID}),
+			symbol: `${sym}/${sym}`,
+			token0Symbol: `${sym}`,
+			token1Symbol: `${sym}`,
+			s: 1
+		    })
+		} else if ( let asset = this.is_xc_asset_currencyID(tailAsset) ) {
+		    newpath.push({
+			route: "system",
+			dest: asset,
+			symbol: `${sym}/${sym}`,
+			token0Symbol: `${sym}`,
+			token1Symbol: `${sym}`,
+			s: 0
+		    })
+		} */
+            } else {
+		// (2) for actually observed xcmtransfers from chainID to chainIDDest..., add paths -- this requires chainID to be present in the tailAsset
+		/*
+		  newpath.push({
+		     route: "xcm",
+		     symbol: `${sym}/${sym}`
+		     token0Symbol: `${sym}`,
+		     token1Symbol: `${sym}`,
+                  })
+		*/
+	    }
+
         }
         return (extensions);
     }
@@ -154,8 +187,8 @@ module.exports = class PriceManager extends Query {
         for (const asset of Object.keys(this.resultPaths)) {
             let paths = this.resultPaths[asset];
             let pathsString = JSON.stringify(paths);
-            console.log("RESULT", asset, paths);
             let sql = `update asset set priceUSDpaths = ` + mysql.escape(pathsString) + ` where asset = '${asset}' and chainID = '${chainID}'`
+            console.log("RESULT", asset, paths, sql);
             this.batchedSQL.push(sql);
             cnt++;
         }
