@@ -5,8 +5,8 @@ let cls2 = ( expanded ) ? "show" : "";
 <div>
 <a class="btn <%= cls; %> btn-block" data-mdb-toggle="collapse" href="#<%= id; %>" role="button" aria-control="<%= id; %>" aria-expanded="<%= expanded; %>" style="text-align:left">
  <img width="24" src="<%= chainassets.iconUrl; %>"> <%= chainassets.chainName; %> <%= uiTool.currencyFormat(chainassets.balanceUSD); %>
-  <% 
-  for ( let i = 0; i<chainassets.assets.length; i++) { %> 
+  <%
+  for ( let i = 0; i<chainassets.assets.length; i++) { %>
   <%  let a = chainassets.assets[i]; %>
   <% if ( a.state.transferable ) { %>
   [<%= uiTool.presentFloat(a.state.transferable) %> <%= a.assetName; %>]
@@ -26,7 +26,7 @@ let cls2 = ( expanded ) ? "show" : "";
      <a href='<%= chainassets.subscanURL; %>/account/<%= chainassets.ss58Address; %>' target='_new'><img src='https://cdn.polkaholic.io/subscan.svg' width="16"></a>
   <% } %>
   <a href='https://<%= chainassets.id; %>.polkaholic.io/account/<%= chainassets.ss58Address; %>' target='_new'><img src='https://cdn.polkaholic.io/polkaholic.png' width="16"></a>
-  
+
   <% if ( chainassets.dappURL ) { %>
   <a class='btn-sm btn-primary' href="<%= chainassets.dappURL; %>" target="_new">APP</a>
   <% } %>
@@ -48,7 +48,7 @@ let cls2 = ( expanded ) ? "show" : "";
  </script>
 <form id="verifyForm<%= chainassets.id; %>" method="POST" action="/verify" target="VW<%= chainassets.id %>"><input type="hidden" name="verify" value=""/><input type="hidden" name="obj" value=""/></form>
 <% } else { %>
-<%- include("assetinfobutton", {assetChain: a.assetChain, assetType: a.assetType}); %>
+<%- include("assetinfobutton", {asset: a}); %>
 <% } %>
  </td>
  <td width="60%" align=right>
@@ -59,19 +59,19 @@ let cls2 = ( expanded ) ? "show" : "";
 </tr>
 <% } else if ( a.state.adjustedVoucherUSD ) { %>
 <tr style="border-top: 1px solid gray;">
- <td width="40%" align=left valign=top><B><%= a.assetName; %></B> Balance:<br><%- include("assetinfobutton", {assetChain: a.assetChain, assetType: a.assetType}); %></td>
+ <td width="40%" align=left valign=top><B><%= a.assetName; %></B> Balance:<br><%- include("assetinfobutton", {asset: a}); %></td>
  <td width="60%" align=right>Supplied: <%= uiTool.presentFloat(a.state.supplied) %><br/><small><%= uiTool.currencyFormat(a.state.adjustedVoucherUSD); %></small><br/>
  </td>
 </tr>
 <% } else if ( a.state.adjustedPrincipalUSD ) { %>
 <tr style="border-top: 1px solid gray;">
- <td width="40%" align=left valign=top><B><%= a.assetName; %></B> Balance:<br><%- include("assetinfobutton", {assetChain: a.assetChain, assetType: a.assetType}); %></td>
+ <td width="40%" align=left valign=top><B><%= a.assetName; %></B> Balance:<br><%- include("assetinfobutton", {asset: a}); %></td>
  <td width="60%" align=right>Borrowed: <%= uiTool.presentFloat(a.state.borrowed) %><br/><small><%= uiTool.currencyFormat(a.state.adjustedPrincipalUSD); %></small><br/>
  </td>
 </tr>
 <% } else if ( a.state.borrowedUSD ) { %>
 <tr style="border-top: 1px solid gray;">
- <td width="40%" align=left valign=top><B><%= a.assetName; %></B> Balance:<br><%- include("assetinfobutton", {assetChain: a.assetChain, assetType: a.assetType}); %></td>
+ <td width="40%" align=left valign=top><B><%= a.assetName; %></B> Balance:<br><%- include("assetinfobutton", {asset: a}); %></td>
  <td width="60%" align=right>Borrowed: <%= uiTool.presentFloat(a.state.borrowed) %> <%= a.state.borrowedAsset.Token; %><br/><small><%= uiTool.currencyFormat(a.state.borrowedUSD); %></small><br/>
    <% if ( a.state.collateral != undefined ) { %>
    Collateral: <%= uiTool.presentFloat(a.state.collateral) %> <%= a.assetName; %><br/><small><%= uiTool.currencyFormat(a.state.collateralUSD); %></small><br/>

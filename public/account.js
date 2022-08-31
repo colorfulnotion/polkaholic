@@ -630,9 +630,9 @@ function showxcmtransfers(address, chainListStr = 'all') {
                     try {
                         let parsedAsset = JSON.parse(row.asset);
                         let symbol = parsedAsset.Token;
-                        let assetChain = row.asset + "~" + row.chainID;
                         if (symbol !== undefined) {
-                            return presentTokenCount(data) + " " + presentAsset(assetChain, symbol);
+                            row.symbol = symbol;
+                            return presentTokenCount(data) + " " + presentAsset(row);
                         } else {
                             return row.asset;
                         }
@@ -790,9 +790,9 @@ function showrewards(address, chainListStr = 'all') {
                     try {
                         let parsedAsset = JSON.parse(row.asset);
                         let symbol = parsedAsset.Token;
-                        let assetChain = row.asset + "~" + row.chainID;
                         if (symbol !== undefined) {
-                            return presentAsset(assetChain, symbol);
+                            row.symbol = symbol
+                            return presentAsset(row);
                         } else {
                             return row.asset;
                         }
@@ -953,9 +953,9 @@ function showcrowdloans(address, chainListStr = 'all') {
                     try {
                         let parsedAsset = JSON.parse(row.asset);
                         let symbol = parsedAsset.Token;
-                        let assetChain = row.asset + "~" + row.chainID;
                         if (symbol !== undefined) {
-                            return presentAsset(assetChain, symbol);
+                            row.symbol = symbol;
+                            return presentAsset(row);
                         } else {
                             return row.asset;
                         }

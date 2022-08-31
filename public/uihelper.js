@@ -461,17 +461,16 @@ function encodeURIComponent2(assetChain) {
     return encodeURIComponent(assetChain).replace("#", "%23");
 }
 
-function presentAsset(assetChain, symbol) {
-    return '<a href="/asset/' + encodeURIComponent2(assetChain) + '">' + symbol + '</a>';
+function presentAsset(asset) {
+    let chainID = asset.chainID;
+    let asset0 = asset.asset;
+    let symbol = asset.symbol;
+    return `<a href="/asset/${chainID}/` + encodeURIComponent2(asset0) + `">` + symbol + '</a>';
 }
 
-
-
-function presentAssetPair(assetChain, symbol, asset0, asset1, symbol0, symbol1, chainID) {
-    let assetPair = symbol + ":" + asset0.substring(0, 6) + "/" + asset1.substring(0, 6);
-    let assetChain0 = asset0 + "~" + chainID;
-    let assetChain1 = asset1 + "~" + chainID;
-    return '<a href="/asset/' + encodeURIComponent2(assetChain0) + '">' + symbol0 + '</a> / <a href="/asset/' + encodeURIComponent2(assetChain1) + '">' + symbol1 + '</a> (<a href="/asset/' + encodeURIComponent2(assetChain) + '">' + assetPair + '</a>)';
+function presentAssetPair(row) {
+    let assetPair = row.symbol + ":" + asset0.substring(0, 6) + "/" + asset1.substring(0, 6);
+    return `<a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token0) + '">' + row.token0Symbol + `</a> / <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token1) + '">' + row.token1Symbol + '</a>';
 }
 
 function presentID(id) {

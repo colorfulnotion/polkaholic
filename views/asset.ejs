@@ -4,9 +4,55 @@
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="/">Polkaholic</a></li>
     <li class="breadcrumb-item"><img src="<%= asset.iconUrl; %>" width="20"/><a href='/chain/<%= asset.id; %>#xcmassets'><%= asset.chainName; %> [Chain <%= asset.chainID %> : <%= asset.id %>]</a></li>
-    <li class="breadcrumb-item active" aria-current="page">Currency <%= currencyID; %></li>
+    <li class="breadcrumb-item active" aria-current="page"><%= asset.assetName; %></li>
   </ol>
 </nav>
+
+<table class="table table-hover table-bordered">
+  <tbody>
+  <% if ( asset.currencyID ) { %>
+    <tr>
+      <td width="200">Currency ID</td>
+      <td>
+        <%= asset.currencyID %>
+      </td>
+    </tr>
+  <% } %>
+    <tr>
+      <td width="200">Asset Type</td>
+      <td>
+        <%= asset.assetType %>
+      </td>
+    </tr>
+    <tr>
+      <td>Asset Name</td>
+      <td>
+        <%= asset.assetName %>
+      </td>
+    </tr>
+
+    <tr>
+      <td>Symbol</td>
+      <td><%= asset.symbol %></td>
+    </tr>
+
+    <tr>
+      <td>Decimals</td>
+      <td><%= asset.decimals; %></td>
+    </tr>
+<% if ( asset.xcContractAddress ) { %>
+    <tr>
+      <td>Contract Address</td>
+      <td><%= asset.xcContractAddress; %></td>
+    </tr>
+<% } %>
+<% if ( asset.priceUSD >= 0 ) { %>
+    <tr>
+      <td>Current Price</td>
+      <td><%= asset.priceUSD; %></td>
+    </tr>
+<% } %>
+</table>
 
 <div class="row">
 <%

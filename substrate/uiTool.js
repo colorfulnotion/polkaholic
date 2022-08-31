@@ -145,17 +145,6 @@ function tx_link_full(id, allowCopy = true) {
     return out;
 }
 
-function erc_token_link(id, assetInfo, allowCopy = false) {
-    let assetChain = (assetInfo != undefined && assetInfo.assetChain != undefined) ? assetInfo.assetChain : false
-    let symbol = (assetInfo != undefined && assetInfo.symbol != undefined) ? assetInfo.symbol : false
-    if (!assetChain && !symbol) {
-        return '-'
-    }
-    let out = '<a href="/asset/' + encodeURIComponent(assetChain) + '">' + symbol + '</a>';
-    if (allowCopy) out += copyToClipboard(id);
-    return out;
-}
-
 function account_link(id, allowCopy = true, shortHash = true) {
     let accountID = paraTool.getPubKey(id);
     let h = shortHash ? get_short_hash(id) : id;
@@ -401,9 +390,6 @@ module.exports = {
     presentFullTx: function(id) {
         return tx_link_full(id)
     },
-    presentERCToken: function(id, assetInfo) {
-        return erc_token_link(id, assetInfo)
-    },
     presentExtrinsicID: function(extrinsicHash, extrinsicID) {
         return tx_link_with_desc(extrinsicHash, extrinsicID)
     },
@@ -461,16 +447,10 @@ module.exports = {
     presentSearchResult: function(r) {
         return `<p><a href='${r.link}'>` + r.text + "</a><br>" + r.description + "</p>";
     },
-    presentAsset: function(asset, chainID, symbol, assetName = false) {
-        let assetChain = asset + assetChainSeparator + chainID;
-        let assetText = assetName ? assetName : symbol;
-        return '<a href="/asset/' + encodeURIComponent(assetChain) + '">' + assetText + '</a>';
-    },
     presentAssetPair: function(assetChain, symbol, asset0, asset1, symbol0, symbol1, chainID) {
-        let assetPair = symbol + ":" + asset0.substring(0, 6) + "/" + asset1.substring(0, 6);
-        let assetChain0 = asset0 + assetChainSeparator + chainID;
-        let assetChain1 = asset1 + assetChainSeparator + chainID;
-        return '<a href="/asset/' + encodeURIComponent(assetChain0) + '">' + symbol0 + '</a> / <a href="/asset/' + encodeURIComponent(assetChain1) + '">' + symbol1 + '</a> (<a href="/asset/' + encodeURIComponent(assetChain) + '">' + assetPair + '</a>)';
+        return `<a href="/asset/${chainID}/` + encodeURIComponent(asset0) + '">' + symbol0 + `</a> / <a href="/asset/${chainID}/` + encodeURIComponent(asset1) + '">' + symbol1 + '</a>';
+        //let assetPair = symbol + ":" + asset0.substring(0, 6) + "/" + asset1.substring(0, 6);
+        // (<a href="/asset/' + encodeURIComponent(assetChain) + '">' + assetPair + '</a>)';
     },
     presentAssetPairChart: function(assetChain) {
         return '<a href="/chart/' + encodeURIComponent(assetChain) + '">Chart</a>';
@@ -621,6 +601,17 @@ module.exports = {
         return timeline.map((t) => {
             return [t.id, t.blockNumber.toString(), t.blockTS, t.blockTS + 6, t.objects, t.extra]
         });
+    },
+    presentERCToken: function(id, assetInfo, allowCopy = true) {
+        let asset = (assetInfo != undefined && assetInfo.asset != undefined) ? assetInfo.asset : false
+        let symbol = (assetInfo != undefined && assetInfo.symbol != undefined) ? assetInfo.symbol : false
+        let chainID = (assetInfo != undefined && assetInfo.chainID != undefined) ? assetInfo.chainID : false
+        if (!chainID || !symbol || !asset) {
+            return '-'
+        }
+        let out = `<a href="/asset/${chainID}/` + encodeURIComponent(asset) + '">' + symbol + '</a>';
+        if (allowCopy) out += copyToClipboard(id);
+        return out;
     },
     getPublicWSEndpoints: function(chain) {
         let endpoints = [];

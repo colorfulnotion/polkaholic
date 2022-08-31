@@ -1573,24 +1573,30 @@ module.exports = class Query extends AssetManager {
 
     async getAsset(currencyID, chainID, address = false) {
         try {
-            let assets = await this.poolREADONLY.query(`select asset.* from asset where chainID = '${chainID}' and currencyID = '${currencyID}' order by numHolders desc limit 1`);
+            let assets = await this.poolREADONLY.query(`select asset.* from asset where chainID = '${chainID}' and ( currencyID = '${currencyID}' or asset = '${currencyID}' ) order by numHolders desc limit 1`);
             if (assets.length == 0) {
                 throw new paraTool.InvalidError(`Invalid currencyID: ${currencyID}`)
             }
             let chainInfo = this.chainInfos[chainID];
             let [__, id] = this.convertChainID(chainID)
             let chainName = this.getChainName(chainID);
-            assets[0].id = id;
-            assets[0].chainName = chainName;
-            assets[0].iconUrl = chainInfo.iconUrl;
-            return (assets[0]);
+            let asset = assets[0];
+            asset.id = id;
+            asset.chainName = chainName;
+            asset.iconUrl = chainInfo.iconUrl;
+            let ts = this.currentTS();
+            let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, asset.asset, asset.chainID, ts);
+            asset.priceUSD = priceUSDCurrent;
+
+            return asset;
         } catch (err) {
+            console.log(err);
             this.logger.error({
                 "op": "query.getAsset",
-                assetChain,
                 err
             });
         }
+        return null;
     }
 
     getHoldingsState(holdings, asset, chainID) {
@@ -1740,7 +1746,7 @@ module.exports = class Query extends AssetManager {
                 w = `and asset.chainID = ${chainID}`
             }
 
-            let sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w}  order by numHolders desc;`
+            let sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w}  and assetType = 'Token' order by numHolders desc;`
             console.log(sql);
             assets = await this.poolREADONLY.query(sql);
             if (assets.length == 0) {
