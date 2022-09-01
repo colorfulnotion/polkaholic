@@ -861,8 +861,8 @@ module.exports = {
     assetTypeERC1155: "ERC1155",
     assetTypeERC1155Token: "ERC1155Token",
     assetTypeContract: "Contract",
-
-
+    assetTypeXCAsset: "XCAsset",
+    assetTypeXCMTransfer: "XCMTransfer",
 
     toHex: function(bytes) {
         return toHex(bytes);

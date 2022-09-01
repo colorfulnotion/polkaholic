@@ -220,7 +220,7 @@ function getLoginEmail(req) {
 // Usage: https://polkaholic.io/login
 app.get('/login', async (req, res) => {
     try {
-        var chains = await query.getChaisn();
+        var chains = await query.getChains();
         res.render('login', {
             chains: chains,
             chainInfo: query.getChainInfo(),
