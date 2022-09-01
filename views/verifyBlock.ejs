@@ -1,7 +1,7 @@
 <a id="verifyButton<%= blockNumber %>" class="btn btn-link">Verify</a>
 <script>
 $(`#verifyButton<%= blockNumber; %>`).on('click', function(e) {
-    verifyExec("<%= blockNumber %>", { verification: "block", blockNumber: <%= blockNumber; %> }, <%- JSON.stringify(obj) %>);
+    verifyExec("<%= blockNumber %>", { verification: "block", id: "<%= id; %>", blockNumber: <%= blockNumber; %> }, <%- JSON.stringify(obj) %>);
 });
 </script>
 <form id="verifyForm<%= blockNumber %>" method="POST" action="/verify" target="VW<%= blockNumber %>">

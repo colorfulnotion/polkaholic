@@ -6,7 +6,7 @@ function getPolkadotAddress(w) {
     let addressType = w.type
     let address = w.address;
     if (addressType == 'sr25519') {
-        address = keyring.encodeAddress(address, 0) //polkadot address here
+        address = polkadotKeyring.encodeAddress(address, 0) //polkadot address here
     }
     return address
 }

@@ -13,16 +13,11 @@ async function getAPI(chainID_or_id) {
     // global var wsEndpoints
     let WSEndpoint = getWSEndpoint(chainID_or_id, wsEndpoints)
     if ( ! WSEndpoint ) return(null);
-    
-    const wsProvider = await new window.api.WsProvider(WSEndpoint);
-    await wsProvider.isReady;
-    
-    // connect API
-    let myapi = await window.api.ApiPromise.create({
-        provider: wsProvider
-    });
-    await myapi.isReady;
-    return [myapi, WSEndpoint];
+    const { WsProvider, ApiPromise } = polkadotApi;
+    const wsProvider = new WsProvider(WSEndpoint);
+    const polkadot = await ApiPromise.create({ provider: wsProvider });
+
+    return [polkadot, WSEndpoint];
 }
 
 async function verifyXCMMessage(xcm) {
@@ -83,19 +78,23 @@ async function verifyBlock(id, blockNumber, params) {
 	    if ( ! matched ) success = false;
 	}
 	str += "</table>";
-	if ( success ) {
-	    str += `<div class="alert" role="alert" data-mdb-color="success">` + presentSuccessFailure(success) + ` Verified!  Indexed result and On chain result are the same</div>`;
-	} else {
-	    str += `<div class="alert" role="alert" data-mdb-color="danger">` + presentSuccessFailure(success) + ` Failure!   Indexed result and On chain result are <u>NOT</u> the same!</div>`;
-	}
-	document.getElementById("comparison").innerHTML = str;
 
+	let finalization = "";
         try {
 	    let proof = await myapi.rpc.grandpa.proveFinality(blockNumber);
-	    console.log(proof);
+	    if ( proof.toString() && proof.toString().length > 0 ) {
+		finalization = "[Block finalization verified]";
+	    }
 	} catch (err ) {
 	    console.log(err)
 	}
+
+	if ( success ) {
+	    str += `<div class="alert" role="alert" data-mdb-color="success">` + presentSuccessFailure(success) + ` Verified!  Indexed result and On chain result are the same ${finalization}</div>`;
+	} else {
+	    str += `<div class="alert" role="alert" data-mdb-color="danger">` + presentSuccessFailure(success) + ` Failure!   Indexed result and On chain result are <u>NOT</u> the same!  ${finalization}</div>`;
+	}
+	document.getElementById("comparison").innerHTML = str;
 
     } catch (err) {
 	console.log(err)

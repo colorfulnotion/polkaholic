@@ -982,7 +982,7 @@ module.exports = class Query extends AssetManager {
             if (chainList.length > 0) {
                 chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
             }
-            let xcmtransfers = await this.poolREADONLY.query(`select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(asset) > 3 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`);
+            let xcmtransfers = await this.poolREADONLY.query(`select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, xcmInteriorKey, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(asset) > 3 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`);
             for (let i = 0; i < xcmtransfers.length; i++) {
                 let x = xcmtransfers[i];
                 x.asset = this.trimquote(x.asset); // temporary hack
@@ -998,6 +998,7 @@ module.exports = class Query extends AssetManager {
                         targetChainID = nativeChainID
                         defaultAsset = nativeAsset // use nativeAsset as defaultAsset (if set)
                     }
+
 
                     let rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
                     if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
@@ -1028,10 +1029,12 @@ module.exports = class Query extends AssetManager {
                             }
                             x.chainName = this.getChainName(x.chainID);
                             [x.chainID, x.id] = this.convertChainID(x.chainID)
+
                             if (x.chainIDDest != undefined) {
                                 [x.chainIDDest, x.idDest] = this.convertChainID(x.chainIDDest)
                                 x.chainDestName = this.getChainName(x.chainIDDest);
                                 let sectionPieces = x.sectionMethod.split(':')
+                                let symbol = this.getXcmAssetInfoSymbol(x.xcmInteriorKey);
                                 let r = {
                                     extrinsicHash: x.extrinsicHash,
                                     extrinsicID: x.extrinsicID,
@@ -1061,6 +1064,7 @@ module.exports = class Query extends AssetManager {
                                     destTS: x.destTS,
 
                                     asset: defaultAsset, //this is default asset (somewhat human-readable)
+                                    symbol: symbol,
                                     rawAsset: x.rawAsset, //this is the rawAsset
                                     amountSent: x.amountSent,
                                     amountSentUSD: x.amountSentUSD,
@@ -1529,6 +1533,7 @@ module.exports = class Query extends AssetManager {
 
     async getAssetHolders(chainID, asset, limit = 1000) {
         let assetChain = paraTool.makeAssetChain(asset, chainID);
+        console.log("assetChain", assetChain)
         if (this.assetInfo[assetChain] == undefined) {
             throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
         }
@@ -1536,6 +1541,7 @@ module.exports = class Query extends AssetManager {
             let [asset, chainID] = paraTool.parseAssetChain(assetChain)
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
             let sql = `select holder, free, reserved, miscFrozen, frozen  from assetholder${chainID} where asset = '${asset}' ${w} order by free desc limit ${limit}`
+            console.log("getAssetHolders", sql)
             let holders = await this.poolREADONLY.query(sql);
             let ts = this.currentTS();
             for (let i = 0; i < holders.length; i++) {

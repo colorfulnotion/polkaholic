@@ -471,15 +471,21 @@ app.get('/', async (req, res) => {
         res.render('downtime');
         return;
     }
-
+    let account = {};
+    try {
+        var homePubkey = getHomePubkey(req);
+        if (homePubkey) {
+            account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+        }
+    } catch (e) {
+        // ok
+    }
     try {
         let [chainID, id] = getHostChain(req)
         if (id) {
             let chain = await query.getChain(chainID);
             if (chain) {
                 var blocks = await query.getChainRecentBlocks(chainID);
-                var homePubkey = getHomePubkey(req);
-                let account = homePubkey ? await query.getAccountAssetsRealtimeByChain(null, homePubkey) : {};
                 res.render('chain', {
                     blocks: blocks,
                     chainID: chainID,
@@ -511,11 +517,18 @@ app.get('/', async (req, res) => {
 })
 
 async function handleChains(req, res) {
+    let account = {}
+    try {
+        var homePubkey = getHomePubkey(req);
+        if (homePubkey) {
+            account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+        }
+    } catch (err) {
+        // errors should not matter here
+    }
     try {
         var relaychain = req.params.relaychain ? req.params.relaychain : "";
         var chains = await query.getChains();
-        var homePubkey = getHomePubkey(req);
-        let account = homePubkey ? await query.getAccountAssetsRealtimeByChain(null, homePubkey) : {};
 
         let topNfilters = query.getAddressTopNFilters();
         res.render('chains', {
@@ -604,6 +617,15 @@ app.get('/identicon/:address', async (req, res) => {
 
 // Usage: https://polkaholic.io/chain/22000
 app.get('/chain/:chainID_or_chainName', async (req, res) => {
+    let account = {};
+    try {
+        var homePubkey = getHomePubkey(req);
+        if (homePubkey) {
+            account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+        }
+    } catch (e) {
+        // errors should not matter here
+    }
     let chainID_or_chainName = req.params["chainID_or_chainName"]
     try {
         let [chainID, id] = query.convertChainID(chainID_or_chainName)
@@ -611,8 +633,6 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
         if (chain) {
             console.log(chain);
             var blocks = await query.getChainRecentBlocks(chainID);
-            var homePubkey = getHomePubkey(req);
-            let account = homePubkey ? await query.getAccountAssetsRealtimeByChain(null, homePubkey) : "";
             res.render('chain', {
                 blocks: blocks,
                 chainID: chainID,
@@ -1293,11 +1313,19 @@ app.get('/address/:address', async (req, res) => {
 // (c) "XCM Transfer" button on each line which enables the user to move their assets from one chain to the other.
 // Any chain-specific asset links to /asset/:chainID/:assetOrCurrencyID.  Any chain mention links to /chain/:chainID_or_chainName#xcmassets
 app.get('/symbol/:symbol', async (req, res) => {
+    let account = {};
+    try {
+        if (homePubkey) {
+            account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+        }
+    } catch (e) {
+        // errors should not matter
+    }
+
     try {
         let homePubkey = getHomePubkey(req);
         let symbol = req.params["symbol"];
         let chains = await query.getSymbolAssets(symbol);
-        let account = homePubkey ? await query.getAccountAssetsRealtimeByChain(null, homePubkey) : {};
         res.render('symbol', {
             symbol: symbol,
             chainInfo: query.getChainInfo(),

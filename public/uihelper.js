@@ -465,7 +465,8 @@ function presentAsset(asset) {
     let chainID = asset.chainID;
     let asset0 = asset.asset;
     let symbol = asset.symbol;
-    return `<a href="/asset/${chainID}/` + encodeURIComponent2(asset0) + `">` + symbol + '</a>';
+    console.log("presentAsset", asset);
+    return `<a href="/symbol/${symbol}">` + symbol + '</a>';
 }
 
 function presentAssetPair(row) {
@@ -832,7 +833,12 @@ function hideWalletModal() {
 }
 
 function getPubkey(account) {
-    return util.u8aToHex(keyring.decodeAddress(account.address))
+    try {
+        let pubkey = polkadotKeyring.decodeAddress(account.address);
+        return polkadotUtil.u8aToHex(pubkey);
+    } catch (err) {
+        console.log(err);
+    }
 }
 
 function getCookie(cname) {
