@@ -311,7 +311,7 @@ async function showxcmtransfers(filter = {}) {
                             let symbol = parsedAsset.Token;
                             let assetChain = row.asset + "~" + row.chainID;
                             if (symbol !== undefined) {
-                                return presentTokenCount(data) + " " + presentAsset(assetChain, symbol);
+                                return presentTokenCount(data) + " " + presentAsset(row);
                             } else {
                                 return row.asset;
                             }

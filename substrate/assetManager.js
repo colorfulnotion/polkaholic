@@ -29,7 +29,9 @@ const ChainParser = require("./chains/chainparser");
 module.exports = class AssetManager extends PolkaholicDB {
     nativeAssetInfo = {};
     assetInfo = {};
+    // TODO:fuse these together 
     xcmAssetInfo = {}; // xcmInteriorKey   -> nativeAssetChain
+    xcmAssetsInfo = {}; // xcmInteriorKey -> symbol
     xcmInteriorInfo = {}; // nativeAssetChain -> xcmInteriorKey
     xcmSymbolInfo = {}; // symbolKey -> xcmInteriorKey
     assetlog = {};
@@ -450,6 +452,12 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
     }
     */
     async init_xcm_asset() {
+        let xcmAssets = await this.poolREADONLY.query("select xcmInteriorKey, symbol, relayChain, nativeAssetChain from xcmasset");
+        this.xcmAssetsInfo = {};
+        for (let i = 0; i < xcmAssets.length; i++) {
+            let v = xcmAssets[i];
+            this.xcmAssetsInfo[v.xcmInteriorKey] = v;
+        }
         let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
         let xcmAssetInfo = {};
         let xcmInteriorInfo = {};
@@ -497,6 +505,14 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         this.xcmSymbolInfo = xcmSymbolInfo;
         //console.log(`xcmSymbolInfo`, xcmSymbolInfo)
         //console.log(`init_xcm_asset !!`, xcmAssetInfo)
+    }
+
+    getXcmAssetInfoSymbol(xcmInteriorKey) {
+        let xcmAssetInfo = this.xcmAssetsInfo[xcmInteriorKey]
+        if (xcmAssetInfo != undefined) {
+            return xcmAssetInfo.symbol
+        }
+        return false
     }
 
     getXcmAssetInfoByInteriorkey(xcmInteriorKey) {
