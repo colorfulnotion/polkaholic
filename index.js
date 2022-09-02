@@ -1267,7 +1267,7 @@ app.get('/account/:address', async (req, res) => {
     }
 })
 
-app.get('/address/:address', async (req, res) => {
+app.get('/address/:address/:chainID?', async (req, res) => {
     try {
         let fromAddress = getHomePubkey(req);
         let address = req.params["address"];

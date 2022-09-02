@@ -939,10 +939,22 @@ function currencyFormat(c, priceUSD = false, priceUSDCurrent = false, isDefaultO
     if (isNaN(c)) {
         return `-`
     }
-    var formatter = new Intl.NumberFormat('en-US', {
+    let msd = {
         style: 'currency',
-        currency: 'USD'
-    });
+        currency: 'USD',
+    }
+    if (c <= .01) {
+        msd.minimumSignificantDigits = 5;
+        msd.maximumSignificantDigits = 5;
+    } else if (c <= .10) {
+        msd.minimumSignificantDigits = 4;
+        msd.maximumSignificantDigits = 4;
+    } else if (c <= 1.0) {
+        msd.minimumSignificantDigits = 3;
+        msd.maximumSignificantDigits = 3;
+    }
+    // : (c < .10) ? 4 : ( c < 1 ) ? 3
+    var formatter = new Intl.NumberFormat('en-US', msd);
     if (priceUSD && priceUSDCurrent && priceUSD > 0 && priceUSDCurrent > 0) {
         let originalUSD = formatter.format(c);
         let currentUSD = formatter.format(c * (priceUSDCurrent / priceUSD));

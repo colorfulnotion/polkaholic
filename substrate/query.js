@@ -155,27 +155,6 @@ module.exports = class Query extends AssetManager {
         return events;
     }
 
-    async updateChainAdmin(chainID, chainName, id, ss58Format, asset, symbol, WSEndpoint, WSEndpoint2, WSEndpoint3) {
-        prefix = parseInt(prefix, 10);
-        let sql = `update chain set chainName = ${mysql.escape(chainName)}, id = ${mysql.escape(id)}, ss58Format = '${ss58Format}', asset = ${mysql.escape(asset)}, symbol = ${mysql.escape(symbol)}, WSEndpoint = ${mysql.escape(WSEndpoint)}, WSEndpoint2 = ${mysql.escape(WSEndpoint2)}, WSEndpoint3 = ${mysql.escape(WSEndpoint3)} where chainID = '${chainID}'`;
-        try {
-            this.batchedSQL.push(sql);
-            await this.update_batchedSQL();
-            return ({
-                success: true
-            });
-        } catch (e) {
-            this.logger.error({
-                "op": "query.updateChainAdmin",
-                sql,
-                err
-            });
-            return ({
-                error: "Could not update chain"
-            });
-        }
-    }
-
     resetPasswordSig(toMail, ts) {
         let h = ts + toMail + this.POLKAHOLIC_EMAIL_PASSWORD;
         let sig = uiTool.blake2(h);
@@ -227,7 +206,7 @@ module.exports = class Query extends AssetManager {
         });
 
         var passwordHash = this.getPasswordHash(password)
-        let sql = `update user set password = '${passwordHash}' where email = ${mysql.escape(email)}`;
+        let sql = `update user set password = ${mysql.escape(passwordHash)} where email = ${mysql.escape(email)}`;
         try {
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
@@ -253,11 +232,11 @@ module.exports = class Query extends AssetManager {
             // check that we aren't following the user already
             // TODO: validate fromAddress + toAddress
             let sql0 = `select isFollowing from follow where fromAddress = '${fromAddress}' and toAddress = '${toAddress}'`
-            let isFollowing = await this.pool.query(sql0)
+            let isFollowing = await this.poolREADONLY.query(sql0)
             if (isFollowing.length == 0) {
-                var sql = `insert into follow ( fromAddress, toAddress, isFollowing, followDT ) values ('${fromAddress}', '${toAddress}', 1, Now() )`
-                var sql2 = `insert into account ( address, numFollowing ) values ('${fromAddress}', 1 ) on duplicate key update numFollowing = numFollowing + 1`
-                var sql3 = `insert into account ( address, numFollowers ) values ('${toAddress}', 1 ) on duplicate key update numFollowers = numFollowers + 1`
+                var sql = `insert into follow ( fromAddress, toAddress, isFollowing, followDT ) values (${mysql.escape(fromAddress)}, ${mysql.escape(toAddress)}, 1, Now() )`
+                var sql2 = `insert into account ( address, numFollowing ) values (${mysql.escape(fromAddress)}, 1 ) on duplicate key update numFollowing = numFollowing + 1`
+                var sql3 = `insert into account ( address, numFollowers ) values (${mysql.escape(toAddress)}, 1 ) on duplicate key update numFollowers = numFollowers + 1`
                 this.batchedSQL.push(sql);
                 this.batchedSQL.push(sql2);
                 this.batchedSQL.push(sql3);
@@ -290,12 +269,12 @@ module.exports = class Query extends AssetManager {
             // TODO: validate fromAddress + toAddress
             // check that we are following the user already
             let sql0 = `select isFollowing from follow where fromAddress = '${fromAddress}' and toAddress = '${toAddress}'`
-            let isFollowing = await this.pool.query(sql0)
+            let isFollowing = await this.poolREADONLY.query(sql0)
             if (isFollowing.length > 0) {
                 // TODO: make this a transaction
-                var sql = `delete from follow where fromAddress = '${fromAddress}' and toAddress = '${toAddress}'`
-                var sql2 = `update account set numFollowing = numFollowing - 1 where address = '${fromAddress}'`
-                var sql3 = `update account set numFollowers = numFollowers - 1 where address = '${toAddress}'`
+                var sql = `delete from follow where fromAddress = ${mysql.escape(fromAddress)} and toAddress = ${mysql.escape(toAddress)}`
+                var sql2 = `update account set numFollowing = numFollowing - 1 where address = ${mysql.escape(fromAddress)}`
+                var sql3 = `update account set numFollowers = numFollowers - 1 where address = ${mysql.escape(toAddress)}`
                 this.batchedSQL.push(sql);
                 this.batchedSQL.push(sql2);
                 this.batchedSQL.push(sql3);
@@ -420,7 +399,7 @@ module.exports = class Query extends AssetManager {
         }
         var passwordHash = this.getPasswordHash(password)
         try {
-            var sql = `insert into user ( email, password, createDT ) values ('${email}', '${passwordHash}', Now() )`
+            var sql = `insert into user ( email, password, createDT ) values (${mysql.escape(email)}, ${mysql.escape(passwordHash)}, Now() )`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
             return ({
@@ -488,7 +467,7 @@ module.exports = class Query extends AssetManager {
             }];
             await this.btAPIKeys.insert(rowsToInsert);
 
-            var sql = `update apikey set planID = '${planID}' where email = '${email}' and apikey = '${apikey}'`;
+            var sql = `update apikey set planID = ${mysql.escape(planID)} where email = ${mysql.escape(email)} and apikey = ${mysql.escape(apikey)}`;
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
             return (true);
@@ -556,7 +535,7 @@ module.exports = class Query extends AssetManager {
 
     async createAPIKey(email, planID = 0) {
         let apikey = this.create_api_key(email)
-        var sql = `insert into apikey (email, apikey, createDT) values ('${email}', '${apikey}', Now())`;
+        var sql = `insert into apikey (email, apikey, createDT) values (${mysql.escape(email)}, ${mysql.escape(apikey)}, Now())`;
         try {
             // update bigtable
             let ratelimit = this.getPlanRateLimit(planID);
@@ -572,8 +551,6 @@ module.exports = class Query extends AssetManager {
                     n: nrec
                 }
             }];
-
-
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
             await this.btAPIKeys.insert(rowsToInsert);
@@ -595,7 +572,7 @@ module.exports = class Query extends AssetManager {
     }
 
     async deleteAPIKey(email, apikey) {
-        var sql = `update apikey set deleted = 1, deleteDT = Now() where email = '${email}' and apikey = '${apikey}'`;
+        var sql = `update apikey set deleted = 1, deleteDT = Now() where email = ${mysql.escape(email)} and apikey = ${mysql.escape(apikey)}`;
         try {
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
@@ -625,11 +602,42 @@ module.exports = class Query extends AssetManager {
             });
             rows.forEach((row) => {
                 let rowData = row.data;
-                res.push({
-                    link: "/account/" + addr,
-                    text: addr,
-                    description: "Address"
-                })
+                if (rowData["wasmcontract"]) {
+                    for (const chainID of Object.keys(rowData["wasmcontract"])) {
+                        let cells = rowData["wasmcontract"][chainID]
+                        let cell = cells[0];
+                        let c = JSON.parse(cell.value);
+                        if (c && c.address) {
+                            // TODO: adjust description based on PSP22, ... contractType features
+                            res.push({
+                                link: `/wasmcontract/${c.address}/${c.chainID}`,
+                                text: "WASM Contract: " + c.address,
+                                description: `ChainID: ${c.chainID} Deployer: ${c.deployer}`
+                            })
+                        }
+                    }
+                } else if (rowData["evmcontract"]) {
+                    for (const chainID of Object.keys(rowData["evmcontract"])) {
+                        let cells = rowData["evmcontract"][chainID]
+                        let cell = cells[0];
+                        let c = JSON.parse(cell.value);
+                        if (c && c.asset) {
+                            // TODO: adjust text/description based on ERC20, ERC721, ERC1155 assetType data
+                            res.push({
+                                link: `/address/${c.asset}/${c.chainID}`,
+                                text: "EVM Contract: " + c.asset,
+                                description: `Chain ID: ${c.chainID}`,
+                                numHolders: c.numHolders
+                            })
+                        }
+                    }
+                } else {
+                    res.push({
+                        link: "/account/" + addr,
+                        text: addr,
+                        description: "Address"
+                    })
+                }
             });
         } catch (err) {
             if (err.code == 404) {
@@ -663,6 +671,61 @@ module.exports = class Query extends AssetManager {
                     description: this.getChainName(chainID) + " Block " + blockNumber + " : " + hash
                 })
             }
+        }
+    }
+
+    // send users to eg /xcmmessage/{msgHash}
+    redirect_search_xcmmessage(search, cells, res = []) {
+        let cell = cells[0];
+        let m = JSON.parse(cell.value);
+        if (m && m.msgHash) {
+            res.push({
+                link: `/xcmmessage/${m.msgHash}/${m.sentAt}`,
+                text: `hash: ${m.msgHash} sentAt: ${m.sentAt} relay chain: ${m.relayChain}`,
+                description: this.getChainName(m.chainID) + " Block " + m.blockNumber + ` : block time: ${m.blockTS} `
+            })
+        }
+    }
+
+    // send users to eg /chain/{id}
+    redirect_search_chain(search, cells, res = []) {
+        let cell = cells[0];
+        let c = JSON.parse(cell.value);
+        if (c && (c.chainID != undefined)) {
+            let chainID = c.chainID;
+            res.push({
+                link: `/chain/${c.id}`,
+                text: `${c.chainName}`,
+                description: `chainID: ${c.chainID} id: ${c.id} para ID: ${c.paraID} relay chain: ${c.relayChain}`,
+                numHolders: c.numHolders
+            })
+        }
+    }
+
+    // send users to eg /chain/{id}
+    redirect_search_symbol(search, cells, res = []) {
+        let cell = cells[0];
+        let c = JSON.parse(cell.value);
+        if (c && c.symbol) {
+            res.push({
+                link: `/symbol/${c.symbol}`,
+                text: `${c.symbol}`,
+                description: `relay chain: ${c.relayChain}`,
+                numHolders: c.numHolders
+            })
+        }
+    }
+
+    // send users to eg /wasmcode/{codeHash}
+    redirect_search_wasmcode(hash, cells, res = []) {
+        let cell = cells[0];
+        let c = JSON.parse(cell.value);
+        if (c && c.codeHash) {
+            res.push({
+                link: `/wasmcode/${c.codeHash}/${c.chainID}`,
+                text: "WASM Code: " + c.codeHash,
+                description: `ChainID: ${c.chainID} Storer: ${c.storer}`
+            })
         }
     }
 
@@ -728,10 +791,7 @@ module.exports = class Query extends AssetManager {
             rows.forEach((row) => {
                 let rowData = row.data;
                 //priority: use feed then feedunfinalized/feedevmunfinalized
-                let blockcells = false;
-                let txcells = false;
                 let data = false
-
                 if (rowData["feed"]) {
                     // finalized
                     data = rowData["feed"]
@@ -744,18 +804,41 @@ module.exports = class Query extends AssetManager {
                 }
                 if (data) {
                     if (data["block"]) {
-                        blockcells = data["block"]
-                        this.redirect_search_block(hash, blockcells, res)
+                        this.redirect_search_block(hash, data["block"], res)
                     } else if (data["tx"]) {
-                        txcells = data["tx"]
-                        this.redirect_search_tx(hash, txcells, res)
+                        this.redirect_search_tx(hash, data["tx"], res)
+                    }
+                } else {
+                    if (rowData["wasmcode"]) {
+                        for (const chainID of Object.keys(rowData["wasmcode"])) {
+                            this.redirect_search_wasmcode(hash, rowData["wasmcode"][chainID], res)
+                        }
+                    }
+                    if (rowData["wasmcontract"]) {
+                        for (const chainID of Object.keys(rowData["wasmcontract"])) {
+                            this.redirect_search_wasmcontract(hash, rowData["wasmcontract"][chainID], res)
+                        }
+                    } else if (rowData["xcmmessage"]) {
+                        for (const sentAt of Object.keys(rowData["xcmmessage"])) {
+                            this.redirect_search_xcmmessage(hash, rowData["xcmmessage"][sentAt], res)
+                        }
+                    } else if (rowData["symbol"]) {
+                        for (const relayChain of Object.keys(rowData["symbol"])) {
+                            this.redirect_search_symbol(hash, rowData["symbol"][relayChain], res)
+                        }
+                    } else if (rowData["chain"]) {
+                        for (const chainID of Object.keys(rowData["chain"])) {
+                            this.redirect_search_chain(hash, rowData["chain"][chainID], res)
+                        }
                     }
                 }
             });
         } catch (err) {
             if (err.code == 404) {
+                console.log("NOT FOUND", hash);
                 return res;
             } else {
+                console.log(err);
                 this.logger.error({
                     "op": "query.search_hash",
                     hash,
@@ -859,7 +942,8 @@ module.exports = class Query extends AssetManager {
                 res.push({
                     link: "/block/" + chains[i].chainID + "/" + bn,
                     text: chains[i].chainName + " Block " + bn.toString(),
-                    description: "Block"
+                    description: "Block",
+                    numHolders: chains[i].numHolders
                 });
             }
         }
@@ -868,33 +952,32 @@ module.exports = class Query extends AssetManager {
 
     async getSearchResults(search) {
         if (search.length > 45 && search.length < 53) {
-            let addr = paraTool.getPubKey(search);
-            return await this.search_address(addr);
-        } else if (search.length == 66) {
-            var tasks = [this.search_address(search), this.search_hash(search)];
-            var results = await Promise.all(tasks);
-            var out = results.flat(2);
-            return out;
-        } else if (search.length < 12) {
+            let search = paraTool.getPubKey(search);
+        }
+        var tasks = [this.search_address(search.toLowerCase()), this.search_hash(search.toLowerCase())];
+        var results = await Promise.all(tasks);
+        var out = results.flat(2);
+        if (out.length == 0) {
             let bn = parseInt(search, 10);
             if (bn > 0) {
                 return await this.search_blocks(bn);
             }
-        } else if (search.length == 42) {
-            // evm address
-            var tasks = [this.search_address(search.toLowerCase())];
-            var results = await Promise.all(tasks);
-            var out = results.flat(1);
-            return out;
         }
-        return [];
+        if (out.length > 1) { // better would be sort by TVL (numHolders*priceUSD) desc
+            out.sort(function(a, b) {
+                let b1 = (b.numHolders !== undefined) ? b.numHolders : 0;
+                let a1 = (a.numHolders !== undefined) ? a.numHolders : 0;
+                return (b1 - a1);
+            })
+        }
+        return out;
     }
 
     async getChainSymbols(chainID_or_chainName) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         if (chainID === false) return [];
         try {
-            let sql = `select distinct symbol from asset where chainID = 2000 and assetType = 'Token' order by symbol`;
+            let sql = `select distinct symbol from asset where chainID = ${chainID} and assetType = 'Token' order by symbol`;
             let symbols = await this.poolREADONLY.query(sql);
             return symbols;
         } catch (err) {
@@ -5006,99 +5089,6 @@ module.exports = class Query extends AssetManager {
         return (false);
     }
 
-    /*
-    For each crowdloan, write 2 cells into "hashes.related"
-    (a) forward direction (fromAddress => memo)
-    (b) reverse direction (memo => fromAddress)
-    mysql> select ts, paraID, fromAddress, memo from crowdloan where memo in ( select holder from assetholder ) limit 10;
-    +------------+--------+--------------------------------------------------------------------+--------------------------------------------------------------------+
-    | ts         | paraID | fromAddress                                                        | memo                                                               |
-    +------------+--------+--------------------------------------------------------------------+--------------------------------------------------------------------+
-    | 1636706034 |   2004 | 0x9433e03eb43fb7f086f150a56b229e38150ab5411934438252520486e9fc047d | 0xcaadf7c0f8f58b8b468d201bfac676c135eb75d4                         |
-    | 1637695278 |   2006 | 0x768e9b1c7df028c6f9c8cd702bc938a51a455d7babbd2434f751fe47c1007437 | 0x4ab52bb8245e545fc6b7861df6cf6a2db175f95c99f6b4b27e8f3bb3e9d10c4b |
-    */
-    async writeCrowdloanRelated(chainID, limit = 1000000) {
-        // TODO: 0 vs 2
-        let sql = `select chainID, amount, blockNumber, ts, paraID, fromAddress, memo from crowdloan where memo in ( select holder from assetholder${chainID} ) order by ts limit ${limit}`
-        let crowdloans = await this.poolREADONLY.query(sql);
-        let rows = [];
-
-        for (let c = 0; c < crowdloans.length; c++) {
-            let crowdloan = crowdloans[c];
-            let replayChain = paraTool.getRelayChainByChainID(parseInt(crowdloan.chainID, 10))
-            let paraChainID = paraTool.getChainIDFromParaIDAndRelayChain(crowdloan.paraID, replayChain)
-            let paraChainName = this.getChainName(paraChainID);
-            let relayChainName = this.getChainName(crowdloan.chainID);
-            let relayChainAsset = this.getChainAsset(crowdloan.chainID);
-            let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(crowdloan.amount, relayChainAsset, crowdloan.ts)
-            let description = `${paraChainName} Crowdloan Address/Referral (${relayChainName}) ${uiTool.presentCurrency(amountUSD)}`
-            let metadata = {
-                datasource: "crowdloan",
-                relayChainID: crowdloan.chainID,
-                relayChainName,
-                paraChainName,
-                paraChainID,
-                amount: crowdloan.amount,
-                amountUSD,
-                priceUSD,
-                paraID: crowdloan.paraID,
-                blockNumber: crowdloan.blockNumber,
-                ts: crowdloan.ts
-            }
-            if (paraChainID && paraChainName && relayChainName) {
-                // forward direction (fromAddress => memo)
-                let related = {}
-                related[crowdloan.memo] = {
-                    value: JSON.stringify({
-                        url: "/account/" + crowdloan.memo,
-                        title: crowdloan.memo,
-                        description,
-                        linktype: "address",
-                        metadata: metadata
-                    }),
-                    timestamp: crowdloan.ts * 1000000
-                };
-                rows.push({
-                    key: crowdloan.fromAddress,
-                    data: {
-                        related: related
-                    }
-                });
-
-                // reverse direction (memo => fromAddress)
-                let related1 = {}
-                related1[crowdloan.fromAddress] = {
-                    value: JSON.stringify({
-                        url: "/account/" + crowdloan.fromAddress,
-                        title: crowdloan.fromAddress,
-                        description,
-                        linktype: "address",
-                        metadata: metadata
-                    }),
-                    timestamp: crowdloan.ts * 1000000
-                }
-                rows.push({
-                    key: crowdloan.memo,
-                    data: {
-                        related: related1
-                    }
-                })
-                //console.log(`${crowdloan.fromAddress}`, related)
-                if (rows.length > 500) {
-                    await this.btHashes.insert(rows);
-                    console.log("writeCrowdloanRelated rows=", rows.length);
-                    rows = [];
-                }
-            }
-        }
-        if (rows.length > 0) {
-            await this.btHashes.insert(rows);
-            console.log("writeCrowdloanRelated rows=", rows.length);
-            rows = [];
-        }
-
-    }
-
     async verifyClaimAddress(address, message, signature) {
         try {
             // check that signed message is from address...
@@ -5106,7 +5096,7 @@ module.exports = class Query extends AssetManager {
             if (!verified) {
                 return (false);
             }
-            let sql = `insert into account ( address, verified, verifyDT ) values ( '${address}', 1, Now() ) on duplicate key update verified = values(verified), verifyDT = values(verifyDT)`
+            let sql = `insert into account ( address, verified, verifyDT ) values ( ${mysql.escape(address)}, 1, Now() ) on duplicate key update verified = values(verified), verifyDT = values(verifyDT)`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
             return (true);
@@ -5186,7 +5176,7 @@ module.exports = class Query extends AssetManager {
 
     async getRecentAddressSuggestions(status = "Submitted", lookbackDays = 7) {
         let sql = `select address, submitter, nickname, addressType, submitDT, status, judgementDT from addresssuggestion where status = '${status}' and submitDT > date_sub(Now(), INTERVAL ${lookbackDays} DAY) order by submitDT Desc`
-        let suggestions = await this.pool.query(sql)
+        let suggestions = await this.poolREADONLY.query(sql)
         return suggestions;
     }
 
@@ -5194,7 +5184,7 @@ module.exports = class Query extends AssetManager {
         if (address.length != 66) return (false)
         if (submitter.length != 66) return (false);
         if (!(status == "Accepted" || status == "Rejected")) return (false);
-        let sql = `update addresssuggestion set status = '${status}', judgementDT = Now(), judge = ${mysql.escape(judge)} where address = '${address}' and submitter = '${submitter}'`
+        let sql = `update addresssuggestion set status = ${mysql.escape(status)}, judgementDT = Now(), judge = ${mysql.escape(judge)} where address = '${address}' and submitter = '${submitter}'`
         this.batchedSQL.push(sql);
         if (status == "Accepted") {
             let rewardAmount = this.getRewardLevelHOLIC("addresssuggestion");

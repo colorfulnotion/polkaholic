@@ -43,7 +43,7 @@
 <% if ( asset.xcContractAddress ) { %>
     <tr>
       <td>Contract Address</td>
-      <td><%= asset.xcContractAddress; %></td>
+      <td><a href='/asset/<%= asset.chainID %>/<%= asset.xcContractAddress; %>'><%- uiTool.getShortHash(asset.xcContractAddress, false); %></a></td>
     </tr>
 <% } %>
 <% if ( asset.priceUSD >= 0 ) { %>

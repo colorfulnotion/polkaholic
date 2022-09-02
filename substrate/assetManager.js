@@ -26,6 +26,8 @@ const InterlayParser = require("./chains/interlay");
 const KicoParser = require("./chains/kico");
 const ChainParser = require("./chains/chainparser");
 
+const MAX_PRICEUSD = 100000.00;
+
 module.exports = class AssetManager extends PolkaholicDB {
     nativeAssetInfo = {};
     assetInfo = {};
@@ -996,7 +998,6 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
 
         // fallback to nativeAsset
         let [nativeChainID, isFound] = await this.getNativeAssetChainID(asset)
-        //console.log(`getNativeAssetChainID(${asset}), nativeChainID=${nativeChainID}, isFound=${isFound}`)
         if (isFound) {
             let nativeAssetlog = await this.get_assetlog(asset, nativeChainID)
             //console.log(`get_assetlog asset=${asset}, nativeChainID=${nativeChainID}, nativeAssetlog`, nativeAssetlog)
@@ -1007,6 +1008,12 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     let out = val * res.p;
                     let priceUSD = res.p;
                     let priceUSDCurrent = (nativeAssetlog.prices.length > 0) ? nativeAssetlog.prices[nativeAssetlog.prices.length - 1].p : 0;
+                    if (priceUSD > MAX_PRICEUSD) {
+                        priceUSD = 0.0;
+                    }
+                    if (priceUSDCurrent > MAX_PRICEUSD) {
+                        priceUSDCurrent = 0.0;
+                    }
                     //console.log(`Fall back CEX model, val=${val}, out=${out}, priceUSD=${priceUSD}, priceUSDCurrent=${priceUSDCurrent}`)
                     return [out, priceUSD, priceUSDCurrent];
                 }
@@ -1195,6 +1202,9 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         if (!dexRecFound) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`getTokenPriceUSD path not found asset=${asset}, price=${v}, dexRecFound=${dexRecFound}`)
             v = 0
+        }
+        if (v > MAX_PRICEUSD) {
+            v = 0;
         }
         return (v);
     }
