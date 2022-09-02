@@ -3,13 +3,13 @@ let cls = ( expanded ) ? "btn-secondary" : "btn-outline-secondary";
 let cls2 = ( expanded ) ? "show" : "";
 %>
 <div>
-<a class="btn <%= cls; %> btn-block" data-mdb-toggle="collapse" href="#<%= id; %>" role="button" aria-control="<%= id; %>" aria-expanded="<%= expanded; %>" style="text-align:left">
+<a class="btn <%= cls; %> btn-block" style="text-transform: none; text-align: left" data-mdb-toggle="collapse" href="#<%= id; %>" role="button" aria-control="<%= id; %>" aria-expanded="<%= expanded; %>" style="text-align:left">
  <img width="24" src="<%= chainassets.iconUrl; %>"> <%= chainassets.chainName; %> <%= uiTool.currencyFormat(chainassets.balanceUSD); %>
   <%
   for ( let i = 0; i<chainassets.assets.length; i++) { %>
   <%  let a = chainassets.assets[i]; %>
   <% if ( a.state.transferable ) { %>
-  [<%= uiTool.presentFloat(a.state.transferable) %> <%= a.assetName; %>]
+  [<%= uiTool.presentFloat(a.state.transferable) %> <%= a.symbol; %>]
   <% } %>
  <% } %>
 </a>
@@ -38,7 +38,11 @@ let cls2 = ( expanded ) ? "show" : "";
 <% if ( a.state.balance ) { %>
 <tr style="border-top: 1px solid gray;">
  <td width="40%" align=left valign=top>
-  <B><%= a.assetName; %></B> Balance:<br>
+  <B><%= a.symbol; %></B>
+  <% if ( a.symbol != a.assetName ) { %>
+    <B>(<%= a.assetName; %>)</B>
+  <% } %>
+  Balance:<br>
 <% if ( false ) { %>
   <a id="verifyaccount-<%= chainassets.id %>" class="btn btn-link">Verify</a>
  <script>
@@ -52,7 +56,7 @@ let cls2 = ( expanded ) ? "show" : "";
 <% } %>
  </td>
  <td width="60%" align=right>
-  <%= uiTool.presentFloat(a.state.balance) %> <%= a.assetName; %><br/>
+  <%= uiTool.presentFloat(a.state.balance) %> <%= a.symbol; %><br/>
   <small><%= uiTool.currencyFormat(a.state.balanceUSD); %></small>
 
  </td>

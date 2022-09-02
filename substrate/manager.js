@@ -1416,4 +1416,264 @@ module.exports = class Manager extends AssetManager {
         return addressData.length;
     }
 
+    push_rows_related_keys(family, column, rows, key, c) {
+        let ts = this.getCurrentTS();
+        let colData = {}
+        colData[`${column}`] = {
+            value: JSON.stringify(c),
+            timestamp: ts * 1000000
+        }
+        let data = {}
+        data[`${family}`] = colData
+        let row = {
+            key: key.toLowerCase(),
+            data
+        }
+        //console.log("PUSH", row);
+        rows.push(row);
+    }
+
+    async write_btRealtime_rows(rows, min, ctx = "") {
+        if (rows.length > min) {
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            try {
+                await tblRealtime.insert(rows);
+                console.log(ctx, "rows=", rows.length);
+                return [];
+            } catch (err) {
+                console.log(err);
+            }
+        }
+        return rows;
+    }
+
+    async write_btHashes_rows(rows, min, ctx = "") {
+        if (rows.length > min) {
+            try {
+                await this.btHashes.insert(rows);
+                console.log(ctx, "rows=", rows.length);
+                return [];
+            } catch (err) {
+                console.log(err);
+            }
+        }
+        return rows;
+    }
+
+    // write wasmCode.codeHash to btHashes wasmcode:${chainID}
+    async write_btHashes_wasmcode(lookbackDays = 1) {
+        let sql = `select codeHash, chainID, storer, codeStoredTS from wasmCode where codeStoredTS > UNIX_TIMESTAMP(DATE_SUB(Now(), interval ${lookbackDays} DAY)) order by codeStoredTS desc`
+        let recs = await this.poolREADONLY.query(sql);
+        let rows = [];
+        for (let i = 0; i < recs.length; i++) {
+            let c = recs[i];
+            this.push_rows_related_keys("wasmcode", c.chainID.toString(), rows, c.codeHash, c)
+            rows = await this.write_btHashes_rows(rows, 500, "write_hashes_wasmcode");
+        }
+        rows = await this.write_btHashes_rows(rows, 0, "write_hashes_wasmcode");
+    }
+
+    // write xcmmessages.msgHash to hashes xcmmessage:${sentAt}
+    async write_btHashes_xcmmessage(lookbackDays = 1) {
+        let ctx = "write_btHashes_xcmmessage";
+        let sql = `select msgHash, sentAt, chainID, chainIDDest, msgType, blockTS, blockNumber, relayChain from xcmmessages where incoming = 1 and matched = 1 and blockTS > UNIX_TIMESTAMP(DATE_SUB(Now(), interval ${lookbackDays} DAY)) order by blockTS desc`
+        let recs = await this.poolREADONLY.query(sql);
+        let rows = [];
+        for (let i = 0; i < recs.length; i++) {
+            let c = recs[i];
+            this.push_rows_related_keys("xcmmessage", c.sentAt.toString(), rows, c.msgHash, c)
+            rows = await this.write_btHashes_rows(rows, 500, ctx);
+        }
+        await this.write_btHashes_rows(rows, 0, ctx);
+    }
+
+    // write xcmasset.symbol to hashes symbol:${relayChain}
+    async write_btHashes_symbol(limit = 1) {
+        let ctx = "write_btHashes_symbol";
+        let sql = `select xcmasset.symbol, xcmasset.relayChain, xcmasset.nativeAssetChain, sum(numHolders) as numHolders from xcmasset join asset on xcmasset.xcmInteriorKey = asset.xcmInteriorKey group by symbol, relayChain, nativeAssetChain order by numHolders desc limit ${limit}`
+        let recs = await this.poolREADONLY.query(sql);
+        let rows = [];
+        for (let i = 0; i < recs.length; i++) {
+            let c = recs[i];
+            this.push_rows_related_keys("symbol", c.relayChain, rows, c.symbol, c)
+            rows = await this.write_btHashes_rows(rows, 500, ctx);
+        }
+        rows = await this.write_btHashes_rows(rows, 0, ctx);
+    }
+
+    // write asset.currencyID to hashes symbol:{chainID}
+    async write_btHashes_currencyID(limit = 1) {
+        let ctx = "write_btHashes_currencyID"
+        let sql = `select asset.currencyID, asset.chainID, xcmasset.symbol, xcmasset.relayChain, asset.numHolders from asset join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey and asset.currencyID != xcmasset.symbol order by numHolders desc limit ${limit}`
+        let recs = await this.poolREADONLY.query(sql);
+        let rows = [];
+        for (let i = 0; i < recs.length; i++) {
+            let c = recs[i];
+            this.push_rows_related_keys("symbol", c.relayChain, rows, c.currencyID, c)
+            rows = await this.write_btHashes_rows(rows, 500, ctx);
+        }
+        rows = await this.write_btHashes_rows(rows, 0, ctx);
+
+        let sql2 = `select asset.currencyID, asset.chainID, xcmasset.symbol, asset.symbol as localSymbol, xcmasset.relayChain, asset.numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey and asset.symbol != xcmasset.symbol and assetType = 'Token' and asset.symbol like 'xc%' order by numHolders desc;`
+        recs = await this.poolREADONLY.query(sql2);
+        for (let i = 0; i < recs.length; i++) {
+            let c = recs[i];
+            this.push_rows_related_keys("symbol", c.relayChain, rows, c.localSymbol, c)
+            rows = await this.write_btHashes_rows(rows, 500, ctx);
+        }
+        rows = await this.write_btHashes_rows(rows, 0, ctx);
+    }
+
+    // write chain.{chainID, paraID, id} to hashes chain:${relayChain}
+    async write_btHashes_chain(limit = 1000) {
+        let ctx = "write_btHashes_chain";
+        let sql = `select chainID, id, chainName, paraID, relayChain, numHolders from chain where crawling = 1 order by numHolders desc limit ${limit}`
+        let recs = await this.poolREADONLY.query(sql);
+        let rows = [];
+        for (let i = 0; i < recs.length; i++) {
+            let c = recs[i];
+            this.push_rows_related_keys("chain", c.relayChain, rows, c.chainID.toString(), c)
+            if (c.paraID != c.chainID) {
+                this.push_rows_related_keys("chain", c.relayChain, rows, c.paraID.toString(), c)
+            }
+            this.push_rows_related_keys("chain", c.relayChain, rows, c.id, c)
+            rows = await this.write_btHashes_rows(rows, 500, ctx);
+        }
+        rows = await this.write_btHashes_rows(rows, 0, ctx);
+    }
+
+    // write contract.address to btRealtime wasmcontract:${chainID}    TODO: contractType (PSP22, PSP37, ...)
+    async write_btRealtime_wasmcontract(lookbackDays = 1) {
+        let ctx = "write_btRealtime_wasmcontract";
+        let sql = `select address, chainID, codeHash, blockTS, deployer from contract where blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval ${lookbackDays} DAY)) order by blockTS desc`
+        let recs = await this.poolREADONLY.query(sql);
+        let rows = [];
+        for (let i = 0; i < recs.length; i++) {
+            let c = recs[i];
+            this.push_rows_related_keys("wasmcontract", c.chainID.toString(), rows, c.address, c)
+            rows = await this.write_btRealtime_rows(rows, 500, ctx);
+        }
+        await this.write_btRealtime_rows(rows, 0, ctx);
+    }
+
+    // write asset.asset to accountrealtime evmcontract:{chainID} for assetType = 'ERC20', 'ERC20LP' (TODO: 'ERC721', 'ERC1155')
+    async write_btRealtime_evmcontract(lookbackDays = 1) {
+        let ctx = "write_btRealtime_evmcontract";
+        let sql = `select asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol, numHolders from asset where assetType in ('ERC20', 'ERC20LP') and lastUpdateDT > date_sub(Now(), interval ${lookbackDays} DAY) order by lastUpdateDT desc`
+        let recs = await this.poolREADONLY.query(sql);
+        let rows = [];
+        for (let i = 0; i < recs.length; i++) {
+            let c = recs[i];
+            this.push_rows_related_keys("evmcontract", c.chainID.toString(), rows, c.asset, c)
+            rows = await this.write_btRealtime_rows(rows, 500, ctx);
+        }
+        await this.write_btRealtime_rows(rows, 0, ctx);
+    }
+
+    // writeBTHashesRealtime: writes all hashes/strings from { asset, xcmAsset, contract, chain } (other than extrinsicHashes, blockHashes)
+    // to the { btHashes, btRealtime } BigTables 
+    async writeBTHashesRealtime(lookbackDays = 1, limit = 100) {
+        await this.write_btHashes_xcmmessage(lookbackDays);
+        await this.write_btHashes_symbol(limit);
+        await this.write_btHashes_chain(limit);
+        await this.write_btHashes_currencyID(limit);
+        await this.write_btHashes_wasmcode(lookbackDays);
+        await this.write_btRealtime_wasmcontract(lookbackDays);
+        await this.write_btRealtime_evmcontract(lookbackDays);
+    }
+
+    /*
+    For each crowdloan, write 2 cells into "hashes.related"
+    (a) forward direction (fromAddress => memo)
+    (b) reverse direction (memo => fromAddress)
+    mysql> select ts, paraID, fromAddress, memo from crowdloan where memo in ( select holder from assetholder ) limit 10;
+    +------------+--------+--------------------------------------------------------------------+--------------------------------------------------------------------+
+    | ts         | paraID | fromAddress                                                        | memo                                                               |
+    +------------+--------+--------------------------------------------------------------------+--------------------------------------------------------------------+
+    | 1636706034 |   2004 | 0x9433e03eb43fb7f086f150a56b229e38150ab5411934438252520486e9fc047d | 0xcaadf7c0f8f58b8b468d201bfac676c135eb75d4                         |
+    | 1637695278 |   2006 | 0x768e9b1c7df028c6f9c8cd702bc938a51a455d7babbd2434f751fe47c1007437 | 0x4ab52bb8245e545fc6b7861df6cf6a2db175f95c99f6b4b27e8f3bb3e9d10c4b |
+    */
+    async write_hashes_crowdloan(chainID, limit = 1000000) {
+        // TODO: 0 vs 2
+        let sql = `select chainID, amount, blockNumber, ts, paraID, fromAddress, memo from crowdloan where memo in ( select holder from assetholder${chainID} ) order by ts limit ${limit}`
+        let crowdloans = await this.poolREADONLY.query(sql);
+        let rows = [];
+
+        for (let c = 0; c < crowdloans.length; c++) {
+            let crowdloan = crowdloans[c];
+            let replayChain = paraTool.getRelayChainByChainID(parseInt(crowdloan.chainID, 10))
+            let paraChainID = paraTool.getChainIDFromParaIDAndRelayChain(crowdloan.paraID, replayChain)
+            let paraChainName = this.getChainName(paraChainID);
+            let relayChainName = this.getChainName(crowdloan.chainID);
+            let relayChainAsset = this.getChainAsset(crowdloan.chainID);
+            let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(crowdloan.amount, relayChainAsset, crowdloan.ts)
+            let description = `${paraChainName} Crowdloan Address/Referral (${relayChainName}) ${uiTool.presentCurrency(amountUSD)}`
+            let metadata = {
+                datasource: "crowdloan",
+                relayChainID: crowdloan.chainID,
+                relayChainName,
+                paraChainName,
+                paraChainID,
+                amount: crowdloan.amount,
+                amountUSD,
+                priceUSD,
+                paraID: crowdloan.paraID,
+                blockNumber: crowdloan.blockNumber,
+                ts: crowdloan.ts
+            }
+            if (paraChainID && paraChainName && relayChainName) {
+                // forward direction (fromAddress => memo)
+                let related = {}
+                related[crowdloan.memo] = {
+                    value: JSON.stringify({
+                        url: "/account/" + crowdloan.memo,
+                        title: crowdloan.memo,
+                        description,
+                        linktype: "address",
+                        metadata: metadata
+                    }),
+                    timestamp: crowdloan.ts * 1000000
+                };
+                rows.push({
+                    key: crowdloan.fromAddress,
+                    data: {
+                        related: related
+                    }
+                });
+
+                // reverse direction (memo => fromAddress)
+                let related1 = {}
+                related1[crowdloan.fromAddress] = {
+                    value: JSON.stringify({
+                        url: "/account/" + crowdloan.fromAddress,
+                        title: crowdloan.fromAddress,
+                        description,
+                        linktype: "address",
+                        metadata: metadata
+                    }),
+                    timestamp: crowdloan.ts * 1000000
+                }
+                rows.push({
+                    key: crowdloan.memo,
+                    data: {
+                        related: related1
+                    }
+                })
+                //console.log(`${crowdloan.fromAddress}`, related)
+                if (rows.length > 500) {
+                    await this.btHashes.insert(rows);
+                    console.log("writeCrowdloanRelated rows=", rows.length);
+                    rows = [];
+                }
+            }
+        }
+        if (rows.length > 0) {
+            await this.btHashes.insert(rows);
+            console.log("writeCrowdloanRelated rows=", rows.length);
+            rows = [];
+        }
+
+    }
+
+
 }

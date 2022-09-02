@@ -1,17 +1,16 @@
 #!/usr/bin/env node
- // Usage: ./writeCrowdloanRelated chainID
-var Query = require("./query");
+ // Usage: ./writeBTHashesRealtime
+var Manager = require("./manager");
 
 async function main() {
-    var chainID = -1;
-    let query = new Query();
-    await query.assetManagerInit();
+    let manager = new Manager();
+    let lookbackDays = 1;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
-            chainID = parseInt(val, 10);
+            lookbackDays = val;
         }
     });
-    await query.writeCrowdloanRelated(chainID);
+    await manager.writeBTHashesRealtime(lookbackDays);
 }
 
 main()

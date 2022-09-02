@@ -13,8 +13,10 @@ const {
 async function main() {
     var crawler = new Crawler();
     await crawler.assetManagerInit();
-    let chainID = 22000;
-    let blockNumber = 1025175;
+    let chainID = 22007;
+    let blockNumber = 2253533;
+    chainID = 22023;
+    blockNumber = 2499781;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = parseInt(val, 10);

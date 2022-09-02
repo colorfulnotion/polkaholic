@@ -471,9 +471,9 @@ app.get('/', async (req, res) => {
         res.render('downtime');
         return;
     }
+    let homePubkey = getHomePubkey(req);
     let account = {};
     try {
-        var homePubkey = getHomePubkey(req);
         if (homePubkey) {
             account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
         }
@@ -518,8 +518,8 @@ app.get('/', async (req, res) => {
 
 async function handleChains(req, res) {
     let account = {}
+    let homePubkey = getHomePubkey(req);
     try {
-        var homePubkey = getHomePubkey(req);
         if (homePubkey) {
             account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
         }
@@ -618,8 +618,8 @@ app.get('/identicon/:address', async (req, res) => {
 // Usage: https://polkaholic.io/chain/22000
 app.get('/chain/:chainID_or_chainName', async (req, res) => {
     let account = {};
+    let homePubkey = getHomePubkey(req);
     try {
-        var homePubkey = getHomePubkey(req);
         if (homePubkey) {
             account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
         }
@@ -1267,7 +1267,7 @@ app.get('/account/:address', async (req, res) => {
     }
 })
 
-app.get('/address/:address', async (req, res) => {
+app.get('/address/:address/:chainID?', async (req, res) => {
     try {
         let fromAddress = getHomePubkey(req);
         let address = req.params["address"];
@@ -1314,6 +1314,7 @@ app.get('/address/:address', async (req, res) => {
 // Any chain-specific asset links to /asset/:chainID/:assetOrCurrencyID.  Any chain mention links to /chain/:chainID_or_chainName#xcmassets
 app.get('/symbol/:symbol', async (req, res) => {
     let account = {};
+    let homePubkey = getHomePubkey(req);
     try {
         if (homePubkey) {
             account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
@@ -1323,7 +1324,6 @@ app.get('/symbol/:symbol', async (req, res) => {
     }
 
     try {
-        let homePubkey = getHomePubkey(req);
         let symbol = req.params["symbol"];
         let chains = await query.getSymbolAssets(symbol);
         res.render('symbol', {

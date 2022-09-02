@@ -33,7 +33,7 @@
 
     <tr>
       <td>Symbol</td>
-      <td><%= asset.symbol %></td>
+      <td><a href="/symbol/<%= asset.symbol %>"><%= asset.symbol %></a></td>
     </tr>
 
     <tr>
@@ -43,13 +43,13 @@
 <% if ( asset.xcContractAddress ) { %>
     <tr>
       <td>Contract Address</td>
-      <td><%= asset.xcContractAddress; %></td>
+      <td><a href='/asset/<%= asset.chainID %>/<%= asset.xcContractAddress; %>'><%- uiTool.getShortHash(asset.xcContractAddress, false); %></a></td>
     </tr>
 <% } %>
 <% if ( asset.priceUSD >= 0 ) { %>
     <tr>
       <td>Current Price</td>
-      <td><%= asset.priceUSD; %></td>
+      <td><%- uiTool.currencyFormat(asset.priceUSD); %></td>
     </tr>
 <% } %>
 </table>

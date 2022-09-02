@@ -36,12 +36,12 @@ let timelineRows = uiTool.getTimelineRows(timeline);
        <%- uiTool.showAccountInfo(xcm, "destAddress") %>
        <br/>
      <% } %>
-     <B>Origination:</B> <%= uiTool.capitalizeFirstLetter(xcm.id) %>
+     <B>Origination [Para ID: <%= xcm.paraID %>]:</B> <%= uiTool.capitalizeFirstLetter(xcm.id) %>
      <% if ( xcm.blockNumberSent ) { %>
        (<a href='/block/<%= xcm.id %>/<%= xcm.blockNumberSent %>'><%= xcm.blockNumberSent %></a>)
      <% } %>
      <br/>
-     <B>Destination:</B> <%= uiTool.capitalizeFirstLetter(xcm.idDest) %>
+     <B>Destination: [Para ID: <%= xcm.paraIDDest %>]</B> <%= uiTool.capitalizeFirstLetter(xcm.idDest) %>
      <% if ( xcm.blockNumberReceived ) { %>
        (<a href='/block/<%= xcm.idDest %>/<%= xcm.blockNumberReceived %>'><%= xcm.blockNumberReceived %></a>)
      <% } %>

@@ -1,13 +1,10 @@
 <%- include('header', {chainInfo: chainInfo, title: "All Chains"}); %>
 
-<div style='float:right; width: 200px'>
-<select name="relaychain" id="relaychain" class="select" data-mdb-option-height="44">
+<span style='float:right; white-space: nowrap; width: 200px; font-size: 8pt;'>Relay chain filter:<select name="relaychain" id="relaychain" class="select" data-mdb-option-height="44">
   <option value="all" data-mdb-secondary-text="All Parachains" <%=  ( relaychain == "" ) ? "SELECTED": ""; %>>All</option>
-  <option value="polkadot" data-mdb-secondary-text="Polkadot Parachains" <%=  ( relaychain == "polkadot" ) ? "SELECTED": ""; %>>Polkadot</option>
-  <option value="kusama" data-mdb-secondary-text="Kusama Parachains" <%=  ( relaychain == "kusama" ) ? "SELECTED": ""; %>>Kusama</option>
-</select>
-</div>
-
+  <option value="polkadot" data-mdb-secondary-text="Polkadot+Parachains" <%=  ( relaychain == "polkadot" ) ? "SELECTED": ""; %>>Polkadot</option>
+  <option value="kusama" data-mdb-secondary-text="Kusama+Parachains" <%=  ( relaychain == "kusama" ) ? "SELECTED": ""; %>>Kusama</option>
+</select></span>
 <!-- Nav tabs -->
 <ul class="nav nav-tabs" id="chainsTab" role="tablist">
 <%

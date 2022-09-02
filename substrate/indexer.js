@@ -719,6 +719,7 @@ module.exports = class Indexer extends AssetManager {
         let multisigListTS = (new Date().getTime() - multisigListStartTS) / 1000
         if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(+): Multisig", multisigListTS);
 
+	// writes to mysql
         let assetHolderStartTS = new Date().getTime();
         await this.flushAssetHolder();
         let assetHolderTS = (new Date().getTime() - assetHolderStartTS) / 1000
@@ -751,6 +752,7 @@ module.exports = class Indexer extends AssetManager {
         try {
             let [tblName, tblRealtime] = this.get_btTableRealtime()
             let rows = [];
+	    // addressStorage
             for (const address of Object.keys(this.addressStorage)) {
                 let r = this.addressStorage[address];
                 let rowKey = address.toLowerCase()
@@ -4481,6 +4483,7 @@ module.exports = class Indexer extends AssetManager {
         let assetholder = `${holder}-${asset}`
         this.stat.assetholder.read++
         let cachedState = this.assetholder[assetholder]
+
         if (cachedState == undefined) {
             this.stat.assetholder.unique++
             this.stat.assetholder.write++
@@ -6150,6 +6153,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
             let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
             let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
+            let fees = blockStats && blockStats.fees ? blockStats.fees : 0
             let feedTS = Math.floor(Date.now() / 1000)
             let indexTS = Math.floor(blockTS / 3600) * 3600;
             if (typeof blockTS === "undefined") {
