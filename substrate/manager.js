@@ -1416,23 +1416,6 @@ module.exports = class Manager extends AssetManager {
         return addressData.length;
     }
 
-    push_rows_related_keys(family, column, rows, key, c) {
-        let ts = this.getCurrentTS();
-        let colData = {}
-        colData[`${column}`] = {
-            value: JSON.stringify(c),
-            timestamp: ts * 1000000
-        }
-        let data = {}
-        data[`${family}`] = colData
-        let row = {
-            key: key.toLowerCase(),
-            data
-        }
-        //console.log("PUSH", row);
-        rows.push(row);
-    }
-
     async write_btRealtime_rows(rows, min, ctx = "") {
         if (rows.length > min) {
             let [tblName, tblRealtime] = this.get_btTableRealtime()
@@ -1467,6 +1450,7 @@ module.exports = class Manager extends AssetManager {
         let rows = [];
         for (let i = 0; i < recs.length; i++) {
             let c = recs[i];
+            this.add_index_metadata(c);
             this.push_rows_related_keys("wasmcode", c.chainID.toString(), rows, c.codeHash, c)
             rows = await this.write_btHashes_rows(rows, 500, "write_hashes_wasmcode");
         }
@@ -1481,6 +1465,7 @@ module.exports = class Manager extends AssetManager {
         let rows = [];
         for (let i = 0; i < recs.length; i++) {
             let c = recs[i];
+            this.add_index_metadata(c);
             this.push_rows_related_keys("xcmmessage", c.sentAt.toString(), rows, c.msgHash, c)
             rows = await this.write_btHashes_rows(rows, 500, ctx);
         }
@@ -1495,6 +1480,7 @@ module.exports = class Manager extends AssetManager {
         let rows = [];
         for (let i = 0; i < recs.length; i++) {
             let c = recs[i];
+            this.add_index_metadata(c);
             this.push_rows_related_keys("symbol", c.relayChain, rows, c.symbol, c)
             rows = await this.write_btHashes_rows(rows, 500, ctx);
         }
@@ -1509,6 +1495,7 @@ module.exports = class Manager extends AssetManager {
         let rows = [];
         for (let i = 0; i < recs.length; i++) {
             let c = recs[i];
+            this.add_index_metadata(c);
             this.push_rows_related_keys("symbol", c.relayChain, rows, c.currencyID, c)
             rows = await this.write_btHashes_rows(rows, 500, ctx);
         }
@@ -1518,6 +1505,7 @@ module.exports = class Manager extends AssetManager {
         recs = await this.poolREADONLY.query(sql2);
         for (let i = 0; i < recs.length; i++) {
             let c = recs[i];
+            this.add_index_metadata(c);
             this.push_rows_related_keys("symbol", c.relayChain, rows, c.localSymbol, c)
             rows = await this.write_btHashes_rows(rows, 500, ctx);
         }
@@ -1532,6 +1520,7 @@ module.exports = class Manager extends AssetManager {
         let rows = [];
         for (let i = 0; i < recs.length; i++) {
             let c = recs[i];
+            this.add_index_metadata(c);
             this.push_rows_related_keys("chain", c.relayChain, rows, c.chainID.toString(), c)
             if (c.paraID != c.chainID) {
                 this.push_rows_related_keys("chain", c.relayChain, rows, c.paraID.toString(), c)
@@ -1559,7 +1548,7 @@ module.exports = class Manager extends AssetManager {
     // write asset.asset to accountrealtime evmcontract:{chainID} for assetType = 'ERC20', 'ERC20LP' (TODO: 'ERC721', 'ERC1155')
     async write_btRealtime_evmcontract(lookbackDays = 1) {
         let ctx = "write_btRealtime_evmcontract";
-        let sql = `select asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol, numHolders from asset where assetType in ('ERC20', 'ERC20LP') and lastUpdateDT > date_sub(Now(), interval ${lookbackDays} DAY) order by lastUpdateDT desc`
+        let sql = `select asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol, creator, createdAtTx, token0Decimals, token1Decimals from asset where assetType in ('ERC20', 'ERC20LP') and lastUpdateDT > date_sub(Now(), interval ${lookbackDays} DAY) order by lastUpdateDT desc`
         let recs = await this.poolREADONLY.query(sql);
         let rows = [];
         for (let i = 0; i < recs.length; i++) {
@@ -1571,7 +1560,7 @@ module.exports = class Manager extends AssetManager {
     }
 
     // writeBTHashesRealtime: writes all hashes/strings from { asset, xcmAsset, contract, chain } (other than extrinsicHashes, blockHashes)
-    // to the { btHashes, btRealtime } BigTables 
+    // to the { btHashes, btRealtime } BigTables
     async writeBTHashesRealtime(lookbackDays = 1, limit = 100) {
         await this.write_btHashes_xcmmessage(lookbackDays);
         await this.write_btHashes_symbol(limit);

@@ -564,10 +564,10 @@ module.exports = class PolkaholicDB {
     }
 
     async getChains(crawling = 1, orderBy = "valueTransfersUSD7d DESC") {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, chain.chainName, blocksCovered, blocksFinalized, asset.symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS, 
-unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, 
-valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numAccountsActive, numAccountsActive7d, numAccountsActive30d, asset.numHolders, relayChain, totalIssuance, lastUpdateChainAssetsTS, 
-onfinalityID, onfinalityStatus, isEVM, chain.asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange 
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, chain.chainName, blocksCovered, blocksFinalized, asset.symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS,
+unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents,
+valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numAccountsActive, numAccountsActive7d, numAccountsActive30d, asset.numHolders, relayChain, totalIssuance, lastUpdateChainAssetsTS,
+onfinalityID, onfinalityStatus, isEVM, chain.asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange
 from chain  left join asset on chain.chainID = asset.chainID and chain.asset = asset.asset where crawling = ${crawling} order by ${orderBy}`);
         return (chains);
     }
@@ -584,11 +584,11 @@ from chain  left join asset on chain.chainID = asset.chainID and chain.asset = a
     }
 
     async get_chains_external(crawling = 1) {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, CONCAT(UPPER(SUBSTRING(chain.chainName,1,1)),LOWER(SUBSTRING(chain.chainName,2))) AS chainName, asset.symbol, unix_timestamp(lastFinalizedDT) as lastFinalizedTS, iconUrl, 
-numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, 
-numXCMTransferIncoming, numXCMTransferIncoming7d, numXCMTransferIncoming30d, numXCMTransferOutgoing, numXCMTransferOutgoing7d, numXCMTransferOutgoing30d, valXCMTransferIncomingUSD, valXCMTransferIncomingUSD7d, valXCMTransferIncomingUSD30d, valXCMTransferOutgoingUSD, 
-valXCMTransferOutgoingUSD7d, valXCMTransferOutgoingUSD30d, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, asset.numHolders, numAccountsActive, numAccountsActive7d, numAccountsActive30d, relayChain, totalIssuance, isEVM, blocksCovered, blocksFinalized, 
-crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, chain.asset, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange 
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, CONCAT(UPPER(SUBSTRING(chain.chainName,1,1)),LOWER(SUBSTRING(chain.chainName,2))) AS chainName, asset.symbol, unix_timestamp(lastFinalizedDT) as lastFinalizedTS, iconUrl,
+numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents, valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD,
+numXCMTransferIncoming, numXCMTransferIncoming7d, numXCMTransferIncoming30d, numXCMTransferOutgoing, numXCMTransferOutgoing7d, numXCMTransferOutgoing30d, valXCMTransferIncomingUSD, valXCMTransferIncomingUSD7d, valXCMTransferIncomingUSD30d, valXCMTransferOutgoingUSD,
+valXCMTransferOutgoingUSD7d, valXCMTransferOutgoingUSD30d, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, asset.numHolders, numAccountsActive, numAccountsActive7d, numAccountsActive30d, relayChain, totalIssuance, isEVM, blocksCovered, blocksFinalized,
+crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, chain.asset, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange
 from chain left join asset on chain.chainID = asset.chainID and chain.asset = asset.asset where crawling = ${crawling} order by relayChain, id, chainID;`);
         return (chains);
     }
@@ -1119,9 +1119,32 @@ from chain where chainID = '${chainID}' limit 1`);
         return this.build_block_from_row(row)
     }
 
+    push_rows_related_keys(family, column, rows, key, c) {
+        let ts = this.getCurrentTS();
+        let colData = {}
+        colData[`${column}`] = {
+            value: JSON.stringify(c),
+            timestamp: ts * 1000000
+        }
+        let data = {}
+        data[`${family}`] = colData
+        let row = {
+            key: key.toLowerCase(),
+            data
+        }
+        //console.log("PUSH", row);
+        rows.push(row);
+    }
+
     getCurrentTS() {
         return Math.round(new Date().getTime() / 1000);
     }
+
+    add_index_metadata(c) {
+        c.source = this.hostname;
+        c.genTS = this.getCurrentTS();
+    }
+
     capitalizeFirstLetter(string) {
         return string.charAt(0).toUpperCase() + string.slice(1);
     }
