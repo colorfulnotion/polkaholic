@@ -649,7 +649,7 @@ app.get('/hash/blockhash/:blockHash', async (req, res) => {
 
 app.get('/account/:address', async (req, res) => {
     try {
-        let address = req.params["address"];
+        let address = paraTool.getPubKey(req.params["address"]);
         let targetGroup = (req.query["group"] != undefined) ? req.query["group"].toLowerCase() : "realtime"
         let lookback = (req.query["lookback"] != undefined) ? req.query["lookback"] : 180
         let predefinedGroups = ["extrinsics", "transfers", "crowdloans", "rewards", "realtime", "history", "related", "xcmtransfers", "nfts", "balances", "feed", "unfinalized", "offers", "ss58h160"]
@@ -676,6 +676,46 @@ app.get('/account/:address', async (req, res) => {
         let account = await query.getAccount(address, targetGroup, chainList, maxRows, ts, lookback, decorate, decorateExtra, pageIndex);
         if (account) {
             res.write(JSON.stringify(account));
+            await query.tallyAPIKey(getapikey(req));
+            return res.end();
+        } else {
+            return res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/evmtx/:address', async (req, res) => {
+    try {
+        let address = req.params["address"];
+        let targetGroup = (req.query["group"] != undefined) ? req.query["group"].toLowerCase() : "to"
+        let predefinedGroups = ["to", "internal"]
+        if (!predefinedGroups.includes(targetGroup)) {
+            return res.status(400).json({
+                error: `group=${req.query["group"]} is not supprted`
+            });
+        }
+        let ts = (req.query["ts"] != undefined) ? req.query["ts"] : null;
+        let pageIndex = (req.query["p"] != undefined) ? req.query["p"] : 0;
+        //console.log(`${targetGroup} requested`)
+        let [decorate, decorateExtra] = decorateOpt(req, "account")
+        let chainList = chainFilterOpt(req)
+        let maxLimit = 1000;
+        let hardLimit = 10000;
+        let maxRows = (req.query.limit != undefined) ? req.query.limit : maxLimit;
+        if (maxRows > hardLimit) {
+            return res.status(400).json({
+                error: `Search: 'limit' parameter must be less or equal to than ${hardLimit}`
+            });
+        }
+
+        //console.log(`/account/ chainList`, chainList)
+        let feed = await query.getEVMTxFeed(address, targetGroup, null, maxRows, ts);
+        if (feed) {
+            res.write(JSON.stringify(feed));
             await query.tallyAPIKey(getapikey(req));
             return res.end();
         } else {

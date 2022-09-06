@@ -501,7 +501,7 @@ function showchainlog(chainID, address) {
 function showchaintab(hash) {
     switch (hash) {
         case "#xcmassets":
-            showxcmassets(id, address);
+            showxcmassets(id);
             setupapidocs("chain", "assets", `${id}`);
             break;
         case "#xcmtransfers":

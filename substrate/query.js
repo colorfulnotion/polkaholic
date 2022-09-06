@@ -885,7 +885,6 @@ module.exports = class Query extends AssetManager {
                             const cell = data.tx[0];
                             let c = JSON.parse(cell.value);
                             if (c.gasLimit != undefined) {
-                                console.log("CELL", c);
                                 if (this.is_evm_xcmtransfer_input(c.input)) {
                                     let substrateTXHash = c.substrate.extrinsicHash;
                                     let substratetx = await this.getTransaction(substrateTXHash);
@@ -1660,7 +1659,7 @@ module.exports = class Query extends AssetManager {
 
     }
 
-    async getAsset(currencyID, chainID, address = false) {
+    async getAsset(currencyID, chainID) {
         try {
             let assets = await this.poolREADONLY.query(`select asset.asset, asset.chainID, asset.assetType, asset.decimals, assetName, asset.symbol as localSymbol, asset.currencyID, asset.xcContractAddress, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.chainID = '${chainID}' and ( asset.currencyID = '${currencyID}' or asset.asset = '${currencyID}' ) order by asset.numHolders desc limit 1`);
             if (assets.length == 0) {
@@ -2481,7 +2480,6 @@ module.exports = class Query extends AssetManager {
                                     // skip this until hitting pageIndex
                                     p++;
                                 } else if (feedItems < maxRows) {
-                                    console.log("INCLUDING", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
                                     p++;
                                     let d = await this.decorateExtrinsic(t, t.chainID, "", decorate, decorateExtra)
                                     decoratedFeeds.push(d)
@@ -2714,188 +2712,215 @@ module.exports = class Query extends AssetManager {
         return (related)
     }
 
-    async getAccountAssetsRealtimeByChain(requestedChainID, rawAddress, rawFromAddress, chainList = [], maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
-        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let fromAddress = paraTool.getPubKey(rawFromAddress) // observer
-        let address = paraTool.getPubKey(rawAddress)
-        let isEVMAddr = paraTool.isValidEVMAddress(address)
-
-        let assets = null;
+    async getMultiAccount(rawAddresses, requestedChainID = 0, chainList = []) {
+        let addresses = []
+        for (let i = 0; i < rawAddresses.length; i++) {
+            let x = paraTool.getPubKey(rawAddresses[i]);
+            if (x) addresses.push(x);
+        }
+        let accounts = [];
+        if (addresses.length == 0) return (accounts);
         try {
-            assets = await this.getAccount(address, "realtime", chainList, maxRows);
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            const filter = [{
+                column: {
+                    cellLimit: 1
+                },
+                families: ["realtime", "evmcontract", "wasmcontract"],
+                limit: 10,
+            }];
+
+            let [rows] = await tblRealtime.getRows({
+                keys: addresses,
+                filter
+            });
+
+
+            for (const row of rows) {
+                let address = row.id;
+                let rowData = row.data;
+                let isEVMAddr = paraTool.isValidEVMAddress(address)
+                let [assets, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], chainList)
+                let chainsMap = {};
+                for (let i = 0; i < assets.length; i++) {
+                    let a = assets[i];
+                    let chainID = a.assetInfo.chainID;
+                    if (chainsMap[chainID] == undefined) {
+                        let chainInfo = this.chainInfos[chainID];
+                        var id, chainName, ss58Format, ss58Address, iconUrl, subscanURL, dappURL, WSEndpoint;
+                        if (chainInfo !== undefined) {
+                            chainName = this.getChainName(chainID);
+                            id = chainInfo.id;
+                            ss58Format = this.chainInfos[chainID].ss58Format;
+                            ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
+                            iconUrl = this.chainInfos[chainID].iconUrl;
+                            subscanURL = this.chainInfos[chainID].subscanURL;
+                            dappURL = this.chainInfos[chainID].dappURL;
+                            WSEndpoint = this.chainInfos[chainID].WSEndpoint;
+                        }
+                        chainsMap[chainID] = {
+                            chainID,
+                            chainName,
+                            id,
+                            ss58Format,
+                            ss58Address,
+                            iconUrl,
+                            subscanURL,
+                            dappURL,
+                            WSEndpoint,
+                            assets: [],
+                            balanceUSD: 0
+                        };
+                    }
+                    let o = a.assetInfo;
+                    o.state = a.state;
+                    chainsMap[a.assetInfo.chainID].assets.push(o);
+                }
+
+                // if we didn't get any assets at all for the requestedChainID, synthesize a 0 asset record so that the user can see it
+                if (chainsMap[requestedChainID] == undefined && this.chainInfos[requestedChainID] != undefined) {
+                    let chainInfo = this.chainInfos[requestedChainID];
+                    let chainName = this.getChainName(requestedChainID);
+                    let id = chainInfo.id;
+                    let ss58Format = chainInfo.ss58Format;
+                    let ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
+                    let iconUrl = chainInfo.iconUrl;
+                    let zeroAssets = [];
+                    chainsMap[requestedChainID] = {
+                        chainID: requestedChainID,
+                        chainName,
+                        id,
+                        ss58Format,
+                        ss58Address,
+                        iconUrl,
+                        assets: zeroAssets,
+                        balanceUSD: 0
+                    }
+                }
+                // turn chainsMap into chains array, and compute balanceUSD
+                let chains = [];
+                let balanceUSD = 0;
+                for (const chainID of Object.keys(chainsMap)) {
+                    let chain = chainsMap[chainID];
+                    let chainBalanceUSD = 0;
+                    for (let j = 0; j < chain.assets.length; j++) {
+                        let a = chain.assets[j];
+                        if (a.state.balanceUSD !== undefined) {
+                            chainBalanceUSD += a.state.balanceUSD;
+                        }
+                    }
+                    chain.assets.sort(function(a, b) {
+                        let bBalance = (b.state.balanceUSD !== undefined) ? b.state.balanceUSD : 0;
+                        let aBalance = (a.state.balanceUSD !== undefined) ? a.state.balanceUSD : 0;
+                        if (aBalance != bBalance) {
+                            return (bBalance - aBalance);
+                        }
+                        let bFree = b.state.free !== undefined ? b.state.free : 0;
+                        let aFree = a.state.free !== undefined ? a.state.free : 0;
+                        if (aFree != bFree) {
+                            return (bFree - aFree);
+                        }
+                        return 0;
+                    })
+                    chain.balanceUSD = chainBalanceUSD;
+                    balanceUSD += chain.balanceUSD;
+                    chains.push(chain);
+                }
+
+                // check asc vs desc
+                chains.sort(function(a, b) {
+                    if (requestedChainID == a.chainID) {
+                        return -1;
+                    }
+                    if (requestedChainID == b.chainID) {
+                        return 1;
+                    }
+                    let bBalance = b.balanceUSD;
+                    let aBalance = a.balanceUSD;
+                    if (aBalance != bBalance) {
+                        return (bBalance - aBalance);
+                    }
+                    let bAssets = b.assets.length;
+                    let aAssets = a.assets.length;
+                    if (aAssets != bAssets) {
+                        return (bAssets - aAssets);
+                    }
+                    return (a.chainID - b.chainID);
+                })
+
+
+                let requestedChainPrefix = null;
+                if (requestedChainID) {
+                    requestedChainPrefix = this.getChainPrefix(requestedChainID);
+                } else if (chains.length > 0) {
+                    requestedChainPrefix = chains[0].ss58Format;
+                } else {
+                    requestedChainPrefix = 0;
+                }
+                let requestedChainAddress = isEVMAddr ? address : paraTool.getAddress(address, requestedChainPrefix)
+                let account = {
+                    address,
+                    requestedChainAddress,
+                    requestedChainPrefix,
+                    balanceUSD,
+                    chains,
+                    numFollowing: 0,
+                    numFollowers: 0,
+                    isFollowing: false,
+                    nickname: null,
+                    info: null,
+                    judgements: null,
+                    infoKSM: null,
+                    judgementsKSM: null,
+                    related: null
+                }
+
+                let a = this.lookup_account(address);
+                if (a) {
+                    account.nickname = a.nickname;
+                    try {
+                        if (a.parentDisplay != null && a.subName) {
+                            account.subName = `${a.parentDisplay}/${a.subName}`
+                            account.parent = a.parent
+                        } else if (a.parentDisplayKSM != null && a.subNameKSM) {
+                            account.subName = `${a.parentDisplayKSM}/${a.subNameKSM}`
+                            account.parent = a.parentKSM
+                        } else {
+                            account.subName = null;
+                        }
+                        account.info = (a.info != null) ? a.info : null;
+                        account.judgements = (a.judgements != null) ? a.judgements : null;
+                        account.infoKSM = (a.infoKSM != null) ? a.infoKSM : null;
+                        account.judgementsKSM = (a.judgementsKSM != null) ? a.judgementsKSM : null;
+                        account.related = (a.related != null) ? a.related : null;
+                    } catch (e) {
+                        console.log(e)
+                    }
+                    account.numFollowers = a.numFollowers;
+                    account.numFollowing = a.numFollowing;
+                    /*
+		    if (account.numFollowers > 0 && fromAddress) {
+			let sql2 = `select isFollowing, followDT from follow where fromAddress = '${fromAddress}' and toAddress = '${address}'`
+			let follows = await this.poolREADONLY.query(sql2);
+			if (follows.length > 0) {
+			    account.isFollowing = true;
+			}
+		    } */
+                }
+
+                accounts.push(account);
+            }
         } catch (err) {
-            console.log("getAccountAssetsRealtimeByChain", err);
+            console.log("getMultiAccount", err);
             throw err;
         }
 
-        let chainsMap = {};
-        for (let i = 0; i < assets.length; i++) {
-            let a = assets[i];
-            let chainID = a.assetInfo.chainID;
-            if (chainsMap[chainID] == undefined) {
-                let chainInfo = this.chainInfos[chainID];
-                var id, chainName, ss58Format, ss58Address, iconUrl, subscanURL, dappURL, WSEndpoint;
-                if (chainInfo !== undefined) {
-                    chainName = this.getChainName(chainID);
-                    id = chainInfo.id;
-                    ss58Format = this.chainInfos[chainID].ss58Format;
-                    ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
-                    iconUrl = this.chainInfos[chainID].iconUrl;
-                    subscanURL = this.chainInfos[chainID].subscanURL;
-                    dappURL = this.chainInfos[chainID].dappURL;
-                    WSEndpoint = this.chainInfos[chainID].WSEndpoint;
-                }
-                chainsMap[chainID] = {
-                    chainID,
-                    chainName,
-                    id,
-                    ss58Format,
-                    ss58Address,
-                    iconUrl,
-                    subscanURL,
-                    dappURL,
-                    WSEndpoint,
-                    assets: [],
-                    balanceUSD: 0
-                };
-            }
-            let o = a.assetInfo;
-            o.state = a.state;
-            chainsMap[a.assetInfo.chainID].assets.push(o);
-        }
-        // if we didn't get any assets at all for the requestedChainID, synthesize a 0 asset record so that the user can see it
-        if (chainsMap[requestedChainID] == undefined && this.chainInfos[requestedChainID] != undefined) {
-            let chainInfo = this.chainInfos[requestedChainID];
-            let chainName = this.getChainName(requestedChainID);
-            let id = chainInfo.id;
-            let ss58Format = chainInfo.ss58Format;
-            let ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
-            let iconUrl = chainInfo.iconUrl;
-            let zeroAssets = [];
-            chainsMap[requestedChainID] = {
-                chainID: requestedChainID,
-                chainName,
-                id,
-                ss58Format,
-                ss58Address,
-                iconUrl,
-                assets: zeroAssets,
-                balanceUSD: 0
-            }
-        }
-        // turn chainsMap into chains array, and compute balanceUSD
-        let chains = [];
-        let balanceUSD = 0;
-        for (const chainID of Object.keys(chainsMap)) {
-            let chain = chainsMap[chainID];
-            let chainBalanceUSD = 0;
-            for (let j = 0; j < chain.assets.length; j++) {
-                let a = chain.assets[j];
-                if (a.state.balanceUSD !== undefined) {
-                    chainBalanceUSD += a.state.balanceUSD;
-                }
-            }
-            chain.assets.sort(function(a, b) {
-                let bBalance = (b.state.balanceUSD !== undefined) ? b.state.balanceUSD : 0;
-                let aBalance = (a.state.balanceUSD !== undefined) ? a.state.balanceUSD : 0;
-                if (aBalance != bBalance) {
-                    return (bBalance - aBalance);
-                }
-                let bFree = b.state.free !== undefined ? b.state.free : 0;
-                let aFree = a.state.free !== undefined ? a.state.free : 0;
-                if (aFree != bFree) {
-                    return (bFree - aFree);
-                }
-                return 0;
-            })
-            chain.balanceUSD = chainBalanceUSD;
-            balanceUSD += chain.balanceUSD;
-            chains.push(chain);
-        }
-
-        // check asc vs desc
-        chains.sort(function(a, b) {
-            if (requestedChainID == a.chainID) {
-                return -1;
-            }
-            if (requestedChainID == b.chainID) {
-                return 1;
-            }
-            let bBalance = b.balanceUSD;
-            let aBalance = a.balanceUSD;
-            if (aBalance != bBalance) {
-                return (bBalance - aBalance);
-            }
-            let bAssets = b.assets.length;
-            let aAssets = a.assets.length;
-            if (aAssets != bAssets) {
-                return (bAssets - aAssets);
-            }
-            return (a.chainID - b.chainID);
-        })
-
-        let requestedChainPrefix = null;
-        if (requestedChainID) {
-            requestedChainPrefix = this.getChainPrefix(requestedChainID);
-        } else if (chains.length > 0) {
-            requestedChainPrefix = chains[0].ss58Format;
-        } else {
-            requestedChainPrefix = 0;
-        }
-        let requestedChainAddress = isEVMAddr ? address : paraTool.getAddress(address, requestedChainPrefix)
-        let account = {
-            address,
-            requestedChainAddress,
-            requestedChainPrefix,
-            balanceUSD,
-            chains,
-            numFollowing: 0,
-            numFollowers: 0,
-            isFollowing: false,
-            nickname: null,
-            info: null,
-            judgements: null,
-            infoKSM: null,
-            judgementsKSM: null,
-            related: null
-        }
-
-        let a = this.lookup_account(address);
-        if (a) {
-            account.nickname = a.nickname;
-            try {
-                if (a.parentDisplay != null && a.subName) {
-                    account.subName = `${a.parentDisplay}/${a.subName}`
-                    account.parent = a.parent
-                } else if (a.parentDisplayKSM != null && a.subNameKSM) {
-                    account.subName = `${a.parentDisplayKSM}/${a.subNameKSM}`
-                    account.parent = a.parentKSM
-                } else {
-                    account.subName = null;
-                }
-                account.info = (a.info != null) ? a.info : null;
-                account.judgements = (a.judgements != null) ? a.judgements : null;
-                account.infoKSM = (a.infoKSM != null) ? a.infoKSM : null;
-                account.judgementsKSM = (a.judgementsKSM != null) ? a.judgementsKSM : null;
-                account.related = (a.related != null) ? a.related : null;
-            } catch (e) {
-                console.log(e)
-            }
-            account.numFollowers = a.numFollowers;
-            account.numFollowing = a.numFollowing;
-            if (account.numFollowers > 0 && fromAddress) {
-                let sql2 = `select isFollowing, followDT from follow where fromAddress = '${fromAddress}' and toAddress = '${address}'`
-                let follows = await this.poolREADONLY.query(sql2);
-                if (follows.length > 0) {
-                    account.isFollowing = true;
-                }
-            }
-        }
-        return (account);
+        return (accounts);
     }
 
-    async get_account_realtime(address, realtimeData, chainList = []) {
+    async get_account_realtime(address, realtimeData, evmcontractData, wasmcontractData, chainList = []) {
         let realtime = {};
+        let contract = null;
         if (realtimeData) {
             let lastCellTS = {};
             for (const assetChainEncoded of Object.keys(realtimeData)) {
@@ -2946,7 +2971,32 @@ module.exports = class Query extends AssetManager {
             }
         }
 
-        return (current);
+        if (evmcontractData) {
+            let lastCellTS = {};
+            for (const chainID of Object.keys(evmcontractData)) {
+                let cells = evmcontractData[chainID];
+                if (!this.chainFilters(chainList, chainID)) {
+                    //filter non-specified records .. do not decorate
+                    continue
+                }
+                contract = JSON.parse(cells[0].value)
+                break;
+            }
+
+        } else if (wasmcontractData) {
+            let lastCellTS = {};
+            for (const chainID of Object.keys(wasmcontractData)) {
+                let cell = wasmcontractData[chainID];
+                if (!this.chainFilters(chainList, chainID)) {
+                    //filter non-specified records .. do not decorate
+                    continue
+                }
+                contract = JSON.parse(cells[0].value)
+                break;
+            }
+            // TODO
+        }
+        return [current, contract];
     }
 
     async get_account_history(address, rows, maxRows = 1000, chainList = [], daily = false) {
@@ -3375,6 +3425,117 @@ module.exports = class Query extends AssetManager {
         return addressTopN;
     }
 
+    async getAddressContract(rawAddress, chainID) {
+        let address = paraTool.getPubKey(rawAddress)
+        if (!this.validAddress(address)) {
+            throw new paraTool.InvalidError(`Invalid address ${address}`)
+        }
+        let families = ["realtime", "evmcontract", "wasmcontract"];
+        let row = false;
+        try {
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            const filter = [{
+                column: {
+                    cellLimit: 1
+                },
+                families: families,
+            }];
+            [row] = await tblRealtime.row(address).get({
+                filter
+            });
+        } catch (err) {
+            console.log(err);
+            this.logger.error({
+                "op": "query.getAddress",
+                address,
+                err
+            });
+            return false;
+        }
+        let rowData = row.data;
+        let [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
+        if (contract) {
+            let sql = `select asset, assetName, chainID, priceUSD, totalSupply, numHolders from asset where asset = '${address}' and chainID = '${contract.chainID}'`
+            let extraRecs = await this.poolREADONLY.query(sql)
+            if (extraRecs.length > 0) {
+                let e = extraRecs[0];
+                var [_, _, priceUSDCurrent] = await this.computeUSD(1.0, e.asset, e.chainID, this.getCurrentTS());
+                contract.assetName = e.assetName;
+                contract.priceUSD = priceUSDCurrent;
+                contract.totalSupply = e.totalSupply;
+                contract.numHolders = e.numHolders;
+            }
+        }
+        return [realtime, contract];
+    }
+
+    async getEVMTxFeed(address, txGroup = "to", chainID = null, maxRows = 1000, TSStart = null) {
+        let tableName = "evmtx"
+        let families = [];
+        if (txGroup == "internal") {
+            families.push("feedinternal");
+        } else {
+            families.push("feedto");
+        }
+        let TSpagination = false;
+        let startRow = address;
+        if (TSStart != null) {
+            startRow = address + "#" + paraTool.inverted_ts_key(TSStart)
+        }
+        let out = []
+        try {
+            let endRow = address + "#ZZZ";
+            // cbt read evmtx prefix=0xf3918988eb3ce66527e2a1a4d42c303915ce28ce
+            let [rows] = await this.btEVMTx.getRows({
+                start: startRow,
+                end: endRow,
+                limit: maxRows + 1,
+                filter: [{
+                    family: families,
+                    cellLimit: 1
+                }]
+            });
+
+            let feedItems = 0;
+            for (const row of rows) {
+                let rowData = row.data
+
+                if (rowData["feedto"]) {
+                    let [addressPiece, ts, txHash] = paraTool.parse_addressExtrinsic_rowKey(row.id)
+                    let txs = rowData["feedto"];
+                    for (const extrinsicID of Object.keys(txs)) {
+                        for (const cell of txs[extrinsicID]) {
+                            var t = JSON.parse(cell.value);
+                            if (feedItems < maxRows) {
+                                out.push(t);
+                                feedItems++;
+                            } else {
+                                return {
+                                    data: out,
+                                    nextPage: `/evmtx/${address}?txGroup=${txGroup}&ts=${ts}`
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+        } catch (err) {
+            console.log(err);
+            this.logger.error({
+                "op": "query.getEVMTx",
+                address,
+                txGroup,
+                err
+            });
+        }
+        return {
+            data: out,
+            nextPage: null
+        };
+    }
+
     async getAccount(rawAddress, accountGroup = "realtime", chainList = [], maxRows = 1000, TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"], pageIndex = 0) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let address = paraTool.getPubKey(rawAddress)
@@ -3446,6 +3607,8 @@ module.exports = class Query extends AssetManager {
             case "realtime":
                 tableName = "addressrealtime"
                 families.push("realtime");
+                families.push("evmcontract");
+                families.push("wasmcontract");
                 break;
             case "ss58h160":
                 tableName = "hashes"
@@ -3471,7 +3634,6 @@ module.exports = class Query extends AssetManager {
             let row = false,
                 rows = false
             if (tableName == "addressrealtime") {
-
                 try {
                     let [tblName, tblRealtime] = this.get_btTableRealtime()
                     const filter = [{
@@ -3503,7 +3665,6 @@ module.exports = class Query extends AssetManager {
                     endRow = address + "#" + paraTool.inverted_ts_key(this.currentTS() - 3600 * 2);
                 }
                 try {
-                    console.log("READING addressextrinsic", "startRow=", startRow, "endRow=", endRow, "TSStart=", TSStart)
                     let x = await this.btAddressExtrinsic.getRows({
                         start: startRow,
                         end: endRow,
@@ -3577,14 +3738,15 @@ module.exports = class Query extends AssetManager {
                     });
                 }
             }
-
             switch (accountGroup) {
                 case "realtime":
                     if (row) {
                         let rowData = row.data;
-                        return await this.get_account_realtime(address, rowData["realtime"], chainList)
+                        let [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], chainList)
+                        return realtime;
                     } else {
-                        return await this.get_account_realtime(address, false, chainList)
+                        let [realtime, contract] = await this.get_account_realtime(address, null, null, null, chainList)
+                        return realtime;
                     }
                 case "ss58h160":
                     let relatedData = false
@@ -6410,7 +6572,7 @@ module.exports = class Query extends AssetManager {
         if (contract.codeHash != actualHash) {
             throw new paraTool.InvalidError(`Code hash is ${contract.codeHash} but hash of supplied code is ${actualHash}`)
         }
-        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata 
+        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata
         let sql = `update wasmCode set metadata = ${mysql.escape(contractData)}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)} where codeHash = '${contract.codeHash}'`
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
@@ -6436,7 +6598,7 @@ module.exports = class Query extends AssetManager {
         if (code.codeHash != actualHash) {
             throw new paraTool.InvalidError(`Code hash is ${contract.codeHash} but hash of supplied code is ${actualHash}`)
         }
-        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata 
+        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata
         let sql = `update wasmCode set metadata = ${mysql.escape(contractData)}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)} where codeHash = '${contract.codeHash}'`
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();

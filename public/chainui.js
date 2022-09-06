@@ -458,7 +458,7 @@ async function showxcmtransfers(filter = {}) {
 var initassets = false;
 let xcmassetsTable = null;
 
-function showxcmassets(chainID, address) {
+function showxcmassets(chainID) {
     if (initassets) return;
     else initassets = true;
     let chainIDstr = (chainID == undefined) ? "all" : chainID.toString();
@@ -612,19 +612,21 @@ function showxcmassets(chainID, address) {
 
 // returns null if balance 
 function get_accountState(asset, chainID, assetChain) {
-    if (!account) return [null, null];
-    if (account.chains == undefined) return [null, null];
+    if (!accounts) return [null, null];
     try {
-        for (let i = 0; i < account.chains.length; i++) {
-            let c = account.chains[i];
-            if (c.chainID == chainID) {
-                for (let j = 0; j < c.assets.length; j++) {
-                    let a = c.assets[j];
-                    if (a.asset == asset) {
-                        let state = a.state;
-                        let balanceUSD = state.balanceUSD;
+        for (let a = 0; a < accounts.length; a++) {
+            let account = accounts[a];
+            for (let i = 0; i < account.chains.length; i++) {
+                let c = account.chains[i];
+                if (c.chainID == chainID) {
+                    for (let j = 0; j < c.assets.length; j++) {
+                        let a = c.assets[j];
+                        if (a.asset == asset) {
+                            let state = a.state;
+                            let balanceUSD = state.balanceUSD;
 
-                        return [state, balanceUSD];
+                            return [state, balanceUSD];
+                        }
                     }
                 }
             }
@@ -632,6 +634,7 @@ function get_accountState(asset, chainID, assetChain) {
     } catch (err) {
         console.log(err);
     }
+
     return [null, 0];
 }
 

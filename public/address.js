@@ -178,8 +178,7 @@ var initevmtxs = false;
 function showevmtxs(address, chainListStr = 'all') {
     if (initevmtxs) return;
     else initevmtxs = true;
-    //let pathParams = `account/${address}?group=extrinsics&chainfilters=${chainListStr}`
-    let pathParams = `evmtx/${address}?group=to`
+    let pathParams = `account/${address}?group=extrinsics&chainfilters=${chainListStr}`
     let tableName = '#tableevmtxs'
     tableEVMTxs = $(tableName).DataTable({
         lengthMenu: getLengthMenu(),
@@ -220,9 +219,12 @@ function showevmtxs(address, chainListStr = 'all') {
             data: 'section',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-                    if (row.decodedInput !== undefined && row.transactionHash !== undefined) {
-                        let methodID = row.decodedInput.methodID
-                        return '<button type="button" class="btn btn-outline-primary text-capitalize">' + methodID + '</button>';
+                    if (row.method !== undefined && row.section !== undefined && row.transactionHash !== undefined) {
+                        return '<button type="button" class="btn btn-outline-primary text-capitalize">' + row.section + '</button>';
+                    } else if (row.method !== undefined && row.section !== undefined && row.extrinsicHash !== undefined) {
+                        return presentExtrinsic(row.id, row.section, row.method)
+                    } else if (row.method !== undefined) {
+                        return '<button type="button" class="btn btn-outline-primary">' + row.method + '</button>';
                     } else {
                         return "-";
                     }
@@ -260,14 +262,12 @@ function showevmtxs(address, chainListStr = 'all') {
 
             }
         }, {
-            data: 'chainID',
+            data: 'result',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-                    console.log(row);
-                    return "NA"
-                    //let res = (row.result == 1) ? 'Success' : 'Failed'
-                    //let txStatus = presentSuccessFailure(row.result, row.err)
-                    //return txStatus;
+                    let res = (row.result == 1) ? 'Success' : 'Failed'
+                    let txStatus = presentSuccessFailure(row.result, row.err)
+                    return txStatus;
                 }
                 return data;
             }
@@ -1139,7 +1139,6 @@ function showhistory(address, chainListStr = 'all') {
 }
 
 function showaccounttab(hash, chainListStr = 'all') {
-    console.log("showaccounttab", hash);
     switch (hash) {
         case "#overview":
             setupapidocs("account", "", address, chainListStr);

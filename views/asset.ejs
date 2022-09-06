@@ -79,7 +79,7 @@ if ( a.assetType == "ERC20LP" || a.assetType == "LiquidityPair" ) {
   <div class="col-sm-1">
     <div class="card text-white bg-info" style="width: 18rem;">
       <div class="card-body">
-        <h6 class="card-title"><%- uiTool.presentAssetPairChart(assetChain); %></h6>
+        <h6 class="card-title"><%- uiTool.presentAssetPairChart(asset.assetChain); %></h6>
       </div>
     </div>
   </div>
@@ -93,8 +93,9 @@ if ( a.assetType == "ERC20LP" || a.assetType == "LiquidityPair" ) {
 <ul class="nav nav-tabs" id="assetTab" role="tablist">
 <%
 let tabs = [
-  { title: "Top 1K Holders", target: "assetholders" },
-//  { title: "Related", target: "assetsrelated" }
+  { title: "Your Holdings", target: "accountassets" },
+  { title: "Top 1K Holders", target: "assetholders" }
+//  { title: "Connections", target: "connections" }
 ];
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
@@ -113,6 +114,20 @@ for (let i=0; i<tabs.length; i++) {
 
 <!-- Tab panes -->
 <div class="tab-content">
+
+  <div class="tab-pane" id="accountassets" role="tabpanel" aria-labelledby="accountassets-tab">
+    <table id="tableaccountassets" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Your Account</th>
+          <th>Your Holdings</th>
+          <th>Value (USD)</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+
+
   <div class="tab-pane" id="assetholders" role="tabpanel" aria-labelledby="assetholders-tab">
     <table id="tableassetholders" class="display" style='width: 100%'>
       <thead>
@@ -127,19 +142,17 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="assethistory" role="tabpanel" aria-labelledby="history-tab">
     <div id="container" class="chart"></div>
   </div>
-  <div class="tab-pane" id="assetsrelated" role="tabpanel" aria-labelledby="assetsrelated-tab">
-    <table id="tableassetsrelated" class="display" style='width: 100%'>
+  <div class="tab-pane" id="assetlps" role="tabpanel" aria-labelledby="assetlps-tab">
+    <table id="tablelps" class="display" style='width: 100%'>
     <thead>
     <tr>
       <th scope="col">Asset</th>
+      <th scope="col">Your Holdings</th>
       <th scope="col">Decimals</th>
-      <th scope="col">AssetType</th>
       <th scope="col"># Holders</th>
       <th scope="col">Current Price (USD)</th>
       <th scope="col">Total Free</th>
       <th scope="col">TVL</th>
-      <th scope="col">Your # Tokens</th>
-      <th scope="col">Your Balance USD</th>
     </tr>
     </thead>
     </table>
@@ -150,9 +163,8 @@ for (let i=0; i<tabs.length; i++) {
 var chainID = '<%- chainID; %>';
 var currencyID = '<%- currencyID; %>';
 var asset = '<%- asset.asset; %>';
-var address = '<%- address; %>';
-let tabs = <%- JSON.stringify(tabs); %>;
-
+var tabs = <%- JSON.stringify(tabs); %>;
+var accounts = <%- JSON.stringify(accounts); %>;
 </script>
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script src="/asset.js"></script>

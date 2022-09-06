@@ -14,8 +14,7 @@ async function main() {
             account = val;
         }
     });
-    var a = await query.getAccountAssetsRealtimeByChain(chainID, account);
-
+    var a = await query.getMultiAccount(["0xEaf3223589Ed19bcd171875AC1D0F99D31A5969c"]) // "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d", "0x2c8feeab5bd9a317375e01adb6cb959f1fea78c751936d556fa2e36ede425a47"]);
     console.log(JSON.stringify(a));
 }
 

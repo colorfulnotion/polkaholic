@@ -1,0 +1,13 @@
+<%
+let totalUSD = 0;
+for ( let i = 0; i < account.length; i++) {
+   let a = account[i].assetInfo;
+   let s = account[i].state;
+   if ( a.assetType == "Token" ) {
+      let free = s.free ? s.free : 0;
+      let symbol = a.symbol;
+      totalUSD += s.balanceUSD;
+   }
+}
+%>
+<%- uiTool.currencyFormat(totalUSD) %>

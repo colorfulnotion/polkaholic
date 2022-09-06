@@ -25,6 +25,7 @@ module.exports = class Indexer extends AssetManager {
     readyToCrawlParachains = false;
 
     hashesRowsToInsert = [];
+    evmTxRowsToInsert = [];
     blockRowsToInsert = [];
     addressStorage = {};
     historyMap = {};
@@ -2269,6 +2270,24 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async flushHashesRows() {
+        if (this.evmTxRowsToInsert && this.evmTxRowsToInsert.length > 0) {
+            if (this.writeData) {
+                let i = 0;
+                let batchSize = this.computeTargetBatchSize(1024, this.evmTxRowsToInsert.length);
+                while (i < this.evmTxRowsToInsert.length) {
+                    let currBatch = this.evmTxRowsToInsert.slice(i, i + batchSize);
+                    if (currBatch.length > 0) {
+                        await this.insertBTRows(this.btEVMTx, currBatch, "evmtx");
+                        if (currBatch.length > 50) console.log(`flush: flushEVMTxRows btEVMTx=${currBatch.length}`);
+                        i += batchSize;
+                    }
+                }
+            } else {
+                console.log("SKIP wrote evmtx");
+            }
+            this.evmTxRowsToInsert = [];
+        }
+
         if (this.hashesRowsToInsert && this.hashesRowsToInsert.length > 0) {
             if (this.writeData) {
                 let i = 0;
@@ -2289,6 +2308,7 @@ module.exports = class Indexer extends AssetManager {
             this.relatedMap = {}
             this.extrinsicEvmMap = {}
         }
+
     }
 
     async flushBlockRows() {
@@ -5119,6 +5139,29 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     }
                 }
             }
+            // write evmtx to "feedto" to index txs interacting with contract
+            let col = `${chainID}-${syntheticExtrinsicID}`
+            let evmTxToRec = {
+                key: paraTool.make_addressExtrinsic_rowKey(tx.to, evmTxHash, tx.timestamp),
+                data: {
+                    feedto: {}
+                }
+            }
+            evmTxToRec.data.feedto[col] = {
+                value: JSON.stringify({
+                    chainID: chainID,
+                    blockNumber: tx.blockNumber,
+                    transactionHash: evmTxHash,
+                    decodedInput: tx.decodedInput,
+                    from: tx.from.toLowerCase(),
+                    to: tx.to.toLowerCase(),
+                    ts: tx.timestamp,
+                    value: tx.value,
+                    fee: tx.fee
+                }),
+                timestamp: rects
+            }
+            this.evmTxRowsToInsert.push(evmTxToRec)
         } else {
             evmTxHashRec.data = {
                 feedevmunfinalized: {
@@ -6347,7 +6390,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             await this.update_batchedSQL(10.0);
 
             var tbl = `assetholder${chainID}`;
-            this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree, totalReserved, totalMiscFrozen, totalFrozen) (select asset, chainID, count(*) numHolders, sum(free) as totalFree, sum(reserved) as totalReserved, sum(miscFrozen) as totalMiscFrozen, sum(frozen) as totalFrozen from ${tbl} where chainID = '${chainID}' group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree), totalReserved = values(totalReserved), totalMiscFrozen = values(totalMiscFrozen), totalFrozen = values(totalFrozen)`)
+            this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree, totalReserved, totalMiscFrozen, totalFrozen) (select asset, chainID, count(*) numHolders, sum(free) as totalFree, sum(reserved) as totalReserved, sum(miscFrozen) as totalMiscFrozen, sum(frozen) as totalFrozen from ${tbl} where chainID = '${chainID}' and free > 0 group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree), totalReserved = values(totalReserved), totalMiscFrozen = values(totalMiscFrozen), totalFrozen = values(totalFrozen)`)
 
             var tbls = [];
             if (chain.isEVM) {

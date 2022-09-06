@@ -26,21 +26,22 @@ function showchains() {
 function get_accountBalanceOnChain(chainID, assetChain) {
     try {
         let balanceUSD = 0;
-        if (account.chains) {
-            for (let i = 0; i < account.chains.length; i++) {
-                let c = account.chains[i];
-                if (c.chainID == chainID) {
-                    for (let j = 0; j < c.assets.length; j++) {
-                        let a = c.assets[j];
-                        if (a.state.balanceUSD > 0) {
-                            //console.log(a);
-                            balanceUSD += a.state.balanceUSD;
+        for (let a = 0; a < accounts.length; a++) {
+            let account = accounts[a];
+            if (account.chains) {
+                for (let i = 0; i < account.chains.length; i++) {
+                    let c = account.chains[i];
+                    if (c.chainID == chainID) {
+                        for (let j = 0; j < c.assets.length; j++) {
+                            let a = c.assets[j];
+                            if (a.state.balanceUSD > 0) {
+                                //console.log(a);
+                                balanceUSD += a.state.balanceUSD;
+                            }
                         }
                     }
                 }
             }
-        } else {
-            return null
         }
         return balanceUSD;
     } catch (err) {
@@ -323,7 +324,7 @@ function showchainstab(hash) {
             break;
         case "#xcmassets":
             setupapidocs("chains", "list");
-            showxcmassets(null, account);
+            showxcmassets(null);
             break;
         case "#xcmtransfers":
             setupapidocs("xcmtransfers");

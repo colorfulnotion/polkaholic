@@ -822,16 +822,6 @@ function presentNumber(a) {
     return (a.toString());
 }
 
-
-// wallet functions
-function showWalletModal() {
-    $('#walletModal').modal('show');
-}
-
-function hideWalletModal() {
-    $('#walletModal').modal('hide');
-}
-
 function getPubkey(account) {
     try {
         let pubkey = polkadotKeyring.decodeAddress(account.address);
@@ -864,18 +854,6 @@ function setCookie(cname, cvalue, exdays) {
     document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;domain=polkaholic.io";
 }
 
-function clearWallet() {
-    try {
-        console.log("clearWallet START");
-        setCookie("homeName", "", 3650);
-        setCookie("homeAcct", "", 3650);
-        setCookie("homePub", "", 3650);
-        document.getElementById('identicon').style.visibility = false;
-        showWalletHome();
-    } catch (e) {
-        console.log("clearWallet FAIL!!!", e);
-    }
-}
 
 function setConsent(consent) {
     try {
@@ -892,46 +870,15 @@ function setConsent(consent) {
     }
 }
 
-function setWalletHome(name, addr, pubkey) {
-    try {
-        setCookie("homeName", name, 3650);
-        setCookie("homeAcct", addr, 3650);
-        setCookie("homePub", pubkey, 3650);
-        showWalletHome();
-    } catch (e) {
-        console.log("setWalletHome", e);
-    }
-}
-
-function getWalletHome() {
-    let homeName = getCookie('homeName');
-    let homeAcct = getCookie('homeAcct');
-    return [homeName, homeAcct];
-}
 
 function home() {
     let [homeName, homeAcct] = getWalletHome();
 
     if (homeAcct != undefined && homeAcct.length > 0) {
-        window.location.href = "/account/" + homeAcct;
+        window.location.href = "/home/";
     } else {
         //showWalletModal();
         selectWalletAccount();
-    }
-}
-
-function showWalletHome() {
-    let [homeName, homeAcct] = getWalletHome();
-    if (homeAcct != "") {
-        //document.getElementById('walletHome').innerHTML = homeName + ":" + homeAcct.substring(0, 6) + "...";
-        document.getElementById('walletHome').innerHTML = `${homeName} `;
-        if (homeAcct.length > 10) {
-            document.getElementById('identicon').style.visibility = 'visible';
-            document.getElementById('identicon').src = "/identicon/" + homeAcct;
-        }
-    } else {
-        document.getElementById('walletHome').innerHTML = "-Connect Wallet-";
-        document.getElementById('identicon').style.visibility = 'hidden';
     }
 }
 

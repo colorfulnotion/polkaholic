@@ -17,8 +17,8 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap"/>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
-    <!-- json5-to-table -->
-    <script src="https://github.com/yetrun/json5-to-table/releases/download/0.1.8/json5-to-table.js"></script>
+    <!-- evm wallet -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.4-rc.1/web3.min.js"></script>
     <script src="/uihelper.js"></script>
 
     <script src="//unpkg.com/@polkadot/util/bundle-polkadot-util.js"></script>
@@ -157,16 +157,14 @@ var baseURL = '<%= config.baseURL; %>'
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="walletModalLabel">Choose account</h5>
+        <h5 class="modal-title" id="walletModalLabel">Choose accounts</h5>
         <button type="button" id="walletModalClose" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
       </div>
       <div class="modal-body">
       </div>
-      <button type="button" id="walletClear" data-dismiss="modal" class="btn btn-link" aria-label="Clear">
-        Clear
-      </button>
+      <button type="button" id="walletSelect" data-dismiss="modal" class="btn btn-link" aria-label="Select">Select</button>
     </div>
   </div>
 </div>

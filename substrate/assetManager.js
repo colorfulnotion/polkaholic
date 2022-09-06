@@ -1076,7 +1076,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                 let x1 = dexRec.lp1 / issuance;
                 let priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
                 let priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeERC20LiquidityPair returned`, "priceUSD0", priceUSD0, "priceUSD1", priceUSD1, "issuance", issuance, "x0", x0, "x1", x1, "p0", p0, "p1", p1, "priceUSD", priceUSD);
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeERC20LiquidityPair returned`, "priceUSD0", priceUSD0, "priceUSD1", priceUSD1, "issuance", issuance, "x0", x0, "x1", x1, "priceUSD", priceUSD);
                 return [val * priceUSD, priceUSD, priceUSDCurrent];
             }
             break;

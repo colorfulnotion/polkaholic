@@ -1,14 +1,94 @@
 var initassetholders = false;
 var initassetsrelated = false;
+var initaccountassets = false;
+var tableAccountAssets = null;
+var tableAssetHolders = null;
+
+function showaccountassets(asset, chainID) {
+    if (initaccountassets) return (false);
+    initaccountassets = true;
+    let recs = []
+    for (let i = 0; i < accounts.length; i++) {
+        let a = accounts[i];
+        let address = a.address;
+        if (a.chains) {
+            for (let j = 0; j < a.chains.length; j++) {
+                let c = a.chains[j];
+                if (c.chainID == chainID) {
+                    for (let k = 0; k < c.assets.length; k++) {
+                        if (asset == c.assets[k].asset) {
+                            c.assets[k].state.symbol = c.assets[k].symbol;
+                            c.assets[k].state.address = address;
+                            recs.push(c.assets[k].state);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let tableName = '#tableaccountassets'
+    tableAccountAssets = $(tableName).DataTable({
+        order: [
+            [1, "desc"]
+        ],
+        columnDefs: [{
+            "className": "dt-right",
+            "targets": [1, 2]
+        }],
+        columns: [{
+            data: 'address',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentFullAddress(row.address);
+                }
+                return data;
+            }
+        }, {
+            data: 'free',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.free !== undefined) {
+                        return presentTokenCount(row.free);
+                    }
+                } else {
+                    if (row.free !== undefined) {
+                        return row.free;
+                    }
+                }
+                return 0;
+            }
+        }, {
+            data: 'freeUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.freeUSD !== undefined) {
+                        return currencyFormat(row.freeUSD);
+                    }
+                } else {
+                    if (row.freeUSD !== undefined) {
+                        return row.freeUSD;
+                    }
+                }
+                return 0;
+            }
+        }]
+    });
+    console.log(recs);
+    let table = tableAccountAssets;
+    table.clear();
+    table.rows.add(recs);
+    table.draw();
+
+}
 
 function showassetholders(asset, chainID) {
     if (initassetholders) return;
-    else initassetholders = true;
-
+    initassetholders = true;
+    console.log("showassetholders");
     let pathParams = `asset/holders/${chainID}/${encodeURIComponent2(asset)}`
 
     let tableName = '#tableassetholders'
-    var table = $(tableName).DataTable({
+    tableAssetHolders = $(tableName).DataTable({
         order: [
             [1, "desc"]
         ],
@@ -144,6 +224,9 @@ function showassetsrelated(asset, chainID) {
 
 function showassettab(hash) {
     switch (hash) {
+        case "#accountassets":
+            showaccountassets(asset, chainID);
+            break;
         case "#assetsrelated":
             setupapidocs("asset", "assetsrelated");
             showassetsrelated(asset, chainID);
@@ -171,7 +254,7 @@ function setuptabs(tabs, asset, chainID) {
         })
     }
     let url = location.href.replace(/\/$/, "");
-    let hash = "#assetholders";
+    let hash = "#accountassets";
     if (location.hash) {
         const urlhash = url.split("#");
         if (urlhash.length > 1) hash = "#" + urlhash[1];

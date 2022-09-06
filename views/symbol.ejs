@@ -49,10 +49,9 @@ for (let i=0; i<tabs.length; i++) {
 
 <script>
 var symbol = '<%- symbol; %>';
-var address = '<%- address; %>';
-let tabs = <%- JSON.stringify(tabs); %>;
-let account = <%- JSON.stringify(account); %>;
-let chains = <%- JSON.stringify(chains); %>;
+var tabs = <%- JSON.stringify(tabs); %>;
+var accounts = <%- JSON.stringify(accounts); %>;
+var chains = <%- JSON.stringify(chains); %>;
 </script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>

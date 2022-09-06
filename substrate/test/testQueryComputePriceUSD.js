@@ -27,7 +27,7 @@ async function main() {
         'KUSD/CSM': '[{"Token":"KUSD"},{"ForeignAsset":"5"}]~22000',
         'KSM/ARIS': '[{"Token":"KSM"},{"ForeignAsset":"1"}]~22000',
         'xcDOT-moonbeam': '{"Token":"42259045809535163221576417993425387648"}~2004',
-        'KUSD': '{"Token":"103"}~22085'
+        'KUSD': '{"Token":"103"}~22085',
         'xcDOT-moonbeamxc': '0xffffffff1fcacbd218edc0eba20fc2308c778080~2004',
         'xcKSM-moonriverxc': '0xffffffff1fcacbd218edc0eba20fc2308c778080~22023',
         'xcKSM-moonriver': '{"Token":"42259045809535163221576417993425387648"}~22023',
