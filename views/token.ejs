@@ -9,59 +9,34 @@
     </div>
     <div class="col-md-8">
       <div class="card-body">
-        <h5 class="card-title">
-	<% if ( contract ) { %>
-	Contract <%- contract.asset; %> 
-	<% } else { %>
-	Address	<%- address; %>
-	<% } %>
-	</h5>
-	<% if ( account.nickname ) { suggest = false; %>
-	  <B><%= account.nickname %></B><br/>
-	<% } else if ( account.subName ) { suggest = false; %>
-	  <B><%= account.subName %></B>
-	  <% if ( account.parent ) { suggest = false; %>
-	  (<a href='/account/<%= account.parent; %>'>parent identity</a>)<br/>
-	  <% } %>
-        <% } %>
-
+        <h5 class="card-title">Token <%- contract.assetName; %></h5>
         <table class="table table-hover table-bordered">
 	<tr>
-		<td>Balance:</td>
-		<td><%- include("addressBalance", { account }) %></td>
+		<td>Price:</td>
+		<td><a href='/token/<%= address; %>'><%- contract.assetName %> (<%- contract.symbol; %>)</a> (<%- uiTool.currencyFormat(contract.priceUSD); %>)
+		</td>
 	</tr>
 	<tr>
-		<td>Value:</td>
-		<td><%- include("addressValue", { account }) %></td>
+		<td>Total Supply:</td>
+		<td><%- uiTool.presentFloat(contract.totalSupply); %></td>
 	</tr>
-	<% if ( contract && contract.assetType == "ERC20LP" ) { %>
 	<tr>
-	   <td>Token Pair:</td>
+		<td>Fully Diluted Market Cap:</td>
+		<td><%- uiTool.currencyFormat(contract.totalSupply*contract.priceUSD) %></td>
+	</tr>
+	<tr>
+		<td>Holders:</td>
+		<td><%- uiTool.presentNumber(contract.numHolders) %> addresses</td>
+	</tr>
+	<tr>
+	   <td>Contract:</td>
 	   <td><a href='/address/<%- contract.token0 %>'><%- uiTool.getShortHash(contract.token0) %></a> / <a href='/address/<%- contract.token1 %>'><%- uiTool.getShortHash(contract.token1) %></a></td>
 	</tr>
 	<tr>
-	   <td>Token Symbol:</td>
-	   <td><a href='/symbol/<%- contract.token0Symbol %>'><%= contract.token0Symbol %></a> / <a href='/symbol/<%- contract.token1Symbol %>'><%= contract.token1Symbol %></a> </td>
-	</tr>
-	<% } %>
-	<% if ( contract && contract.creator && contract.createdAtTx ) {%>
-	<tr>
-	   <td>Contract Creator:</td>
-	   <td><%- uiTool.presentERCID(contract.creator) %> at txn <%- uiTool.presentTx(contract.createdAtTx) %></td>
-	</tr>
-	<% } %>
-	<% if ( contract && ( contract.assetType == "ERC20" || contract.assetType == "ERC20LP" ) ) { %>
-	<tr>
-		<td>Token Tracker:</td>
-		<td><a href='/token/<%= address; %>'><%- contract.assetName %> (<%- contract.symbol; %>)</a> (<%- uiTool.currencyFormat(contract.priceUSD); %>)</td>
-	</tr>
-	<% } %>
-	<tr>
-		<td>Tokens:</td>
-		<td><%- include("addressTokens", { account }) %></td>
+	   <td>Decimals:</td>
+	   <td><%= contract.decimals %></td>
 	</tr>
 	</table>
-	
       </div>
     </div>
   </div>
@@ -154,6 +129,7 @@ let requestedChainAddress = '<%= address; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
 let chainListStr = '<%= chainListStr; %>';
 let isEVM = 1;
+let isToken = true;
 </script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>

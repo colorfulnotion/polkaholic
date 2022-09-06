@@ -1,0 +1,21 @@
+<%
+let out = [];
+for ( let i = 0; i < account.length; i++) {
+   let a = account[i].assetInfo;
+   let s = account[i].state;
+   if ( a.assetType == "Token") {
+      let free = s.free ? s.free : 0;
+      let symbol = a.symbol;
+      switch ( symbol ) {
+      case "GLMR":
+      case "MOVR":
+      case "ASTR":
+      case "SDN":
+            out.push(`${uiTool.presentFloat(free)} ${symbol}`)
+      }
+   }
+}
+
+if ( out.length > 0 ) { %>
+<%- out.join(", "); %>
+<% } %>

@@ -1,0 +1,33 @@
+<%
+let out = [];
+let totalUSD = 0;
+account.sort( function(a, b) {
+   let aUSD = ( a.state && a.state.balanceUSD ) ? a.state.balanceUSD : 0;
+   let bUSD = ( b.state && b.state.balanceUSD ) ? b.state.balanceUSD : 0;
+   return bUSD - aUSD;
+})
+for ( let i = 0; i < account.length; i++) {
+   let a = account[i].assetInfo;
+   let s = account[i].state;
+   if ( a.assetType == "ERC20" || a.assetType == "ERC20LP" ) {
+      let free = s.free ? s.free : 0;
+      let symbol = a.symbol;
+      let balanceUSD = s.balanceUSD ? s.balanceUSD : 0;
+      totalUSD += balanceUSD;
+      out.push(`<option value="${a.asset}" data-mdb-secondary-text="${uiTool.presentFloat(free)} ${symbol}">${a.assetName} (${uiTool.currencyFormat(balanceUSD)})</option>`)
+   }
+}
+out.unshift(`<option value="">${uiTool.currencyFormat(totalUSD)}</option>`)
+%>
+<select id="tokens" class="select" data-mdb-option-height="44">
+<%- out.join(", "); %>
+</select>
+<script>
+$("#tokens").on("change", function(e) {
+  var e = document.getElementById("tokens");
+  var value = e.value;
+  let url = `/address/${value}?a=${address}`
+  console.log(url);
+  window.location.href = url;
+})
+</script>

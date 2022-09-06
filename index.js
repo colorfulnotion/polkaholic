@@ -1271,18 +1271,55 @@ app.get('/address/:address/:chainID?', async (req, res) => {
     try {
         let fromAddress = getHomePubkey(req);
         let address = req.params["address"];
-        let [decorate, decorateExtra] = decorateOptUI(req)
         let [requestedChainID, id] = getHostChain(req);
-        let chainList = chainFilterOptUI(req)
-        let maxLimit = 1000;
-        let hardLimit = 100000; // 100x [above this it takes too long] -- users should use date ranges to filter
-        let maxRows = (req.query.limit != undefined) ? req.query.limit : maxLimit;
-        if (maxRows > hardLimit) {
-            maxRows = hardLimit;
+        let chainID = req.params["chainID"] ? req.params["chainID"] : null;
+        if (chainID == null && requestedChainID > 10) {
+            chainID = requestedChainID;
         }
-        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, maxRows, decorate, decorateExtra);
+        let chainList = [];
+        let [account, contract] = await query.getAddressContract(address, chainID);
         res.render('address', {
             account: account,
+            contract: contract,
+            chainInfo: query.getChainInfo(),
+            address: address,
+            claimed: false,
+            apiUrl: req.path,
+            fromAddress: fromAddress,
+            requestedChainID: requestedChainID,
+            chainListStr: chainList.join(','),
+            docsSection: "get-account"
+        });
+    } catch (err) {
+        console.log(err)
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "account",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+app.get('/token/:address/:chainID?', async (req, res) => {
+    try {
+        let fromAddress = getHomePubkey(req);
+        let address = req.params["address"];
+        let [requestedChainID, id] = getHostChain(req);
+        let chainID = req.params["chainID"] ? req.params["chainID"] : null;
+        if (chainID == null && requestedChainID > 10) {
+            chainID = requestedChainID;
+        }
+        let chainList = [];
+        let [account, contract] = await query.getAddressContract(address, chainID);
+        res.render('token', {
+            account: account,
+            contract: contract,
             chainInfo: query.getChainInfo(),
             address: address,
             claimed: false,

@@ -74,8 +74,8 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 	    let tok = tx.transfers[t];
 	  %>
 	    <tr>
-	      <td><%- uiTool.presentID(tok.from); %></td>
-	      <td><%- uiTool.presentID(tok.to); %></td>
+	      <td><%- uiTool.presentERCID(tok.from); %></td>
+	      <td><%- uiTool.presentERCID(tok.to); %></td>
 	      <td><%- uiTool.presentERCToken(tok.tokenAddress, tok.assetInfo); %> <%- ; %></td>
         <td><%- tok.value; %> (<%- uiTool.currencyFormat(tok.valueUSD, tok.priceUSD, tok.priceUSDCurrent); %> )</td>
 	    </tr>

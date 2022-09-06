@@ -360,8 +360,7 @@ module.exports = {
         return (a.toString());
     },
     presentFloat: function(a, decplaces = 5) {
-        let amt = a.toFixed(decplaces);
-        return (amt.toString());
+        return a.toLocaleString("en-US");
     },
     presentPath: function(p) {
         if (Array.isArray(p)) {
@@ -609,7 +608,12 @@ module.exports = {
         if (!chainID || !symbol || !asset) {
             return '-'
         }
-        let out = `<a href="/asset/${chainID}/` + encodeURIComponent(asset) + '">' + symbol + '</a>';
+        let out = `<a href="/token/` + encodeURIComponent(asset) + '">' + symbol + '</a>';
+        if (allowCopy) out += copyToClipboard(id);
+        return out;
+    },
+    presentERCID: function(id, allowCopy = true) {
+        let out = `<a href="/address/` + encodeURIComponent(id) + '">' + id + '</a>';
         if (allowCopy) out += copyToClipboard(id);
         return out;
     },

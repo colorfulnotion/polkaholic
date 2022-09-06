@@ -2894,8 +2894,9 @@ module.exports = class Query extends AssetManager {
         return (account);
     }
 
-    async get_account_realtime(address, realtimeData, chainList = []) {
+    async get_account_realtime(address, realtimeData, evmcontractData, wasmcontractData, chainList = []) {
         let realtime = {};
+        let contract = null;
         if (realtimeData) {
             let lastCellTS = {};
             for (const assetChainEncoded of Object.keys(realtimeData)) {
@@ -2946,7 +2947,32 @@ module.exports = class Query extends AssetManager {
             }
         }
 
-        return (current);
+        if (evmcontractData) {
+            let lastCellTS = {};
+            for (const chainID of Object.keys(evmcontractData)) {
+                let cells = evmcontractData[chainID];
+                if (!this.chainFilters(chainList, chainID)) {
+                    //filter non-specified records .. do not decorate
+                    continue
+                }
+                contract = JSON.parse(cells[0].value)
+                break;
+            }
+
+        } else if (wasmcontractData) {
+            let lastCellTS = {};
+            for (const chainID of Object.keys(wasmcontractData)) {
+                let cell = wasmcontractData[chainID];
+                if (!this.chainFilters(chainList, chainID)) {
+                    //filter non-specified records .. do not decorate
+                    continue
+                }
+                contract = JSON.parse(cells[0].value)
+                break;
+            }
+            // TODO
+        }
+        return [current, contract];
     }
 
     async get_account_history(address, rows, maxRows = 1000, chainList = [], daily = false) {
@@ -3375,6 +3401,118 @@ module.exports = class Query extends AssetManager {
         return addressTopN;
     }
 
+    async getAddressContract(rawAddress, chainID) {
+        let address = paraTool.getPubKey(rawAddress)
+        if (!this.validAddress(address)) {
+            throw new paraTool.InvalidError(`Invalid address ${address}`)
+        }
+        let families = ["realtime", "evmcontract", "wasmcontract"];
+        let row = false;
+        try {
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            const filter = [{
+                column: {
+                    cellLimit: 1
+                },
+                families: families,
+            }];
+            [row] = await tblRealtime.row(address).get({
+                filter
+            });
+        } catch (err) {
+            console.log(err);
+            this.logger.error({
+                "op": "query.getAddress",
+                address,
+                err
+            });
+            return false;
+        }
+        let rowData = row.data;
+        let [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
+        if (contract) {
+            let sql = `select asset, assetName, chainID, priceUSD, totalSupply, numHolders from asset where asset = '${address}' and chainID = '${contract.chainID}'`
+            let extraRecs = await this.poolREADONLY.query(sql)
+            if (extraRecs.length > 0) {
+                let e = extraRecs[0];
+                var [_, _, priceUSDCurrent] = await this.computeUSD(1.0, e.asset, e.chainID, this.getCurrentTS());
+                contract.assetName = e.assetName;
+                contract.priceUSD = priceUSDCurrent;
+                contract.totalSupply = e.totalSupply;
+                contract.numHolders = e.numHolders;
+            }
+        }
+        return [realtime, contract];
+    }
+
+    async getEVMTxFeed(address, txGroup = "to", chainID = null, maxRows = 1000, TSStart = null) {
+        let tableName = "evmtx"
+        let families = [];
+        if (txGroup == "internal") {
+            families.push("feedinternal");
+        } else {
+            families.push("feedto");
+        }
+        let TSpagination = false;
+        let startRow = address;
+        if (TSStart != null) {
+            startRow = address + "#" + paraTool.inverted_ts_key(TSStart)
+        }
+        let out = []
+        try {
+            let endRow = address + "#ZZZ";
+            console.log("READING evmtx", "startRow=", startRow, "endRow=", endRow, "maxRows", maxRows, "TSStart=", TSStart, families)
+            // cbt read evmtx prefix=0xf3918988eb3ce66527e2a1a4d42c303915ce28ce
+            let [rows] = await this.btEVMTx.getRows({
+                start: startRow,
+                end: endRow,
+                limit: maxRows + 1,
+                filter: [{
+                    family: families,
+                    cellLimit: 1
+                }]
+            });
+
+            let feedItems = 0;
+            for (const row of rows) {
+                let rowData = row.data
+
+                if (rowData["feedto"]) {
+                    let [addressPiece, ts, txHash] = paraTool.parse_addressExtrinsic_rowKey(row.id)
+                    let txs = rowData["feedto"];
+                    for (const extrinsicID of Object.keys(txs)) {
+                        for (const cell of txs[extrinsicID]) {
+                            var t = JSON.parse(cell.value);
+                            if (feedItems < maxRows) {
+                                out.push(t);
+                                feedItems++;
+                            } else {
+                                return {
+                                    data: out,
+                                    nextPage: `/evmtx/${address}?txGroup=${txGroup}&ts=${ts}`
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+        } catch (err) {
+            console.log(err);
+            this.logger.error({
+                "op": "query.getEVMTx",
+                address,
+                txGroup,
+                err
+            });
+        }
+        return {
+            data: out,
+            nextPage: null
+        };
+    }
+
     async getAccount(rawAddress, accountGroup = "realtime", chainList = [], maxRows = 1000, TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"], pageIndex = 0) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let address = paraTool.getPubKey(rawAddress)
@@ -3446,6 +3584,8 @@ module.exports = class Query extends AssetManager {
             case "realtime":
                 tableName = "addressrealtime"
                 families.push("realtime");
+                families.push("evmcontract");
+                families.push("wasmcontract");
                 break;
             case "ss58h160":
                 tableName = "hashes"
@@ -3582,9 +3722,11 @@ module.exports = class Query extends AssetManager {
                 case "realtime":
                     if (row) {
                         let rowData = row.data;
-                        return await this.get_account_realtime(address, rowData["realtime"], chainList)
+                        let [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], chainList)
+                        return realtime;
                     } else {
-                        return await this.get_account_realtime(address, false, chainList)
+                        let [realtime, contract] = await this.get_account_realtime(address, null, null, null, chainList)
+                        return realtime;
                     }
                 case "ss58h160":
                     let relatedData = false
@@ -6410,7 +6552,7 @@ module.exports = class Query extends AssetManager {
         if (contract.codeHash != actualHash) {
             throw new paraTool.InvalidError(`Code hash is ${contract.codeHash} but hash of supplied code is ${actualHash}`)
         }
-        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata 
+        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata
         let sql = `update wasmCode set metadata = ${mysql.escape(contractData)}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)} where codeHash = '${contract.codeHash}'`
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
@@ -6436,7 +6578,7 @@ module.exports = class Query extends AssetManager {
         if (code.codeHash != actualHash) {
             throw new paraTool.InvalidError(`Code hash is ${contract.codeHash} but hash of supplied code is ${actualHash}`)
         }
-        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata 
+        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata
         let sql = `update wasmCode set metadata = ${mysql.escape(contractData)}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)} where codeHash = '${contract.codeHash}'`
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
