@@ -391,7 +391,7 @@ order by chainID, extrinsicHash, diffTS`
         let endWhere = endTS ? `and s.blockTS < ${endTS} and d.blockTS < ${endTS+lookbackSeconds}` : ""
 
         let sql = `select
-          s.msgHash, s.blockNumber as s_blockNumber, d.blockNumber as d_blockNumber, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, abs(d.blockTS - s.blockTS) as diffTS, (d.sentAt - s.sentAt) as diffSentAt, d.errorDesc as d_errorDesc, d.destStatus as d_destStatus, d.executedEventID as d_executedEventID
+          s.msgHash, s.msgType, s.relayChain, s.blockNumber as s_blockNumber, d.blockNumber as d_blockNumber, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, abs(d.blockTS - s.blockTS) as diffTS, (d.sentAt - s.sentAt) as diffSentAt, d.errorDesc as d_errorDesc, d.destStatus as d_destStatus, d.executedEventID as d_executedEventID
         from xcmmessages as s, xcmmessages as d
  where  d.msgHash = s.msgHash and
         d.chainID = s.chainID and
@@ -417,6 +417,7 @@ order by msgHash, diffSentAt, diffTS`
             }
             let vals = ["chainID", "chainIDDest", "sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt", "sourceBlocknumber", "destBlocknumber", "matchDT", "errorDesc", "destStatus", "executedEventID"];
             let out = [];
+            let rows = [];
             for (let i = 0; i < xcmmatches.length; i++) {
                 let s = xcmmatches[i];
                 // to protect against the same dest message matched more than once we keep in the "matched" map a set of msgHash-sentAt (for xcmmessages dest candidates)
@@ -425,6 +426,17 @@ order by msgHash, diffSentAt, diffTS`
                 if (matched[k] == undefined) {
                     out.push(`( '${s.msgHash}', ${s.s_blockNumber}, 0, '${s.chainID}', '${s.chainIDDest}', ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now(), ${mysql.escape(s.d_errorDesc)}, ${mysql.escape(s.d_destStatus)}, ${mysql.escape(s.d_executedEventID)} )`)
                     out.push(`( '${s.msgHash}', ${s.d_blockNumber}, 1, '${s.chainID}', '${s.chainIDDest}', ${s.sourceTS}, ${s.destTS}, 1, '${s.s_sentAt}', '${s.d_sentAt}', '${s.s_blockNumber}', '${s.d_blockNumber}', Now(), ${mysql.escape(s.d_errorDesc)}, ${mysql.escape(s.d_destStatus)}, ${mysql.escape(s.d_executedEventID)} )`)
+                    // write { msgHash, sentAt, chainID, chainIDDest, msgType, blockTS, blockNumber, relayChain } to hashes xcmmessage:${sentAt}
+                    this.push_rows_related_keys("xcmmessage", s.s_sentAt.toString(), rows, s.msgHash, {
+                        msgHash: s.msgHash,
+                        sentAt: s.s_sentAt,
+                        chainID: s.chainID,
+                        chainIDDest: s.chainIDDest,
+                        msgType: s.msgType,
+                        blockTS: s.sourceTS,
+                        blockNumber: s.s_blockNumber,
+                        relayChain: s.relayChain,
+                    })
                     matched[k] = true;
                 } else {
                     numRecs++;
@@ -439,6 +451,8 @@ order by msgHash, diffSentAt, diffTS`
                 "data": out,
                 "replace": vals
             });
+            await this.btHashes.insert(rows);
+            console.log("xcmmessages_match wrote btHashes rows=", rows.length);
             return (numRecs);
         } catch (err) {
             console.log("xcmmessages_match", err)

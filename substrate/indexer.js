@@ -65,6 +65,7 @@ module.exports = class Indexer extends AssetManager {
     xcmmsgMap = {};
     xcmmsgSentAtUnknownMap = {};
     xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove
+    evmcontractMap = {};
 
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
@@ -719,7 +720,7 @@ module.exports = class Indexer extends AssetManager {
         let multisigListTS = (new Date().getTime() - multisigListStartTS) / 1000
         if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(+): Multisig", multisigListTS);
 
-	// writes to mysql
+        // writes to mysql
         let assetHolderStartTS = new Date().getTime();
         await this.flushAssetHolder();
         let assetHolderTS = (new Date().getTime() - assetHolderStartTS) / 1000
@@ -752,7 +753,7 @@ module.exports = class Indexer extends AssetManager {
         try {
             let [tblName, tblRealtime] = this.get_btTableRealtime()
             let rows = [];
-	    // addressStorage
+            // addressStorage
             for (const address of Object.keys(this.addressStorage)) {
                 let r = this.addressStorage[address];
                 let rowKey = address.toLowerCase()
@@ -800,25 +801,53 @@ module.exports = class Indexer extends AssetManager {
     async flushWasmContracts() {
         let wasmCodes = []
         let wasmContracts = []
+        let btHashes_rows = [];
+        let btRealtime_rows = [];
         for (const k of Object.keys(this.wasmContractMap)) {
             let w = this.wasmContractMap[k]
             if (w.withCode) {
                 //["codeHash", "chainID"] + ["extrinsicHash", "extrinsicID", "wasm", "codeStoredBN", "codeStoredTS", "storer"]
                 let c = `('${w.codeHash}', '${w.chainID}', '${w.extrinsicHash}', '${w.extrinsicID}', '${w.code}', '${w.blockNumber}', '${w.blockTS}', '${w.deployer}')`
                 wasmCodes.push(c)
+                let d = {
+                    codeHash: w.codeHash,
+                    // contractType: "TODO",
+                    chainID: w.chainID,
+                    extrinsicHash: w.extrinsicHash,
+                    extrinsicID: w.extrinsicID,
+                    codeStoredBN: w.blockNumber,
+                    codeStoredTS: w.blockTS,
+                    deployer: w.deployer,
+                }
+                this.add_index_metadata(d);
+                this.push_rows_related_keys("wasmcode", w.chainID.toString(), btHashes_rows, w.codeHash, d)
             }
             //["address", "chainID"] + ["extrinsicHash", "extrinsicID", "instantiateBN", "codeHash", "constructor", "salt", "blockTS", "deployer"]
             let t = `('${w.contractAddress}', '${w.chainID}', '${w.extrinsicHash}', '${w.extrinsicID}', '${w.blockNumber}', '${w.codeHash}', '${w.constructor}', '${w.salt}', '${w.blockTS}', '${w.deployer}')`
             wasmContracts.push(t)
+
+            // write u = { address, chainID, codeHash, blockTS, deployer, ... }  to btRealtime wasmcontract:${chainID}
+            let u = {
+                address: w.contractAddress,
+                chainID: w.chainID,
+                extrinsicHash: w.extrinsicHash,
+                extrinsicID: w.extrinsicID,
+                instantiateBN: w.blockNumber,
+                codeHash: w.codeHash,
+                constructor: w.constructor,
+                salt: w.salt,
+                blockTS: w.blockTS,
+                deployer: w.deployer,
+            }
+            this.add_index_metadata(u);
+            this.push_rows_related_keys("wasmcontract", w.chainID.toString(), btRealtime_rows, w.contractAddress, u)
         }
         if (this.debugLevel >= paraTool.debugInfo) console.log(`flushWasmContracts wasmCodes`, wasmCodes)
         if (this.debugLevel >= paraTool.debugInfo) console.log(`flushWasmContracts wasmContracts`, wasmContracts)
-
         this.wasmContractMap = {};
 
         // --- multiaccount no update
         let sqlDebug = true
-
         let wasmCodeVal = ["extrinsicHash", "extrinsicID", "wasm", "codeStoredBN", "codeStoredTS", "storer"]
         await this.upsertSQL({
             "table": `wasmCode`,
@@ -836,6 +865,17 @@ module.exports = class Indexer extends AssetManager {
             "data": wasmContracts,
             "replace": wasmContractVal,
         }, sqlDebug);
+        // write wasmcontract to tblRealtime, wasmcode to btHashes
+        if (btRealtime_rows.length > 0) {
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            await tblRealtime.insert(btRealtime_rows);
+            console.log("flushWasmContracts btRealtime_rows=", btRealtime_rows.length, btRealtime_rows);
+        }
+        if (btHashes_rows.length > 0) {
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            await this.btHashes.insert(btHashes_rows);
+            console.log("flushWasmContracts btHashes_rows=", btHashes_rows.length, btHashes_rows);
+        }
     }
 
     async flushProxy() {
@@ -1568,6 +1608,24 @@ module.exports = class Indexer extends AssetManager {
             var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20LiquidityPair}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}', '${token0}', '${token1}', ${lp20TokenInfo.token0Decimals}, ${lp20TokenInfo.token1Decimals}, ${lp20TokenInfo.token0Supply}, ${lp20TokenInfo.token1Supply}, '${lp20TokenInfo.token0Symbol}', '${lp20TokenInfo.token1Symbol}')`;
             if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
                 console.log(`erc20 LP`, o)
+                // write { asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol } to accountrealtime evmcontract:{chainID}
+                let lp = {
+                    asset: assetKey,
+                    assetType: paraTool.assetTypeERC20LiquidityPair,
+                    chainID: chainID,
+                    assetName: this.clip_string(assetInfo.name),
+                    symbol: assetInfo.symbol,
+                    decimals: assetInfo.decimal,
+                    creator: creator,
+                    createdAtTx: createdAtTx,
+                    // LP specific info
+                    token0: token0,
+                    token1: token1,
+                    token0Decimals: lp20TokenInfo.token0Decimals,
+                    token1Decimals: lp20TokenInfo.token1Decimals,
+                }
+                this.add_index_metadata(lp);
+                this.evmcontractMap[assetKey] = lp;
                 return o
                 //erc20s.push(o);
             }
@@ -1578,6 +1636,19 @@ module.exports = class Indexer extends AssetManager {
             var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}', Null, Null, Null, Null, Null, Null, Null, Null)`;
             console.log(`erc20 nonLP`, o)
             if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
+                // write { asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol }
+                let nlp = {
+                    asset: assetKey,
+                    chainID: chainID,
+                    assetType: paraTool.assetTypeERC20,
+                    assetName: this.clip_string(assetInfo.name),
+                    symbol: assetInfo.symbol,
+                    decimals: assetInfo.decimal,
+                    creator: creator,
+                    createdAtTx: createdAtTx,
+                };
+                this.add_index_metadata(nlp);
+                this.evmcontractMap[assetKey] = nlp;
                 return o
             }
         }
@@ -1593,6 +1664,26 @@ module.exports = class Indexer extends AssetManager {
             }
         }
         this.tallyAsset = newTallyAsset
+    }
+
+    async flush_evmcontractMap() {
+        let rows = [];
+        for (const k of Object.keys(this.evmcontractMap)) {
+            let c = this.evmcontractMap[k];
+            this.add_index_metadata(c);
+            this.push_rows_related_keys("evmcontract", c.chainID.toString(), rows, c.asset, c)
+        }
+
+        if (rows.length > 0) {
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            try {
+                await tblRealtime.insert(rows);
+                console.log("flush_evmcontractMap rows=", rows.length);
+                return [];
+            } catch (err) {
+                console.log(err);
+            }
+        }
     }
 
     async flush_assets(ts = false, blockNumber = false, isFullPeriod = false, isTip = false) {

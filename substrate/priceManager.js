@@ -69,6 +69,7 @@ module.exports = class PriceManager extends Query {
         let extensions = [];
         let tailAssetChain = path[path.length - 1].dest; // the last element, which is an assetChain
         if (tailAssetChain == undefined) {
+            console.log("UNFEIN", path);
             return (extensions);
         }
         let [tailAsset, tailAssetChainID] = paraTool.parseAssetChain(tailAssetChain);
@@ -159,6 +160,162 @@ module.exports = class PriceManager extends Query {
         return (extensions);
     }
 
+    path_not_explored(p, assetInfo, maxDepth = 2) {
+        if (p.length >= maxDepth) return (false);
+        for (let i = 0; i < p.length; i++) {
+            if (p[i].route == assetInfo.assetChain) {
+                return (false);
+            }
+        }
+        return (true);
+    }
+
+    recentRoutes = {};
+
+    async compute_route_rat(p, sym) {
+        //if ( p.symbol == "ZLK-LP" ) return([null, null]);
+        if (this.assetInfo[p.route] == undefined) {
+            return [null, null, null];
+        } else if (this.assetInfo[p.route].numHolders < 5) {
+            return [null, null, null];
+        }
+        let [asset, chainID] = paraTool.parseAssetChain(p.route);
+        let sql = `select close from assetlog where asset = '${asset}' and chainID = ${chainID} order by indexTS desc limit 1` /// and indexTS > UNIX_TIMESTAMP(date_sub(Now(), interval 100 hour)) 
+        let recents = await this.poolREADONLY.query(sql)
+        if (recents.length > 0) {
+            let close = recents[0].close;
+            if (p.token0Symbol == sym) {
+                return [1.0 / close, p.token1Symbol, this.assetInfo[p.route].numHolders];
+            } else if (p.token1Symbol == sym) {
+                return [close, p.token0Symbol, this.assetInfo[p.route].numHolders];
+            }
+        }
+        return [null, null, null];
+    }
+
+    async compute_path_rat(path) {
+        let rat = 1.0;
+        let sym = path[0].symbol;
+        for (let i = 1; i < path.length; i++) {
+            let [route_rat, new_sym, numHolders] = await this.compute_route_rat(path[i], sym);
+            if (route_rat && new_sym) {
+                path[i].rat = route_rat;
+                path[i].numHolders = numHolders;
+                rat *= route_rat;
+                sym = new_sym
+            } else {
+                return (null);
+            }
+        }
+        return rat;
+    }
+
+    async showAssetCycles(symbol) {
+        await this.init(); /// sets up this.assetInfo
+
+        let sql = `select asset.asset, asset.chainID, paths from assetcycle join asset on asset.chainID = assetcycle.chainID and asset.asset = assetcycle.asset and asset.symbol = '${symbol}' order by numHolders desc limit 10;`
+        let assetChains = await this.poolREADONLY.query(sql);
+        for (let a = 0; a < assetChains.length; a++) {
+            let r = assetChains[a];
+            let asset = r.asset;
+            let chainID = r.chainID;
+            let paths = JSON.parse(r.paths);
+            console.log(paths);
+            for (let b = 0; b < paths.length; b++) {
+                let rat = await this.compute_path_rat(paths[b]);
+                //if ( rat > 1.005 ) {
+                console.log(paths[b], rat);
+                //}
+            }
+        }
+    }
+
+    getPathExtensionsBFS(path, maxDepth = 2) {
+        let extensions = [];
+        let tailAssetChain = path[path.length - 1].dest; // the last element, which is an assetChain
+        if (tailAssetChain == undefined) {
+            return (extensions);
+        }
+        let [tailAsset, tailAssetChainID] = paraTool.parseAssetChain(tailAssetChain);
+        for (const assetChain of Object.keys(this.assetInfo)) {
+            let [asset, cID] = paraTool.parseAssetChain(assetChain);
+            let assetInfo = this.assetInfo[assetChain];
+            if (assetInfo.routeDisabled) {
+                // aUSD hack
+            } else if ((assetInfo.assetType == paraTool.assetTypeERC20LiquidityPair || assetInfo.assetType == paraTool.assetTypeLiquidityPair || assetInfo.assetType == paraTool.assetTypeXCAsset || assetInfo.assetType == paraTool.assetTypeXCMTransfer) && (assetInfo.token0 && assetInfo.token1)) {
+                let chainIDDest = null;
+                if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
+                    chainIDDest = assetInfo.chainIDDest;
+                }
+                let debug = (assetInfo.assetType == paraTool.assetTypeXCMTransfer);
+                let token0chain = paraTool.makeAssetChain(assetInfo.token0, assetInfo.chainID);
+                let token1chain = paraTool.makeAssetChain(assetInfo.token1, assetInfo.chainID);
+                if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
+                    let x = JSON.parse(asset)
+                    if (x.xcmtransfer) {
+                        let symbol = x.xcmtransfer.symbol;
+                        let chainIDDest = x.xcmtransfer.chainIDDest;
+                        if ((cID == tailAssetChainID) && (symbol == this.get_symbol(tailAssetChain)) && this.path_not_explored(path, assetInfo, maxDepth)) {
+                            // extend with a.token1
+                            let newpath = [...path];
+                            let token1chain = paraTool.makeAssetChain(assetInfo.token1, chainIDDest);
+                            newpath.push({
+                                route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                                dest: token1chain,
+                                symbol: assetInfo.symbol,
+                                token0Symbol: assetInfo.token0Symbol,
+                                token1Symbol: assetInfo.token1Symbol,
+                                s: 1
+                            });
+                            console.log("extending0 xcmtransfer", assetChain, newpath);
+                            extensions.push(newpath);
+
+                        } else if ((chainIDDest == tailAssetChainID) && (symbol == this.get_symbol(tailAssetChain)) && this.path_not_explored(path, assetInfo, maxDepth)) {
+                            // extend with a.token0
+                            let newpath = [...path];
+                            let token0chain = paraTool.makeAssetChain(assetInfo.token0, cID);
+                            newpath.push({
+                                route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                                dest: token0chain,
+                                symbol: assetInfo.symbol,
+                                token0Symbol: assetInfo.token0Symbol,
+                                token1Symbol: assetInfo.token1Symbol,
+                                s: 0
+                            });
+                            console.log("extending1 xcmtransfer", assetChain, newpath);
+                            extensions.push(newpath);
+                        }
+                    }
+                } else if (assetInfo.numHolders < 5) {} else if (assetInfo.token0 == tailAsset && (cID == tailAssetChainID) && this.path_not_explored(path, assetInfo, maxDepth)) {
+                    // extend with a.token1
+                    let newpath = [...path];
+                    newpath.push({
+                        route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                        dest: token1chain,
+                        symbol: assetInfo.symbol,
+                        token0Symbol: assetInfo.token0Symbol,
+                        token1Symbol: assetInfo.token1Symbol,
+                        s: 1
+                    });
+                    extensions.push(newpath);
+                } else if (assetInfo.token1 == tailAsset && (cID == tailAssetChainID) && this.path_not_explored(path, assetInfo, maxDepth)) {
+                    // extend with a.token0
+                    let newpath = [...path];
+                    newpath.push({
+                        route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                        dest: token0chain,
+                        symbol: assetInfo.symbol,
+                        token0Symbol: assetInfo.token0Symbol,
+                        token1Symbol: assetInfo.token1Symbol,
+                        s: 0
+                    });
+                    extensions.push(newpath);
+                }
+            }
+        }
+        return (extensions);
+    }
+
     async load_xc_assetInfo() {
         let sql = `select asset, chainID, xcContractAddress, symbol from asset where xcContractAddress is not null and assetType = 'Token' and routeDisabled = 0 order by chainID, asset;`
         let routes = await this.poolREADONLY.query(sql)
@@ -189,7 +346,7 @@ module.exports = class PriceManager extends Query {
   symbol: 'xcDOT'
 }
 */
-            console.log(assetChain, xcAsset);
+            // console.log(assetChain, xcAsset);
             this.assetInfo[assetChain] = xcAsset;
         }
         // for actually observed xcmtransfers from chainID to chainIDDest, add assetInfo
@@ -270,6 +427,53 @@ module.exports = class PriceManager extends Query {
         }
         await this.update_batchedSQL();
         console.log("updated paths: ", cnt);
+    }
+
+    async computeAssetCycles(symbol = "xcGLMR", maxDepth = 2) {
+        await this.init(); /// sets up this.assetInfo
+        await this.load_xc_assetInfo();
+        // add the roots:
+
+        for (const assetChain of Object.keys(this.assetInfo)) {
+            let assetInfo = this.assetInfo[assetChain];
+            if (assetInfo.routeDisabled) {
+                console.log("DISABLED", assetInfo);
+            } else if (assetInfo.symbol == symbol) {
+                console.log("ENABLED", assetChain);
+                this.enqueue([{
+                    dest: assetChain,
+                    symbol: assetInfo.symbol
+                }]);
+                this.resultPaths[assetChain] = [];
+            }
+        }
+        let path = false;
+        while (path = this.dequeue()) {
+            let tailPath = path[path.length - 1].dest;
+            console.log("DEQUEUE", this.resultPaths[path[0].dest].length, tailPath, this.queueHead, this.queueTail);
+            if (tailPath == path[0].dest && path.length > 1) {
+                this.resultPaths[path[0].dest].push(path);
+            }
+            let extensions = this.getPathExtensionsBFS(path, maxDepth);
+            for (let e = 0; e < extensions.length; e++) {
+                let p = extensions[e];
+                if (p.length <= maxDepth) {
+                    let tailAssetChain = p[p.length - 1].dest;
+                    this.enqueue(extensions[e]);
+                }
+            }
+        }
+
+        // create table assetcycle (asset varchar(67), chainID int, paths mediumblob, lastUpdateDT datetime, primary key (asset, chainID));
+        for (const assetChain of Object.keys(this.resultPaths)) {
+            let paths = this.resultPaths[assetChain];
+            let pathsString = JSON.stringify(paths);
+            let [asset, chainID] = paraTool.parseAssetChain(assetChain);
+            console.log(assetChain, paths.length);
+            let sql = `insert into assetcycle (asset, chainID, paths, lastUpdateDT) values ('${asset}', '${chainID}', ` + mysql.escape(pathsString) + `, Now()) on duplicate key update paths = values(paths), lastUpdateDT = values(lastUpdateDT)`
+            this.batchedSQL.push(sql);
+        }
+        await this.update_batchedSQL();
     }
 
     date_key_to_ts(datekey = "2021-12-21") {

@@ -1,0 +1,39 @@
+#!/usr/bin/env node
+/*
+ Usage: computeAssetCycles [symbol]
+*/
+
+var PriceManager = require("./priceManager");
+var ParaTool = require("./paraTool");
+
+async function main() {
+    let symbol = null;
+    let maxDepth = 4;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            symbol = val;
+	}
+        if (index == 3 && val.length > 0) {
+            maxDepth = parseInt(val, 10);
+        }
+    });
+    var priceManager = new PriceManager();
+    if ( symbol ) {
+	await priceManager.computeAssetCycles(symbol, maxDepth);
+    } else {
+	let symbols = [ "xcACA", "xcPARA", "xcPHA", "xcIBTC", "xcINTR", "xcASTR", "xcDOT", "xcaUSD", "WGLMR"];
+	for ( let s = 0 ; s < symbols.length; s++) {
+	    symbol = symbols[s];
+	    await priceManager.computeAssetCycles(symbol, maxDepth);
+	}
+    }
+}
+
+main()
+    .then(() => {
+	process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
