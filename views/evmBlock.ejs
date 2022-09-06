@@ -11,6 +11,11 @@ let tabs = [
 { title: "Extrinsics", target: "extrinsics" },
 { title: "Events", target: "events" },
 ]
+
+if ( b.evmBlock.transactionsInternal && ( b.evmBlock.transactionsInternal.length > 0 ) ) {
+  tabs.splice(2, 0, { title: "Internal Txns", target: "internal" });
+}
+
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
   let title = t.title;
@@ -31,6 +36,7 @@ for (let i=0; i<tabs.length; i++) {
 
 <div class="tab-pane" id="evmtxs" role="tabpanel" aria-labelledby="evmtxs-tab">
   <table id="tableevmtxs" class="display" style="width: 100%">
+    <thead>
     <tr>
       <th>Tx Hash</th>
       <th>Method</th>
@@ -42,6 +48,23 @@ for (let i=0; i<tabs.length; i++) {
       <th>Value</th>
       <th>Fee</th>
     </tr>
+    </thead>
+  </table>
+</div>
+
+<div class="tab-pane" id="internal" role="tabpanel" aria-labelledby="internal-tab">
+  <table id="tableinternal" class="display" style="width: 100%">
+    <thead>
+    <tr>
+       <th>Parent Txn Hash</th>
+       <th>Type Trace Address</th>
+       <th>From</th>
+       <th>To</th>
+       <th>Value</th>
+       <th>Gas Limit</th>
+       <th>Gas Used</th>
+    </tr>
+    </thead>
   </table>
 </div>
 
@@ -99,6 +122,14 @@ let evmtxs = <%- JSON.stringify(b.evmBlock.transactions); %>;
 <% } else { %>
 let evmtxs = '[]';
 <% } %>
+
+
+<% if (b.evmBlock != undefined && b.evmBlock.transactionsInternal !=undefined) { %>
+let evminternal = <%- JSON.stringify(b.evmBlock.transactionsInternal); %>;
+<% } else { %>
+let evminternal = '[]';
+<% } %>
+
 <% if (b.extrinsics != undefined) { %>
 let extrinsics = <%- JSON.stringify(b.extrinsics); %>;
 <% } else { %>
@@ -125,6 +156,7 @@ for (const extrinsic of extrinsics) {
    }
 }
 document.getElementById('evmtxs-tab').innerHTML = `Transactions (${evmtxs.length})`;
+document.getElementById('internal-tab').innerHTML = `Internal Txns (${evminternal.length})`;
 document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
 document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
 </script>

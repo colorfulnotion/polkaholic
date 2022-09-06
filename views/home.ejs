@@ -1,0 +1,27 @@
+<%- include('header', {chainInfo: chainInfo, title: "Account"}); %>
+
+
+<!-- Tab panes -->
+<% for ( let j = 0; j < accounts.length; j++ ) { %>
+   <%  let account = accounts[j]; %>
+<div class="card mb-3">
+    <div class="card-title">
+    <% let url = ( account.address.length == 42 ) ? `/address/${account.address}` : `/account/${account.address}`; %>
+      <B>Account:</B> <code><%= account.address %></code> <a class='btn' href='<%= url; %>'>View Account</a>
+    </div>
+    <div class="row g-0">
+      <div class="col-md-12  text-center">
+   <% for ( let i = 0; i < account.chains.length; i++ ) { %>
+     <%- include('accountchainassets', {idx: i, chainassets: account.chains[i], expanded: false }); %>
+   <% } %>
+      </div>
+    </div>
+</div>
+<% } %>
+
+<script>
+var baseURL = '<%= config.baseURL; %>'
+let chainListStr = '<%= chainListStr; %>';
+</script>
+<%- include('footer', {apiUrl: apiUrl}); %>
+

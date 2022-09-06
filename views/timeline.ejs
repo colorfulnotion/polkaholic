@@ -15,6 +15,7 @@
 <h4>XCM Timeline</h4>
 <%
 let timelineRows = uiTool.getTimelineRows(timeline);
+let firstMessage = null;
 %>
 <div id="xcmmessagesmap">
  <h6>XCM Messages with Instructions</h6>
@@ -48,7 +49,7 @@ let timelineRows = uiTool.getTimelineRows(timeline);
      <br/>
      <B>MessageType:</B> <%= xcm.msgType %><%= ` (${uiTool.capitalizeFirstLetter(xcm.id)} -> ${uiTool.capitalizeFirstLetter(xcm.idDest)})` %><br/>
      <B>Relay Chain:</B> <%= uiTool.capitalizeFirstLetter(xcm.relayChain); %><br/>
-     <% if ( xcm.sentTS ) { %>
+     <% if ( xcm.sentTS ) { if ( firstMessage == null ) { firstMessage = uiTool.presentTS(xcm.sentTS); } %>
         <B>Sent:</B> <%= uiTool.presentTS(xcm.sentTS) %> <br/>
      <% } %>
      <% if ( xcm.receivedTS ) { %>
@@ -118,9 +119,20 @@ let timelineRows = uiTool.getTimelineRows(timeline);
 </div>
 
 <h6>Visualization</h6>
+<div id="timelineNotes">
+  <small>
+  Legend: Horizontal axis: Timestamp
+    <% if ( firstMessage ) { %>
+     (starting at <%= firstMessage; %>);
+    <% } %>
+    Vertical: Chain (topmost sending, bottommost receiving)
+  </small>
+</div>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <div id="timeline" style="height: 180px; width: 100%"></div>
+<hr/>
 <div><i>Select any block in the timeline above to see extrinsics, events, and traces in the table below:</i></div>
+
 <div>
   <button id="btnShowAllTimelineObjects" type="button" class="btn-sm btn-outline-primary">Show All Events</button>
 </div>

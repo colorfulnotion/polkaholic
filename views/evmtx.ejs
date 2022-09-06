@@ -10,6 +10,11 @@ let tabs = [
 { title: "Overview", target: "overview" },
 { title: `Logs (${tx.decodedLogs.length})`, target: "logs" },
 ]
+
+if ( tx.transactionsInternal && tx.transactionsInternal.length > 0 ) {
+   tabs.push({ title: `Internal Txns (${tx.transactionsInternal.length})`, target: "internal" });
+}
+
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
   let title = t.title;
@@ -23,11 +28,14 @@ for (let i=0; i<tabs.length; i++) {
 <%
 }
 let defHash = '#overview';
+
+console.log(tx);
 %>
 </ul>
 
 <div class="tab-content">
   <%- include("evmtxOverview", {chainID: tx.chainID, id: tx.id, tx: tx }); %>
+  <%- include("evmtxInternal", {chainID: tx.chainID, id: tx.id, tx: tx }); %>
   <%- include("evmtxLogs", {chainID: tx.chainID, id: tx.id, tx: tx }); %>
 </div>
 

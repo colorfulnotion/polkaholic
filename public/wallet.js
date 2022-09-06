@@ -29,82 +29,181 @@ async function selectWalletAccount() {
         // now that we have some accounts, show the modal
         if (accounts.length == 0) {
             launchToast("Please configure Polkadot extension with at least 1 account")
-        } else if (accounts.length == 1) {
-            let w = accounts[0];
-            let acctAddr = getPolkadotAddress(w)
-            let pubkey = getPubkey(w)
-            setWalletHome(w.meta.name, acctAddr, pubkey);
-            launchToast(`Selected: ${w.meta.name}(${acctAddr} !`);
-            if (afterWalletSelected) {
-                let res = await afterWalletSelected();
-                console.log("afterWalletSelected 1", res)
-            }
         } else {
             showWalletModal();
         }
     })()
 }
 
-function getWalletAccount() {
-    let [homeName, homeAcct] = getWalletHome();
-    console.log("getWalletAccount", homeName, homeAcct, accounts);
-    for (let i = 0; i < accounts.length; i++) {
-        if (accounts[i].address == homeAcct) { // TODO: check?
-            return (accounts[i]);
-        }
-    }
-    return (false);
+// wallet functions
+function showWalletModal() {
+    $('#walletModal').modal('show');
 }
 
+function hideWalletModal() {
+    $('#walletModal').modal('hide');
+}
 
-$('#walletClear').on('click', function(e) {
-    clearWallet();
-    hideWalletModal();
-});
+function setWalletHome(selectedAccounts) {
+    let addresses = selectedAccounts.join("|")
+    try {
+        setCookie("homePub", addresses, 3650);
+        showWalletHome();
+    } catch (e) {
+        console.log("setWalletHome", e);
+    }
+}
+
+function getWalletHome() {
+    let homePub = getCookie('homePub');
+    if (homePub.length > 20) {
+        let addresses = homePub.split("|");
+        if (addresses.length > 0) {
+            return [`${addresses.length} accounts`, addresses];
+        }
+    }
+    return [`0 accounts`, []];
+}
+
+function showWalletHome() {
+    let [homeName, addresses] = getWalletHome();
+    if (addresses.length > 0) {
+        document.getElementById('walletHome').innerHTML = `${homeName}`;
+        if (addresses.length == 1) {
+            document.getElementById('identicon').style.visibility = 'visible';
+            document.getElementById('identicon').src = "/identicon/" + addresses[0];
+        }
+    } else {
+        document.getElementById('walletHome').innerHTML = "-Connect Wallet-";
+        document.getElementById('identicon').style.visibility = 'hidden';
+    }
+}
 
 $('#walletModalClose').on('click', function(e) {
     hideWalletModal();
 });
+
+async function connect_evmwallet() {
+    if (window.ethereum) {
+        await window.ethereum.request({
+            method: "eth_requestAccounts"
+        });
+        window.web3 = new Web3(window.ethereum);
+        const account = web3.eth.accounts;
+        const evmAddress = account.givenProvider.selectedAddress;
+        let address = evmAddress;
+        let addr = evmAddress;
+        let name = "EVM";
+        console.log(`EVMWalletAccount: ${evmAddress}`, account);
+        document.getElementById('evmwallettoggle').checked = true;
+        document.getElementById('evmwallettoggle').value = evmAddress;
+        document.getElementById('identicon').innerHTML = `<img src='/identicon/${address}' width=50/>`;
+        document.getElementById('headerStr').innerHTML = `<span><small>EVM Address: ${address}</small></span><span style="float:right"><a class='btn btn-link' href='/address/${address}'>View Account</a></span>`;
+        document.getElementById('descriptionStr').innerHTML = ``;
+    } else {
+        launchToast("Download <a href='https://metamask.io/'  target='_new'>Metamask</a>, <a href='https://subwallet.app/' target='_new'>Subwallet</a>, or <a href='https://talisman.xyz/'  target='_new'>Talisman</a> and grant permissions to polkaholic.io");
+    }
+}
+
+async function toggle_evmwallet() {
+    let toggle = document.getElementById("evmwallettoggle");
+    if (toggle.checked) {
+        await connect_evmwallet();
+    }
+}
+
+function presentEVMWalletConnect(address = null) {
+    let checkedStr = "";
+    let addressHeaderStr = "<a class='btn btn-link' href='javascript:connect_evmwallet();'>Connect EVM Wallet</a></span>";
+    let descriptionStr = "";
+    let identiconStr = "";
+    if (address) {
+        checkedStr = " CHECKED";
+        addressHeaderStr = `<span><small>EVM Address: ${address}</small></span><span style="float:right"><a class='btn btn-link' href='/address/${address}'>View Account</a></span>`
+        descriptionStr = ``
+        identiconStr = `<img src='/identicon/${address}' width=50/>`;
+    }
+    return `<div type="button" class="btn btn-lg btn-outline-dark  text-capitalize" style="padding-left: 0.25rem; padding-right: 0.25rem; padding-bottom: 0.15rem;padding-bottom: 0.15rem; text-align: left"> 
+  <div id="identicon" style='float: left; width: 15%'>${identiconStr}</div>
+  <div style='float:right; width: 85%'>
+    <div class="form-check form-switch"> <input onclick="javascript:toggle_evmwallet()" class="form-check-input" type="checkbox" id="evmwallettoggle" role="switch" value="${address}" ${checkedStr}/><span id='headerStr'>${addressHeaderStr}</span></div>
+    <div id="descriptionStr">${descriptionStr}</div>
+  </div>
+</div>`
+}
+
+function presentWalletAccount(name, address, pubKey, checked, isEVM = false) {
+    let checkedStr = checked ? " CHECKED" : "";
+    let addressStr = `<small>SS58 Address: ${getShortHash(address)}<br/>Public Key: ${getShortHash(pubKey)}</small>`;
+    let url = `/account/${pubKey}`;
+    return `<div type="button" class="btn btn-lg btn-outline-dark  text-capitalize" style="padding-left: 0.25rem; padding-right: 0.25rem; padding-bottom: 0.15rem;padding-bottom: 0.15rem; text-align: left"> 
+  <div style='float: left; width: 15%'><img src='/identicon/${address}' width=50/></div>
+  <div style='float:right; width: 85%'>
+    <div class="form-check form-switch"> <input class="form-check-input" type="checkbox" role="switch" value="${pubKey}" ${checkedStr} />${name}<span style='float:right'><a class='btn btn-link' href='${url}'>View Account</a></span></div>
+    <div>${addressStr}</div>
+  </div>
+</div>`
+}
 
 $('#walletModal').on('show.bs.modal', async function(event) {
     var button = $(event.relatedTarget) // Button that triggered the modal
     // Update the modal's content. We'll use jQuery here, but you could use a data binding library or other methods instead.
     var modal = $(this)
 
+    let [_, currentAddresses] = getWalletHome();
+    let evmAddress = null;
+    for (let i = 0; i < currentAddresses.length; i++) {
+        console.log(currentAddresses[i].length);
+        if (currentAddresses[i].length == 42) {
+            evmAddress = currentAddresses[i];
+        }
+    }
+    let out = [];
+
     if (accounts?.length > 0) {
         //accounts?.map(account => console.log(`Address: ${account.address}\t(pubkey: ${getPubkey(account)})`));
-        var out = accounts.map((w, idx) => {
+        accounts.forEach((w, idx) => {
             let address = getPolkadotAddress(w)
-            //let addr = w.address.substring(0, 20) + "..."; //16DWzV....ueH4Nz
-            //let addr = (address.length > 20)? `${address.substring(0, 6)}....${address.slice(-6)}`: address
-            let addr = address
+            let pubKeyu8 = polkadotKeyring.decodeAddress(address);
+            let pubKey = polkadotUtil.u8aToHex(pubKeyu8);
             let name = w.meta.name;
-            let walletid = "wallet" + idx;
-            //console.log('account', walletid, name, addr);
-            return `<a id="${walletid}" type="button" class="btn btn-lg btn-outline-dark" style="padding-left: 0.25rem; padding-right: 0.25rem; padding-bottom: 0.15rem;padding-bottom: 0.15rem"> <div style='float: left; width: 10%'><img src='/identicon/${address}' width=50/></div><div style='float:right; width: 90%'>${name}<br/><p class="text-capitalize" style="margin-padding:0rem">${addr}</p></div></a>`;
-        });
-        //btn-group-vertical mx-auto
-        out = '<div class="d-grid gap-2">' + out.join("") + '</div>';
-        $("#walletModal .modal-body").html(out);
-        // register click handlers
-        accounts?.forEach(async (w, idx) => {
-            let walletid = "wallet" + idx;
-            $('#' + walletid).on('click', async function(e) {
-                let acctAddr = getPolkadotAddress(w)
-                let pubkey = getPubkey(w)
-                setWalletHome(w.meta.name, acctAddr, pubkey);
-                hideWalletModal();
-                if (afterWalletSelected) {
-                    let res = await afterWalletSelected();
-                    console.log("afterWalletSelected 2+", acctAddr)
-                } else {
-                    launchToast(`Selected: ${w.meta.name}(${acctAddr}`);
-                }
-            });
-        });
-    } else {
+            //console.log(currentAddresses.includes(pubKey), pubKey, currentAddresses);
+            out.push(presentWalletAccount(name, address, pubKey, currentAddresses.includes(pubKey), false));
 
+        });
     }
+    out.push(presentEVMWalletConnect(evmAddress));
+    //btn-group-vertical mx-auto
+    out = `<div class="d-grid gap-2">` + out.join("") + `</div>`;
+    $("#walletModal .modal-body").html(out);
+});
+
+async function selectedWallets(e) {
+    let selectedAccounts = [];
+    document.querySelectorAll('[role="switch"]').forEach(function(el) {
+        if (el.checked) {
+            selectedAccounts.push(el.value);
+        }
+    });
+    console.log(selectedAccounts);
+    hideWalletModal();
+    setWalletHome(selectedAccounts);
+
+    if (afterWalletSelected) {
+        let res = await afterWalletSelected();
+        console.log("afterWalletSelected", acctAddr)
+    } else {
+        launchToast(`Selected: ${selectedAccounts.length} accounts`);
+    }
+}
+
+
+$('#walletSelect').on('click', async function(e) {
+    await selectedWallets(e);
+});
+
+$('#walletModalClose').on('click', async function(e) {
+    await selectedWallets(e);
 });
 
 showWalletHome();

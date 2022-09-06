@@ -535,30 +535,9 @@ async function getTokenHoldersRawBalances(web3Api, contractAddress, holders, tok
     return res
 }
 
-async function process_block_and_receipt(evmBlk, evmReceipts, contractABIs, contractABISignatures, chainID) {
-    let fBlk = evmBlk
-    let txns = fBlk.transactions
-    let blockTS = fBlk.timestamp
-
-    var statusesPromise = Promise.all([
-        processTranssctions(txns, contractABIs, contractABISignatures),
-        processReceipts(evmReceipts, contractABIs, contractABISignatures)
-    ])
-    let [dTxns, dReceipts] = await statusesPromise
-
-    let fTxns = []
-    for (i = 0; i < dTxns.length; i += 1) {
-        let dTxn = dTxns[i]
-        let dReceipt = dReceipts[i]
-        let fTxn = decorateTxn(dTxn, dReceipt, blockTS, chainID)
-        fTxns.push(fTxn)
-    }
-    fBlk.transactions = fTxns
-    return fBlk
-}
 
 // this function decorates and generate a "full" txn using decodedTxn and decodedReceipts
-function decorateTxn(dTxn, dReceipt, blockTS = false, chainID = false) {
+function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
     if (!dReceipt || dReceipt.transactionHash === undefined) {
         console.log(`decorateTxn: missing receipts`)
     }
@@ -599,6 +578,9 @@ function decorateTxn(dTxn, dReceipt, blockTS = false, chainID = false) {
         input: dTxn.input,
         decodedInput: dTxn.decodedInput,
         decodedLogs: dReceipt.decodedLogs,
+    }
+    if (dInternal.length > 0) {
+        fTxn.transactionsInternal = dInternal;
     }
     return fTxn
 }
@@ -914,20 +896,44 @@ function parseAbiSignature(abiStrArr) {
 }
 */
 
-async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, chainID) {
+async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, chainID) {
     let fBlk = evmBlk
     let blockTS = fBlk.timestamp
     let fTxns = []
+    let fTxnsInternal = [];
     if (dTxns.length != dReceipts.length) {
         console.log(`[${fBlk.blockNumber}][${fBlk.blockHash}] txns/receipts len mismatch: txnLen=${dTxns.length}, receiptLen=${dReceipts.length}`)
     }
+    // recurse through all the trace records in dTrace, and for any with value, accumulate in feedTrace
+    let feedtrace = []
+    if (dTrace) {
+        process_evm_trace(dTrace, feedtrace, 0, [0], dTxns);
+    }
+    let feedtraceMap = {};
+    if (feedtrace.length > 0) {
+        for (let t = 0; t < feedtrace.length; t++) {
+            let internalTx = feedtrace[t];
+            if (feedtraceMap[internalTx.transactionHash] == undefined) {
+                feedtraceMap[internalTx.transactionHash] = [];
+            }
+            feedtraceMap[internalTx.transactionHash].push(internalTx);
+        }
+    }
+
     for (i = 0; i < dTxns.length; i += 1) {
         let dTxn = dTxns[i]
         let dReceipt = dReceipts[i]
-        let fTxn = decorateTxn(dTxn, dReceipt, blockTS, chainID)
+        let dInternal = feedtraceMap[dTxn.hash] ? feedtraceMap[dTxn.hash] : []
+        let fTxn = decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID)
         fTxns.push(fTxn)
+        if (fTxn.transactionsInternal && fTxn.transactionsInternal.length > 0) {
+            for (let j = 0; j < fTxn.transactionsInternal.length; j++) {
+                fTxnsInternal.push(fTxn.transactionsInternal[j]);
+            }
+        }
     }
     fBlk.transactions = fTxns
+    fBlk.transactionsInternal = fTxnsInternal
     return fBlk
 }
 
@@ -1532,6 +1538,30 @@ function int_to_hex(id) {
     return web3.utils.toHex(id)
 }
 
+function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
+    for (let i = 0; i < evmTrace.length; i++) {
+        let t = evmTrace[i];
+        if (t.value != "0x0" && stack.length > 1) {
+            res.push({
+                transactionHash: txs[stack[1]].hash,
+                stack: stack,
+                from: t.from,
+                to: t.to,
+                gas: paraTool.dechexToInt(t.gas),
+                gasUsed: paraTool.dechexToInt(t.gasUsed),
+                value: paraTool.dechexToInt(t.value),
+            });
+        }
+
+        if (t.calls != undefined) {
+            let newStack = [...stack];
+            newStack.push(i);
+            // recursive call 
+            process_evm_trace(t.calls, res, depth + 1, newStack, txs);
+        }
+    }
+}
+
 module.exports = {
     toHex: function(bytes) {
         return toHex(bytes);
@@ -1597,11 +1627,8 @@ module.exports = {
     processTranssctions: async function(txns, contractABIs, contractABISignatures) {
         return processTranssctions(txns, contractABIs, contractABISignatures)
     },
-    processBlockAndReceipt: async function(evmBlk, evmReceipts, contractABIs, contractABISignatures, chainID) {
-        return process_block_and_receipt(evmBlk, evmReceipts, contractABIs, contractABISignatures, chainID)
-    },
-    fuseBlockTransactionReceipt: async function(evmBlk, dTxns, dReceipts, chainID) {
-        return fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, chainID)
+    fuseBlockTransactionReceipt: async function(evmBlk, dTxns, dReceipts, dTrace, chainID) {
+        return fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, chainID)
     },
     decodeTransactionInput: function(txn, contractABIs, contractABISignatures) {
         return decodeTransactionInput(txn, contractABIs, contractABISignatures)
@@ -1646,5 +1673,11 @@ module.exports = {
         } catch (e) {
             return null
         }
+    },
+    processEVMTrace: function(evmTrace, evmTxs) {
+        let res = []
+        process_evm_trace(evmTrace, res, 0, [0], evmTxs);
+        return res
     }
+
 };

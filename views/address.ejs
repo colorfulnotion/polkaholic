@@ -2,13 +2,20 @@
 <div class="card mb-3">
   <div class="row g-0">
     <div class="col-md-2  text-center">
-      <img src="/identicon/<%= account.address; %>"  class="rounded-start"  width="128"  loading="lazy" class="card-img-center"/>
+      <img src="/identicon/<%= address; %>"  class="rounded-start"  width="128"  loading="lazy" class="card-img-center"/><br/>
+      <% if ( contract ) { %>
+          <%- contract.assetType %>
+      <% } %>
     </div>
     <div class="col-md-8">
       <div class="card-body">
-        <h5 class="card-title"><%- account.requestedChainAddress;%></h5>
-        <h5 class="card-title"><B>Account Balance: <%= uiTool.currencyFormat(account.balanceUSD) %></B></h5>
-        <p class="card-text">
+        <h5 class="card-title">
+	<% if ( contract ) { %>
+	Contract <%- contract.asset; %> 
+	<% } else { %>
+	Address	<%- address; %>
+	<% } %>
+	</h5>
 	<% if ( account.nickname ) { suggest = false; %>
 	  <B><%= account.nickname %></B><br/>
 	<% } else if ( account.subName ) { suggest = false; %>
@@ -17,7 +24,40 @@
 	  (<a href='/account/<%= account.parent; %>'>parent identity</a>)<br/>
 	  <% } %>
         <% } %>
-        </p>
+
+        <table class="table table-hover table-bordered">
+	<tr>
+		<td>Balance:</td>
+		<td><%- include("addressBalance", { account }) %></td>
+	</tr>
+	<% if ( contract && contract.assetType == "ERC20LP" ) { %>
+	<tr>
+	   <td>Token Pair:</td>
+	   <td><a href='/address/<%- contract.token0 %>'><%- uiTool.getShortHash(contract.token0) %></a> / <a href='/address/<%- contract.token1 %>'><%- uiTool.getShortHash(contract.token1) %></a></td>
+	</tr>
+	<tr>
+	   <td>Token Symbol:</td>
+	   <td><a href='/symbol/<%- contract.token0Symbol %>'><%= contract.token0Symbol %></a> / <a href='/symbol/<%- contract.token1Symbol %>'><%= contract.token1Symbol %></a> </td>
+	</tr>
+	<% } %>
+	<% if ( contract && contract.creator && contract.createdAtTx ) {%>
+	<tr>
+	   <td>Contract Creator:</td>
+	   <td><%- uiTool.presentERCID(contract.creator) %> at txn <%- uiTool.presentTx(contract.createdAtTx) %></td>
+	</tr>
+	<% } %>
+	<% if ( contract && ( contract.assetType == "ERC20" || contract.assetType == "ERC20LP" ) ) { console.log(contract);  %>
+	<tr>
+		<td>Token Tracker:</td>
+		<td><a href='/token/<%= address; %>'><%- contract.assetName %> (<%- contract.localSymbol; %>)</a> (<%- uiTool.currencyFormat(contract.priceUSD); %>)</td>
+	</tr>
+	<% } %>
+	<tr>
+		<td>Tokens:</td>
+		<td><%- include("addressTokens", { account }) %></td>
+	</tr>
+	</table>
+	
       </div>
     </div>
   </div>
@@ -31,9 +71,13 @@
 <%
 let tabs = [
 { title: "Transactions", target: "evmtxs" },
-{ title: "Transfers", target: "transfers" },
 { title: "XCM Transfers", target: "xcmtransfers" },
 ];
+
+if ( contract ) {
+  tabs.splice(1, 0, { title: "Internal Txns", target: "transfers" });
+  tabs.splice(2, 0, { title: "ERC20 Token Txns", target: "erc20" });
+}
 
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
@@ -60,7 +104,6 @@ for (let i=0; i<tabs.length; i++) {
       <th>Method</th>
       <th>Block</th>
       <th>Age</th>
-      <th>Result</th>
       <th>From</th>
       <th>To</th>
       <th>Value</th>
@@ -102,15 +145,48 @@ for (let i=0; i<tabs.length; i++) {
       </thead>
     </table>
   </div>
+<% if ( contract ) { %>
+  <div class="tab-pane" id="internal" role="tabpanel" aria-labelledby="internal-tab">
+    <table id="tableinternal" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+         <th>Parent Tx Hash</th>
+         <th>Block</th>
+         <th>Date</th>
+         <th>From</th>
+         <th>To</th>
+         <th>Value</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="erc20" role="tabpanel" aria-labelledby="erc20-tab">
+    <table id="tableerc20" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+         <th>Tx Hash</th>
+         <th>Date</th>
+         <th>From</th>
+         <th>Type</th>
+         <th>To</th>
+         <th>Value</th>
+         <th>Value USD</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+<% } %>
 </div>
 
 <script>
-let address = '<%= account.address; %>';
-let requestedChainAddress = '<%= account.requestedChainAddress; %>';
+let address = '<%= address; %>';
+let requestedChainAddress = '<%= address; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
 let chainListStr = '<%= chainListStr; %>';
 let isEVM = 1;
 </script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
-<script src="/account.js"></script>
+<script src="/accountui.js"></script>
+<script src="/addressui.js"></script>
+<script src="/address.js"></script>

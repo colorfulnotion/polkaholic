@@ -1,7 +1,9 @@
 let initevmblocktransactions = false;
+let initevmblockinternal = false;
 let initevmblockextrinsics = false;
 let initevmblockevents = false;
 let tableEVMBlockTransactions = false;
+let tableEVMBlockInternal = false;
 let tableEVMBlockExtrinsics = false;
 let tableEVMBlockEvents = false;
 
@@ -285,9 +287,115 @@ function showevmblocktransactions(objects) {
     table.draw();
 }
 
+
+function showevmblockinternal(objects) {
+    let tableName = '#tableinternal'
+    if (!initevmblockinternal) {
+	initevmblockinternal = true;
+        tableEVMBlockInternal = $(tableName).DataTable({
+        columnDefs: [{
+                "className": "dt-center",
+                "targets": [3, 4]
+            }
+        ],
+        columns: [{
+                data: 'transactionHash',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        try {
+                            if (row.transactionHash != undefined) {
+                                let s = presentTxHash(row.transactionHash);
+                                return `${s}`
+                            }
+                        } catch (e) {
+                            console.log(row);
+                        }
+                    }
+                    if (row.extrinsicID != undefined) {
+                        return data;
+                    }
+                    return "";
+                }
+            },
+            {
+                data: 'stack',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+			if ( row.stack != undefined ) {
+                            return presentStack(data);
+			}
+                    }
+                    return "";
+                }
+            },
+            {
+                data: 'from',
+                render: function(data, type, row, meta) {
+		    if ( row.from != undefined ) {
+			return presentID(row.from);
+		    }
+		    return "";
+                }
+            },
+            {
+                data: 'to',
+                render: function(data, type, row, meta) {
+                    if (row.to) {
+                        return presentID(row.to);
+                    } else {
+                        return "";
+                    }
+                }
+            },
+            {
+                data: 'value',
+                render: function(data, type, row, meta) {
+                    if (row.value) {
+                        return data;
+                    } else {
+                        return "";
+                    }
+                }
+            },
+            {
+                data: 'gas',
+                render: function(data, type, row, meta) {
+                    if (row.gas) {
+                        return data;
+                    } else {
+                        return "";
+                    }
+                }
+            },
+            {
+                data: 'gasUsed',
+                render: function(data, type, row, meta) {
+		    console.log(row);
+                    if (row.gasUsed) {
+                        return data;
+                    } else {
+                        return "";
+                    }
+                }
+            }
+        ]
+	});
+    }
+    let table = tableEVMBlockInternal;
+    table.clear();
+    if (objects != undefined) {
+        table.rows.add(objects);
+    }
+    table.draw();
+}
+
 function jumpTab(hash = "#evmtxs") {
     const triggerEl = document.querySelector('#blockTab a[href="' + hash + '"]');
-    mdb.Tab.getInstance(triggerEl).show();
+    if ( triggerEl ) {
+	mdb.Tab.getInstance(triggerEl).show();
+    } else {
+	console.log("jumpTabFAIL", hash)
+    }
 }
 
 function showevmblockevents(objects) {
@@ -486,6 +594,7 @@ $("#showallevents").on('click', function(e) {
 $(document).ready(function() {
     setuptabs(tabs, id, blockNumber, blockHash, defHash);
     showevmblocktransactions(evmtxs);
+    showevmblockinternal(evminternal);
     showevmblockextrinsics(extrinsics);
     showevmblockevents(events);
 });

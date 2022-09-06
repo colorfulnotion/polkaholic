@@ -458,7 +458,7 @@ async function showxcmtransfers(filter = {}) {
 var initassets = false;
 let xcmassetsTable = null;
 
-function showxcmassets(chainID, address) {
+function showxcmassets(chainID) {
     if (initassets) return;
     else initassets = true;
     let chainIDstr = (chainID == undefined) ? "all" : chainID.toString();
@@ -513,12 +513,10 @@ function showxcmassets(chainID, address) {
                             }
                         } else if (accountState && accountState.free !== undefined) {
                             if (type == 'display') {
-                                return presentTokenCount(accountState.free) + " " + str + " (" + currencyFormat(accountState.freeUSD) + ")";
+
+                                return presentTokenCount(accountState.free) + " " + str + " (" + currencyFormat(balanceUSD) + ")";
                             } else {
-                                if (accountState.freeUSD != undefined) {
-                                    return accountState.freeUSD
-                                }
-                                return 0;
+                                return balanceUSD + .000000001 * accountState.free;
                             }
                             return 0;
                         } else {
@@ -549,9 +547,6 @@ function showxcmassets(chainID, address) {
                         return `<a href='/chain/${row.chainID}#xcmassets'>${row.chainName} ${row.symbol}</a>`
                     }
                 } else {
-                    if (row.chainID == 2004) {
-                        console.log(row);
-                    }
                     return row.assetName;
                 }
                 return data;
@@ -610,34 +605,7 @@ function showxcmassets(chainID, address) {
     loadData2(pathParams, tableName, true)
 }
 
-// returns null if balance 
-function get_accountState(asset, chainID, assetChain) {
-    if (!account) return [null, null];
-    if (account.chains == undefined) return [null, null];
-    try {
-        for (let i = 0; i < account.chains.length; i++) {
-            let c = account.chains[i];
-            if (c.chainID == chainID) {
-                for (let j = 0; j < c.assets.length; j++) {
-                    let a = c.assets[j];
-                    if (a.asset == asset) {
-                        let state = a.state;
-                        let balanceUSD = state.balanceUSD;
-
-                        return [state, balanceUSD];
-                    }
-                }
-            }
-        }
-    } catch (err) {
-        console.log(err);
-    }
-    return [null, 0];
-}
-
-
 function filterchains(relaychain = "all") {
-
     if (relaychain == "kusama" || relaychain == "polkadot") {
         console.log("filterchains", relaychain);
         if (chainsTable) chainsTable.column(8).search(relaychain).draw();

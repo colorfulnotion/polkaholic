@@ -26,21 +26,22 @@ function showchains() {
 function get_accountBalanceOnChain(chainID, assetChain) {
     try {
         let balanceUSD = 0;
-        if (account.chains) {
-            for (let i = 0; i < account.chains.length; i++) {
-                let c = account.chains[i];
-                if (c.chainID == chainID) {
-                    for (let j = 0; j < c.assets.length; j++) {
-                        let a = c.assets[j];
-                        if (a.state.balanceUSD > 0) {
-                            //console.log(a);
-                            balanceUSD += a.state.balanceUSD;
+        for (let a = 0; a < accounts.length; a++) {
+            let account = accounts[a];
+            if (account.chains) {
+                for (let i = 0; i < account.chains.length; i++) {
+                    let c = account.chains[i];
+                    if (c.chainID == chainID) {
+                        for (let j = 0; j < c.assets.length; j++) {
+                            let a = c.assets[j];
+                            if (a.state.balanceUSD > 0) {
+                                //console.log(a);
+                                balanceUSD += a.state.balanceUSD;
+                            }
                         }
                     }
                 }
             }
-        } else {
-            return null
         }
         return balanceUSD;
     } catch (err) {
@@ -121,7 +122,8 @@ async function show_chains() {
                             if (balanceUSD == null) {
                                 return "-Connect Wallet-";
                             }
-                            return currencyFormat(balanceUSD);
+                            let url = `/chain/${row.chainID}#xcmassets`;
+                            return `<a href="${url}">` + currencyFormat(balanceUSD) + "</a>";
                         } else {
                             if (balanceUSD == null) return 0;
                             return balanceUSD;
@@ -162,7 +164,8 @@ async function show_chains() {
                 render: function(data, type, row, meta) {
                     try {
                         if (type == 'display') {
-                            return presentNumber(data);
+                            let url = `chain/${row.id}#chainlog`
+                            return `<a href="${url}">` + presentNumber(data) + "</a>";
                         }
                         return data;
                     } catch {
@@ -173,7 +176,8 @@ async function show_chains() {
                 data: 'numXCMTransferIncoming7d',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        return presentNumber(data) + " " + currencyFormat(row.valXCMTransferIncomingUSD7d);
+                        let url = `chain/${row.id}#xcmtransfers`
+                        return `<a href="${url}">` + presentNumber(data) + " " + currencyFormat(row.valXCMTransferIncomingUSD7d) + "</a>";
                     } else {
                         return row.valXCMTransferIncomingUSD7d;
                     }
@@ -182,7 +186,8 @@ async function show_chains() {
                 data: 'numXCMTransferOutgoing7d',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        return presentNumber(data) + " " + currencyFormat(row.valXCMTransferOutgoingUSD7d);
+                        let url = `chain/${row.id}#xcmtransfers`
+                        return `<a href="${url}">` + presentNumber(data) + " " + currencyFormat(row.valXCMTransferOutgoingUSD7d) + "</a>";
                     }
                     return row.valXCMTransferOutgoingUSD7d;
                 }
@@ -323,7 +328,7 @@ function showchainstab(hash) {
             break;
         case "#xcmassets":
             setupapidocs("chains", "list");
-            showxcmassets(null, account);
+            showxcmassets(null);
             break;
         case "#xcmtransfers":
             setupapidocs("xcmtransfers");

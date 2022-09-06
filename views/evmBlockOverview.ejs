@@ -24,8 +24,13 @@
   <tr>
     <td>Transactions</td>
     <td>
-<% if ( block && block.transactions ) { %>
+<%
+console.log(block);
+if ( block && block.transactions ) { %>
 <a class="btn-sm btn-primary" href='javascript:jumpTab()'><%= block.transactions.length %> transactions</a>
+    <% if ( block.transactionsInternal && ( block.transactionsInternal.length > 0 ) ) { %>
+     and <a class="btn-sm btn-primary" href='javascript:jumpTab("#internal")'><%= block.transactionsInternal.length %> internal transactions</a> in this block
+    <% } %>
 <% } else { %>
      Awaiting finalization
 <% } %>

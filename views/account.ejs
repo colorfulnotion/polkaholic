@@ -136,7 +136,7 @@ let suggest = false; // disabled for now
         <% } %>
         <i>(source: Kusama On-chain Identity, <%= verificationStatus %>)</i><br/>
   <% } %>
-    <% if ( suggest && fromAddress.length == 66 ) { %>
+    <% if ( false ) { %>
       <button type="button" class="btn btn-link" data-mdb-toggle="modal" data-mdb-target="#suggestModal">
         Suggest Nickname
       </button>
@@ -171,7 +171,6 @@ Help others, earn 25 HOLIC for suggesting a public nickname:<br/>
 <small>
 Rewards granted upon reasonable verification.  Important: PII info (Person) will not be published or be eligible for rewards.
 </small>
-            <input type="hidden" id="submitter"  value="<%= fromAddress %>"/>
             </div>
 
             <div class="modal-footer">
@@ -192,13 +191,8 @@ Rewards granted upon reasonable verification.  Important: PII info (Person) will
     </div>
     <div class="col-md-2  text-center">
       <div class="card-body">
-      <% if ( paraTool.sameAddress(account.address, fromAddress) ) { %>
-        <% if ( claimed == false && false ) {
-            canClaim = true; %>
-          <button id="btnClaim" type="button" class="btn btn-secondary">Claim</button>
-        <% } else { %>
+      <% if ( addresses.includes(account.address) ) { %>
           <button id="btnHome" type="button" class="btn btn-outline-secondary">Home</button>
-        <% } %>
       <% } else if ( account.isFollowing ) { %>
         <a href="/unfollow/<%= account.address; %>" class="btn btn-outline-secondary">Unfollow</a>
       <% } else { %>
@@ -249,15 +243,19 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-content">
   <div class="tab-pane" id="overview" role="tabpanel" aria-labelledby="overview-tab">
 
+<% if ( account.chains ) { %>
 <div class="card mb-3">
   <div class="row g-0">
     <div class="col-md-12  text-center">
 <% for ( let i = 0; i < account.chains.length; i++ ) { %>
-<%- include('accountchainassets', {chainassets: account.chains[i], expanded: ( i == 0 ) }); %>
+<%- include('accountchainassets', {idx: i, chainassets: account.chains[i], expanded: false }); %>
 <% } %>
     </div>
   </div>
 </div>
+<% } else { %>
+   No assets found.
+<% } %>
 
   </div>
   <div class="tab-pane" id="history" role="tabpanel" aria-labelledby="history-tab">
@@ -406,7 +404,7 @@ for (let i=0; i<tabs.length; i++) {
 </div>
 <script>
 var baseURL = '<%= config.baseURL; %>'
-let address = '<%= account.address; %>';
+let address = '<%= address; %>';
 let requestedChainAddress = '<%= account.requestedChainAddress; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
 let chainListStr = '<%= chainListStr; %>';
@@ -423,4 +421,5 @@ $('#btnClaim').on('click', function(e) {
 <script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
 <script src="https://code.highcharts.com/stock/modules/export-data.js"></script>
 <%- include('footer', {apiUrl: apiUrl}); %>
+<script src="/accountui.js"></script>
 <script src="/account.js"></script>

@@ -471,11 +471,11 @@ app.get('/', async (req, res) => {
         res.render('downtime');
         return;
     }
-    let homePubkey = getHomePubkey(req);
-    let account = {};
+    let addresses = getHomeAddresses(req);
+    let accounts = [];
     try {
-        if (homePubkey) {
-            account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+        if (addresses) {
+            accounts = await query.getMultiAccount(addresses);
         }
     } catch (e) {
         // ok
@@ -489,8 +489,8 @@ app.get('/', async (req, res) => {
                 res.render('chain', {
                     blocks: blocks,
                     chainID: chainID,
-                    address: homePubkey,
-                    account: account,
+                    addresses: addresses,
+                    accounts: accounts,
                     id: id,
                     chainInfo: query.getChainInfo(chainID),
                     chain: chain,
@@ -517,11 +517,11 @@ app.get('/', async (req, res) => {
 })
 
 async function handleChains(req, res) {
-    let account = {}
-    let homePubkey = getHomePubkey(req);
+    let accounts = [];
+    let addresses = getHomeAddresses(req);
     try {
-        if (homePubkey) {
-            account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+        if (addresses) {
+            accounts = await query.getMultiAccount(addresses);
         }
     } catch (err) {
         // errors should not matter here
@@ -536,7 +536,7 @@ async function handleChains(req, res) {
             chainInfo: query.getChainInfo(),
             relaychain: relaychain,
             topNfilters: topNfilters,
-            account: account,
+            accounts: accounts,
             topN: "balanceUSD",
             apiUrl: '/chains',
             docsSection: "get-all-chains"
@@ -558,17 +558,39 @@ function getConsent(req) {
     return (false);
 }
 
-function getHomePubkey(req) {
+function getHomeAddresses(req) {
     if (req.cookies && req.cookies.homePub) {
         let res = req.cookies.homePub;
-        return paraTool.getPubKey(res);
+        let out = [];
+        if (res.length > 20) {
+            let sa = res.split("|");
+            for (let a = 0; a < sa.length; a++) {
+                let addr = paraTool.getPubKey(sa[a]);
+                if (addr) {
+                    out.push(addr);
+                }
+            }
+            if (out.length > 0) {
+                return out;
+            }
+        }
     }
     return (false);
 }
 
-function getHomeAccount(req) {
-    if (req.cookies && req.cookies.homeAcct) {
-        return (req.cookies.homeAcct);
+function getHomeDefault(req) {
+    if (req.cookies && req.cookies.homePub) {
+        let res = req.cookies.homePub;
+        let out = [];
+        if (res.length > 20) {
+            let sa = res.split("|");
+            for (let a = 0; a < sa.length; a++) {
+                let addr = paraTool.getPubKey(sa[a]);
+                if (addr) {
+                    return addr;
+                }
+            }
+        }
     }
     return (false);
 }
@@ -617,11 +639,11 @@ app.get('/identicon/:address', async (req, res) => {
 
 // Usage: https://polkaholic.io/chain/22000
 app.get('/chain/:chainID_or_chainName', async (req, res) => {
-    let account = {};
-    let homePubkey = getHomePubkey(req);
+    let accounts = [];
+    let addresses = getHomeAddresses(req);
     try {
-        if (homePubkey) {
-            account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+        if (addresses) {
+            accounts = await query.getMultiAccount(addresses);
         }
     } catch (e) {
         // errors should not matter here
@@ -636,8 +658,8 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
             res.render('chain', {
                 blocks: blocks,
                 chainID: chainID,
-                address: homePubkey,
-                account: account,
+                addresses: addresses,
+                accounts: accounts,
                 id: id,
                 chainInfo: query.getChainInfo(chainID),
                 chain: chain,
@@ -1157,7 +1179,7 @@ app.get('/claimaddress/:address/:message/:signature', async (req, res) => {
 app.get('/follow/:toAddress', async (req, res) => {
     try {
         let toAddress = req.params["toAddress"];
-        let fromAddress = getHomePubkey(req);
+        let fromAddress = getHomeDefault(req);
         if (fromAddress) {
             await query.followUser(fromAddress, toAddress);
         }
@@ -1172,7 +1194,7 @@ app.get('/follow/:toAddress', async (req, res) => {
 app.get('/unfollow/:toAddress', async (req, res) => {
     try {
         let toAddress = req.params["toAddress"];
-        let fromAddress = getHomePubkey(req);
+        let fromAddress = getHomeDefault(req);
         if (fromAddress) {
             await query.unfollowUser(fromAddress, toAddress);
         }
@@ -1187,7 +1209,7 @@ app.get('/unfollow/:toAddress', async (req, res) => {
 app.get('/followers/:address', async (req, res) => {
     try {
         let address = req.params["address"];
-        let fromAddress = getHomePubkey(req);
+        let fromAddress = getHomeDefault(req);
         let [decorate, decorateExtra] = decorateOptUI(req)
         let followers = await query.getFollowers(address, fromAddress, decorate, decorateExtra);
         res.render('followers', {
@@ -1208,7 +1230,7 @@ app.get('/followers/:address', async (req, res) => {
 app.get('/following/:address', async (req, res) => {
     try {
         let address = req.params["address"];
-        let fromAddress = getHomePubkey(req);
+        let fromAddress = getHomeDefault(req);
         let [decorate, decorateExtra] = decorateOptUI(req)
         let following = await query.getFollowing(address, fromAddress, decorate, decorateExtra);
         res.render('following', {
@@ -1226,31 +1248,21 @@ app.get('/following/:address', async (req, res) => {
     }
 })
 
-app.get('/account/:address', async (req, res) => {
+app.get('/home', async (req, res) => {
     try {
-        let fromAddress = getHomePubkey(req);
-        let address = req.params["address"];
-        let [decorate, decorateExtra] = decorateOptUI(req, "account")
+        let addresses = getHomeAddresses(req);
         let [requestedChainID, id] = getHostChain(req);
         let chainList = chainFilterOptUI(req)
-
-        let maxLimit = 1000;
-        let hardLimit = 100000; // 100x [above this it takes too long] -- users should use date ranges to filter
-        let maxRows = (req.query.limit != undefined) ? req.query.limit : maxLimit;
-
-        // console.log(`UI /account/ chainList`, chainList)
-        // console.log(`getHostChain chainID=${requestedChainID}, id=${id}`)
-        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, maxRows, decorate, decorateExtra);
-        res.render('account', {
-            account: account,
+        let accounts = await query.getMultiAccount(addresses, requestedChainID, chainList);
+        res.render('home', {
+            accounts: accounts,
+            addresses: addresses,
             chainInfo: query.getChainInfo(),
-            address: address,
             claimed: false,
             apiUrl: req.path,
-            fromAddress: fromAddress,
             requestedChainID: requestedChainID,
             chainListStr: chainList.join(','),
-            docsSection: "get-account"
+            docsSection: "get-multiaccount"
         });
     } catch (err) {
         if (err instanceof paraTool.NotFoundError) {
@@ -1267,27 +1279,112 @@ app.get('/account/:address', async (req, res) => {
     }
 })
 
-app.get('/address/:address/:chainID?', async (req, res) => {
+app.get('/account/:address', async (req, res) => {
     try {
-        let fromAddress = getHomePubkey(req);
         let address = req.params["address"];
-        let [decorate, decorateExtra] = decorateOptUI(req)
         let [requestedChainID, id] = getHostChain(req);
         let chainList = chainFilterOptUI(req)
-        let maxLimit = 1000;
-        let hardLimit = 100000; // 100x [above this it takes too long] -- users should use date ranges to filter
-        let maxRows = (req.query.limit != undefined) ? req.query.limit : maxLimit;
-        if (maxRows > hardLimit) {
-            maxRows = hardLimit;
+        let addresses = getHomeAddresses(req);
+        let accounts = await query.getMultiAccount([address], requestedChainID, chainList);
+        if (accounts.length == 0) {
+            accounts = [{
+                address,
+                requestedChainAddress: paraTool.getAddress(address, 0),
+                requestedChainPrefix: 0
+            }];
         }
-        let account = await query.getAccountAssetsRealtimeByChain(requestedChainID, address, fromAddress, chainList, maxRows, decorate, decorateExtra);
+        res.render('account', {
+            account: accounts[0],
+            chainInfo: query.getChainInfo(),
+            address: address,
+            addresses: addresses,
+            apiUrl: req.path,
+            requestedChainID: requestedChainID,
+            chainListStr: chainList.join(','),
+            docsSection: "get-account"
+        });
+        /*} else {
+                res.render('notfound', {
+                    recordtype: "account",
+                    chainInfo: query.getChainInfo()
+                });
+            } */
+    } catch (err) {
+        res.render('error', {
+            chainInfo: query.getChainInfo(),
+            err: err
+        });
+
+    }
+})
+
+app.get('/address/:address/:chainID?', async (req, res) => {
+    try {
+        let address = req.params["address"];
+        let [requestedChainID, id] = getHostChain(req);
+        let chainID = req.params["chainID"] ? req.params["chainID"] : null;
+        if (chainID == null && requestedChainID > 10) {
+            chainID = requestedChainID;
+        }
+        let chainList = [];
+        let [account, contract] = await query.getAddressContract(address, chainID);
         res.render('address', {
             account: account,
+            contract: contract,
             chainInfo: query.getChainInfo(),
             address: address,
             claimed: false,
             apiUrl: req.path,
-            fromAddress: fromAddress,
+            requestedChainID: requestedChainID,
+            chainListStr: chainList.join(','),
+            docsSection: "get-account"
+        });
+    } catch (err) {
+        console.log(err)
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "account",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+app.get('/token/:address/:chainID?', async (req, res) => {
+    let accounts = [];
+    let addresses = getHomeAddresses(req);
+    try {
+        if (addresses) {
+            accounts = await query.getMultiAccount(addresses);
+        }
+    } catch (e) {
+        // errors should not matter
+    }
+
+    try {
+        let address = req.params["address"];
+        let [requestedChainID, id] = getHostChain(req);
+        let chainID = req.params["chainID"] ? req.params["chainID"] : null;
+        if (chainID == null && requestedChainID > 10) {
+            chainID = requestedChainID;
+        }
+        let chainList = [];
+        let [account, contract] = await query.getAddressContract(address, chainID);
+        if (contract && contract.chainID) chainID = contract.chainID;
+        res.render('token', {
+            account: account,
+            chainID: chainID,
+            accounts: accounts,
+            contract: contract,
+            chainInfo: query.getChainInfo(),
+            address: address,
+            claimed: false,
+            apiUrl: req.path,
             requestedChainID: requestedChainID,
             chainListStr: chainList.join(','),
             docsSection: "get-account"
@@ -1313,11 +1410,11 @@ app.get('/address/:address/:chainID?', async (req, res) => {
 // (c) "XCM Transfer" button on each line which enables the user to move their assets from one chain to the other.
 // Any chain-specific asset links to /asset/:chainID/:assetOrCurrencyID.  Any chain mention links to /chain/:chainID_or_chainName#xcmassets
 app.get('/symbol/:symbol', async (req, res) => {
-    let account = {};
-    let homePubkey = getHomePubkey(req);
+    let accounts = [];
+    let addresses = getHomeAddresses(req);
     try {
-        if (homePubkey) {
-            account = await query.getAccountAssetsRealtimeByChain(null, homePubkey);
+        if (addresses) {
+            accounts = await query.getMultiAccount(addresses);
         }
     } catch (e) {
         // errors should not matter
@@ -1329,8 +1426,8 @@ app.get('/symbol/:symbol', async (req, res) => {
         res.render('symbol', {
             symbol: symbol,
             chainInfo: query.getChainInfo(),
-            address: homePubkey,
-            account: account,
+            addresses: addresses,
+            accounts: accounts,
             chains: chains,
             apiUrl: req.path,
             docsSection: "get-symbol"
@@ -1344,18 +1441,25 @@ app.get('/symbol/:symbol', async (req, res) => {
 
 app.get('/asset/:chainID/:currencyID', async (req, res) => {
     try {
-        let homePubkey = getHomePubkey(req);
+        let addresses = getHomeAddresses(req);
         let chainID = req.params["chainID"];
         let currencyID = decodeURIComponent(req.params["currencyID"]);
-
-        let asset = await query.getAsset(currencyID, chainID, homePubkey);
-
+        let asset = await query.getAsset(currencyID, chainID);
+        let accounts = [];
+        try {
+            if (addresses) {
+                accounts = await query.getMultiAccount(addresses);
+            }
+        } catch (e) {
+            // errors should not matter
+        }
         res.render('asset', {
             asset: asset,
             currencyID: currencyID,
             chainID: chainID,
             chainInfo: query.getChainInfo(),
-            address: homePubkey,
+            addresses: addresses,
+            accounts: accounts,
             apiUrl: req.path,
             docsSection: "get-asset"
         });
@@ -1369,7 +1473,7 @@ app.get('/asset/:chainID/:currencyID', async (req, res) => {
 // Usage: /wasmcontract/0xfa4c7e407f86e24770b9b7b5826457350df83eab1122bb398f4a5a4892ff98cb
 app.get('/wasmcontract/:address/:chainID?', async (req, res) => {
     try {
-        let homePubkey = getHomePubkey(req);
+
         let address = req.params["address"];
         let chainID = req.params["chainID"] ? req.params["chainID"] : null;
         let contract = await query.getWASMContract(address, chainID);
@@ -1484,7 +1588,7 @@ app.get('/xcmmessage/:msgHash/:blockNumber?', async (req, res) => {
     } catch (err) {
         if (err instanceof paraTool.NotFoundError) {
             res.render('notfound', {
-                recordtype: "transaction",
+                recordtype: "XCM message",
                 chainInfo: query.getChainInfo()
             });
         } else {

@@ -42,7 +42,7 @@ function showchains() {
 		    }
                 } else {
                     if ( type == 'display' ) {
-			return str;
+			return presentTokenCount(0) + " " + str + " (-)";
 		    } else {
 			return 0;
 		    }
@@ -113,30 +113,6 @@ function showchains() {
     table.draw();
 }
 
-function get_accountState(asset, chainID, assetChain) {
-    if ( ! account ) return [null, null];
-    if ( account.chains == undefined ) return [null, null];
-    try {
-    for ( let i = 0; i < account.chains.length; i++ ) {
-	let c = account.chains[i];
-	if ( c.chainID == chainID ) {
-	    for (let j= 0; j < c.assets.length; j++) {
-		let a = c.assets[j];
-		if ( a.asset == asset ) {
-		    let state = a.state;
-		    let balanceUSD = state.balanceUSD;
-
-		    return [state, balanceUSD];
-		}
-	    }
-	}
-    }
-    } catch (err) {
-	console.log(err);
-    }
-    return [null, null];
-}
-
 
 function showsymboltab(hash) {
     switch (hash) {
@@ -169,7 +145,6 @@ function setuptabs(tabs, symbol) {
     }
     const triggerEl = document.querySelector('#symbolTab a[href="' + hash + '"]');
     if ( triggerEl ) {
-	console.log(hash, triggerEl);
 	mdb.Tab.getInstance(triggerEl).show();
     }
 }

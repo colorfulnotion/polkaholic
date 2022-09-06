@@ -182,12 +182,14 @@ module.exports = class PolkaholicDB {
         const tableAddressExtrinsic = "addressextrinsic";
         const tableAccountRealtime = "accountrealtime";
         const tableAccountHistory = "accounthistory";
+        const tableEVMTx = "evmtx";
         const tableHashes = "hashes";
         const tableAddress = "address";
         const tableAPIKeys = "apikeys";
         this.instance = bigtable.instance(instanceName);
         this.btAddressExtrinsic = this.instance.table(tableAddressExtrinsic);
         this.btHashes = this.instance.table(tableHashes);
+        this.btEVMTx = this.instance.table(tableEVMTx);
         this.btAccountRealtime = this.instance.table(tableAccountRealtime);
         this.btAccountHistory = this.instance.table(tableAccountHistory);
         this.btAPIKeys = this.instance.table(tableAPIKeys);
@@ -1104,6 +1106,7 @@ from chain where chainID = '${chainID}' limit 1`);
             families.push("receiptsevm");
             families.push("traceevm");
             families.push("feedevm");
+            families.push("traceevm");
         }
         const filter = {
             filter: [{

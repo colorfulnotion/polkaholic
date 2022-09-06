@@ -465,13 +465,18 @@ function presentAsset(asset) {
     let chainID = asset.chainID;
     let asset0 = asset.asset;
     let symbol = asset.symbol;
-    console.log("presentAsset", asset);
     return `<a href="/symbol/${symbol}">` + symbol + '</a>';
 }
 
 function presentAssetPair(row) {
-    let assetPair = row.symbol + ":" + asset0.substring(0, 6) + "/" + asset1.substring(0, 6);
-    return `<a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token0) + '">' + row.token0Symbol + `</a> / <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token1) + '">' + row.token1Symbol + '</a>';
+    try {
+        let asset0 = row.token0
+        let asset1 = row.token1
+        let assetPair = `<a href='/token/${row.asset}/${row.chainID}'>${row.symbol}</a>`
+        return `${assetPair}: <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token0) + '">' + row.token0Symbol + `</a> / <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token1) + '">' + row.token1Symbol + '</a>';
+    } catch (e) {
+        console.log("presentAssetPair", row);
+    }
 }
 
 function presentID(id) {
@@ -822,16 +827,6 @@ function presentNumber(a) {
     return (a.toString());
 }
 
-
-// wallet functions
-function showWalletModal() {
-    $('#walletModal').modal('show');
-}
-
-function hideWalletModal() {
-    $('#walletModal').modal('hide');
-}
-
 function getPubkey(account) {
     try {
         let pubkey = polkadotKeyring.decodeAddress(account.address);
@@ -864,18 +859,6 @@ function setCookie(cname, cvalue, exdays) {
     document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;domain=polkaholic.io";
 }
 
-function clearWallet() {
-    try {
-        console.log("clearWallet START");
-        setCookie("homeName", "", 3650);
-        setCookie("homeAcct", "", 3650);
-        setCookie("homePub", "", 3650);
-        document.getElementById('identicon').style.visibility = false;
-        showWalletHome();
-    } catch (e) {
-        console.log("clearWallet FAIL!!!", e);
-    }
-}
 
 function setConsent(consent) {
     try {
@@ -892,46 +875,15 @@ function setConsent(consent) {
     }
 }
 
-function setWalletHome(name, addr, pubkey) {
-    try {
-        setCookie("homeName", name, 3650);
-        setCookie("homeAcct", addr, 3650);
-        setCookie("homePub", pubkey, 3650);
-        showWalletHome();
-    } catch (e) {
-        console.log("setWalletHome", e);
-    }
-}
-
-function getWalletHome() {
-    let homeName = getCookie('homeName');
-    let homeAcct = getCookie('homeAcct');
-    return [homeName, homeAcct];
-}
 
 function home() {
     let [homeName, homeAcct] = getWalletHome();
 
     if (homeAcct != undefined && homeAcct.length > 0) {
-        window.location.href = "/account/" + homeAcct;
+        window.location.href = "/home/";
     } else {
         //showWalletModal();
         selectWalletAccount();
-    }
-}
-
-function showWalletHome() {
-    let [homeName, homeAcct] = getWalletHome();
-    if (homeAcct != "") {
-        //document.getElementById('walletHome').innerHTML = homeName + ":" + homeAcct.substring(0, 6) + "...";
-        document.getElementById('walletHome').innerHTML = `${homeName} `;
-        if (homeAcct.length > 10) {
-            document.getElementById('identicon').style.visibility = 'visible';
-            document.getElementById('identicon').src = "/identicon/" + homeAcct;
-        }
-    } else {
-        document.getElementById('walletHome').innerHTML = "-Connect Wallet-";
-        document.getElementById('identicon').style.visibility = 'hidden';
     }
 }
 
@@ -1473,4 +1425,42 @@ function presentWASMCodeHash(codeHash) {
 
 function presentWASMContract(contractAddress) {
     return `<a href='/wasmcontract/${contractAddress}'>` + getShortHash(contractAddress) + `</a>`
+}
+
+function presentStack(s) {
+    let out = s.map((x, idx) => {
+        return (idx > 0) ? "1" : "0"
+    })
+    return "call " + out.join("_");
+}
+
+function get_accountState(asset, chainID, assetChain) {
+    if (!accounts) return [null, null];
+    let balanceUSD = 0;
+    let state = {
+        free: 0
+    };
+    try {
+        for (const account of accounts) {
+            if (account.chains) {
+                for (let i = 0; i < account.chains.length; i++) {
+                    let c = account.chains[i];
+                    if (c.chainID == chainID) {
+                        for (let j = 0; j < c.assets.length; j++) {
+                            let a = c.assets[j];
+                            if (a.asset == asset) {
+                                state.free += a.state.free;
+                                balanceUSD += (a.state.balanceUSD) ? a.state.balanceUSD : 0;
+                                //console.log("balanceadd", chainID, balanceUSD, a);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return [state, balanceUSD];
+    } catch (err) {
+        console.log(err);
+    }
+    return [null, null];
 }

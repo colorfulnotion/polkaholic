@@ -562,7 +562,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
     }
 
     async init_asset_info() {
-        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.asset, asset.symbol, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.chainName, asset.isUSD, priceUSDpaths, asset.routeDisabled, nativeAssetChain, currencyID from asset, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow') order by chainID, assetType, asset");
+        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.totalSupply, asset.asset, asset.symbol, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.id, chain.chainName, asset.isUSD, asset.priceUSD, asset.priceUSDPercentChange, priceUSDpaths, asset.routeDisabled, nativeAssetChain, currencyID from asset, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow') order by chainID, assetType, asset");
 
         let nassets = 0;
         let assetInfo = {};
@@ -579,6 +579,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     assetType: v.assetType,
                     assetName: v.assetName,
                     numHolders: v.numHolders,
+                    totalSupply: v.totalSupply,
                     asset: vAsset,
                     symbol: v.symbol,
                     decimals: v.decimals,
@@ -589,9 +590,12 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     token1Symbol: v.token1Symbol,
                     token1Decimals: v.token1Decimals,
                     chainID: v.chainID,
+                    id: v.id,
                     chainName: v.chainName,
                     assetChain: assetChain,
                     isUSD: v.isUSD,
+                    priceUSD: v.priceUSD,
+                    priceUSDPercentChange: v.priceUSDPercentChange,
                     priceUSDpaths: priceUSDpaths,
                     nativeAssetChain: v.nativeAssetChain,
                     routeDisabled: v.routeDisabled
@@ -602,13 +606,17 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     assetType: v.assetType,
                     assetName: v.assetName,
                     numHolders: v.numHolders,
+                    totalSupply: v.totalSupply,
                     asset: vAsset,
                     symbol: v.symbol,
                     decimals: v.decimals,
                     chainID: v.chainID,
+                    id: v.id,
                     chainName: v.chainName,
                     assetChain: assetChain,
                     isUSD: v.isUSD,
+                    priceUSD: v.priceUSD,
+                    priceUSDPercentChange: v.priceUSDPercentChange,
                     priceUSDpaths: priceUSDpaths,
                     nativeAssetChain: v.nativeAssetChain,
                     routeDisabled: v.routeDisabled
@@ -1076,7 +1084,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                 let x1 = dexRec.lp1 / issuance;
                 let priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
                 let priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeERC20LiquidityPair returned`, "priceUSD0", priceUSD0, "priceUSD1", priceUSD1, "issuance", issuance, "x0", x0, "x1", x1, "p0", p0, "p1", p1, "priceUSD", priceUSD);
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`assetTypeERC20LiquidityPair returned`, "priceUSD0", priceUSD0, "priceUSD1", priceUSD1, "issuance", issuance, "x0", x0, "x1", x1, "priceUSD", priceUSD);
                 return [val * priceUSD, priceUSD, priceUSDCurrent];
             }
             break;
@@ -1194,7 +1202,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     }
                 } else {
                     //if (this.debugLevel >= paraTool.debugTracing)
-                    console.log("getTokenPriceUSD - MISSING route", r.route, "ts", ts, "asset", asset, "assetChain", assetChain, "assetInfo", assetInfo);
+                    console.log("getTokenPriceUSD - MISSING route", r.route, "ts", ts, "asset", asset, "assetChain", assetChain, "assetInfo", assetInfo, "priceUSDpath", priceUSDpath);
                 }
             }
         }

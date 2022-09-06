@@ -632,11 +632,19 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                 } else {
-                    res.push({
-                        link: "/account/" + addr,
-                        text: addr,
-                        description: "Address"
-                    })
+                    if (addr.length == 42) {
+                        res.push({
+                            link: "/address/" + addr,
+                            text: addr,
+                            description: "Address"
+                        })
+                    } else {
+                        res.push({
+                            link: "/account/" + addr,
+                            text: addr,
+                            description: "Address"
+                        })
+                    }
                 }
             });
         } catch (err) {
@@ -885,7 +893,6 @@ module.exports = class Query extends AssetManager {
                             const cell = data.tx[0];
                             let c = JSON.parse(cell.value);
                             if (c.gasLimit != undefined) {
-                                console.log("CELL", c);
                                 if (this.is_evm_xcmtransfer_input(c.input)) {
                                     let substrateTXHash = c.substrate.extrinsicHash;
                                     let substratetx = await this.getTransaction(substrateTXHash);
@@ -1057,7 +1064,7 @@ module.exports = class Query extends AssetManager {
         let address = filters.address ? filters.address : null;
         let out = [];
         try {
-            let w = address ? `and fromAddress = '${address}'` : "";
+            let w = address ? `and ( fromAddress = '${address}' or destAddress = '${address}' )` : "";
             if (blockNumber) {
                 w += ` and blockNumber = '${parseInt(blockNumber, 10)}'`
             }
@@ -1065,7 +1072,9 @@ module.exports = class Query extends AssetManager {
             if (chainList.length > 0) {
                 chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
             }
-            let xcmtransfers = await this.poolREADONLY.query(`select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, xcmInteriorKey, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(asset) > 3 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`);
+	    let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, xcmInteriorKey, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(asset) > 3 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`
+            let xcmtransfers = await this.poolREADONLY.query(sql);
+	    console.log(filters, xcmtransfers, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
                 let x = xcmtransfers[i];
                 x.asset = this.trimquote(x.asset); // temporary hack
@@ -1338,6 +1347,20 @@ module.exports = class Query extends AssetManager {
 
                     c.result = c.status // this is success/fail indicator of the evm tx
                     c.status = status // finalized/unfinalized
+
+                    // decorate transactionsInternal
+                    if (c.transactionsInternal !== undefined && c.transactionsInternal.length > 0) {
+                        for (let i = 0; i < c.transactionsInternal.length; i++) {
+                            let t = c.transactionsInternal[i];
+                            t.valueRaw = t.value;
+                            t.value = t.valueRaw / 10 ** this.getChainDecimal(c.chainID);
+                            if (decorateUSD) {
+                                t.valueUSD = c.priceUSD * t.value;
+                                t.priceUSD = c.priceUSD;
+                                t.priceUSDCurrent = c.priceUSDCurrent;
+                            }
+                        }
+                    }
                     // decorate transfers
                     if (c.transfers !== undefined && c.transfers.length > 0) {
                         for (let i = 0; i < c.transfers.length; i++) {
@@ -1348,7 +1371,6 @@ module.exports = class Query extends AssetManager {
                                 t.assetInfo = this.assetInfo[tokenAssetChain];
                                 if (t.assetInfo.decimals !== false) {
                                     t.value = t.value / 10 ** t.assetInfo.decimals;
-                                    //await this.decorateUSD(t, "value", tokenAsset, c.chainID, cTimestamp, decorateUSD)
                                     if (decorateUSD) {
                                         let [valueUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(t.value, tokenAsset, c.chainID, cTimestamp);
                                         t.valueUSD = valueUSD;
@@ -1660,7 +1682,7 @@ module.exports = class Query extends AssetManager {
 
     }
 
-    async getAsset(currencyID, chainID, address = false) {
+    async getAsset(currencyID, chainID) {
         try {
             let assets = await this.poolREADONLY.query(`select asset.asset, asset.chainID, asset.assetType, asset.decimals, assetName, asset.symbol as localSymbol, asset.currencyID, asset.xcContractAddress, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.chainID = '${chainID}' and ( asset.currencyID = '${currencyID}' or asset.asset = '${currencyID}' ) order by asset.numHolders desc limit 1`);
             if (assets.length == 0) {
@@ -1702,7 +1724,7 @@ module.exports = class Query extends AssetManager {
         return (undefined);
     }
 
-    async getAssetsRelated(chainID, asset, address = false, limit = 100) {
+    async getAssetsRelated(chainID, asset, limit = 100) {
         let assetChain = paraTool.makeAssetChain(asset, chainID);
         if (this.assetInfo[assetChain] == undefined) {
             throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
@@ -1716,23 +1738,8 @@ module.exports = class Query extends AssetManager {
             }
             for (const assetChainRelated of Object.keys(this.assetInfo)) {
                 let assetInfoRelated = this.assetInfo[assetChainRelated];
-                if (assetInfoRelated.token0 == asset || assetInfoRelated.token1 == asset) {
+                if ((assetInfoRelated.token0 == asset) || (assetInfoRelated.token1 == asset) || (assetInfoRelated.currencyID == asset)) {
                     assets.push(assetInfoRelated);
-                }
-            }
-
-            let holdings = (address) ? await this.getRealtimeAsset(address) : false;
-            for (let i = 0; i < assets.length; i++) {
-                let a = assets[i];
-                let assetType = (a.assetType) ? a.assetType : false;
-                if (holdings[assetType] !== undefined) {
-                    let h = holdings[assetType];
-                    for (let j = 0; j < h.length; j++) {
-                        let b = h[j];
-                        if ((b.assetInfo.asset == a.asset) && (b.assetInfo.chainID == a.chainID)) {
-                            a.accountState = b.state;
-                        }
-                    }
                 }
             }
         } catch (err) {
@@ -2008,7 +2015,20 @@ module.exports = class Query extends AssetManager {
 
             block.specVersion = this.getSpecVersionForBlockNumber(chainID, block.number);
             if (evmBlock) {
+                if (evmBlock.transactionsInternal !== undefined && evmBlock.transactionsInternal.length > 0) {
+                    for (let i = 0; i < evmBlock.transactionsInternal.length; i++) {
+                        let t = evmBlock.transactionsInternal[i];
+                        t.valueRaw = t.value;
+                        t.value = t.valueRaw / 10 ** this.getChainDecimal(chainID);
+                        if (decorateUSD) {
+                            /*t.valueUSD = c.priceUSD * t.value;
+                            t.priceUSD = c.priceUSD;
+                            t.priceUSDCurrent = c.priceUSDCurrent;*/
+                        }
+                    }
+                }
                 block.evmBlock = evmBlock
+                // decorate transactionsInternal
             }
         } catch (err) {
             this.logger.error({
@@ -2295,7 +2315,6 @@ module.exports = class Query extends AssetManager {
         return out;
     }
 
-
     async get_account_extrinsics_unfinalized(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let feedItems = 0;
@@ -2367,9 +2386,15 @@ module.exports = class Query extends AssetManager {
         if (rows && rows.length > 0) {
             for (const row of rows) {
                 let rowData = row.data
-                if (rowData["feed"]) {
+
+                if (rowData["feed"] || (rowData["feedto"])) {
                     let [addressPiece, ts, extrinsicHashPiece] = paraTool.parse_addressExtrinsic_rowKey(row.id)
-                    let extrinsics = rowData["feed"];
+                    let extrinsics = null;
+                    if (rowData["feed"]) {
+                        extrinsics = rowData["feed"];
+                    } else if (rowData["feedto"]) {
+                        extrinsics = rowData["feedto"];
+                    }
                     if (pTS != ts) {
                         p = 0;
                         pTS = ts;
@@ -2405,6 +2430,8 @@ module.exports = class Query extends AssetManager {
                                         c.assetInfo = this.assetInfo[assetChain];
                                     }
                                 }
+                                let [_, id] = this.convertChainID(c.chainID)
+                                c.id = id;
                                 c.chainName = this.getChainName(c.chainID)
                                 let cTimestamp = c.timestamp
                                 let chainAsset = this.getChainAsset(c.chainID)
@@ -2481,7 +2508,6 @@ module.exports = class Query extends AssetManager {
                                     // skip this until hitting pageIndex
                                     p++;
                                 } else if (feedItems < maxRows) {
-                                    console.log("INCLUDING", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
                                     p++;
                                     let d = await this.decorateExtrinsic(t, t.chainID, "", decorate, decorateExtra)
                                     decoratedFeeds.push(d)
@@ -2587,6 +2613,86 @@ module.exports = class Query extends AssetManager {
             nextPage: null
         }
     }
+
+    async get_account_evmtransfers(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"], TSStart = null, pageIndex = 0) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        let feedTransfer = [];
+        let feedTransferItems = 0;
+        let p = 0;
+        let pTS = null;
+        let prevKey = false;
+        if (rows && rows.length > 0) {
+            for (const row of rows) {
+                let rowData = row.data
+                if (rowData["feedevmtransfer"]) {
+                    let [accKey, ts, transactionHash] = paraTool.parse_addressExtrinsic_rowKey(row.id)
+                    let transactionsTransfer = rowData["feedevmtransfer"];
+                    if (pTS != ts) {
+                        p = 0;
+                        pTS = ts;
+                    }
+                    //transfer:extrinsicHash [rows]
+                    //tranfers:extrinsicHash#eventID
+                    //tranfers:0x0804ea6287afaf070b7717505770da790785b0b36d34529d51b5c9670ea49cb5#5-324497-0-0 @ 2022/02/01-16:47:48.000000
+
+                    //for each feedevmtransfer:extrinsicHash row, cell come in reverse order
+                    for (const transactionHashEventID of Object.keys(transactionsTransfer).reverse()) {
+                        //console.log(`extrinsicsTransfer[${extrinsicHashEventID}] length=${extrinsicsTransferCells.length}`)
+                        for (const cell of transactionsTransfer[transactionHashEventID]) {
+                            try {
+                                let transactionHash = transactionHashEventID.split('#')[0]
+                                let eventID = transactionHashEventID.split('#')[1]
+                                var t = JSON.parse(cell.value);
+                                if (!this.chainFilters(chainList, t.chainID)) {
+                                    //filter non-specified records .. do not decorate
+                                    continue
+                                }
+                                t['transactionHash'] = transactionHash;
+                                t['blockNumber'] = parseInt(t.blockNumber, 10);
+                                t['chainID'] = parseInt(t.chainID, 10);
+                                t['chainName'] = this.getChainName(t["chainID"]);
+
+                                let [__, id] = this.convertChainID(t.chainID);
+                                t['id'] = id
+                                if (t.ts) t['ts'] = parseInt(t.ts, 10);
+
+                                let tt = await this.decorateQueryFeedEVMTransfer(t, t.chainID, decorate, decorateExtra)
+                                let currKey = `${transactionHash}|${t.from}|${t.to}|${t.value}` // it's probably "safe" to check without asset type here.
+                                if (currKey == prevKey) {
+                                    console.log(`skip duplicate [${tt.eventID}] (${currKey})`)
+                                } else if (TSStart && (t['ts'] == TSStart) && (p < pageIndex)) {
+                                    console.log("SKIPPING (p<pageIndex)", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    // skip this until hitting pageIndex
+                                    p++;
+                                } else if (feedTransferItems < maxRows) {
+                                    console.log("INCLUDING", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    p++;
+                                    feedTransfer.push(tt);
+                                    feedTransferItems++;
+                                } else if (feedTransferItems == maxRows) {
+                                    return {
+                                        data: feedTransfer,
+                                        nextPage: `/account/evmtransfers/${address}?` + this.page_params(ts, maxRows, p, chainList, decorate, decorateExtra)
+                                    }
+                                }
+                                console.log("prevkey SET", currKey);
+                                prevKey = currKey
+                            } catch (err) {
+                                // bad data
+                                console.log(err);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return {
+            data: feedTransfer,
+            nextPage: null
+        }
+    }
+
 
     // column: link
     // cell value: { title, description, metadata, linktype }
@@ -2714,188 +2820,215 @@ module.exports = class Query extends AssetManager {
         return (related)
     }
 
-    async getAccountAssetsRealtimeByChain(requestedChainID, rawAddress, rawFromAddress, chainList = [], maxRows = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
-        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let fromAddress = paraTool.getPubKey(rawFromAddress) // observer
-        let address = paraTool.getPubKey(rawAddress)
-        let isEVMAddr = paraTool.isValidEVMAddress(address)
-
-        let assets = null;
+    async getMultiAccount(rawAddresses, requestedChainID = 0, chainList = []) {
+        let addresses = []
+        for (let i = 0; i < rawAddresses.length; i++) {
+            let x = paraTool.getPubKey(rawAddresses[i]);
+            if (x) addresses.push(x);
+        }
+        let accounts = [];
+        if (addresses.length == 0) return (accounts);
         try {
-            assets = await this.getAccount(address, "realtime", chainList, maxRows);
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            const filter = [{
+                column: {
+                    cellLimit: 1
+                },
+                families: ["realtime", "evmcontract", "wasmcontract"],
+                limit: 10,
+            }];
+
+            let [rows] = await tblRealtime.getRows({
+                keys: addresses,
+                filter
+            });
+
+
+            for (const row of rows) {
+                let address = row.id;
+                let rowData = row.data;
+                let isEVMAddr = paraTool.isValidEVMAddress(address)
+                let [assets, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], chainList)
+                let chainsMap = {};
+                for (let i = 0; i < assets.length; i++) {
+                    let a = assets[i];
+                    let chainID = a.assetInfo.chainID;
+                    if (chainsMap[chainID] == undefined) {
+                        let chainInfo = this.chainInfos[chainID];
+                        var id, chainName, ss58Format, ss58Address, iconUrl, subscanURL, dappURL, WSEndpoint;
+                        if (chainInfo !== undefined) {
+                            chainName = this.getChainName(chainID);
+                            id = chainInfo.id;
+                            ss58Format = this.chainInfos[chainID].ss58Format;
+                            ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
+                            iconUrl = this.chainInfos[chainID].iconUrl;
+                            subscanURL = this.chainInfos[chainID].subscanURL;
+                            dappURL = this.chainInfos[chainID].dappURL;
+                            WSEndpoint = this.chainInfos[chainID].WSEndpoint;
+                        }
+                        chainsMap[chainID] = {
+                            chainID,
+                            chainName,
+                            id,
+                            ss58Format,
+                            ss58Address,
+                            iconUrl,
+                            subscanURL,
+                            dappURL,
+                            WSEndpoint,
+                            assets: [],
+                            balanceUSD: 0
+                        };
+                    }
+                    let o = a.assetInfo;
+                    o.state = a.state;
+                    chainsMap[a.assetInfo.chainID].assets.push(o);
+                }
+
+                // if we didn't get any assets at all for the requestedChainID, synthesize a 0 asset record so that the user can see it
+                if (chainsMap[requestedChainID] == undefined && this.chainInfos[requestedChainID] != undefined) {
+                    let chainInfo = this.chainInfos[requestedChainID];
+                    let chainName = this.getChainName(requestedChainID);
+                    let id = chainInfo.id;
+                    let ss58Format = chainInfo.ss58Format;
+                    let ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
+                    let iconUrl = chainInfo.iconUrl;
+                    let zeroAssets = [];
+                    chainsMap[requestedChainID] = {
+                        chainID: requestedChainID,
+                        chainName,
+                        id,
+                        ss58Format,
+                        ss58Address,
+                        iconUrl,
+                        assets: zeroAssets,
+                        balanceUSD: 0
+                    }
+                }
+                // turn chainsMap into chains array, and compute balanceUSD
+                let chains = [];
+                let balanceUSD = 0;
+                for (const chainID of Object.keys(chainsMap)) {
+                    let chain = chainsMap[chainID];
+                    let chainBalanceUSD = 0;
+                    for (let j = 0; j < chain.assets.length; j++) {
+                        let a = chain.assets[j];
+                        if (a.state.balanceUSD !== undefined) {
+                            chainBalanceUSD += a.state.balanceUSD;
+                        }
+                    }
+                    chain.assets.sort(function(a, b) {
+                        let bBalance = (b.state.balanceUSD !== undefined) ? b.state.balanceUSD : 0;
+                        let aBalance = (a.state.balanceUSD !== undefined) ? a.state.balanceUSD : 0;
+                        if (aBalance != bBalance) {
+                            return (bBalance - aBalance);
+                        }
+                        let bFree = b.state.free !== undefined ? b.state.free : 0;
+                        let aFree = a.state.free !== undefined ? a.state.free : 0;
+                        if (aFree != bFree) {
+                            return (bFree - aFree);
+                        }
+                        return 0;
+                    })
+                    chain.balanceUSD = chainBalanceUSD;
+                    balanceUSD += chain.balanceUSD;
+                    chains.push(chain);
+                }
+
+                // check asc vs desc
+                chains.sort(function(a, b) {
+                    if (requestedChainID == a.chainID) {
+                        return -1;
+                    }
+                    if (requestedChainID == b.chainID) {
+                        return 1;
+                    }
+                    let bBalance = b.balanceUSD;
+                    let aBalance = a.balanceUSD;
+                    if (aBalance != bBalance) {
+                        return (bBalance - aBalance);
+                    }
+                    let bAssets = b.assets.length;
+                    let aAssets = a.assets.length;
+                    if (aAssets != bAssets) {
+                        return (bAssets - aAssets);
+                    }
+                    return (a.chainID - b.chainID);
+                })
+
+
+                let requestedChainPrefix = null;
+                if (requestedChainID) {
+                    requestedChainPrefix = this.getChainPrefix(requestedChainID);
+                } else if (chains.length > 0) {
+                    requestedChainPrefix = chains[0].ss58Format;
+                } else {
+                    requestedChainPrefix = 0;
+                }
+                let requestedChainAddress = isEVMAddr ? address : paraTool.getAddress(address, requestedChainPrefix)
+                let account = {
+                    address,
+                    requestedChainAddress,
+                    requestedChainPrefix,
+                    balanceUSD,
+                    chains,
+                    numFollowing: 0,
+                    numFollowers: 0,
+                    isFollowing: false,
+                    nickname: null,
+                    info: null,
+                    judgements: null,
+                    infoKSM: null,
+                    judgementsKSM: null,
+                    related: null
+                }
+
+                let a = this.lookup_account(address);
+                if (a) {
+                    account.nickname = a.nickname;
+                    try {
+                        if (a.parentDisplay != null && a.subName) {
+                            account.subName = `${a.parentDisplay}/${a.subName}`
+                            account.parent = a.parent
+                        } else if (a.parentDisplayKSM != null && a.subNameKSM) {
+                            account.subName = `${a.parentDisplayKSM}/${a.subNameKSM}`
+                            account.parent = a.parentKSM
+                        } else {
+                            account.subName = null;
+                        }
+                        account.info = (a.info != null) ? a.info : null;
+                        account.judgements = (a.judgements != null) ? a.judgements : null;
+                        account.infoKSM = (a.infoKSM != null) ? a.infoKSM : null;
+                        account.judgementsKSM = (a.judgementsKSM != null) ? a.judgementsKSM : null;
+                        account.related = (a.related != null) ? a.related : null;
+                    } catch (e) {
+                        console.log(e)
+                    }
+                    account.numFollowers = a.numFollowers;
+                    account.numFollowing = a.numFollowing;
+                    /*
+		    if (account.numFollowers > 0 && fromAddress) {
+			let sql2 = `select isFollowing, followDT from follow where fromAddress = '${fromAddress}' and toAddress = '${address}'`
+			let follows = await this.poolREADONLY.query(sql2);
+			if (follows.length > 0) {
+			    account.isFollowing = true;
+			}
+		    } */
+                }
+
+                accounts.push(account);
+            }
         } catch (err) {
-            console.log("getAccountAssetsRealtimeByChain", err);
+            console.log("getMultiAccount", err);
             throw err;
         }
 
-        let chainsMap = {};
-        for (let i = 0; i < assets.length; i++) {
-            let a = assets[i];
-            let chainID = a.assetInfo.chainID;
-            if (chainsMap[chainID] == undefined) {
-                let chainInfo = this.chainInfos[chainID];
-                var id, chainName, ss58Format, ss58Address, iconUrl, subscanURL, dappURL, WSEndpoint;
-                if (chainInfo !== undefined) {
-                    chainName = this.getChainName(chainID);
-                    id = chainInfo.id;
-                    ss58Format = this.chainInfos[chainID].ss58Format;
-                    ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
-                    iconUrl = this.chainInfos[chainID].iconUrl;
-                    subscanURL = this.chainInfos[chainID].subscanURL;
-                    dappURL = this.chainInfos[chainID].dappURL;
-                    WSEndpoint = this.chainInfos[chainID].WSEndpoint;
-                }
-                chainsMap[chainID] = {
-                    chainID,
-                    chainName,
-                    id,
-                    ss58Format,
-                    ss58Address,
-                    iconUrl,
-                    subscanURL,
-                    dappURL,
-                    WSEndpoint,
-                    assets: [],
-                    balanceUSD: 0
-                };
-            }
-            let o = a.assetInfo;
-            o.state = a.state;
-            chainsMap[a.assetInfo.chainID].assets.push(o);
-        }
-        // if we didn't get any assets at all for the requestedChainID, synthesize a 0 asset record so that the user can see it
-        if (chainsMap[requestedChainID] == undefined && this.chainInfos[requestedChainID] != undefined) {
-            let chainInfo = this.chainInfos[requestedChainID];
-            let chainName = this.getChainName(requestedChainID);
-            let id = chainInfo.id;
-            let ss58Format = chainInfo.ss58Format;
-            let ss58Address = isEVMAddr ? false : paraTool.getAddress(address, ss58Format);
-            let iconUrl = chainInfo.iconUrl;
-            let zeroAssets = [];
-            chainsMap[requestedChainID] = {
-                chainID: requestedChainID,
-                chainName,
-                id,
-                ss58Format,
-                ss58Address,
-                iconUrl,
-                assets: zeroAssets,
-                balanceUSD: 0
-            }
-        }
-        // turn chainsMap into chains array, and compute balanceUSD
-        let chains = [];
-        let balanceUSD = 0;
-        for (const chainID of Object.keys(chainsMap)) {
-            let chain = chainsMap[chainID];
-            let chainBalanceUSD = 0;
-            for (let j = 0; j < chain.assets.length; j++) {
-                let a = chain.assets[j];
-                if (a.state.balanceUSD !== undefined) {
-                    chainBalanceUSD += a.state.balanceUSD;
-                }
-            }
-            chain.assets.sort(function(a, b) {
-                let bBalance = (b.state.balanceUSD !== undefined) ? b.state.balanceUSD : 0;
-                let aBalance = (a.state.balanceUSD !== undefined) ? a.state.balanceUSD : 0;
-                if (aBalance != bBalance) {
-                    return (bBalance - aBalance);
-                }
-                let bFree = b.state.free !== undefined ? b.state.free : 0;
-                let aFree = a.state.free !== undefined ? a.state.free : 0;
-                if (aFree != bFree) {
-                    return (bFree - aFree);
-                }
-                return 0;
-            })
-            chain.balanceUSD = chainBalanceUSD;
-            balanceUSD += chain.balanceUSD;
-            chains.push(chain);
-        }
-
-        // check asc vs desc
-        chains.sort(function(a, b) {
-            if (requestedChainID == a.chainID) {
-                return -1;
-            }
-            if (requestedChainID == b.chainID) {
-                return 1;
-            }
-            let bBalance = b.balanceUSD;
-            let aBalance = a.balanceUSD;
-            if (aBalance != bBalance) {
-                return (bBalance - aBalance);
-            }
-            let bAssets = b.assets.length;
-            let aAssets = a.assets.length;
-            if (aAssets != bAssets) {
-                return (bAssets - aAssets);
-            }
-            return (a.chainID - b.chainID);
-        })
-
-        let requestedChainPrefix = null;
-        if (requestedChainID) {
-            requestedChainPrefix = this.getChainPrefix(requestedChainID);
-        } else if (chains.length > 0) {
-            requestedChainPrefix = chains[0].ss58Format;
-        } else {
-            requestedChainPrefix = 0;
-        }
-        let requestedChainAddress = isEVMAddr ? address : paraTool.getAddress(address, requestedChainPrefix)
-        let account = {
-            address,
-            requestedChainAddress,
-            requestedChainPrefix,
-            balanceUSD,
-            chains,
-            numFollowing: 0,
-            numFollowers: 0,
-            isFollowing: false,
-            nickname: null,
-            info: null,
-            judgements: null,
-            infoKSM: null,
-            judgementsKSM: null,
-            related: null
-        }
-
-        let a = this.lookup_account(address);
-        if (a) {
-            account.nickname = a.nickname;
-            try {
-                if (a.parentDisplay != null && a.subName) {
-                    account.subName = `${a.parentDisplay}/${a.subName}`
-                    account.parent = a.parent
-                } else if (a.parentDisplayKSM != null && a.subNameKSM) {
-                    account.subName = `${a.parentDisplayKSM}/${a.subNameKSM}`
-                    account.parent = a.parentKSM
-                } else {
-                    account.subName = null;
-                }
-                account.info = (a.info != null) ? a.info : null;
-                account.judgements = (a.judgements != null) ? a.judgements : null;
-                account.infoKSM = (a.infoKSM != null) ? a.infoKSM : null;
-                account.judgementsKSM = (a.judgementsKSM != null) ? a.judgementsKSM : null;
-                account.related = (a.related != null) ? a.related : null;
-            } catch (e) {
-                console.log(e)
-            }
-            account.numFollowers = a.numFollowers;
-            account.numFollowing = a.numFollowing;
-            if (account.numFollowers > 0 && fromAddress) {
-                let sql2 = `select isFollowing, followDT from follow where fromAddress = '${fromAddress}' and toAddress = '${address}'`
-                let follows = await this.poolREADONLY.query(sql2);
-                if (follows.length > 0) {
-                    account.isFollowing = true;
-                }
-            }
-        }
-        return (account);
+        return (accounts);
     }
 
-    async get_account_realtime(address, realtimeData, chainList = []) {
+    async get_account_realtime(address, realtimeData, evmcontractData, wasmcontractData, chainList = []) {
         let realtime = {};
+        let contract = null;
         if (realtimeData) {
             let lastCellTS = {};
             for (const assetChainEncoded of Object.keys(realtimeData)) {
@@ -2946,7 +3079,32 @@ module.exports = class Query extends AssetManager {
             }
         }
 
-        return (current);
+        if (evmcontractData) {
+            let lastCellTS = {};
+            for (const chainID of Object.keys(evmcontractData)) {
+                let cells = evmcontractData[chainID];
+                if (!this.chainFilters(chainList, chainID)) {
+                    //filter non-specified records .. do not decorate
+                    continue
+                }
+                contract = JSON.parse(cells[0].value)
+                break;
+            }
+
+        } else if (wasmcontractData) {
+            let lastCellTS = {};
+            for (const chainID of Object.keys(wasmcontractData)) {
+                let cell = wasmcontractData[chainID];
+                if (!this.chainFilters(chainList, chainID)) {
+                    //filter non-specified records .. do not decorate
+                    continue
+                }
+                contract = JSON.parse(cells[0].value)
+                break;
+            }
+            // TODO
+        }
+        return [current, contract];
     }
 
     async get_account_history(address, rows, maxRows = 1000, chainList = [], daily = false) {
@@ -3375,6 +3533,54 @@ module.exports = class Query extends AssetManager {
         return addressTopN;
     }
 
+    async getAddressContract(rawAddress, chainID) {
+        let address = paraTool.getPubKey(rawAddress)
+        if (!this.validAddress(address)) {
+            throw new paraTool.InvalidError(`Invalid address ${address}`)
+        }
+        let families = ["realtime", "evmcontract", "wasmcontract"];
+        let row = false;
+        try {
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            const filter = [{
+                column: {
+                    cellLimit: 1
+                },
+                families: families,
+            }];
+            [row] = await tblRealtime.row(address).get({
+                filter
+            });
+        } catch (err) {
+            console.log(err);
+            this.logger.error({
+                "op": "query.getAddress",
+                address,
+                err
+            });
+            return false;
+        }
+        let rowData = row.data;
+        let [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
+        if (contract) {
+            let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' and asset.chainID = '${contract.chainID}'`
+            let extraRecs = await this.poolREADONLY.query(sql)
+            if (extraRecs.length > 0) {
+                let e = extraRecs[0];
+                var [_, _, priceUSDCurrent] = await this.computeUSD(1.0, e.asset, e.chainID, this.getCurrentTS());
+                contract.assetName = e.assetName;
+                contract.symbol = e.symbol;
+                contract.localSymbol = e.localSymbol;
+                contract.priceUSD = priceUSDCurrent;
+                contract.totalSupply = e.totalSupply;
+                contract.numHolders = e.numHolders;
+                contract.decimals = e.decimals;
+            }
+        }
+        return [realtime, contract];
+    }
+
+
     async getAccount(rawAddress, accountGroup = "realtime", chainList = [], maxRows = 1000, TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"], pageIndex = 0) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let address = paraTool.getPubKey(rawAddress)
@@ -3382,7 +3588,6 @@ module.exports = class Query extends AssetManager {
             throw new paraTool.InvalidError(`Invalid address ${address}`)
         }
         var hrstart = process.hrtime()
-
         // xcmtransfers comes from mysql "xcmtransfer" table
         if (accountGroup == "xcmtransfers") {
             let filters = {
@@ -3422,6 +3627,12 @@ module.exports = class Query extends AssetManager {
                 families.push("feed");
                 TSpagination = true;
                 break;
+            case "evmtxs":
+                tableName = "addressextrinsic"
+                families.push("feed");
+                families.push("feedto"); // tmp column used to easily drop and readd
+                TSpagination = true;
+                break;
             case "unfinalized":
                 tableName = "addressextrinsic"
                 families.push("feed");
@@ -3431,6 +3642,11 @@ module.exports = class Query extends AssetManager {
             case "transfers":
                 tableName = "addressextrinsic"
                 families.push("feedtransfer");
+                TSpagination = true;
+                break;
+            case "evmtransfers":
+                tableName = "addressextrinsic"
+                families.push("feedevmtransfer");
                 TSpagination = true;
                 break;
             case "crowdloans":
@@ -3446,6 +3662,8 @@ module.exports = class Query extends AssetManager {
             case "realtime":
                 tableName = "addressrealtime"
                 families.push("realtime");
+                families.push("evmcontract");
+                families.push("wasmcontract");
                 break;
             case "ss58h160":
                 tableName = "hashes"
@@ -3463,6 +3681,7 @@ module.exports = class Query extends AssetManager {
         if (accountGroup == "balances") {
             maxRows = 1000;
         }
+        console.log(accountGroup, tableName);
         let startRow = address;
         if (TSpagination && (TSStart != null)) {
             startRow = address + "#" + paraTool.inverted_ts_key(TSStart)
@@ -3471,7 +3690,6 @@ module.exports = class Query extends AssetManager {
             let row = false,
                 rows = false
             if (tableName == "addressrealtime") {
-
                 try {
                     let [tblName, tblRealtime] = this.get_btTableRealtime()
                     const filter = [{
@@ -3503,7 +3721,6 @@ module.exports = class Query extends AssetManager {
                     endRow = address + "#" + paraTool.inverted_ts_key(this.currentTS() - 3600 * 2);
                 }
                 try {
-                    console.log("READING addressextrinsic", "startRow=", startRow, "endRow=", endRow, "TSStart=", TSStart)
                     let x = await this.btAddressExtrinsic.getRows({
                         start: startRow,
                         end: endRow,
@@ -3577,14 +3794,15 @@ module.exports = class Query extends AssetManager {
                     });
                 }
             }
-
             switch (accountGroup) {
                 case "realtime":
                     if (row) {
                         let rowData = row.data;
-                        return await this.get_account_realtime(address, rowData["realtime"], chainList)
+                        let [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], chainList)
+                        return realtime;
                     } else {
-                        return await this.get_account_realtime(address, false, chainList)
+                        let [realtime, contract] = await this.get_account_realtime(address, null, null, null, chainList)
+                        return realtime;
                     }
                 case "ss58h160":
                     let relatedData = false
@@ -3595,6 +3813,7 @@ module.exports = class Query extends AssetManager {
                 case "unfinalized":
                     //feed:extrinsicHash#chainID-extrinsicID
                     return await this.get_account_extrinsics_unfinalized(address, rows, maxRows, chainList, decorate, decorateExtra);
+                case "evmtxs":
                 case "extrinsics":
                     //feed:extrinsicHash#chainID-extrinsicID
                     return await this.get_account_extrinsics(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
@@ -3602,6 +3821,9 @@ module.exports = class Query extends AssetManager {
                     // need to also bring in "feedtransferunfinalized" from the same table
                     //feedtransfer:extrinsicHash#eventID
                     return await this.get_account_transfers(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
+                case "evmtransfers":
+                    //feedtransfer:transactionHash#eventID
+                    return await this.get_account_evmtransfers(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
                 case "crowdloans":
                     //feedcrowdloan:extrinsicHash#eventID
                     return await this.get_account_crowdloans(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
@@ -4255,6 +4477,55 @@ module.exports = class Query extends AssetManager {
         dFeedtransfer.decimals = (feedtransfer.decimals != undefined) ? feedtransfer.decimals : null // unknown case
         dFeedtransfer.data = feedtransfer.data
         if (decorateData) dFeedtransfer.decodedData = res
+        return dFeedtransfer
+    }
+
+    async decorateQueryFeedEVMTransfer(feedtransfer, chainID, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        var value = feedtransfer.value
+        var assetSymbol = null;
+        var decimals = null;
+        let dFeedtransfer = {
+            chainID: feedtransfer.chainID,
+            chainName: feedtransfer.chainName,
+            id: feedtransfer.id,
+            blockNumber: feedtransfer.blockNumber,
+            ts: feedtransfer.ts,
+            transactionHash: feedtransfer.transactionHash,
+            from: feedtransfer.from,
+            to: feedtransfer.to,
+            tokenAddress: feedtransfer.tokenAddress,
+            valueRaw: value
+        }
+        let asset = feedtransfer.tokenAddress.toLowerCase();
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
+        let assetInfo = this.assetInfo[assetChain];
+        if (assetInfo != undefined) {
+            dFeedtransfer.decimals = assetInfo.decimals;
+            dFeedtransfer.value = dFeedtransfer.valueRaw / 10 ** assetInfo.decimals;
+            dFeedtransfer.symbol = assetInfo.symbol;
+            if (decorateUSD) {
+                let [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(dFeedtransfer.value, asset, chainID, feedtransfer.ts)
+                if (balanceUSD) {
+                    dFeedtransfer.valueUSD = balanceUSD
+                    dFeedtransfer.priceUSD = priceUSD
+                    dFeedtransfer.priceUSDCurrent = priceUSDCurrent
+                }
+            }
+            console.log("DECORATE", decorateUSD, asset, dFeedtransfer);
+        } else {
+            console.log("MISSING", assetChain, feedtransfer.tokenAddress.toLowerCase(), chainID);
+        }
+        if (decorate) {
+            if (dFeedtransfer.from != undefined) {
+                //if (decorate) this.decorateAddress(dFeedtransfer, "fromAddress", decorateAddr, decorateRelated)
+            }
+            if (dFeedtransfer.to != undefined) {
+                // if (decorate) this.decorateAddress(dFeedtransfer, "toAddress", decorateAddr, decorateRelated)
+            }
+        }
+
+
         return dFeedtransfer
     }
 
@@ -5556,12 +5827,12 @@ module.exports = class Query extends AssetManager {
 
     async getXCMMessage(msgHash, blockNumber = null, decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let w = (blockNumber) ? ` and blockNumber = ${blockNumber}` : "";
+        let w = (blockNumber) ? ` and sentAt = ${blockNumber}` : "";
         let sql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, executedEventID, destStatus, errorDesc from xcmmessages
         where msgHash = '${msgHash}' ${w} order by blockTS desc limit 1`
         let xcmrecs = await this.poolREADONLY.query(sql);
         if (xcmrecs.length == 0) {
-            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${blockNumbersentAt}`)
+            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${blockNumber}`)
         }
         let x = xcmrecs[0];
         x.paraID = paraTool.getParaIDfromChainID(x.chainID)
@@ -5739,11 +6010,11 @@ module.exports = class Query extends AssetManager {
                     }
                 }
                 if (instructionV.effects != undefined) {
-                    console.log(`instructionV.effects`, instructionV.effects)
+                    //console.log(`instructionV.effects`, instructionV.effects)
                     for (let i = 0; i < instructionV.effects.length; i++) {
                         let instructionXCMK = Object.keys(instructionV.effects[i])[0]
                         let instructionXCMV = instructionV.effects[i][instructionXCMK]
-                        console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
                         await this.decorateInternalXCMInstruction(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
                     }
                 }
@@ -5782,7 +6053,7 @@ module.exports = class Query extends AssetManager {
                     for (let i = 0; i < instructionV.xcm.length; i++) {
                         let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
                         let instructionXCMV = instructionV.xcm[i][instructionXCMK]
-                        console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
                         await this.decorateInternalXCMInstruction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
                     }
                 }
@@ -5848,7 +6119,7 @@ module.exports = class Query extends AssetManager {
                     for (let i = 0; i < instructionV.xcm.length; i++) {
                         let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
                         let instructionXCMV = instructionV.xcm[i][instructionXCMK]
-                        console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
                         await this.decorateInternalXCMInstruction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
                     }
                 }
@@ -5868,7 +6139,7 @@ module.exports = class Query extends AssetManager {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let dXcmMsg = {}
         let version = Object.keys(xcmMsg)[0]
-        console.log(`decorateXCMMsg version=${version}`, xcmMsg)
+        //console.log(`decorateXCMMsg version=${version}`, xcmMsg)
         let xcmMsgV = xcmMsg[version]
 
         dXcmMsg.version = version
@@ -6166,7 +6437,7 @@ module.exports = class Query extends AssetManager {
 
     // given a hash of an extrinsic OR a XCM message hash, get the timeline of blocks and ALL xcmmessages we have indexed
     async getXCMTimeline(hash, hashType = "extrinsic", blockNumber = null, decorate = true, decorateExtra = true, advanced = true) {
-        console.log("STEP1");
+
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         try {
             let xcmmessages = [];
@@ -6295,6 +6566,10 @@ module.exports = class Query extends AssetManager {
                 decorated_xcmmessages.push(decorated_m);
                 console.log(decorated_m);
             }
+
+	    decorated_xcmmessages.sort( function(a, b) {
+		return (a.blockTS - b.blockTS);
+	    })
             return [timeline, decorated_xcmmessages];
         } catch (err) {
             console.log(err);
@@ -6410,7 +6685,7 @@ module.exports = class Query extends AssetManager {
         if (contract.codeHash != actualHash) {
             throw new paraTool.InvalidError(`Code hash is ${contract.codeHash} but hash of supplied code is ${actualHash}`)
         }
-        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata 
+        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata
         let sql = `update wasmCode set metadata = ${mysql.escape(contractData)}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)} where codeHash = '${contract.codeHash}'`
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
@@ -6436,7 +6711,7 @@ module.exports = class Query extends AssetManager {
         if (code.codeHash != actualHash) {
             throw new paraTool.InvalidError(`Code hash is ${contract.codeHash} but hash of supplied code is ${actualHash}`)
         }
-        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata 
+        // store { metadata, language, compiler } (by the actualHash) in codeHash.metadata
         let sql = `update wasmCode set metadata = ${mysql.escape(contractData)}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)} where codeHash = '${contract.codeHash}'`
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();

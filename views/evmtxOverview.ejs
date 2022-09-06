@@ -2,7 +2,6 @@
 <%
 let f = tx;
 let newDate = new Date();
-console.log("HOHO", f);
 newDate.setTime(f.timestamp*1000);
 let dateString = newDate.toUTCString();
 let txResult = (f.result != undefined)? f.result == 1: true //by default tx result is true (until we back fill it)
@@ -74,8 +73,8 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 	    let tok = tx.transfers[t];
 	  %>
 	    <tr>
-	      <td><%- uiTool.presentID(tok.from); %></td>
-	      <td><%- uiTool.presentID(tok.to); %></td>
+	      <td><%- uiTool.presentERCID(tok.from); %></td>
+	      <td><%- uiTool.presentERCID(tok.to); %></td>
 	      <td><%- uiTool.presentERCToken(tok.tokenAddress, tok.assetInfo); %> <%- ; %></td>
         <td><%- tok.value; %> (<%- uiTool.currencyFormat(tok.valueUSD, tok.priceUSD, tok.priceUSDCurrent); %> )</td>
 	    </tr>

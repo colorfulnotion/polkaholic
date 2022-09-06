@@ -459,13 +459,12 @@ app.get('/asset/holders/:chainID/:asset', async (req, res) => {
     }
 })
 
-// Usage: https://api.polkaholic.io/asset/related/0x89f52002e544585b42f8c7cf557609ca4c8ce12a%231285
-app.get('/asset/related/:chainID/:asset/:homePubkey?', async (req, res) => {
+// Usage: https://api.polkaholic.io/asset/related
+app.get('/asset/related/:chainID/:asset', async (req, res) => {
     try {
         let chainID = req.params["chainID"];
         let asset = req.params["asset"];
-        let homePubkey = req.params["homePubkey"] ? req.params["homePubkey"] : false;
-        let assetsRelated = await query.getAssetsRelated(chainID, asset, homePubkey);
+        let assetsRelated = await query.getAssetsRelated(chainID, asset);
         if (assetsRelated) {
             res.write(JSON.stringify(assetsRelated));
             await query.tallyAPIKey(getapikey(req));
@@ -649,10 +648,10 @@ app.get('/hash/blockhash/:blockHash', async (req, res) => {
 
 app.get('/account/:address', async (req, res) => {
     try {
-        let address = req.params["address"];
+        let address = paraTool.getPubKey(req.params["address"]);
         let targetGroup = (req.query["group"] != undefined) ? req.query["group"].toLowerCase() : "realtime"
         let lookback = (req.query["lookback"] != undefined) ? req.query["lookback"] : 180
-        let predefinedGroups = ["extrinsics", "transfers", "crowdloans", "rewards", "realtime", "history", "related", "xcmtransfers", "nfts", "balances", "feed", "unfinalized", "offers", "ss58h160"]
+        let predefinedGroups = ["extrinsics", "transfers", "crowdloans", "rewards", "realtime", "history", "related", "xcmtransfers", "nfts", "balances", "feed", "unfinalized", "offers", "ss58h160", "evmtxs"]
         if (!predefinedGroups.includes(targetGroup)) {
             return res.status(400).json({
                 error: `group=${req.query["group"]} is not supprted`

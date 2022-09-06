@@ -25,6 +25,7 @@ module.exports = class Indexer extends AssetManager {
     readyToCrawlParachains = false;
 
     hashesRowsToInsert = [];
+    evmTxRowsToInsert = [];
     blockRowsToInsert = [];
     addressStorage = {};
     historyMap = {};
@@ -2269,6 +2270,24 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async flushHashesRows() {
+        if (this.evmTxRowsToInsert && this.evmTxRowsToInsert.length > 0) {
+            if (this.writeData) {
+                let i = 0;
+                let batchSize = this.computeTargetBatchSize(1024, this.evmTxRowsToInsert.length);
+                while (i < this.evmTxRowsToInsert.length) {
+                    let currBatch = this.evmTxRowsToInsert.slice(i, i + batchSize);
+                    if (currBatch.length > 0) {
+                        await this.insertBTRows(this.btEVMTx, currBatch, "evmtx");
+                        if (currBatch.length > 50) console.log(`flush: flushEVMTxRows btEVMTx=${currBatch.length}`);
+                        i += batchSize;
+                    }
+                }
+            } else {
+                console.log("SKIP wrote evmtx");
+            }
+            this.evmTxRowsToInsert = [];
+        }
+
         if (this.hashesRowsToInsert && this.hashesRowsToInsert.length > 0) {
             if (this.writeData) {
                 let i = 0;
@@ -2289,6 +2308,7 @@ module.exports = class Indexer extends AssetManager {
             this.relatedMap = {}
             this.extrinsicEvmMap = {}
         }
+
     }
 
     async flushBlockRows() {
@@ -4404,6 +4424,7 @@ module.exports = class Indexer extends AssetManager {
             blockStats.blockHashEVM = evmBlock.hash;
             blockStats.parentHashEVM = evmBlock.parentHash;
             blockStats.numTransactionsEVM = evmBlock.transactions.length;
+            blockStats.numTransactionsInternalEVM = evmBlock.transactionsInternal.length;
             blockStats.gasUsed = evmBlock.gasUsed;
             blockStats.gasLimit = evmBlock.gasLimit;
         }
@@ -4762,7 +4783,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return (true);
     }
 
-    async process_erc20_token_transfer(tx, t, chainID) {
+    async process_erc20_token_transfer(tx, t, chainID, eventID = "0") {
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         //   1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
@@ -4825,6 +4846,24 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         // This mark for lookup on isTip = true for processAssetTypeERC20/fetchAssetHolderBalances
         this.updateAssetHolder(assetChain, t.from, bn)
         this.updateAssetHolder(assetChain, t.to, bn)
+
+        if (t.from && t.to && t.tokenAddress) {
+            let v = {
+                type: "ERC20",
+                chainID: chainID,
+                blockNumber: tx.blockNumber,
+                from: t.from.toLowerCase(),
+                to: t.to.toLowerCase(),
+                tokenAddress: t.tokenAddress,
+                ts: tx.timestamp,
+                value: t.value,
+            };
+            let extrinsicID = `${tx.blockNumber}-${tx.transactionIndex}`
+
+            this.updateAddressExtrinsicStorage(t.from, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+            this.updateAddressExtrinsicStorage(t.to, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+            this.updateAddressExtrinsicStorage(t.tokenAddress, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+        }
     }
 
 
@@ -4858,7 +4897,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async process_erc721_token_transfer(tx, t, chainID) {
+    async process_erc721_token_transfer(tx, t, chainID, eventID = "0") {
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         let tokenID = t.tokenId
@@ -4906,27 +4945,29 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async process_erc1155_token_transfer(tx, t, chainID) {
+    async process_erc1155_token_transfer(tx, t, chainID, eventID = "0") {
         //stub
     }
 
     async process_evmtx_token_transfer(tx, chainID) {
-        // TODO: erc721/1151
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         let transfers = tx.transfers
 
-        for (const t of transfers) {
+        for (let e = 0; e < transfers.length; e++) {
+            let eventID = e.toString();
+            let t = transfers[e];
             //console.log(`Evm transfer [${bn}-${tx.transactionIndex}]`, JSON.stringify(t))
             if (t.type == "ERC20") {
-                await this.process_erc20_token_transfer(tx, t, chainID)
+                await this.process_erc20_token_transfer(tx, t, chainID, eventID)
             }
             if (t.type == "ERC721") {
-                await this.process_erc721_token_transfer(tx, t, chainID)
+                await this.process_erc721_token_transfer(tx, t, chainID, eventID)
             }
             if (t.type == "ERC1155") {
-                await this.process_erc1155_token_transfer(tx, t, chainID)
+                await this.process_erc1155_token_transfer(tx, t, chainID, eventID)
             }
+
         }
         return (false);
     }
@@ -5119,6 +5160,22 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     }
                 }
             }
+            // write evmtx to "feedto" to index txs interacting with (contract) address
+            let col = `${chainID}-${syntheticExtrinsicID}`
+            if (tx.to) {
+                let feedto = {
+                    chainID: chainID,
+                    blockNumber: tx.blockNumber,
+                    transactionHash: evmTxHash,
+                    decodedInput: tx.decodedInput,
+                    from: tx.from.toLowerCase(),
+                    to: tx.to.toLowerCase(),
+                    ts: tx.timestamp,
+                    value: tx.value,
+                    fee: tx.fee
+                }
+                this.updateAddressExtrinsicStorage(tx.to, syntheticExtrinsicID, evmTxHash, "feedto", feedto, tx.timestamp, true);
+            }
         } else {
             evmTxHashRec.data = {
                 feedevmunfinalized: {
@@ -5132,7 +5189,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         this.hashesRowsToInsert.push(evmTxHashRec)
     }
 
-    async processEVMFullBlock(evmFullBlock, chainID, blockNumber, finalized) {
+
+    async processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, finalized) {
         if (!evmFullBlock) return (false)
         // could this be done with Promise.all?
         let evmTxnCnt = 0
@@ -5258,7 +5316,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false) {
+    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, evmTrace = false, autoTraces = false, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
         if (!block) return;
         if (!block.extrinsics) return;
@@ -5430,7 +5488,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 this.timeStat.processReceiptTS += processReceiptTS
 
                 let decorateTxnStartTS = new Date().getTime()
-                evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmBlock, dTxns, dReceipts, chainID)
+                evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmBlock, dTxns, dReceipts, evmTrace, chainID)
                 let decorateTxnTS = (new Date().getTime() - decorateTxnStartTS) / 1000
                 this.timeStat.decorateTxnTS += decorateTxnTS
 
@@ -5439,7 +5497,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 this.timeStat.processBlockAndReceipt++
 
                 let processEVMFullBlockStartTS = new Date().getTime()
-                await this.processEVMFullBlock(evmFullBlock, chainID, blockNumber, block.finalized)
+                await this.processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, block.finalized)
                 let processEVMFullBlockTS = (new Date().getTime() - processEVMFullBlockStartTS) / 1000
                 this.timeStat.processEVMFullBlockTS += processEVMFullBlockTS
                 this.timeStat.processEVMFullBlock++
@@ -5497,7 +5555,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 blockNumber: blockNumber,
                 blockType: 'evm'
             }
-
             // add 'feedevm'
             cres['data']['feedevm'][blockHash] = {
                 value: JSON.stringify(evmFullBlock),
@@ -5546,7 +5603,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             this.write_bqlog_block(block.extrinsics, blockNumber, blockTS);
         }
         let blockStats = this.getBlockStats(block, eventsRaw, evmBlock, evmReceipts, autoTraces);
-        //console.log(`bn=${blockNumber}`, blockStats)
+
         this.blockRowsToInsert.push(cres)
         if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXcmMsgs.length > 0) {
             this.add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs)
@@ -6202,7 +6259,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let processBlockEventsStartTS = new Date().getTime()
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
             let tracesPresent = (r.trace) ? true : false;
-            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, autoTraces, true, write_bq_log, isTip, tracesPresent);
+            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, true, write_bq_log, isTip, tracesPresent);
 
             let processBlockEventsTS = (new Date().getTime() - processBlockEventsStartTS) / 1000
             this.timeStat.processBlockEventsTS += processBlockEventsTS
@@ -6223,6 +6280,17 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             return (true);
         }
         return (false);
+    }
+
+    async indexEVMTrace(chain, blockNumber) {
+        await this.setup_chainParser(chain, this.debugLevel);
+        //await this.initApiAtStorageKeys(chain, null, blockNumber);
+        this.chainID = chain.chainID;
+        console.log("evmtrace chainID=", chain.chainID, blockNumber);
+        let rRow = await this.fetch_block_row(chain, blockNumber);
+        let transactionsInternal = ethTool.processEVMTrace(rRow['evmTrace'], rRow['evmBlock'].transactions);
+        //console.log(evmTrace.length, JSON.stringify(evmTrace, null, 4));
+        console.log(transactionsInternal);
     }
 
     // fetches a SINGLE row r (of block, events + trace) with fetch_block_row and indexes the row with index_chain_block_row
@@ -6347,7 +6415,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             await this.update_batchedSQL(10.0);
 
             var tbl = `assetholder${chainID}`;
-            this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree, totalReserved, totalMiscFrozen, totalFrozen) (select asset, chainID, count(*) numHolders, sum(free) as totalFree, sum(reserved) as totalReserved, sum(miscFrozen) as totalMiscFrozen, sum(frozen) as totalFrozen from ${tbl} where chainID = '${chainID}' group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree), totalReserved = values(totalReserved), totalMiscFrozen = values(totalMiscFrozen), totalFrozen = values(totalFrozen)`)
+            this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree, totalReserved, totalMiscFrozen, totalFrozen) (select asset, chainID, count(*) numHolders, sum(free) as totalFree, sum(reserved) as totalReserved, sum(miscFrozen) as totalMiscFrozen, sum(frozen) as totalFrozen from ${tbl} where chainID = '${chainID}' and free > 0 group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree), totalReserved = values(totalReserved), totalMiscFrozen = values(totalMiscFrozen), totalFrozen = values(totalFrozen)`)
 
             var tbls = [];
             if (chain.isEVM) {
