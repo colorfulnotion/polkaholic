@@ -1466,6 +1466,19 @@ async function createWeb3Api(rpcURL) {
     return false
 }
 
+function loadWallet(pk) {
+    const Web3 = require("web3");
+    const web3 = new Web3();
+    try {
+        let wallet = web3.eth.accounts.privateKeyToAccount(pk);
+        console.log(`evmWallet loaded: ${wallet.address}`)
+        return wallet
+    }catch(error){
+        console.log(`loadWallet error=${error.toString()}`)
+    }
+    return false
+}
+
 function is_tx_contract_create(tx) {
     if (!tx) return (false);
     let isCreate = (tx.creates != null)
@@ -1612,6 +1625,9 @@ module.exports = {
     },
     createWeb3Api: async function(rpcURL) {
         return createWeb3Api(rpcURL)
+    },
+    loadWallet: function(pk) {
+        return loadWallet(pk)
     },
     parseAbiSignature: function(abiStrArr) {
         return parseAbiSignature(abiStrArr)

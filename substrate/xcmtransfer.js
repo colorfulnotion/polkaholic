@@ -4,6 +4,7 @@ const {
 const fs = require('fs');
 const AssetManager = require('./assetManager');
 const paraTool = require('./paraTool');
+const ethTool = require('./ethTool');
 const {
     stringToU8a,
     u8aToHex
@@ -12,6 +13,7 @@ const mysql = require("mysql2");
 
 module.exports = class XCMTransfer extends AssetManager {
     pair = null;
+    evmpair = null
 
     setupPair(FN = "/root/.wallet", name = "polkadot") {
         const privateSeed = fs.readFileSync(FN, 'utf8');
@@ -21,6 +23,11 @@ module.exports = class XCMTransfer extends AssetManager {
         this.pair = keyring.addFromUri(privateSeed, {
             name: name
         })
+    }
+
+    setupEvmPair(FN = "/root/.walletevm2", name = "evm") {
+        const privateSeed = fs.readFileSync(FN, 'utf8');
+        this.evmpair = ethTool.loadWallet(privateSeed)
     }
 
     parse_xcmInteriorKey(xcmInteriorKeyRelayChain, symbol) {
@@ -501,6 +508,29 @@ module.exports = class XCMTransfer extends AssetManager {
         console.log("TESTCASES", autoTestcases.length);
         return autoTestcases;
     }
+
+    async getTestcasesAutomatedEVM(limit = 10) {
+        let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM as isBeneficiaryEVM, 0 as isSenderEVM, count(*) cnt from xcmtransfer join xcmasset on
+        xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where
+        xcmtransfer.chainID in (${paraTool.chainIDMoonriver}, ${paraTool.chainIDMoonbeam}) and
+        sourceTS > unix_timestamp(date_sub(Now(), interval 30 day)) and
+        chain.chainID = xcmtransfer.chainIDDest and xcmtransfer.chainID >= 0 and
+        xcmtransfer.chainIDDest >= 0 and incomplete = 0 and length(xcmtransfer.xcmInteriorKey) > 4 and
+        xcmtransfer.sectionMethod not in ('xTransfer:transfer' )
+        group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM
+        having count(*) > 10 order by count(*) desc limit ${limit}`
+        let testcases = await this.poolREADONLY.query(sql);
+        let autoTestcases = []
+        for (const testcase of testcases){
+            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam){
+                testcase.isSenderEVM = 1
+            }
+            autoTestcases.push(testcase)
+        }
+        console.log("TESTCASES", autoTestcases.length);
+        return autoTestcases;
+    }
+
     async getTestcasesManual() {
         return [{
                 chainID: 2,

@@ -202,7 +202,8 @@ async function main() {
     const xcmtransfer = new XCMTransfer();
 
     if (chainID == -1) {
-        let testcases = await xcmtransfer.getTestcasesAutomated();
+        //let testcases = await xcmtransfer.getTestcasesAutomated();
+        let testcases = await xcmtransfer.getTestcasesAutomatedEVM();
         // let testcases = xcmtransfer.getTestcasesManual();
         for (let i = 0; i < testcases.length; i++) {
             try {
