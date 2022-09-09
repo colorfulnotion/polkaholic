@@ -1,4 +1,5 @@
-cbt createtable  addressextrinsic  "families=feed:maxversions=1,feedunfinalized:maxversions=1,feedtransfer:maxversions=1,feedtransferunfinalized:maxversions=1,feedxcm:maxversions=1,feedxcmdest:maxversions=1,feedxcmunfinalized:maxversions=1,feedcrowdloan:maxversions=1,feedreward:maxversions=1"
+# rowKey:  {address}#{invTS}#{hash}
+cbt createtable  addressextrinsic  "families=feed:maxversions=1,feedunfinalized:maxversions=1,feedtransfer:maxversions=1,feedtransferunfinalized:maxversions=1,feedxcm:maxversions=1,feedxcmdest:maxversions=1,feedxcmunfinalized:maxversions=1,feedcrowdloan:maxversions=1,feedreward:maxversions=1,feedto:maxversions=1"
 cbt setgcpolicy  addressextrinsic  feedtransferunfinalized maxage=1200s or maxversions=1
 cbt setgcpolicy  addressextrinsic  feedunfinalized maxage=7d or maxversions=1
 cbt setgcpolicy  addressextrinsic  feedxcmunfinalized maxage=7d or maxversions=1
@@ -31,14 +32,4 @@ cbt setgcpolicy  apikeys  rate maxage=3d or maxversions=1
 cbt createtable  chain0      "families=blockraw:maxversions=1,autotrace=maxversions=1,trace:maxversions=1,finalized:maxversions=1,n:maxversions=1,events:maxversions=1,feed:maxversions=1"
 cbt createtable  chain2004   "families=blockraw:maxversions=1,autotrace=maxversions=1,trace:maxversions=1,finalized:maxversions=1,n:maxversions=1,events:maxversions=1,feed:maxversions=1,blockrawevm:maxversions=1,feedevm:maxversions=1,receiptsevm:maxversions=1,traceevm:maxversions=1"
 
-
-# rowKey:  {contractAddress}#{invTS}#{txhash}
-#  feedto:       evmtx incoming INTO contract by users (whereas addressextrinsic feed is from other the users)
-#  feedinternal: txn initiated BY contract during execution
-cbt createtable  evmtx          "families=feedto:maxversions=1,feedinternal:maxversions=1"
-
-# Note: contract transfers are already in addressextrinsic "feedtransfer" column family ({contractAddress}#{invTS}#{txhash}, column: {txhash}#{eventID}
-# Example: cbt read addressextrinsic prefix=0xacc15dc74880c9944775448304b263d191c6077f
-# 0xacc15dc74880c9944775448304b263d191c6077f#0x9cb8855e#0x4929dabb5e40262c53697b3d6c47e797c09aa6ecd1c55df3e55e2ed88313b429
-#   feedtransfer:0x4929dabb5e40262c53697b3d6c47e797c09aa6ecd1c55df3e55e2ed88313b429#2004-1812817-7-71 @ 2022/09/06-20:12:18.000000
 

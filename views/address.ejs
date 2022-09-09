@@ -75,10 +75,13 @@
 <%
 let tabs = [
 { title: "Transactions", target: "evmtxs" },
-{ title: "Transfers", target: "transfers" },
 { title: "XCM Transfers", target: "xcmtransfers" },
 ];
 
+if ( contract ) {
+  tabs.splice(1, 0, { title: "Internal Txns", target: "transfers" });
+  tabs.splice(2, 0, { title: "ERC20 Token Txns", target: "erc20" });
+}
 
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
@@ -147,6 +150,37 @@ for (let i=0; i<tabs.length; i++) {
       </thead>
     </table>
   </div>
+<% if ( contract ) { %>
+  <div class="tab-pane" id="internal" role="tabpanel" aria-labelledby="internal-tab">
+    <table id="tableinternal" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+         <th>Parent Tx Hash</th>
+         <th>Block</th>
+         <th>Date</th>
+         <th>From</th>
+         <th>To</th>
+         <th>Value</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  <div class="tab-pane" id="erc20" role="tabpanel" aria-labelledby="erc20-tab">
+    <table id="tableerc20" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+         <th>Tx Hash</th>
+         <th>Date</th>
+         <th>From</th>
+         <th>Type</th>
+         <th>To</th>
+         <th>Value</th>
+         <th>Value USD</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+<% } %>
 </div>
 
 <script>
@@ -158,4 +192,6 @@ let isEVM = 1;
 </script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
-<script src="/account.js"></script>
+<script src="/accountui.js"></script>
+<script src="/addressui.js"></script>
+<script src="/address.js"></script>

@@ -8,6 +8,16 @@ async function main() {
 
     await query.init();
     let assets = {
+        //ERC20 returned assetChain=0x14a0243c333a5b238143068dc3a7323ba4c30ecb~22023, priceUSD=0, priceUSDCurrent=0
+        //ERC20 returned assetChain=0x639a647fbe20b6c8ac19e48e2de44ea792c62c5c~22023, priceUSD=0, priceUSDCurrent=0
+        //ERC20 returned assetChain=0x682f81e57eaa716504090c3ecba8595fb54561d8~22023, priceUSD=0, priceUSDCurrent=0
+        //ERC20 returned assetChain=0x6ab6d61428fde76768d7b45d8bfeec19c6ef91a8~22023, priceUSD=0, priceUSDCurrent=0
+        //ERC20 returned assetChain=0xb44a9b6905af7c801311e8f4e76932ee959c663c~22023, priceUSD=0, priceUSDCurrent=0
+        //ERC20 returned assetChain=0xe3f5a90f9cb311505cd691a46596599aa1a0ad7d~22023, priceUSD=0, priceUSDCurrent=0
+
+
+        "USDC": '0x818ec0A7Fe18Ff94269904fCED6AE3DaE6d6dC0b~2004',
+        "USDC2": '0x818ec0a7fe18ff94269904fced6ae3dae6d6dc0b~2004',
         "lcDOT": '{"LiquidCrowdloan":"13"}~2000',
         "DOT": '{"Token":"DOT"}~2000',
         "DOT-lcDOT LP": '[{"Token":"DOT"},{"LiquidCrowdloan":"13"}]~2000',

@@ -87,7 +87,9 @@ module.exports = class PriceManager extends Query {
 
                 let token0chain = paraTool.makeAssetChain(assetInfo.token0, assetInfo.chainID);
                 let token1chain = paraTool.makeAssetChain(assetInfo.token1, assetInfo.chainID);
-                if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
+                if (assetInfo.symbol == "ZLK-LP") {
+                    // skip for now
+                } else if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
                     let x = JSON.parse(asset)
                     if (x.xcmtransfer) {
                         let symbol = x.xcmtransfer.symbol;
@@ -129,6 +131,7 @@ module.exports = class PriceManager extends Query {
                         }
                     }
                 } else if (assetInfo.token0 == tailAsset && (cID == tailAssetChainID) && this.explored[token1chain] == undefined) {
+
                     // extend with a.token1
                     let newpath = [...path];
                     newpath.push({

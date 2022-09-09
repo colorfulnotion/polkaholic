@@ -6,13 +6,15 @@ async function main() {
     let debugLevel = 0
     var query = new Query(debugLevel);
     await query.init();
-    let address = "0xf3918988eb3ce66527e2a1a4d42c303915ce28ce";
+    let account = "0xcf1107a96747cdec84489f07111cceeb30e2d881";
+    account = "0xaa30ef758139ae4a7f798112902bf6d65612045f";
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
-            address = val;
+            account = val;
         }
     });
-    var a = await query.getEVMTxFeed(address, "feedto")
+    // async getAccount(rawAddress, accountGroup = "realtime", chainList = [], maxRows = 1000, TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"], pageIndex = 0) {
+    var a = await query.getAccount(account, "evmtxs", [22023]);
     console.log(JSON.stringify(a));
 }
 

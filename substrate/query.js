@@ -632,11 +632,19 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                 } else {
-                    res.push({
-                        link: "/account/" + addr,
-                        text: addr,
-                        description: "Address"
-                    })
+                    if (addr.length == 42) {
+                        res.push({
+                            link: "/address/" + addr,
+                            text: addr,
+                            description: "Address"
+                        })
+                    } else {
+                        res.push({
+                            link: "/account/" + addr,
+                            text: addr,
+                            description: "Address"
+                        })
+                    }
                 }
             });
         } catch (err) {
@@ -1701,7 +1709,7 @@ module.exports = class Query extends AssetManager {
         return (undefined);
     }
 
-    async getAssetsRelated(chainID, asset, address = false, limit = 100) {
+    async getAssetsRelated(chainID, asset, limit = 100) {
         let assetChain = paraTool.makeAssetChain(asset, chainID);
         if (this.assetInfo[assetChain] == undefined) {
             throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
@@ -1715,23 +1723,8 @@ module.exports = class Query extends AssetManager {
             }
             for (const assetChainRelated of Object.keys(this.assetInfo)) {
                 let assetInfoRelated = this.assetInfo[assetChainRelated];
-                if (assetInfoRelated.token0 == asset || assetInfoRelated.token1 == asset) {
+                if ((assetInfoRelated.token0 == asset) || (assetInfoRelated.token1 == asset) || (assetInfoRelated.currencyID == asset)) {
                     assets.push(assetInfoRelated);
-                }
-            }
-
-            let holdings = (address) ? await this.getRealtimeAsset(address) : false;
-            for (let i = 0; i < assets.length; i++) {
-                let a = assets[i];
-                let assetType = (a.assetType) ? a.assetType : false;
-                if (holdings[assetType] !== undefined) {
-                    let h = holdings[assetType];
-                    for (let j = 0; j < h.length; j++) {
-                        let b = h[j];
-                        if ((b.assetInfo.asset == a.asset) && (b.assetInfo.chainID == a.chainID)) {
-                            a.accountState = b.state;
-                        }
-                    }
                 }
             }
         } catch (err) {
@@ -2294,7 +2287,6 @@ module.exports = class Query extends AssetManager {
         return out;
     }
 
-
     async get_account_extrinsics_unfinalized(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let feedItems = 0;
@@ -2366,9 +2358,15 @@ module.exports = class Query extends AssetManager {
         if (rows && rows.length > 0) {
             for (const row of rows) {
                 let rowData = row.data
-                if (rowData["feed"]) {
+
+                if (rowData["feed"] || (rowData["feedto"])) {
                     let [addressPiece, ts, extrinsicHashPiece] = paraTool.parse_addressExtrinsic_rowKey(row.id)
-                    let extrinsics = rowData["feed"];
+                    let extrinsics = null;
+                    if (rowData["feed"]) {
+                        extrinsics = rowData["feed"];
+                    } else if (rowData["feedto"]) {
+                        extrinsics = rowData["feedto"];
+                    }
                     if (pTS != ts) {
                         p = 0;
                         pTS = ts;
@@ -2585,6 +2583,86 @@ module.exports = class Query extends AssetManager {
             nextPage: null
         }
     }
+
+    async get_account_evmtransfers(address, rows, maxRows = 1000, chainList = [], decorate = true, decorateExtra = ["data", "address", "usd", "related"], TSStart = null, pageIndex = 0) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        let feedTransfer = [];
+        let feedTransferItems = 0;
+        let p = 0;
+        let pTS = null;
+        let prevKey = false;
+        if (rows && rows.length > 0) {
+            for (const row of rows) {
+                let rowData = row.data
+                if (rowData["feedevmtransfer"]) {
+                    let [accKey, ts, transactionHash] = paraTool.parse_addressExtrinsic_rowKey(row.id)
+                    let transactionsTransfer = rowData["feedevmtransfer"];
+                    if (pTS != ts) {
+                        p = 0;
+                        pTS = ts;
+                    }
+                    //transfer:extrinsicHash [rows]
+                    //tranfers:extrinsicHash#eventID
+                    //tranfers:0x0804ea6287afaf070b7717505770da790785b0b36d34529d51b5c9670ea49cb5#5-324497-0-0 @ 2022/02/01-16:47:48.000000
+
+                    //for each feedevmtransfer:extrinsicHash row, cell come in reverse order
+                    for (const transactionHashEventID of Object.keys(transactionsTransfer).reverse()) {
+                        //console.log(`extrinsicsTransfer[${extrinsicHashEventID}] length=${extrinsicsTransferCells.length}`)
+                        for (const cell of transactionsTransfer[transactionHashEventID]) {
+                            try {
+                                let transactionHash = transactionHashEventID.split('#')[0]
+                                let eventID = transactionHashEventID.split('#')[1]
+                                var t = JSON.parse(cell.value);
+                                if (!this.chainFilters(chainList, t.chainID)) {
+                                    //filter non-specified records .. do not decorate
+                                    continue
+                                }
+                                t['transactionHash'] = transactionHash;
+                                t['blockNumber'] = parseInt(t.blockNumber, 10);
+                                t['chainID'] = parseInt(t.chainID, 10);
+                                t['chainName'] = this.getChainName(t["chainID"]);
+
+                                let [__, id] = this.convertChainID(t.chainID);
+                                t['id'] = id
+                                if (t.ts) t['ts'] = parseInt(t.ts, 10);
+
+                                let tt = await this.decorateQueryFeedEVMTransfer(t, t.chainID, decorate, decorateExtra)
+                                let currKey = `${transactionHash}|${t.from}|${t.to}|${t.value}` // it's probably "safe" to check without asset type here.
+                                if (currKey == prevKey) {
+                                    console.log(`skip duplicate [${tt.eventID}] (${currKey})`)
+                                } else if (TSStart && (t['ts'] == TSStart) && (p < pageIndex)) {
+                                    console.log("SKIPPING (p<pageIndex)", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    // skip this until hitting pageIndex
+                                    p++;
+                                } else if (feedTransferItems < maxRows) {
+                                    console.log("INCLUDING", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
+                                    p++;
+                                    feedTransfer.push(tt);
+                                    feedTransferItems++;
+                                } else if (feedTransferItems == maxRows) {
+                                    return {
+                                        data: feedTransfer,
+                                        nextPage: `/account/evmtransfers/${address}?` + this.page_params(ts, maxRows, p, chainList, decorate, decorateExtra)
+                                    }
+                                }
+                                console.log("prevkey SET", currKey);
+                                prevKey = currKey
+                            } catch (err) {
+                                // bad data
+                                console.log(err);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return {
+            data: feedTransfer,
+            nextPage: null
+        }
+    }
+
 
     // column: link
     // cell value: { title, description, metadata, linktype }
@@ -3455,86 +3533,23 @@ module.exports = class Query extends AssetManager {
         let rowData = row.data;
         let [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
         if (contract) {
-            let sql = `select asset, assetName, chainID, priceUSD, totalSupply, numHolders from asset where asset = '${address}' and chainID = '${contract.chainID}'`
+            let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' and asset.chainID = '${contract.chainID}'`
             let extraRecs = await this.poolREADONLY.query(sql)
             if (extraRecs.length > 0) {
                 let e = extraRecs[0];
                 var [_, _, priceUSDCurrent] = await this.computeUSD(1.0, e.asset, e.chainID, this.getCurrentTS());
                 contract.assetName = e.assetName;
+                contract.symbol = e.symbol;
+                contract.localSymbol = e.localSymbol;
                 contract.priceUSD = priceUSDCurrent;
                 contract.totalSupply = e.totalSupply;
                 contract.numHolders = e.numHolders;
+                contract.decimals = e.decimals;
             }
         }
         return [realtime, contract];
     }
 
-    async getEVMTxFeed(address, txGroup = "to", chainID = null, maxRows = 1000, TSStart = null) {
-        let tableName = "evmtx"
-        let families = [];
-        if (txGroup == "internal") {
-            families.push("feedinternal");
-        } else {
-            families.push("feedto");
-        }
-        let TSpagination = false;
-        let startRow = address;
-        if (TSStart != null) {
-            startRow = address + "#" + paraTool.inverted_ts_key(TSStart)
-        }
-        let out = []
-        try {
-            let endRow = address + "#ZZZ";
-            // cbt read evmtx prefix=0xf3918988eb3ce66527e2a1a4d42c303915ce28ce
-            let [rows] = await this.btEVMTx.getRows({
-                start: startRow,
-                end: endRow,
-                limit: maxRows + 1,
-                filter: [{
-                    family: families,
-                    cellLimit: 1
-                }]
-            });
-
-            let feedItems = 0;
-            for (const row of rows) {
-                let rowData = row.data
-
-                if (rowData["feedto"]) {
-                    let [addressPiece, ts, txHash] = paraTool.parse_addressExtrinsic_rowKey(row.id)
-                    let txs = rowData["feedto"];
-                    for (const extrinsicID of Object.keys(txs)) {
-                        for (const cell of txs[extrinsicID]) {
-                            var t = JSON.parse(cell.value);
-                            if (feedItems < maxRows) {
-                                out.push(t);
-                                feedItems++;
-                            } else {
-                                return {
-                                    data: out,
-                                    nextPage: `/evmtx/${address}?txGroup=${txGroup}&ts=${ts}`
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-
-        } catch (err) {
-            console.log(err);
-            this.logger.error({
-                "op": "query.getEVMTx",
-                address,
-                txGroup,
-                err
-            });
-        }
-        return {
-            data: out,
-            nextPage: null
-        };
-    }
 
     async getAccount(rawAddress, accountGroup = "realtime", chainList = [], maxRows = 1000, TSStart = null, lookback = 180, decorate = true, decorateExtra = ["data", "address", "usd", "related"], pageIndex = 0) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -3543,7 +3558,6 @@ module.exports = class Query extends AssetManager {
             throw new paraTool.InvalidError(`Invalid address ${address}`)
         }
         var hrstart = process.hrtime()
-
         // xcmtransfers comes from mysql "xcmtransfer" table
         if (accountGroup == "xcmtransfers") {
             let filters = {
@@ -3583,6 +3597,12 @@ module.exports = class Query extends AssetManager {
                 families.push("feed");
                 TSpagination = true;
                 break;
+            case "evmtxs":
+                tableName = "addressextrinsic"
+                families.push("feed");
+                families.push("feedto"); // tmp column used to easily drop and readd
+                TSpagination = true;
+                break;
             case "unfinalized":
                 tableName = "addressextrinsic"
                 families.push("feed");
@@ -3592,6 +3612,11 @@ module.exports = class Query extends AssetManager {
             case "transfers":
                 tableName = "addressextrinsic"
                 families.push("feedtransfer");
+                TSpagination = true;
+                break;
+            case "evmtransfers":
+                tableName = "addressextrinsic"
+                families.push("feedevmtransfer");
                 TSpagination = true;
                 break;
             case "crowdloans":
@@ -3626,6 +3651,7 @@ module.exports = class Query extends AssetManager {
         if (accountGroup == "balances") {
             maxRows = 1000;
         }
+        console.log(accountGroup, tableName);
         let startRow = address;
         if (TSpagination && (TSStart != null)) {
             startRow = address + "#" + paraTool.inverted_ts_key(TSStart)
@@ -3757,6 +3783,7 @@ module.exports = class Query extends AssetManager {
                 case "unfinalized":
                     //feed:extrinsicHash#chainID-extrinsicID
                     return await this.get_account_extrinsics_unfinalized(address, rows, maxRows, chainList, decorate, decorateExtra);
+                case "evmtxs":
                 case "extrinsics":
                     //feed:extrinsicHash#chainID-extrinsicID
                     return await this.get_account_extrinsics(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
@@ -3764,6 +3791,9 @@ module.exports = class Query extends AssetManager {
                     // need to also bring in "feedtransferunfinalized" from the same table
                     //feedtransfer:extrinsicHash#eventID
                     return await this.get_account_transfers(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
+                case "evmtransfers":
+                    //feedtransfer:transactionHash#eventID
+                    return await this.get_account_evmtransfers(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
                 case "crowdloans":
                     //feedcrowdloan:extrinsicHash#eventID
                     return await this.get_account_crowdloans(address, rows, maxRows, chainList, decorate, decorateExtra, TSStart, pageIndex);
@@ -4417,6 +4447,55 @@ module.exports = class Query extends AssetManager {
         dFeedtransfer.decimals = (feedtransfer.decimals != undefined) ? feedtransfer.decimals : null // unknown case
         dFeedtransfer.data = feedtransfer.data
         if (decorateData) dFeedtransfer.decodedData = res
+        return dFeedtransfer
+    }
+
+    async decorateQueryFeedEVMTransfer(feedtransfer, chainID, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        var value = feedtransfer.value
+        var assetSymbol = null;
+        var decimals = null;
+        let dFeedtransfer = {
+            chainID: feedtransfer.chainID,
+            chainName: feedtransfer.chainName,
+            id: feedtransfer.id,
+            blockNumber: feedtransfer.blockNumber,
+            ts: feedtransfer.ts,
+            transactionHash: feedtransfer.transactionHash,
+            from: feedtransfer.from,
+            to: feedtransfer.to,
+            tokenAddress: feedtransfer.tokenAddress,
+            valueRaw: value
+        }
+        let asset = feedtransfer.tokenAddress.toLowerCase();
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
+        let assetInfo = this.assetInfo[assetChain];
+        if (assetInfo != undefined) {
+            dFeedtransfer.decimals = assetInfo.decimals;
+            dFeedtransfer.value = dFeedtransfer.valueRaw / 10 ** assetInfo.decimals;
+            dFeedtransfer.symbol = assetInfo.symbol;
+            if (decorateUSD) {
+                let [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(dFeedtransfer.value, asset, chainID, feedtransfer.ts)
+                if (balanceUSD) {
+                    dFeedtransfer.valueUSD = balanceUSD
+                    dFeedtransfer.priceUSD = priceUSD
+                    dFeedtransfer.priceUSDCurrent = priceUSDCurrent
+                }
+            }
+            console.log("DECORATE", decorateUSD, asset, dFeedtransfer);
+        } else {
+            console.log("MISSING", assetChain, feedtransfer.tokenAddress.toLowerCase(), chainID);
+        }
+        if (decorate) {
+            if (dFeedtransfer.from != undefined) {
+                //if (decorate) this.decorateAddress(dFeedtransfer, "fromAddress", decorateAddr, decorateRelated)
+            }
+            if (dFeedtransfer.to != undefined) {
+                // if (decorate) this.decorateAddress(dFeedtransfer, "toAddress", decorateAddr, decorateRelated)
+            }
+        }
+
+
         return dFeedtransfer
     }
 
@@ -5718,12 +5797,12 @@ module.exports = class Query extends AssetManager {
 
     async getXCMMessage(msgHash, blockNumber = null, decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let w = (blockNumber) ? ` and blockNumber = ${blockNumber}` : "";
+        let w = (blockNumber) ? ` and sentAt = ${blockNumber}` : "";
         let sql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, executedEventID, destStatus, errorDesc from xcmmessages
         where msgHash = '${msgHash}' ${w} order by blockTS desc limit 1`
         let xcmrecs = await this.poolREADONLY.query(sql);
         if (xcmrecs.length == 0) {
-            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${blockNumbersentAt}`)
+            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${blockNumber}`)
         }
         let x = xcmrecs[0];
         x.paraID = paraTool.getParaIDfromChainID(x.chainID)

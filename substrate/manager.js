@@ -1548,7 +1548,7 @@ module.exports = class Manager extends AssetManager {
     // write asset.asset to accountrealtime evmcontract:{chainID} for assetType = 'ERC20', 'ERC20LP' (TODO: 'ERC721', 'ERC1155')
     async write_btRealtime_evmcontract(lookbackDays = 1) {
         let ctx = "write_btRealtime_evmcontract";
-        let sql = `select asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol, creator, createdAtTx, token0Decimals, token1Decimals from asset where assetType in ('ERC20', 'ERC20LP') and lastUpdateDT > date_sub(Now(), interval ${lookbackDays} DAY) order by lastUpdateDT desc`
+        let sql = `select asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol, creator, createdAtTx, token0Decimals, token1Decimals from asset where assetType in ('Contract', 'ERC20', 'ERC20LP') and lastUpdateDT > date_sub(Now(), interval ${lookbackDays} DAY) order by lastUpdateDT desc`
         let recs = await this.poolREADONLY.query(sql);
         let rows = [];
         for (let i = 0; i < recs.length; i++) {
@@ -1562,12 +1562,12 @@ module.exports = class Manager extends AssetManager {
     // writeBTHashesRealtime: writes all hashes/strings from { asset, xcmAsset, contract, chain } (other than extrinsicHashes, blockHashes)
     // to the { btHashes, btRealtime } BigTables
     async writeBTHashesRealtime(lookbackDays = 1, limit = 100) {
-        await this.write_btHashes_xcmmessage(lookbackDays);
-        await this.write_btHashes_symbol(limit);
-        await this.write_btHashes_chain(limit);
-        await this.write_btHashes_currencyID(limit);
-        await this.write_btHashes_wasmcode(lookbackDays);
-        await this.write_btRealtime_wasmcontract(lookbackDays);
+        /*        await this.write_btHashes_xcmmessage(lookbackDays);
+                await this.write_btHashes_symbol(limit);
+                await this.write_btHashes_chain(limit);
+                await this.write_btHashes_currencyID(limit);
+                await this.write_btHashes_wasmcode(lookbackDays);
+                await this.write_btRealtime_wasmcontract(lookbackDays); */
         await this.write_btRealtime_evmcontract(lookbackDays);
     }
 
