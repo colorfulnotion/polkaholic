@@ -26,8 +26,9 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     setupEvmPair(FN = "/root/.walletevm2", name = "evm") {
-        const privateSeed = fs.readFileSync(FN, 'utf8');
-        this.evmpair = ethTool.loadWallet(privateSeed)
+        var pk = fs.readFileSync(FN, 'utf8');
+        pk = pk.replace(/\r|\n/g, '');
+        this.evmpair = ethTool.loadWallet(pk)
     }
 
     parse_xcmInteriorKey(xcmInteriorKeyRelayChain, symbol) {
@@ -531,6 +532,37 @@ module.exports = class XCMTransfer extends AssetManager {
         return autoTestcases;
     }
 
+    async getTestcasesManualEVM() {
+        return [
+            /*
+            {
+                chainID: 22023,
+                chainIDDest: 2,
+                symbol: 'KSM',
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 1,
+                cnt: 100
+            },
+            */
+            {
+                chainID: 22023, //0xb9f813ff
+                chainIDDest: 22007,
+                symbol: 'MOVR',
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 1,
+                cnt: 64
+            },
+            {
+                chainID: 2004,
+                chainIDDest: 2000,
+                symbol: 'ACA',
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 1,
+                cnt: 64
+            }
+        ]
+    }
+
     async getTestcasesManual() {
         return [{
                 chainID: 2,
@@ -604,7 +636,9 @@ module.exports = class XCMTransfer extends AssetManager {
         let chain = await this.getChain(chainID)
         await this.setupAPI(chain)
         this.setupPair();
+        this.setupEvmPair();
         let relayChain = (chainID != 2 && chainID < 20000) ? "polkadot" : "kusama";
+        let isEVMTx = 0
         try {
             let xcmInteriorKey = await this.lookupSymbolXCMInteriorKey(symbol, relayChain);
             let asset = await this.lookupChainAsset(chainID, xcmInteriorKey);
@@ -620,9 +654,15 @@ module.exports = class XCMTransfer extends AssetManager {
             console.log("sectionMethod DISPATCH", sectionMethod);
             if ((chainID == 2 || chainID == 21000) && chainIDDest == 22000) version = "v0";
 
+            if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase){
+                // mark isEVMTx as true
+                isEVMTx = 1
+            }
+
             switch (sectionMethod) {
                 case "assets_withdraw:0x019054d0":
                     [func, args] = await this.assets_withdraw(version, asset, assetDest, xcm, amount, beneficiary);
+                    isEVMTx = 1
                     break;
                 case "polkadotXcm:limitedReserveTransferAssets":
                     [func, args] = await this.polkadotXcm_limitedReserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
@@ -661,10 +701,10 @@ module.exports = class XCMTransfer extends AssetManager {
                     [func, args] = await this.xTransfer_transfer(version, asset, assetDest, xcm, amount, beneficiary);
                     break;
             }
-            return [sectionMethod, func, JSON.stringify(args, null, 4)];
+            return [sectionMethod, func, JSON.stringify(args, null, 4), isEVMTx];
         } catch (err) {
             console.log(err);
-            return [null, null, null];
+            return [null, null, null, null];
         }
     }
 }

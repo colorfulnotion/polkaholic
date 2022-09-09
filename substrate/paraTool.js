@@ -1152,6 +1152,12 @@ module.exports = {
     makeXcmInteriorKey: function(interior, relayChain = 'kusama') {
         return (interior + assetChainSeparator + relayChain);
     },
+    parseXcmInteriorKey: function(xcmInteriorKey='[{"parachain":2023},{"palletInstance":10}]~kusama') {
+        let pieces = xcmInteriorKey.split(assetChainSeparator);
+        let assetUnparsed = pieces[0];
+        let relayChain = (pieces.length > 1) ? pieces[1] : undefined;
+        return [assetUnparsed, relayChain];
+    },
     inverted_ts_key: function(ts) {
         return inverted_ts_key(ts);
     },
@@ -1320,5 +1326,7 @@ module.exports = {
     contractAddrToXcAssetID: function(xcAssetAddress) {
         return contractAddrToXcAssetID(xcAssetAddress)
     },
-
+    bnToHex: function(n) {
+        return bnToHex(n)
+    },
 };

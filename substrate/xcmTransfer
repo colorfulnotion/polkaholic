@@ -201,10 +201,26 @@ async function main() {
 
     const xcmtransfer = new XCMTransfer();
 
+    let test = 'manualEVM' // ['auto', 'manual', 'autoEVM', 'manualEVM']
+    console.log(`testing ${test}`)
     if (chainID == -1) {
-        //let testcases = await xcmtransfer.getTestcasesAutomated();
-        let testcases = await xcmtransfer.getTestcasesAutomatedEVM();
-        // let testcases = xcmtransfer.getTestcasesManual();
+        let testcases = []
+        switch (test) {
+            case 'auto':
+                testcases = await xcmtransfer.getTestcasesAutomated();
+                break;
+            case 'manuals':
+                testcases = xcmtransfer.getTestcasesManual();
+                break;
+            case 'autoEVM':
+                testcases = await xcmtransfer.getTestcasesAutomatedEVM();
+                break;
+            case 'manualEVM':
+                //TODO
+                testcases = await xcmtransfer.getTestcasesManualEVM();
+                break;
+            default:
+        }
         for (let i = 0; i < testcases.length; i++) {
             try {
                 let t = testcases[i];
@@ -217,22 +233,30 @@ async function main() {
                 if (t.isEVM) {
                     beneficiary = beneficiaryEVM;
                 }
-                let [sectionMethod, func, args] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
+                let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
                 console.log(`xcmtransfer cli ${sectionMethod} args=`, args);
             } catch (e) {
                 console.log(`xcmtransfer cli error`, e.toString());
             }
         }
     } else {
-        let [sectionMethod, func, args] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
+        let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
         let execute = false;
         console.log(sectionMethod, args);
         if (chainIDDest == 2004 || chainIDDest == 2006 || chainIDDest == 22023 || chainIDDest == 22007) {
             beneficiary = beneficiaryEVM;
         }
-        if (execute) {
-            let hash = func.apply(null, args).signAndSend(xcmtransfer.pair);
-            console.log("Transfer sent with hash", hash.toHex());
+        if (isEVMTx){
+            if (execute) {
+                //TODO: get rawTX
+                let signedTx = {}
+                console.log("EVM Transfer sent with hash", hash.toHex());
+            }
+        }else{
+            if (execute) {
+                let hash = func.apply(null, args).signAndSend(xcmtransfer.pair);
+                console.log("Transfer sent with hash", hash.toHex());
+            }
         }
     }
 }
