@@ -5141,27 +5141,29 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
             // write evmtx to "feedto" to index txs interacting with contract
             let col = `${chainID}-${syntheticExtrinsicID}`
-            let evmTxToRec = {
-                key: paraTool.make_addressExtrinsic_rowKey(tx.to, evmTxHash, tx.timestamp),
-                data: {
-                    feedto: {}
-                }
-            }
-            evmTxToRec.data.feedto[col] = {
-                value: JSON.stringify({
-                    chainID: chainID,
-                    blockNumber: tx.blockNumber,
-                    transactionHash: evmTxHash,
-                    decodedInput: tx.decodedInput,
-                    from: tx.from.toLowerCase(),
-                    to: tx.to.toLowerCase(),
-                    ts: tx.timestamp,
-                    value: tx.value,
-                    fee: tx.fee
-                }),
-                timestamp: rects
-            }
-            this.evmTxRowsToInsert.push(evmTxToRec)
+	    if ( tx.to ) {
+		let evmTxToRec = {
+                    key: paraTool.make_addressExtrinsic_rowKey(tx.to, evmTxHash, tx.timestamp),
+                    data: {
+			feedto: {}
+                    }
+		}
+		evmTxToRec.data.feedto[col] = {
+                    value: JSON.stringify({
+			chainID: chainID,
+			blockNumber: tx.blockNumber,
+			transactionHash: evmTxHash,
+			decodedInput: tx.decodedInput,
+			from: tx.from.toLowerCase(),
+			to: tx.to.toLowerCase(),
+			ts: tx.timestamp,
+			value: tx.value,
+			fee: tx.fee
+                    }),
+                    timestamp: rects
+		}
+		this.evmTxRowsToInsert.push(evmTxToRec)
+	    }
         } else {
             evmTxHashRec.data = {
                 feedevmunfinalized: {
