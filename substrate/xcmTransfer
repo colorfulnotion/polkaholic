@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /*
 Usage: xcmTransfer chainID chainIDDest amount symbol [beneficiary]
 
@@ -7,9 +8,9 @@ KSM:
  ./xcmTransfer 2     22000 .01 KSM   // https://polkaholic.io/tx/0xb4353232721de67b61f735b05f1465b3962ed53e2cd7d998302a24afdccaf403 -- exception: v0...
  ./xcmTransfer 22000 2     .01 KSM   // https://polkaholic.io/tx/0x738afe4f7eb27cc49df361fe5903cbb1d1ae09db8375219b2ffcfa76f8df3ea7
 
- Kusama <=> Parallel-Heiko (KSM) 
+ Kusama <=> Parallel-Heiko (KSM)
  ./xcmTransfer 2     22085 1.0 KSM   // https://polkaholic.io/tx/0x707ca971b9f954873f3aef75bb044487e1b9740521e7b7c8a717c8888962d96c
- ./xcmTransfer 22085 2     1.0 KSM   // https://polkaholic.io/tx/0x20d9ddf6f9b008221726a9b3e146c233e587fbd09df02adf4289b8ff934ae085 
+ ./xcmTransfer 22085 2     1.0 KSM   // https://polkaholic.io/tx/0x20d9ddf6f9b008221726a9b3e146c233e587fbd09df02adf4289b8ff934ae085
 
  Kusama <=> Kintsugi (KSM)
  ./xcmTransfer 2     22092 1.0 KSM   // https://polkaholic.io/tx/0xf4150be70cf0e28bb752bdd9d420a11c3b7877f5f7563c91bdd358363b4eac72
@@ -21,14 +22,14 @@ KSM:
 
 MOVR:
  Karura <==> Moonriver (MOVR)
- ./xcmTransfer 22000 22023 1.0 MOVR  // https://polkaholic.io/tx/0x2d0196bbb82da4521e64f6bcc129f10df4652b8d09522a827df00d3063b2dcc5 
+ ./xcmTransfer 22000 22023 1.0 MOVR  // https://polkaholic.io/tx/0x2d0196bbb82da4521e64f6bcc129f10df4652b8d09522a827df00d3063b2dcc5
  ./xcmTransfer 22023 22000 1.0 MOVR  // https://polkaholic.io/tx/0x6a106f869de0e6a451acccaa47173e8f682d27ea41ac7be60fa0b4349233d3ea -- TODO
 
- Shiden <==> Moonriver (MOVR) 
+ Shiden <==> Moonriver (MOVR)
  ./xcmTransfer 22007 22023 1.0 MOVR  // https://polkaholic.io/tx/0x38519633a2df111c61b5dcaf68f84ccbf10e4d14630e93d517ef185889309d92 -- TODO
  ./xcmTransfer 22023 22007 1.0 MOVR  // https://polkaholic.io/tx/0x51b0a8cb2a4f0dbe7982586977034ff2ed82af36b417ce3e02704be1fca25ddb -- TODO
 
- Parallel-Heiko <==> Moonriver (MOVR) 
+ Parallel-Heiko <==> Moonriver (MOVR)
  ./xcmTransfer 22085 22023 1.0 MOVR  // https://polkaholic.io/tx/0x4fe33a7149c39ec9626baf3c59f4cb693175e7f0d2f19f43ebd457b74dbeb561
  ./xcmTransfer 22023 22085 1.0 MOVR  // https://polkaholic.io/tx/0xda7b756bb17b0940539220f1cbf4c495ebb356ed1246c72aa4e7dbeeeff41e36 -- TODO
 
@@ -38,13 +39,13 @@ KINT:
  ./xcmTransfer 22092 22000 1.0 KINT  // https://polkaholic.io/tx/0x90ad8ac2d0795540d540fb05a32def025ca6debb351dcdf9a06f069c01379ef6
 
  Kintsugi <=> Moonriver (KINT)
- ./xcmTransfer 22092 22023 1.0 KINT  // 
- ./xcmTransfer 22023 22092 1.0 KINT  // 
+ ./xcmTransfer 22092 22023 1.0 KINT  //
+ ./xcmTransfer 22023 22092 1.0 KINT  //
 
 BNC:
  Karura <=> Bifrost-KSM (BNC)
  ./xcmTransfer 22000 22001 1.0 BNC   // https://polkaholic.io/tx/0x3acb4bc43ee9d76be319d469880e7ac538cfdcd598a97de45785dbf866299dcf
- ./xcmTransfer 22001 22000 1.0 BNC   // https://polkaholic.io/tx/0xb3a99967fdef5546259c7eaea9335279dd09786ebe515461d93342f27c785f88  
+ ./xcmTransfer 22001 22000 1.0 BNC   // https://polkaholic.io/tx/0xb3a99967fdef5546259c7eaea9335279dd09786ebe515461d93342f27c785f88
 
 CSM: https://polkaholic.io/symbol/CSM#chains
  Karura <=> Crust Shadow (CSM)
@@ -57,16 +58,16 @@ CSM: https://polkaholic.io/symbol/CSM#chains
 
 PHA: https://polkaholic.io/symbol/PHA#chains
  Khala <=> Moonriver (PHA)
- ./xcmTransfer 22004 22023 1.0 PHA   // 
- ./xcmTransfer 22023 22004 1.0 PHA   // 
+ ./xcmTransfer 22004 22023 1.0 PHA   //
+ ./xcmTransfer 22023 22004 1.0 PHA   //
 
  Khala <=> Parallel-Heiko (PHA)
- ./xcmTransfer 22004 22085 1.0 PHA   // 
- ./xcmTransfer 22084 22005 1.0 PHA   // 
+ ./xcmTransfer 22004 22085 1.0 PHA   //
+ ./xcmTransfer 22084 22005 1.0 PHA   //
 
  Khala <=> Calamari (PHA)
- ./xcmTransfer 22004 22084 1.0 PHA   // 
- ./xcmTransfer 22084 22004 1.0 PHA   // 
+ ./xcmTransfer 22004 22084 1.0 PHA   //
+ ./xcmTransfer 22084 22004 1.0 PHA   //
 
  Karura <==> Khala (PHA)
  ./xcmTransfer 22000 22004 1.0 PHA   // https://polkaholic.io/tx/0x688526b4c781f9009fd7e64bdba25cbba06ef345a3e19c8a9a23264075975ea6
@@ -79,7 +80,7 @@ KUSD:
 
 AIR:
  Karura <=> Altair (AIR)
- ./xcmTransfer 22000 22088 1.0 AIR   // https://polkaholic.io/tx/0xe0a993118813fbacf6462c3fd21de6941dd82937e2de4f3552fd2d4be4664816 
+ ./xcmTransfer 22000 22088 1.0 AIR   // https://polkaholic.io/tx/0xe0a993118813fbacf6462c3fd21de6941dd82937e2de4f3552fd2d4be4664816
  ./xcmTransfer 22088 22000 1.0 AIR   // https://polkaholic.io/tx/0xb83a9cfe4da9593b5f303b785cce0bf25a8a0b5953ce0e317dc12a91ab626c6d
 
 QTZ:
@@ -88,13 +89,13 @@ QTZ:
  ./xcmTransfer 22095 22000 1.0 QTZ   // https://polkaholic.io/tx/0xf5e84c9f5355df40f0430279b9b525d8eacc9d75fcb4a8d92f09cce2c06742cb -- TODO
 
 RMRK: https://polkaholic.io/symbol/RMRK#chains
- Statemine <=> Moonriver (RMRK) 
+ Statemine <=> Moonriver (RMRK)
  ./xcmTransfer 21000 22023 1.0 RMRK  // https://polkaholic.io/tx/0x86c9195f0985411f8633b95c21da02287ca616d2c88430cfa9e385e74ab79a98
  ./xcmTransfer 22023 21000 1.0 RMRK  // https://polkaholic.io/tx/0x64574083ac92956bfecff160086bcb3a8cd6c4aff1d2a36656e203991a92070c -- TODO
 
  Statemine <==> Karura (RMRK)
  ./xcmTransfer 21000 22000 1.0 RMRK  // https://polkaholic.io/tx/0xb4fa455ed4aa0786220043de74888cf4e7b81edd440d777b8cfdcc29e87f75d9 check
- ./xcmTransfer 22000 21000 1.0 RMRK  // https://polkaholic.io/tx/0xc15f8da2060f2b47e3dd55d1888605d690a2be050ad2ed627b7d3b17a48bacd9 
+ ./xcmTransfer 22000 21000 1.0 RMRK  // https://polkaholic.io/tx/0xc15f8da2060f2b47e3dd55d1888605d690a2be050ad2ed627b7d3b17a48bacd9
 
 DOT: https://polkaholic.io/symbol/DOT#chains
  Polkadot <=> Moonbeam (DOT)
@@ -110,7 +111,7 @@ DOT: https://polkaholic.io/symbol/DOT#chains
  ./xcmTransfer 2012 0 .01 DOT    // https://polkaholic.io/tx/0x7837ccf0290c8edc1985880356e37390a6e01d0f63529a54bae214918d393382
 
  Polkadot <=> Acala (DOT)
- ./xcmTransfer 0 2000 .01 DOT    // https://polkaholic.io/tx/0x14105b98d52392f22bf55bd99b848ac52a7fb3a6468cb4042a3557548f57ff87 
+ ./xcmTransfer 0 2000 .01 DOT    // https://polkaholic.io/tx/0x14105b98d52392f22bf55bd99b848ac52a7fb3a6468cb4042a3557548f57ff87
  ./xcmTransfer 2000 0 .01 DOT    // disabled
 
  Polkadot <=> Interlay (DOT)
@@ -129,15 +130,15 @@ GLMR: https://polkaholic.io/symbol/GLMR#chains
 
  Moonbeam <=> Astar (GLMR)
  ./xcmTransfer 2004 2006 1.0 GLMR  // https://polkaholic.io/tx/0x8623135d6e3c6c40daa6e888a8ab7d0b2b40922e873792bd26472cf3229bc008 -- TODO
- ./xcmTransfer 2006 2004 1.0 GLMR  // https://polkaholic.io/tx/0x018122c050318c7a3ae8ad13c8cdc122aac85001ec0b448a737b72a6f1a53faf -- TODO 
+ ./xcmTransfer 2006 2004 1.0 GLMR  // https://polkaholic.io/tx/0x018122c050318c7a3ae8ad13c8cdc122aac85001ec0b448a737b72a6f1a53faf -- TODO
 
  Moonbeam <==> Acala (GLMR)
- ./xcmTransfer 2004 2000 1.0 GLMR  // TODO: evm transfer https://polkaholic.io/tx/0x1a359894db4c2997cef40c85e5a74037cf1fb2c49a1989a289347da16b6a26e0 
+ ./xcmTransfer 2004 2000 1.0 GLMR  // TODO: evm transfer https://polkaholic.io/tx/0x1a359894db4c2997cef40c85e5a74037cf1fb2c49a1989a289347da16b6a26e0
  ./xcmTransfer 2000 2004 1.0 GLMR  // disabled
 
 PARA: https://polkaholic.io/symbol/PARA#chains
  Parallel <=> Moonbeam (PARA)
- ./xcmTransfer 2012 2004 .01 PARA  // https://polkaholic.io/tx/0xfaebf4da5ab6633ea06d6d8d0ed9c08f93196010af87d759efa23f73dffea3cb 
+ ./xcmTransfer 2012 2004 .01 PARA  // https://polkaholic.io/tx/0xfaebf4da5ab6633ea06d6d8d0ed9c08f93196010af87d759efa23f73dffea3cb
  ./xcmTransfer 2004 2012 .01 PARA  // https://polkaholic.io/tx/0xcd87bea0acebed1a0d103f5ca77f909e551317fba917c287c1c524fbb7c02d02 -- TODO
 
  Acala <==> Parallel (PARA)
@@ -148,33 +149,33 @@ ASTR: https://polkaholic.io/symbol/ASTR#chains
  Astar <=> Moonbeam (ASTR)
  ./xcmTransfer 2006 2004 1.0 ASTR //
  ./xcmTransfer 2004 2006 1.0 ASTR //
-  
+
  Astar <=> Acala (ASTR)
  ./xcmTransfer 2006 2000 1.0 ASTR //
  ./xcmTransfer 2000 2006 1.0 ASTR //
- 
+
 IBTC: https://polkaholic.io/symbol/IBTC#chains
  Interlay <==> Moonbeam (IBTC)
  ./xcmTransfer 2032 2004 1.0 IBTC // https://polkaholic.io/tx/0xe8ab0a139dc32be1ed8baa32a9586ac6b7efb6c4f7a346fc4f71befb8a2df198 -- check
  ./xcmTransfer 2004 2032 1.0 IBTC // https://polkaholic.io/tx/0x76edab61b190e0c86dd81e59125370eaa2643c846df0fb2cc93644a15216f654
 
- Interlay <=> Acala (IBTC) 
+ Interlay <=> Acala (IBTC)
  ./xcmTransfer 2000 2032 1.0 IBTC // ["error mint"]
  ./xcmTransfer 2032 2000 1.0 IBTC // ["error mint"]
 
 ACA: https://polkaholic.io/symbol/ACA#chains
  Acala <==> Parallel (ACA)
  ./xcmTransfer 2000 2012 1.0 ACA  //
- ./xcmTransfer 2012 2000 1.0 ACA  // 
+ ./xcmTransfer 2012 2000 1.0 ACA  //
 
  Acala <=> Moonbeam (ACA)
- ./xcmTransfer 2000 2004 1.0 ACA  // 
+ ./xcmTransfer 2000 2004 1.0 ACA  //
  ./xcmTransfer 2004 2000 1.0 ACA  // https://polkaholic.io/tx/0x0a71af022c8b2bb6d909387eede206adf9f5ef99b0a32e43c94ef19519ebe9da
 */
 const XCMTransfer = require("./xcmtransfer");
 
 async function main() {
-    let chainID = -1;    
+    let chainID = -1;
     let chainIDDest = -1;
     let amount = 1.0;
     let symbol = "KSM";
@@ -200,38 +201,38 @@ async function main() {
 
     const xcmtransfer = new XCMTransfer();
 
-    if ( chainID == -1 ) {
-	let testcases = await xcmtransfer.getTestcasesAutomated();
-	// let testcases = xcmtransfer.getTestcasesManual();
-	for ( let i=0; i < testcases.length ; i++) {
-	    try {
-		let t = testcases[i];
-		chainID = t.chainID;
-		chainIDDest = t.chainIDDest;
-		symbol = t.symbol;
-		amount = 1.0;
-		console.log("*******");
-		console.log(t);
-		if ( t.isEVM ) { 
-		    beneficiary = beneficiaryEVM;
-		}
-		let [sectionMethod, func, args] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
-		console.log(sectionMethod, args);
-	    } catch (e) {
-		console.log(e);
-	    }
-	}
+    if (chainID == -1) {
+        let testcases = await xcmtransfer.getTestcasesAutomated();
+        // let testcases = xcmtransfer.getTestcasesManual();
+        for (let i = 0; i < testcases.length; i++) {
+            try {
+                let t = testcases[i];
+                chainID = t.chainID;
+                chainIDDest = t.chainIDDest;
+                symbol = t.symbol;
+                amount = 1.0;
+                console.log(`******* CASE ${i}`);
+                console.log(t);
+                if (t.isEVM) {
+                    beneficiary = beneficiaryEVM;
+                }
+                let [sectionMethod, func, args] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
+                console.log(`xcmtransfer cli ${sectionMethod} args=`, args);
+            } catch (e) {
+                console.log(`xcmtransfer cli error`, e.toString());
+            }
+        }
     } else {
-	let [sectionMethod, func, args] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
-	let execute = false;
-	console.log(sectionMethod, args);
-	if ( chainIDDest == 2004 || chainIDDest == 2006 || chainIDDest == 22023 || chainIDDest == 22007 ) { 
-	    beneficiary = beneficiaryEVM;
-	}
-	if ( execute ) {
-	    let hash = func.apply(null, args).signAndSend(xcmtransfer.pair);
-	    console.log("Transfer sent with hash", hash.toHex());
-	}
+        let [sectionMethod, func, args] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
+        let execute = false;
+        console.log(sectionMethod, args);
+        if (chainIDDest == 2004 || chainIDDest == 2006 || chainIDDest == 22023 || chainIDDest == 22007) {
+            beneficiary = beneficiaryEVM;
+        }
+        if (execute) {
+            let hash = func.apply(null, args).signAndSend(xcmtransfer.pair);
+            console.log("Transfer sent with hash", hash.toHex());
+        }
     }
 }
 main()

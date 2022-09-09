@@ -137,7 +137,7 @@ module.exports = class XCMTransfer extends AssetManager {
                 parsedAsset.foreignAsset = parsedAsset.ForeignAsset
                 delete parsedAsset.ForeignAsset
             }
-            // "native" HACKS 
+            // "native" HACKS
             if (assetRec.chainID == 22001 && parsedAsset.token == "BNC") {
                 return {
                     "native": parsedAsset.token
@@ -200,14 +200,14 @@ module.exports = class XCMTransfer extends AssetManager {
             }
         } else if (xcm.parachain) {
             /*
-    //KSM  here~kusama 
+    //KSM  here~kusama
     //DOT  here~polkadot
     //ASTR {"parachain":2006}~polkadot
     //ACA  [{"parachain":2000},{"generalKey":"0x0000"}]~polkadot
     //AUSD [{"parachain":2000},{"generalKey":"0x0001"}]~polkadot
-    //BNC  [{"parachain":2001},{"generalKey":"0x0001"}]~kusama  
-    //BSX  [{"parachain":2090},{"generalIndex":0}]~kusama       
-    //GLMR [{"parachain":2004},{"palletInstance":10}]~polkadot  
+    //BNC  [{"parachain":2001},{"generalKey":"0x0001"}]~kusama
+    //BSX  [{"parachain":2090},{"generalIndex":0}]~kusama
+    //GLMR [{"parachain":2004},{"palletInstance":10}]~polkadot
     //HKO  [{"parachain":2085},{"generalKey":"0x484b4f"}]~kusama
     */
             if (xcm.generalIndex) {
@@ -482,66 +482,88 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async getTestcasesAutomated(limit = 10) {
-        let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM, count(*) cnt from xcmtransfer join xcmasset on xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where sourceTS > unix_timestamp(date_sub(Now(), interval 30 day)) and chain.chainID = xcmtransfer.chainIDDest and xcmtransfer.chainID >= 0 and xcmtransfer.chainIDDest >= 0 and incomplete = 0 and length(xcmtransfer.xcmInteriorKey) > 4 and xcmtransfer.sectionMethod not in ( 'xTokens:TransferredMultiAssets', 'xTransfer:transfer' ) group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM having count(*) > 10 order by count(*) desc limit ${limit}`
+        let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM as isBeneficiaryEVM, 0 as isSenderEVM, count(*) cnt from xcmtransfer join xcmasset on
+        xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where
+        sourceTS > unix_timestamp(date_sub(Now(), interval 30 day)) and
+        chain.chainID = xcmtransfer.chainIDDest and xcmtransfer.chainID >= 0 and
+        xcmtransfer.chainIDDest >= 0 and incomplete = 0 and length(xcmtransfer.xcmInteriorKey) > 4 and
+        xcmtransfer.sectionMethod not in ( 'xTokens:TransferredMultiAssets', 'xTransfer:transfer' )
+        group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM
+        having count(*) > 10 order by count(*) desc limit ${limit}`
         let testcases = await this.poolREADONLY.query(sql);
-        console.log("TESTCASES", testcases.length);
-        return testcases;
+        let autoTestcases = []
+        for (const testcase of testcases){
+            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam){
+                testcase.isSenderEVM = 1
+            }
+            autoTestcases.push(testcase)
+        }
+        console.log("TESTCASES", autoTestcases.length);
+        return autoTestcases;
     }
     async getTestcasesManual() {
         return [{
                 chainID: 2,
                 chainIDDest: 21000,
                 symbol: 'KSM',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 100
             },
             {
                 chainID: 2006,
                 chainIDDest: 2000,
                 symbol: 'ACA',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 64
             },
             {
                 chainID: 2006,
                 chainIDDest: 2000,
                 symbol: 'AUSD',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 47
             },
             {
                 chainID: 2000,
                 chainIDDest: 2006,
                 symbol: 'AUSD',
-                isEVM: 1,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 45
             },
             {
                 chainID: 2,
                 chainIDDest: 22024,
                 symbol: 'KSM',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 20
             },
             {
                 chainID: 0,
                 chainIDDest: 1000,
                 symbol: 'DOT',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 16
             },
             {
                 chainID: 21000,
                 chainIDDest: 22000,
                 symbol: 'USDT',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 12
             },
             {
                 chainID: 21000,
                 chainIDDest: 22001,
                 symbol: 'RMRK',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 12
             }
         ]

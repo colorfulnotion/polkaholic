@@ -1616,6 +1616,9 @@ module.exports = {
     parseAbiSignature: function(abiStrArr) {
         return parseAbiSignature(abiStrArr)
     },
+    parseAbiSignature: function(abiStrArr) {
+        return parseAbiSignature(abiStrArr)
+    },
     processReceipts: async function(evmReceipts, contractABIs, contractABISignatures) {
         return processReceipts(evmReceipts, contractABIs, contractABISignatures)
     },
