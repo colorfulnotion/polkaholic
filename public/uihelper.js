@@ -470,8 +470,34 @@ function presentAsset(asset) {
 }
 
 function presentAssetPair(row) {
-    let assetPair = row.symbol + ":" + asset0.substring(0, 6) + "/" + asset1.substring(0, 6);
-    return `<a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token0) + '">' + row.token0Symbol + `</a> / <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token1) + '">' + row.token1Symbol + '</a>';
+    try {
+	/*
+asset: "0x05cae890aa5b30f19dcc38ba2ea525e9eb9ae995"
+assetChain: "0x05cae890aa5b30f19dcc38ba2ea525e9eb9ae995~2004"
+assetName: "Stella LP"
+assetType: "ERC20LP"
+chainID: 2004
+chainName: "Moonbeam"
+decimals: 18
+isUSD: 0
+nativeAssetChain: null
+numHolders: 2
+priceUSDpaths: false
+routeDisabled: 0
+symbol: "STELLA LP"
+token0: "0x322e86852e492a7ee17f28a78c663da38fb33bfb"
+token0Decimals: 18
+token0Symbol: "FRAX"
+token1: "0xffffffffa922fef94566104a6e5a35a4fcddaa9f"
+token1Decimals: 12
+token1Symbol: "xcACA" */
+	let asset0 = row.token0
+	let asset1 = row.token1
+	let assetPair = `<a href='${row.chainID}/${row.asset}'>${row.symbol}</a>`
+	return `${assetPair}: <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token0) + '">' + row.token0Symbol + `</a> / <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token1) + '">' + row.token1Symbol + '</a>';
+    } catch (e) {
+	console.log("presentAssetPair", row);
+    }
 }
 
 function presentID(id) {

@@ -4782,7 +4782,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return (true);
     }
 
-    async process_erc20_token_transfer(tx, t, chainID) {
+    async process_erc20_token_transfer(tx, t, chainID, eventID = "0") {
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         //   1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
@@ -4845,6 +4845,24 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         // This mark for lookup on isTip = true for processAssetTypeERC20/fetchAssetHolderBalances
         this.updateAssetHolder(assetChain, t.from, bn)
         this.updateAssetHolder(assetChain, t.to, bn)
+
+	if ( t.from && t.to && t.tokenAddress) {
+	    let v = {
+		    type: "ERC20",
+		    chainID: chainID,
+		    blockNumber: tx.blockNumber,
+		    from: t.from.toLowerCase(),
+		    to: t.to.toLowerCase(),
+		    tokenAddress: t.tokenAddress,
+		    ts: tx.timestamp,
+		    value: t.value,
+            };
+	    let extrinsicID = `${tx.blockNumber}-${tx.transactionIndex}`
+	    console.log("ERC20 update!!!!!!!", v, tx);
+	    this.updateAddressExtrinsicStorage(t.from, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+	    this.updateAddressExtrinsicStorage(t.to, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+	    this.updateAddressExtrinsicStorage(t.tokenAddress, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+	}
     }
 
 
@@ -4878,7 +4896,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async process_erc721_token_transfer(tx, t, chainID) {
+    async process_erc721_token_transfer(tx, t, chainID, eventID = "0") {
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         let tokenID = t.tokenId
@@ -4926,27 +4944,29 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async process_erc1155_token_transfer(tx, t, chainID) {
+    async process_erc1155_token_transfer(tx, t, chainID, eventID = "0") {
         //stub
     }
 
     async process_evmtx_token_transfer(tx, chainID) {
-        // TODO: erc721/1151
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         let transfers = tx.transfers
 
-        for (const t of transfers) {
+        for (let e = 0; e < transfers.length; e++) {
+	    let eventID = e.toString();
+	    let t = transfers[e];
             //console.log(`Evm transfer [${bn}-${tx.transactionIndex}]`, JSON.stringify(t))
             if (t.type == "ERC20") {
-                await this.process_erc20_token_transfer(tx, t, chainID)
+                await this.process_erc20_token_transfer(tx, t, chainID, eventID)
             }
             if (t.type == "ERC721") {
-                await this.process_erc721_token_transfer(tx, t, chainID)
+                await this.process_erc721_token_transfer(tx, t, chainID, eventID)
             }
             if (t.type == "ERC1155") {
-                await this.process_erc1155_token_transfer(tx, t, chainID)
+                await this.process_erc1155_token_transfer(tx, t, chainID, eventID)
             }
+
         }
         return (false);
     }

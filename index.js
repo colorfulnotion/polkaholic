@@ -1352,6 +1352,16 @@ app.get('/address/:address/:chainID?', async (req, res) => {
 })
 
 app.get('/token/:address/:chainID?', async (req, res) => {
+    let accounts = [];
+    let addresses = getHomeAddresses(req);
+    try {
+        if (addresses) {
+            accounts = await query.getMultiAccount(addresses);
+        }
+    } catch (e) {
+        // errors should not matter
+    }
+
     try {
         let address = req.params["address"];
         let [requestedChainID, id] = getHostChain(req);
@@ -1361,8 +1371,11 @@ app.get('/token/:address/:chainID?', async (req, res) => {
         }
         let chainList = [];
         let [account, contract] = await query.getAddressContract(address, chainID);
+	if ( contract && contract.chainID ) chainID = contract.chainID;
         res.render('token', {
             account: account,
+	    chainID: chainID,
+	    accounts: accounts,
             contract: contract,
             chainInfo: query.getChainInfo(),
             address: address,
@@ -1571,7 +1584,7 @@ app.get('/xcmmessage/:msgHash/:blockNumber?', async (req, res) => {
     } catch (err) {
         if (err instanceof paraTool.NotFoundError) {
             res.render('notfound', {
-                recordtype: "transaction",
+                recordtype: "XCM message",
                 chainInfo: query.getChainInfo()
             });
         } else {

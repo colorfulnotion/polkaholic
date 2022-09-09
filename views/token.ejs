@@ -9,11 +9,27 @@
     </div>
     <div class="col-md-8">
       <div class="card-body">
-        <h5 class="card-title">Token <%- contract.assetName; %></h5>
+        <h5 class="card-title">Token: <%- contract.assetName; %></h5>
         <table class="table table-hover table-bordered">
 	<tr>
+		<td>Symbol:</td>
+		<td>
+		<% if ( contract.symbol ) { %>
+		  <a href='/symbol/<%= contract.symbol; %>'><%- contract.localSymbol %></a>
+		<% } else if ( contract.localSymbol ) { %>
+		  <%- contract.localSymbol %>
+		<% } %>
+		</td>
+	</tr>
+	<tr>
+		<td>Contract:</td>
+		<td>
+		  <a href='/address/<%= address; %>'><%- uiTool.getShortHash(contract.asset) %></a>
+		</td>
+	</tr>
+	<tr>
 		<td>Price:</td>
-		<td><a href='/token/<%= address; %>'><%- contract.assetName %> (<%- contract.symbol; %>)</a> (<%- uiTool.currencyFormat(contract.priceUSD); %>)
+		<td><%- uiTool.currencyFormat(contract.priceUSD); %>
 		</td>
 	</tr>
 	<tr>
@@ -28,13 +44,15 @@
 		<td>Holders:</td>
 		<td><%- uiTool.presentNumber(contract.numHolders) %> addresses</td>
 	</tr>
+	<% if ( contract.token0 && contract.token1 ) { %>
 	<tr>
 	   <td>Contract:</td>
 	   <td><a href='/address/<%- contract.token0 %>'><%- uiTool.getShortHash(contract.token0) %></a> / <a href='/address/<%- contract.token1 %>'><%- uiTool.getShortHash(contract.token1) %></a></td>
 	</tr>
+	<% } %>
 	<tr>
 	   <td>Decimals:</td>
-	   <td><%= contract.decimals %></td>
+	   <td><%= contract.decimals %><%= JSON.stringify(contract); %></td>
 	</tr>
 	</table>
       </div>
@@ -49,6 +67,8 @@
 <ul class="nav nav-tabs" style="font-size:1rem" id="accountTab" role="tablist">
 <%
 let tabs = [
+{ title: "Your Holdings", target: "accountassets" },
+{ title: "Liquidity Pools", target: "assetsrelated" },
 { title: "Transactions", target: "evmtxs" },
 { title: "Transfers", target: "transfers" },
 { title: "XCM Transfers", target: "xcmtransfers" },
@@ -71,6 +91,19 @@ for (let i=0; i<tabs.length; i++) {
 
 <!-- Tab panes -->
 <div class="tab-content">
+
+  <div class="tab-pane" id="accountassets" role="tabpanel" aria-labelledby="accountassets-tab">
+    <table id="tableaccountassets" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Your Account</th>
+          <th>Your Holdings</th>
+          <th>Value (USD)</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+
   <div class="tab-pane" id="evmtxs" role="tabpanel" aria-labelledby="evmtxs-tab">
     <table id="tableevmtxs" class="display" style='width: 100%'>
       <thead>
@@ -88,6 +121,7 @@ for (let i=0; i<tabs.length; i++) {
       </thead>
     </table>
   </div>
+  
   <div class="tab-pane" id="transfers" role="tabpanel" aria-labelledby="transfers-tab">
     <table id="tabletransfers" class="display" style='width: 100%'>
       <thead>
@@ -121,16 +155,35 @@ for (let i=0; i<tabs.length; i++) {
       </thead>
     </table>
   </div>
+
+  <div class="tab-pane" id="assetsrelated" role="tabpanel" aria-labelledby="assetsrelated-tab">
+    <table id="tableassetsrelated" class="display" style='width: 100%'>
+    <thead>
+    <tr>
+      <th scope="col">Asset</th>
+      <th scope="col">Your Holdings</th>
+      <th scope="col"># Holders</th>
+      <th scope="col">Current Price (USD)</th>
+      <th scope="col">Total Free</th>
+      <th scope="col">TVL</th>
+    </tr>
+    </thead>
+    </table>
+  </div>
+
 </div>
 
 <script>
-let address = '<%= address; %>';
-let requestedChainAddress = '<%= address; %>';
-let tabs = <%- JSON.stringify(tabs); %>;
-let chainListStr = '<%= chainListStr; %>';
-let isEVM = 1;
-let isToken = true;
+var address = '<%= address; %>';
+var chainID = '<%= chainID; %>';
+var accounts = '<%= accounts; %>';
+var requestedChainAddress = '<%= address; %>';
+var tabs = <%- JSON.stringify(tabs); %>;
+var chainListStr = '<%= chainListStr; %>';
+var isEVM = 1;
 </script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
-<script src="/account.js"></script>
+<script src="/accountui.js"></script>
+<script src="/assetui.js"></script>
+<script src="/token.js"></script>

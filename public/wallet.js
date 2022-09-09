@@ -84,6 +84,7 @@ $('#walletModalClose').on('click', function(e) {
 });
 
 async function connect_evmwallet() {
+    return;
     if (window.ethereum) {
         await window.ethereum.request({
             method: "eth_requestAccounts"
@@ -118,10 +119,9 @@ $('#walletModal').on('show.bs.modal', async function(event) {
 
     let [_, currentAddresses] = getWalletHome();
 
-    await connect_evmwallet();
+    //await connect_evmwallet();
     let out = [];
-    let evmAddresses = [];
-    if (window.ethereum) {
+/*    if (window.ethereum) {
         const evmAccounts = web3.eth.accounts;
         //Get the current selected/active wallet
         const evmAddress = evmAccounts.givenProvider.selectedAddress;
@@ -130,7 +130,7 @@ $('#walletModal').on('show.bs.modal', async function(event) {
         let addr = evmAddress;
         let name = "EVM";
         out.push(presentWalletAccount("EVM", addr, addr, currentAddresses.includes(addr), true));
-    }
+    } */
 
     if (accounts?.length > 0) {
         //accounts?.map(account => console.log(`Address: ${account.address}\t(pubkey: ${getPubkey(account)})`));

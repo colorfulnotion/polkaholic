@@ -35,7 +35,8 @@ cbt createtable  chain2004   "families=blockraw:maxversions=1,autotrace=maxversi
 # rowKey:  {contractAddress}#{invTS}#{txhash}
 #  feedto:       evmtx incoming INTO contract by users (whereas addressextrinsic feed is from other the users)
 #  feedinternal: txn initiated BY contract during execution
-cbt createtable  evmtx          "families=feedto:maxversions=1,feedinternal:maxversions=1"
+#  feederc20:    erc20transfer incoming/outgoing into/out from contract
+cbt createtable  evmtx          "families=feedto:maxversions=1,feedinternal:maxversions=1,feederc20:maxversions=1"
 
 # Note: contract transfers are already in addressextrinsic "feedtransfer" column family ({contractAddress}#{invTS}#{txhash}, column: {txhash}#{eventID}
 # Example: cbt read addressextrinsic prefix=0xacc15dc74880c9944775448304b263d191c6077f
