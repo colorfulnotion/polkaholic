@@ -6798,21 +6798,13 @@
     "web3-core-requestmanager" "1.6.0"
     "web3-utils" "1.6.0"
 
-"web3-eth-abi@^1.2.1":
+"web3-eth-abi@1.6.0":
   "integrity" "sha512-qWHvF7sayxql9BD1yqK9sZRLBQ66eJzGeaU53Y1PRq2iFPrhY6NUWxQ3c3ps0rg+dyObvRbloviWpKXcS4RE/A=="
   "resolved" "https://registry.npmjs.org/web3-eth-abi/-/web3-eth-abi-1.7.5.tgz"
   "version" "1.7.5"
   dependencies:
     "@ethersproject/abi" "^5.6.3"
     "web3-utils" "1.7.5"
-
-"web3-eth-abi@1.6.0":
-  "integrity" "sha512-fImomGE9McuTMJLwK8Tp0lTUzXqCkWeMm00qPVIwpJ/h7lCw9UFYV9+4m29wSqW6FF+FIZKwc6UBEf9dlx3orA=="
-  "resolved" "https://registry.npmjs.org/web3-eth-abi/-/web3-eth-abi-1.6.0.tgz"
-  "version" "1.6.0"
-  dependencies:
-    "@ethersproject/abi" "5.0.7"
-    "web3-utils" "1.6.0"
 
 "web3-eth-accounts@1.6.0":
   "integrity" "sha512-2f6HS4KIH4laAsNCOfbNX3dRiQosqSY2TRK86C8jtAA/QKGdx+5qlPfYzbI2RjG81iayb2+mVbHIaEaBGZ8sGw=="
@@ -6941,7 +6933,7 @@
     "web3-core-subscriptions" "1.6.0"
     "web3-net" "1.6.0"
 
-"web3-utils@^1.2.1", "web3-utils@^1.6.0", "web3-utils@1.6.0":
+"web3-utils@1.6.0":
   "integrity" "sha512-bgCAWAeQnJF035YTFxrcHJ5mGEfTi/McsjqldZiXRwlHK7L1PyOqvXiQLE053dlzvy1kdAxWl/sSSfLMyNUAXg=="
   "resolved" "https://registry.npmjs.org/web3-utils/-/web3-utils-1.6.0.tgz"
   "version" "1.6.0"
