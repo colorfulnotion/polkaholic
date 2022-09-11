@@ -1670,7 +1670,7 @@ module.exports = class ChainParser {
             }
         ]
         */
-	let section_method = `${extrinsic.section}:${extrinsic.method}`
+        let section_method = `${extrinsic.section}:${extrinsic.method}`
         let evetnData = event.data
         let transferIndex = 0;
         let xcmIndex = extrinsic.xcms.length

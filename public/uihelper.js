@@ -1447,3 +1447,10 @@ function presentWASMCodeHash(codeHash) {
 function presentWASMContract(contractAddress) {
     return `<a href='/wasmcontract/${contractAddress}'>` + getShortHash(contractAddress) + `</a>`
 }
+
+function presentStack(s) {
+    let out = s.map((x, idx) => {
+        return (idx > 0) ? "1" : "0"
+    })
+    return "call " + out.join("_");
+}

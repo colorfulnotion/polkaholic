@@ -65,6 +65,8 @@ module.exports = class PriceManager extends Query {
         }
         return null;
     }
+
+
     getPathExtensions(path) {
         let extensions = [];
         let tailAssetChain = path[path.length - 1].dest; // the last element, which is an assetChain
@@ -77,7 +79,7 @@ module.exports = class PriceManager extends Query {
             let [asset, cID] = paraTool.parseAssetChain(assetChain);
             let assetInfo = this.assetInfo[assetChain];
             if (assetInfo.routeDisabled) {
-                // aUSD hack
+
             } else if ((assetInfo.assetType == paraTool.assetTypeERC20LiquidityPair || assetInfo.assetType == paraTool.assetTypeLiquidityPair || assetInfo.assetType == paraTool.assetTypeXCAsset || assetInfo.assetType == paraTool.assetTypeXCMTransfer) && (assetInfo.token0 && assetInfo.token1)) {
                 let chainIDDest = null;
                 if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
@@ -183,7 +185,7 @@ module.exports = class PriceManager extends Query {
             return [null, null, null];
         }
         let [asset, chainID] = paraTool.parseAssetChain(p.route);
-        let sql = `select close from assetlog where asset = '${asset}' and chainID = ${chainID} order by indexTS desc limit 1` /// and indexTS > UNIX_TIMESTAMP(date_sub(Now(), interval 100 hour)) 
+        let sql = `select close from assetlog where asset = '${asset}' and chainID = ${chainID} order by indexTS desc limit 1` /// and indexTS > UNIX_TIMESTAMP(date_sub(Now(), interval 100 hour))
         let recents = await this.poolREADONLY.query(sql)
         if (recents.length > 0) {
             let close = recents[0].close;
@@ -330,7 +332,7 @@ module.exports = class PriceManager extends Query {
             let assetChain = paraTool.makeAssetChain(asset, r.chainID);
             let xcAsset = {
                 assetType: paraTool.assetTypeXCAsset,
-                asset: asset, // this is the virtual "mapper" 
+                asset: asset, // this is the virtual "mapper"
                 chainID: r.chainID,
                 token0: r.asset, // {"Token":...} which is NOT the same!
                 token1: r.xcContractAddress, // 0x... which not the same as token0!
@@ -373,19 +375,78 @@ module.exports = class PriceManager extends Query {
                 chainIDDest: r.chainIDDest,
                 token0: r.asset,
                 token1: r.assetDest,
-                token0Symbol: r.symbol, // could be the symbol name on chainID     (e.g. xcDOT) instead of the "universal" one (DOT) 
+                token0Symbol: r.symbol, // could be the symbol name on chainID     (e.g. xcDOT) instead of the "universal" one (DOT)
                 token1Symbol: r.symbol, // could be the symbol name on chainIDDest
                 symbol: r.symbol
             }
             this.assetInfo[assetChain] = xcmtransfer;
         }
+    }
 
+    async checkRoutes(chainID = -1) {
+        await this.init(); /// sets up this.assetInfo
+
+        let cnt = 0;
+        let ts = this.getCurrentTS();
+        let ts1 = this.getCurrentTS() - 86400;
+
+        for (const assetChain of Object.keys(this.assetInfo)) {
+            let [asset, cID] = paraTool.parseAssetChain(assetChain);
+            let assetInfo = this.assetInfo[assetChain];
+            if ((chainID >= 0 && cID != chainID) || assetInfo.routeDisabled) {
+
+            } else if ((assetInfo.assetType == paraTool.assetTypeERC20LiquidityPair || assetInfo.assetType == paraTool.assetTypeLiquidityPair)) {
+                cnt++;
+                let dexrec = await this.getDexRec(asset, cID, ts);
+                let routeDisabled = 0
+                if (dexrec) {
+                    if (dexrec.close > 1000000) {
+                        routeDisabled = 1;
+                        console.log("CHECK", dexrec.close, asset, dexrec, assetInfo.token0Symbol, assetInfo.token1Symbol);
+                    }
+                } else {
+                    routeDisabled = 1;
+                    console.log("FAILURE", asset, cID, assetInfo);
+                }
+                if (routeDisabled) {
+                    let sql = `update asset set routeDisabled = ${routeDisabled}, priceUSD = 0, priceUSDPercentChange = 0 where asset = ${mysql.escape(asset)} and chainID = ${cID}`
+                    this.batchedSQL.push(sql);
+                    await this.update_batchedSQL();
+                    console.log(sql);
+                } else {
+                    let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, asset, cID, ts1);
+                    if (priceUSD == 0) {
+                        console.log("FAIL LP", asset, cID, priceUSD, priceUSDCurrent);
+                    } else {
+                        console.log("SUCC LP", asset, cID, priceUSD, priceUSDCurrent);
+                    }
+                    let priceUSDPercentChange = (priceUSD > 0) ? 100 * (priceUSDCurrent - priceUSD) / priceUSD : 0.0;
+                    let sql = `update asset set priceUSD = ${priceUSDCurrent}, priceUSDPercentChange = '${priceUSDPercentChange}' where asset = ${mysql.escape(asset)} and chainID = ${cID}`
+                    this.batchedSQL.push(sql);
+                    await this.update_batchedSQL();
+                    console.log(sql);
+                }
+            } else if (assetInfo.assetType == paraTool.assetTypeToken || assetInfo.assetType == paraTool.assetTypeERC20) {
+                let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, asset, cID, ts1);
+                if (priceUSD == 0) {
+                    console.log("FAIL TOK", asset, cID, priceUSD, priceUSDCurrent, assetInfo.priceUSDpaths);
+                } else {
+                    console.log("SUCC TOK", asset, cID, priceUSD, priceUSDCurrent);
+                }
+                let priceUSDPercentChange = (priceUSD > 0) ? 100 * (priceUSDCurrent - priceUSD) / priceUSD : 0.0;
+                let sql = `update asset set priceUSD = ${priceUSDCurrent}, priceUSDPercentChange = '${priceUSDPercentChange}' where asset = ${mysql.escape(asset)} and chainID = ${cID}`
+                this.batchedSQL.push(sql);
+                await this.update_batchedSQL();
+                console.log(sql);
+            }
+        }
     }
 
     async computePriceUSDPaths() {
         await this.init(); /// sets up this.assetInfo
-
         await this.load_xc_assetInfo();
+
+        await this.checkRoutes();
         // add the roots:
         for (const assetChain of Object.keys(this.assetInfo)) {
             let assetInfo = this.assetInfo[assetChain];

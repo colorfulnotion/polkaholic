@@ -617,6 +617,12 @@ module.exports = {
         if (allowCopy) out += copyToClipboard(id);
         return out;
     },
+    presentStack: function(s) {
+        let out = s.map((x, idx) => {
+            return (idx > 0) ? "1" : "0"
+        })
+        return "call " + out.join("_");
+    },
     getPublicWSEndpoints: function(chain) {
         let endpoints = [];
         if (chain.WSEndpoint && chain.WSEndpoint.length > 0 && !chain.WSEndpoint.includes("polkaholic.io")) {

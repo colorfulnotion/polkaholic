@@ -399,9 +399,9 @@ module.exports = class Crawler extends Indexer {
                 evals = `, '${numReceiptsEVM}'`;
                 eupds = ", numReceiptsEVM = values(numReceiptsEVM)";
             } else if (evmBlock) {
-                eflds = ", blockHashEVM, parentHashEVM, numTransactionsEVM, gasUsed, gasLimit";
-                evals = `, '${evmBlock.hash}', '${evmBlock.parentHash}', '${evmBlock.transactions.length}', '${evmBlock.gasUsed}', '${evmBlock.gasLimit}'`;
-                eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit)";
+                eflds = ", blockHashEVM, parentHashEVM, numTransactionsEVM, numTransactionsInternalEVM, gasUsed, gasLimit";
+                evals = `, '${evmBlock.hash}', '${evmBlock.parentHash}', '${evmBlock.transactions.length}', '${evmBlock.transactionsInternal.length}', '${evmBlock.gasUsed}', '${evmBlock.gasLimit}'`;
+                eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), numTransactionsInternalEVM = values(numTransactionsInternalEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit)";
             }
             if (trace && finalized) {
                 sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, blockDT, crawlBlock, crawlTrace, lastTraceDT ${eflds} ) values (${bn}, '${blockHash}', '${parentHash}', FROM_UNIXTIME(${blockTS}), 0, 0, Now()  ${evals} ) on duplicate key update lastTraceDT = values(lastTraceDT), blockHash = values(blockHash), parentHash = values(parentHash), crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace), blockDT = values(blockDT) ${eupds} ;`;
@@ -461,7 +461,7 @@ module.exports = class Crawler extends Indexer {
             };
             save = true;
         }
-        console.log(`save_evm_block: cbt read chain${chainID} prefix=${paraTool.blockNumberToHex(bn)} evmTrace`, evmTrace);
+        console.log(`save_evm_block: cbt read chain${chainID} prefix=${paraTool.blockNumberToHex(bn)}`);
         // flush out BT updates
         if (save) {
             try {
@@ -1794,12 +1794,13 @@ create table talismanEndpoint (
                     let blockHashEVM = blockStats.blockHashEVM ? blockStats.blockHashEVM : "";
                     let parentHashEVM = blockStats.parentHashEVM ? blockStats.parentHashEVM : "";
                     let numTransactionsEVM = blockStats.numTransactionsEVM ? blockStats.numTransactionsEVM : 0;
+                    let numTransactionsInternalEVM = blockStats.numTransactionsInternalEVM ? blockStats.numTransactionsInternalEVM : 0;
                     let numReceiptsEVM = blockStats.numReceiptsEVM ? blockStats.numReceiptsEVM : 0;
                     let gasUsed = blockStats.gasUsed ? blockStats.gasUsed : 0;
                     let gasLimit = blockStats.gasLimit ? blockStats.gasLimit : 0;
-                    eflds = ", blockHashEVM, parentHashEVM, numTransactionsEVM, numReceiptsEVM, gasUsed, gasLimit, crawlBlockEVM, crawlReceiptsEVM, crawlTraceEVM";
-                    evals = `, '${blockHashEVM}', '${parentHashEVM}', '${numTransactionsEVM}', '${numReceiptsEVM}', '${gasUsed}', '${gasLimit}', ${crawlBlockEVM}, ${crawlReceiptsEVM}, ${crawlTraceEVM}`;
-                    eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), numReceiptsEVM = values(numReceiptsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit), crawlBlockEVM = values(crawlBlockEVM), crawlReceiptsEVM = values(crawlReceiptsEVM), crawlTraceEVM = values(crawlTraceEVM)";
+                    eflds = ", blockHashEVM, parentHashEVM, numTransactionsEVM, numTransactionsInternalEVM, numReceiptsEVM, gasUsed, gasLimit, crawlBlockEVM, crawlReceiptsEVM, crawlTraceEVM";
+                    evals = `, '${blockHashEVM}', '${parentHashEVM}', '${numTransactionsEVM}', '${numTransactionsInternalEVM}', '${numReceiptsEVM}', '${gasUsed}', '${gasLimit}', ${crawlBlockEVM}, ${crawlReceiptsEVM}, ${crawlTraceEVM}`;
+                    eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), numTransactionsInternalEVM = values(numTransactionsInternalEVM), numReceiptsEVM = values(numReceiptsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit), crawlBlockEVM = values(crawlBlockEVM), crawlReceiptsEVM = values(crawlReceiptsEVM), crawlTraceEVM = values(crawlTraceEVM)";
                 }
                 let sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, fees, blockDT, crawlBlock, crawlTrace ${eflds}) values ('${bn}', '${finalizedHash}', '${parentHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', FROM_UNIXTIME('${blockTS}'), '${crawlBlock}', '${crawlTrace}' ${evals}) on duplicate key update blockHash=values(blockHash), parentHash = values(parentHash), blockDT=values(blockDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), fees = values(fees), crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace) ${eupds}`;
                 this.batchedSQL.push(sql);
@@ -1984,7 +1985,7 @@ create table talismanEndpoint (
                             signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
 
                             //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
-                            let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts); // autotrace, finalized, write_bq_log are all false
+                            let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace); // autotrace, finalized, write_bq_log are all false
 
                             await this.immediateFlushBlockAndAddressExtrinsics()
 

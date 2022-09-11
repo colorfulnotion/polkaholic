@@ -1345,6 +1345,20 @@ module.exports = class Query extends AssetManager {
 
                     c.result = c.status // this is success/fail indicator of the evm tx
                     c.status = status // finalized/unfinalized
+
+                    // decorate transactionsInternal
+                    if (c.transactionsInternal !== undefined && c.transactionsInternal.length > 0) {
+                        for (let i = 0; i < c.transactionsInternal.length; i++) {
+                            let t = c.transactionsInternal[i];
+                            t.valueRaw = t.value;
+                            t.value = t.valueRaw / 10 ** this.getChainDecimal(c.chainID);
+                            if (decorateUSD) {
+                                t.valueUSD = c.priceUSD * t.value;
+                                t.priceUSD = c.priceUSD;
+                                t.priceUSDCurrent = c.priceUSDCurrent;
+                            }
+                        }
+                    }
                     // decorate transfers
                     if (c.transfers !== undefined && c.transfers.length > 0) {
                         for (let i = 0; i < c.transfers.length; i++) {
@@ -1355,7 +1369,6 @@ module.exports = class Query extends AssetManager {
                                 t.assetInfo = this.assetInfo[tokenAssetChain];
                                 if (t.assetInfo.decimals !== false) {
                                     t.value = t.value / 10 ** t.assetInfo.decimals;
-                                    //await this.decorateUSD(t, "value", tokenAsset, c.chainID, cTimestamp, decorateUSD)
                                     if (decorateUSD) {
                                         let [valueUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(t.value, tokenAsset, c.chainID, cTimestamp);
                                         t.valueUSD = valueUSD;
@@ -2000,7 +2013,20 @@ module.exports = class Query extends AssetManager {
 
             block.specVersion = this.getSpecVersionForBlockNumber(chainID, block.number);
             if (evmBlock) {
+                if (evmBlock.transactionsInternal !== undefined && evmBlock.transactionsInternal.length > 0) {
+                    for (let i = 0; i < evmBlock.transactionsInternal.length; i++) {
+                        let t = evmBlock.transactionsInternal[i];
+                        t.valueRaw = t.value;
+                        t.value = t.valueRaw / 10 ** this.getChainDecimal(chainID);
+                        if (decorateUSD) {
+                            /*t.valueUSD = c.priceUSD * t.value;
+                            t.priceUSD = c.priceUSD;
+                            t.priceUSDCurrent = c.priceUSDCurrent;*/
+                        }
+                    }
+                }
                 block.evmBlock = evmBlock
+                // decorate transactionsInternal
             }
         } catch (err) {
             this.logger.error({

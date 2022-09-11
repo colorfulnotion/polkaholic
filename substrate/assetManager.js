@@ -1194,7 +1194,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     }
                 } else {
                     //if (this.debugLevel >= paraTool.debugTracing)
-                    console.log("getTokenPriceUSD - MISSING route", r.route, "ts", ts, "asset", asset, "assetChain", assetChain, "assetInfo", assetInfo);
+                    console.log("getTokenPriceUSD - MISSING route", r.route, "ts", ts, "asset", asset, "assetChain", assetChain, "assetInfo", assetInfo, "priceUSDpath", priceUSDpath);
                 }
             }
         }

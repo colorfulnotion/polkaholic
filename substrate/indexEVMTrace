@@ -1,0 +1,30 @@
+#!/usr/bin/env node
+ // Usage: while true; do ./indexChain 10; done
+var Crawler = require("./crawler");
+
+async function main() {
+    let blockNumber = 2536837;
+    let chainID = 22023; // or 2004
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            blockNumber = parseInt(val, 10);
+        }
+        if (index == 3 && val.length > 0) {
+            chainID = val;
+        }
+    });
+    let crawler = new Crawler();
+    crawler.exitOnDisconnect = true;
+    let chain = await crawler.getChain(chainID);
+    await crawler.indexEVMTrace(chain, blockNumber);
+    await crawler.sleep(3*1000);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

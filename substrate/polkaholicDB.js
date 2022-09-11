@@ -1106,6 +1106,7 @@ from chain where chainID = '${chainID}' limit 1`);
             families.push("receiptsevm");
             families.push("traceevm");
             families.push("feedevm");
+            families.push("traceevm");
         }
         const filter = {
             filter: [{
