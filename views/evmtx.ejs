@@ -35,7 +35,9 @@ console.log(tx);
 
 <div class="tab-content">
   <%- include("evmtxOverview", {chainID: tx.chainID, id: tx.id, tx: tx }); %>
+  <% if ( tx.transactionsInternal) { %>
   <%- include("evmtxInternal", {chainID: tx.chainID, id: tx.id, tx: tx }); %>
+  <% } %>
   <%- include("evmtxLogs", {chainID: tx.chainID, id: tx.id, tx: tx }); %>
 </div>
 
