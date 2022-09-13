@@ -1138,10 +1138,12 @@ module.exports = {
         let assetChain = this.makeAssetChain(lowerAsset, chainID);
         let rawAssetChain = this.makeAssetChain(lowerAsset, chainID);
         let isXcAsset = false
-        if (lowerAsset.substr(0,10) == '0xffffffff'){
+        if (lowerAsset.substr(0, 10) == '0xffffffff') {
             // this is xcAsset
             let xcAssetID = contractAddrToXcAssetID(tokenAddress)
-            let xcAsset = {Token:xcAssetID}
+            let xcAsset = {
+                Token: xcAssetID
+            }
             isXcAsset = true
             assetChain = this.makeAssetChain(JSON.stringify(xcAsset), chainID)
         }
