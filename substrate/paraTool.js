@@ -1152,7 +1152,7 @@ module.exports = {
     makeXcmInteriorKey: function(interior, relayChain = 'kusama') {
         return (interior + assetChainSeparator + relayChain);
     },
-    parseXcmInteriorKey: function(xcmInteriorKey='[{"parachain":2023},{"palletInstance":10}]~kusama') {
+    parseXcmInteriorKey: function(xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
         let pieces = xcmInteriorKey.split(assetChainSeparator);
         let assetUnparsed = pieces[0];
         let relayChain = (pieces.length > 1) ? pieces[1] : undefined;

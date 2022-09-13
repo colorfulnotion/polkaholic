@@ -19,7 +19,9 @@ const web3 = new Web3();
 const util = require('util');
 const rlp = require('rlp')
 const paraTool = require("./paraTool");
-const { Transaction } = require('@ethereumjs/tx')
+const {
+    Transaction
+} = require('@ethereumjs/tx')
 
 const abiDecoder = require('abi-decoder');
 const exec = util.promisify(require("child_process").exec);
@@ -586,38 +588,38 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     return fTxn
 }
 
-function decodeRLPTransaction(rawTxHex){
+function decodeRLPTransaction(rawTxHex) {
     try {
         var tx = Transaction.fromRlpSerializedTx(rawTxHex)
         var txJSON = tx.toJSON()
         let from = web3.eth.accounts.recoverTransaction(rawTxHex);
         txJSON.from = from.toLowerCase()
         return txJSON
-    }catch(error){
+    } catch (error) {
         console.log(`decodeRLPTransaction rawTxHex=${rawTxHex}, error=${error.toString()}`)
         return false
     }
 }
 
-async function signEvmTx(web3Api, txStruct, wallet){
+async function signEvmTx(web3Api, txStruct, wallet) {
     var signedTX = false
     try {
         signedTX = await web3Api.eth.accounts.signTransaction(txStruct, wallet.privateKey)
-        console.log(`signEvmTx [acct=${wallet.address}], txHash=${signedTX.transactionHash}, txStruct=`,txStruct)
-    }catch(e){
+        console.log(`signEvmTx [acct=${wallet.address}], txHash=${signedTX.transactionHash}, txStruct=`, txStruct)
+    } catch (e) {
         console.log(`signEvmTx [acct=${wallet.address}], txStruct=${txStruct} error=${error.toString()}`)
     }
     return signedTX
 }
 
-async function sendSignedTx(web3Api, signedTx){
+async function sendSignedTx(web3Api, signedTx) {
     var isError = 0
     let txHash = signedTx.transactionHash
     let rawTransaction = signedTx.rawTransaction
     try {
         console.log(`sendSignedTx txhHash=${txHash}, rawTransaction=${rawTransaction}`)
         await web3Api.eth.sendSignedTransaction(signedTx.rawTransaction)
-    }catch(e){
+    } catch (e) {
         console.log(`sendSignedTx txhHash=${txHash}, rawTransaction=${rawTransaction} error=${error.toString()}`)
         isError = error.toString()
     }
@@ -1512,7 +1514,7 @@ function loadWallet(pk) {
         let wallet = web3.eth.accounts.privateKeyToAccount(pk);
         console.log(`evmWallet loaded: ${wallet.address}`)
         return wallet
-    }catch(error){
+    } catch (error) {
         console.log(`loadWallet error=${error.toString()}`)
     }
     return false
@@ -1544,27 +1546,58 @@ PalletInstance	"0x04+03"	            Pallet Instance 3
 see: https://docs.moonbeam.network/builders/xcm/xc20/xtokens/#xtokens-transfer-function
 */
 
-function xTokenBuilder(web3Api, currency_address='0x0000000000000000000000000000000000000802', rawAmount=100000000000000000, beneficiary='0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest=22007){
+function xTokenBuilder(web3Api, currency_address = '0x0000000000000000000000000000000000000802', rawAmount = 100000000000000000, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 22007) {
     console.log(`xTokenBuilder currency_address=${currency_address}, rawAmount=${rawAmount}, beneficiary=${beneficiary}, chainIDDest=${chainIDDest}`)
-    var xTokensContractAbi = [{"inputs":[{"internalType":"address","name":"currency_address","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"components":[{"internalType":"uint8","name":"parents","type":"uint8"},{"internalType":"bytes[]","name":"interior","type":"bytes[]"}],"internalType":"struct IxTokens.Multilocation","name":"destination","type":"tuple"},{"internalType":"uint64","name":"weight","type":"uint64"}],"name":"transfer","outputs":[],"stateMutability":"nonpayable","type":"function"}]
+    var xTokensContractAbi = [{
+        "inputs": [{
+            "internalType": "address",
+            "name": "currency_address",
+            "type": "address"
+        }, {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+        }, {
+            "components": [{
+                "internalType": "uint8",
+                "name": "parents",
+                "type": "uint8"
+            }, {
+                "internalType": "bytes[]",
+                "name": "interior",
+                "type": "bytes[]"
+            }],
+            "internalType": "struct IxTokens.Multilocation",
+            "name": "destination",
+            "type": "tuple"
+        }, {
+            "internalType": "uint64",
+            "name": "weight",
+            "type": "uint64"
+        }],
+        "name": "transfer",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }]
     var xTokensContractAddress = '0x0000000000000000000000000000000000000804' //this is the precompiled interface
-    var xTokensContract = new web3Api.eth.Contract(xTokensContractAbi,xTokensContractAddress);
+    var xTokensContract = new web3Api.eth.Contract(xTokensContractAbi, xTokensContractAddress);
     let weight = 6000000000
     let relayChain = paraTool.getRelayChainByChainID(chainIDDest)
     let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
     let junction = []
     let junctionInterior = []
     junction.push(1) // local asset would have 0. (but this is not xcm?)
-    if (paraIDDest != 0){
+    if (paraIDDest != 0) {
         let parachainHex = paraTool.bnToHex(paraIDDest).substr(2)
-        parachainHex = '0x'+parachainHex.padStart(10, '0')
+        parachainHex = '0x' + parachainHex.padStart(10, '0')
         junctionInterior.push(parachainHex)
     }
     //assume "any"
-    if (beneficiary.length == 66){
+    if (beneficiary.length == 66) {
         let accountId32 = `0x01${beneficiary.substr(2)}00`
         junctionInterior.push(accountId32)
-    }else if (beneficiary.length == 42){
+    } else if (beneficiary.length == 42) {
         let accountKey20 = `0x03${beneficiary.substr(2)}00`
         junctionInterior.push(accountKey20)
     }
@@ -1581,7 +1614,7 @@ function xTokenBuilder(web3Api, currency_address='0x0000000000000000000000000000
         gas: 2000000,
         data: data
     }
-    console.log(`xTokenBuilder txStruct=`,txStruct)
+    console.log(`xTokenBuilder txStruct=`, txStruct)
     return txStruct
 }
 

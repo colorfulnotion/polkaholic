@@ -68,13 +68,13 @@ function showassetsrelated(asset, chainID) {
         }, {
             data: 'tvl',
             render: function(data, type, row, meta) {
-		let tvl = row.totalSupply * row.priceUSD
+                let tvl = row.totalSupply * row.priceUSD
                 if (type == 'display') {
                     return currencyFormat(tvl)
                 }
                 return tvl;
             }
-        } ]
+        }]
     });
     loadData2(pathParams, tableName, true)
 }
@@ -94,7 +94,7 @@ function showaccountassets(asset, chainID) {
                 let c = a.chains[j];
                 if (c.chainID == chainID) {
                     for (let k = 0; k < c.assets.length; k++) {
-			console.log(asset, c.assets[k]);
+                        console.log(asset, c.assets[k]);
                         if (asset.toLowerCase() == c.assets[k].asset.toLowerCase()) {
                             c.assets[k].state.symbol = c.assets[k].symbol;
                             c.assets[k].state.address = address;
@@ -152,7 +152,7 @@ function showaccountassets(asset, chainID) {
             }
         }]
     });
- 
+
     let table = tableAccountAssets;
     table.clear();
     table.rows.add(recs);

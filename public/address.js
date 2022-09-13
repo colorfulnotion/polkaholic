@@ -1,27 +1,25 @@
-
-
 function showaddresstab(hash) {
     switch (hash) {
-    case "#evmtxs":
-        showevmtxs(address);
-        setupapidocs("account", "evmtxs", address);
-        break;
-    case "#transfers":
-        showtransfers(address)
-        setupapidocs("account", "transfers", address);
-        break;
-    case "#xcmtransfers":
-        showxcmtransfers(address)
-        setupapidocs("account", "xcmtransfers", address)
-        break;
-    case "#erc20":
-        showerc20(address)
-        setupapidocs("address", "erc20", address);
-        break;
-    case "#internal":
-        showinternal(address);
-        setupapidocs("address", "internal", address);
-        break;
+        case "#evmtxs":
+            showevmtxs(address);
+            setupapidocs("account", "evmtxs", address);
+            break;
+        case "#transfers":
+            showtransfers(address)
+            setupapidocs("account", "transfers", address);
+            break;
+        case "#xcmtransfers":
+            showxcmtransfers(address)
+            setupapidocs("account", "xcmtransfers", address)
+            break;
+        case "#erc20":
+            showerc20(address)
+            setupapidocs("address", "erc20", address);
+            break;
+        case "#internal":
+            showinternal(address);
+            setupapidocs("address", "internal", address);
+            break;
     }
 }
 

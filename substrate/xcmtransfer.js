@@ -500,8 +500,8 @@ module.exports = class XCMTransfer extends AssetManager {
         having count(*) > 10 order by count(*) desc limit ${limit}`
         let testcases = await this.poolREADONLY.query(sql);
         let autoTestcases = []
-        for (const testcase of testcases){
-            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam){
+        for (const testcase of testcases) {
+            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam) {
                 testcase.isSenderEVM = 1
             }
             autoTestcases.push(testcase)
@@ -522,8 +522,8 @@ module.exports = class XCMTransfer extends AssetManager {
         having count(*) > 10 order by count(*) desc limit ${limit}`
         let testcases = await this.poolREADONLY.query(sql);
         let autoTestcases = []
-        for (const testcase of testcases){
-            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam){
+        for (const testcase of testcases) {
+            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam) {
                 testcase.isSenderEVM = 1
             }
             autoTestcases.push(testcase)
@@ -654,7 +654,7 @@ module.exports = class XCMTransfer extends AssetManager {
             console.log("sectionMethod DISPATCH", sectionMethod);
             if ((chainID == 2 || chainID == 21000) && chainIDDest == 22000) version = "v0";
 
-            if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase){
+            if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase) {
                 // mark isEVMTx as true
                 isEVMTx = 1
             }
