@@ -86,6 +86,73 @@ function isFloat(n) {
     return Number(n) === n && n % 1 !== 0;
 }
 
+// does not handle 1.0e+23 but does handle 123.45678987654321
+function float_to_BigInt_decimals(f, decimals) {
+  let fstr = f.toString();
+
+  let e = fstr.indexOf("e");
+  if ( e > 0 ) {
+     return null;
+  }
+  let i = fstr.indexOf(".");
+  if ( i == -1 ) {
+     return BigInt(fstr.padEnd(decimals+1, "0"))
+  }
+  // get everything before the decimal, then everything after the decimal, and then pad to decimals
+  return BigInt(fstr.substr(0, i) +  fstr.substr(i+1, fstr.length).padEnd(decimals, "0"));
+}
+
+function isString(s) {
+  return (typeof s === 'string' || s instanceof String)
+}
+
+//see https://ethereum.stackexchange.com/questions/41506/web3-dealing-with-decimals-in-erc20
+function toBaseUnit(value, decimals) {
+  if (!isString(value)) {
+    throw new Error('Pass strings to prevent floating point precision issues.')
+  }
+  let BN = web3.utils.BN
+  const ten = new BN(10);
+  const base = ten.pow(new BN(decimals));
+
+  // Is it negative?
+  let negative = (value.substring(0, 1) === '-');
+  if (negative) {
+    value = value.substring(1);
+  }
+
+  if (value === '.') {
+    throw new Error(
+    `Invalid value ${value} cannot be converted to`
+    + ` base unit with ${decimals} decimals.`);
+  }
+
+  // Split it into a whole and fractional part
+  let comps = value.split('.');
+  if (comps.length > 2) { throw new Error('Too many decimal points'); }
+
+  let whole = comps[0], fraction = comps[1];
+
+  if (!whole) { whole = '0'; }
+  if (!fraction) { fraction = '0'; }
+  if (fraction.length > decimals) {
+    throw new Error('Too many decimal places');
+  }
+
+  while (fraction.length < decimals) {
+    fraction += '0';
+  }
+
+  whole = new BN(whole);
+  fraction = new BN(fraction);
+  let wei = (whole.mul(base)).add(fraction);
+
+  if (negative) {
+    wei = wei.neg();
+  }
+  return new BN(wei.toString(10), 10);
+}
+
 function dechexAssetID(number) {
     if ((number.length > 2) && number.substring(0, 2) == "0x") {
         let n = hexToBn(number)
@@ -1152,6 +1219,12 @@ module.exports = {
     makeXcmInteriorKey: function(interior, relayChain = 'kusama') {
         return (interior + assetChainSeparator + relayChain);
     },
+    parseXcmInteriorKey: function(xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
+        let pieces = xcmInteriorKey.split(assetChainSeparator);
+        let assetUnparsed = pieces[0];
+        let relayChain = (pieces.length > 1) ? pieces[1] : undefined;
+        return [assetUnparsed, relayChain];
+    },
     inverted_ts_key: function(ts) {
         return inverted_ts_key(ts);
     },
@@ -1320,5 +1393,13 @@ module.exports = {
     contractAddrToXcAssetID: function(xcAssetAddress) {
         return contractAddrToXcAssetID(xcAssetAddress)
     },
-
+    bnToHex: function(n) {
+        return bnToHex(n)
+    },
+    toBaseUnit: function(value, decimals) {
+        return toBaseUnit(value, decimals)
+    },
+    floatToBigIntDecimals: function(f, decimals) {
+        return float_to_BigInt_decimals(f, decimals)
+    },
 };

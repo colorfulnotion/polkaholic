@@ -4,6 +4,7 @@ const {
 const fs = require('fs');
 const AssetManager = require('./assetManager');
 const paraTool = require('./paraTool');
+const ethTool = require('./ethTool');
 const {
     stringToU8a,
     u8aToHex
@@ -12,6 +13,7 @@ const mysql = require("mysql2");
 
 module.exports = class XCMTransfer extends AssetManager {
     pair = null;
+    evmpair = null
 
     setupPair(FN = "/root/.wallet", name = "polkadot") {
         const privateSeed = fs.readFileSync(FN, 'utf8');
@@ -21,6 +23,12 @@ module.exports = class XCMTransfer extends AssetManager {
         this.pair = keyring.addFromUri(privateSeed, {
             name: name
         })
+    }
+
+    setupEvmPair(FN = "/root/.walletevm2", name = "evm") {
+        var pk = fs.readFileSync(FN, 'utf8');
+        pk = pk.replace(/\r|\n/g, '');
+        this.evmpair = ethTool.loadWallet(pk)
     }
 
     parse_xcmInteriorKey(xcmInteriorKeyRelayChain, symbol) {
@@ -68,7 +76,7 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async lookupChainAsset(chainID, xcmInteriorKey) {
-        let sql = `select asset, currencyID, chainID, decimals from asset where xcmInteriorKey = ${mysql.escape(xcmInteriorKey)} and chainID = '${chainID}' limit 1`
+        let sql = `select asset, currencyID, chainID, decimals, xcContractAddress from asset where xcmInteriorKey = ${mysql.escape(xcmInteriorKey)} and chainID = '${chainID}' limit 1`
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) {
             // throw error
@@ -137,7 +145,7 @@ module.exports = class XCMTransfer extends AssetManager {
                 parsedAsset.foreignAsset = parsedAsset.ForeignAsset
                 delete parsedAsset.ForeignAsset
             }
-            // "native" HACKS 
+            // "native" HACKS
             if (assetRec.chainID == 22001 && parsedAsset.token == "BNC") {
                 return {
                     "native": parsedAsset.token
@@ -157,7 +165,7 @@ module.exports = class XCMTransfer extends AssetManager {
         console.log("xcm", xcm);
         let currency_id = this.transform_asset(asset, assetDest, xcm); // transform "Token" to "token"
         console.log("currency_id", currency_id);
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         if (assetDest.paraID == undefined) {
             console.log("xTokens_transfer TERMINATED", assetDest);
             process.exit(1);
@@ -200,14 +208,14 @@ module.exports = class XCMTransfer extends AssetManager {
             }
         } else if (xcm.parachain) {
             /*
-    //KSM  here~kusama 
+    //KSM  here~kusama
     //DOT  here~polkadot
     //ASTR {"parachain":2006}~polkadot
     //ACA  [{"parachain":2000},{"generalKey":"0x0000"}]~polkadot
     //AUSD [{"parachain":2000},{"generalKey":"0x0001"}]~polkadot
-    //BNC  [{"parachain":2001},{"generalKey":"0x0001"}]~kusama  
-    //BSX  [{"parachain":2090},{"generalIndex":0}]~kusama       
-    //GLMR [{"parachain":2004},{"palletInstance":10}]~polkadot  
+    //BNC  [{"parachain":2001},{"generalKey":"0x0001"}]~kusama
+    //BSX  [{"parachain":2090},{"generalIndex":0}]~kusama
+    //GLMR [{"parachain":2004},{"palletInstance":10}]~polkadot
     //HKO  [{"parachain":2085},{"generalKey":"0x484b4f"}]~kusama
     */
             if (xcm.generalIndex) {
@@ -236,7 +244,7 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async xTransfer_transfer(version, asset, assetDest, xcm, amount, beneficiary, dest_weight = 5000000000) {
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         let assets = {
             id: {
                 "concrete": this.get_asset_concrete(xcm, asset, assetDest)
@@ -264,7 +272,8 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async polkadotXcm_reserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiaryAccount, dest_weight = 5000000000) {
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        //let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         if (assetDest.paraID == undefined) {
             console.log("polkadotXcm_reserveTransferAssets TERMINATED", assetDest);
             process.exit(1);
@@ -305,7 +314,7 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async polkadotXcm_limitedReserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary, fee_asset_item = 0, weightLimit = 0) {
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         if (assetDest.paraID == undefined) {
             console.log("polkadotXcm_limitedReserveTransferAssets TERMINATED", assetDest);
             process.exit(1);
@@ -397,7 +406,7 @@ module.exports = class XCMTransfer extends AssetManager {
                     x1: this.get_beneficiary(beneficiary)
                 }
             }
-            let amountRaw = amount * 10 ** assetDest.decimals;
+            let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
             let assets = {
                 v0: [{
                     concreteFungible: {
@@ -428,7 +437,7 @@ module.exports = class XCMTransfer extends AssetManager {
                     }
                 }
             }
-            let amountRaw = amount * 10 ** assetDest.decimals;
+            let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
             let assets = {
                 "v1": [{
                     "id": {
@@ -467,7 +476,7 @@ module.exports = class XCMTransfer extends AssetManager {
                 }
             }
         };
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         let assets = {
             v0: [{
                 concreteFungible: {
@@ -482,66 +491,142 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async getTestcasesAutomated(limit = 10) {
-        let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM, count(*) cnt from xcmtransfer join xcmasset on xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where sourceTS > unix_timestamp(date_sub(Now(), interval 30 day)) and chain.chainID = xcmtransfer.chainIDDest and xcmtransfer.chainID >= 0 and xcmtransfer.chainIDDest >= 0 and incomplete = 0 and length(xcmtransfer.xcmInteriorKey) > 4 and xcmtransfer.sectionMethod not in ( 'xTokens:TransferredMultiAssets', 'xTransfer:transfer' ) group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM having count(*) > 10 order by count(*) desc limit ${limit}`
+        let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM as isBeneficiaryEVM, 0 as isSenderEVM, count(*) cnt from xcmtransfer join xcmasset on
+        xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where
+        sourceTS > unix_timestamp(date_sub(Now(), interval 30 day)) and
+        chain.chainID = xcmtransfer.chainIDDest and xcmtransfer.chainID >= 0 and
+        xcmtransfer.chainIDDest >= 0 and incomplete = 0 and length(xcmtransfer.xcmInteriorKey) > 4 and
+        xcmtransfer.sectionMethod not in ( 'xTokens:TransferredMultiAssets', 'xTransfer:transfer' )
+        group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM
+        having count(*) > 10 order by count(*) desc limit ${limit}`
         let testcases = await this.poolREADONLY.query(sql);
-        console.log("TESTCASES", testcases.length);
-        return testcases;
+        let autoTestcases = []
+        for (const testcase of testcases) {
+            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam) {
+                testcase.isSenderEVM = 1
+            }
+            autoTestcases.push(testcase)
+        }
+        console.log("TESTCASES", autoTestcases.length);
+        return autoTestcases;
     }
+
+    async getTestcasesAutomatedEVM(limit = 10) {
+        let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM as isBeneficiaryEVM, 0 as isSenderEVM, count(*) cnt from xcmtransfer join xcmasset on
+        xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where
+        xcmtransfer.chainID in (${paraTool.chainIDMoonriver}, ${paraTool.chainIDMoonbeam}) and
+        sourceTS > unix_timestamp(date_sub(Now(), interval 30 day)) and
+        chain.chainID = xcmtransfer.chainIDDest and xcmtransfer.chainID >= 0 and
+        xcmtransfer.chainIDDest >= 0 and incomplete = 0 and length(xcmtransfer.xcmInteriorKey) > 4 and
+        xcmtransfer.sectionMethod not in ('xTransfer:transfer' )
+        group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM
+        having count(*) > 10 order by count(*) desc limit ${limit}`
+        let testcases = await this.poolREADONLY.query(sql);
+        let autoTestcases = []
+        for (const testcase of testcases) {
+            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam) {
+                testcase.isSenderEVM = 1
+            }
+            autoTestcases.push(testcase)
+        }
+        console.log("TESTCASES", autoTestcases.length);
+        return autoTestcases;
+    }
+
+    async getTestcasesManualEVM() {
+        return [
+            /*
+            {
+                chainID: 22023,
+                chainIDDest: 2,
+                symbol: 'KSM',
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 1,
+                cnt: 100
+            },
+            */
+            {
+                chainID: 22023, //0xb9f813ff
+                chainIDDest: 22007,
+                symbol: 'MOVR',
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 1,
+                cnt: 64
+            },
+            {
+                chainID: 2004,
+                chainIDDest: 2000,
+                symbol: 'ACA',
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 1,
+                cnt: 64
+            }
+        ]
+    }
+
     async getTestcasesManual() {
         return [{
                 chainID: 2,
                 chainIDDest: 21000,
                 symbol: 'KSM',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 100
             },
             {
                 chainID: 2006,
                 chainIDDest: 2000,
                 symbol: 'ACA',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 64
             },
             {
                 chainID: 2006,
                 chainIDDest: 2000,
                 symbol: 'AUSD',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 47
             },
             {
                 chainID: 2000,
                 chainIDDest: 2006,
                 symbol: 'AUSD',
-                isEVM: 1,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 45
             },
             {
                 chainID: 2,
                 chainIDDest: 22024,
                 symbol: 'KSM',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 20
             },
             {
                 chainID: 0,
                 chainIDDest: 1000,
                 symbol: 'DOT',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 16
             },
             {
                 chainID: 21000,
                 chainIDDest: 22000,
                 symbol: 'USDT',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 12
             },
             {
                 chainID: 21000,
                 chainIDDest: 22001,
                 symbol: 'RMRK',
-                isEVM: 0,
+                isBeneficiaryEVM: 0,
+                isSenderEVM: 0,
                 cnt: 12
             }
         ]
@@ -552,7 +637,9 @@ module.exports = class XCMTransfer extends AssetManager {
         let chain = await this.getChain(chainID)
         await this.setupAPI(chain)
         this.setupPair();
+        this.setupEvmPair();
         let relayChain = (chainID != 2 && chainID < 20000) ? "polkadot" : "kusama";
+        let isEVMTx = 0
         try {
             let xcmInteriorKey = await this.lookupSymbolXCMInteriorKey(symbol, relayChain);
             let asset = await this.lookupChainAsset(chainID, xcmInteriorKey);
@@ -568,9 +655,21 @@ module.exports = class XCMTransfer extends AssetManager {
             console.log("sectionMethod DISPATCH", sectionMethod);
             if ((chainID == 2 || chainID == 21000) && chainIDDest == 22000) version = "v0";
 
+            if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase) {
+                // mark isEVMTx as true
+                isEVMTx = 1
+                console.log(`isEVMTx=${isEVMTx}, asset=`,asset)
+                if (asset.xcContractAddress){
+                    args = ethTool.xTokenBuilder(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest)
+                    func = this.web3Api
+                }
+                return ['ethereum:Transact', func, JSON.stringify(args, null, 4), isEVMTx];
+            }
+
             switch (sectionMethod) {
                 case "assets_withdraw:0x019054d0":
                     [func, args] = await this.assets_withdraw(version, asset, assetDest, xcm, amount, beneficiary);
+                    isEVMTx = 1
                     break;
                 case "polkadotXcm:limitedReserveTransferAssets":
                     [func, args] = await this.polkadotXcm_limitedReserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
@@ -609,10 +708,10 @@ module.exports = class XCMTransfer extends AssetManager {
                     [func, args] = await this.xTransfer_transfer(version, asset, assetDest, xcm, amount, beneficiary);
                     break;
             }
-            return [sectionMethod, func, JSON.stringify(args, null, 4)];
+            return [sectionMethod, func, JSON.stringify(args, null, 4), isEVMTx];
         } catch (err) {
             console.log(err);
-            return [null, null, null];
+            return [null, null, null, null];
         }
     }
 }

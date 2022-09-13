@@ -1,5 +1,6 @@
 var initchains = false;
 var tableChains = null;
+
 function showchains() {
     if (initchains) return;
     else initchains = true;
@@ -28,35 +29,35 @@ function showchains() {
         }, {
             data: 'localSymbol',
             render: function(data, type, row, meta) {
-		let str = ( row.localSymbol != undefined ) ? row.localSymbol : "";
-		let [accountState, balanceUSD] = get_accountState(row.asset, row.chainID, row.assetChain);
-		if (accountState && accountState.free !== undefined) {
-		    if (type == 'display') {
+                let str = (row.localSymbol != undefined) ? row.localSymbol : "";
+                let [accountState, balanceUSD] = get_accountState(row.asset, row.chainID, row.assetChain);
+                if (accountState && accountState.free !== undefined) {
+                    if (type == 'display') {
                         return presentTokenCount(accountState.free) + " " + str + " (" + currencyFormat(balanceUSD) + ")";
-		    } else {
-			if ( balanceUSD ) {
-			    return balanceUSD;
-			} else {
-			    return 0;
-			}
-		    }
+                    } else {
+                        if (balanceUSD) {
+                            return balanceUSD;
+                        } else {
+                            return 0;
+                        }
+                    }
                 } else {
-                    if ( type == 'display' ) {
-			return presentTokenCount(0) + " " + str + " (-)";
-		    } else {
-			return 0;
-		    }
-		}
+                    if (type == 'display') {
+                        return presentTokenCount(0) + " " + str + " (-)";
+                    } else {
+                        return 0;
+                    }
+                }
             }
         }, {
             data: 'currencyID',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-		    if ( row.currencyID ) {
-			return `<a href='/asset/${row.chainID}/${row.currencyID}'>${row.currencyID}</a>`
-		    } else {
-			return row.symbol; // TODO `<a href='/asset/${row.chainID}/${row.assetChain}'>${row.symbol}</a>`
-		    }
+                    if (row.currencyID) {
+                        return `<a href='/asset/${row.chainID}/${row.currencyID}'>${row.currencyID}</a>`
+                    } else {
+                        return row.symbol; // TODO `<a href='/asset/${row.chainID}/${row.assetChain}'>${row.symbol}</a>`
+                    }
                 }
                 return data;
             }
@@ -106,7 +107,7 @@ function showchains() {
             }
         }]
     });
-    
+
     let table = tableChains;
     table.clear();
     table.rows.add(chains);
@@ -144,8 +145,8 @@ function setuptabs(tabs, symbol) {
         if (urlhash.length > 1) hash = "#" + urlhash[1];
     }
     const triggerEl = document.querySelector('#symbolTab a[href="' + hash + '"]');
-    if ( triggerEl ) {
-	mdb.Tab.getInstance(triggerEl).show();
+    if (triggerEl) {
+        mdb.Tab.getInstance(triggerEl).show();
     }
 }
 

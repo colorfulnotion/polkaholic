@@ -15,10 +15,9 @@ function showchains() {
                 [10, 25, 50, 100, "All"]
             ],
             columnDefs: [{
-                    "className": "dt-right",
+                "className": "dt-right",
                 "targets": [3, 4, 5, 6]
-                }
-            ],
+            }],
             order: [
                 [0, "asc"]
             ],
@@ -26,8 +25,8 @@ function showchains() {
                     data: 'paraID',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-			    let chainID = row.chainID;
-                            return `<a href='/admin/chain/${chainID}'>` + row.relayChain + ":" + row.paraID  + "</a>";
+                            let chainID = row.chainID;
+                            return `<a href='/admin/chain/${chainID}'>` + row.relayChain + ":" + row.paraID + "</a>";
                         }
                         return row.chainID;
                     }
@@ -90,10 +89,10 @@ function showchains() {
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
                             let endpoints = [];
-			    if ( row.WSEndpoint && row.WSEndpoint.length > 0 ) endpoints.push(row.WSEndpoint);
-			    if ( row.WSEndpoint2 && row.WSEndpoint2.length > 0 ) endpoints.push(row.WSEndpoint2);
-			    if ( row.WSEndpoint3 && row.WSEndpoint3.length > 0 ) endpoints.push(row.WSEndpoint3);
-			    return endpoints.join("<br>");
+                            if (row.WSEndpoint && row.WSEndpoint.length > 0) endpoints.push(row.WSEndpoint);
+                            if (row.WSEndpoint2 && row.WSEndpoint2.length > 0) endpoints.push(row.WSEndpoint2);
+                            if (row.WSEndpoint3 && row.WSEndpoint3.length > 0) endpoints.push(row.WSEndpoint3);
+                            return endpoints.join("<br>");
                         }
                         return data;
                     }
