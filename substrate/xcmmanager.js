@@ -170,13 +170,13 @@ module.exports = class XCMManager extends AssetManager {
             xcContractAddrUpdates.push(c)
 
             //["asset", "chainID"] + ["xcContractAddress", "xcmInteriorKey"]
-            let xcmInteriorKey = (xcAsset.xcmInteriorKey != undefined) ? `'${xcAsset.xcmInteriorKey}'` : `NULL`
-            let x = `('${xcAsset.xcContractAddress}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}', ${xcmInteriorKey})`
-            xcInteriorKeyUpdates.push(x)
+            //let xcmInteriorKey = (xcAsset.xcmInteriorKey != undefined) ? `'${xcAsset.xcmInteriorKey}'` : `NULL`
+            //let x = `('${xcAsset.xcContractAddress}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}', ${xcmInteriorKey})`
+            //xcInteriorKeyUpdates.push(x)
         }
 
         console.log(xcContractAddrUpdates)
-        console.log(xcInteriorKeyUpdates)
+        //console.log(xcInteriorKeyUpdates)
 
         let sqlDebug = true
         let xcContractAddressVal = ["xcContractAddress"]
@@ -188,14 +188,14 @@ module.exports = class XCMManager extends AssetManager {
             "replace": xcContractAddressVal,
         }, sqlDebug);
 
-        let xcInteriorKeyVal = ["xcContractAddress", "xcmInteriorKey"]
+        /*let xcInteriorKeyVal = ["xcContractAddress", "xcmInteriorKey"]
         await this.upsertSQL({
             "table": `asset`,
             "keys": ["asset", "chainID"],
             "vals": xcInteriorKeyVal,
             "data": xcInteriorKeyUpdates,
             "replace": xcInteriorKeyVal,
-        }, sqlDebug);
+        }, sqlDebug); */
     }
 
 
