@@ -76,7 +76,7 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async lookupChainAsset(chainID, xcmInteriorKey) {
-        let sql = `select asset, currencyID, chainID, decimals from asset where xcmInteriorKey = ${mysql.escape(xcmInteriorKey)} and chainID = '${chainID}' limit 1`
+        let sql = `select asset, currencyID, chainID, decimals, xcContractAddress from asset where xcmInteriorKey = ${mysql.escape(xcmInteriorKey)} and chainID = '${chainID}' limit 1`
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) {
             // throw error
@@ -165,7 +165,7 @@ module.exports = class XCMTransfer extends AssetManager {
         console.log("xcm", xcm);
         let currency_id = this.transform_asset(asset, assetDest, xcm); // transform "Token" to "token"
         console.log("currency_id", currency_id);
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         if (assetDest.paraID == undefined) {
             console.log("xTokens_transfer TERMINATED", assetDest);
             process.exit(1);
@@ -244,7 +244,7 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async xTransfer_transfer(version, asset, assetDest, xcm, amount, beneficiary, dest_weight = 5000000000) {
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         let assets = {
             id: {
                 "concrete": this.get_asset_concrete(xcm, asset, assetDest)
@@ -272,7 +272,8 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async polkadotXcm_reserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiaryAccount, dest_weight = 5000000000) {
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        //let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         if (assetDest.paraID == undefined) {
             console.log("polkadotXcm_reserveTransferAssets TERMINATED", assetDest);
             process.exit(1);
@@ -313,7 +314,7 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async polkadotXcm_limitedReserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary, fee_asset_item = 0, weightLimit = 0) {
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         if (assetDest.paraID == undefined) {
             console.log("polkadotXcm_limitedReserveTransferAssets TERMINATED", assetDest);
             process.exit(1);
@@ -405,7 +406,7 @@ module.exports = class XCMTransfer extends AssetManager {
                     x1: this.get_beneficiary(beneficiary)
                 }
             }
-            let amountRaw = amount * 10 ** assetDest.decimals;
+            let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
             let assets = {
                 v0: [{
                     concreteFungible: {
@@ -436,7 +437,7 @@ module.exports = class XCMTransfer extends AssetManager {
                     }
                 }
             }
-            let amountRaw = amount * 10 ** assetDest.decimals;
+            let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
             let assets = {
                 "v1": [{
                     "id": {
@@ -475,7 +476,7 @@ module.exports = class XCMTransfer extends AssetManager {
                 }
             }
         };
-        let amountRaw = amount * 10 ** assetDest.decimals;
+        let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
         let assets = {
             v0: [{
                 concreteFungible: {
@@ -657,6 +658,12 @@ module.exports = class XCMTransfer extends AssetManager {
             if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase) {
                 // mark isEVMTx as true
                 isEVMTx = 1
+                console.log(`isEVMTx=${isEVMTx}, asset=`,asset)
+                if (asset.xcContractAddress){
+                    args = ethTool.xTokenBuilder(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest)
+                    func = this.web3Api
+                }
+                return ['ethereum:Transact', func, JSON.stringify(args, null, 4), isEVMTx];
             }
 
             switch (sectionMethod) {

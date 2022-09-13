@@ -173,6 +173,8 @@ ACA: https://polkaholic.io/symbol/ACA#chains
  ./xcmTransfer 2004 2000 1.0 ACA  // https://polkaholic.io/tx/0x0a71af022c8b2bb6d909387eede206adf9f5ef99b0a32e43c94ef19519ebe9da
 */
 const XCMTransfer = require("./xcmtransfer");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
 
 async function main() {
     let chainID = -1;
@@ -235,21 +237,35 @@ async function main() {
                 }
                 let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
                 console.log(`xcmtransfer cli ${sectionMethod} args=`, args);
+                if (isEVMTx){
+                    var txStruct = JSON.parse(args)
+                    var signedTx = await ethTool.signEvmTx(func, txStruct, xcmtransfer.evmpair)
+                    var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
+                    console.log(`signedTx`, signedTx)
+                    console.log(`decodedTx`, decodedTx)
+                }
             } catch (e) {
                 console.log(`xcmtransfer cli error`, e.toString());
             }
         }
     } else {
-        let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
-        let execute = false;
-        console.log(sectionMethod, args);
         if (chainIDDest == 2004 || chainIDDest == 2006 || chainIDDest == 22023 || chainIDDest == 22007) {
             beneficiary = beneficiaryEVM;
         }
+        let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
+        let execute = false;
+        console.log(sectionMethod, args);
         if (isEVMTx){
+            var txStruct = JSON.parse(args)
+            var signedTx = await ethTool.signEvmTx(func, args, xcmtransfer.evmpair)
+            var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
+            console.log(`signedTx`, signedTx)
+            console.log(`decodedTx`, decodedTx)
             if (execute) {
-                //TODO: get rawTX
-                let signedTx = {}
+                console.log(`broadcasting signedTX`)
+                //if execute true, brocast the tx
+                //var result = await ethTool.sendSignedTx(web3Api, signedTx)
+                //console.log(`execute signedTX result=`result)
                 console.log("EVM Transfer sent with hash", hash.toHex());
             }
         }else{

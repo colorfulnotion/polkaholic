@@ -166,7 +166,7 @@ module.exports = class XCMManager extends AssetManager {
         }
         for (const xcAsset of xcAssetList) {
             //["asset", "chainID"] + ["xcContractAddress"]
-            let c = `('${xcAsset.asset}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}')`
+            let c = `('${xcAsset.asset}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}', '${xcAsset.xcmInteriorKey}')`
             xcContractAddrUpdates.push(c)
 
             //["asset", "chainID"] + ["xcContractAddress", "xcmInteriorKey"]
@@ -179,7 +179,7 @@ module.exports = class XCMManager extends AssetManager {
         //console.log(xcInteriorKeyUpdates)
 
         let sqlDebug = true
-        let xcContractAddressVal = ["xcContractAddress"]
+        let xcContractAddressVal = ["xcContractAddress", "xcmInteriorKey"]
         await this.upsertSQL({
             "table": `asset`,
             "keys": ["asset", "chainID"],
