@@ -619,7 +619,7 @@ async function sendSignedTx(web3Api, signedTx) {
     try {
         console.log(`sendSignedTx txhHash=${txHash}, rawTransaction=${rawTransaction}`)
         await web3Api.eth.sendSignedTransaction(signedTx.rawTransaction)
-    } catch (e) {
+    } catch (error) {
         console.log(`sendSignedTx txhHash=${txHash}, rawTransaction=${rawTransaction} error=${error.toString()}`)
         isError = error.toString()
     }
@@ -1546,8 +1546,8 @@ PalletInstance	"0x04+03"	            Pallet Instance 3
 see: https://docs.moonbeam.network/builders/xcm/xc20/xtokens/#xtokens-transfer-function
 */
 
-function xTokenBuilder(web3Api, currency_address = '0x0000000000000000000000000000000000000802', rawAmount = 100000000000000000, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 22007) {
-    console.log(`xTokenBuilder currency_address=${currency_address}, rawAmount=${rawAmount}, beneficiary=${beneficiary}, chainIDDest=${chainIDDest}`)
+function xTokenBuilder(web3Api, currency_address = '0x0000000000000000000000000000000000000802', amount = 1, decimals=18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 22006) {
+    console.log(`xTokenBuilder currency_address=${currency_address}, amount=${amount}, decimals=${decimals}, beneficiary=${beneficiary}, chainIDDest=${chainIDDest}`)
     var xTokensContractAbi = [{
         "inputs": [{
             "internalType": "address",
@@ -1601,13 +1601,13 @@ function xTokenBuilder(web3Api, currency_address = '0x00000000000000000000000000
         let accountKey20 = `0x03${beneficiary.substr(2)}00`
         junctionInterior.push(accountKey20)
     }
-    let rawAmountHex = paraTool.bnToHex(rawAmount)
+    let rawAmount = paraTool.toBaseUnit(`${amount}`, decimals)
     junction.push(junctionInterior)
     console.log(`junction`, junction)
     console.log(`junctionInterior`, junctionInterior)
     //[1,["0x00000007d4","0x01108cb67dcbaab765b66fdb99e3c4997ead09f1f82186e425dc9fec271e97aa7e00"]]
-    console.log(`xTokenBuilder currency_address=${currency_address}, rawAmount=${rawAmountHex}(${rawAmount}), junction=${junction}, weight=${weight}`)
-    var data = xTokensContract.methods.transfer(currency_address, rawAmountHex, junction, weight).encodeABI()
+    console.log(`xTokenBuilder currency_address=${currency_address}, Human Readable Amount=${amount}(rawAmount=${rawAmount}, using decimals=${decimals}), junction=${junction}, weight=${weight}`)
+    var data = xTokensContract.methods.transfer(currency_address, rawAmount, junction, weight).encodeABI()
     let txStruct = {
         to: xTokensContractAddress,
         value: '0',
@@ -1777,8 +1777,8 @@ module.exports = {
     sendSignedTx: async function(web3Api, signedTx) {
         return sendSignedTx(web3Api, signedTx)
     },
-    xTokenBuilder: function(web3Api, currencyAddress, rawAmount, beneficiary) {
-        return xTokenBuilder(web3Api, currencyAddress, rawAmount, beneficiary)
+    xTokenBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary) {
+        return xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
     },
     parseAbiSignature: function(abiStrArr) {
         return parseAbiSignature(abiStrArr)

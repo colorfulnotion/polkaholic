@@ -15,8 +15,8 @@ function loadTestKey(FN = "/root/.walletevm2", name = "evm") {
 async function main() {
     var crawler = new Crawler();
     var contractABIs = await crawler.getContractABI()
-    //var apiEndpoint = 'https://rpc.api.moonbeam.network'
-    var apiEndpoint = 'https://rpc.api.moonbase.moonbeam.network'
+    var apiEndpoint = 'https://rpc.api.moonbeam.network'
+    //var apiEndpoint = 'https://rpc.api.moonbase.moonbeam.network'
     var web3Api = await ethTool.createWeb3Api(apiEndpoint)
     //var web3SamplePV = '0x348ce564d427a3311b6536bbcff9390d69395b06ed6c486954e971d960fe8709' //https://web3js.readthedocs.io/en/v1.2.11/web3-eth-accounts.html [DO NOT send real fund]
     //var w = ethTool.loadWallet(web3SamplePV)
@@ -30,7 +30,13 @@ async function main() {
     }
     */
     //var signedTx = await web3Api.eth.accounts.signTransaction(txStruct, w.privateKey)
-    var txStruct = ethTool.xTokenBuilder(web3Api)
+    //xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
+    let currencyAddress = '0x0000000000000000000000000000000000000802'
+    let amount = 1.0
+    let decimals = 18
+    let beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
+    let chainIDDest = paraTool.chainIDAstar
+    var txStruct = ethTool.xTokenBuilder(web3Api,currencyAddress, amount, decimals, beneficiary, chainIDDest)
     var signedTx = await ethTool.signEvmTx(web3Api, txStruct, w)
     var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
     console.log(`signedTx`, signedTx)
