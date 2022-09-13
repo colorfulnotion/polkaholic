@@ -939,12 +939,6 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
 
 async function processTranssctions(txns, contractABIs, contractABISignatures) {
     let decodeTxns = []
-    /*
-    for (const txn of txns) {
-        let decodeTxn = decodeTransaction(txn, contractABIs, contractABISignatures)
-        decodeTxns.push(decodeTxn)
-    }
-    */
     let txnsAsync = await txns.map(async (txn) => {
         try {
             return decodeTransaction(txn, contractABIs, contractABISignatures)

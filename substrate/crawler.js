@@ -73,6 +73,7 @@ module.exports = class Crawler extends Indexer {
     finalizedHashes = {};
     lastmarkedTS = 0;
     lastmarkedlogDT = '2019-01-01';
+    coveredtx = {};
 
     constructor() {
         super("crawler")
@@ -1419,6 +1420,58 @@ module.exports = class Crawler extends Indexer {
         }
     }
 
+
+    async crawlTxpoolContent(chain, crawler) {
+        if (crawler.latestBlockNumber > 0) {
+            let cmd = `curl ${chain.RPCBackfill}  -X POST -H "Content-Type: application/json" --data '{"method":"txpool_content","params":[],"id":1,"jsonrpc":"2.0"}'`
+            const {
+                stdout,
+                stderr
+            } = await exec(cmd, {
+                maxBuffer: 1024 * 64000
+            });
+            let txs = [];
+            let content = JSON.parse(stdout);
+
+            if (content && content.result && content.result.pending) {
+                let pending = content.result.pending;
+                let ts = crawler.getCurrentTS();
+                for (const addr of Object.keys(pending)) {
+                    for (const nonce of Object.keys(pending[addr])) {
+                        let tx = pending[addr][nonce];
+                        // make sure we don't repeat this
+                        let transactionHash = tx.hash
+                        if (transactionHash && (crawler.coveredtx[transactionHash] == undefined)) {
+                            txs.push(tx);
+                            crawler.coveredtx[tx.hash] = ts;
+                        }
+                    }
+                }
+                if (txs.length) {
+                    txs = await ethTool.processTranssctions(txs, crawler.contractABIs, crawler.contractABISignatures);
+                    for (let i = 0; i < txs.length; i++) {
+                        let tx = txs[i];
+                        tx.blockHash = ""; // if ( tx.blockHash != undefined) delete tx.blockHash;
+                        tx.blockNumber = 0; // if ( tx.blockNumber != undefined ) delete tx.blockNumber;
+                        tx.transactionIndex = -1; // if ( tx.transactionIndex != undefined) delete tx.transactionIndex;
+                        tx.chainID = chain.chainID;
+                        tx.timestamp = ts;
+                    }
+                    if (txs.length < 10) {
+                        await crawler.processPendingEVMTransactions(txs);
+                    }
+                } else if (ts % 60 == 0) {
+
+                    for (const txhash of Object.keys(crawler.coveredtx)) {
+                        if (crawler.coveredtx[txhash] < ts - 60) {
+                            delete crawler.coveredtx[txhash];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     async crawl_parachains(chainID = 2) {
         let allEndPoints = Endpoints.getAllEndpoints();
         console.log(`allEndPoints len=${Object.keys(allEndPoints).length}`, allEndPoints)
@@ -1890,6 +1943,9 @@ create table talismanEndpoint (
 
         await this.setup_chainParser(chain, paraTool.debugNoLog, true);
         if (chain.WSEndpointSelfHosted == 1) {
+            if (chain.isEVM) {
+                setInterval(this.crawlTxpoolContent, 1000, chain, this);
+            }
             setInterval(this.crawlPendingExtrinsics, 1000, chain, this);
         }
 
@@ -2023,6 +2079,7 @@ create table talismanEndpoint (
                     if (err.toString().includes("disconnected")) {
                         console.log(err);
                     } else {
+                        console.log(err);
                         this.logger.error({
                             "op": "subscribeStorage",
                             chainID,
