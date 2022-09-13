@@ -1516,7 +1516,7 @@ module.exports = class Indexer extends AssetManager {
 
     async fetchAssetHolderBalances(web3Api, chainID, tokenAddress, tokenDecimal, blockNumber, ts = false) {
         //tokenAddress is checkSumAddr
-        let assetChain = this.getErcTokenAssetChain(tokenAddress, chainID)
+        let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(tokenAddress, chainID)  // REVIEW -- TODO: the result of this will NOT have 0xfffff... precompile because getErcTokenAssetChain maps from 0xffff.. to xcContractAddress
         let assetholderKeys = Object.keys(this.assetholder)
         let holders = []
         for (let i = 0; i < assetholderKeys.length; i++) {
@@ -1527,7 +1527,8 @@ module.exports = class Indexer extends AssetManager {
             }
         }
         if (holders.length == 0) return;
-        console.log(`fetchAssetHolderBalances [${tokenAddress}] [${blockNumber}] holders=${JSON.stringify(holders)}`)
+        if (isXcAsset) console.log(`***fetchAssetHolderBalances ${tokenAddress} -> ${assetChain} (original:${rawAssetChain})`)
+        console.log(`fetchAssetHolderBalances [${tokenAddress}] [${blockNumber}] holders=${JSON.stringify(holders)}, isXcAsset=${isXcAsset}`)
         let i = 0;
         let n = 0
         let batchSize = 50; // safety check
@@ -1577,8 +1578,9 @@ module.exports = class Indexer extends AssetManager {
 
         let assetKey = assetInfo.tokenAddress.toLowerCase();
         let tokenAddress = assetInfo.tokenAddress
+	// if isXcAsset = true, then assetChainStr = {"Token":[currencyID]}~chainID vs rawAssetChainStr 0xffff...~chainID (tokenAddress)
+        let [isXcAsset, assetChainStr, rawAssetChainStr] = paraTool.getErcTokenAssetChain(tokenAddress, chainID)
         await this.fetchAssetHolderBalances(web3Api, chainID, tokenAddress, assetInfo.decimal, blockNumber, ts)
-
 
         let totalSupply = ethTool.validate_bigint(assetInfo.totalSupply);
         let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
@@ -1635,12 +1637,17 @@ module.exports = class Indexer extends AssetManager {
             // we will update total supply once per index_period
             //(asset, chainID, assetType, assetName, symbol, lastState, decimals, totalSupply, lastUpdateDT, lastUpdateBN, createDT, creator, createdAtTx, token0, token1, token0Decimals, token1Decimals, token0Supply, token1Supply, token0Symbol, token1Symbol) [token0, token1, token0Decimals, token1Decimals, token0Supply, token1Supply, token0Symbol, token1Symbol] all NULL
             var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}', Null, Null, Null, Null, Null, Null, Null, Null)`;
-            console.log(`erc20 nonLP`, o)
+            if (isXcAsset){
+                let [assetK, _] = paraTool.parseAssetChain(assetChainStr)
+                o = `('${assetK}', '${chainID}', '${paraTool.assetTypeToken}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}', Null, Null, Null, Null, Null, Null, Null, Null)`;
+            }
+            console.log(`erc20 nonLP, isXcAsset=${isXcAsset}`, o)
             if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
                 // write { asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol }
                 let nlp = {
                     asset: assetKey,
                     chainID: chainID,
+                    //assetType: (isXcAsset)? paraTool.assetTypeToken: paraTool.assetTypeERC20, check here
                     assetType: paraTool.assetTypeERC20,
                     assetName: this.clip_string(assetInfo.name),
                     symbol: assetInfo.symbol,
@@ -1650,7 +1657,12 @@ module.exports = class Indexer extends AssetManager {
                 };
                 this.add_index_metadata(nlp);
                 this.evmcontractMap[assetKey] = nlp;
-                return o
+                if (!isXcAsset){
+                    return o
+                }else{
+                    return false
+                    //return o
+                }
             }
         }
         return false
@@ -4452,12 +4464,6 @@ module.exports = class Indexer extends AssetManager {
         return (blockStats);
     }
 
-    getErcTokenAssetChain(tokenAddress, chainID) {
-        // Store in lower case
-        let lowerAsset = tokenAddress.toLowerCase()
-        return paraTool.makeAssetChain(lowerAsset, chainID);
-    }
-
     getErc20LPAssetChain(tokenAddress, chainID) {
         // Store in lower case
         let lowerAsset = `${tokenAddress.toLowerCase()}:LP`
@@ -4492,7 +4498,7 @@ module.exports = class Indexer extends AssetManager {
         return paraTool.makeAssetChain(lowerAssetKey, chainID);
     }
 
-    initERCAssetOnCache(assetChain, tokenInfo) {
+    initERCAssetOnCache(assetChain, tokenInfo, isXcAsset = false) {
         let assetType = tokenInfo.assetType
         if (this.tallyAsset[assetChain] == undefined) {
             this.tallyAsset[assetChain] = tokenInfo
@@ -4503,7 +4509,7 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    initERCAssetOnMiss(assetChain, tokenInfo, assetType) {
+    initERCAssetOnMiss(assetChain, tokenInfo, assetType, isXcAsset = false) {
         tokenInfo.assetType = assetType;
         if (this.tallyAsset[assetChain] == undefined) {
             this.tallyAsset[assetChain] = tokenInfo
@@ -4548,7 +4554,7 @@ module.exports = class Indexer extends AssetManager {
                 ercType = paraTool.assetTypeERC20LiquidityPair
             }
             */
-            let assetChain = this.getErcTokenAssetChain(erc20TokenInfo.tokenAddress, chainID)
+            let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(erc20TokenInfo.tokenAddress, chainID) // REVIEW
             this.initERCAsset(assetChain, erc20TokenInfo, tx, ercType);
             return (true)
         }
@@ -4574,7 +4580,7 @@ module.exports = class Indexer extends AssetManager {
             let contractInfo = {
                 tokenAddress: contractAddress,
             };
-            let assetChain = this.getErcTokenAssetChain(contractAddress, chainID);
+            let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(contractAddress, chainID); // REVIEW
             this.initERCAsset(assetChain, contractInfo, tx, paraTool.assetTypeContract);
         }
 
@@ -4621,8 +4627,7 @@ module.exports = class Indexer extends AssetManager {
         let startTS = this.getCurrentTS();
 
         let nativeAsset = this.getNativeAsset();
-        // temporarily doing 0xbc136d697007f3be0cdf2c8efcd6a6120a20f9e6
-        var sql = `select asset.asset, assetholder.holder, asset.decimals, assetholder.lastUpdateBN, UNIX_TIMESTAMP(assetholder.lastUpdateDT) as lastUpdateTS
+        var sql = `select asset.asset, assetholder.holder, asset.decimals, asset.xcContractAddress, asset.assetType, assetholder.lastUpdateBN, UNIX_TIMESTAMP(assetholder.lastUpdateDT) as lastUpdateTS
 from assetholder${chainID} as assetholder, asset where assetholder.asset = asset.asset and asset.chainID = ${chainID} and assetholder.lastCrawlBN < assetholder.lastUpdateBN and asset.assetType in ( 'ERC20', 'Token' ) limit 100000`;
         console.log(sql);
         let ts = this.getCurrentTS();
@@ -4661,7 +4666,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let tokenDecimal = assetdecimals[asset];
                 try {
                     console.log("FETCH", asset, holders.length, nativeAsset, this.chainID)
-                    if (asset == nativeAsset && (chainID !== paraTool.chainIDMoonbeam) && (chainID !== paraTool.chainIDMoonriver)) {
+                    if (asset == nativeAsset && (chainID !== paraTool.chainIDMoonbeam) && (chainID !== paraTool.chainIDMoonriver)) { // TODO: check Astar/Shiden
                         holderBalances.blockNumber = chain.blocksFinalized;
                         holderBalances.holders = [];
                         for (let h = 0; h < holders.length; h++) {
@@ -4684,7 +4689,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         // holderBalances = await ethTool.getNativeChainBalances(web3Api, holders, bn)
                     } else {
                         let tokenAddress = asset;
-                        // ethTool rpccall (8b)
+			// TODO: if there is a mapping from asset => xcContractAddress,use that for the tokenAddress in this ethTool rpccall
                         console.log("FETCH", tokenAddress, holders.length)
                         holderBalances = await ethTool.getTokenHoldersRawBalances(web3Api, tokenAddress, holders, tokenDecimal, bn)
                         if (holderBalances.holders.length != holders.length) {
@@ -4788,7 +4793,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let bn = tx.blockNumber
         //   1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
         //   2. mark that the assetholder balancer have to be fetched
-        let assetChain = this.getErcTokenAssetChain(t.tokenAddress, chainID)
+        let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(t.tokenAddress, chainID) // REVIEW
         let tokenInfo = this.tallyAsset[assetChain]
         // [mint] token send from '0x0000000000000000000000000000000000000000'
         // [burn] token sent to '0x0000000000000000000000000000000000000000' or '0x000000000000000000000000000000000000dEaD'
@@ -4816,7 +4821,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
         if (isCached) {
             // console.log(`[${bn}-${tx.transactionIndex}] ERC20 Cached  ${t.tokenAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply}`)
-            this.initERCAssetOnCache(assetChain, tokenInfo)
+            this.initERCAssetOnCache(rawAssetChain, tokenInfo, isXcAsset) //MK: should be rawAssetChain here
         } else {
             // TODO: search mysql asset first, then do RPC
             // ethTool rpccall (9)
@@ -4839,7 +4844,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (tokenInfo) {
                 tokenInfo.lpInfo = lpTokenInfo
                 console.log(`**[${bn}-${tx.transactionIndex}] ${ercType} Fetched ${t.tokenAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply} (Miss: ${isMiss}, Mint: ${isMint}, Burn: ${isBurn})`)
-                this.initERCAssetOnMiss(assetChain, tokenInfo, ercType)
+                this.initERCAssetOnMiss(rawAssetChain, tokenInfo, ercType, isXcAsset)
                 //this.tallyAsset[assetChain] = tokenInfo
             }
         }
@@ -4890,9 +4895,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
 
             tokenInfo.lpInfo = lpTokenInfo
-            let assetChain = this.getErcTokenAssetChain(contractAddress, this.chainID)
+            let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(contractAddress, this.chainID) // REVIEW
             console.log(`**[${bn}] ${ercType} Fetched ${contractAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply}`)
-            this.initERCAssetOnMiss(assetChain, tokenInfo, paraTool.assetTypeERC20)
+            this.initERCAssetOnMiss(rawAssetChain, tokenInfo, paraTool.assetTypeERC20, isXcAsset)
             //this.tallyAsset[assetChain] = tokenInfo
         }
     }
@@ -5022,9 +5027,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 }
                 //console.log(`swapV2`, r)
                 let assetChainLP = this.getErc20LPAssetChain(lpTokenAddress, chainID)
-                let assetChainLPAsNormal = this.getErcTokenAssetChain(lpTokenAddress, chainID)
+                let [isXcAsset, assetChainLPAsNormal, rawAssetChainLPAsNormal] = paraTool.getErcTokenAssetChain(lpTokenAddress, chainID) // REVIEW
                 lpToken.assetType = paraTool.assetTypeERC20 // modify assetType here so it get updated at the tip
-                this.initERCAssetOnCache(assetChainLPAsNormal, lpToken)
+                this.initERCAssetOnCache(rawAssetChainLPAsNormal, lpToken, isXcAsset) //MK should be original
                 this.updateAssetERC20SwapTradingVolume(assetChainLP, r.token0In, r.token1In, r.token0Out, r.token1Out) //MK
             } else if (retryOnMiss) {
                 console.log(`process_v2_swap: fetching unknown lpToken ${lpTokenAddress}`, lpToken)
@@ -5060,9 +5065,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 }
                 //console.log(`syncV2`, r)
                 let assetChainLP = this.getErc20LPAssetChain(lpTokenAddress, chainID)
-                let assetChainLPAsNormal = this.getErcTokenAssetChain(lpTokenAddress, chainID)
+                let [isXcAsset, assetChainLPAsNormal, rawAssetChainLPAsNormal] = paraTool.getErcTokenAssetChain(lpTokenAddress, chainID) // REVIEW
                 lpToken.assetType = paraTool.assetTypeERC20 // modify assetType here so it get updated at the tip
-                this.initERCAssetOnCache(assetChainLPAsNormal, lpToken)
+                this.initERCAssetOnCache(rawAssetChainLPAsNormal, lpToken, isXcAsset) // should be original?
                 this.updateAssetERC20LiquidityPair(assetChainLP, r.lp0, r.lp1, r.rat) //MK
             } else if (retryOnMiss) {
                 console.log(`process_evmtx_syncEvent: fetching unknown lpToken ${lpTokenAddress}`)

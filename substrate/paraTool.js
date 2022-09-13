@@ -648,7 +648,6 @@ function contractAddrToXcAssetID(xcAssetAddress) {
     return xcAssetID
 }
 
-
 class NotFoundError extends Error {
     constructor(message) {
         // Needs to pass both `message` and `options` to install the "cause" property.
@@ -1130,6 +1129,23 @@ module.exports = {
     },
     makeAssetChain: function(asset, chainID = 99) {
         return (asset + assetChainSeparator + chainID);
+    },
+    //paraTool.getErcTokenAssetChain('0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080', 2004) -> [true, '{"Token":"42259045809535163221576417993425387648"}~2004', '0xffffffff1fcacbd218edc0eba20fc2308c778080~2004']
+    //paraTool.getErcTokenAssetChain('0x0fFFfFff1FcaCBd218EDc0EbA20Fc2308C778080', 2004) -> [false, '0x0fffffff1fcacbd218edc0eba20fc2308c778080~2004', '0x0fffffff1fcacbd218edc0eba20fc2308c778080~2004' ]
+    getErcTokenAssetChain: function(tokenAddress, chainID) {
+        // Store in lower case
+        let lowerAsset = tokenAddress.toLowerCase()
+        let assetChain = this.makeAssetChain(lowerAsset, chainID);
+        let rawAssetChain = this.makeAssetChain(lowerAsset, chainID);
+        let isXcAsset = false
+        if (lowerAsset.substr(0,10) == '0xffffffff'){
+            // this is xcAsset
+            let xcAssetID = contractAddrToXcAssetID(tokenAddress)
+            let xcAsset = {Token:xcAssetID}
+            isXcAsset = true
+            assetChain = this.makeAssetChain(JSON.stringify(xcAsset), chainID)
+        }
+        return [isXcAsset, assetChain, rawAssetChain]
     },
     makeXcmInteriorKey: function(interior, relayChain = 'kusama') {
         return (interior + assetChainSeparator + relayChain);
