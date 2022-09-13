@@ -4066,13 +4066,16 @@ module.exports = class Indexer extends AssetManager {
                 extrinsicHash: extrinsicHash
             }
             if (!finalized) {
-		// HERE is where we take an unfinalized SUBSTRATE block where we have extracted Etherem:executed data via "checkExtrinsicStatusAndFee" and add CANDIDATE substrate block info
-		// and then write it into (a) hashes "feedevmunfinalized" (b) addressextrinsic "feedunfinalized"
-		// IMPORTANT: Because different candidate blocks with different times may be written (as well as with different indexers), query MUST dedup both hashes and addressextrinsic based on transactionHash! 
+                // HERE is where we take an unfinalized SUBSTRATE block where we have extracted Etherem:executed data via "checkExtrinsicStatusAndFee" and add CANDIDATE substrate block info
+                // and then write it into (a) hashes "feedevmunfinalized" (b) addressextrinsic "feedunfinalized"
+                // IMPORTANT: Because different candidate blocks with different times may be written (as well as with different indexers), query MUST dedup both hashes and addressextrinsic based on transactionHash! 
                 evmTxStatus.blockHash = blockHash;
                 evmTxStatus.blockNumber = blockNumber;
-		evmTxStatus.substrate = { extrinsicID, extrinsicHash};
-		evmTxStatus.chainID = this.chainID;
+                evmTxStatus.substrate = {
+                    extrinsicID,
+                    extrinsicHash
+                };
+                evmTxStatus.chainID = this.chainID;
                 let evmTxHashRec = {
                     key: evmTxHash,
                     data: {}
@@ -4085,10 +4088,10 @@ module.exports = class Indexer extends AssetManager {
                         }
                     }
                 }
-		this.hashesRowsToInsert.push(evmTxHashRec);
-		let fromAddress = evmTxStatus.from
+                this.hashesRowsToInsert.push(evmTxHashRec);
+                let fromAddress = evmTxStatus.from
                 console.log("UNFINALIZED EVM TRANSACTION", evmTxHash, evmTxHashRec, evmTxStatus)
-		this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, evmTxHash, "feed", evmTxStatus, blockTS, false); // finalized = false means "feedunfinalized" is the column family
+                this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, evmTxHash, "feed", evmTxStatus, blockTS, false); // finalized = false means "feedunfinalized" is the column family
             }
         }
 
@@ -5139,8 +5142,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     async process_evm_transaction(tx, chainID, finalized = false) {
         if (tx == undefined) return;
         if (!finalized) {
-	    // REVIEW: we do not write feedunfinalized into addressextrinsic or hashes -- instead we use the Ethereum:executed event data to write CANDIDATE blockHash/blockNumber elsewhere
-            return; 
+            // REVIEW: we do not write feedunfinalized into addressextrinsic or hashes -- instead we use the Ethereum:executed event data to write CANDIDATE blockHash/blockNumber elsewhere
+            return;
         }
         if (ethTool.isTxContractCreate(tx)) {
             // Contract Creates

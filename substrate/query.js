@@ -1292,6 +1292,7 @@ module.exports = class Query extends AssetManager {
             let feedXCMDestData = false
             let status = ""
             let isPending = false
+            let isEVMUnfinalized = false
             if (rowData["feed"]) {
                 feedData = rowData["feed"]
                 status = "finalized"
@@ -1301,6 +1302,7 @@ module.exports = class Query extends AssetManager {
             } else if (rowData["feedevmunfinalized"]) {
                 feedData = rowData["feedevmunfinalized"]
                 status = "unfinalized"
+                isEVMUnfinalized = true
             } else if (rowData["feedpending"]) {
                 feedData = rowData["feedpending"]
                 status = "pending"
@@ -1319,6 +1321,10 @@ module.exports = class Query extends AssetManager {
                 if (!paraTool.auditHashesTx(c)) {
                     console.log(`Audit Failed`, txHash)
                 }
+                if (isEVMUnfinalized) {
+                    // TODO: combine with feedpending data
+                }
+
                 if (c.gasLimit) {
                     // this is an EVM tx
                     let assetChain = paraTool.makeAssetChain(c.to.toLowerCase(), c.chainID);

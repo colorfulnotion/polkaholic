@@ -191,7 +191,7 @@ Rewards granted upon reasonable verification.  Important: PII info (Person) will
     </div>
     <div class="col-md-2  text-center">
       <div class="card-body">
-      <% if ( addresses.includes(account.address) ) { %>
+      <% if ( addresses && Array.isArray(addresses) && addresses.includes(account.address) ) { %>
           <button id="btnHome" type="button" class="btn btn-outline-secondary">Home</button>
       <% } else if ( account.isFollowing ) { %>
         <a href="/unfollow/<%= account.address; %>" class="btn btn-outline-secondary">Unfollow</a>
