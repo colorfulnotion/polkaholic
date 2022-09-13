@@ -1152,6 +1152,7 @@ function categorizeTokenTransfers(dLog) {
         let dEvents = dLog.events
         switch (dSig) {
             case 'Transfer(index_topic_1 address from, index_topic_2 address to, uint256 value)':
+            case 'Transfer(index_topic_1 address from, index_topic_2 address to, uint256 amount)':
                 //ERC20
                 let erc20Transfer = {
                     type: 'ERC20',
@@ -1556,7 +1557,7 @@ function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
         if (t.calls != undefined) {
             let newStack = [...stack];
             newStack.push(i);
-            // recursive call 
+            // recursive call
             process_evm_trace(t.calls, res, depth + 1, newStack, txs);
         }
     }
