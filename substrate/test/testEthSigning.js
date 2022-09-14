@@ -36,7 +36,7 @@ async function main() {
     let decimals = 18
     let beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
     let chainIDDest = paraTool.chainIDAstar
-    var txStruct = ethTool.xTokenBuilder(web3Api,currencyAddress, amount, decimals, beneficiary, chainIDDest)
+    var txStruct = ethTool.xTokenBuilder(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
     var signedTx = await ethTool.signEvmTx(web3Api, txStruct, w)
     var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
     console.log(`signedTx`, signedTx)

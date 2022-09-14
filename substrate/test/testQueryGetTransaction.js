@@ -14,7 +14,7 @@ async function main() {
         }
     });
     var a = await query.getTransaction(txHash);
-    console.log(JSON.stringify(a.params)); // JSON.stringify(a));
+    console.log(JSON.stringify(a));
 }
 
 main()

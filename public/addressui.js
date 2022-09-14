@@ -24,7 +24,6 @@ function showerc20(address) {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     try {
-                        console.log("HEY", row);
                         if (row.transactionHash != undefined) {
                             let s = presentTxHash(row.transactionHash);
                             return `${s}`

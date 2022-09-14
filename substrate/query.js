@@ -1293,7 +1293,7 @@ module.exports = class Query extends AssetManager {
             let status = ""
             let isPending = false
             let isEVMUnfinalized = false
-            if (rowData["feed"]) {
+            if (rowData["feed"] ) {
                 feedData = rowData["feed"]
                 status = "finalized"
             } else if (rowData["feedunfinalized"]) {
@@ -1321,11 +1321,7 @@ module.exports = class Query extends AssetManager {
                 if (!paraTool.auditHashesTx(c)) {
                     console.log(`Audit Failed`, txHash)
                 }
-                if (isEVMUnfinalized) {
-                    // TODO: combine with feedpending data
-                }
-
-                if (c.gasLimit) {
+                if (c.transactionHash) {
                     // this is an EVM tx
                     let assetChain = paraTool.makeAssetChain(c.to.toLowerCase(), c.chainID);
                     if (this.assetInfo[assetChain]) {
@@ -1411,13 +1407,15 @@ module.exports = class Query extends AssetManager {
                 if (!isPending) {
                     //pending does not have event, fee, specVersion, blockNumber
                     let dEvents = []
-                    for (const evt of d.events) {
-                        let dEvent = await this.decorateEvent(evt, d.chainID, d.ts, decorate, decorateExtra)
-                        dEvents.push(dEvent)
+                    if (d.events) {
+                        for (const evt of d.events) {
+                            let dEvent = await this.decorateEvent(evt, d.chainID, d.ts, decorate, decorateExtra)
+                            dEvents.push(dEvent)
+                        }
+                        d.events = dEvents
+                        //await this.decorateFee(d, d.chainID, decorateUSD)
+                        d.specVersion = this.getSpecVersionForBlockNumber(d.chainID, d.blockNumber);
                     }
-                    d.events = dEvents
-                    //await this.decorateFee(d, d.chainID, decorateUSD)
-                    d.specVersion = this.getSpecVersionForBlockNumber(d.chainID, d.blockNumber);
                 }
                 //d.chainName = this.getChainName(d.chainID)
                 //[d.id, d.chainID] = this.convertChainID(d.chainID)
@@ -1492,6 +1490,7 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                 } catch (err) {
+                    console.log(err);
                     this.logger.warn({
                         "op": "query.getTransaction",
                         txHash,

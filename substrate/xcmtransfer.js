@@ -658,8 +658,8 @@ module.exports = class XCMTransfer extends AssetManager {
             if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase) {
                 // mark isEVMTx as true
                 isEVMTx = 1
-                console.log(`isEVMTx=${isEVMTx}, asset=`,asset)
-                if (asset.xcContractAddress){
+                console.log(`isEVMTx=${isEVMTx}, asset=`, asset)
+                if (asset.xcContractAddress) {
                     args = ethTool.xTokenBuilder(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest)
                     func = this.web3Api
                 }

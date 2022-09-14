@@ -58,7 +58,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 	<%- uiTool.presentAddress(f.to) %>
       </td>
     </tr>
-<% if ( tx.transfers.length > 0 ) { %>
+<% if ( tx.transfers && tx.transfers.length > 0 ) { %>
     <tr>
       <td>Tokens Transferred</td>
       <td>
@@ -93,21 +93,22 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td><%- tx.fee; %> <%- tx.symbol; %> (<%- uiTool.currencyFormat(tx.feeUSD, tx.priceUSD, tx.priceUSDCurrent); %> ) <% %> </td>
     </tr>
 
+<% if ( tx.gasLimit ) { %>
     <tr>
       <td>Gas Limit</td>
       <td><%- tx.gasLimit; %></td>
     </tr>
-
+<% } %>
     <tr>
       <td>Gas Used by Transaction</td>
-      <td><%- tx.gasUsed; %><%- ` (${uiTool.presentPercentage(tx.gasUsed/tx.gasLimit)})` %></td>
+      <td><%- tx.gasUsed; %><% if ( tx.gasLimit ) { %><%- ` (${uiTool.presentPercentage(tx.gasUsed/tx.gasLimit)})` %><% } %></td>
     </tr>
-
+<% if ( tx.gasPrice ) { %>
     <tr>
       <td>Gas Price</td>
       <td><%- `${tx.gasPrice} Gwei`; %></td>
     </tr>
-
+<% } %>
     <tr>
       <td><%- tx.symbol; %> Price</td>
       <td><%- uiTool.currencyFormat(tx.priceUSD); %> </td>
@@ -118,6 +119,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td><%= f.nonce; %></td>
     </tr>
 
+<% if ( tx.decodedInput ) { %>
     <tr>
       <td>Input Data</td>
       <td>
@@ -127,7 +129,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 	</div>
       </td>
     </tr>
-
+<% } %>
     <tr>
       <td>Compare to</td>
       <td>

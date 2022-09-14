@@ -209,6 +209,7 @@ function showevmblocktransactions(objects) {
                     render: function(data, type, row, meta) {
                         let x = 0
                         if (type == 'display') {
+                            console.log("TS", row.ts, row.timestamp);
                             if (row.ts !== undefined) {
                                 return presentTS(row.ts);
                             } else if (row.timestamp !== undefined) {

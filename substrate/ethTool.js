@@ -542,10 +542,12 @@ async function getTokenHoldersRawBalances(web3Api, contractAddress, holders, tok
 // this function decorates and generate a "full" txn using decodedTxn and decodedReceipts
 function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
     if (!dReceipt || dReceipt.transactionHash === undefined) {
-        console.log(`decorateTxn: missing receipts`)
+        console.log(`decorateTxn: missing receipts`, dReceipt)
+        process.exit(0);
     }
     if (dTxn.hash != dReceipt.transactionHash) {
-        console.log(`decorateTxn: txnHash mismatch (tx:${dTxn.hash}) vs (receipt: ${dReceipt.transactionHash})`)
+        console.log(`decorateTxn: txnHash mismatch (tx:${dTxn.hash}) vs (receipt: ${dReceipt.transactionHash})`, dTxn)
+        process.exit(0);
         return
     }
     //todo: how to detect reverted but successful case?
@@ -553,9 +555,9 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     let gWei = 10 ** 9
     let ether = 10 ** 18
     let value = paraTool.dechexToInt(dTxn.value)
-    let gasLimit = paraTool.dechexToInt(dTxn.gas)
-    let gasPrice = paraTool.dechexToInt(dTxn.gasPrice)
-    let gasUsed = paraTool.dechexToInt(dReceipt.gasUsed)
+    let gasLimit = dTxn.gas ? paraTool.dechexToInt(dTxn.gas) : 0
+    let gasPrice = dTxn.gasPrice ? paraTool.dechexToInt(dTxn.gasPrice) : 0
+    let gasUsed = dTxn.gasUsed ? paraTool.dechexToInt(dReceipt.gasUsed) : 0
     let fee = gasUsed * gasPrice
 
     let fTxn = {
@@ -1546,7 +1548,7 @@ PalletInstance	"0x04+03"	            Pallet Instance 3
 see: https://docs.moonbeam.network/builders/xcm/xc20/xtokens/#xtokens-transfer-function
 */
 
-function xTokenBuilder(web3Api, currency_address = '0x0000000000000000000000000000000000000802', amount = 1, decimals=18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 22006) {
+function xTokenBuilder(web3Api, currency_address = '0x0000000000000000000000000000000000000802', amount = 1, decimals = 18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 22006) {
     console.log(`xTokenBuilder currency_address=${currency_address}, amount=${amount}, decimals=${decimals}, beneficiary=${beneficiary}, chainIDDest=${chainIDDest}`)
     var xTokensContractAbi = [{
         "inputs": [{
@@ -1791,6 +1793,9 @@ module.exports = {
     },
     fuseBlockTransactionReceipt: async function(evmBlk, dTxns, dReceipts, dTrace, chainID) {
         return fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, chainID)
+    },
+    decorateTxn: function(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
+        return decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID);
     },
     decodeTransactionInput: function(txn, contractABIs, contractABISignatures) {
         return decodeTransactionInput(txn, contractABIs, contractABISignatures)
