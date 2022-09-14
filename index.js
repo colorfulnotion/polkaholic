@@ -1533,7 +1533,7 @@ app.post('/search/', async (req, res) => {
     }
 })
 
-app.get('/tx/:txhash', async (req, res) => {
+async function txUIRedirect(req, res) {
     try {
         let txHash = req.params['txhash'];
         let [decorate, decorateExtra] = decorateOptUI(req)
@@ -1567,7 +1567,10 @@ app.get('/tx/:txhash', async (req, res) => {
             });
         }
     }
-})
+}
+
+app.get('/extrinsic/:txhash', async (req, res) => txUIRedirect(req, res))
+app.get('/tx/:txhash', async (req, res) => txUIRedirect(req, res))
 
 app.get('/xcmmessage/:msgHash/:blockNumber?', async (req, res) => {
     try {
