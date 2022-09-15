@@ -10,8 +10,8 @@ const moonbeamRPC = 'https://rpc.api.moonbeam.network'
 const moonriverRPC = 'https://rpc.api.moonriver.moonbeam.network'
 const moonbaseRPC = 'https://rpc.api.moonbase.moonbeam.network'
 
-const astarRPC = 'https://astar.public.blastapi.io'
-const shidenRPC = 'https://shiden.public.blastapi.io'
+const astarRPC = 'https://rpc.astar.network:8545'
+const shidenRPC = 'https://rpc.shiden.astar.network:8545'
 const shibuyaRPC = 'https://evm.shibuya.astar.network'
 
 function loadTestKey(FN = "/root/.walletevm2", name = "evm") {
@@ -56,7 +56,7 @@ async function testXTokenBuilder(apiEndpoint = moonbeamRPC, isbeneficiaryEVM = f
 
     //xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
     let currencyAddress = '0x0000000000000000000000000000000000000802'
-    let amount = 1.0
+    let amount = 0.26
     let decimals = 18
     let beneficiarySubtrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
     let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
@@ -83,7 +83,7 @@ async function testXC20Builder(apiEndpoint = astarRPC, isbeneficiaryEVM = false,
 
     //xc20AssetWithdrawBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
     let currencyAddress = '0xFFFFFFFF00000000000000010000000000000003' //GLMR
-    let amount = 1.0
+    let amount = 0.26
     let decimals = 18
     let beneficiarySubtrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
     let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
@@ -101,11 +101,11 @@ async function testXC20Builder(apiEndpoint = astarRPC, isbeneficiaryEVM = false,
 }
 
 async function main() {
-    let isbeneficiaryEVM = true
-    let isBroadcast = false
+    let isbeneficiaryEVM = 1
+    let isBroadcast = 0
     //await testSimpleEvmTx(moonbaseRPC, isBroadcast)
-    //await testXC20Builder(astarRPC, isbeneficiaryEVM, isBroadcast)
-    await testXTokenBuilder(moonbeamRPC, isbeneficiaryEVM, isBroadcast)
+    await testXC20Builder(astarRPC, isbeneficiaryEVM, isBroadcast)
+    //await testXTokenBuilder(moonbeamRPC, isbeneficiaryEVM, isBroadcast)
 }
 
 main()

@@ -628,6 +628,19 @@ async function sendSignedTx(web3Api, signedTx) {
     return isError
 }
 
+async function sendSignedRLPTx(web3Api, rlpTx) {
+    var isError = 0
+    let txHash = web3.utils.keccak256(rlpTx)
+    console.log(`sendSignedTx txhHash=${txHash}, rawTransaction=${rlpTx}`)
+    try {
+        await web3Api.eth.sendSignedTransaction(rlpTx)
+    } catch (error) {
+        console.log(`sendSignedTx txhHash=${txHash}, rawTransaction=${rlpTx} error=${error.toString()}`)
+        isError = error.toString()
+    }
+    return isError
+}
+
 function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
     //etherscan is marking native case as "Transfer"
     let contractcreationAddress = false
@@ -1633,9 +1646,9 @@ function xc20AssetWithdrawBuilder(web3Api, currency_address = '0xFFfFfFffFFfffFF
         console.log(`xc20Builder method=0x019054d0, currency_address_list=${currency_address_list}, Human Readable Amount=${amount}(amountList=${amountList}, using decimals=${decimals})`)
         data = xc20Contract.methods['0x019054d0'](currency_address_list, amountList, beneficiary, isRelay, paraIDDest, feeIndex).encodeABI()
     }
-
     let txStruct = {
         to: xc20ContractAddress,
+        gasPrice: web3.utils.numberToHex('30052000000'), //30.052Gwei
         value: '0',
         gas: 2000000,
         data: data
@@ -1803,11 +1816,14 @@ module.exports = {
     sendSignedTx: async function(web3Api, signedTx) {
         return sendSignedTx(web3Api, signedTx)
     },
-    xTokenBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary) {
-        return xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
+    sendSignedRLPTx: async function(web3Api, rlpTX) {
+        return sendSignedRLPTx(web3Api, rlpTX)
     },
-    xc20AssetWithdrawBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary) {
-        return xc20AssetWithdrawBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
+    xTokenBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest) {
+        return xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest)
+    },
+    xc20AssetWithdrawBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest) {
+        return xc20AssetWithdrawBuilder(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest)
     },
     parseAbiSignature: function(abiStrArr) {
         return parseAbiSignature(abiStrArr)
