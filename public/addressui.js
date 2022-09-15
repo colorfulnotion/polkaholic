@@ -1,4 +1,3 @@
-
 var initerc20 = false;
 var tableERC20 = null
 
@@ -25,7 +24,6 @@ function showerc20(address) {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     try {
-			console.log("HEY", row);
                         if (row.transactionHash != undefined) {
                             let s = presentTxHash(row.transactionHash);
                             return `${s}`
@@ -59,20 +57,20 @@ function showerc20(address) {
             data: 'from',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-		    if ( data.toLowerCase() == address.toLowerCase() ) {
-			return getShortHash(data);
-		    } else {
-			return presentAddress(data);
-		    }
+                    if (data.toLowerCase() == address.toLowerCase()) {
+                        return getShortHash(data);
+                    } else {
+                        return presentAddress(data);
+                    }
                 }
                 return "nfrom";
             }
         }, {
             data: 'transferType',
             render: function(data, type, row, meta) {
-        	let transferType = ( row.from !== address ) ? 'incoming' : 'outgoing';
+                let transferType = (row.from !== address) ? 'incoming' : 'outgoing';
                 if (type == 'display') {
-	            if (transferType == 'incoming') {
+                    if (transferType == 'incoming') {
                         return '<button type="button" class="btn transfer" style="background-color:rgba(0,201,167,.2); color:#02977e">' + "IN" + '</button>';
                     } else {
                         return '<button type="button" class="btn transfer" style="background-color:rgba(219,154,4,.2); color:#b47d00">' + "OUT" + '</button>';
@@ -84,11 +82,11 @@ function showerc20(address) {
             data: 'to',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-		    if ( data.toLowerCase() == address.toLowerCase() ) {
-			return getShortHash(data);
-		    } else {
-			return presentAddress(data);
-		    }
+                    if (data.toLowerCase() == address.toLowerCase()) {
+                        return getShortHash(data);
+                    } else {
+                        return presentAddress(data);
+                    }
                 }
                 return "ndest";
             }
@@ -104,18 +102,18 @@ function showerc20(address) {
         }, {
             data: 'valueUSD',
             render: function(data, type, row, meta) {
-                if ( row.valueUSD != undefined ) {
-		    return(currencyFormat(row.valueUSD));
-		}
+                if (row.valueUSD != undefined) {
+                    return (currencyFormat(row.valueUSD));
+                }
             }
-        } 
-        ]
+        }]
     });
     loadData2(pathParams, tableName, true, "data", 'internal', 'Internal Txs')
 }
 
 var initinternal = false;
 var tableInternal = null
+
 function showinternal(address) {
     if (initinternal) return;
     else initinternal = true;
@@ -206,8 +204,7 @@ function showinternal(address) {
                     return 0;
                 }
             }
-        }
-		 ]
+        }]
     });
 
     loadData2(pathParams, tableName, true, "data", 'internal', 'Internal Txs')

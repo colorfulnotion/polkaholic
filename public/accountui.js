@@ -179,7 +179,7 @@ function showevmtxs(address, chainListStr = 'all') {
     if (initevmtxs) return;
     else initevmtxs = true;
     let pathParams = `account/${address}?group=evmtxs&chainfilters=${chainListStr}`
-    
+
     let tableName = '#tableevmtxs'
     tableEVMTxs = $(tableName).DataTable({
         lengthMenu: getLengthMenu(),
@@ -238,7 +238,7 @@ function showevmtxs(address, chainListStr = 'all') {
         }, {
             data: 'blockNumber',
             render: function(data, type, row, meta) {
-		let s = ( row.id != undefined ) && (row.chainName != undefined ) ? presentChain(row.id, row.chainName) + " " : "";
+                let s = (row.id != undefined) && (row.chainName != undefined) ? presentChain(row.id, row.chainName) + " " : "";
                 return s + presentBlockNumber(row.chainID, "", row.blockNumber);
             }
         }, {
@@ -263,33 +263,33 @@ function showevmtxs(address, chainListStr = 'all') {
         }, {
             data: 'from',
             render: function(data, type, row, meta) {
-		if ( address && data ) {
+                if (address && data) {
                     if (type == 'display') {
-			if ( data.toLowerCase() == address.toLowerCase() ) {
-			    return getShortHash(data, false);
-			} else {
-			    return presentAddress(data);
-			}
-		    } else {
-			return "-"
-		    }
+                        if (data.toLowerCase() == address.toLowerCase()) {
+                            return getShortHash(data, false);
+                        } else {
+                            return presentAddress(data);
+                        }
+                    } else {
+                        return "-"
+                    }
                 }
                 return "";
             }
         }, {
             data: 'to',
             render: function(data, type, row, meta) {
-		if ( row.to != undefined ) {
+                if (row.to != undefined) {
                     if (type == 'display') {
-			if ( address && ( data == address ) ) {
-			    return getShortHash(data, false);
-			} else {
-			    return presentAddress(data);
-			}
+                        if (address && (data == address)) {
+                            return getShortHash(data, false);
+                        } else {
+                            return presentAddress(data);
+                        }
                     }
-                    return data; 
-		}
-		return "";
+                    return data;
+                }
+                return "";
             }
         }, {
             data: 'value',
@@ -470,11 +470,11 @@ function showtransfers(address, chainListStr = 'all') {
             data: 'from',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-		    if ( row.from.toLowerCase() == address ) {
-			return getShortHash(data, false);
-		    } else {
-			return presentIDRow(row, 'from');
-		    }
+                    if (row.from.toLowerCase() == address) {
+                        return getShortHash(data, false);
+                    } else {
+                        return presentIDRow(row, 'from');
+                    }
                 }
                 return data;
             }
@@ -482,11 +482,11 @@ function showtransfers(address, chainListStr = 'all') {
             data: 'to',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-		    if ( row.to.toLowerCase() == address ) {
-			return getShortHash(data, false);
-		    } else {
-			return presentIDRow(row, 'to');
-		    }
+                    if (row.to.toLowerCase() == address) {
+                        return getShortHash(data, false);
+                    } else {
+                        return presentIDRow(row, 'to');
+                    }
                 }
                 return data;
             }
@@ -680,11 +680,11 @@ function showxcmtransfers(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     if (row.fromAddress !== undefined) {
-			if ( row.fromAddress.toLowerCase() == address ) {
-			    return getShortHash(data, false);
-			} else {
+                        if (row.fromAddress.toLowerCase() == address) {
+                            return getShortHash(data, false);
+                        } else {
                             return presentID(data);
-			}
+                        }
                     } else {
                         console.log("missing fromAddress", row);
                     }
@@ -696,11 +696,11 @@ function showxcmtransfers(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     if (row.destAddress !== undefined) {
-			if ( row.destAddress.toLowerCase() == address.toLowerCase() ) {
+                        if (row.destAddress.toLowerCase() == address.toLowerCase()) {
                             return getShortHash(data, false);
-			} else {
+                        } else {
                             return presentID(data);
-			}
+                        }
                     } else {
                         console.log("missing destAddress", row);
                     }

@@ -1,4 +1,3 @@
-
 function showtokentab(hash, chainListStr = 'all') {
     switch (hash) {
         case "#accountassets":
@@ -28,7 +27,7 @@ function showtokentab(hash, chainListStr = 'all') {
 
 function setuptabs(tabs, address, requestedChainAddress, chainListStr = 'all', isEVM = 0) {
     if (chainListStr == '') chainListStr = 'all'
-    
+
     for (let i = 0; i < tabs.length; i++) {
         let t = tabs[i];
         let id = "#" + t.target + "-tab";
@@ -37,16 +36,16 @@ function setuptabs(tabs, address, requestedChainAddress, chainListStr = 'all', i
             const hash = $(this).attr("href");
             let view = "token";
             let newUrl = `/${view}/` + requestedChainAddress + `?group=${t.target}&chainfilters=${chainListStr}`
-            
+
             setTimeout(() => {
                 showtokentab(hash, chainListStr);
             }, 250);
             history.replaceState(null, null, newUrl);
         })
     }
-    
+
     let url = location.href.replace(/\/$/, "");
-    let hash = "#accountassets" ;
+    let hash = "#accountassets";
     if (location.hash) {
         const urlhash = url.split("#");
         if (urlhash.length > 1) hash = "#" + urlhash[1];

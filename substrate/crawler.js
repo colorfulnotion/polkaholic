@@ -1420,7 +1420,6 @@ module.exports = class Crawler extends Indexer {
         }
     }
 
-
     async crawlTxpoolContent(chain, crawler) {
         if (crawler.latestBlockNumber > 0) {
             let cmd = `curl ${chain.RPCBackfill}  -X POST -H "Content-Type: application/json" --data '{"method":"txpool_content","params":[],"id":1,"jsonrpc":"2.0"}'`
@@ -1432,7 +1431,6 @@ module.exports = class Crawler extends Indexer {
             });
             let txs = [];
             let content = JSON.parse(stdout);
-
             if (content && content.result && content.result.pending) {
                 let pending = content.result.pending;
                 let ts = crawler.getCurrentTS();
@@ -1457,9 +1455,7 @@ module.exports = class Crawler extends Indexer {
                         tx.chainID = chain.chainID;
                         tx.timestamp = ts;
                     }
-                    if (txs.length < 10) {
-                        await crawler.processPendingEVMTransactions(txs);
-                    }
+                    await crawler.processPendingEVMTransactions(txs);
                 } else if (ts % 60 == 0) {
 
                     for (const txhash of Object.keys(crawler.coveredtx)) {
@@ -2039,9 +2035,10 @@ create table talismanEndpoint (
                             this.apiAt = this.api //set here for opaqueCall  // TODO: what if metadata changes?
                             let signedExtrinsicBlock = block
                             signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
-
                             //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
-                            let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace); // autotrace, finalized, write_bq_log are all false
+                            // IMPORTANT NOTE: we only need to do this for evm chains... (review)
+                            let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, "subscribeStorage", this.api);
+                            let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces); // autotrace, finalized, write_bq_log are all false
 
                             await this.immediateFlushBlockAndAddressExtrinsics()
 
@@ -2057,15 +2054,44 @@ create table talismanEndpoint (
                             let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
                             let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
                             let fees = blockStats && blockStats.fees ? blockStats.fees : 0
+                            let vals = ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "fees", "lastTraceDT"]
+                            let evals = "";
+                            if (chain.isEVM) {
+                                let blockHashEVM = blockStats.blockHashEVM ? blockStats.blockHashEVM : "";
+                                let parentHashEVM = blockStats.parentHashEVM ? blockStats.parentHashEVM : "";
+                                let numTransactionsEVM = blockStats.numTransactionsEVM ? blockStats.numTransactionsEVM : 0;
+                                let numTransactionsInternalEVM = blockStats.numTransactionsInternalEVM ? blockStats.numTransactionsInternalEVM : 0;
+                                let numReceiptsEVM = blockStats.numReceiptsEVM ? blockStats.numReceiptsEVM : 0;
+                                let gasUsed = blockStats.gasUsed ? blockStats.gasUsed : 0;
+                                let gasLimit = blockStats.gasLimit ? blockStats.gasLimit : 0;
+                                vals.push("blockHashEVM", "parentHashEVM", "numTransactionsEVM", "numTransactionsInternalEVM", "numReceiptsEVM", "gasUsed", "gasLimit");
+                                evals = `, '${blockHashEVM}', '${parentHashEVM}', '${numTransactionsEVM}', '${numTransactionsInternalEVM}', '${numReceiptsEVM}', '${gasUsed}', '${gasLimit}'`;
+                            }
 
-                            sql = `insert into block${chainID} (blockNumber, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, fees, lastTraceDT) values ('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS})) on duplicate key update lastTraceDT=values(lastTraceDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), fees = values(fees)`;
-                            this.batchedSQL.push(sql);
-
+                            let out = `('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
+                            await this.upsertSQL({
+                                "table": `block${chainID}`,
+                                "keys": ["blockNumber"],
+                                "vals": vals,
+                                "data": [out],
+                                "replace": vals
+                            }, true);
+                            /*
+                            {"name":"polkaholic","hostname":"kusama","pid":684112,"level":50,"op":"update_batchedSQL","sql":"insert into blockunfinalized (chainID,blockNumber,numExtrinsics,numSignedExtrinsics,numTransfers,numEvents,valueTransfersUSD,fees,lastTraceDT,blockHashEVM,parentHashEVM,numTransactionsEVM,numTransactionsInternalEVM,numReceiptsEVM,gasUsed,gasLimit) VALUES ('2004', '1868555', '0x1cf7a3838a8dcf9087251521e070023b9cd633c9d6a1dc777a4a5866822e1bc4', '15', '0', '2', '138', '26.831085319352944', from_unixtime(1663191949) , '', '', '0', '0', '0', '0', '0' ) on duplicate key update numExtrinsics=VALUES(numExtrinsics),numSignedExtrinsics=VALUES(numSignedExtrinsics),numTransfers=VALUES(numTransfers),numEvents=VALUES(numEvents),valueTransfersUSD=VALUES(valueTransfersUSD),fees=VALUES(fees),lastTraceDT=VALUES(lastTraceDT),blockHashEVM=VALUES(blockHashEVM),parentHashEVM=VALUES(parentHashEVM),numTransactionsEVM=VALUES(numTransactionsEVM),numTransactionsInternalEVM=VALUES(numTransactionsInternalEVM),numReceiptsEVM=VALUES(numReceiptsEVM),gasUsed=VALUES(gasUsed),gasLimit=VALUES(gasLimit)","len":981,"try":1,"err":{"code":"ER_WARN_DATA_TRUNCATED","errno":1265,"sqlState":"01000","sqlMessage":"Data truncated for column 'numExtrinsics' at row 1"
+                            */
                             //store unfinalized blockHashes in a single table shared across chains
-                            let sql2 = `insert into blockunfinalized (chainID, blockNumber, blockHash, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, blockDT) values ('${chainID}', '${blockNumber}', '${blockHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', from_unixtime(${blockTS})) on duplicate key update blockDT=values(blockDT), numExtrinsics=values(numExtrinsics), numSignedExtrinsics=values(numSignedExtrinsics), numEvents=values(numEvents), valueTransfersUSD=values(valueTransfersUSD)`;
+                            let outunf = `('${chainID}', '${blockNumber}', '${blockHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
+                            let vals2 = [...vals]; // same as other insert, but with
+                            vals2.unshift("blockHash");
+                            await this.upsertSQL({
+                                "table": "blockunfinalized",
+                                "keys": ["chainID", "blockNumber"],
+                                "vals": vals2,
+                                "data": [outunf],
+                                "replace": vals
+                            })
 
-                            this.batchedSQL.push(sql2);
-                            console.log(`subscribeStorage ${chain.chainName} bn=${blockNumber} ${blockHash}: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(parseInt(blockNumber, 10)));
+                            console.log(`****** subscribeStorage ${chain.chainName} bn=${blockNumber} ${blockHash}: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(parseInt(blockNumber, 10)));
                             await this.update_batchedSQL();
                         }
                     } else {

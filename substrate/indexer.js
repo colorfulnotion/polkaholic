@@ -6,7 +6,6 @@ const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 const Endpoints = require("./summary/endpoints");
 const mysql = require("mysql2");
-
 const {
     hexToU8a,
     compactStripLength,
@@ -4060,38 +4059,10 @@ module.exports = class Indexer extends AssetManager {
         if (res.isEVM) {
             evmTxStatus = res.isEVM
             let evmTxHash = evmTxStatus.transactionHash
-            // add extrinsicEvmMap here
+            // add extrinsicEvmMap here to link evmTX <=> substrateTX
             this.extrinsicEvmMap[evmTxHash] = {
                 extrinsicID: extrinsicID,
                 extrinsicHash: extrinsicHash
-            }
-            if (!finalized) {
-                // HERE is where we take an unfinalized SUBSTRATE block where we have extracted Etherem:executed data via "checkExtrinsicStatusAndFee" and add CANDIDATE substrate block info
-                // and then write it into (a) hashes "feedevmunfinalized" (b) addressextrinsic "feedunfinalized"
-                // IMPORTANT: Because different candidate blocks with different times may be written (as well as with different indexers), query MUST dedup both hashes and addressextrinsic based on transactionHash! 
-                evmTxStatus.blockHash = blockHash;
-                evmTxStatus.blockNumber = blockNumber;
-                evmTxStatus.substrate = {
-                    extrinsicID,
-                    extrinsicHash
-                };
-                evmTxStatus.chainID = this.chainID;
-                let evmTxHashRec = {
-                    key: evmTxHash,
-                    data: {}
-                }
-                evmTxHashRec.data = {
-                    feedevmunfinalized: {
-                        tx: {
-                            value: JSON.stringify(evmTxStatus),
-                            timestamp: blockTS * 1000000
-                        }
-                    }
-                }
-                this.hashesRowsToInsert.push(evmTxHashRec);
-                let fromAddress = evmTxStatus.from
-                console.log("UNFINALIZED EVM TRANSACTION", evmTxHash, evmTxHashRec, evmTxStatus)
-                this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, evmTxHash, "feed", evmTxStatus, blockTS, false); // finalized = false means "feedunfinalized" is the column family
             }
         }
 
@@ -4169,7 +4140,6 @@ module.exports = class Indexer extends AssetManager {
 
         if (!paraTool.auditHashesTx(rExtrinsic)) {
             console.log(`Failed Audit!!`, rExtrinsic)
-            //process.exit(0)
         }
 
         if (!isSigned) {
@@ -4550,7 +4520,7 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async process_evm_contract_create(tx, chainID) {
+    async process_evm_contract_create(tx, chainID, finalized = false) {
         // waterfall model: use `getERC20TokenInfo` to categorize ERC20 contract first. if doesn't work, we will try erc720 next, and then erc1155..
         let web3Api = this.web3Api
         let bn = tx.blockNumber
@@ -4605,13 +4575,15 @@ module.exports = class Indexer extends AssetManager {
         return (false);
     }
 
-    async process_evmtx_native_transfer(tx, chainID, ts, blockNumber) {
+    async process_evmtx_native_transfer(tx, chainID, ts, blockNumber, finalized = false) {
         let nativeAsset = this.getNativeAsset()
         let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
         // mark assetholder as worthy of update
         // Note: could get internal transfer with evmtraces https://docs.moonbeam.network/builders/build/eth-api/debug-trace/ https://docs.moonbeam.network/builders/build/eth-api/debug-trace/
-        this.updateAssetHolder(nativeAssetChain, tx.from, tx.blockNumber)
-        this.updateAssetHolder(nativeAssetChain, tx.to, tx.blockNumber)
+        if (finalized) {
+            this.updateAssetHolder(nativeAssetChain, tx.from, tx.blockNumber)
+            this.updateAssetHolder(nativeAssetChain, tx.to, tx.blockNumber)
+        }
         return (false);
     }
 
@@ -4806,7 +4778,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return (true);
     }
 
-    async process_erc20_token_transfer(tx, t, chainID, eventID = "0") {
+    async process_erc20_token_transfer(tx, t, chainID, eventID = "0", finalized = false) {
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         //   1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
@@ -4867,8 +4839,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
         }
         // This mark for lookup on isTip = true for processAssetTypeERC20/fetchAssetHolderBalances
-        this.updateAssetHolder(assetChain, t.from, bn)
-        this.updateAssetHolder(assetChain, t.to, bn)
+        if (finalized) {
+            this.updateAssetHolder(assetChain, t.from, bn)
+            this.updateAssetHolder(assetChain, t.to, bn)
+        }
 
         if (t.from && t.to && t.tokenAddress) {
             let v = {
@@ -4882,10 +4856,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 value: t.value,
             };
             let extrinsicID = `${tx.blockNumber}-${tx.transactionIndex}`
-
-            this.updateAddressExtrinsicStorage(t.from, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
-            this.updateAddressExtrinsicStorage(t.to, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
-            this.updateAddressExtrinsicStorage(t.tokenAddress, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+            if (finalized) {
+                this.updateAddressExtrinsicStorage(t.from, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+                this.updateAddressExtrinsicStorage(t.to, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+                this.updateAddressExtrinsicStorage(t.tokenAddress, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+            }
         }
     }
 
@@ -4920,7 +4895,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async process_erc721_token_transfer(tx, t, chainID, eventID = "0") {
+    async process_erc721_token_transfer(tx, t, chainID, eventID = "0", finalized = false) {
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         let tokenID = t.tokenId
@@ -4968,11 +4943,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async process_erc1155_token_transfer(tx, t, chainID, eventID = "0") {
+    async process_erc1155_token_transfer(tx, t, chainID, eventID = "0", finalized = false) {
         //stub
     }
 
-    async process_evmtx_token_transfer(tx, chainID) {
+    async process_evmtx_token_transfer(tx, chainID, finalized = false) {
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         let transfers = tx.transfers
@@ -4982,13 +4957,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let t = transfers[e];
             //console.log(`Evm transfer [${bn}-${tx.transactionIndex}]`, JSON.stringify(t))
             if (t.type == "ERC20") {
-                await this.process_erc20_token_transfer(tx, t, chainID, eventID)
+                await this.process_erc20_token_transfer(tx, t, chainID, eventID, finalized)
             }
             if (t.type == "ERC721") {
-                await this.process_erc721_token_transfer(tx, t, chainID, eventID)
+                await this.process_erc721_token_transfer(tx, t, chainID, eventID, finalized)
             }
             if (t.type == "ERC1155") {
-                await this.process_erc1155_token_transfer(tx, t, chainID, eventID)
+                await this.process_erc1155_token_transfer(tx, t, chainID, eventID, finalized)
             }
 
         }
@@ -4997,7 +4972,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
 
     //called after erc20 transfers is processed
-    async process_evmtx_swap(tx, chainID) {
+    async process_evmtx_swap(tx, chainID, finalized = false) {
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         let swaps = tx.swaps
@@ -5005,13 +4980,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         for (const s of swaps) {
             //concole.log(`[${bn}-${tx.transactionIndex}]`, JSON.stringify(t))
             if (s.type == "swapV2") {
-                await this.process_v2_swap(s, chainID, bn)
+                await this.process_v2_swap(s, chainID, bn, true, finalized)
             }
         }
         return (false);
     }
 
-    async process_v2_swap(swapEvent, chainID, bn, retryOnMiss = true) {
+    async process_v2_swap(swapEvent, chainID, bn, retryOnMiss = true, finalized = false) {
         //console.log(`process_v2_swap`, swapEvent)
         if (swapEvent.type == "swapV2") {
             let lpTokenAddress = swapEvent.lpTokenAddress
@@ -5048,11 +5023,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let [isXcAsset, assetChainLPAsNormal, rawAssetChainLPAsNormal] = paraTool.getErcTokenAssetChain(lpTokenAddress, chainID) // REVIEW
                 lpToken.assetType = paraTool.assetTypeERC20 // modify assetType here so it get updated at the tip
                 this.initERCAssetOnCache(rawAssetChainLPAsNormal, lpToken, isXcAsset) //MK should be original
-                this.updateAssetERC20SwapTradingVolume(assetChainLP, r.token0In, r.token1In, r.token0Out, r.token1Out) //MK
+                if (finalized) {
+                    this.updateAssetERC20SwapTradingVolume(assetChainLP, r.token0In, r.token1In, r.token0Out, r.token1Out) //MK
+                }
             } else if (retryOnMiss) {
                 console.log(`process_v2_swap: fetching unknown lpToken ${lpTokenAddress}`, lpToken)
                 await this.fetchMissingERC20(lpTokenAddress, bn)
-                await this.process_v2_swap(swapEvent, chainID, bn, false)
+                await this.process_v2_swap(swapEvent, chainID, bn, false, finalized)
             } else {
                 console.log(`process_v2_swap: unknown lpToken ${lpTokenAddress} exit`, lpToken)
             }
@@ -5061,7 +5038,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    async process_evmtx_syncEvent(syncEvent, chainID, bn, retryOnMiss = true) {
+    async process_evmtx_syncEvent(syncEvent, chainID, bn, retryOnMiss = true, finalized = false) {
         if (syncEvent.type == "syncV2") {
             let lpTokenAddress = syncEvent.lpTokenAddress
             let lpToken = this.getLPToken(lpTokenAddress)
@@ -5086,11 +5063,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let [isXcAsset, assetChainLPAsNormal, rawAssetChainLPAsNormal] = paraTool.getErcTokenAssetChain(lpTokenAddress, chainID) // REVIEW
                 lpToken.assetType = paraTool.assetTypeERC20 // modify assetType here so it get updated at the tip
                 this.initERCAssetOnCache(rawAssetChainLPAsNormal, lpToken, isXcAsset) // should be original?
-                this.updateAssetERC20LiquidityPair(assetChainLP, r.lp0, r.lp1, r.rat) //MK
+                if (finalized) {
+                    this.updateAssetERC20LiquidityPair(assetChainLP, r.lp0, r.lp1, r.rat) //MK
+                }
             } else if (retryOnMiss) {
                 console.log(`process_evmtx_syncEvent: fetching unknown lpToken ${lpTokenAddress}`)
                 await this.fetchMissingERC20(lpTokenAddress, bn)
-                await this.process_evmtx_syncEvent(syncEvent, chainID, bn, false)
+                await this.process_evmtx_syncEvent(syncEvent, chainID, bn, false, finalized)
             } else {
                 console.log(`process_evmtx_syncEvent: unknown lpToken ${lpTokenAddress} exit`)
             }
@@ -5112,7 +5091,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     // Because multiple indexers write "feedpending" cells with slightly different TS, query MUST dedup these cells by transactionHash (which embeds nonce) should use the oldest cells timestamp
     // We do NOT write into addressextrinsic "feedunfinalized" here, and defer writing there until we have a extrinsicID/blockNumber CANDIDATE.
     async processPendingEVMTransactions(txs, chainID) {
-        let rects = this.getCurrentTS() * 1000000;
+        let ts = this.getCurrentTS();
+        let rects = ts * 1000000;
         for (const tx of txs) {
             let evmTxHash = tx.hash;
             let fromAddress = tx.from.toLowerCase()
@@ -5120,19 +5100,27 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 key: evmTxHash,
                 data: {}, //feedpending
             }
+            let receipt = {
+                transactionHash: evmTxHash,
+                gasUsed: "0x",
+                status: [],
+                transfers: [],
+                swaps: [],
+                decodedLogs: [],
+            }
+            let fTxn = ethTool.decorateTxn(tx, receipt, [], ts, chainID)
             evmTxHashRec.data = {
                 feedpending: {
                     tx: {
-                        value: JSON.stringify(tx),
+                        value: JSON.stringify(fTxn),
                         timestamp: rects
                     }
                 }
             }
-            console.log("processPendingEVMTransaction", evmTxHashRec);
+            console.log("processPendingEVMTransaction", evmTxHashRec, fTxn);
             this.hashesRowsToInsert.push(evmTxHashRec)
         }
     }
-
 
     // For all evm txs in evmFullBlock, we wish to be able to at least:
     //  - /account/0x7aB.. --> get all the ERC20/721/... assets across chains at the tip
@@ -5141,53 +5129,45 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     //  - /asset/0x1d3.. --> get the totalSupply, top 1000 asset holders
     async process_evm_transaction(tx, chainID, finalized = false) {
         if (tx == undefined) return;
-        if (!finalized) {
-            // REVIEW: we do not write feedunfinalized into addressextrinsic or hashes -- instead we use the Ethereum:executed event data to write CANDIDATE blockHash/blockNumber elsewhere
-            return;
-        }
         if (ethTool.isTxContractCreate(tx)) {
             // Contract Creates
-            await this.process_evm_contract_create(tx, chainID);
+            await this.process_evm_contract_create(tx, chainID, finalized);
         }
 
         if (ethTool.isTxNativeTransfer(tx)) {
             // Native Transfers
-            await this.process_evmtx_native_transfer(tx, chainID);
+            await this.process_evmtx_native_transfer(tx, chainID, finalized);
         }
 
         if (ethTool.isTxTokenTransfer(tx)) {
             // Token Transfers (ERC20/ERC721/1155)
-            await this.process_evmtx_token_transfer(tx, chainID);
+            await this.process_evmtx_token_transfer(tx, chainID, finalized);
         }
 
         if (ethTool.isTxSwap(tx)) {
             // swap detected - aggregate trading volumes
-            await this.process_evmtx_swap(tx, chainID);
+            await this.process_evmtx_swap(tx, chainID, finalized);
         }
         let syncEvents = ethTool.isTxLPSync(tx) // swap, add/removeLiquidity
         if (syncEvents) {
             //LP token lp0, lp1 updates
             let bn = tx.blockNumber
             for (const syncEvent of syncEvents) {
-                await this.process_evmtx_syncEvent(syncEvent, chainID, tx)
+                await this.process_evmtx_syncEvent(syncEvent, chainID, tx, true, finalized)
             }
         }
         //process feedevmtx
         let evmTxHash = tx.transactionHash
         let extRes = this.extrinsicEvmMap[evmTxHash]
         let syntheticExtrinsicID = `${tx.blockNumber}-${tx.transactionIndex}`
-        if (extRes !== undefined) {
+        if (extRes !== undefined) { // && finalized // REVIEW
             tx['substrate'] = extRes
             syntheticExtrinsicID = extRes.extrinsicID
         }
-
-        //console.log(`evm tx ${evmTxHash}`, extRes, tx)
         if (tx.from != undefined) {
             let fromAddress = tx.from.toLowerCase()
             // writes into feed or feedunfinalized based on finalized
-            if (finalized) {
-                this.updateAddressExtrinsicStorage(fromAddress, syntheticExtrinsicID, evmTxHash, "feed", tx, tx.timestamp, finalized);
-            }
+            this.updateAddressExtrinsicStorage(fromAddress, syntheticExtrinsicID, evmTxHash, "feed", tx, tx.timestamp, finalized);
         }
         // (2) hashesRowsToInsert: evmTxHash -> evmTX
         this.stat.hashesRows.evmTx++
@@ -5197,32 +5177,34 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             key: evmTxHash,
             data: {}, //feed/feedunfinalized
         }
-
-        evmTxHashRec.data = {
-            feed: {
-                tx: {
-                    value: JSON.stringify(tx),
-                    timestamp: rects
-                }
+        let family = finalized ? 'feed' : 'feedunfinalized';
+        evmTxHashRec.data[family] = {
+            tx: {
+                value: JSON.stringify(tx),
+                timestamp: rects
             }
-        }
-        // write evmtx to "feedto" to index txs interacting with (contract) address
-        let col = `${chainID}-${syntheticExtrinsicID}`
-        if (tx.to) {
-            let feedto = {
-                chainID: chainID,
-                blockNumber: tx.blockNumber,
-                transactionHash: evmTxHash,
-                decodedInput: tx.decodedInput,
-                from: tx.from.toLowerCase(),
-                to: tx.to.toLowerCase(),
-                ts: tx.timestamp,
-                value: tx.value,
-                fee: tx.fee
-            }
-            this.updateAddressExtrinsicStorage(tx.to, syntheticExtrinsicID, evmTxHash, "feedto", feedto, tx.timestamp, true);
         }
         this.hashesRowsToInsert.push(evmTxHashRec)
+
+        // write evmtx to "feedto" to index txs interacting with (contract) address
+        if (finalized) {
+            let col = `${chainID}-${syntheticExtrinsicID}`
+            if (tx.to) {
+                // writes into feedto ONLY
+                let feedto = {
+                    chainID: chainID,
+                    blockNumber: tx.blockNumber,
+                    transactionHash: evmTxHash,
+                    decodedInput: tx.decodedInput,
+                    from: tx.from.toLowerCase(),
+                    to: tx.to.toLowerCase(),
+                    ts: tx.timestamp,
+                    value: tx.value,
+                    fee: tx.fee
+                }
+                this.updateAddressExtrinsicStorage(tx.to, syntheticExtrinsicID, evmTxHash, "feedto", feedto, tx.timestamp, true);
+            }
+        }
     }
 
 
@@ -5352,6 +5334,80 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
+    combine_tx_with_receipt_status(rawTx, rawReceipt, rawTransactionStatus, idx, blockHash, blockNumber, blockTS) {
+        // TODO: reformat to match
+        let tx = null;
+        let gasUsed = null
+        let typ = "legacy";
+        if (rawTx.eip1559) {
+            tx = JSON.parse(JSON.stringify(rawTx.eip1559))
+            tx.type = 2;
+            typ = "eip1559";
+            gasUsed = rawReceipt.eip1559.gasUsed;
+        } else if (rawTx.legacy) {
+            tx = JSON.parse(JSON.stringify(rawTx.legacy))
+            tx.type = 1;
+            gasUsed = rawReceipt.legacy.gasUsed;
+        }
+        if (tx) {
+            tx.ts = blockTS;
+            tx.timestamp = blockTS;
+            tx.blockNumber = blockNumber;
+            tx.transactionIndex = rawTransactionStatus.transactionIndex
+            tx.hash = rawTransactionStatus.transactionHash
+            tx.from = rawTransactionStatus.from
+            tx.to = rawTransactionStatus.to
+            tx.logs = rawTransactionStatus.logs
+            tx.gasUsed = rawReceipt[typ].usedGas
+            tx.statusCode = rawReceipt[typ].statusCode
+        }
+        let dtx = {
+            rawTx,
+            rawTransactionStatus,
+            rawReceipt,
+            tx
+        };
+        let receipt = (typ == "eip1559") ? JSON.parse(JSON.stringify(rawReceipt.eip1559)) : JSON.parse(JSON.stringify(rawReceipt.legacy));
+        receipt.blockHash = blockHash;
+        receipt.blockNumber = blockNumber;
+        receipt.contractAddress = rawTransactionStatus.contractAddress;
+        //receipt.cumulativeGasUsed = ""; // check
+        //receipt.effectiveGasPrice = "" // check
+        receipt.gasUsed = receipt.usedGas; // check
+        receipt.status = receipt.statusCode; // check
+        receipt.from = rawTransactionStatus.from;
+        receipt.to = rawTransactionStatus.to;
+        receipt.transactionHash = rawTransactionStatus.transactionHash;
+        receipt.transactionIndex = rawTransactionStatus.transactionIndex
+        //console.log("combine", idx, dtx, "receipt", rawReceipt);
+        return [tx, receipt];
+    }
+
+    convertUnfinalizedRawTraceData(current) {
+        if (current.Block && current.Receipts && current.TransactionStatuses && current.evmBlockHash) {
+            try {
+                let receipts = [];
+                let b = JSON.parse(JSON.stringify(current.Block.header));
+                b.hash = current.evmBlockHash;
+                b.ts = current.blockTS;
+                b.timestamp = current.blockTS;
+                b.transactions = [];
+                for (let idx = 0; idx < current.Block.transactions.length; idx++) {
+                    let rawTransaction = current.Block.transactions[idx];
+                    let rawReceipt = current.Receipts[idx];
+                    let rawTransactionStatus = current.TransactionStatuses[idx];
+                    let [tx, receipt] = this.combine_tx_with_receipt_status(rawTransaction, rawReceipt, rawTransactionStatus, idx, current.evmBlockHash, current.blockNumber, current.blockTS);
+                    b.transactions.push(tx);
+                    receipts.push(receipt);
+                }
+                return [b, receipts];
+            } catch (err) {
+                console.log(err);
+            }
+        }
+        return [null, null];
+    }
+
     async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, evmTrace = false, autoTraces = false, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
         if (!block) return;
@@ -5361,9 +5417,51 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let blockTS = block.blockTS;
         let recentExtrinsics = [];
         let recentTransfers = [];
-
         let recentXcmMsgs = []; //new xcm here
+        if (finalized == true && autoTraces) {
+            //console.log("STANDARD BLOCK", JSON.stringify(evmBlock, null, 4));		
+            //console.log("STANDARD RECEIPTS", JSON.stringify(evmReceipts, null, 4));	
+        }
+        if (finalized == false && autoTraces) {
+            // OPTIMIZATION: we only need to do this for evm chains... 
+            let current = {
+                Block: null,
+                Receipts: null,
+                TransactionStatuses: null,
+                blockHash,
+                blockNumber,
+                blockTS,
+                evmBlockHash: null
+            }; // note that blockHash is the Substrate block hash 
+            for (const t of autoTraces) {
+                if ((t.p == "Ethereum" && t.s == "CurrentBlock") && t.pv) {
+                    current.Block = JSON.parse(t.pv)
+                }
+                if ((t.p == "Ethereum" && t.s == "CurrentReceipts") && t.pv) {
+                    current.Receipts = JSON.parse(t.pv)
+                }
+                if ((t.p == "Ethereum" && t.s == "CurrentTransactionStatuses") && t.pv) {
+                    current.TransactionStatuses = JSON.parse(t.pv);
+                }
+                if ((t.p == "Ethereum" && t.s == "BlockHash")) {
+                    let pkExtraArr = JSON.parse(t.pkExtra);
+                    if (Array.isArray(pkExtraArr) && pkExtraArr.length > 0) {
+                        let bnCand = paraTool.toNumWithoutComma(pkExtraArr[0]);
+                        if (bnCand == blockNumber) {
+                            current.evmBlockHash = t.pv;
+                        }
+                    }
+                }
+            }
+            let [newEVMBlock, newReceipts] = this.convertUnfinalizedRawTraceData(current);
+            if (newEVMBlock && newReceipts) {
+                //console.log("NEW BLOCK", JSON.stringify(newEVMBlock, null, 4));		
+                //console.log("NEW RECEIPTS", JSON.stringify(newReceipts, null, 4));	
+                evmBlock = newEVMBlock;
+                evmReceipts = newReceipts;
 
+            }
+        }
         // setParserContext
         this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash, chainID);
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
@@ -5517,7 +5615,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 //let dTxns = await ethTool.processTranssctions(evmBlock.transactions, contractABIs, contractABISignatures)
                 let processTransasctionTS = (new Date().getTime() - processTransasctionStartTS) / 1000
                 this.timeStat.processTransasctionTS += processTransasctionTS
-
 
                 //let dReceipts = await ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                 let processReceiptTS = (new Date().getTime() - processReceiptStartTS) / 1000
@@ -6265,18 +6362,16 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
                     autoTraces = r.autotrace;
                 }
-                for (const t of autoTraces) {
-                    if (this.debugLevel >= paraTool.debugTracing) console.log(`[autoTraces ${t.traceID}]`, t)
-                    //TODO: write this to chain table
-                }
                 await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // use result from rawtrace to decorate
-                //await this.processTrace(blockTS, blockNumber, blockHash, r.trace, traceType, api);
+
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
                 //console.log(`index_chain_block_row: processTrace`, processTraceTS);
                 this.timeStat.processTraceTS += processTraceTS
                 this.timeStat.processTrace++
             }
         }
+
+
 
         if (r.block && r.events) {
             let decodeRawBlockStartTS = new Date().getTime()
@@ -6922,6 +7017,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         logDT,
                         hr
                     })
+                    console.log(err);
                     process.exit(1);
                 }
             }

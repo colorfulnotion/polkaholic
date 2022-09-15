@@ -1,4 +1,3 @@
-
 function showcontracttab(hash) {
     switch (hash) {
         case "#contract":
@@ -28,10 +27,10 @@ function setuptabs(tabs, address) {
         if (urlhash.length > 1) hash = "#" + urlhash[1];
     }
     const triggerEl = document.querySelector('#wasmcontractTab a[href="' + hash + '"]');
-    if ( triggerEl ) {
-	mdb.Tab.getInstance(triggerEl).show();
+    if (triggerEl) {
+        mdb.Tab.getInstance(triggerEl).show();
     } else {
-	console.log("MISSING: ", hash);
+        console.log("MISSING: ", hash);
     }
 }
 

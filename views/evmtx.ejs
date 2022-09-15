@@ -8,9 +8,10 @@
 <%
 let tabs = [
 { title: "Overview", target: "overview" },
-{ title: `Logs (${tx.decodedLogs.length})`, target: "logs" },
 ]
-
+if ( tx.decodedLogs && tx.decodedLogs.length > 0 ) {
+   tabs.push({ title: `Logs (${tx.decodedLogs.length})`, target: "logs" });
+}
 if ( tx.transactionsInternal && tx.transactionsInternal.length > 0 ) {
    tabs.push({ title: `Internal Txns (${tx.transactionsInternal.length})`, target: "internal" });
 }

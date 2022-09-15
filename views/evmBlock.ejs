@@ -113,11 +113,11 @@ let blockNumber = <%= blockNumber %>;
 let tabs = <%- JSON.stringify(tabs); %> ;
 <% if ( ! b.finalized ) { %>
     let blockHash = '<%= blockHash %>';
-    showblockstatus("<%= b.hash; %>");
 <% } else { %>
 let blockHash = '';
 <% } %>
-<% if (b.evmBlock != undefined && b.evmBlock.transactions !=undefined) { %>
+<%
+if (b.evmBlock != undefined && b.evmBlock.transactions !=undefined) { %>
 let evmtxs = <%- JSON.stringify(b.evmBlock.transactions); %>;
 <% } else { %>
 let evmtxs = '[]';
@@ -156,7 +156,8 @@ for (const extrinsic of extrinsics) {
    }
 }
 document.getElementById('evmtxs-tab').innerHTML = `Transactions (${evmtxs.length})`;
-document.getElementById('internal-tab').innerHTML = `Internal Txns (${evminternal.length})`;
+let internalTab = document.getElementById('internal-tab');
+if ( evminternal && internalTab ) internalTab.innerHTML = `Internal Txns (${evminternal.length})`;
 document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
 document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
 </script>

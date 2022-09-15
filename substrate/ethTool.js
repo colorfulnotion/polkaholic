@@ -19,6 +19,9 @@ const web3 = new Web3();
 const util = require('util');
 const rlp = require('rlp')
 const paraTool = require("./paraTool");
+const {
+    Transaction
+} = require('@ethereumjs/tx')
 
 const abiDecoder = require('abi-decoder');
 const exec = util.promisify(require("child_process").exec);
@@ -539,10 +542,12 @@ async function getTokenHoldersRawBalances(web3Api, contractAddress, holders, tok
 // this function decorates and generate a "full" txn using decodedTxn and decodedReceipts
 function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
     if (!dReceipt || dReceipt.transactionHash === undefined) {
-        console.log(`decorateTxn: missing receipts`)
+        console.log(`decorateTxn: missing receipts`, dReceipt)
+        process.exit(0);
     }
     if (dTxn.hash != dReceipt.transactionHash) {
-        console.log(`decorateTxn: txnHash mismatch (tx:${dTxn.hash}) vs (receipt: ${dReceipt.transactionHash})`)
+        console.log(`decorateTxn: txnHash mismatch (tx:${dTxn.hash}) vs (receipt: ${dReceipt.transactionHash})`, dTxn)
+        process.exit(0);
         return
     }
     //todo: how to detect reverted but successful case?
@@ -550,9 +555,9 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     let gWei = 10 ** 9
     let ether = 10 ** 18
     let value = paraTool.dechexToInt(dTxn.value)
-    let gasLimit = paraTool.dechexToInt(dTxn.gas)
-    let gasPrice = paraTool.dechexToInt(dTxn.gasPrice)
-    let gasUsed = paraTool.dechexToInt(dReceipt.gasUsed)
+    let gasLimit = dTxn.gas ? paraTool.dechexToInt(dTxn.gas) : 0
+    let gasPrice = dTxn.gasPrice ? paraTool.dechexToInt(dTxn.gasPrice) : 0
+    let gasUsed = dTxn.gasUsed ? paraTool.dechexToInt(dReceipt.gasUsed) : 0
     let fee = gasUsed * gasPrice
 
     let fTxn = {
@@ -583,6 +588,44 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         fTxn.transactionsInternal = dInternal;
     }
     return fTxn
+}
+
+function decodeRLPTransaction(rawTxHex) {
+    try {
+        var tx = Transaction.fromRlpSerializedTx(rawTxHex)
+        var txJSON = tx.toJSON()
+        let from = web3.eth.accounts.recoverTransaction(rawTxHex);
+        txJSON.from = from.toLowerCase()
+        return txJSON
+    } catch (error) {
+        console.log(`decodeRLPTransaction rawTxHex=${rawTxHex}, error=${error.toString()}`)
+        return false
+    }
+}
+
+async function signEvmTx(web3Api, txStruct, wallet) {
+    var signedTX = false
+    try {
+        signedTX = await web3Api.eth.accounts.signTransaction(txStruct, wallet.privateKey)
+        console.log(`signEvmTx [acct=${wallet.address}], txHash=${signedTX.transactionHash}, txStruct=`, txStruct)
+    } catch (e) {
+        console.log(`signEvmTx [acct=${wallet.address}], txStruct=${txStruct} error=${error.toString()}`)
+    }
+    return signedTX
+}
+
+async function sendSignedTx(web3Api, signedTx) {
+    var isError = 0
+    let txHash = signedTx.transactionHash
+    let rawTransaction = signedTx.rawTransaction
+    try {
+        console.log(`sendSignedTx txhHash=${txHash}, rawTransaction=${rawTransaction}`)
+        await web3Api.eth.sendSignedTransaction(signedTx.rawTransaction)
+    } catch (error) {
+        console.log(`sendSignedTx txhHash=${txHash}, rawTransaction=${rawTransaction} error=${error.toString()}`)
+        isError = error.toString()
+    }
+    return isError
 }
 
 function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
@@ -1466,6 +1509,117 @@ async function createWeb3Api(rpcURL) {
     return false
 }
 
+function loadWallet(pk) {
+    const Web3 = require("web3");
+    const web3 = new Web3();
+    try {
+        let wallet = web3.eth.accounts.privateKeyToAccount(pk);
+        console.log(`evmWallet loaded: ${wallet.address}`)
+        return wallet
+    } catch (error) {
+        console.log(`loadWallet error=${error.toString()}`)
+    }
+    return false
+}
+
+/* 0.1MOVR to 22023 -> 22007
+Function: transfer(address, uint256, (uint8,bytes[]), uint64)
+#	Name	Type	Data
+1	currency_address	address	0x0000000000000000000000000000000000000802
+2	amount	uint256	100000000000000000
+2	destination.parents	uint8	1
+2	destination.interior	bytes	0x00000007d7,0x015c88c4cdb316381d45d7dfbe59623516cfe5805808313e76f7ce6af6333a443700
+
+Byte Value	Selector	Data Type
+0x00	Parachain	bytes4
+0x01	AccountId32	bytes32
+0x02	AccountIndex64	u64
+0x03	AccountKey20	bytes20
+0x04	PalletInstance	byte
+0x05	GeneralIndex	u128
+0x06	GeneralKey	bytes[]
+
+Selector	    Data Value	            Represents
+Parachain	    "0x00+000007E7"	        Parachain ID 2023
+AccountId32	    "0x01+AccountId32+00"	AccountId32, Network Any
+AccountKey20	"0x03+AccountKey20+00"	AccountKey20, Network Any
+PalletInstance	"0x04+03"	            Pallet Instance 3
+
+see: https://docs.moonbeam.network/builders/xcm/xc20/xtokens/#xtokens-transfer-function
+*/
+
+function xTokenBuilder(web3Api, currency_address = '0x0000000000000000000000000000000000000802', amount = 1, decimals = 18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 22006) {
+    console.log(`xTokenBuilder currency_address=${currency_address}, amount=${amount}, decimals=${decimals}, beneficiary=${beneficiary}, chainIDDest=${chainIDDest}`)
+    var xTokensContractAbi = [{
+        "inputs": [{
+            "internalType": "address",
+            "name": "currency_address",
+            "type": "address"
+        }, {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+        }, {
+            "components": [{
+                "internalType": "uint8",
+                "name": "parents",
+                "type": "uint8"
+            }, {
+                "internalType": "bytes[]",
+                "name": "interior",
+                "type": "bytes[]"
+            }],
+            "internalType": "struct IxTokens.Multilocation",
+            "name": "destination",
+            "type": "tuple"
+        }, {
+            "internalType": "uint64",
+            "name": "weight",
+            "type": "uint64"
+        }],
+        "name": "transfer",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }]
+    var xTokensContractAddress = '0x0000000000000000000000000000000000000804' //this is the precompiled interface
+    var xTokensContract = new web3Api.eth.Contract(xTokensContractAbi, xTokensContractAddress);
+    let weight = 6000000000
+    let relayChain = paraTool.getRelayChainByChainID(chainIDDest)
+    let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
+    let junction = []
+    let junctionInterior = []
+    junction.push(1) // local asset would have 0. (but this is not xcm?)
+    if (paraIDDest != 0) {
+        let parachainHex = paraTool.bnToHex(paraIDDest).substr(2)
+        parachainHex = '0x' + parachainHex.padStart(10, '0')
+        junctionInterior.push(parachainHex)
+    }
+    //assume "any"
+    if (beneficiary.length == 66) {
+        let accountId32 = `0x01${beneficiary.substr(2)}00`
+        junctionInterior.push(accountId32)
+    } else if (beneficiary.length == 42) {
+        let accountKey20 = `0x03${beneficiary.substr(2)}00`
+        junctionInterior.push(accountKey20)
+    }
+    let rawAmount = paraTool.toBaseUnit(`${amount}`, decimals)
+    junction.push(junctionInterior)
+    console.log(`junction`, junction)
+    console.log(`junctionInterior`, junctionInterior)
+    //[1,["0x00000007d4","0x01108cb67dcbaab765b66fdb99e3c4997ead09f1f82186e425dc9fec271e97aa7e00"]]
+    console.log(`xTokenBuilder currency_address=${currency_address}, Human Readable Amount=${amount}(rawAmount=${rawAmount}, using decimals=${decimals}), junction=${junction}, weight=${weight}`)
+    var data = xTokensContract.methods.transfer(currency_address, rawAmount, junction, weight).encodeABI()
+    let txStruct = {
+        to: xTokensContractAddress,
+        value: '0',
+        gas: 2000000,
+        data: data
+    }
+    console.log(`xTokenBuilder txStruct=`, txStruct)
+    return txStruct
+}
+
 function is_tx_contract_create(tx) {
     if (!tx) return (false);
     let isCreate = (tx.creates != null)
@@ -1613,6 +1767,21 @@ module.exports = {
     createWeb3Api: async function(rpcURL) {
         return createWeb3Api(rpcURL)
     },
+    loadWallet: function(pk) {
+        return loadWallet(pk)
+    },
+    decodeRLPTransaction: function(rlpTx) {
+        return decodeRLPTransaction(rlpTx)
+    },
+    signEvmTx: async function(web3Api, txStruct, wallet) {
+        return signEvmTx(web3Api, txStruct, wallet)
+    },
+    sendSignedTx: async function(web3Api, signedTx) {
+        return sendSignedTx(web3Api, signedTx)
+    },
+    xTokenBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary) {
+        return xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
+    },
     parseAbiSignature: function(abiStrArr) {
         return parseAbiSignature(abiStrArr)
     },
@@ -1624,6 +1793,9 @@ module.exports = {
     },
     fuseBlockTransactionReceipt: async function(evmBlk, dTxns, dReceipts, dTrace, chainID) {
         return fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, chainID)
+    },
+    decorateTxn: function(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
+        return decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID);
     },
     decodeTransactionInput: function(txn, contractABIs, contractABISignatures) {
         return decodeTransactionInput(txn, contractABIs, contractABISignatures)

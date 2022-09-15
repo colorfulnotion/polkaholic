@@ -6,7 +6,8 @@
      <th>Log</th>
      <th>Data/Topics</th>
    </tr>
-   <% for ( let i = 0; i < tx.decodedLogs.length; i++) {
+<% if ( tx.decodedLogs ) { %>
+<% for ( let i = 0; i < tx.decodedLogs.length; i++) {
         let log = tx.decodedLogs[i];
       %>
        <tr>
@@ -24,5 +25,6 @@
 	</td>
 	</tr>
    <% } %>
+<% } %>
 </table>
 </div>
