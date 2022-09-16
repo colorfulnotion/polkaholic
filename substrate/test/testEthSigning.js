@@ -58,9 +58,9 @@ async function testXTokenBuilder(apiEndpoint = moonbeamRPC, isbeneficiaryEVM = f
     let currencyAddress = '0x0000000000000000000000000000000000000802'
     let amount = 0.26
     let decimals = 18
-    let beneficiarySubtrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
+    let beneficiarySubstrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
     let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
-    let beneficiary = (isbeneficiaryEVM) ? beneficiaryEVM : beneficiarySubtrate
+    let beneficiary = (isbeneficiaryEVM) ? beneficiaryEVM : beneficiarySubstrate
     let chainIDDest = paraTool.chainIDAstar
     var txStruct = ethTool.xTokenBuilder(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
     var signedTx = await ethTool.signEvmTx(web3Api, txStruct, w)
@@ -85,9 +85,9 @@ async function testXC20Builder(apiEndpoint = astarRPC, isbeneficiaryEVM = false,
     let currencyAddress = '0xFFFFFFFF00000000000000010000000000000003' //GLMR
     let amount = 0.26
     let decimals = 18
-    let beneficiarySubtrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
+    let beneficiarySubstrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
     let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
-    let beneficiary = (isbeneficiaryEVM) ? beneficiaryEVM : beneficiarySubtrate
+    let beneficiary = (isbeneficiaryEVM) ? beneficiaryEVM : beneficiarySubstrate
     let chainIDDest = paraTool.chainIDMoonbeam
     var txStruct = ethTool.xc20AssetWithdrawBuilder(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
     var signedTx = await ethTool.signEvmTx(web3Api, txStruct, w)

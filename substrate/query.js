@@ -1505,6 +1505,7 @@ module.exports = class Query extends AssetManager {
             if (err.code == 404) {
                 throw new paraTool.NotFoundError(`Transaction not found: ${txHash}`)
             } else {
+                console.log(err);
                 this.logger.error({
                     "op": "query.getTransaction",
                     txHash,
@@ -4572,16 +4573,18 @@ module.exports = class Query extends AssetManager {
         let dd = []
         for (var i = 0; i < data.length; i++) {
             let d = data[i]
-            let dt = dataType[i]
             let x = {
                 data: d,
-                typeDef: dt.typeDef,
-                name: dt.name
             }
-            if (x.typeDef == "AccountId32") {
-                x.address = paraTool.getPubKey(d)
-                if (decorate) {
-                    this.decorateAddress(x, "address", decorateAddr, decorateRelated)
+            let dt = dataType[i]
+            if (dt) {
+                x.typeDef = dt.typeDef
+                x.name = dt.name
+                if (x.typeDef == "AccountId32") {
+                    x.address = paraTool.getPubKey(d)
+                    if (decorate) {
+                        this.decorateAddress(x, "address", decorateAddr, decorateRelated)
+                    }
                 }
             }
             dd.push(x)

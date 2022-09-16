@@ -110,6 +110,12 @@ function getHostChain(req) {
                 }
                 return [2006, "astar"];
             }
+            if (domain == "acalascan") {
+                if (subdomain == "karura") {
+                    return [22000, subdomain];
+                }
+                return [2000, "acala"];
+            }
             if (domain == "xcmscan") {
                 if (subdomain == "moonriver") {
                     return [22023, subdomain];

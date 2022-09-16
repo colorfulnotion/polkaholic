@@ -217,7 +217,7 @@ module.exports = class PriceManager extends Query {
 
     async showAssetCycles(symbol) {
         await this.init(); /// sets up this.assetInfo
-
+	let simple = {};
         let sql = `select asset.asset, asset.chainID, paths from assetcycle join asset on asset.chainID = assetcycle.chainID and asset.asset = assetcycle.asset and asset.symbol = '${symbol}' order by numHolders desc limit 10;`
         let assetChains = await this.poolREADONLY.query(sql);
         for (let a = 0; a < assetChains.length; a++) {
@@ -225,14 +225,33 @@ module.exports = class PriceManager extends Query {
             let asset = r.asset;
             let chainID = r.chainID;
             let paths = JSON.parse(r.paths);
-            console.log(paths);
             for (let b = 0; b < paths.length; b++) {
-                let rat = await this.compute_path_rat(paths[b]);
-                //if ( rat > 1.005 ) {
-                console.log(paths[b], rat);
-                //}
+		let first = paths[b][1].assetName;
+		let succ = true;
+		for (let p = 2; p < paths[b].length; p++) {
+		    let s = paths[b][p];
+		    if (s.assetName == first) {
+			
+		    } else {
+			succ = false;
+		    }
+		}
+		if ( succ ) {
+		    let out = [];
+		    for ( let p = 0; p < paths[b].length; p++ ) {
+			let s = paths[b][p];
+			let [d, cID] = paraTool.parseAssetChain(s.dest);
+			out.push(d);
+		    }
+		    console.log(first, out);
+		    if ( simple[first] == undefined ) {
+			simple[first] = [];
+		    }
+		    simple[first].push(out);
+		}
             }
         }
+	console.log(JSON.stringify(simple, null, 4));
     }
 
     getPathExtensionsBFS(path, maxDepth = 2) {
@@ -241,6 +260,9 @@ module.exports = class PriceManager extends Query {
         if (tailAssetChain == undefined) {
             return (extensions);
         }
+        let whitelisted = [];
+        whitelisted.push("Stella LP", "Flare LP Token", "Arthswap LPs", "Beast LPs", "StarSwap LPs", "Uniswap V2", "Kaco LPs");
+
         let [tailAsset, tailAssetChainID] = paraTool.parseAssetChain(tailAssetChain);
         for (const assetChain of Object.keys(this.assetInfo)) {
             let [asset, cID] = paraTool.parseAssetChain(assetChain);
@@ -291,11 +313,14 @@ module.exports = class PriceManager extends Query {
                             extensions.push(newpath);
                         }
                     }
+                } else if (!whitelisted.includes(assetInfo.assetName)) {
+                    // console.log(assetInfo);
                 } else if (assetInfo.numHolders < 5) {} else if (assetInfo.token0 == tailAsset && (cID == tailAssetChainID) && this.path_not_explored(path, assetInfo, maxDepth)) {
                     // extend with a.token1
                     let newpath = [...path];
                     newpath.push({
                         route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                        assetName: assetInfo.assetName,
                         dest: token1chain,
                         symbol: assetInfo.symbol,
                         token0Symbol: assetInfo.token0Symbol,
@@ -308,6 +333,7 @@ module.exports = class PriceManager extends Query {
                     let newpath = [...path];
                     newpath.push({
                         route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
+                        assetName: assetInfo.assetName,
                         dest: token0chain,
                         symbol: assetInfo.symbol,
                         token0Symbol: assetInfo.token0Symbol,
@@ -531,10 +557,11 @@ module.exports = class PriceManager extends Query {
         // create table assetcycle (asset varchar(67), chainID int, paths mediumblob, lastUpdateDT datetime, primary key (asset, chainID));
         for (const assetChain of Object.keys(this.resultPaths)) {
             let paths = this.resultPaths[assetChain];
+            let pathlength = paths.length;
             let pathsString = JSON.stringify(paths);
             let [asset, chainID] = paraTool.parseAssetChain(assetChain);
             console.log(assetChain, paths.length);
-            let sql = `insert into assetcycle (asset, chainID, paths, lastUpdateDT) values ('${asset}', '${chainID}', ` + mysql.escape(pathsString) + `, Now()) on duplicate key update paths = values(paths), lastUpdateDT = values(lastUpdateDT)`
+            let sql = `insert into assetcycle (asset, chainID, paths, pathlength, lastUpdateDT) values ('${asset}', '${chainID}', ` + mysql.escape(pathsString) + `, '${pathlength}', Now()) on duplicate key update paths = values(paths), lastUpdateDT = values(lastUpdateDT), pathlength = values(pathlength)`
             this.batchedSQL.push(sql);
         }
         await this.update_batchedSQL();

@@ -38,6 +38,7 @@
     "debug": "^4.3.4",
     "dotenv": "^16.0.1",
     "ejs": "^3.1.6",
+    "ethers": "^5.7.1",
     "express": "^4.17.2",
     "express-fileupload": "^1.4.0",
     "express-mysql-session": "^2.1.8",
