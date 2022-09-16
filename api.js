@@ -726,7 +726,7 @@ app.get('/account/:accountGroup/:address', async (req, res) => {
     }
 })
 
-app.get('/tx/:txhash', async (req, res) => {
+async function txAPIRedirect(req, res) {
     try {
         let txHash = req.params['txhash'];
         let [decorate, decorateExtra] = decorateOpt(req)
@@ -744,7 +744,10 @@ app.get('/tx/:txhash', async (req, res) => {
             error: err.toString()
         });
     }
-})
+}
+
+app.get('/extrinsic/:txhash', async (req, res) => txAPIRedirect(req, res))
+app.get('/tx/:txhash', async (req, res) => txAPIRedirect(req, res))
 
 app.get('/xcmmessage/:msgHash/:sentAt?', async (req, res) => {
     try {

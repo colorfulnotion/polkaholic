@@ -3899,6 +3899,7 @@ module.exports = class ChainParser {
         }
         if (!a) return
         let assetList = {}
+        let xcmInteriorUpdates = []
 
         a.forEach(async ([key, val]) => {
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
@@ -3910,6 +3911,8 @@ module.exports = class ChainParser {
 
             var asset = JSON.stringify(parsedAsset);
             let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
+            let xcContractAddress = paraTool.xcAssetIDToContractAddr(assetID).toLowerCase()
+
             let cachedAssetInfo = indexer.assetInfo[assetChain]
             if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
                 //cached found
@@ -3980,9 +3983,11 @@ module.exports = class ChainParser {
 
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                let updateXcmConcept = true
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
+                    updateXcmConcept = false
                     if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
-                    return
+                    //return
                 }
 
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
@@ -4001,11 +4006,33 @@ module.exports = class ChainParser {
                     source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
-                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdToLocation');
+                if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdToLocation');
+
+                //["asset", "chainID"] + ["xcmInteriorKey"]
+                //let [assetUnparsed, chainID] = paraTool.parseAssetChain(xcmRec.originalKey)
+                if (indexer.chainID == paraTool.chainIDAstar || indexer.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya) {
+                    if (updateXcmConcept){
+                        let c = `('${asset}', '${indexer.chainID}', '${xcmAssetInfo.xcmInteriorKey}', '${xcContractAddress}')`
+                        xcmInteriorUpdates.push(c)
+                        console.log(`xcmInteriorUpdates`, c)
+                    }
+                }
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
         });
+
+        if (xcmInteriorUpdates.length > 0){
+            let sqlDebug = true
+            let xcmInteriorKeyVal = ["xcmInteriorKey", "xcContractAddress"]
+            await indexer.upsertSQL({
+                "table": `asset`,
+                "keys": ["asset", "chainID"],
+                "vals": xcmInteriorKeyVal,
+                "data": xcmInteriorUpdates,
+                "replace": xcmInteriorKeyVal,
+            }, sqlDebug);
+        }
     }
 
     //moonbeam/parallel/astar
