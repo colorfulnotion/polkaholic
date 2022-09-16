@@ -209,10 +209,11 @@ async function main() {
     });
 
     const xcmtransfer = new XCMTransfer();
+    await xcmtransfer.init() //wait for cryptoReady here
     xcmtransfer.setupPair();
     xcmtransfer.setupEvmPair();
 
-    let test = 'manualEVM' // ['auto', 'manual', 'autoEVM', 'manualEVM']
+    let test = 'auto' // ['autoSubstrate', 'manualSubstrate', 'autoEVM', 'manualEVM', 'auto', 'manuals']
     console.log(`testing ${test}`)
     if (chainID == -1) {
         let testcases = []
@@ -221,6 +222,12 @@ async function main() {
                 testcases = await xcmtransfer.getTestcasesAutomated();
                 break;
             case 'manuals':
+                testcases = xcmtransfer.getTestcasesManual();
+                break;
+            case 'autoSubstrate':
+                testcases = await xcmtransfer.getTestcasesAutomated();
+                break;
+            case 'manualSubstrate':
                 testcases = xcmtransfer.getTestcasesManual();
                 break;
             case 'autoEVM':
@@ -232,6 +239,7 @@ async function main() {
                 break;
             default:
         }
+        console.log(testcases)
         for (let i = 0; i < testcases.length; i++) {
             try {
                 let t = testcases[i];
@@ -242,12 +250,15 @@ async function main() {
                 let beneficiary = beneficiarySubstrate
                 console.log(`******* CASE ${i}`);
                 console.log(t);
+                /*
                 if (t.isEVM != undefined) {
                     beneficiary = beneficiaryEVM;
                 }
                 if (test == 'manualEVM'){
                     beneficiary = (t.isBeneficiaryEVM)? beneficiaryEVM : beneficiarySubstrate
                 }
+                */
+                beneficiary = (t.isBeneficiaryEVM)? beneficiaryEVM : beneficiarySubstrate
                 let executionInput = {
                     execute: false,
                     origination: chainID,
@@ -256,9 +267,10 @@ async function main() {
                     amount: amount,
                     beneficiary: beneficiary,
                 }
-                console.log(`executionInput`, executionInput)
-                let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
-                console.log(`xcmtransfer cli ${sectionMethod} args=`, args);
+                let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary, t.isSenderEVM);
+                let argsStr = JSON.stringify(args, null, 4)
+                console.log(`xcmtransfer cli executionInput`, executionInput)
+                console.log(`xcmtransfer cli transcribed ${sectionMethod} args`, argsStr);
                 if (isEVMTx){
                     var txStruct = args
                     var web3Api = func
@@ -285,16 +297,17 @@ async function main() {
         }
         let execute = 0;
         let executionInput = {
-            execute: (execute == 1)? True : false,
+            execute: (execute == 1)? true : false,
             origination: chainID,
             destination: chainIDDest,
             symbol: symbol,
             amount: amount,
             beneficiary: beneficiary,
         }
-        console.log(`executionInput`, executionInput)
         let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
-        console.log(sectionMethod, JSON.stringify(args, null, 4));
+        console.log(`xcmtransfer cli executionInput`, executionInput)
+        let argsStr = JSON.stringify(args, null, 4)
+        console.log(`xcmtransfer cli transcribed ${sectionMethod} args`, argsStr);
         if (isEVMTx){
             var txStruct = args
             var web3Api = func
@@ -316,7 +329,6 @@ async function main() {
                 let xcmTxn = func.apply(null, args)
                 const { partialFee, weight } = await xcmTxn.paymentInfo(xcmtransfer.pair);
                 console.log(`Est. extrinsics weight=${weight}, weight fees=${partialFee.toHuman()}`);
-                //let hash = await func.apply(null, args).signAndSend(xcmtransfer.pair);
                 console.log(`broadcasting signed extrinsics`)
                 let hash = await xcmTxn.signAndSend(xcmtransfer.pair);
                 let extrinsicHash = hash.toHex()

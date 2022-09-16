@@ -1,19 +1,22 @@
 const {
     Keyring
 } = require("@polkadot/api");
+const {
+    cryptoWaitReady
+} = require('@polkadot/util-crypto');
 const fs = require('fs');
 const AssetManager = require('./assetManager');
 const paraTool = require('./paraTool');
 const ethTool = require('./ethTool');
-const {
-    stringToU8a,
-    u8aToHex
-} = require('@polkadot/util');
 const mysql = require("mysql2");
 
 module.exports = class XCMTransfer extends AssetManager {
     pair = null;
     evmpair = null
+
+    async init() {
+        await cryptoWaitReady()
+    }
 
     setupPair(FN = "/root/.wallet", name = "polkadot") {
         const privateSeed = fs.readFileSync(FN, 'utf8');
@@ -516,7 +519,7 @@ module.exports = class XCMTransfer extends AssetManager {
         return [this.api.tx.xcmPallet.limitedReserveTransferAssets, [dest, beneficiary, assets, fee_asset_item, weight_limit]];
     }
 
-    async getTestcasesAutomated(limit = 10) {
+    async getTestcasesAutomated(limit = 30) {
         let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM as isBeneficiaryEVM, 0 as isSenderEVM, count(*) cnt from xcmtransfer join xcmasset on
         xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where
         sourceTS > unix_timestamp(date_sub(Now(), interval 30 day)) and
@@ -525,19 +528,26 @@ module.exports = class XCMTransfer extends AssetManager {
         xcmtransfer.sectionMethod not in ( 'xTokens:TransferredMultiAssets', 'xTransfer:transfer' )
         group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM
         having count(*) > 10 order by count(*) desc limit ${limit}`
+        console.log(paraTool.removeNewLine(sql))
         let testcases = await this.poolREADONLY.query(sql);
         let autoTestcases = []
         for (const testcase of testcases) {
-            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam) {
-                testcase.isSenderEVM = 1
+            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam || testcase.chainID == paraTool.chainIDMoonbase ||
+                testcase.chainID == paraTool.chainIDAstar || testcase.chainID == paraTool.chainIDShiden || testcase.chainID == paraTool.chainIDShibuya
+            ) {
+                autoTestcases.push(testcase)
+                let testcase2 = JSON.parse(JSON.stringify(testcase))
+                testcase2.isSenderEVM = 1
+                autoTestcases.push(testcase2)
+            }else{
+                autoTestcases.push(testcase)
             }
-            autoTestcases.push(testcase)
         }
         console.log("TESTCASES", autoTestcases.length);
         return autoTestcases;
     }
 
-    async getTestcasesAutomatedEVM(limit = 10) {
+    async getTestcasesAutomatedEVM(limit = 30) {
         let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM as isBeneficiaryEVM, 0 as isSenderEVM, count(*) cnt from xcmtransfer join xcmasset on
         xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where
         xcmtransfer.chainID in (${paraTool.chainIDMoonriver}, ${paraTool.chainIDMoonbeam}) and
@@ -547,6 +557,7 @@ module.exports = class XCMTransfer extends AssetManager {
         xcmtransfer.sectionMethod not in ('xTransfer:transfer' )
         group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM
         having count(*) > 10 order by count(*) desc limit ${limit}`
+        console.log(paraTool.removeNewLine(sql))
         let testcases = await this.poolREADONLY.query(sql);
         let autoTestcases = []
         for (const testcase of testcases) {
@@ -708,7 +719,7 @@ module.exports = class XCMTransfer extends AssetManager {
         return [isValid, desc]
     }
 
-    async xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary) {
+    async xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary, evmPreferred = true) {
         let [isValidBeneficiary, desc] = this.validateBeneficiaryAddress(chainIDDest, beneficiary)
         if (!isValidBeneficiary){
             console.log(`xcmtransfer warning: ${desc}`);
@@ -718,14 +729,13 @@ module.exports = class XCMTransfer extends AssetManager {
         let chain = await this.getChain(chainID)
         await this.setupAPI(chain)
         //this.setupPair();
-        //this.setupEvmPair();
         let relayChain = (chainID != 2 && chainID < 20000) ? "polkadot" : "kusama";
         let isEVMTx = 0
         try {
             let xcmInteriorKey = await this.lookupSymbolXCMInteriorKey(symbol, relayChain);
             let asset = await this.lookupChainAsset(chainID, xcmInteriorKey);
             let assetDest = await this.lookupChainAsset(chainIDDest, xcmInteriorKey);
-            let [sectionMethod, version] = await this.lookup_sectionMethod(chainID, chainIDDest, xcmInteriorKey);
+            let [sectionMethod, version] = await this.lookup_sectionMethod(chainID, chainIDDest, xcmInteriorKey, evmPreferred);
             let xcm = this.parse_xcmInteriorKey(xcmInteriorKey, symbol);
             let func = null,
                 args = null;
