@@ -113,15 +113,17 @@ module.exports = class XCMTransfer extends AssetManager {
                 }
             }
         }
+        /*
         // TEMPORARY
         if (r.sectionMethod == "xTokens:TransferredMultiAssets") {
             r.sectionMethod = "xTokens:transfer";
         }
+        */
         return [r.sectionMethod, "v2"];
     }
 
     async evm_xTokens_transfer(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest) {
-        let args = ethTool.xTokenBuilder(web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest)
+        let args = ethTool.xTokenBuilder(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
         return [web3Api, args];
     }
 
@@ -557,7 +559,6 @@ module.exports = class XCMTransfer extends AssetManager {
 
     async getTestcasesManualEVM() {
         return [
-            /*
             {
                 chainID: 22023,
                 chainIDDest: 2,
@@ -582,12 +583,19 @@ module.exports = class XCMTransfer extends AssetManager {
                 isSenderEVM: 1,
                 cnt: 64
             },
-            */
             {
                 chainID: 2006,
                 chainIDDest: 2004,
                 symbol: 'GLMR',
                 isBeneficiaryEVM: 1,
+                isSenderEVM: 1,
+                cnt: 64
+            },
+            {
+                chainID: 2006,
+                chainIDDest: 0,
+                symbol: 'DOT',
+                isBeneficiaryEVM: 0,
                 isSenderEVM: 1,
                 cnt: 64
             },
@@ -662,8 +670,49 @@ module.exports = class XCMTransfer extends AssetManager {
         ]
     }
 
+    validateBeneficiaryAddress(chainIDDest, beneficiary){
+        let isValid = true
+        let desc = "ok"
+        let accountKey20Len = 42
+        let accountID32Len = 66
+
+        switch (chainIDDest){
+            case paraTool.chainIDMoonbeam:
+            case paraTool.chainIDMoonriver:
+            case paraTool.chainIDMoonbase:
+                //accountKey20 only
+                if (beneficiary.length != accountKey20Len){
+                    isValid = false
+                    desc = `Invalid beneficiary ${beneficiary} for chainIDDest=${chainIDDest}`
+                }
+                break;
+            case paraTool.chainIDAstar:
+            case paraTool.chainIDShiden:
+            case paraTool.chainIDShibuya:
+                //accountKey20, accountID32
+                if (beneficiary.length != accountID32Len && beneficiary.length != accountKey20Len){
+                    isValid = false
+                    desc = `Invalid beneficiary ${beneficiary} for chainIDDest=${chainIDDest}`
+                }
+                break;
+            default:
+                // accountID32 only
+                if (beneficiary.length != accountID32Len){
+                    isValid = false
+                    desc = `Invalid beneficiary ${beneficiary} for chainIDDest=${chainIDDest}`
+                }
+                break;
+        }
+        return [isValid, desc]
+    }
 
     async xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary) {
+        let [isValidBeneficiary, desc] = this.validateBeneficiaryAddress(chainIDDest, beneficiary)
+        if (!isValidBeneficiary){
+            console.log(`xcmtransfer warning: ${desc}`);
+            return [null, null, null, null];
+        }
+
         let chain = await this.getChain(chainID)
         await this.setupAPI(chain)
         this.setupPair();

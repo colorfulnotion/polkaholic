@@ -183,6 +183,8 @@ async function main() {
     let symbol = "KSM";
     let beneficiary = "0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c"
     let beneficiaryEVM = "0xeaf3223589ed19bcd171875ac1d0f99d31a5969c";
+    let isNonDefaultBeneficiary = false
+
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = parseInt(val, 10);
@@ -198,6 +200,7 @@ async function main() {
         }
         if (index == 6 && val.length > 0) {
             beneficiary = val
+            isNonDefaultBeneficiary = true
         }
     });
 
@@ -232,8 +235,11 @@ async function main() {
                 amount = 1.0;
                 console.log(`******* CASE ${i}`);
                 console.log(t);
-                if (t.isEVM) {
+                if (t.isEVM != undefined) {
                     beneficiary = beneficiaryEVM;
+                }
+                if (test == 'manualEVM'){
+                    beneficiary = (t.isBeneficiaryEVM)? beneficiaryEVM : beneficiary
                 }
                 let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
                 console.log(`xcmtransfer cli ${sectionMethod} args=`, args);
@@ -249,8 +255,16 @@ async function main() {
             }
         }
     } else {
-        if (chainIDDest == 2004 || chainIDDest == 2006 || chainIDDest == 22023 || chainIDDest == 22007) {
-            beneficiary = beneficiaryEVM;
+        if (chainIDDest == paraTool.chainIDMoonbeam || chainIDDest == paraTool.chainIDMoonriver || chainIDDest == paraTool.chainIDAstar || chainIDDest == paraTool.chainIDShiden) {
+            if (!isNonDefaultBeneficiary){
+                beneficiary = beneficiaryEVM;
+            }
+        }
+        //validate cli inputs
+        let [isValidBeneficiary, desc] = xcmtransfer.validateBeneficiaryAddress(chainIDDest, beneficiary)
+        if (!isValidBeneficiary){
+            console.error('ERROR', desc);
+            process.exit(1);
         }
         let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
         let execute = false;
