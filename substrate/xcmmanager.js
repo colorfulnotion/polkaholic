@@ -114,7 +114,8 @@ module.exports = class XCMManager extends AssetManager {
             } else {
                 //["asset", "chainID"] + ["xcmInteriorKey"]
                 let [assetUnparsed, chainID] = paraTool.parseAssetChain(xcmRec.originalKey)
-                let c = `('${assetUnparsed}', '${chainID}', '${xcmRec.xcmInteriorKey}')`
+                let xcmInteriorKey = (xcmRec.xcmInteriorKey != undefined && xcmRec.xcmInteriorKey != 'null' && xcmRec.xcmInteriorKey != 'NULL') ? `'${xcmRec.xcmInteriorKey}'` : 'NULL'
+                let c = `('${assetUnparsed}', '${chainID}', ${xcmInteriorKey})`
                 xcmInteriorUpdates.push(c)
                 console.log(c)
             }
@@ -122,6 +123,7 @@ module.exports = class XCMManager extends AssetManager {
         console.log(`exactMatch len=${Object.keys(exactMatch).length}`, exactMatch)
         console.log(`noMatch len=${Object.keys(noMatch).length}`, noMatch)
         let sqlDebug = true
+        console.log(xcmInteriorUpdates)
         let xcmInteriorKeyVal = ["xcmInteriorKey"]
         await this.upsertSQL({
             "table": `asset`,
@@ -166,7 +168,8 @@ module.exports = class XCMManager extends AssetManager {
         }
         for (const xcAsset of xcAssetList) {
             //["asset", "chainID"] + ["xcContractAddress"]
-            let c = `('${xcAsset.asset}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}', '${xcAsset.xcmInteriorKey}')`
+            let xcmInteriorKey = (xcAsset.xcmInteriorKey != undefined && xcAsset.xcmInteriorKey  != 'null' && xcAsset.xcmInteriorKey != 'NULL') ? `'${xcAsset.xcmInteriorKey}'` : 'NULL'
+            let c = `('${xcAsset.asset}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}', ${xcmInteriorKey})`
             xcContractAddrUpdates.push(c)
 
             //["asset", "chainID"] + ["xcContractAddress", "xcmInteriorKey"]
