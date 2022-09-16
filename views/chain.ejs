@@ -25,6 +25,9 @@ if ( chain.isWASM ) {
   tabs.splice(1, 0, { title: "Contracts", target: "wasmcontracts", func: "showwasmcontracts" });
   tabs.splice(2, 0, { title: "Code", target: "wasmcode", func: "showwasmcode" });
 }
+if ( chain.chainID > 2 ) {
+  tabs.splice(4, 0, { title: "Channels", target: "hrmpchannels" });
+}
 
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
@@ -199,6 +202,23 @@ for (let i=0; i<tabs.length; i++) {
           <th>Block Number</th>
           <th>Block Hash</th>
           <th>First Seen</th>
+        </tr>
+    </thead>
+  </table>
+</div>
+
+<div class="tab-pane" id="hrmpchannels" role="tabpanel" aria-labelledby="hrmpchannels-tab">
+  <div class="alert" role="alert" data-mdb-color="warning">
+    <i class="fas fa-exclamation-triangle"></i>This is a new feature under active development; data is being indexed.
+  </div>
+  <table id="tablehrmpchannels" class="display" style='width: 100%'>
+    <thead>
+        <tr>
+          <th>Sender</th>
+          <th>Recipient</th>
+          <th>Status</th>
+          <th>Request</th>
+          <th>Accepted</th>
         </tr>
     </thead>
   </table>

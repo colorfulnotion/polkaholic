@@ -3,6 +3,7 @@ var initchainlog = false;
 var initspecversions = false;
 var initwasmcontracts = false;
 var initwasmcode = false;
+var inithrmpchannels = false;
 var refreshIntervalMS = 5000;
 var recentBlocksIntervalId = false;
 
@@ -209,6 +210,75 @@ function showspecversions(chainID) {
     });
     loadData2(pathParams, tableName, false)
 }
+
+function showhrmpchannels(chainID) {
+    if (inithrmpchannels) return;
+    else inithrmpchannels = true;
+    let pathParams = `chain/hrmpchannels/${chainID}`
+    let tableName = '#tablehrmpchannels'
+    var table = $(tableName).DataTable({
+        order: [
+            [4, "desc"]
+        ],
+        columnDefs: [{
+            "className": "dt-center",
+            "targets": "_all"
+        }],
+        columns: [{
+            data: 'id',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.chainID == chainID || row.id == chainID) {
+                        return "<B>" + row.chainName + "</B>";
+                    } else {
+                        return presentChain(row.id, row.chainName, false, "", "#hrmpchannels");
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'idDest',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.chainIDDest == chainID || row.idDest == chainID) {
+                        return "<B>" + row.chainNameDest + "</B>";
+                    } else {
+                        return presentChain(row.idDest, row.chainNameDest, false, "", "#hrmpchannels");
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'status',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'openRequestTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let s = presentXCMMessageHash(row.msgHashOpenRequest, row.sentAtOpenRequest);
+                    return presentTS(data) + s;
+                }
+                return data;
+            }
+        }, {
+            data: 'acceptTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let s = presentXCMMessageHash(row.msgHashAccepted, row.sentAtAccepted);
+                    return presentTS(data) + s;
+                }
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, false)
+}
+
 
 function showwasmcontracts(chainID) {
     if (initwasmcontracts) return;
@@ -526,6 +596,10 @@ function showchaintab(hash) {
             showwasmcontracts(id);
             setupapidocs("chain", "wasmcontracts", `${id}`);
             break;
+        case "#hrmpchannels":
+            showhrmpchannels(id);
+            //setupapidocs("chain", "hrmpchannels", `${id}`);
+            break;
         case "#wasmcode":
             showwasmcode(id);
             setupapidocs("chain", "wasmcode", `${id}`);
@@ -562,6 +636,7 @@ function setuptabs(tabs, chain_id) {
         if (urlhash.length > 1) hash = "#" + urlhash[1];
     }
     const triggerEl = document.querySelector('#chainTab a[href="' + hash + '"]');
+    console.log(hash)
     mdb.Tab.getInstance(triggerEl).show();
 }
 

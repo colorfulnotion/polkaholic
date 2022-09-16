@@ -424,6 +424,26 @@ app.get('/chain/assets/:chainID_or_chainName/:homePubkey?', async (req, res) => 
     }
 })
 
+// Usage: https://api.polkaholic.io/chain/hrmpchannels/10
+// Usage: https://api.polkaholic.io/chain/hrmpchannels/acala
+app.get('/chain/hrmpchannels/:chainID_or_chainName/:homePubkey?', async (req, res) => {
+    try {
+        let chainID_or_chainName = req.params["chainID_or_chainName"]
+        let hrmpchannels = await query.getChainHRMPChannels(chainID_or_chainName);
+        if (hrmpchannels) {
+            res.write(JSON.stringify(hrmpchannels));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 // Usage: https://api.polkaholic.io/asset/pricefeed/%7B"Token"%3A"GLMR"%7D%231284
 app.get('/asset/pricefeed/:assetChain', async (req, res) => {
     try {

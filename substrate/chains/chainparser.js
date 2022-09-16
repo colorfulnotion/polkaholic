@@ -4011,7 +4011,7 @@ module.exports = class ChainParser {
                 //["asset", "chainID"] + ["xcmInteriorKey"]
                 //let [assetUnparsed, chainID] = paraTool.parseAssetChain(xcmRec.originalKey)
                 if (indexer.chainID == paraTool.chainIDAstar || indexer.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya) {
-                    if (updateXcmConcept){
+                    if (updateXcmConcept) {
                         let c = `('${asset}', '${indexer.chainID}', '${xcmAssetInfo.xcmInteriorKey}', '${xcContractAddress}')`
                         xcmInteriorUpdates.push(c)
                         console.log(`xcmInteriorUpdates`, c)
@@ -4022,7 +4022,7 @@ module.exports = class ChainParser {
             }
         });
 
-        if (xcmInteriorUpdates.length > 0){
+        if (xcmInteriorUpdates.length > 0) {
             let sqlDebug = true
             let xcmInteriorKeyVal = ["xcmInteriorKey", "xcContractAddress"]
             await indexer.upsertSQL({
