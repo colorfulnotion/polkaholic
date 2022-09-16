@@ -1603,8 +1603,8 @@ function xTokenBuilder(web3Api, currency_address = '0x00000000000000000000000000
     return txStruct
 }
 
-function xc20AssetWithdrawBuilder(web3Api, currency_address = '0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF', amount = 1, decimals=18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 0) {
-    let isBeneficiaryEVM = (beneficiary.length == 42)? true : false
+function xc20AssetWithdrawBuilder(web3Api, currency_address = '0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF', amount = 1, decimals = 18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 0) {
+    let isBeneficiaryEVM = (beneficiary.length == 42) ? true : false
     console.log(`xc20Builder currency_address=${currency_address}, amount=${amount}, decimals=${decimals}, beneficiary=${beneficiary}(isEVM=${isBeneficiaryEVM}), chainIDDest=${chainIDDest}`)
     //https://github.com/AstarNetwork/astar-frame/blob/polkadot-v0.9.28/precompiles/xcm/XCM.sol
     var xc20ContractAbiStr = '[{"inputs":[{"internalType":"address[]","name":"asset_id","type":"address[]"},{"internalType":"uint256[]","name":"asset_amount","type":"uint256[]"},{"internalType":"bytes32","name":"recipient_account_id","type":"bytes32"},{"internalType":"bool","name":"is_relay","type":"bool"},{"internalType":"uint256","name":"parachain_id","type":"uint256"},{"internalType":"uint256","name":"fee_index","type":"uint256"}],"name":"assets_withdraw","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address[]","name":"asset_id","type":"address[]"},{"internalType":"uint256[]","name":"asset_amount","type":"uint256[]"},{"internalType":"address","name":"recipient_account_id","type":"address"},{"internalType":"bool","name":"is_relay","type":"bool"},{"internalType":"uint256","name":"parachain_id","type":"uint256"},{"internalType":"uint256","name":"fee_index","type":"uint256"}],"name":"assets_withdraw","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]'
@@ -1630,18 +1630,18 @@ function xc20AssetWithdrawBuilder(web3Api, currency_address = '0xFFfFfFffFFfffFF
     let isRelay = true
     let feeIndex = 0
     let data = '0x'
-    if (paraIDDest != 0){
+    if (paraIDDest != 0) {
         isRelay = false
     }
     //only teleport one asset for now
     currency_address_list.push(currency_address)
     let rawAmount = paraTool.toBaseUnit(`${amount}`, decimals)
     amountList.push(rawAmount)
-    if (isBeneficiaryEVM){
+    if (isBeneficiaryEVM) {
         //0xecf766ff  /BeneficiaryEVM
         console.log(`xc20Builder method=0xecf766ff, currency_address_list=${currency_address_list}, Human Readable Amount=${amount}(amountList=${amountList}, beneficiary=${beneficiary}, using decimals=${decimals})`)
         data = xc20Contract.methods['0xecf766ff'](currency_address_list, amountList, beneficiary, isRelay, paraIDDest, feeIndex).encodeABI()
-    }else if (beneficiary.length == 66){
+    } else if (beneficiary.length == 66) {
         //0x019054d0 /BeneficiarySubstrate
         console.log(`xc20Builder method=0x019054d0, currency_address_list=${currency_address_list}, Human Readable Amount=${amount}(amountList=${amountList}, using decimals=${decimals})`)
         data = xc20Contract.methods['0x019054d0'](currency_address_list, amountList, beneficiary, isRelay, paraIDDest, feeIndex).encodeABI()

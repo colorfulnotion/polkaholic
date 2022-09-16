@@ -450,11 +450,11 @@ function presentXCMMessageHash(msgHash, blockNumber, allowCopy = true) {
     return `<a href="/xcmmessage/${msgHash}/${blockNumber}">` + getShortHash(msgHash, allowCopy) + '</a>';
 }
 
-function presentChain(id, chainName, iconURL = false, crawlingStatus = "") {
+function presentChain(id, chainName, iconURL = false, crawlingStatus = "", tab = "") {
     if (!chainName) chainName = "chain" + id;
     let i = iconURL ? `<img width=24 src="${iconURL}" style="margin: 3px; padding: 3px;"/>` : "";
     let s = crawlingStatus.length > 0 ? `<span data-mdb-placement="right" title="${crawlingStatus}" ><i class="fas fa-exclamation-triangle"></i></span>` : '';
-    return i + '<a href="/chain/' + id + '">' + beautifyCamelCase(chainName) + '</a>' + s;
+    return i + `<a href="/chain/${id}${tab}">` + beautifyCamelCase(chainName) + '</a>' + s;
 }
 
 function encodeURIComponent2(assetChain) {

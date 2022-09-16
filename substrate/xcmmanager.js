@@ -12,7 +12,75 @@ module.exports = class XCMManager extends AssetManager {
 
     lastupdateTS = 0
 
-
+    async updateHrmpChannelEvents() {
+        let msgs = await this.poolREADONLY.query("select msgHash, sentAt, sourceTS, from_unixtime(sourceTS) as messageDT, chainID, chainIDDest, msgStr from xcmmessages where ((incoming = 0 and matched = 0) or ( incoming = 1 and matched = 1 )) and msgStr like '%hrmp%' limit 200000;");
+        let openRequests = [];
+        let accepts = [];
+        let closings = [];
+        for (const m of msgs) {
+            let msg = JSON.parse(m.msgStr)
+            let chainID = m.chainID;
+            let relayChain = paraTool.getRelayChainByChainID(m.chainID);
+            let chainIDDest = m.chainIDDest;
+            for (const ver of Object.keys(msg)) {
+                let instructions = msg[ver];
+                for (const inst of instructions) {
+                    if (inst.hrmpNewChannelOpenRequest) { // Ex: { hrmpNewChannelOpenRequest: { sender: 2035, maxMessageSize: 102400, maxCapacity: 1000 }}
+                        let i = inst.hrmpNewChannelOpenRequest;
+                        let fromChainID = paraTool.getChainIDFromParaIDAndRelayChain(i.sender, relayChain);
+                        openRequests.push(`('${fromChainID}', '${chainIDDest}', '${relayChain}', '${m.msgHash}', '${m.sentAt}', ${mysql.escape(m.sourceTS)}, '${i.maxMessageSize}', '${i.maxCapacity}', Now(), '${m.sentAt}', 'Requested')`);
+                        console.log("hrmpMsg OPEN REQUEST", m.messageDT, relayChain, fromChainID, chainIDDest, i.maxMessageSize, i.maxCapacity);
+                    } else if (inst.hrmpChannelAccepted) { // Ex: { hrmpChannelAccepted: { recipient: 2035 } }
+                        let i = inst.hrmpChannelAccepted;
+                        let toChainID = paraTool.getChainIDFromParaIDAndRelayChain(i.recipient, relayChain);
+                        accepts.push(`( '${chainIDDest}', '${toChainID}', '${relayChain}', '${m.msgHash}', '${m.sentAt}', ${mysql.escape(m.sourceTS)}, Now(), '${m.sentAt}', 'Accepted')`);
+                        console.log("hrmpMsg CHANNEL ACCEPTED", m.messageDT, relayChain, chainIDDest, toChainID);
+                    } else if (inst.hrmpChannelClosing) { // Ex: hrmpChannelClosing: { initiator: 2001, sender: 2000, recipient: 2001 }
+                        let i = inst.hrmpChannelClosing;
+                        let closingInitiatorChainID = paraTool.getChainIDFromParaIDAndRelayChain(i.initiator, relayChain);
+                        let senderChainID = paraTool.getChainIDFromParaIDAndRelayChain(i.sender, relayChain);
+                        let recipientChainID = paraTool.getChainIDFromParaIDAndRelayChain(i.recipient, relayChain);
+                        let sql2 = `select chainID, chainIDDest, lastUpdateBN from hrmpchannel where ( chainID = '${senderChainID}' and chainIDDest = '${recipientChainID}' ) or ( chainIDDest = '${recipientChainID}' and chainID = '${senderChainID}' )`
+                        let hrmpchannels = await this.poolREADONLY.query(sql2);
+                        for (const n of hrmpchannels) {
+                            closings.push(`('${n.chainID}', '${n.chainIDDest}', '${relayChain}', '${m.msgHash}', '${m.sentAt}', '${m.sourceTS}', '${closingInitiatorChainID}', Now(),  '${m.sentAt}', 'Closed')`)
+                            console.log("hrmpMsg CHANNEL CLOSED", m.messageDT, relayChain, n.chainID, n.chainIDDest);
+                        }
+                    } else {
+                        console.log("TODO", inst);
+                    }
+                }
+            }
+        }
+        let valsOpenRequests = ["msgHashOpenRequest", "sentAtOpenRequest", "openRequestTS", "maxMessageSize", "maxCapacity", "addDT", "lastUpdateBN", "status"]
+        let valsAccepts = ["msgHashAccepted", "sentAtAccepted", "acceptTS", "addDT", "lastUpdateBN", "status"]
+        let valsClosing = ["msgHashClosing", "sentAtClosing", "closingTS", "closingInitiatorChainID", "addDT", "lastUpdateBN", "status"]
+        await this.upsertSQL({
+            "table": `hrmpchannel`,
+            "keys": ["chainID", "chainIDDest", "relayChain"],
+            "vals": valsOpenRequests,
+            "data": openRequests,
+            "replace": ["msgHashOpenRequest", "sentAtOpenRequest", "openRequestTS", "maxMessageSize", "maxCapacity"],
+            "lastUpdateBN": ["lastUpdateBN", "status", "addDT"]
+        });
+        await this.upsertSQL({
+            "table": `hrmpchannel`,
+            "keys": ["chainID", "chainIDDest", "relayChain"],
+            "vals": valsAccepts,
+            "data": accepts,
+            "replace": ["msgHashAccepted", "sentAtAccepted", "acceptTS"],
+            "lastUpdateBN": ["lastUpdateBN", "status", "addDT"]
+        });
+        await this.upsertSQL({
+            "table": `hrmpchannel`,
+            "keys": ["chainID", "chainIDDest", "relayChain"],
+            "vals": valsClosing,
+            "data": closings,
+            "replace": ["msgHashAccepted", "sentAtAccepted", "closingTS"],
+            "lastUpdateBN": ["lastUpdateBN", "status", "addDT"]
+        });
+        process.exit(0);
+    }
 
     async updateXcmInteriorOut(isRawAsset = false) {
         let xcmListRecs = await this.poolREADONLY.query("select relayChain, chainID, rawAsset, asset, xcmInteriorKey, count(*) cnt from xcmtransfer where xcmInteriorKey is not null group by chainID, rawAsset, asset, xcmInteriorKey, relaychain order by chainID, xcmInteriorKey;");
@@ -132,12 +200,37 @@ module.exports = class XCMManager extends AssetManager {
             "data": xcmInteriorUpdates,
             "replace": xcmInteriorKeyVal,
         }, sqlDebug);
-
-
     }
 
-
     async updateXcmTransferRoute() {
+        await this.updateHrmpChannelEvents();
+        process.exit(0);
+        // add new xcmasset records that have recently appeared in the asset table
+        let sql = `select chainID, xcmInteriorKey, nativeAssetChain, symbol, numholders from asset where xcminteriorkey is not null and xcminteriorkey not in (select xcminteriorkey from xcmasset) and chainID < 50000 and xcminteriorkey != 'null'`;
+        let xcAssetRecs = await this.poolREADONLY.query(sql);
+        let vals = ["xcmInteriorKey", "nativeAssetChain", "addDT"];
+        let out = [];
+        let covered = {};
+        for (const xc of xcAssetRecs) {
+            try {
+                let relayChain = paraTool.getRelayChainByChainID(xc.chainID)
+                let k = paraTool.makeAssetChain(xc.symbol, relayChain);
+                if (covered[k] == undefined) {
+                    out.push(`('${xc.symbol}', '${relayChain}', ${mysql.escape(xc.xcmInteriorKey)}, ${mysql.escape(xc.nativeAssetChain)}, Now())`)
+                    covered[k] = true;
+                }
+            } catch (err) {
+                console.log(`updateXcAssetContractAddr error:${err.toString()}`)
+            }
+        }
+        await this.upsertSQL({
+            "table": `xcmasset`,
+            "keys": ["symbol", "relayChain"],
+            "vals": vals,
+            "data": out,
+            "replace": vals
+        });
+        process.exit(0);
         let sqlroute = `insert into xcmtransferroute ( asset, assetDest, symbol, chainID, chainIDDest, cnt) (select asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest, count(*) as cnt from xcmtransfer, xcmasset, asset, asset as assetDest where xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey and xcmasset.xcmInteriorKey = asset.xcmInteriorKey and asset.chainID = xcmtransfer.chainID and xcmasset.xcmInteriorKey = assetDest.xcmInteriorKey and assetDest.chainID = xcmtransfer.chainIDDest and sourceTS > UNIX_TIMESTAMP(date_sub(Now(), interval 30 day)) and assetDest.assetType = "Token" and asset.assetType = "Token" group by asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest) on duplicate key update asset = values(asset), assetDest = values(assetDest), cnt = values(cnt);`
         this.batchedSQL.push(sqlroute);
         await this.update_batchedSQL();
@@ -168,7 +261,7 @@ module.exports = class XCMManager extends AssetManager {
         }
         for (const xcAsset of xcAssetList) {
             //["asset", "chainID"] + ["xcContractAddress"]
-            let xcmInteriorKey = (xcAsset.xcmInteriorKey != undefined && xcAsset.xcmInteriorKey  != 'null' && xcAsset.xcmInteriorKey != 'NULL') ? `'${xcAsset.xcmInteriorKey}'` : 'NULL'
+            let xcmInteriorKey = (xcAsset.xcmInteriorKey != undefined && xcAsset.xcmInteriorKey != 'null' && xcAsset.xcmInteriorKey != 'NULL') ? `'${xcAsset.xcmInteriorKey}'` : 'NULL'
             let c = `('${xcAsset.asset}', '${xcAsset.chainID}', '${xcAsset.xcContractAddress}', ${xcmInteriorKey})`
             xcContractAddrUpdates.push(c)
 

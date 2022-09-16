@@ -1293,7 +1293,7 @@ module.exports = class Query extends AssetManager {
             let status = ""
             let isPending = false
             let isEVMUnfinalized = false
-            if (rowData["feed"] ) {
+            if (rowData["feed"]) {
                 feedData = rowData["feed"]
                 status = "finalized"
             } else if (rowData["feedunfinalized"]) {
@@ -1813,6 +1813,39 @@ module.exports = class Query extends AssetManager {
             assets[i] = a
         }
         return assets;
+    }
+
+    async getChainHRMPChannels(chainID_or_chainName = "all") {
+        var chainID = null,
+            id = null,
+            chain = {};
+        if (chainID_or_chainName == "all") {
+
+        } else {
+            [chainID, id] = this.convertChainID(chainID_or_chainName)
+            if (chainID === false) throw new NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
+            chain = await this.getChain(chainID)
+        }
+
+        try {
+            let w = (chainID) ? `(chainID = '${chainID}' or chainIDDest = '${chainID}')` : `(status != 'Closed')`
+            let sql = `select chainID, chainIDDest, relayChain, status, msgHashOpenRequest, sentAtOpenRequest, openRequestTS, maxMessageSize, maxCapacity, msgHashAccepted, msgHashAccepted, sentAtAccepted, acceptTS, msgHashClosing, sentAtClosing, closingInitiatorChainID, closingTS from hrmpchannel where ${w}`
+            let channels = await this.poolREADONLY.query(sql);
+            for (let i = 0; i < channels.length; i++) {
+                let c = channels[i];
+                let [_, id] = this.convertChainID(c.chainID);
+                let [__, idDest] = this.convertChainID(c.chainIDDest);
+                c.chainName = this.getChainName(c.chainID);
+                c.chainNameDest = this.getChainName(c.chainIDDest);
+                c.id = id;
+                c.idDest = idDest;
+            }
+            return (channels);
+        } catch (err) {
+            // TODO
+            console.log(err);
+            return [];
+        }
     }
 
     async getChainAssets(chainID_or_chainName = "all", address = false) {

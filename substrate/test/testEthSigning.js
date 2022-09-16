@@ -21,7 +21,7 @@ function loadTestKey(FN = "/root/.walletevm2", name = "evm") {
     return ethTool.loadWallet(pk)
 }
 
-async function testSimpleEvmTx(apiEndpoint = moonbeamRPC, isBroadcast = false){
+async function testSimpleEvmTx(apiEndpoint = moonbeamRPC, isBroadcast = false) {
     var crawler = new Crawler();
     var contractABIs = await crawler.getContractABI()
     var web3Api = await ethTool.createWeb3Api(apiEndpoint)
@@ -40,13 +40,13 @@ async function testSimpleEvmTx(apiEndpoint = moonbeamRPC, isBroadcast = false){
     var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
     console.log(`signedTx`, signedTx)
     console.log(`decodedTx`, decodedTx)
-    if (isBroadcast){
+    if (isBroadcast) {
         var result = await ethTool.sendSignedTx(web3Api, signedTx)
         console.log(`signedTX result`, result)
     }
 }
 
-async function testXTokenBuilder(apiEndpoint = moonbeamRPC, isbeneficiaryEVM = false, isBroadcast = false){
+async function testXTokenBuilder(apiEndpoint = moonbeamRPC, isbeneficiaryEVM = false, isBroadcast = false) {
     var crawler = new Crawler();
     var contractABIs = await crawler.getContractABI()
 
@@ -60,20 +60,20 @@ async function testXTokenBuilder(apiEndpoint = moonbeamRPC, isbeneficiaryEVM = f
     let decimals = 18
     let beneficiarySubtrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
     let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
-    let beneficiary = (isbeneficiaryEVM)? beneficiaryEVM: beneficiarySubtrate
+    let beneficiary = (isbeneficiaryEVM) ? beneficiaryEVM : beneficiarySubtrate
     let chainIDDest = paraTool.chainIDAstar
     var txStruct = ethTool.xTokenBuilder(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
     var signedTx = await ethTool.signEvmTx(web3Api, txStruct, w)
     var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
     console.log(`signedTx`, signedTx)
     console.log(`decodedTx`, decodedTx)
-    if (isBroadcast){
+    if (isBroadcast) {
         var result = await ethTool.sendSignedTx(web3Api, signedTx)
         console.log(`signedTX result`, result)
     }
 }
 
-async function testXC20Builder(apiEndpoint = astarRPC, isbeneficiaryEVM = false, isBroadcast = false){
+async function testXC20Builder(apiEndpoint = astarRPC, isbeneficiaryEVM = false, isBroadcast = false) {
     var crawler = new Crawler();
     var contractABIs = await crawler.getContractABI()
 
@@ -87,14 +87,14 @@ async function testXC20Builder(apiEndpoint = astarRPC, isbeneficiaryEVM = false,
     let decimals = 18
     let beneficiarySubtrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
     let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
-    let beneficiary = (isbeneficiaryEVM)? beneficiaryEVM: beneficiarySubtrate
+    let beneficiary = (isbeneficiaryEVM) ? beneficiaryEVM : beneficiarySubtrate
     let chainIDDest = paraTool.chainIDMoonbeam
-    var txStruct = ethTool.xc20AssetWithdrawBuilder(web3Api,currencyAddress, amount, decimals, beneficiary, chainIDDest)
+    var txStruct = ethTool.xc20AssetWithdrawBuilder(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
     var signedTx = await ethTool.signEvmTx(web3Api, txStruct, w)
     var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
     console.log(`signedTx`, signedTx)
     console.log(`decodedTx`, decodedTx)
-    if (isBroadcast){
+    if (isBroadcast) {
         var result = await ethTool.sendSignedTx(web3Api, signedTx)
         console.log(`signedTX result`, result)
     }
