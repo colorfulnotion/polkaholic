@@ -89,17 +89,24 @@ function isFloat(n) {
 // does not handle 1.0e+23 but does handle 123.45678987654321
 function float_to_BigInt_decimals(f, decimals) {
     let fstr = f.toString();
-
     let e = fstr.indexOf("e");
     if (e > 0) {
         return null;
     }
     let i = fstr.indexOf(".");
     if (i == -1) {
-        return BigInt(fstr.padEnd(decimals + 1, "0"))
+        let bn = BigInt(fstr.padEnd(decimals + 1, "0"))
+        let bnHex = bnToHex(bn)
+        //let bnHex = bnToBn(bn)
+        console.log(`${f}, ${decimals} -> ${bn} -> ${bnHex}`)
+        return bnHex
     }
     // get everything before the decimal, then everything after the decimal, and then pad to decimals
-    return BigInt(fstr.substr(0, i) + fstr.substr(i + 1, fstr.length).padEnd(decimals, "0"));
+    let bn = BigInt(fstr.substr(0, i) + fstr.substr(i + 1, fstr.length).padEnd(decimals, "0"));
+    let bnHex = bnToHex(bn)
+    //let bnHex = bnToBn(bn)
+    console.log(`${f}, ${decimals} -> ${bn} -> ${bnHex}`)
+    return bnHex;
 }
 
 function isString(s) {
@@ -1408,5 +1415,8 @@ module.exports = {
     },
     floatToBigIntDecimals: function(f, decimals) {
         return float_to_BigInt_decimals(f, decimals)
+    },
+    removeNewLine: function(str) {
+        return str.replace(/(\r\n|\n|\r)/gm, "").replace(/\s\s+/g, ' ')
     },
 };

@@ -97,7 +97,7 @@ module.exports = class XCMTransfer extends AssetManager {
         sectionMethod not in (${sectionMethodBlacklist}) and
         matched = 1 and sourceTS > unix_timestamp(date_sub(Now(), interval 30 day))
         group by sectionMethod order by count(*) desc limit 5`
-        console.log(sql)
+        console.log(paraTool.removeNewLine(sql))
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) {
             // throw error
@@ -431,6 +431,7 @@ module.exports = class XCMTransfer extends AssetManager {
                 }
             }
             let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
+            console.log(`xcmPallet_reserveTransferAssets amountRaw`, amountRaw)
             let assets = {
                 v0: [{
                     concreteFungible: {
@@ -501,6 +502,7 @@ module.exports = class XCMTransfer extends AssetManager {
             }
         };
         let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
+	    //console.log("*****", JSON.stringify(amountRaw, null, 4))
         let assets = {
             v0: [{
                 concreteFungible: {
@@ -715,8 +717,8 @@ module.exports = class XCMTransfer extends AssetManager {
 
         let chain = await this.getChain(chainID)
         await this.setupAPI(chain)
-        this.setupPair();
-        this.setupEvmPair();
+        //this.setupPair();
+        //this.setupEvmPair();
         let relayChain = (chainID != 2 && chainID < 20000) ? "polkadot" : "kusama";
         let isEVMTx = 0
         try {
@@ -800,7 +802,8 @@ module.exports = class XCMTransfer extends AssetManager {
                     [func, args] = await this.xTransfer_transfer(version, asset, assetDest, xcm, amount, beneficiary);
                     break;
             }
-            return [sectionMethod, func, JSON.stringify(args, null, 4), isEVMTx];
+            //let argStr = JSON.stringify(args, null, 4)
+            return [sectionMethod, func, args, isEVMTx];
         } catch (err) {
             console.log(err);
             return [null, null, null, null];
