@@ -17,21 +17,12 @@
 const Query = require("./query");
 const paraTool = require("./paraTool");
 const mysql = require("mysql2");
-const {
-    ethers
-} = require('ethers');
-const {
-    Address
-} = require('cluster');
-const fs = require('fs');
+const { ethers } = require('ethers');
+const { Address }  = require('cluster');
+const  fs   = require('fs');
 const {
     Keyring
 } = require("@polkadot/api");
-const {
-    bnToHex,
-    hexToBn,
-} = require("@polkadot/util");
-
 
 
 module.exports = class PriceManager extends Query {
@@ -231,198 +222,202 @@ module.exports = class PriceManager extends Query {
         return rat;
     }
 
-    async getChainRouters(chainID = -1) {
-        // and assetRouter.chainID = '${chainID}' 
-        let sql = `select assetRouter.assetName, assetRouter.router as address, convert(asset.abiRaw using utf8) as ABI, numLPs from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRouter.router = asset.asset where assetRouter.chainID = asset.chainID and asset.isRouter = 1`;
-        let recs = await this.poolREADONLY.query(sql);
-        let routers = {};
-        if (recs.length > 0) {
-            for (const r of recs) {
-                routers[r.assetName] = r;
-            }
-        }
-        return routers;
+    async getChainRouters(chainID) {
+	let sql = `select assetRouter.assetName, assetRouter.router as address, convert(asset.abiRaw using utf8) as ABI, numLPs from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRouter.router = asset.asset where assetRouter.chainID = asset.chainID and assetRouter.chainID = '${chainID}' and asset.isRouter = 1`;
+	let recs = await this.poolREADONLY.query(sql);
+	let routers = {};
+	if ( recs.length  > 0 ) {
+	    for ( const r of recs ) {
+		routers[r.assetName] = r;
+	    }
+	}
+	return routers;
     }
 
-    async getRouterPaths(paths, routers, allowMultipleRouters = false) {
-        let filtered = [];
-        for (let b = 0; b < paths.length; b++) {
-
-            let succ = true;
-            let out = [];
-            let p0 = null;
-            let last = null;
-            for (let p = 0; p < paths[b].length; p++) {
-                let s = paths[b][p];
-                let [d, cID] = paraTool.parseAssetChain(s.dest);
-                if (p == 0) {
-                    p0 = d;
-                } else {
-                    let route = s.route;
-                    let routeAsset = this.assetInfo[s.route];
-                    let assetName = this.assetInfo[s.route].assetName;
-                    if (this.assetInfo[s.route] && routers[this.assetInfo[s.route].assetName]) { // check that we know the router
-                        if (out.length > 0 && out[out.length - 1][0] == assetName) {
-                            out[out.length - 1].push(d)
-                            last = d
-                        } else {
-                            if (p0) {
-                                out.push([assetName, p0, d]);
-                                p0 = null;
-                                last = d
-                            } else if (last) {
-                                out.push([assetName, last, d]);
-                                last = d
-                            } else {
-                                out.push([assetName, d]);
-                                last = d
-                            }
-                        }
-                    } else {
-                        succ = false;
-                        p = 9999;
-                    }
-                }
-            }
-            if (succ) { // ok, we found a full path using routers that we know
-                if ((allowMultipleRouters == false) && (out.length > 1)) {} else {
-                    filtered.push(out);
-                }
-            }
-        }
-        return (filtered);
-    }
     async showAssetCycles(symbol = "WGLMR", chainID = 2004, addr = "0xeaf3223589ed19bcd171875ac1d0f99d31a5969c") {
         await this.init(); /// sets up this.assetInfo
-        let chain = await this.getChain(chainID);
-        const routers = await this.getChainRouters(chainID);
-        let complex = [];
+	let chain = await this.getChain(chainID);
+	const routers = await this.getChainRouters(chainID);
+	let complex = [];
 
-        // find all "complex" cycles using 1 OR MORE routers (e.g Stella-Flare-Stella) where we can run 1+ EVM calls to get a quote 
+	// find all "complex" cycles using 1 OR MORE routers (e.g Stella-Flare-Stella) where we can run 1+ EVM calls to get a quote
         let sql = `select asset.asset, asset.chainID, paths from assetcycle join asset on asset.chainID = assetcycle.chainID and asset.asset = assetcycle.asset and asset.symbol = '${symbol}' and asset.chainID = ${chainID} order by numHolders desc limit 100;`
         let assetChains = await this.poolREADONLY.query(sql);
         for (let a = 0; a < assetChains.length; a++) {
             let r = assetChains[a];
             let paths = JSON.parse(r.paths);
-            let routerPaths = await this.getRouterPaths(paths, routers, true); // true = allow multiple routers
-            if (routerPaths.length > 0) {
-
-                complex = complex.concat(routerPaths);
+            for (let b = 0; b < paths.length; b++) {
+		let succ = true;
+		let out = [];
+		let p0 = null;
+		let last = null;
+		for (let p = 0; p < paths[b].length; p++) {
+		    let s = paths[b][p];
+		    let [d, cID] = paraTool.parseAssetChain(s.dest);
+		    if ( p == 0 ) {
+			p0 = d;
+		    } else {
+			if ( routers[s.assetName] ) {  // check that we know the router
+			    if ( out.length > 0 && out[out.length-1][0] == s.assetName ) {
+				out[out.length-1].push(d)
+				last = d
+			    } else {
+				if ( p0 ) {
+				    out.push([s.assetName, p0, d]);
+				    p0 = null;
+				    last = d
+				} else if ( last ) {
+				    out.push([s.assetName, last, d]);
+				    last = d
+				} else {
+				    out.push([s.assetName, d]);
+				    last = d
+				}
+			    }
+			} else {
+			    succ = false;
+			    p = 9999;
+			}
+		    }
+		}
+		if ( succ ) { // ok, we found a full path using routers that we know
+		    complex.push(out);
+		}
             }
         }
 
-        let id = chain.id;
-        const provider = new ethers.providers.JsonRpcProvider(
-            chain.RPCBackfill, {
-                chainId: chain.ss58Format,
-                name: id
-            }
-        );
-        let dec = 18 // TODO: this.getAssetDecimal(asset)
-        let batchAbi = await fs.readFileSync("batch-abi.json", "utf8")
-        console.log(batchAbi);
-        let pk = await fs.readFileSync("/root/.walletevm2")
-        pk = pk.toString().trim();
-        let execute = false
-        let wallet = new ethers.Wallet(pk.toString(), provider);
-        while (1) {
-            console.log("READY", complex.length);
-            for (const c of complex) {
-                try {
-                    let s = "3000000000000000000"; // 3GLMR 
-                    let start = ethers.BigNumber.from(s);
-                    let newStart = ethers.BigNumber.from(s);
-                    for (const x of c) {
-                        // take a router and its paths, use the Contract to call getAmountsOut and figure out how much of the end asset exists after the path
-                        let routerName = x[0];
-                        let path = x.slice(1);
-                        let router = routers[routerName];
-                        let abiRaw = JSON.parse(router.ABI);
-                        let abi = abiRaw.result;
-                        const contract = new ethers.Contract(router.address, abi, wallet);
-                        const rawResult = await contract.getAmountsOut(newStart, path);
-                        let newStartRaw = rawResult.toString().split(",");
-                        newStart = ethers.BigNumber.from(newStartRaw[newStartRaw.length - 1]);
-                        //console.log("routerName", routerName, "@", router.address, "path", path, "getAmountsOut=", newStartRaw, "newStart=", newStart.toString());
-                    }
-                    if (c.length == 1 && newStart.gt(start)) {
-                        let execute = false;
-                        console.log("SUCCESS single-hop", execute, c, newStart.toString());
-                        if (execute) {
-                            let deadline = this.getCurrentTS() + 600;
-                            let amountOutMin = 200;
-                            let value = s;
-                            let x = c[0];
-                            let routerName = x[0];
-                            let path = x.slice(1);
-                            let router = routers[routerName];
-                            let abiRaw = JSON.parse(router.ABI);
-                            let abi = abiRaw.result;
-                            const contract = new ethers.Contract(router.address, abi, wallet);
-                            const gasEst = await contract.estimateGas.swapExactTokensForTokens(start, amountOutMin, path, addr, deadline);
-                            let gasLimit = gasEst.mul(125).div(100).toString();
-                            console.log("gasESTIMATE", gasLimit);
-                            const receipt = await contract.swapExactTokensForTokens(start, amountOutMin, path, addr, deadline, {
-                                gasLimit
-                            });
-                            console.log(receipt)
-                            process.exit(0);
-                        }
-                    } else {
-                        // https://docs.moonbeam.network/builders/pallets-precompiles/precompiles/batch/
-                        await this.setupAPI(chain)
-                        let batch_to = [];
-                        let batch_value = [];
-                        let batch_callData = [];
-                        let batch_gasLimit = [];
+	let id = chain.id;
+	const provider = new ethers.providers.JsonRpcProvider(
+	    chain.RPCBackfill,
+	    {
+		chainId: chain.ss58Format,
+		name: id
+	    }
+	);
+	let dec = 18  // TODO: this.getAssetDecimal(asset)
+	let pk = await fs.readFileSync("/root/.walletevm2")
+	pk = pk.toString().trim();
+	let execute = false
+	let wallet = new ethers.Wallet(pk.toString(), provider);
+	while ( 1 ) {
+	    console.log("READY", complex.length);
+	    for ( const c of complex ) {
+		try {
+		    let s = "3000000000000000000"; // 3GLMR
+		    let start = ethers.BigNumber.from(s);
+		    let newStart = ethers.BigNumber.from(s);
+		    for (const x of c) {
+			// take a router and its paths, use the Contract to call getAmountsOut and figure out how much of the end asset exists after the path
+			let routerName = x[0];
+			let path = x.slice(1);
+			let router = routers[routerName];
+			let abiRaw = JSON.parse(router.ABI);
+			let abi = abiRaw.result;
+			const contract = new ethers.Contract(router.address, abi, wallet);
+			const rawResult = await contract.getAmountsOut(newStart, path);
+			let newStartRaw = rawResult.toString().split(",");
+			newStart = ethers.BigNumber.from(newStartRaw[newStartRaw.length-1]);
+			//console.log("routerName", routerName, "@", router.address, "path", path, "getAmountsOut=", newStartRaw, "newStart=", newStart.toString());
+		    }
+		    if ( newStart.gt(start) || true) {
 
-                        for (let t = 0; t < c.length; t++) {
-                            let x = c[t];
-                            let deadline = this.getCurrentTS() + 600;
-                            let amountOutMin = 200;
-                            let value = s;
-                            let routerName = x[0];
-                            let path = x.slice(1);
-                            let router = routers[routerName];
-                            let abiRaw = JSON.parse(router.ABI);
-                            let abi = abiRaw.result;
-                            const contract = new ethers.Contract(router.address, abi, wallet);
-                            const txInput = await contract.populateTransaction.swapExactTokensForTokens(start, amountOutMin, path, addr, deadline);
-                            //txInput.nonce = await wallet.getTransactionCount();
-                            //txInput.gasPrice = 100000000000
-                            //let gasLimit = gasEst.mul(125).div(100).toString();
-                            const txSigned = await wallet.signTransaction(txInput);
-                            batch_to.push(router.address);
-                            batch_value.push(0);
-                            batch_callData.push(txSigned);
-                            batch_gasLimit.push(500000); // use contract.estimateGas to compute gasEst
-                        }
-                        let batchPrecompileAddress = "0x0000000000000000000000000000000000000808";
-                        const batch_contract = new ethers.Contract(batchPrecompileAddress, batchAbi, wallet);
-                        try {
-                            const gasEst = await batch_contract.estimateGas.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit);
-                        } catch (err) {
-                            console.log("estimateGas batchAll", err);
-                            process.exit(0);
-                        }
-                        let gasLimit = gasEst.mul(125).div(100).toString();
-                        console.log("gasESTIMATE", gasLimit);
-                        try {
-                            const receipt = await batch_contract.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit, {
-                                gasLimit
-                            });
-                            console.log(receipt)
-                        } catch (err) {
-                            console.log("batchAll", err);
-                            process.exit(0);
-                        }
-                        break;
-                    }
-                } catch (err) {
-                    console.log(err)
-                }
-            }
-        }
+			if ( c.length == 1 ) {
+			    let execute = false;
+			    console.log("SUCCESS single-hop", execute, c, newStart.toString());
+			    if ( execute ) {
+				let deadline = this.getCurrentTS() + 600;
+				let amountOutMin = 200;
+				let value = s;
+				let x = c[0];
+				let routerName = x[0];
+				let path = x.slice(1);
+				let router = routers[routerName];
+				let abiRaw = JSON.parse(router.ABI);
+				let abi = abiRaw.result;
+				const contract = new ethers.Contract(router.address, abi, wallet);
+				const gasEst = await contract.estimateGas.swapExactTokensForTokens(start, amountOutMin, path, addr, deadline);
+				let gasLimit = gasEst.mul(125).div(100).toString();
+				console.log("gasESTIMATE", gasLimit);
+				const receipt = await contract.swapExactTokensForTokens(start, amountOutMin, path, addr, deadline, { gasLimit });
+				console.log(receipt)
+				process.exit(0);
+			    }
+			} else {
+			    // check if utility batch works with multiple ethereum:transact
+			    // https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fwss.api.moonbeam.network#/extrinsics
+			    await this.setupAPI(chain)
+			    let calls = [];
+			    for ( let t = 0; t < c.length; t++ ) {
+				let x = c[t];
+				let deadline = this.getCurrentTS() + 600;
+				let amountOutMin = 200;
+				let value = s;
+				let routerName = x[0];
+				let path = x.slice(1);
+				let router = routers[routerName];
+				let abiRaw = JSON.parse(router.ABI);
+				let abi = abiRaw.result;
+				const contract = new ethers.Contract(router.address, abi, wallet);
+				const txInput = await contract.populateTransaction.swapExactTokensForTokens(start, amountOutMin, path, addr, deadline);
+				txInput.nonce = await wallet.getTransactionCount();
+				txInput.gasLimit = 500000; // use contract.estimateGas to compute gasEst
+				//let gasLimit = gasEst.mul(125).div(100).toString();
+				const txSigned = await wallet.signTransaction(txInput);
+				// extract r+s+v for signature
+				let parsedTx = ethers.utils.parseTransaction(txSigned)
+				// put this into api.tx.ethereum.transaction form
+				let txSignedSubstrate = {
+				    nonce: txInput.nonce + t,
+				    gasLimit: txInput.gasLimit,
+				    to: router.address,
+				    action: {
+					call: router.address
+				    },
+				    value: 0,
+				    input: txInput.data,
+				    signature: {
+					r: parsedTx.r,
+					s: parsedTx.s,
+					v: parsedTx.v
+				    }
+				}
+				console.log(txSignedSubstrate);
+				let call = this.api.tx.ethereum.transact({Legacy: txSignedSubstrate});
+				calls.push(call);
+			    }
+			    console.log(`SUCCESS multi-hop ${c.length}`, c, newStart.toString(), "utility.batch:", calls)
+
+			    let execute = false;
+			    const privateSeed = fs.readFileSync("/root/.wallet", 'utf8');
+			    var keyring = new Keyring({
+				type: 'sr25519'
+			    });
+			    let pair = keyring.addFromUri(privateSeed, {
+				name: "polkasodt"
+			    })
+
+			    if (this.api.tx.utility.batchAll) {
+				let txUtility = this.api.tx.utility.batchAll(calls) // vs batch https://docs.moonbeam.network/builders/pallets-precompiles/pallets/utility/
+				const { partialFee, weight } = await txUtility.paymentInfo(pair);
+				console.log(`Est. extrinsics weight=${weight}, weight fees=${partialFee.toHuman()}`);
+				console.log(`broadcasting signed extrinsics`, txUtility)
+				console.log(txUtility.toHex());
+				let hash = await txUtility.signAndSend(pair);
+				console.log(hash);
+				//let extrinsicHash = hash.toHex()
+				//console.log("Transfer sent with hash", hash.toHex());
+				//console.log(`View extrinsics: https://polkaholic.io/tx/${extrinsicHash}`); */
+
+				process.exit(0);
+			    }
+			    break;
+			}
+		    }
+		} catch (err) {
+		    console.log(err)
+		}
+	    }
+	}
 
     }
 
@@ -635,8 +630,7 @@ module.exports = class PriceManager extends Query {
         await this.init(); /// sets up this.assetInfo
         await this.load_xc_assetInfo();
 
-        await this.checkRoutes(2004);
-        process.exit(0);
+        //await this.checkRoutes();
         // add the roots:
         for (const assetChain of Object.keys(this.assetInfo)) {
             let assetInfo = this.assetInfo[assetChain];
