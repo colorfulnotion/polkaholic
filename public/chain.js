@@ -3,7 +3,7 @@ var initchainlog = false;
 var initspecversions = false;
 var initwasmcontracts = false;
 var initwasmcode = false;
-var inithrmpchannels = false;
+var initchannels = false;
 var refreshIntervalMS = 5000;
 var recentBlocksIntervalId = false;
 
@@ -211,14 +211,16 @@ function showspecversions(chainID) {
     loadData2(pathParams, tableName, false)
 }
 
-function showhrmpchannels(chainID) {
-    if (inithrmpchannels) return;
-    else inithrmpchannels = true;
-    let pathParams = `chain/hrmpchannels/${chainID}`
-    let tableName = '#tablehrmpchannels'
+function showchannels(chainID) {
+    if (initchannels) return;
+    else initchannels = true;
+    let pathParams = `chain/channels/${chainID}`
+    let tableName = '#tablechannels'
     var table = $(tableName).DataTable({
         order: [
-            [4, "desc"]
+            [6, "desc"],
+            [7, "desc"],
+            [4, "desc"],
         ],
         columnDefs: [{
             "className": "dt-center",
@@ -231,7 +233,7 @@ function showhrmpchannels(chainID) {
                     if (row.chainID == chainID || row.id == chainID) {
                         return "<B>" + row.chainName + "</B>";
                     } else {
-                        return presentChain(row.id, row.chainName, false, "", "#hrmpchannels");
+                        return presentChain(row.id, row.chainName, false, "", "#channels");
                     }
                 }
                 return data;
@@ -243,7 +245,7 @@ function showhrmpchannels(chainID) {
                     if (row.chainIDDest == chainID || row.idDest == chainID) {
                         return "<B>" + row.chainNameDest + "</B>";
                     } else {
-                        return presentChain(row.idDest, row.chainNameDest, false, "", "#hrmpchannels");
+                        return presentChain(row.idDest, row.chainNameDest, false, "", "#channels");
                     }
                 }
                 return data;
@@ -271,6 +273,41 @@ function showhrmpchannels(chainID) {
                 if (type == 'display') {
                     let s = presentXCMMessageHash(row.msgHashAccepted, row.sentAtAccepted);
                     return presentTS(data) + s;
+                }
+                return data;
+            }
+        }, {
+            data: 'symbols',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let out = [];
+                    if (data) {
+                        for (const symbolChain of data) {
+                            let [symbol, relayChain] = parseAssetChain(symbolChain);
+                            out.push(`<a href='/channel/${row.chainID}/${row.chainIDDest}/${symbol}'>${symbol}</a>`);
+                            console.log(symbolChain, row.chainID, row.chainIDDest);
+                        }
+                        return out.join(" | ");
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'numXCMMessagesOutgoing7d',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    console.log(row);
+                    // todo: 1d/7d/30d
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'valXCMMessagesOutgoingUSD7d',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    // todo: 1d/7d/30d
+                    return currencyFormat(data)
                 }
                 return data;
             }
@@ -596,9 +633,9 @@ function showchaintab(hash) {
             showwasmcontracts(id);
             setupapidocs("chain", "wasmcontracts", `${id}`);
             break;
-        case "#hrmpchannels":
-            showhrmpchannels(id);
-            //setupapidocs("chain", "hrmpchannels", `${id}`);
+        case "#channels":
+            showchannels(id);
+            //setupapidocs("chain", "channels", `${id}`);
             break;
         case "#wasmcode":
             showwasmcode(id);

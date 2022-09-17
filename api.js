@@ -242,6 +242,16 @@ app.get('/xcmmessages', async (req, res) => {
             chainList: chainFilterOpt(req),
             blockNumber: req.params["blockNumber"] ? req.params["blockNumber"] : null,
         };
+        try {
+            if (req.query.chainID != undefined) {
+                filters.chainID = req.query.chainID;
+            }
+            if (req.query.chainIDDest != undefined) {
+                filters.chainIDDest = req.query.chainIDDest;
+            }
+        } catch (e) {
+            console.log(e)
+        }
         let xcmmessages = await query.getRecentXCMMessages(filters, limit, decorate, decorateExtra);
         if (xcmmessages) {
             res.write(JSON.stringify(xcmmessages));
@@ -424,14 +434,34 @@ app.get('/chain/assets/:chainID_or_chainName/:homePubkey?', async (req, res) => 
     }
 })
 
-// Usage: https://api.polkaholic.io/chain/hrmpchannels/10
-// Usage: https://api.polkaholic.io/chain/hrmpchannels/acala
-app.get('/chain/hrmpchannels/:chainID_or_chainName/:homePubkey?', async (req, res) => {
+// Usage: https://api.polkaholic.io/chain/channels/10
+// Usage: https://api.polkaholic.io/chain/channels/acala
+app.get('/chain/channels/:chainID_or_chainName/:homePubkey?', async (req, res) => {
     try {
         let chainID_or_chainName = req.params["chainID_or_chainName"]
-        let hrmpchannels = await query.getChainHRMPChannels(chainID_or_chainName);
-        if (hrmpchannels) {
-            res.write(JSON.stringify(hrmpchannels));
+        let channels = await query.getChainChannels(chainID_or_chainName);
+        if (channels) {
+            res.write(JSON.stringify(channels));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/xcmassetlog/:chainID/:chainIDDest/:symbol?', async (req, res) => {
+    try {
+        let chainID = req.params["chainID"];
+        let chainIDDest = req.params["chainIDDest"];
+        let symbol = req.params["symbol"] ? req.params["symbol"] : "";
+        let xcmassetlog = await query.getChannelXCMAssetlog(chainID, chainIDDest, symbol);
+        if (xcmassetlog) {
+            res.write(JSON.stringify(xcmassetlog));
             await query.tallyAPIKey(getapikey(req));
             res.end();
         } else {

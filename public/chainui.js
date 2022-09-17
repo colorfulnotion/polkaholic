@@ -1,14 +1,19 @@
 function build_filter_string(filter) {
     if (!filter) return "";
     let out = [];
-    if (filter.chainList != undefined && Array.isArray(filter.chainList) && filter.chainList.length > 0) {
+    if (filter.chainID != undefined && filter.chainIDDest != undefined) {
+        out.push(`chainID=${filter.chainID}`);
+        out.push(`chainIDDest=${filter.chainIDDest}`);
+    } else if (filter.chainList != undefined && Array.isArray(filter.chainList) && filter.chainList.length > 0) {
         out.push(`chainfilters=${filter.chainList.join(',')}`);
     } else if (filter.chainID != undefined) {
         out.push(`chainfilters=${filter.chainID}`);
     }
+    if (filter.symbol != undefined) {
+        out.push(`symbol=${filter.symbol}`);
+    }
     if (out.length > 0) {
         let filterStr = "?" + out.join("&");
-        console.log("build_filter_string", filterStr);
         return filterStr;
     }
     return "";
@@ -21,7 +26,6 @@ async function showxcmmessages(filter = {}) {
     let tableName = '#tablexcmmessages'
     if (initxcmmessages) {
         // if table is already initiated, update the rows
-        //loadData2(pathParams, tableName, true)
     } else {
         initxcmmessages = true;
         xcmmessagesTable = $(tableName).DataTable({
@@ -472,12 +476,12 @@ function showxcmassets(chainID) {
         ],
         columnDefs: [{
             "className": "dt-right",
-            "targets": [1, 3, 4, 5, 6]
+            "targets": [1, 3, 4, 5, 6, 7, 8]
         }, {
             "className": "dt-left",
             "targets": [2]
         }, {
-            "targets": [7],
+            "targets": [9],
             "visible": false
         }],
         columns: [{
@@ -582,14 +586,42 @@ function showxcmassets(chainID) {
                 }
             }
         }, {
-            data: 'tvl',
+            data: 'tvlFree',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-                    if (row.tvl != undefined) {
+                    if (row.tvlFree != undefined) {
                         return currencyFormat(data);
                     }
                 } else {
-                    if (row.tvl != undefined) {
+                    if (row.tvlFree != undefined) {
+                        return data;
+                    }
+                }
+                return 0;
+            }
+        }, {
+            data: 'totalReserved',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.totalReserved !== undefined) {
+                        return presentTokenCount(data);
+                    }
+                }
+                if (row.totalReserved !== undefined) {
+                    return data;
+                } else {
+                    return 0;
+                }
+            }
+        }, {
+            data: 'tvlReserved',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.tvlReserved != undefined) {
+                        return currencyFormat(data);
+                    }
+                } else {
+                    if (row.tvlReserved != undefined) {
                         return data;
                     }
                 }
@@ -609,7 +641,7 @@ function filterchains(relaychain = "all") {
     if (relaychain == "kusama" || relaychain == "polkadot") {
         console.log("filterchains", relaychain);
         if (chainsTable) chainsTable.column(8).search(relaychain).draw();
-        if (xcmassetsTable) xcmassetsTable.column(7).search(relaychain).draw();
+        if (xcmassetsTable) xcmassetsTable.column(9).search(relaychain).draw();
         if (xcmtransfersTable) xcmtransfersTable.column(8).search(relaychain).draw();
         if (xcmmessagesTable) xcmmessagesTable.column(7).search(relaychain).draw();
     } else {

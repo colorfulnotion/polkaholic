@@ -26,7 +26,7 @@ if ( chain.isWASM ) {
   tabs.splice(2, 0, { title: "Code", target: "wasmcode", func: "showwasmcode" });
 }
 if ( chain.chainID > 2 ) {
-  tabs.splice(4, 0, { title: "Channels", target: "hrmpchannels" });
+  tabs.splice(4, 0, { title: "Channels", target: "channels" });
 }
 
 for (let i=0; i<tabs.length; i++) {
@@ -147,7 +147,9 @@ for (let i=0; i<tabs.length; i++) {
       <th scope="col"># Holders</th>
       <th scope="col">Price</th>
       <th scope="col">Total Free</th>
-      <th scope="col">TVL</th>
+      <th scope="col">TVL Free</th>
+      <th scope="col">Total Reserved</th>
+      <th scope="col">TVL Reserved</th>
       <th scope="col">Relay Chain</th>
     </tr>
   </thead>
@@ -207,11 +209,12 @@ for (let i=0; i<tabs.length; i++) {
   </table>
 </div>
 
-<div class="tab-pane" id="hrmpchannels" role="tabpanel" aria-labelledby="hrmpchannels-tab">
+
+<div class="tab-pane" id="channels" role="tabpanel" aria-labelledby="channels-tab">
   <div class="alert" role="alert" data-mdb-color="warning">
     <i class="fas fa-exclamation-triangle"></i>This is a new feature under active development; data is being indexed.
   </div>
-  <table id="tablehrmpchannels" class="display" style='width: 100%'>
+  <table id="tablechannels" class="display" style='width: 100%'>
     <thead>
         <tr>
           <th>Sender</th>
@@ -219,6 +222,9 @@ for (let i=0; i<tabs.length; i++) {
           <th>Status</th>
           <th>Request</th>
           <th>Accepted</th>
+          <th>Symbols</th>
+          <th>Num Messages Sent 7d </th>
+          <th>Val Messages Sent 7d (USD)</th>
         </tr>
     </thead>
   </table>

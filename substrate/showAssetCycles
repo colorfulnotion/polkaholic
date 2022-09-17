@@ -7,14 +7,18 @@ var PriceManager = require("./priceManager");
 var ParaTool = require("./paraTool");
 
 async function main() {
-    let symbol = null;
+    let symbol = "WGLMR";
+    let chainID = 2004;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             symbol = val;
 	}
+        if (index == 3 && val.length > 0) {
+            chainID = parseInt(val, 10);
+	}
     });
     var priceManager = new PriceManager();
-    await priceManager.showAssetCycles(symbol);
+    await priceManager.showAssetCycles(symbol, chainID);
 }
 
 main()

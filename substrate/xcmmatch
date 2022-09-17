@@ -16,6 +16,7 @@ async function main() {
     await manager.assetManagerInit();
     let chain = await manager.getChain(2);
     await manager.setupAPI(chain);
+
     if (lookbackDays > 0) {
         await manager.xcmanalytics(chain, lookbackDays)
         process.exit(0);
@@ -44,11 +45,12 @@ async function main() {
             lastUpdateTS = manager.getCurrentTS()
             await manager.assetManagerInit();
             let lastGeneralUpdateTSAgo = manager.getCurrentTS() - lastGeneralUpdateTS
-	    if ( lastGeneralUpdateTSAgo > 14400 ) {
+	    if ( lastGeneralUpdateTSAgo > 3600 ) {
 		await manager.updateXcmInteriorOut(true)
 		await manager.updateXcmInteriorOut(false)
 		await manager.updateXcAssetContractAddr()
 		await manager.updateXcmTransferRoute();
+		await manager.update_xcmlogs(1);
 		lastGeneralUpdateTS = manager.getCurrentTS();
 	    }
 	}
