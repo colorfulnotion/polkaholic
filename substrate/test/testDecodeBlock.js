@@ -25,9 +25,6 @@ async function main() {
     await api2.isReady;
 
 
-
-
-    // polkadot multisig (as_multi) https://polkadot.subscan.io/block/1325210
     var signedBlock = await api.rpc.chain.getBlock(blockHash);
     var sj = signedBlock.toJSON();
     var sn = JSON.parse(JSON.stringify(sj));

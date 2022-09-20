@@ -17,7 +17,7 @@
     let endpoints = uiTool.getPublicWSEndpoints(chain);
     let polkadotJSURL = `https://polkadot.js.org/apps/?rpc=${encodeURIComponent(endpoints[0])}#/explorer/query/${b.hash}`; %>
       <a href='<%= polkadotJSURL; %>' target='_new'><img src="https://cdn.polkaholic.io/polkadotjs.svg" width="16"></a>
-      <% if ( chain.subscanURL ) {
+      <% if ( chain.subscanURL && false) {
          let subscanURL = `${chain.subscanURL}/block/${blockNumber}`;
          %>
       <a href='<%- subscanURL; %>' target='_new'><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
