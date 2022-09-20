@@ -1476,6 +1476,26 @@ app.get('/asset/:chainID/:currencyID', async (req, res) => {
     }
 })
 
+app.get('/channel/:chainID/:chainIDDest/:symbol?', async (req, res) => {
+    try {
+        let chainID = req.params["chainID"];
+        let chainIDDest = req.params["chainIDDest"];
+        let symbol = req.params["symbol"] ? req.params["symbol"] : null
+        res.render('channel', {
+            chainID: chainID,
+            chainIDDest: chainIDDest,
+            chainInfo: query.getChainInfo(),
+            symbol: symbol,
+            apiUrl: req.path,
+            docsSection: "get-channel"
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 // Usage: /wasmcontract/0xfa4c7e407f86e24770b9b7b5826457350df83eab1122bb398f4a5a4892ff98cb
 app.get('/wasmcontract/:address/:chainID?', async (req, res) => {
     try {

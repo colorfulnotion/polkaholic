@@ -28,6 +28,14 @@ function fetcheventdata(eventID) {
 }
 
 
+function parseAssetChain(assetChain) {
+    let ida = assetChain.split("~");
+    if (ida.length == 2) {
+        return ida;
+    }
+    return [null, null];
+}
+
 function parseEventID(eventID) {
     let ida = eventID.split("-");
     if (ida.length == 4) {
@@ -230,7 +238,7 @@ async function loadData2(pathParams, tableName, includeCurrency = true, fld = fa
     } else {
         endpoints += separator + "limit=" + limit;
     }
-    console.log("loadData2", endpoints, info);
+    console.log("polkaholic API CALL:", endpoints);
     var req = new Request(endpoints, {
         method: 'GET',
         headers: new Headers({
@@ -1039,6 +1047,14 @@ function setupapidocs(major = "", minor = "", input = "", chainfilterStr = false
                     docsSection = "get-chaininfo-and-recent-blocks";
                     break;
             }
+            break;
+        case "channel":
+            apiUrl = (input == "") ? "/channel/&lt;ChainID&gt;/&lt;ChainIDDest&gt;/&lt;symbol&gt;" : `/channel/${input}`
+            docsSection = "get-channel";
+            break;
+        case "xcmmessages":
+            apiUrl = (input == "") ? "/xcmmessages/" : `/xcmmessages/${input}`
+            docsSection = "get-xcmmessages";
             break;
         case "xcmtransfers":
             apiUrl = "/xcmtransfers";

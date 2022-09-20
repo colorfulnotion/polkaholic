@@ -92,14 +92,42 @@ function showchains() {
                 }
             }
         }, {
-            data: 'tvl',
+            data: 'tvlFree',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-                    if (row.tvl != undefined) {
+                    if (row.tvlFree != undefined) {
                         return currencyFormat(data);
                     }
                 } else {
-                    if (row.tvl != undefined) {
+                    if (row.tvlFree != undefined) {
+                        return data;
+                    }
+                }
+                return 0;
+            }
+        }, {
+            data: 'totalReserved',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.totalReserved !== undefined) {
+                        return presentTokenCount(data);
+                    }
+                }
+                if (row.totalReserved !== undefined) {
+                    return data;
+                } else {
+                    return 0;
+                }
+            }
+        }, {
+            data: 'tvlReserved',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.tvlReserved != undefined) {
+                        return currencyFormat(data);
+                    }
+                } else {
+                    if (row.tvlReserved != undefined) {
                         return data;
                     }
                 }

@@ -108,9 +108,9 @@ module.exports = class XCMTransfer extends AssetManager {
             return [null, null];
         }
         let r = recs[0];
-        if (evmPreferred){
-            for (const rec of recs){
-                if (rec.sectionMethod == 'ethereum:transact' || rec.sectionMethod == 'assets_withdraw:0xecf766ff' || rec.sectionMethod == 'assets_withdraw:0x019054d0'){
+        if (evmPreferred) {
+            for (const rec of recs) {
+                if (rec.sectionMethod == 'ethereum:transact' || rec.sectionMethod == 'assets_withdraw:0xecf766ff' || rec.sectionMethod == 'assets_withdraw:0x019054d0') {
                     r = rec
                     break;
                 }
@@ -505,7 +505,7 @@ module.exports = class XCMTransfer extends AssetManager {
             }
         };
         let amountRaw = paraTool.floatToBigIntDecimals(amount, assetDest.decimals);
-	    //console.log("*****", JSON.stringify(amountRaw, null, 4))
+        //console.log("*****", JSON.stringify(amountRaw, null, 4))
         let assets = {
             v0: [{
                 concreteFungible: {
@@ -539,7 +539,7 @@ module.exports = class XCMTransfer extends AssetManager {
                 let testcase2 = JSON.parse(JSON.stringify(testcase))
                 testcase2.isSenderEVM = 1
                 autoTestcases.push(testcase2)
-            }else{
+            } else {
                 autoTestcases.push(testcase)
             }
         }
@@ -571,8 +571,7 @@ module.exports = class XCMTransfer extends AssetManager {
     }
 
     async getTestcasesManualEVM() {
-        return [
-            {
+        return [{
                 chainID: 22023,
                 chainIDDest: 2,
                 symbol: 'KSM',
@@ -683,18 +682,18 @@ module.exports = class XCMTransfer extends AssetManager {
         ]
     }
 
-    validateBeneficiaryAddress(chainIDDest, beneficiary){
+    validateBeneficiaryAddress(chainIDDest, beneficiary) {
         let isValid = true
         let desc = "ok"
         let accountKey20Len = 42
         let accountID32Len = 66
 
-        switch (chainIDDest){
+        switch (chainIDDest) {
             case paraTool.chainIDMoonbeam:
             case paraTool.chainIDMoonriver:
             case paraTool.chainIDMoonbase:
                 //accountKey20 only
-                if (beneficiary.length != accountKey20Len){
+                if (beneficiary.length != accountKey20Len) {
                     isValid = false
                     desc = `Invalid beneficiary ${beneficiary} for chainIDDest=${chainIDDest}`
                 }
@@ -703,14 +702,14 @@ module.exports = class XCMTransfer extends AssetManager {
             case paraTool.chainIDShiden:
             case paraTool.chainIDShibuya:
                 //accountKey20, accountID32
-                if (beneficiary.length != accountID32Len && beneficiary.length != accountKey20Len){
+                if (beneficiary.length != accountID32Len && beneficiary.length != accountKey20Len) {
                     isValid = false
                     desc = `Invalid beneficiary ${beneficiary} for chainIDDest=${chainIDDest}`
                 }
                 break;
             default:
                 // accountID32 only
-                if (beneficiary.length != accountID32Len){
+                if (beneficiary.length != accountID32Len) {
                     isValid = false
                     desc = `Invalid beneficiary ${beneficiary} for chainIDDest=${chainIDDest}`
                 }
@@ -721,7 +720,7 @@ module.exports = class XCMTransfer extends AssetManager {
 
     async xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary, evmPreferred = true) {
         let [isValidBeneficiary, desc] = this.validateBeneficiaryAddress(chainIDDest, beneficiary)
-        if (!isValidBeneficiary){
+        if (!isValidBeneficiary) {
             console.log(`xcmtransfer warning: ${desc}`);
             return [null, null, null, null];
         }
@@ -748,7 +747,7 @@ module.exports = class XCMTransfer extends AssetManager {
 
             if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase) {
                 // mark isEVMTx as true
-                if (sectionMethod == 'ethereum:transact'){
+                if (sectionMethod == 'ethereum:transact') {
                     sectionMethod = 'evm_xTokens_transfer'
                     isEVMTx = 1
                     console.log(`isEVMTx=${isEVMTx}, asset=`, asset)
@@ -765,13 +764,13 @@ module.exports = class XCMTransfer extends AssetManager {
             switch (sectionMethod) {
                 case "assets_withdraw:0xecf766ff":
                 case "assets_withdraw:0x019054d0":
-                    if (asset.xcContractAddress){
+                    if (asset.xcContractAddress) {
                         [func, args] = await this.evm_assets_withdraw(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest);
                         isEVMTx = 1
                     }
                     break;
                 case "evm_xTokens_transfer":
-                    if (asset.xcContractAddress){
+                    if (asset.xcContractAddress) {
                         [func, args] = await this.evm_xTokens_transfer(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest);
                     }
                     break;

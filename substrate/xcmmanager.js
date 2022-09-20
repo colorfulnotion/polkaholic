@@ -12,7 +12,101 @@ module.exports = class XCMManager extends AssetManager {
 
     lastupdateTS = 0
 
-    async updateHrmpChannelEvents() {
+
+    // generates xcmmessagelog, xcmassetlog, and tallies activity in last 24h/7d/30 in channel, xcmasset
+    async update_xcmlogs(lookbackDays = 1) {
+        // tally all the symbols
+        let sql = `select chainID, chainIDDest, symbol, relayChain, sum(numXCMTransfersOutgoingUSD) numXCMTransfersOutgoingUSD, sum(valXCMTransferOutgoingUSD) valXCMTransferOutgoingUSD from xcmassetlog where logDT >= date_sub(Now(), interval 90 day) group by chainID, chainIDDest, symbol, relayChain order by numXCMTransfersOutgoingUSD desc, valXCMTransferOutgoingUSD desc`;
+        let channel_symbols = await this.poolREADONLY.query(sql)
+        let channel = {}
+        for (const c of channel_symbols) {
+            let k = `${c.chainID}:${c.chainIDDest}`
+            let symbolChain = paraTool.makeAssetChain(c.symbol, c.relayChain);
+            if (channel[k] == undefined) {
+                channel[k] = {};
+            }
+            channel[k][symbolChain] = {
+                numXCMTransfersOutgoingUSD: c.numXCMTransfersOutgoingUSD,
+                valXCMTransferOutgoingUSD: c.valXCMTransferOutgoingUSD
+            };
+        }
+        let out = [];
+        for (const k of Object.keys(channel)) {
+            let symbols = JSON.stringify(Object.keys(channel[k]))
+            let [chainID, chainIDDest] = k.split(":");
+            out.push(`('${chainID}', '${chainIDDest}', ${mysql.escape(symbols)})`)
+        }
+        await this.upsertSQL({
+            "table": `channel`,
+            "keys": ["chainID", "chainIDDest"],
+            "vals": ["symbols"],
+            "data": out,
+            "replace": ["symbols"],
+        });
+
+        // tally recent xcmmessages into xcmmessagelog (up to lookbackDays)  -- which has a daily log of chainID/chainIDDest/logDT
+        let sql_xcmmessagelog = `insert into xcmmessagelog
+      (select chainID, chainIDDest,
+        date(from_unixtime(destTS)) as logDT,
+        count(*) as numXCMMessagesOutgoingUSD,
+        sum(amountReceivedUSD) as valXCMMessagesOutgoingUSD
+      from xcmmessages where matched = 1 and incoming = 1 and sourceTS >= unix_timestamp(date(date_sub(Now(), interval ${lookbackDays} day)))
+      group by chainID, chainIDdest, logDT)
+      on duplicate key update numXCMMessagesOutgoingUSD = values(numXCMMessagesOutgoingUSD), valXCMMessagesOutgoingUSD = values(valXCMMessagesOutgoingUSD);`
+        this.batchedSQL.push(sql_xcmmessagelog);
+        await this.update_batchedSQL();
+
+        // tally recent xcmtransfer into xcmassetlog (up to lookbackDays) -- which has a daily log of symbol/relayChain/logDT
+        let sql_xcmassetlog = `insert into xcmassetlog
+      (select xcmasset.symbol, xcmasset.relayChain,
+        date(from_unixtime(destTS)) as logDT,
+        xcmtransfer.chainID,
+        xcmtransfer.chainIDDest,
+        count(*) as numXCMTransfersOutgoingUSD,
+        sum(amountReceivedUSD) as valXCMTransferOutgoingUSD
+      from asset, xcmtransfer join xcmasset on xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey
+        where incomplete = 0 and
+        sourceTS >= unix_timestamp(date(date_sub(Now(), interval ${lookbackDays} day))) and
+        destTS is not null and
+        asset.xcmInteriorKey = xcmasset.xcmInteriorKey and
+        asset.chainID = xcmtransfer.chainID
+      group by xcmasset.symbol, xcmasset.relayChain, logDT, chainID, chainIDdest)
+      on duplicate key update numXCMTransfersOutgoingUSD = values(numXCMTransfersOutgoingUSD), valXCMTransferOutgoingUSD = values(valXCMTransferOutgoingUSD);`
+        this.batchedSQL.push(sql_xcmassetlog);
+        await this.update_batchedSQL();
+
+        let daysAgoIntervals = [1, 7, 30]
+        for (const daysAgo of daysAgoIntervals) {
+            // tally recent xcmmessages into channel (1/7/30d)
+            let sql_channel = `update channel, (select chainID, chainIDDest, count(*) as numXCMMessagesOutgoing, sum(amountReceivedUSD) as valXCMMessagesOutgoingUSD from xcmmessages where blockTS >= unix_timestamp(date_sub(Now(), interval ${daysAgo} day)) and matched = 1 and incoming = 1
+             group by chainID, chainIDdest)  as t
+              set channel.numXCMMessagesOutgoing${daysAgo}d = t.numXCMMessagesOutgoing,
+              channel.valXCMMessagesOutgoingUSD${daysAgo}d = t.valXCMMessagesOutgoingUSD
+             where  channel.chainID = t.chainID and
+                    channel.chainIDDest = t.chainIDDest`;
+            console.log(daysAgo, sql_channel);
+            this.batchedSQL.push(sql_channel);
+            await this.update_batchedSQL();
+            // tally recent xcmtransfer into xcmasset (1/7/30d)
+            let sql_xcmasset = `update xcmasset, (    select xcmasset.symbol, xcmasset.relayChain, count(*) as numXCMTransfer,  sum(amountReceivedUSD) as valXCMTransferUSD
+                  from asset, xcmtransfer join xcmasset on xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey
+                    where incomplete = 0 and
+                    sourceTS >= unix_timestamp(date(date_sub(Now(), interval 1 day))) and
+                    destTS is not null and
+                    asset.xcmInteriorKey = xcmasset.xcmInteriorKey and
+                    asset.chainID = xcmtransfer.chainID
+                  group by xcmasset.symbol, xcmasset.relayChain )  as t
+                set xcmasset.numXCMTransfer${daysAgo}d = t.numXCMTransfer,
+                xcmasset.valXCMTransfer${daysAgo}d = t.valXCMTransferUSD
+               where  xcmasset.symbol = t.symbol and
+                      xcmasset.symbol = t.symbol`;
+            console.log(daysAgo, sql_xcmasset);
+            this.batchedSQL.push(sql_xcmasset);
+            await this.update_batchedSQL();
+        }
+    }
+
+    async updateHRMPChannelEvents() {
         let msgs = await this.poolREADONLY.query("select msgHash, sentAt, sourceTS, from_unixtime(sourceTS) as messageDT, chainID, chainIDDest, msgStr from xcmmessages where ((incoming = 0 and matched = 0) or ( incoming = 1 and matched = 1 )) and msgStr like '%hrmp%' limit 200000;");
         let openRequests = [];
         let accepts = [];
@@ -56,7 +150,7 @@ module.exports = class XCMManager extends AssetManager {
         let valsAccepts = ["msgHashAccepted", "sentAtAccepted", "acceptTS", "addDT", "lastUpdateBN", "status"]
         let valsClosing = ["msgHashClosing", "sentAtClosing", "closingTS", "closingInitiatorChainID", "addDT", "lastUpdateBN", "status"]
         await this.upsertSQL({
-            "table": `hrmpchannel`,
+            "table": `channel`,
             "keys": ["chainID", "chainIDDest", "relayChain"],
             "vals": valsOpenRequests,
             "data": openRequests,
@@ -64,7 +158,7 @@ module.exports = class XCMManager extends AssetManager {
             "lastUpdateBN": ["lastUpdateBN", "status", "addDT"]
         });
         await this.upsertSQL({
-            "table": `hrmpchannel`,
+            "table": `channel`,
             "keys": ["chainID", "chainIDDest", "relayChain"],
             "vals": valsAccepts,
             "data": accepts,
@@ -72,14 +166,13 @@ module.exports = class XCMManager extends AssetManager {
             "lastUpdateBN": ["lastUpdateBN", "status", "addDT"]
         });
         await this.upsertSQL({
-            "table": `hrmpchannel`,
+            "table": `channel`,
             "keys": ["chainID", "chainIDDest", "relayChain"],
             "vals": valsClosing,
             "data": closings,
             "replace": ["msgHashAccepted", "sentAtAccepted", "closingTS"],
             "lastUpdateBN": ["lastUpdateBN", "status", "addDT"]
         });
-        process.exit(0);
     }
 
     async updateXcmInteriorOut(isRawAsset = false) {
@@ -203,8 +296,6 @@ module.exports = class XCMManager extends AssetManager {
     }
 
     async updateXcmTransferRoute() {
-        await this.updateHrmpChannelEvents();
-        process.exit(0);
         // add new xcmasset records that have recently appeared in the asset table
         let sql = `select chainID, xcmInteriorKey, nativeAssetChain, symbol, numholders from asset where xcminteriorkey is not null and xcminteriorkey not in (select xcminteriorkey from xcmasset) and chainID < 50000 and xcminteriorkey != 'null'`;
         let xcAssetRecs = await this.poolREADONLY.query(sql);
@@ -230,7 +321,6 @@ module.exports = class XCMManager extends AssetManager {
             "data": out,
             "replace": vals
         });
-        process.exit(0);
         let sqlroute = `insert into xcmtransferroute ( asset, assetDest, symbol, chainID, chainIDDest, cnt) (select asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest, count(*) as cnt from xcmtransfer, xcmasset, asset, asset as assetDest where xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey and xcmasset.xcmInteriorKey = asset.xcmInteriorKey and asset.chainID = xcmtransfer.chainID and xcmasset.xcmInteriorKey = assetDest.xcmInteriorKey and assetDest.chainID = xcmtransfer.chainIDDest and sourceTS > UNIX_TIMESTAMP(date_sub(Now(), interval 30 day)) and assetDest.assetType = "Token" and asset.assetType = "Token" group by asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest) on duplicate key update asset = values(asset), assetDest = values(assetDest), cnt = values(cnt);`
         this.batchedSQL.push(sqlroute);
         await this.update_batchedSQL();
@@ -1023,7 +1113,6 @@ order by msgHash, diffSentAt, diffTS`
                 out.push(`('${rec.msgHash}', '${rec.blockNumber}', '${rec.incoming}', '${rec.chainID}', '${rec.chainIDDest}', '${JSON.stringify(parentInclusionFingerprints)}', '${JSON.stringify(instructionFingerprints)}', ${mysql.escape(JSON.stringify(assetChains))}, ${beneficiaries2})`);
             } catch (err) {
                 console.log(err);
-                process.exit(0);
             }
         }
 

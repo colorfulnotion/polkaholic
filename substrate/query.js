@@ -1003,7 +1003,7 @@ module.exports = class Query extends AssetManager {
             return (false);
         }
         try {
-            let chains = await this.poolREADONLY.query(`select id, chainID, chainName, blocksCovered, blocksFinalized, symbol, UNIX_TIMESTAMP(lastCrawlDT) as lastCrawlTS, UNIX_TIMESTAMP(lastFinalizedDT) as lastFinalizedTS, iconUrl, crawling, crawlingStatus, numTraces, WSEndpoint, WSEndpoint2, WSEndpoint3, relayChain, paraID, ss58Format,
+            let chains = await this.poolREADONLY.query(`select id, chainID, chainName, blocksCovered, blocksFinalized, symbol, UNIX_TIMESTAMP(lastCrawlDT) as lastCrawlTS, UNIX_TIMESTAMP(lastFinalizedDT) as lastFinalizedTS, iconUrl, crawling, crawlingStatus, numTraces, WSEndpoint, WSEndpoint2, WSEndpoint3, relayChain, paraID, ss58Format, RPCBackfill,
             numHolders, totalIssuance,
             numExtrinsics, numExtrinsics7d, numExtrinsics30d,
             numSignedExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d,
@@ -1759,7 +1759,7 @@ module.exports = class Query extends AssetManager {
     }
 
     async getSymbolAssets(symbol, address = false) {
-        let sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.symbol as localSymbol, asset.chainName, asset.currencyID, numHolders, totalFree from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey and xcmasset.symbol = '${symbol}' order by numHolders desc;`
+        let sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.symbol as localSymbol, asset.chainName, asset.currencyID, numHolders, totalFree, totalReserved, totalMiscFrozen, totalFrozen from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey and xcmasset.symbol = '${symbol}' order by numHolders desc;`
         let assets = await this.poolREADONLY.query(sql)
         if (assets.length == 0) {
             throw new NotFoundError(`Invalid symbol: ${symbol}`)
@@ -1771,7 +1771,7 @@ module.exports = class Query extends AssetManager {
         } catch (err) {
             // its ok to have an miss here, no need to log it
         }
-        console.log("holdings", address, holdings);
+
         let ts = this.getCurrentTS();
         for (let i = 0; i < assets.length; i++) {
             let v = assets[i];
@@ -1791,19 +1791,30 @@ module.exports = class Query extends AssetManager {
                 chainName,
                 localSymbol: v.localSymbol,
                 priceUSD: 0,
-                tvl: 0
+                tvlFree: 0,
+                tvlReserved: 0,
+                tvlMiscFrozen: 0,
+                tvlFrozen: 0
             };
             let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, v.chainID, ts);
             a.priceUSD = priceUSDCurrent;
             if (a.priceUSD == null) a.priceUSD = 0
             if (a.totalFree == null) a.totalFree = 0
+            if (a.totalReserved == null) a.totalReserved = 0
+            if (a.totalFrozen == null) a.totalFrozen = 0
+            if (a.totalMiscFrozen == null) a.totalMiscFrozen = 0
             a.totalFree = parseFloat(v.totalFree)
-            a.tvl = a.priceUSD * a.totalFree
+            a.tvlFree = a.priceUSD * a.totalFree
+            a.totalReserved = parseFloat(v.totalReserved)
+            a.tvlReserved = a.priceUSD * a.totalReserved
+            a.totalMiscFrozen = parseFloat(v.totalMiscFrozen)
+            a.tvlMiscFrozen = a.priceUSD * a.totalMiscFrozen
+            a.totalFrozen = parseFloat(v.totalFrozen)
+            a.tvlFrozen = a.priceUSD * a.totalFrozen
 
             let assetType = (a.assetType) ? a.assetType : false;
             if (holdings[assetType] !== undefined) {
                 let h = holdings[assetType];
-                console.log("H", h);
                 for (let j = 0; j < h.length; j++) {
                     let b = h[j];
                     if ((b.assetInfo.asset == a.asset) && (b.assetInfo.chainID == a.chainID)) {
@@ -1816,7 +1827,7 @@ module.exports = class Query extends AssetManager {
         return assets;
     }
 
-    async getChainHRMPChannels(chainID_or_chainName = "all") {
+    async getChainChannels(chainID_or_chainName = "all") {
         var chainID = null,
             id = null,
             chain = {};
@@ -1830,7 +1841,7 @@ module.exports = class Query extends AssetManager {
 
         try {
             let w = (chainID) ? `(chainID = '${chainID}' or chainIDDest = '${chainID}')` : `(status != 'Closed')`
-            let sql = `select chainID, chainIDDest, relayChain, status, msgHashOpenRequest, sentAtOpenRequest, openRequestTS, maxMessageSize, maxCapacity, msgHashAccepted, msgHashAccepted, sentAtAccepted, acceptTS, msgHashClosing, sentAtClosing, closingInitiatorChainID, closingTS from hrmpchannel where ${w}`
+            let sql = `select chainID, chainIDDest, relayChain, status, msgHashOpenRequest, sentAtOpenRequest, openRequestTS, maxMessageSize, maxCapacity, msgHashAccepted, msgHashAccepted, sentAtAccepted, acceptTS, msgHashClosing, sentAtClosing, closingInitiatorChainID, closingTS, numXCMMessagesOutgoing1d, numXCMMessagesOutgoing7d, numXCMMessagesOutgoing30d, valXCMMessagesOutgoingUSD1d, valXCMMessagesOutgoingUSD7d, valXCMMessagesOutgoingUSD30d, symbols from channel where ${w}`
             let channels = await this.poolREADONLY.query(sql);
             for (let i = 0; i < channels.length; i++) {
                 let c = channels[i];
@@ -1840,6 +1851,13 @@ module.exports = class Query extends AssetManager {
                 c.chainNameDest = this.getChainName(c.chainIDDest);
                 c.id = id;
                 c.idDest = idDest;
+                if (c.symbols) {
+                    try {
+                        c.symbols = JSON.parse(c.symbols);
+                    } catch (e) {
+                        //...
+                    }
+                }
             }
             return (channels);
         } catch (err) {
@@ -1847,6 +1865,40 @@ module.exports = class Query extends AssetManager {
             console.log(err);
             return [];
         }
+    }
+
+    async getChannelXCMAssetlog(chainID_or_chainName, chainIDDest_or_chainName, symbol = null, relayChain = null, limit = 1000) {
+        let [chainID, id] = this.convertChainID(chainID_or_chainName)
+        if (chainID === false) throw new NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
+        let [chainIDDest, idDest] = this.convertChainID(chainIDDest_or_chainName)
+        if (chainIDDest === false) throw new NotFoundError(`Invalid chain: ${chainIDDest_or_chainName}`)
+        try {
+            let w = [];
+            // get xcmassetlog of a specific symbol
+            if (symbol == null) {
+                // no restriction
+            } else if (symbol) {
+                w.push(` and symbol = '${symbol}'`)
+            }
+            if (relayChain == null) {
+                // no restriction
+            } else if (relayChain) {
+                w.push(` and relayChain = '${relayChain}'`)
+            }
+            let wStr = w.join(" ");
+            let sql = `select logDT, UNIX_TIMESTAMP(logDT) as logTS, symbol, relayChain, numXCMTransfersOutgoingUSD, valXCMTransferOutgoingUSD from xcmassetlog where chainID = '${chainID}' and chainIDDest = '${chainIDDest}' and logDT >= date(date_sub(Now(), interval 90 day)) ${wStr} order by logDT desc  limit ${limit}`
+            console.log(sql);
+            let recs = await this.poolREADONLY.query(sql);
+            for (let i = 0; i < recs.length; i++) {
+                let [logDT, _] = paraTool.ts_to_logDT_hr(recs[i].logTS);
+                recs[i].logDT = logDT;
+            }
+            return recs;
+        } catch (err) {
+            // TODO: 
+            console.log(err);
+        }
+        return ([]);
     }
 
     async getChainAssets(chainID_or_chainName = "all", address = false) {
@@ -1882,7 +1934,6 @@ module.exports = class Query extends AssetManager {
             }
 
             let sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w}  and assetType = 'Token' order by numHolders desc;`
-            console.log(sql);
             assets = await this.poolREADONLY.query(sql);
             if (assets.length == 0) {
                 // TODO: throw NotFound error
@@ -1914,7 +1965,7 @@ module.exports = class Query extends AssetManager {
                         chainName: v.chainName,
                         assetChain: assetChain,
                         priceUSD: 0,
-                        tvl: 0
+                        tvlFree: 0
                     }
                     let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, v.chainID, ts)
                     a.priceUSD = priceUSDCurrent;
@@ -1923,7 +1974,7 @@ module.exports = class Query extends AssetManager {
                     a.token1Supply = latestDexRec.lp1;
                     let priceUSD0 = await this.getTokenPriceUSD(v.token0, v.chainID, ts);
                     let priceUSD1 = await this.getTokenPriceUSD(v.token1, v.chainID, ts);
-                    a.tvl = priceUSD0 * a.token0Supply + priceUSD1 * a.token1Supply;
+                    a.tvlFree = priceUSD0 * a.token0Supply + priceUSD1 * a.token1Supply;
                 } else {
                     //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
                     a = {
@@ -1941,18 +1992,31 @@ module.exports = class Query extends AssetManager {
                         relayChain: v.relayChain,
                         assetChain: assetChain,
                         priceUSD: 0,
-                        tvl: 0
+                        totalFree: 0,
+                        totalReserved: 0,
+                        totalMiscFrozen: 0,
+                        totalFrozen: 0,
+                        tvlFree: 0,
+                        tvlReserved: 0,
+                        tvlMiscFrozen: 0,
+                        tvlFrozen: 0
                     }
                     let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, v.chainID, ts);
                     a.priceUSD = priceUSD;
                     if (a.priceUSD == null) a.priceUSD = 0
                     if (v.assetType == "ERC20") {
                         a.totalSupply = parseFloat(v.totalSupply)
-                        a.tvl = a.priceUSD * a.totalSupply
+                        a.tvlFree = a.priceUSD * a.totalSupply
                     } else {
                         if (a.totalFree == null) a.totalFree = 0
                         a.totalFree = parseFloat(v.totalFree)
-                        a.tvl = a.priceUSD * a.totalFree
+                        a.tvlFree = a.priceUSD * a.totalFree
+                        a.totalReserved = parseFloat(v.totalReserved)
+                        a.tvlReserved = a.priceUSD * a.totalReserved
+                        a.totalMiscFrozen = parseFloat(v.totalMiscFrozen)
+                        a.tvlMiscFrozen = a.priceUSD * a.totalMiscFrozen
+                        a.totalFrozen = parseFloat(v.totalFrozen)
+                        a.tvlFrozen = a.priceUSD * a.totalFrozen
                     }
                 }
                 assets[i] = a
@@ -5049,12 +5113,20 @@ module.exports = class Query extends AssetManager {
         let blockNumber = (filters.blockNumber != undefined) ? filters.blockNumber : null;
         let beneficiaries = (filters.beneficiaries != undefined) ? filters.beneficiaries : null;
         let chainListFilter = "";
-        if (chainList.length > 0) {
-            chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
+        console.log("getRecentXCMMessages", filters);
+        if (filters.chainID != undefined && filters.chainIDDest != undefined) {
+            let chainID = parseInt(filters.chainID);
+            let chainIDDest = parseInt(filters.chainIDDest);
+            chainListFilter = ` and chainID = '${chainID}' and chainIDDest = '${chainIDDest}' `
+        } else if (chainList.length > 0) {
+            chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest in (${chainList.join(",")}) )`
+        }
+        if (filters.symbol) {
+            // TODO: chainListFilter = ` and ( xcmasset.symbol = '${filters.symbol}' )` -- need xcmInteriorKey in xcmmessages
         }
         // if we don't have a blockNumber, bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
         let w = (blockNumber) ? `( blockNumber = '${parseInt(blockNumber, 10)}' )` : "blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 10 day))";
-        let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, sourceBlocknumber as blockNumberOutgoing, destBlocknumber as blockNumberIncoming, executedEventID, destStatus, errorDesc, relayChain FROM xcmmessages where ${w} and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
+        let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, sourceBlocknumber as blockNumberOutgoing, destBlocknumber as blockNumberIncoming, executedEventID, destStatus, errorDesc, xcmmessages.relayChain FROM xcmmessages where ${w} and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
         console.log(mysqlQuery);
         let results = [];
         let recs = await this.poolREADONLY.query(mysqlQuery);
