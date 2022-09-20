@@ -456,9 +456,9 @@ module.exports = class PriceManager extends Query {
                             console.log("estimateGas batch", batchErr.toString());
                             process.exit(0);
                         }
-                        let gasLimit = gasEst.mul(150).div(100).toString();
+                        let gasLimit = gasEst.add(3000000).mul(150).div(100).toString();
                         //totalGasLimit += gasLimit
-                        totalGasLimit = 3000000
+                        //totalGasLimit = 3000000 +
                         console.log(`gasESTIMATE=${gasLimit}, finalGas=${totalGasLimit}`);
                         let shouldBroadcast = 0
                         if (shouldBroadcast){
@@ -466,15 +466,15 @@ module.exports = class PriceManager extends Query {
                                 var receipt;
                                 if (batchCase == 'batchSome'){
                                     receipt = await batch_contract.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit, {
-                                        totalGasLimit
+                                        gasLimit
                                     });
                                 }else if(batchCase == 'batchSomeUntilFailure'){
                                     receipt = await batch_contract.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit, {
-                                        totalGasLimit
+                                        gasLimit
                                     });
                                 }else{
                                     receipt = await batch_contract.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit, {
-                                        totalGasLimit
+                                        gasLimit
                                     });
                                 }
                                 console.log("receipt", receipt)
