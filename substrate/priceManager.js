@@ -439,9 +439,18 @@ module.exports = class PriceManager extends Query {
                         console.log(`batch_gasLimit`, batch_gasLimit);
                         let batchPrecompileAddress = "0x0000000000000000000000000000000000000808";
                         const batch_contract = new ethers.Contract(batchPrecompileAddress, batchAbi, wallet);
+                        let batchCase = 'batchSome' //batchSomeUntilFailure//batchAll
+                        var gasEst;
                         try {
+                            if (batchCase == 'batchSome'){
+                                gasEst = await batch_contract.estimateGas.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit);
+                            }else if(batchCase == 'batchSomeUntilFailure'){
+                                gasEst = await batch_contract.estimateGas.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit);
+                            }else{
+                                gasEst = await batch_contract.estimateGas.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit);
+                            }
                             //var gasEst = await batch_contract.estimateGas.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit);
-                            var gasEst = await batch_contract.estimateGas.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit);
+                            //var gasEst = await batch_contract.estimateGas.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit);
                             //var gasEst = await batch_contract.estimateGas.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit);
                         } catch (batchErr) {
                             console.log("estimateGas batch", batchErr.toString());
@@ -451,12 +460,23 @@ module.exports = class PriceManager extends Query {
                         //totalGasLimit += gasLimit
                         totalGasLimit = 3000000
                         console.log(`gasESTIMATE=${gasLimit}, finalGas=${totalGasLimit}`);
-                        let shouldBroadcast = false
+                        let shouldBroadcast = 0
                         if (shouldBroadcast){
                             try {
-                                const receipt = await batch_contract.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit, {
-                                    gasLimit
-                                });
+                                var receipt;
+                                if (batchCase == 'batchSome'){
+                                    receipt = await batch_contract.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit, {
+                                        totalGasLimit
+                                    });
+                                }else if(batchCase == 'batchSomeUntilFailure'){
+                                    receipt = await batch_contract.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit, {
+                                        totalGasLimit
+                                    });
+                                }else{
+                                    receipt = await batch_contract.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit, {
+                                        totalGasLimit
+                                    });
+                                }
                                 console.log("receipt", receipt)
                                 process.exit(0);
                             } catch (err) {
