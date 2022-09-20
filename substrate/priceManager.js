@@ -16,6 +16,7 @@
 
 const Query = require("./query");
 const paraTool = require("./paraTool");
+const ethTool = require("./ethTool");
 const mysql = require("mysql2");
 const {
     ethers
@@ -381,6 +382,7 @@ module.exports = class PriceManager extends Query {
                         // https://docs.moonbeam.network/builders/pallets-precompiles/precompiles/batch/
                         let totalGasLimit = 0
                         let singleGasLimit = 0
+                        let txIdx = 0
                         await this.setupAPI(chain)
                         let batch_to = [];
                         let batch_value = [];
@@ -388,6 +390,7 @@ module.exports = class PriceManager extends Query {
                         let batch_gasLimit = [];
                         for (let t = 0; t < c.length; t++) {
                             let x = c[t];
+                            txIdx = t
                             let routerAmount = routerAmounts[t]
                             console.log(`x${t}`, x, `start=${routerAmount.start.toString()}, minOut=${routerAmount.minOut.toString()}`)
                             let deadline = this.getCurrentTS() + 600;
@@ -433,6 +436,66 @@ module.exports = class PriceManager extends Query {
                             //batch_callData.push(txSigned);
                             batch_gasLimit.push(0); // use contract.estimateGas to compute gasEst
                         }
+
+                        //unwrap WGLMR
+                        let isUnwrap = true
+                        let unwrapGasLimit = 0
+                        if (isUnwrap){
+                            txIdx+=1
+                            unwrapGasLimit = 100000
+                            let unwrapABI = '[{"constant":false,"inputs":[{"name":"wad","type":"uint256"}],"name":"withdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}]'
+                            let wGLMRAddr = '0xacc15dc74880c9944775448304b263d191c6077f'
+                            var wGLMRcontract = new ethers.Contract(wGLMRAddr, JSON.parse(unwrapABI), wallet);
+                            let finalRouterAmount = routerAmounts[routerAmounts.length-1]
+                            let finalRouterOut = ethers.BigNumber.from(finalRouterAmount.minOut);
+                            let isEstGasOK = false
+                            console.log(`tx${txIdx} WGLMRAddr=${wGLMRAddr} finalRouterOut=${finalRouterAmount.minOut}`)
+                            try {
+                                var singleGasEst = await wGLMRcontract.estimateGas.withdraw(finalRouterOut);
+                                singleGasLimit = singleGasEst.mul(125).div(100).toString();
+                                console.log(`tx${txIdx} estimateGas singleGasLimit=${singleGasLimit}, total=${totalGasLimit}`);
+                                isEstGasOK = true
+                            } catch (singleGasEstErr) {
+                                console.log(`tx${txIdx} estimateGas singleGasEstErr`, singleGasEstErr.toString());
+                            }
+                            if (isEstGasOK){
+                                totalGasLimit +=singleGasLimit
+                            }else{
+                                totalGasLimit += 100000
+                            }
+                            console.log(`tx${txIdx+1} accumulate gasLimit=${totalGasLimit}`);
+                            var txInput = await wGLMRcontract.populateTransaction.withdraw(finalRouterOut);
+                            console.log(`tx${txIdx+1} txInput`, txInput)
+                            batch_to.push(wGLMRAddr);
+                            batch_value.push(0);
+                            batch_callData.push(txInput.data)
+                            //batch_callData.push(txSigned);
+                            batch_gasLimit.push(0); // use contract.estimateGas to compute gasEst
+                        }
+                        let isXCM = true
+                        let xcmGasLimit = 0
+                        if (isXCM){
+                            xcmGasLimit = 2000000
+                            txIdx+=1
+                            //xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
+                            let isbeneficiaryEVM = false
+                            let xTokensContractAddress = '0x0000000000000000000000000000000000000804'
+                            let currencyAddress = '0x0000000000000000000000000000000000000802'
+                            let amount = 0.26
+                            let decimals = 18
+                            let beneficiarySubstrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
+                            let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
+                            let beneficiary = (isbeneficiaryEVM) ? beneficiaryEVM : beneficiarySubstrate
+                            let chainIDDest = paraTool.chainIDParallel
+                            var xcmTxStruct = ethTool.xTokenBuilder(this.web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
+                            console.log(`xTokenBuilder`, xcmTxStruct)
+                            batch_to.push(xTokensContractAddress);
+                            batch_value.push(0);
+                            batch_callData.push(xcmTxStruct.data)
+                            batch_gasLimit.push(0);
+                            console.log(`tx${txIdx} accumulate gasLimit=${totalGasLimit}`);
+                        }
+
                         console.log(`batch_to`, batch_to);
                         console.log(`batch_value`, batch_value);
                         console.log(`batch_callData`, batch_callData);
@@ -456,10 +519,11 @@ module.exports = class PriceManager extends Query {
                             console.log("estimateGas batch", batchErr.toString());
                             process.exit(0);
                         }
-                        let gasLimit = gasEst.add(3000000).mul(150).div(100).toString();
+                        let swapGasLimit = 3000000
+                        let extraGasLimit = swapGasLimit+unwrapGasLimit+xcmGasLimit
+                        let gasLimit = gasEst.add(extraGasLimit).mul(150).div(100).toString();
                         //totalGasLimit += gasLimit
-                        //totalGasLimit = 3000000 +
-                        console.log(`gasESTIMATE=${gasLimit}, finalGas=${totalGasLimit}`);
+                        console.log(`gasESTIMATE Final=${gasLimit}`);
                         let shouldBroadcast = 0
                         if (shouldBroadcast){
                             try {
