@@ -16,6 +16,7 @@
 
 const Query = require("./query");
 const paraTool = require("./paraTool");
+const ethTool = require("./ethTool");
 const mysql = require("mysql2");
 const {
     ethers
@@ -232,7 +233,7 @@ module.exports = class PriceManager extends Query {
     }
 
     async getChainRouters(chainID = -1) {
-        // and assetRouter.chainID = '${chainID}' 
+        // and assetRouter.chainID = '${chainID}'
         let sql = `select assetRouter.assetName, assetRouter.router as address, convert(asset.abiRaw using utf8) as ABI, numLPs from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRouter.router = asset.asset where assetRouter.chainID = asset.chainID and asset.isRouter = 1`;
         let recs = await this.poolREADONLY.query(sql);
         let routers = {};
@@ -298,7 +299,7 @@ module.exports = class PriceManager extends Query {
         const routers = await this.getChainRouters(chainID);
         let complex = [];
 
-        // find all "complex" cycles using 1 OR MORE routers (e.g Stella-Flare-Stella) where we can run 1+ EVM calls to get a quote 
+        // find all "complex" cycles using 1 OR MORE routers (e.g Stella-Flare-Stella) where we can run 1+ EVM calls to get a quote
         let sql = `select asset.asset, asset.chainID, paths from assetcycle join asset on asset.chainID = assetcycle.chainID and asset.asset = assetcycle.asset and asset.symbol = '${symbol}' and asset.chainID = ${chainID} order by numHolders desc limit 100;`
         let assetChains = await this.poolREADONLY.query(sql);
         for (let a = 0; a < assetChains.length; a++) {
@@ -320,18 +321,21 @@ module.exports = class PriceManager extends Query {
         );
         let dec = 18 // TODO: this.getAssetDecimal(asset)
         let batchAbi = await fs.readFileSync("batch-abi.json", "utf8")
-        console.log(batchAbi);
+        //console.log(batchAbi);
         let pk = await fs.readFileSync("/root/.walletevm2")
         pk = pk.toString().trim();
         let execute = false
         let wallet = new ethers.Wallet(pk.toString(), provider);
-        while (1) {
+        let isFirstExecute = true
+        let s = "3000000000000000000"; // 3GLMR
+        let start = ethers.BigNumber.from(s);
+        let newStart = ethers.BigNumber.from(s);
+        while (isFirstExecute) {
             console.log("READY", complex.length);
+            isFirstExecute = false
             for (const c of complex) {
                 try {
-                    let s = "3000000000000000000"; // 3GLMR 
-                    let start = ethers.BigNumber.from(s);
-                    let newStart = ethers.BigNumber.from(s);
+                    let routerAmounts = []
                     for (const x of c) {
                         // take a router and its paths, use the Contract to call getAmountsOut and figure out how much of the end asset exists after the path
                         let routerName = x[0];
@@ -343,8 +347,14 @@ module.exports = class PriceManager extends Query {
                         const rawResult = await contract.getAmountsOut(newStart, path);
                         let newStartRaw = rawResult.toString().split(",");
                         newStart = ethers.BigNumber.from(newStartRaw[newStartRaw.length - 1]);
-                        //console.log("routerName", routerName, "@", router.address, "path", path, "getAmountsOut=", newStartRaw, "newStart=", newStart.toString());
+                        let r = {
+                            start: newStartRaw[0],
+                            minOut: newStartRaw[newStartRaw.length - 1],
+                        }
+                        routerAmounts.push(r)
+                        console.log("routerName", routerName, "@", router.address, "path", path, "getAmountsOut=", newStartRaw, "newStart=", newStart.toString());
                     }
+                    console.log(`routerAmounts`, routerAmounts)
                     if (c.length == 1 && newStart.gt(start)) {
                         let execute = false;
                         console.log("SUCCESS single-hop", execute, c, newStart.toString());
@@ -370,14 +380,19 @@ module.exports = class PriceManager extends Query {
                         }
                     } else {
                         // https://docs.moonbeam.network/builders/pallets-precompiles/precompiles/batch/
+                        let totalGasLimit = 0
+                        let singleGasLimit = 0
+                        let txIdx = 0
                         await this.setupAPI(chain)
                         let batch_to = [];
                         let batch_value = [];
                         let batch_callData = [];
                         let batch_gasLimit = [];
-
                         for (let t = 0; t < c.length; t++) {
                             let x = c[t];
+                            txIdx = t
+                            let routerAmount = routerAmounts[t]
+                            console.log(`x${t}`, x, `start=${routerAmount.start.toString()}, minOut=${routerAmount.minOut.toString()}`)
                             let deadline = this.getCurrentTS() + 600;
                             let amountOutMin = 200;
                             let value = s;
@@ -386,35 +401,154 @@ module.exports = class PriceManager extends Query {
                             let router = routers[routerName];
                             let abiRaw = JSON.parse(router.ABI);
                             let abi = abiRaw.result;
-                            const contract = new ethers.Contract(router.address, abi, wallet);
-                            const txInput = await contract.populateTransaction.swapExactTokensForTokens(start, amountOutMin, path, addr, deadline);
+                            let routerAddr = router.address
+                            var contract = new ethers.Contract(routerAddr, abi, wallet);
+                            let routerStart = ethers.BigNumber.from(routerAmount.start);
+                            let routerMinOut = ethers.BigNumber.from(routerAmount.minOut);
+                            let isEstGasOK = false
+                            console.log(`tx${t} routerAddr=${routerAddr} start=${routerAmount.start}, amountOutMin=${routerAmount.minOut}, path=${path}, addr=${addr}, deadline=${deadline}`)
+                            try {
+                                var singleGasEst = await contract.estimateGas.swapExactTokensForTokens(routerStart, routerMinOut, path, addr, deadline);
+                                singleGasLimit = singleGasEst.mul(125).div(100).toString();
+                                console.log(`tx${t} estimateGas singleGasLimit=${singleGasLimit}, total=${totalGasLimit}`);
+                                isEstGasOK = true
+                            } catch (singleGasEstErr) {
+                                console.log(`tx${t} estimateGas singleGasEstErr`, singleGasEstErr.toString());
+                                //totalGasLimit = totalGasLimit*2
+                                //process.exit(0);
+                            }
+                            if (isEstGasOK){
+                                totalGasLimit +=singleGasLimit
+                            }else{
+                                totalGasLimit += totalGasLimit
+                            }
+                            console.log(`tx${t} accumulate gasLimit=${totalGasLimit}`);
+                            const txInput = await contract.populateTransaction.swapExactTokensForTokens(routerStart, routerMinOut, path, addr, deadline);
+                            console.log(`tx${t} txInput`, txInput)
                             //txInput.nonce = await wallet.getTransactionCount();
                             //txInput.gasPrice = 100000000000
                             //let gasLimit = gasEst.mul(125).div(100).toString();
-                            const txSigned = await wallet.signTransaction(txInput);
-                            batch_to.push(router.address);
+                            //const txSigned = await wallet.signTransaction(txInput);
+                            //console.log(`tx${t} txSigned`, txSigned)
+                            batch_to.push(routerAddr);
                             batch_value.push(0);
-                            batch_callData.push(txSigned);
-                            batch_gasLimit.push(500000); // use contract.estimateGas to compute gasEst
+                            batch_callData.push(txInput.data)
+                            //batch_callData.push(txSigned);
+                            batch_gasLimit.push(0); // use contract.estimateGas to compute gasEst
                         }
+
+                        //unwrap WGLMR
+                        let isUnwrap = true
+                        let unwrapGasLimit = 0
+                        let finalRouterAmount = routerAmounts[routerAmounts.length-1]
+                        if (isUnwrap){
+                            txIdx+=1
+                            unwrapGasLimit = 100000
+                            let unwrapABI = '[{"constant":false,"inputs":[{"name":"wad","type":"uint256"}],"name":"withdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}]'
+                            let wGLMRAddr = '0xacc15dc74880c9944775448304b263d191c6077f'
+                            var wGLMRcontract = new ethers.Contract(wGLMRAddr, JSON.parse(unwrapABI), wallet);
+                            let finalRouterOut = ethers.BigNumber.from(finalRouterAmount.minOut);
+                            let isEstGasOK = false
+                            console.log(`tx${txIdx} WGLMRAddr=${wGLMRAddr} finalRouterOut=${finalRouterAmount.minOut}`)
+                            try {
+                                var singleGasEst = await wGLMRcontract.estimateGas.withdraw(finalRouterOut);
+                                singleGasLimit = singleGasEst.mul(125).div(100).toString();
+                                console.log(`tx${txIdx} estimateGas singleGasLimit=${singleGasLimit}, total=${totalGasLimit}`);
+                                isEstGasOK = true
+                            } catch (singleGasEstErr) {
+                                console.log(`tx${txIdx} estimateGas singleGasEstErr`, singleGasEstErr.toString());
+                            }
+                            if (isEstGasOK){
+                                totalGasLimit +=singleGasLimit
+                            }else{
+                                totalGasLimit += 100000
+                            }
+                            console.log(`tx${txIdx+1} accumulate gasLimit=${totalGasLimit}`);
+                            var txInput = await wGLMRcontract.populateTransaction.withdraw(finalRouterOut);
+                            console.log(`tx${txIdx+1} txInput`, txInput)
+                            batch_to.push(wGLMRAddr);
+                            batch_value.push(0);
+                            batch_callData.push(txInput.data)
+                            //batch_callData.push(txSigned);
+                            batch_gasLimit.push(0); // use contract.estimateGas to compute gasEst
+                        }
+                        let isXCM = true
+                        let xcmGasLimit = 0
+                        if (isXCM){
+                            xcmGasLimit = 2000000
+                            txIdx+=1
+                            //xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
+                            let isbeneficiaryEVM = false
+                            let xTokensContractAddress = '0x0000000000000000000000000000000000000804'
+                            let currencyAddress = '0x0000000000000000000000000000000000000802'
+                            console.log()
+                            //let amount = 0.26
+                            let amount = paraTool.dechexToInt(finalRouterAmount.minOut) / 10**18
+                            let decimals = 18
+                            let beneficiarySubstrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
+                            let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
+                            let beneficiary = (isbeneficiaryEVM) ? beneficiaryEVM : beneficiarySubstrate
+                            let chainIDDest = paraTool.chainIDParallel
+                            var xcmTxStruct = ethTool.xTokenBuilder(this.web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
+                            console.log(`xTokenBuilder`, xcmTxStruct)
+                            batch_to.push(xTokensContractAddress);
+                            batch_value.push(0);
+                            batch_callData.push(xcmTxStruct.data)
+                            batch_gasLimit.push(0);
+                            console.log(`tx${txIdx} accumulate gasLimit=${totalGasLimit}`);
+                        }
+
+                        console.log(`batch_to`, batch_to);
+                        console.log(`batch_value`, batch_value);
+                        console.log(`batch_callData`, batch_callData);
+                        console.log(`batch_gasLimit`, batch_gasLimit);
                         let batchPrecompileAddress = "0x0000000000000000000000000000000000000808";
                         const batch_contract = new ethers.Contract(batchPrecompileAddress, batchAbi, wallet);
+                        let batchCase = 'batchSome' //batchSomeUntilFailure//batchAll
+                        var gasEst;
                         try {
-                            const gasEst = await batch_contract.estimateGas.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit);
-                        } catch (err) {
-                            console.log("estimateGas batchAll", err);
+                            if (batchCase == 'batchSome'){
+                                gasEst = await batch_contract.estimateGas.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit);
+                            }else if(batchCase == 'batchSomeUntilFailure'){
+                                gasEst = await batch_contract.estimateGas.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit);
+                            }else{
+                                gasEst = await batch_contract.estimateGas.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit);
+                            }
+                            //var gasEst = await batch_contract.estimateGas.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit);
+                            //var gasEst = await batch_contract.estimateGas.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit);
+                            //var gasEst = await batch_contract.estimateGas.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit);
+                        } catch (batchErr) {
+                            console.log("estimateGas batch", batchErr.toString());
                             process.exit(0);
                         }
-                        let gasLimit = gasEst.mul(125).div(100).toString();
-                        console.log("gasESTIMATE", gasLimit);
-                        try {
-                            const receipt = await batch_contract.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit, {
-                                gasLimit
-                            });
-                            console.log(receipt)
-                        } catch (err) {
-                            console.log("batchAll", err);
-                            process.exit(0);
+                        let swapGasLimit = 3000000
+                        let extraGasLimit = swapGasLimit+unwrapGasLimit+xcmGasLimit
+                        let gasLimit = gasEst.add(extraGasLimit).mul(150).div(100).toString();
+                        //totalGasLimit += gasLimit
+                        console.log(`gasESTIMATE Final=${gasLimit}`);
+                        let shouldBroadcast = 0
+                        if (shouldBroadcast){
+                            try {
+                                var receipt;
+                                if (batchCase == 'batchSome'){
+                                    receipt = await batch_contract.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit, {
+                                        gasLimit
+                                    });
+                                }else if(batchCase == 'batchSomeUntilFailure'){
+                                    receipt = await batch_contract.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit, {
+                                        gasLimit
+                                    });
+                                }else{
+                                    receipt = await batch_contract.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit, {
+                                        gasLimit
+                                    });
+                                }
+                                console.log("receipt", receipt)
+                                process.exit(0);
+                            } catch (err) {
+                                console.log("batchAll", err);
+                                process.exit(0);
+                            }
                         }
                         break;
                     }
@@ -536,16 +670,16 @@ module.exports = class PriceManager extends Query {
                 symbol: r.symbol
             }
             /*
-{
-  assetType: 'XCAsset',
-  chainID: 2004,
-  token0: '{"Token":"42259045809535163221576417993425387648"}',
-  token1: '0xffffffff1fcacbd218edc0eba20fc2308c778080',
-  token0Symbol: 'xcDOT',
-  token1Symbol: 'xcDOT',
-  symbol: 'xcDOT'
-}
-*/
+            {
+              assetType: 'XCAsset',
+              chainID: 2004,
+              token0: '{"Token":"42259045809535163221576417993425387648"}',
+              token1: '0xffffffff1fcacbd218edc0eba20fc2308c778080',
+              token0Symbol: 'xcDOT',
+              token1Symbol: 'xcDOT',
+              symbol: 'xcDOT'
+            }
+            */
             // console.log(assetChain, xcAsset);
             this.assetInfo[assetChain] = xcAsset;
         }

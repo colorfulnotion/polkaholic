@@ -31,7 +31,7 @@ const MAX_PRICEUSD = 100000.00;
 module.exports = class AssetManager extends PolkaholicDB {
     nativeAssetInfo = {};
     assetInfo = {};
-    // TODO:fuse these together 
+    // TODO:fuse these together
     xcmAssetInfo = {}; // xcmInteriorKey   -> nativeAssetChain
     xcmAssetsInfo = {}; // xcmInteriorKey -> symbol
     xcmInteriorInfo = {}; // nativeAssetChain -> xcmInteriorKey
@@ -137,7 +137,8 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                 paraID: paraID,
                 isEVM: (chain.isEVM == 1) ? true : false,
                 githubURL: chain.githubURL,
-                subscanURL: chain.subscanURL,
+                //subscanURL: chain.subscanURL,
+                subscanURL: null,
                 parachainsURL: chain.parachainsURL,
                 dappURL: chain.dappURL,
                 WSEndpoint: chain.WSEndpoint

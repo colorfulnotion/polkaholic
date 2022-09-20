@@ -284,7 +284,7 @@ for (let i=0; i<tabs.length; i++) {
     <th scope="col">Substrate.io Marketplace</th><td><a href="<%= chain.substrateURL; %>" target="_new"><%= chain.substrateURL; %></a></td>
    </tr>
    <% } %>
-   <% if ( chain.subscanURL ) { %>
+   <% if ( chain.subscanURL && false ) { %>
    <tr>
     <th scope="col">Subscan URL</th><td><a href="<%= chain.subscanURL; %>" target="_new"><%= chain.subscanURL; %></a></td>
    </tr>
@@ -302,4 +302,3 @@ var accounts = <%- JSON.stringify(accounts); %>;
 </script>
 <script src="/chainui.js"></script>
 <script src="/chain.js"></script>
-

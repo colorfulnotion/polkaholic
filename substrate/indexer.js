@@ -5234,7 +5234,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
             if (e.phase.initialization !== undefined || e.phase.finalization !== undefined) {
                 // index 0 holds { moonbeam/moonriver reward events in e.phase.initialization.
-                ///XCM events actually belongs to extrinsicID-1 (parainherent (enter)): ump + balances+currencies/Deposited https://kusama.subscan.io/block/12039596?tab=event
                 index = 0;
             }
             if (index >= 0) {
@@ -5419,11 +5418,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let recentTransfers = [];
         let recentXcmMsgs = []; //new xcm here
         if (finalized == true && autoTraces) {
-            //console.log("STANDARD BLOCK", JSON.stringify(evmBlock, null, 4));		
-            //console.log("STANDARD RECEIPTS", JSON.stringify(evmReceipts, null, 4));	
+            //console.log("STANDARD BLOCK", JSON.stringify(evmBlock, null, 4));
+            //console.log("STANDARD RECEIPTS", JSON.stringify(evmReceipts, null, 4));
         }
         if (finalized == false && autoTraces) {
-            // OPTIMIZATION: we only need to do this for evm chains... 
+            // OPTIMIZATION: we only need to do this for evm chains...
             let current = {
                 Block: null,
                 Receipts: null,
@@ -5432,7 +5431,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 blockNumber,
                 blockTS,
                 evmBlockHash: null
-            }; // note that blockHash is the Substrate block hash 
+            }; // note that blockHash is the Substrate block hash
             for (const t of autoTraces) {
                 if ((t.p == "Ethereum" && t.s == "CurrentBlock") && t.pv) {
                     current.Block = JSON.parse(t.pv)
@@ -5455,8 +5454,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
             let [newEVMBlock, newReceipts] = this.convertUnfinalizedRawTraceData(current);
             if (newEVMBlock && newReceipts) {
-                //console.log("NEW BLOCK", JSON.stringify(newEVMBlock, null, 4));		
-                //console.log("NEW RECEIPTS", JSON.stringify(newReceipts, null, 4));	
+                //console.log("NEW BLOCK", JSON.stringify(newEVMBlock, null, 4));
+                //console.log("NEW RECEIPTS", JSON.stringify(newReceipts, null, 4));
                 evmBlock = newEVMBlock;
                 evmReceipts = newReceipts;
 

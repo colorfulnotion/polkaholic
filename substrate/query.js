@@ -1367,8 +1367,10 @@ module.exports = class Query extends AssetManager {
                     if (c.transfers !== undefined && c.transfers.length > 0) {
                         for (let i = 0; i < c.transfers.length; i++) {
                             let t = c.transfers[i];
-                            let tokenAsset = t.tokenAddress.toLowerCase();
-                            let tokenAssetChain = paraTool.makeAssetChain(tokenAsset, c.chainID);
+                            //let tokenAsset = t.tokenAddress.toLowerCase();
+                            //let tokenAssetChain = paraTool.makeAssetChain(tokenAsset, c.chainID);
+                            let [isXcAsset, tokenAssetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(t.tokenAddress, c.chainID) // REVIEW
+                            let [tokenAsset, _] = paraTool.parseAssetChain(tokenAssetChain)
                             if (this.assetInfo[tokenAssetChain]) {
                                 t.assetInfo = this.assetInfo[tokenAssetChain];
                                 if (t.assetInfo.decimals !== false) {

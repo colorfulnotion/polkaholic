@@ -23,7 +23,7 @@ let cls2 = ( expanded ) ? "show" : "";
   <td width="40%" align=left>SS58 Address: <code><%- uiTool.getShortHash(chainassets.ss58Address, false); %></code> <a href='/qrcode/<%= chainassets.ss58Address; %>'><i class="fa-solid fa-qrcode"></i></a></td>
   <td width="60%" align=right>
   <a href='https://sub.id/<%= chainassets.ss58Address; %>' target='_new'><img src='https://cdn.polkaholic.io/subid.svg' width="16"></a>
-  <% if ( chainassets.subscanURL ) { %>
+  <% if ( chainassets.subscanURL && false) { %>
      <a href='<%= chainassets.subscanURL; %>/account/<%= chainassets.ss58Address; %>' target='_new'><img src='https://cdn.polkaholic.io/subscan.svg' width="16"></a>
   <% } %>
   <a href='https://<%= chainassets.id; %>.polkaholic.io/account/<%= chainassets.ss58Address; %>' target='_new'><img src='https://cdn.polkaholic.io/polkaholic.png' width="16"></a>
