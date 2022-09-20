@@ -440,13 +440,13 @@ module.exports = class PriceManager extends Query {
                         //unwrap WGLMR
                         let isUnwrap = true
                         let unwrapGasLimit = 0
+                        let finalRouterAmount = routerAmounts[routerAmounts.length-1]
                         if (isUnwrap){
                             txIdx+=1
                             unwrapGasLimit = 100000
                             let unwrapABI = '[{"constant":false,"inputs":[{"name":"wad","type":"uint256"}],"name":"withdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}]'
                             let wGLMRAddr = '0xacc15dc74880c9944775448304b263d191c6077f'
                             var wGLMRcontract = new ethers.Contract(wGLMRAddr, JSON.parse(unwrapABI), wallet);
-                            let finalRouterAmount = routerAmounts[routerAmounts.length-1]
                             let finalRouterOut = ethers.BigNumber.from(finalRouterAmount.minOut);
                             let isEstGasOK = false
                             console.log(`tx${txIdx} WGLMRAddr=${wGLMRAddr} finalRouterOut=${finalRouterAmount.minOut}`)
@@ -481,7 +481,9 @@ module.exports = class PriceManager extends Query {
                             let isbeneficiaryEVM = false
                             let xTokensContractAddress = '0x0000000000000000000000000000000000000804'
                             let currencyAddress = '0x0000000000000000000000000000000000000802'
-                            let amount = 0.26
+                            console.log()
+                            //let amount = 0.26
+                            let amount = paraTool.dechexToInt(finalRouterAmount.minOut) / 10**18
                             let decimals = 18
                             let beneficiarySubstrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
                             let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
