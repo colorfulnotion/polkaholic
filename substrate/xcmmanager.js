@@ -1294,27 +1294,37 @@ order by chainID, extrinsicHash, eventID, diffTS`;
 
             let out = [];
             for (const k of Object.keys(assetsReceived)) {
+                let xcmInteriorKeys = []
+                let xcmInteriorKeysStr = 'NULL'
                 let [msgHash, blockNumber, chainID, chainIDDest] = k.split("-");
-                let r = assetsReceived[k];
+                let r = assetsReceived[k]; //assetsReceived array
+                for (const a of r){
+                    if (a.xcmInteriorKey != undefined){
+                        xcmInteriorKeys.push(a.xcmInteriorKey)
+                    }
+                }
+                if (xcmInteriorKeys.length > 0) xcmInteriorKeysStr = `'${xcmInteriorKeys.join('|')}'`
                 let ar = JSON.stringify(r);
                 if (ar.length < 1024) {
                     let valueUSD = this.sum_assetsReceived(r);
                     // console.log("*****", valueUSD, r);
-                    if (outgoing[`${msgHash}-${blockNumber}`] != undefined) out.push(`('${msgHash}', '${blockNumber}', '0', ${mysql.escape(ar)}, '${valueUSD}', '${chainID}', '${chainIDDest}')`);
-                    if (incoming[`${msgHash}-${blockNumber}`] != undefined) out.push(`('${msgHash}', '${blockNumber}', '1', ${mysql.escape(ar)}, '${valueUSD}', '${chainID}', '${chainIDDest}')`);
+                    //["msgHash", "blockNumber", "incoming"] +  ["assetsReceived", "amountReceivedUSD", "chainID", "chainIDDest", "xcmInteriorKeys"]
+                    if (outgoing[`${msgHash}-${blockNumber}`] != undefined) out.push(`('${msgHash}', '${blockNumber}', '0', ${mysql.escape(ar)}, '${valueUSD}', '${chainID}', '${chainIDDest}', ${xcmInteriorKeysStr})`);
+                    if (incoming[`${msgHash}-${blockNumber}`] != undefined) out.push(`('${msgHash}', '${blockNumber}', '1', ${mysql.escape(ar)}, '${valueUSD}', '${chainID}', '${chainIDDest}', ${xcmInteriorKeysStr})`);
                 } else {
                     console.log("LONG VAL", k, "RECS", ar.length, "assetsreceived=", ar);
                 }
             }
             console.log(out.length);
-            let vals = ["assetsReceived", "amountReceivedUSD", "chainID", "chainIDDest"];
+            let sqlDebug = true
+            let vals = ["assetsReceived", "amountReceivedUSD", "chainID", "chainIDDest", "xcmInteriorKeys"];
             await this.upsertSQL({
                 "table": "xcmmessages",
                 "keys": ["msgHash", "blockNumber", "incoming"],
                 "vals": vals,
                 "data": out,
                 "replace": vals
-            });
+            }, sqlDebug);
 
             out = [];
             for (const k of Object.keys(assetsReceivedXCMTransfer)) {
