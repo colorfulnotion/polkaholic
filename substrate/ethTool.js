@@ -552,13 +552,28 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     }
     //todo: how to detect reverted but successful case?
     //todo compute txfee (1559 vs legacy), current using 1284 for prototype
+    /* For 1559
+    baseFeePerGas: subsequently burned.
+    maxPriorityFeePerGas: tip that goes to miner
+    maxFeePerGas: max amount user is willing to pay. if baseFeePerGas+maxPriorityFeePerGas >=maxFeePerGas, maxPriorityFeePerGas is set to maxFeePerGas-baseFeePerGas
+    txSaving: maxFeePerGas - (maxPriorityFeePerGas+maxFeePerGas)
+    */
     let gWei = 10 ** 9
     let ether = 10 ** 18
     let value = paraTool.dechexToInt(dTxn.value)
     let gasLimit = dTxn.gas ? paraTool.dechexToInt(dTxn.gas) : 0
     let gasPrice = dTxn.gasPrice ? paraTool.dechexToInt(dTxn.gasPrice) : 0
-    let gasUsed = dTxn.gasUsed ? paraTool.dechexToInt(dReceipt.gasUsed) : 0
+    let gasUsed = dReceipt.gasUsed ? paraTool.dechexToInt(dReceipt.gasUsed) : 0
+    let txLegacyType = 0
+    let tx1559Type = 2
+    let txType = (dTxn.type != undefined)? dTxn.type : txLegacyType
+    console.log(`txType=${dTxn.type}, dTxn`, dTxn)
     let fee = gasUsed * gasPrice
+    let maxFeePerGas = (dTxn.maxFeePerGas != undefined)? paraTool.dechexToInt(dTxn.maxPriorityFeePerGas): 0
+    let maxPriorityFeePerGas = (dTxn.maxPriorityFeePerGas != undefined)? paraTool.dechexToInt(dTxn.maxPriorityFeePerGas): 0
+    let baseFeePerGas = (dTxn.maxPriorityFeePerGas != undefined)? paraTool.dechexToInt(dReceipt.effectiveGasPrice): 0 //paraTool.dechexToInt("0x174876e800")
+    let burnedFee = gasUsed * baseFeePerGas
+    let txnSaving = (maxFeePerGas - baseFeePerGas) * gasUsed
 
     let fTxn = {
         chainID: chainID,
@@ -575,14 +590,34 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         transfers: dReceipt.transfers, //TODO.. also transaction actions
         swaps: dReceipt.swaps,
         value: value / ether,
+        txType: dTxn.type,
         fee: fee / ether,
+        burnedFee: burnedFee / ether,
+        txnSaving: txnSaving / ether,
         gasLimit: gasLimit,
         gasUsed: gasUsed,
+        maxFeePerGas: maxFeePerGas / gWei,
+        maxPriorityFeePerGas: maxPriorityFeePerGas / gWei,
+        baseFeePerGas: baseFeePerGas / gWei,
         gasPrice: gasPrice / gWei,
         nonce: dTxn.nonce,
+        accessList: null,
         input: dTxn.input,
         decodedInput: dTxn.decodedInput,
         decodedLogs: dReceipt.decodedLogs,
+    }
+    if(txType == txLegacyType){
+        delete fTxn.maxFeePerGas
+        delete fTxn.maxPriorityFeePerGas
+        delete fTxn.txnSaving
+    }
+    if (fTxn.txnSaving < 0){
+        delete fTxn.txnSaving
+    }
+    if (dTxn.accessList){
+        fTxn.accessList = dTxn.accessList
+    }else{
+        delete fTxn.accessList
     }
     if (dInternal.length > 0) {
         fTxn.transactionsInternal = dInternal;

@@ -5333,10 +5333,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    combine_tx_with_receipt_status(rawTx, rawReceipt, rawTransactionStatus, idx, blockHash, blockNumber, blockTS) {
+    combine_tx_with_receipt_status(rawTx, rawReceipt, rawTransactionStatus, idx, blockHash, blockNumber, blockTS, prevCumulativeGasUsed) {
         // TODO: reformat to match
         let tx = null;
-        let gasUsed = null
+        let gasUsed = null;
         let typ = "legacy";
         if (rawTx.eip1559) {
             tx = JSON.parse(JSON.stringify(rawTx.eip1559))
@@ -5357,7 +5357,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             tx.from = rawTransactionStatus.from
             tx.to = rawTransactionStatus.to
             tx.logs = rawTransactionStatus.logs
-            tx.gasUsed = rawReceipt[typ].usedGas
+            //tx.gasUsed = rawReceipt[typ].usedGas
             tx.statusCode = rawReceipt[typ].statusCode
         }
         let dtx = {
@@ -5370,7 +5370,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         receipt.blockHash = blockHash;
         receipt.blockNumber = blockNumber;
         receipt.contractAddress = rawTransactionStatus.contractAddress;
-        //receipt.cumulativeGasUsed = ""; // check
+        receipt.cumulativeGasUsed = prevCumulativeGasUsed + receipt.usedGas
         //receipt.effectiveGasPrice = "" // check
         receipt.gasUsed = receipt.usedGas; // check
         receipt.status = receipt.statusCode; // check
@@ -5391,11 +5391,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 b.ts = current.blockTS;
                 b.timestamp = current.blockTS;
                 b.transactions = [];
+                let prevCumulativeGasUsed = 0;
                 for (let idx = 0; idx < current.Block.transactions.length; idx++) {
                     let rawTransaction = current.Block.transactions[idx];
                     let rawReceipt = current.Receipts[idx];
                     let rawTransactionStatus = current.TransactionStatuses[idx];
-                    let [tx, receipt] = this.combine_tx_with_receipt_status(rawTransaction, rawReceipt, rawTransactionStatus, idx, current.evmBlockHash, current.blockNumber, current.blockTS);
+                    let [tx, receipt] = this.combine_tx_with_receipt_status(rawTransaction, rawReceipt, rawTransactionStatus, idx, current.evmBlockHash, current.blockNumber, current.blockTS, prevCumulativeGasUsed);
+                    if (receipt){
+                        prevCumulativeGasUsed = receipt.cumulativeGasUsed
+                    }
                     b.transactions.push(tx);
                     receipts.push(receipt);
                 }

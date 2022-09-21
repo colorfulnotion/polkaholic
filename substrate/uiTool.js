@@ -641,5 +641,12 @@ module.exports = {
     },
     verifierEnabled: function() {
         return true;
-    }
+    },
+    getEvmTxnType: function(txType) {
+        if (txType == 0){
+            return '0 (Legacy)'
+        }else if(txType == 2){
+            return '2 (EIP-1559)'
+        }
+    },
 };
