@@ -1143,7 +1143,7 @@ order by msgHash, diffSentAt, diffTS`
         return lastTS;
     }
 
-    async xcmmatch2_matcher(startTS, endTS = null, lookbackSeconds = 120) {
+    async xcmmatch2_matcher(startTS, endTS = null, forceRematch = false, lookbackSeconds = 120) {
         let endWhere = endTS ? `and xcmmessages.blockTS <= ${endTS} and xcmtransfer.sourceTS <= ${endTS}` : "";
         // set xcmmessages.{extrinsicID,extrinsicHash} based on xcmtransfer.msgHash / sentAt <= 4 difference
         let sqlA = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash, xcmmessages.sectionMethod = xcmtransfer.sectionMethod, xcmmessages.amountSentUSD = xcmtransfer.amountSentUSD
@@ -1179,7 +1179,8 @@ order by msgHash, diffSentAt, diffTS`
         // ((d.asset = xcmmessages.asset) or (d.nativeAssetChain = xcmmessages.nativeAssetChain and d.nativeAssetChain is not null)) and
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
         let fld = (this.getCurrentTS() % 2 == 0) ? "" : "2"
-        endWhere = endTS ? `and xcmmessages.blockTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds}` : "";
+        endWhere = endTS ? `and xcmmessages.blockTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds} ` : "";
+        let rematchClause = forceRematch? ``: `xcmmessages.assetsReceived is Null and`
         let sqlC = `select  xcmmessages.chainID, xcmmessages.chainIDDest,
           (d.destts - xcmmessages.blockTS) as diffTS,
           (d.sentAt - xcmmessages.sentAt) as diffSentAt,
@@ -1203,10 +1204,8 @@ order by msgHash, diffSentAt, diffTS`
         d.addDT is not null and
         d.destTS >= ${startTS} and
         d.destTS - xcmmessages.blockTS >= 0 and
-        d.destTS - xcmmessages.blockTS < ${lookbackSeconds} and
-        xcmmessages.assetsReceived is Null and
-        length(xcmmessages.extrinsicID) > 0  ${endWhere}
-order by chainID, extrinsicHash, eventID, diffTS`;
+        d.destTS - xcmmessages.blockTS < ${lookbackSeconds} and ${rematchClause}
+        length(xcmmessages.extrinsicID) > 0  ${endWhere} order by chainID, extrinsicHash, eventID, diffTS`;
         console.log(`xcmmatch2_matcher (C)`)
         console.log(paraTool.removeNewLine(sqlC))
         try {
@@ -1441,7 +1440,7 @@ order by msgHash`
         } while (iterations < maxIterations);
     }
 
-    async xcmanalytics_period(chain, t0, t1 = null) {
+    async xcmanalytics_period(chain, t0, t1 = null, forceRematch = false) {
         // xcmmessages_match matches incoming=0 and incoming=1 records
         let numRecs = await this.xcmmessages_match(t0, t1);
 
@@ -1449,7 +1448,7 @@ order by msgHash`
         let lastTS = await this.computeXCMFingerprints(t0, t1);
 
         // xcmmatch2_matcher computes assetsReceived by matching xcmmessages.beneficiaries(2) to xcmtransferdestcandidate
-        await this.xcmmatch2_matcher(t0, t1)
+        await this.xcmmatch2_matcher(t0, t1, forceRematch, 120)
 
         // marks duplicates in xcmmessages
         await this.xcmmessages_dedup(t0, t1);
@@ -1463,13 +1462,13 @@ order by msgHash`
         return [numRecs, lastTS];
     }
 
-    async xcmanalytics(chain, lookbackDays) {
+    async xcmanalytics(chain, lookbackDays, forceRematch = false) {
         let endTS = this.currentTS();
         let startTS = endTS - lookbackDays * 86400;
         for (let ts = startTS; ts < endTS; ts += 86400) {
             let t0 = ts;
             let t1 = ts + 86400;
-            await this.xcmanalytics_period(chain, t0, t1);
+            await this.xcmanalytics_period(chain, t0, t1, forceRematch);
         }
     }
 
