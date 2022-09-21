@@ -6280,16 +6280,18 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let assetRegistryMetaChain = [paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrostKSM, paraTool.chainIDBifrostDOT]
         let assetMetaChain = [paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDHeiko, paraTool.chainIDParallel]
         if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala ||
-            this.chainID == paraTool.chainIDBifrostKSM) {
+            this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
             //TODO: chainIDBifrostDOT does not support assetRegistry yet
-            console.log(`Fetch assetRegistry:assetMetadatas`)
-            await this.chainParser.fetchAssetRegistry(this)
             if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala) {
+                console.log(`Fetch assetRegistry:assetMetadatas`)
+                await this.chainParser.fetchAssetRegistry(this)
                 console.log(`Fetch assetRegistry:foreignAssetLocations`)
                 await this.chainParser.fetchXCMAssetRegistryLocations(this)
                 await this.chainParser.updateLiquidityInfo(this)
             }
             if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
+                //console.log(`Fetch assetRegistry:currencyMetadatas`)
+                //await this.chainParser.fetchAssetRegistryCurrencyMetadatas(this)
                 console.log(`Fetch assetRegistry:currencyIdToLocations`)
                 await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
