@@ -109,6 +109,42 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td><%- `${tx.gasPrice} Gwei`; %></td>
     </tr>
 <% } %>
+<% if ( tx.baseFeePerGas != undefined) { %>
+    <tr>
+      <td>Base Fee Per Gas</td>
+      <td><%- `${tx.baseFeePerGas} Gwei`; %></td>
+    </tr>
+<% } %>
+<% if ( tx.maxFeePerGas != undefined) { %>
+    <tr>
+      <td>Max Fee Per Gas</td>
+      <td><%- `${tx.maxFeePerGas} Gwei`; %></td>
+    </tr>
+<% } %>
+<% if ( tx.maxPriorityFeePerGas != undefined) { %>
+    <tr>
+      <td>Max Priority Fee Per Gas</td>
+      <td><%- `${tx.maxPriorityFeePerGas} Gwei`; %></td>
+    </tr>
+<% } %>
+<% if ( tx.burnedFee != undefined) { %>
+    <tr>
+      <td>Burned Fees</td>
+      <td><%- tx.burnedFee; %> <%- tx.symbol; %> </td>
+    </tr>
+<% } %>
+<% if ( tx.txnSaving != undefined) { %>
+    <tr>
+      <td>Txn Savings</td>
+      <td><%- tx.txnSaving; %> <%- tx.symbol; %> </td>
+    </tr>
+<% } %>
+<% if ( tx.txType != undefined ) { %>
+    <tr>
+      <td>Txn Type</td>
+      <td><%- uiTool.getEvmTxnType(tx.txType); %> </td>
+    </tr>
+<% } %>
     <tr>
       <td><%- tx.symbol; %> Price</td>
       <td><%- uiTool.currencyFormat(tx.priceUSD); %> </td>
