@@ -8,6 +8,7 @@ let tableEVMBlockExtrinsics = false;
 let tableEVMBlockEvents = false;
 
 function showevmblockextrinsics(objects) {
+    refreshTabcount("extrinsics")
     let tableName = '#tableevmblockextrinsics'
     if (!initevmblockextrinsics) {
         initevmblockextrinsics = true;
@@ -144,6 +145,7 @@ function showevmblockextrinsics(objects) {
 }
 
 function showevmblocktransactions(objects) {
+    refreshTabcount("events")
     let tableName = '#tableevmtxs'
     if (!initevmblocktransactions) {
         initevmblocktransactions = true;
@@ -259,21 +261,27 @@ function showevmblocktransactions(objects) {
                 {
                     data: 'value',
                     render: function(data, type, row, meta) {
-                        if (row.value) {
-                            return data;
-                        } else {
-                            return "";
+                        if (type == 'display') {
+                            if (row.fee) {
+                                return `${row.value} ${chainSymbol}`;
+                            } else {
+                                return "-";
+                            }
                         }
+                        return data;
                     }
                 },
                 {
                     data: 'fee',
                     render: function(data, type, row, meta) {
-                        if (row.fee) {
-                            return data;
-                        } else {
-                            return "";
+                        if (type == 'display') {
+                            if (row.fee) {
+                                return `${row.fee.toFixed(8)}`;
+                            } else {
+                                return "-";
+                            }
                         }
+                        return data;
                     }
                 }
             ]
@@ -495,7 +503,7 @@ function showevmblockevents(objects) {
 }
 
 
-function setuptabs(tabs, chain_id, blockNumber, blockHash, hash = "#extrinsics") {
+function setuptabs(tabs, chain_id, blockNumber, blockHash, hash = "#extrinsics", symbol='') {
     setupapidocs("block", "", `${chain_id}/${blockNumber}`);
     for (let i = 0; i < tabs.length; i++) {
         let t = tabs[i];
@@ -582,10 +590,30 @@ $.fn.dataTable.ext.search.push(
     }
 );
 
+function refreshTabcount(tblType = 'extrinsics'){
+    if (tblType == 'extrinsics'){
+        let checked = document.getElementById('showallextrinsics').checked;
+        if (checked){
+            document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${extrinsics.length})`;
+        }else{
+            document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
+        }
+    }else if (tblType == 'events'){
+        let checked = document.getElementById('showallevents').checked;
+        if (checked){
+            document.getElementById('events-tab').innerHTML = `Events (${events.length})`;
+        }else{
+            document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
+        }
+    }
+}
+
 $("#showallextrinsics").on('click', function(e) {
+    refreshTabcount("extrinsics")
     showevmblockextrinsics(extrinsics);
 });
 $("#showallevents").on('click', function(e) {
+    refreshTabcount("events")
     showevmblockevents(events);
 });
 
