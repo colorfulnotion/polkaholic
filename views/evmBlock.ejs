@@ -109,6 +109,7 @@ for (let i=0; i<tabs.length; i++) {
 let chainID = <%= chainID %> ;
 let defHash = "<%= defHash %>";
 let id = '<%- id; %>';
+let chainSymbol = '<%- chainInfo.symbol; %>';
 let blockNumber = <%= blockNumber %>;
 let tabs = <%- JSON.stringify(tabs); %> ;
 <% if ( ! b.finalized ) { %>
@@ -118,7 +119,7 @@ let blockHash = '';
 <% } %>
 <%
 if (b.evmBlock != undefined && b.evmBlock.transactions !=undefined) { %>
-let evmtxs = <%- JSON.stringify(b.evmBlock.transactions); %>;
+let evmtxs = <%- JSON.stringify(b.evmBlock.transactions.reverse()); %>;
 <% } else { %>
 let evmtxs = '[]';
 <% } %>
@@ -149,10 +150,10 @@ for (const extrinsic of extrinsics) {
         e.extrinsicID = extrinsic.extrinsicID
         e.extrinsicHash = extrinsic.extrinsicHash
         e.extrinsicEventIndex = extrinsicEventIndex
-	e.signed = signed;
-	extrinsicEventIndex++
+	    e.signed = signed;
+	    extrinsicEventIndex++
         if ( signed ) totalEvents++
-	events.push(e);
+	    events.push(e);
    }
 }
 document.getElementById('evmtxs-tab').innerHTML = `Transactions (${evmtxs.length})`;

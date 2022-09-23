@@ -37,12 +37,20 @@ let firstMessage = null;
        <%- uiTool.showAccountInfo(xcm, "destAddress") %>
        <br/>
      <% } %>
+     <% if ( xcm.paraID == 0 ) { %>
+     <B>Origination [RelayChain]</B> <%= uiTool.capitalizeFirstLetter(xcm.id) %>
+     <%} else {  %>
      <B>Origination [Para ID: <%= xcm.paraID %>]:</B> <%= uiTool.capitalizeFirstLetter(xcm.id) %>
+     <% } %>
      <% if ( xcm.blockNumberSent ) { %>
        (<a href='/block/<%= xcm.id %>/<%= xcm.blockNumberSent %>'><%= xcm.blockNumberSent %></a>)
      <% } %>
      <br/>
+     <% if ( xcm.paraIDDest == 0 ) { %>
+     <B>Destination: [RelayChain]</B> <%= uiTool.capitalizeFirstLetter(xcm.idDest) %>
+     <%} else {  %>
      <B>Destination: [Para ID: <%= xcm.paraIDDest %>]</B> <%= uiTool.capitalizeFirstLetter(xcm.idDest) %>
+     <% } %>
      <% if ( xcm.blockNumberReceived ) { %>
        (<a href='/block/<%= xcm.idDest %>/<%= xcm.blockNumberReceived %>'><%= xcm.blockNumberReceived %></a>)
      <% } %>

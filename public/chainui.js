@@ -198,7 +198,11 @@ async function showxcmmessages(filter = {}) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         if (data && data.length > 0) {
-                            return presentID(data);
+                            if (row.destAddress !== undefined){
+                                return presentIDwithIdenticon(row.destAddress);
+                            } else {
+                                return presentIDwithIdenticon(data);
+                            }
                         } else {
                             return "";
                         }
@@ -361,8 +365,11 @@ async function showxcmtransfers(filter = {}) {
                 data: 'fromAddress',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        if (row.fromAddress !== undefined) {
-                            return presentID(data);
+                        if (row.sender !== undefined){
+                            return presentIDwithIdenticon(row.sender);
+                        }else if (row.fromAddress !== undefined) {
+                            return presentIDwithIdenticon(data);
+                            //return presentID(data);
                         } else {
                             console.log("missing fromAddress", row);
                         }
@@ -373,8 +380,11 @@ async function showxcmtransfers(filter = {}) {
                 data: 'destAddress',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        if (row.destAddress !== undefined) {
-                            return presentID(data);
+                        if (row.beneficiary !== undefined){
+                            return presentIDwithIdenticon(row.beneficiary);
+                        }else if (row.destAddress !== undefined) {
+                            return presentIDwithIdenticon(data);
+                            //return presentID(data);
                         } else {
                             console.log("missing destAddress", row);
                         }

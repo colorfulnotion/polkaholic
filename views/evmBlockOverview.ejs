@@ -19,7 +19,7 @@
   </tr>
   <tr>
     <td>Timestamp</td>
-    <td class='date'><%= uiTool.presentTS(b.blockTS); %></td>
+    <td class='date'><%- `${uiTool.presentSecondsAgoTS(b.blockTS)}`%><%- ` (${uiTool.presentTS(b.blockTS)})`; %></td>
   </tr>
   <tr>
     <td>Transactions</td>
@@ -124,10 +124,6 @@ if ( block && block.transactions ) { %>
      </td>
   </tr>
 <% } %>
-  <tr>
-    <td>Block Time</td>
-    <td class='date'><%= uiTool.presentSecondsAgoTS(b.blockTS); %></td>
-  </tr>
   <tr>
     <td>Spec Version</td>
     <td>
