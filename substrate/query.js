@@ -1112,12 +1112,14 @@ module.exports = class Query extends AssetManager {
                         if (decimals !== false) {
                             x.amountSent = x.amountSent / 10 ** decimals;
                             x.amountReceived = x.amountReceived / 10 ** decimals;
+                            x.xcmFee = x.amountSent - x.amountReceived
                             if (decorateUSD) {
                                 let [amountSentUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(x.amountSent, targetAsset, targetChainID, x.sourceTS);
                                 x.amountSentUSD = amountSentUSD;
                                 x.priceUSD = priceUSD;
                                 x.priceUSDCurrent = priceUSDCurrent;
                                 x.amountReceivedUSD = x.amountReceived * priceUSD;
+                                x.xcmFeeUSD = x.xcmFee * priceUSD;
                             }
                             x.chainName = this.getChainName(x.chainID);
                             [x.chainID, x.id] = this.convertChainID(x.chainID)
@@ -1162,6 +1164,8 @@ module.exports = class Query extends AssetManager {
                                     amountSentUSD: x.amountSentUSD,
                                     amountReceived: x.amountReceived,
                                     amountReceivedUSD: x.amountReceivedUSD,
+                                    xcmFee: x.xcmFee,
+                                    xcmFeeUSD: x.xcmFeeUSD,
                                     priceUSD: x.priceUSD,
                                     priceUSDCurrent: x.priceUSDCurrent,
                                 }
@@ -1897,7 +1901,7 @@ module.exports = class Query extends AssetManager {
             }
             return recs;
         } catch (err) {
-            // TODO: 
+            // TODO:
             console.log(err);
         }
         return ([]);
