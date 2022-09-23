@@ -580,7 +580,11 @@ function presentRawIDwithIdenticon(id, imageSize='25rpx') {
 }
 
 function presentIDwithIdenticon(id, imageSize='25rpx') {
-    return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
+    if (id.length == 42){
+        return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
+    }else{
+        return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
+    }
 }
 
 
