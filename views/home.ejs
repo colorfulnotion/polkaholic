@@ -2,12 +2,19 @@
 
 
 <!-- Tab panes -->
+
 <% for ( let j = 0; j < accounts.length; j++ ) { %>
-   <%  let account = accounts[j]; %>
+   <%  let account = accounts[j];
+   %>
 <div class="card mb-3">
     <div class="card-title">
-    <% let url = ( account.address.length == 42 ) ? `/address/${account.address}` : `/account/${account.address}`; %>
-      <B>Account:</B> <code><%= account.address %></code> <a class='btn' href='<%= url; %>'>View Account</a>
+    <% let url = ( account.address.length == 42 ) ? `/address/${account.address}` : `/account/${account.address}`;
+       let accountTxt = (accounts.length == 1) ? `Account` : `Account #${j+1}`
+    %>
+      <B><%=accountTxt%> </B> <img src="/identicon/<%= account.address; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+      <a href='<%= url; %>'>
+        <code><%= account.address; %></code>
+      </a>
     </div>
     <div class="row g-0">
       <div class="col-md-12  text-center">
@@ -24,4 +31,3 @@ var baseURL = '<%= config.baseURL; %>'
 let chainListStr = '<%= chainListStr; %>';
 </script>
 <%- include('footer', {apiUrl: apiUrl}); %>
-

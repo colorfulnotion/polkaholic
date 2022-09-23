@@ -4,6 +4,7 @@ let tableBlockExtrinsics = false;
 let tableBlockEvents = false;
 
 function showblockextrinsics(objects) {
+    refreshTabcount("extrinsics")
     let tableName = '#tableblockextrinsics'
     if (!initblockextrinsics) {
         initblockextrinsics = true;
@@ -99,10 +100,12 @@ function showblockextrinsics(objects) {
                 {
                     data: 'fromAddress',
                     render: function(data, type, row, meta) {
-                        if (row.fromAddress) {
-                            return presentID(row.fromAddress);
+                        if (row.signer != undefined){
+                            return presentIDwithIdenticon(row.signer);
+                        } else if (row.fromAddress) {
+                            return presentIDwithIdenticon(row.fromAddress);
                         }
-                        return "";
+                        return "-";
                     }
                 },
                 {
@@ -129,6 +132,7 @@ function showblockextrinsics(objects) {
 }
 
 function showblockevents(objects) {
+    refreshTabcount("events")
     let tableName = '#tableblockevents'
     if (!initblockevents) {
         initblockevents = true;
@@ -307,11 +311,30 @@ $.fn.dataTable.ext.search.push(
     }
 );
 
+function refreshTabcount(tblType = 'extrinsics'){
+    if (tblType == 'extrinsics'){
+        let checked = document.getElementById('showallextrinsics').checked;
+        if (checked){
+            document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${extrinsics.length})`;
+        }else{
+            document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
+        }
+    }else if (tblType == 'events'){
+        let checked = document.getElementById('showallevents').checked;
+        if (checked){
+            document.getElementById('events-tab').innerHTML = `Events (${events.length})`;
+        }else{
+            document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
+        }
+    }
+}
 
 $("#showallextrinsics").on('click', function(e) {
+    refreshTabcount("extrinsics")
     showblockextrinsics(extrinsics);
 });
 $("#showallevents").on('click', function(e) {
+    refreshTabcount("events")
     showblockevents(events);
 });
 

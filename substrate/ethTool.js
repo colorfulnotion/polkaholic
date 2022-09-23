@@ -567,7 +567,9 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     let txLegacyType = 0
     let tx1559Type = 2
     let txType = (dTxn.type != undefined)? dTxn.type : txLegacyType
-    console.log(`txType=${dTxn.type}, dTxn`, dTxn)
+    if (txType != txLegacyType && txType != tx1559Type){
+        console.log(`unknown txType=${dTxn.type}, dTxn`, dTxn)
+    }
     let fee = gasUsed * gasPrice
     let maxFeePerGas = (dTxn.maxFeePerGas != undefined)? paraTool.dechexToInt(dTxn.maxPriorityFeePerGas): 0
     let maxPriorityFeePerGas = (dTxn.maxPriorityFeePerGas != undefined)? paraTool.dechexToInt(dTxn.maxPriorityFeePerGas): 0
@@ -1762,23 +1764,31 @@ function int_to_hex(id) {
 function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
     for (let i = 0; i < evmTrace.length; i++) {
         let t = evmTrace[i];
-        if (t.value != "0x0" && stack.length > 1) {
-            res.push({
-                transactionHash: txs[stack[1]].hash,
-                stack: stack,
-                from: t.from,
-                to: t.to,
-                gas: paraTool.dechexToInt(t.gas),
-                gasUsed: paraTool.dechexToInt(t.gasUsed),
-                value: paraTool.dechexToInt(t.value),
-            });
-        }
-
-        if (t.calls != undefined) {
-            let newStack = [...stack];
-            newStack.push(i);
-            // recursive call
-            process_evm_trace(t.calls, res, depth + 1, newStack, txs);
+        try {
+            if (t.value != "0x0" && stack.length > 1) {
+                res.push({
+                    transactionHash: txs[stack[1]].hash, //mk check
+                    stack: stack,
+                    from: t.from,
+                    to: t.to,
+                    gas: paraTool.dechexToInt(t.gas),
+                    gasUsed: paraTool.dechexToInt(t.gasUsed),
+                    value: paraTool.dechexToInt(t.value),
+                });
+            }
+            if (t.calls != undefined) {
+                let newStack = [...stack];
+                newStack.push(i);
+                // recursive call
+                process_evm_trace(t.calls, res, depth + 1, newStack, txs);
+            }
+        } catch (err){
+            console.log(`process_evm_trace txs[stack[1]]`, txs[stack[1]])
+            console.log(`process_evm_trace err=${err.toString()}`)
+            console.log(`process_evm_trace t`, t)
+            console.log(`process_evm_trace stack(len=${stack.length})`, stack)
+            console.log(`process_evm_trace txs(len=${txs.length})`, txs)
+            //process.exit(0);
         }
     }
 }

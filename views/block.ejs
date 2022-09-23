@@ -202,16 +202,21 @@ for (const extrinsic of extrinsics) {
    let extrinsicEventIndex = 0; // this is the eventIndex within the extrinsic
    let signed = ( ( extrinsic.signer == undefined ) || ( extrinsic.evm ) ) ? false : true;
    if ( signed ) totalSubstrateSignedExtrinsics++;
+   //if ( signed ) totalEvents+=extrinsic.events.length;
    for (const e of extrinsic.events) {
         let pieces = e.eventID.split('-') //2-12039596-1-1
         e.rawEventID = `${pieces[1]}-${pieces[3]}`
         e.extrinsicID = extrinsic.extrinsicID
         e.extrinsicHash = extrinsic.extrinsicHash
         e.extrinsicEventIndex = extrinsicEventIndex
-	e.signed = signed;
-	extrinsicEventIndex++
-        if ( signed ) totalEvents++
-	events.push(e);
+	    e.signed = signed;
+	    extrinsicEventIndex++
+        //if ( signed ) totalEvents++
+        if (e.section == 'system' && (e.method == 'ExtrinsicSuccess' || e.method == 'ExtrinsicFailed')){
+        }else{
+            totalEvents++
+        }
+	    events.push(e);
    }
 }
 document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;

@@ -62,26 +62,41 @@ function presentPercentage(val, decimals = 2) {
 }
 
 
-function timeSince(seconds) {
+function timeSince(seconds, secondePrecision = true) {
     var interval = seconds / 86400;
+    var remainder = seconds % 86400;
     if (interval >= 1) {
         let days = Math.floor(interval)
-        let pl = (days > 1) ? "s" : ""
-        return days + " day" + pl;
+        let pl = (days > 1) ? "s " : " "
+        if (!secondePrecision || remainder < 3600){
+            return `${days} day${pl}`.trim()
+        }else{
+            return `${days} day${pl}${timeSince(remainder, false)}`
+        }
     }
     interval = seconds / 3600;
+    remainder = seconds % 3600;
     if (interval > 1) {
         let hours = Math.floor(interval);
-        let pl = (hours > 1) ? "s" : ""
-        return hours + " hour" + pl;
+        let pl = (hours > 1) ? "s " : " "
+        if (!secondePrecision || remainder < 60){
+            return `${hours} hr${pl}`.trim()
+        }else{
+            return `${hours} hr${pl}${timeSince(remainder, false)}`
+        }
     }
     interval = seconds / 60;
+    remainder = seconds % 60;
     if (interval > 1) {
         let minutes = Math.floor(interval);
-        let pl = (minutes > 1) ? "s" : "";
-        return minutes + " minute" + pl;
+        let pl = (minutes > 1) ? "s " : " ";
+        if (!secondePrecision || remainder < 1){
+            return `${minutes} min${pl}`.trim()
+        }else{
+            return `${minutes} min${pl}${timeSince(remainder, false)}`
+        }
     }
-    return Math.floor(seconds) + " seconds";
+    return Math.floor(seconds) + " secs";
 }
 
 
@@ -494,7 +509,7 @@ module.exports = {
     },
     presentTS: function(ts) {
         let res = new Date(ts * 1000).toISOString().replace(/T/, ' ').replace(/\..+/, '');
-        res += " (+UTC)";
+        res += " +UTC";
         return res;
     },
     presentChain: function(chainID, chainName) {
