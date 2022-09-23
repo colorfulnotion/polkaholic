@@ -575,8 +575,12 @@ function presentIDRow(row, fld) {
     return res;
 }
 
-function presentIDwithIdenticon(id) {
-    return '<img src="/identicon/' + id + '" class="rounded-start"  height="100%"  loading="lazy" class="card-img-center"/><a href="/account/' + id + '">' + getShortHash(id) + '</a>';
+function presentRawIDwithIdenticon(id, imageSize='25rpx') {
+    return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/> ${getShortHash(id, false)}`;
+}
+
+function presentIDwithIdenticon(id, imageSize='25rpx') {
+    return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
 }
 
 

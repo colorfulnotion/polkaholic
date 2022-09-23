@@ -1109,6 +1109,20 @@ module.exports = class Query extends AssetManager {
 
                     if (this.assetInfo[rawassetChain]) {
                         //let decimals = this.assetInfo[assetChain].decimals;
+                        let chainIDOriginationInfo = this.chainInfos[x.chainID]
+                        if (chainIDOriginationInfo != undefined && chainIDOriginationInfo.ss58Format != undefined) {
+                            if (x.fromAddress != undefined) {
+                                if (x.fromAddress.length == 42) x.sender = x.fromAddress
+                                if (x.fromAddress.length == 66) x.sender = paraTool.getAddress(x.fromAddress, chainIDOriginationInfo.ss58Format)
+                            }
+                        }
+                        let chainIDDestInfo = this.chainInfos[x.chainIDDest]
+                        if (chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
+                            if (x.destAddress != undefined) {
+                                if (x.destAddress.length == 42) x.beneficiary = x.destAddress
+                                if (x.destAddress.length == 66) x.beneficiary = paraTool.getAddress(x.destAddress, chainIDDestInfo.ss58Format)
+                            }
+                        }
                         if (decimals !== false) {
                             x.amountSent = x.amountSent / 10 ** decimals;
                             x.amountReceived = x.amountReceived / 10 ** decimals;
@@ -1142,6 +1156,7 @@ module.exports = class Query extends AssetManager {
                                     relayChain: x.relayChain,
 
                                     //source section
+                                    sender: x.sender,           //AccountKey20 or SS58
                                     fromAddress: x.fromAddress,
                                     id: x.id,
                                     chainID: x.chainID,
@@ -1150,6 +1165,7 @@ module.exports = class Query extends AssetManager {
                                     sourceTS: x.sourceTS,
 
                                     //dest section
+                                    beneficiary: x.beneficiary,  //AccountKey20 or SS58
                                     destAddress: x.destAddress,
                                     idDest: x.idDest,
                                     chainIDDest: x.chainIDDest,
@@ -5132,7 +5148,7 @@ module.exports = class Query extends AssetManager {
         }
         // if we don't have a blockNumber, bring in all the matched >= 0 records in the last 12 hours [matched=-1 implies we suppressed it from xcmmessage_dedup process]
         let w = (blockNumber) ? `( blockNumber = '${parseInt(blockNumber, 10)}' )` : "blockTS > UNIX_TIMESTAMP(date_sub(Now(), interval 10 day))";
-        let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, sourceBlocknumber as blockNumberOutgoing, destBlocknumber as blockNumberIncoming, executedEventID, destStatus, errorDesc, xcmmessages.relayChain FROM xcmmessages where ${w} and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
+        let mysqlQuery = `SELECT msgHash, msgStr as msg, version, sentAt, chainID, chainIDDest, msgType, blockNumber, incoming, blockTS, extrinsicHash, extrinsicID, sectionMethod, sourceTS, destTS, beneficiaries, beneficiaries as destAddress, assetsReceived, amountSentUSD, amountReceivedUSD, matched, UNIX_TIMESTAMP(matchDT) as matchTS, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, sourceBlocknumber as blockNumberOutgoing, destBlocknumber as blockNumberIncoming, executedEventID, destStatus, errorDesc, xcmmessages.relayChain FROM xcmmessages where ${w} and matched >= 0 ${chainListFilter} order by blockTS desc limit ${limit}`;
         console.log(mysqlQuery);
         let results = [];
         let recs = await this.poolREADONLY.query(mysqlQuery);
@@ -5166,6 +5182,16 @@ module.exports = class Query extends AssetManager {
             r.msg = JSON.parse(r.msg.toString());
             r.chainName = this.getChainName(chainID);
             r.chainDestName = this.getChainName(chainIDDest);
+            if (r.beneficiaries != undefined){
+                let chainIDDestInfo = this.chainInfos[chainIDDest]
+                if (chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
+                    if (r.beneficiaries != undefined) {
+                        let beneficiarie0 = r.beneficiaries.split('|')[0]
+                        if (beneficiarie0.length == 42) r.destAddress = beneficiarie0
+                        if (beneficiarie0.length == 66) r.destAddress = paraTool.getAddress(beneficiarie0, chainIDDestInfo.ss58Format)
+                    }
+                }
+            }
             // TODO : use new abstraction in paraTool
             r.relayChain = (r.chainIDDest != 2 && (r.chainIDDest < 10000)) ? 'polkadot' : 'kusama';
             if (r.matched == 0 && (this.getCurrentTS() - r.blockTS < 60)) {
