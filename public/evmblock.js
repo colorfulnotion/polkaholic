@@ -105,11 +105,11 @@ function showevmblockextrinsics(objects) {
                     data: 'fromAddress',
                     render: function(data, type, row, meta) {
                         if (row.evm != undefined && (row.evm.from != undefined)) {
-                            return presentID(row.evm.from);
+                            return presentIDwithIdenticon(row.evm.from);
                         } else if (row.fromAddress) {
-                            return presentID(row.fromAddress);
+                            return presentIDwithIdenticon(row.fromAddress);
                         }
-                        return "";
+                        return "-";
                     }
                 },
                 {

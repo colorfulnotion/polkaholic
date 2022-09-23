@@ -100,10 +100,12 @@ function showblockextrinsics(objects) {
                 {
                     data: 'fromAddress',
                     render: function(data, type, row, meta) {
-                        if (row.fromAddress) {
-                            return presentID(row.fromAddress);
+                        if (row.signer != undefined){
+                            return presentIDwithIdenticon(row.signer);
+                        } else if (row.fromAddress) {
+                            return presentIDwithIdenticon(row.fromAddress);
                         }
-                        return "";
+                        return "-";
                     }
                 },
                 {
