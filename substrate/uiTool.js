@@ -61,6 +61,11 @@ function presentPercentage(val, decimals = 2) {
     return `${n}%`
 }
 
+function presentGasPrice(valGwei, chainSymbol='ChainToken') {
+    let v = (valGwei / 10**9).toFixed(20).replace(/0+$/,'')
+    if (chainSymbol == undefined) chainSymbol =''
+    return `${v} ${chainSymbol} (${valGwei} Gwei)`
+}
 
 function timeSince(seconds, secondePrecision = true) {
     var interval = seconds / 86400;
@@ -664,4 +669,7 @@ module.exports = {
             return '2 (EIP-1559)'
         }
     },
+    presentGasPrice: function(valGwei, chainSymbol='ChainToken') {
+        return presentGasPrice(valGwei, chainSymbol)
+    }
 };

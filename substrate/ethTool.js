@@ -571,11 +571,15 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         console.log(`unknown txType=${dTxn.type}, dTxn`, dTxn)
     }
     let fee = gasUsed * gasPrice
-    let maxFeePerGas = (dTxn.maxFeePerGas != undefined)? paraTool.dechexToInt(dTxn.maxPriorityFeePerGas): 0
+    let maxFeePerGas = (dTxn.maxFeePerGas != undefined)? paraTool.dechexToInt(dTxn.maxFeePerGas): 0
     let maxPriorityFeePerGas = (dTxn.maxPriorityFeePerGas != undefined)? paraTool.dechexToInt(dTxn.maxPriorityFeePerGas): 0
+    //console.log(`dReceipt effectiveGasPrice`, paraTool.dechexToInt(dReceipt.effectiveGasPrice))
     let baseFeePerGas = (dTxn.maxPriorityFeePerGas != undefined)? paraTool.dechexToInt(dReceipt.effectiveGasPrice): 0 //paraTool.dechexToInt("0x174876e800")
     let burnedFee = gasUsed * baseFeePerGas
     let txnSaving = (maxFeePerGas - baseFeePerGas) * gasUsed
+    if (gasPrice >= baseFeePerGas){
+        baseFeePerGas = gasPrice - maxPriorityFeePerGas
+    }
 
     let fTxn = {
         chainID: chainID,
