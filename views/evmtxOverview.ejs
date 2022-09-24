@@ -103,28 +103,22 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td>Gas Used by Transaction</td>
       <td><%- tx.gasUsed; %><% if ( tx.gasLimit ) { %><%- ` (${uiTool.presentPercentage(tx.gasUsed/tx.gasLimit)})` %><% } %></td>
     </tr>
-<% if ( tx.gasPrice ) { %>
-    <tr>
-      <td>Gas Price</td>
-      <td><%- `${tx.gasPrice} Gwei`; %></td>
-    </tr>
-<% } %>
-<% if ( tx.baseFeePerGas != undefined) { %>
+<% if ( tx.baseFeePerGas ) { %>
     <tr>
       <td>Base Fee Per Gas</td>
-      <td><%- `${tx.baseFeePerGas} Gwei`; %></td>
+      <td><%- uiTool.presentGasPrice(tx.baseFeePerGas, tx.symbol); %></td>
     </tr>
 <% } %>
 <% if ( tx.maxFeePerGas != undefined) { %>
     <tr>
       <td>Max Fee Per Gas</td>
-      <td><%- `${tx.maxFeePerGas} Gwei`; %></td>
+      <td><%- uiTool.presentGasPrice(tx.maxFeePerGas, tx.symbol); %></td>
     </tr>
 <% } %>
 <% if ( tx.maxPriorityFeePerGas != undefined) { %>
     <tr>
       <td>Max Priority Fee Per Gas</td>
-      <td><%- `${tx.maxPriorityFeePerGas} Gwei`; %></td>
+      <td><%- uiTool.presentGasPrice(tx.maxPriorityFeePerGas, tx.symbol); %></td>
     </tr>
 <% } %>
 <% if ( tx.burnedFee != undefined) { %>
@@ -137,6 +131,12 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
     <tr>
       <td>Txn Savings</td>
       <td><%- tx.txnSaving; %> <%- tx.symbol; %> </td>
+    </tr>
+<% } %>
+<% if ( tx.gasPrice ) { %>
+    <tr>
+      <td>Gas Price</td>
+      <td><%- uiTool.presentGasPrice(tx.gasPrice, tx.symbol); %></td>
     </tr>
 <% } %>
 <% if ( tx.txType != undefined ) { %>
