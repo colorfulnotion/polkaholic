@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@acala-network/sdk": "^4.1.5",
+    "@acala-network/sdk-core": "^4.1.5",
+    "@acala-network/sdk-swap": "^4.1.5",
+    "@acala-network/sdk-wallet": "^4.1.5",
     "@acala-network/type-definitions": "^4.0.1",
     "@bifrost-finance/type-definitions": "^1.4.0",
     "@composable-finance/v1-sdk-typescript": "^1.0.4",

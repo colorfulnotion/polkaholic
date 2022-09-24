@@ -100,7 +100,7 @@ function showblockextrinsics(objects) {
                 {
                     data: 'fromAddress',
                     render: function(data, type, row, meta) {
-                        if (row.signer != undefined){
+                        if (row.signer != undefined) {
                             return presentIDwithIdenticon(row.signer);
                         } else if (row.fromAddress) {
                             return presentIDwithIdenticon(row.fromAddress);
@@ -311,19 +311,19 @@ $.fn.dataTable.ext.search.push(
     }
 );
 
-function refreshTabcount(tblType = 'extrinsics'){
-    if (tblType == 'extrinsics'){
+function refreshTabcount(tblType = 'extrinsics') {
+    if (tblType == 'extrinsics') {
         let checked = document.getElementById('showallextrinsics').checked;
-        if (checked){
+        if (checked) {
             document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${extrinsics.length})`;
-        }else{
+        } else {
             document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
         }
-    }else if (tblType == 'events'){
+    } else if (tblType == 'events') {
         let checked = document.getElementById('showallevents').checked;
-        if (checked){
+        if (checked) {
             document.getElementById('events-tab').innerHTML = `Events (${events.length})`;
-        }else{
+        } else {
             document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
         }
     }

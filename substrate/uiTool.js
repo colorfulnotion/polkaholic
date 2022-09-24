@@ -61,9 +61,9 @@ function presentPercentage(val, decimals = 2) {
     return `${n}%`
 }
 
-function presentGasPrice(valGwei, chainSymbol='ChainToken') {
-    let v = (valGwei / 10**9).toFixed(20).replace(/0+$/,'')
-    if (chainSymbol == undefined) chainSymbol =''
+function presentGasPrice(valGwei, chainSymbol = 'ChainToken') {
+    let v = (valGwei / 10 ** 9).toFixed(20).replace(/0+$/, '')
+    if (chainSymbol == undefined) chainSymbol = ''
     return `${v} ${chainSymbol} (${valGwei} Gwei)`
 }
 
@@ -73,9 +73,9 @@ function timeSince(seconds, secondePrecision = true) {
     if (interval >= 1) {
         let days = Math.floor(interval)
         let pl = (days > 1) ? "s " : " "
-        if (!secondePrecision || remainder < 3600){
+        if (!secondePrecision || remainder < 3600) {
             return `${days} day${pl}`.trim()
-        }else{
+        } else {
             return `${days} day${pl}${timeSince(remainder, false)}`
         }
     }
@@ -84,9 +84,9 @@ function timeSince(seconds, secondePrecision = true) {
     if (interval > 1) {
         let hours = Math.floor(interval);
         let pl = (hours > 1) ? "s " : " "
-        if (!secondePrecision || remainder < 60){
+        if (!secondePrecision || remainder < 60) {
             return `${hours} hr${pl}`.trim()
-        }else{
+        } else {
             return `${hours} hr${pl}${timeSince(remainder, false)}`
         }
     }
@@ -95,9 +95,9 @@ function timeSince(seconds, secondePrecision = true) {
     if (interval > 1) {
         let minutes = Math.floor(interval);
         let pl = (minutes > 1) ? "s " : " ";
-        if (!secondePrecision || remainder < 1){
+        if (!secondePrecision || remainder < 1) {
             return `${minutes} min${pl}`.trim()
-        }else{
+        } else {
             return `${minutes} min${pl}${timeSince(remainder, false)}`
         }
     }
@@ -663,13 +663,13 @@ module.exports = {
         return true;
     },
     getEvmTxnType: function(txType) {
-        if (txType == 0){
+        if (txType == 0) {
             return '0 (Legacy)'
-        }else if(txType == 2){
+        } else if (txType == 2) {
             return '2 (EIP-1559)'
         }
     },
-    presentGasPrice: function(valGwei, chainSymbol='ChainToken') {
+    presentGasPrice: function(valGwei, chainSymbol = 'ChainToken') {
         return presentGasPrice(valGwei, chainSymbol)
     }
 };

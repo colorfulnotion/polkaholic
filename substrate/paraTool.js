@@ -71,11 +71,10 @@ function q(inp) {
 }
 
 function dechexToInt(number) {
-    if ((number.length > 2) && number.substring(0, 2) == "0x") {
-        return parseInt(number)
-    } else {
+    if (number && typeof number == "string" && (number.length > 2) && number.substring(0, 2) == "0x") {
         return parseInt(number);
     }
+    return parseInt(number)
 }
 
 function isInt(n) {

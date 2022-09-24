@@ -97,7 +97,7 @@ module.exports = class XCMManager extends AssetManager {
                     asset.chainID = xcmtransfer.chainID
                   group by xcmasset.symbol, xcmasset.relayChain )  as t
                 set xcmasset.numXCMTransfer${daysAgo}d = t.numXCMTransfer,
-                xcmasset.valXCMTransfer${daysAgo}d = t.valXCMTransferUSD
+                xcmasset.valXCMTransferUSD${daysAgo}d = t.valXCMTransferUSD
                where  xcmasset.symbol = t.symbol and
                       xcmasset.symbol = t.symbol`;
             console.log(daysAgo, sql_xcmasset);
@@ -457,24 +457,22 @@ order by chainID, extrinsicHash, diffTS`
                     let rawAsset = d.rawAsset
                     let [isXCMAssetFound, standardizedXCMInfo] = this.getStandardizedXCMAssetInfo(chainID, asset, rawAsset)
                     if (isXCMAssetFound) {
-                        let priceTS = d.sourceTS
                         let decimals = standardizedXCMInfo.decimals;
-                        let nativeAssetChain = standardizedXCMInfo.nativeAssetChain;
-                        let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(standardizedXCMInfo.nativeAssetChain)
-                        if (this.assetInfo[nativeAssetChain]) {
-                            if (decimals !== false) {
-                                let [_, priceUSDsourceTS, __] = await this.computeUSD(1.0, nativeAsset, nativeChainID, priceTS);
-                                if (priceUSDsourceTS > 0) {
-                                    priceUSD = priceUSDsourceTS;
-                                    let amountSent = parseFloat(d.amountSent) / 10 ** decimals;
-                                    let amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
-                                    amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
-                                    amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
-                                }
+                        if (decimals !== false) {
+                            let priceSource = await this.computePriceUSD({
+                                xcmInteriorKey: standardizedXCMInfo.xcmInteriorKey,
+                                ts: d.sourceTS
+                            });
+                            if (priceSource) {
+                                priceUSD = priceSource.priceUSD;
+                                let amountSent = parseFloat(d.amountSent) / 10 ** decimals;
+                                let amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
+                                amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
+                                amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
                             }
-                        } else {
-                            console.log(`NativeAssetChain NOT FOUND [${m.extrinsicHash}] nativeAsset=${nativeAsset}, nativeChainID=${nativeChainID}, asset=${asset}, rawAsset=${rawAsset}`)
                         }
+                    } else {
+                        console.log(`XCM Asset not found [${d.extrinsicHash}], asset=${asset}, rawAsset=${rawAsset}`)
                     }
                     let sql = `update xcmtransfer
             set blockNumberDest = ${d.blockNumberDest},
@@ -1234,12 +1232,14 @@ order by chainID, extrinsicHash, eventID, diffTS`;
                     symbol = standardizedXCMInfo.symbol;
                     let nativeAssetChain = standardizedXCMInfo.nativeAssetChain;
                     xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
-                    let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(standardizedXCMInfo.nativeAssetChain)
                     if (decimals !== false) {
-                        let [_, priceUSDblockTS, __] = await this.computeUSD(1.0, nativeAsset, nativeChainID, m.blockTS);
+                        let p = await this.computePriceUSD({
+                            xcmInteriorKey,
+                            ts: m.blockTS
+                        });
                         //console.log(`getting price targetAsset=${targetAsset}, targetChainID=${targetChainID}, ts=${m.blockTS}, priceUSDblockTS=${priceUSDblockTS}`)
-                        if (priceUSDblockTS > 0) {
-                            priceUSD = priceUSDblockTS;
+                        if (p) {
+                            priceUSD = p.priceUSD;
                             amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
                             amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
                             isIncompleteRec = false
@@ -1494,8 +1494,13 @@ order by chainID, extrinsicHash`
                     let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(standardizedXCMInfo.nativeAssetChain)
                     if (this.assetInfo[nativeAssetChain]) {
                         let priceTS = (m.destTS != undefined) ? m.destTS : m.sourceTS
-                        let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, nativeAsset, nativeChainID, priceTS);
-                        if (priceUSD > 0) {
+                        let p = await this.computePriceUSD({
+                            asset: nativeAsset,
+                            chainID: nativeChainID,
+                            ts: priceTS
+                        });
+                        if (p) {
+                            let priceUSD = p.priceUSD
                             let asset = m.asset;
                             let amountSent = parseFloat(m.amountSent) / 10 ** decimals;
                             let amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;

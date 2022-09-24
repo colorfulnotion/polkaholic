@@ -198,7 +198,7 @@ async function showxcmmessages(filter = {}) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         if (data && data.length > 0) {
-                            if (row.destAddress !== undefined){
+                            if (row.destAddress !== undefined) {
                                 return presentIDwithIdenticon(row.destAddress);
                             } else {
                                 return presentIDwithIdenticon(data);
@@ -365,9 +365,9 @@ async function showxcmtransfers(filter = {}) {
                 data: 'fromAddress',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        if (row.sender !== undefined){
+                        if (row.sender !== undefined) {
                             return presentIDwithIdenticon(row.sender);
-                        }else if (row.fromAddress !== undefined) {
+                        } else if (row.fromAddress !== undefined) {
                             return presentIDwithIdenticon(data);
                             //return presentID(data);
                         } else {
@@ -380,9 +380,9 @@ async function showxcmtransfers(filter = {}) {
                 data: 'destAddress',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        if (row.beneficiary !== undefined){
+                        if (row.beneficiary !== undefined) {
                             return presentIDwithIdenticon(row.beneficiary);
-                        }else if (row.destAddress !== undefined) {
+                        } else if (row.destAddress !== undefined) {
                             return presentIDwithIdenticon(data);
                             //return presentID(data);
                         } else {

@@ -566,18 +566,18 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     let gasUsed = dReceipt.gasUsed ? paraTool.dechexToInt(dReceipt.gasUsed) : 0
     let txLegacyType = 0
     let tx1559Type = 2
-    let txType = (dTxn.type != undefined)? dTxn.type : txLegacyType
-    if (txType != txLegacyType && txType != tx1559Type){
+    let txType = (dTxn.type != undefined) ? dTxn.type : txLegacyType
+    if (txType != txLegacyType && txType != tx1559Type) {
         console.log(`unknown txType=${dTxn.type}, dTxn`, dTxn)
     }
     let fee = gasUsed * gasPrice
-    let maxFeePerGas = (dTxn.maxFeePerGas != undefined)? paraTool.dechexToInt(dTxn.maxFeePerGas): 0
-    let maxPriorityFeePerGas = (dTxn.maxPriorityFeePerGas != undefined)? paraTool.dechexToInt(dTxn.maxPriorityFeePerGas): 0
+    let maxFeePerGas = (dTxn.maxFeePerGas != undefined) ? paraTool.dechexToInt(dTxn.maxFeePerGas) : 0
+    let maxPriorityFeePerGas = (dTxn.maxPriorityFeePerGas != undefined) ? paraTool.dechexToInt(dTxn.maxPriorityFeePerGas) : 0
     //console.log(`dReceipt effectiveGasPrice`, paraTool.dechexToInt(dReceipt.effectiveGasPrice))
-    let baseFeePerGas = (dTxn.maxPriorityFeePerGas != undefined)? paraTool.dechexToInt(dReceipt.effectiveGasPrice): 0 //paraTool.dechexToInt("0x174876e800")
+    let baseFeePerGas = (dTxn.maxPriorityFeePerGas != undefined) ? paraTool.dechexToInt(dReceipt.effectiveGasPrice) : 0 //paraTool.dechexToInt("0x174876e800")
     let burnedFee = gasUsed * baseFeePerGas
     let txnSaving = (maxFeePerGas - baseFeePerGas) * gasUsed
-    if (gasPrice >= baseFeePerGas){
+    if (gasPrice >= baseFeePerGas) {
         baseFeePerGas = gasPrice - maxPriorityFeePerGas
     }
 
@@ -612,17 +612,17 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         decodedInput: dTxn.decodedInput,
         decodedLogs: dReceipt.decodedLogs,
     }
-    if(txType == txLegacyType){
+    if (txType == txLegacyType) {
         delete fTxn.maxFeePerGas
         delete fTxn.maxPriorityFeePerGas
         delete fTxn.txnSaving
     }
-    if (fTxn.txnSaving < 0){
+    if (fTxn.txnSaving < 0) {
         delete fTxn.txnSaving
     }
-    if (dTxn.accessList){
+    if (dTxn.accessList) {
         fTxn.accessList = dTxn.accessList
-    }else{
+    } else {
         delete fTxn.accessList
     }
     if (dInternal.length > 0) {
@@ -1786,7 +1786,7 @@ function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
                 // recursive call
                 process_evm_trace(t.calls, res, depth + 1, newStack, txs);
             }
-        } catch (err){
+        } catch (err) {
             console.log(`process_evm_trace txs[stack[1]]`, txs[stack[1]])
             console.log(`process_evm_trace err=${err.toString()}`)
             console.log(`process_evm_trace t`, t)
