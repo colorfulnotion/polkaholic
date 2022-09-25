@@ -31,11 +31,11 @@ const MAX_PRICEUSD = 100000.00;
 module.exports = class AssetManager extends PolkaholicDB {
 
     assetInfo = {};
+    xcmAssetInfo = {}; // xcmInteriorKey   -> 
+    xcmInteriorInfo = {}; // nativeAssetChain -> 
     // TODO:fuse these together
-    xcmAssetInfo = {}; // xcmInteriorKey   -> nativeAssetChain
-    xcmAssetsInfo = {}; // xcmInteriorKey -> symbol
-    xcmInteriorInfo = {}; // nativeAssetChain -> xcmInteriorKey
-    xcmSymbolInfo = {}; // symbolKey -> xcmInteriorKey
+    xcmSymbolInfo = {}; // symbolRelayChain -> 
+    symbolRelayChainAsset = {}; // symbolRelayChain -> { ${chainID}: assetInfo }
     assetlog = {};
     ratelog = {};
     assetlogTTL = 0;
@@ -473,14 +473,14 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
     }
 
     getXcmAssetInfoDecimals(xcmInteriorKey) {
-        let xcmAssetInfo = this.xcmAssetsInfo[xcmInteriorKey]
+        let xcmAssetInfo = this.xcmAssetInfo[xcmInteriorKey]
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo.decimals
         }
         return null
     }
     getXcmAssetInfoSymbol(xcmInteriorKey) {
-        let xcmAssetInfo = this.xcmAssetsInfo[xcmInteriorKey]
+        let xcmAssetInfo = this.xcmAssetInfo[xcmInteriorKey]
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo.symbol
         }
@@ -538,6 +538,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         let nassets = 0;
         let assetInfo = {};
         let currencyIDInfo = {};
+        let symbolRelayChainAsset = {};
         for (let i = 0; i < assetRecs.length; i++) {
             let v = assetRecs[i];
             let a = {}
@@ -601,6 +602,11 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     }
                     a.symbol = v.xcmasset_symbol;
                     a.relayChain = v.xcmasset_relayChain
+                    let symbolRelayChain = paraTool.makeAssetChain(a.symbol, a.relayChain)
+                    if (symbolRelayChainAsset[symbolRelayChain] == undefined) {
+                        symbolRelayChainAsset[symbolRelayChain] = {};
+                    }
+                    symbolRelayChainAsset[symbolRelayChain][v.chainID] = a
                 } else {
                     a.relayChain = paraTool.getRelayChainByChainID(a.chainID)
                 }
@@ -617,8 +623,17 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             nassets++;
         }
         this.assetInfo = assetInfo;
+        this.symbolRelayChainAsset = symbolRelayChainAsset;
         //console.log(`this.assetInfo`, assetInfo)
         this.currencyIDInfo = currencyIDInfo;
+    }
+
+    getChainXCMAssetBySymbol(symbol, relayChain, chainID) {
+        let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
+        if (this.symbolRelayChainAsset[symbolRelayChain] == undefined || this.symbolRelayChainAsset[symbolRelayChain][chainID] == undefined) {
+            return (null);
+        }
+        return this.symbolRelayChainAsset[symbolRelayChain][chainID]
     }
 
     async getChainERCAssets(chainID) {

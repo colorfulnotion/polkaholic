@@ -1318,8 +1318,103 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    check_refintegrity_asset(asset, ctx = "", obj = null) {
+        let assetChain = paraTool.makeAssetChain(asset, this.chainID);
+        if (this.assetInfo[assetChain] == undefined) {
+            let parsedAsset = JSON.parse(asset);
+            if (parsedAsset.Token) {
+                let symbol = parsedAsset.Token;
+                let relayChain = paraTool.getRelayChainByChainID(this.chainID);
+                let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
+                let chain_assetInfo_symbol = this.getChainXCMAssetBySymbol(symbol, relayChain, this.chainID);
+                if (chain_assetInfo_symbol && chain_assetInfo_symbol.asset) {
+                    this.logger.warn({
+                        "op": "check_refintegrity_asset CORRECTED",
+                        "chainID": this.chainID,
+                        asset,
+                        corrected: chain_assetInfo_symbol.asset,
+                        ctx,
+                        obj: JSON.stringify(obj)
+                    })
+                    return (chain_assetInfo_symbol.asset);
+                }
+            }
+            this.logger.error({
+                "op": "check_refintegrity_asset",
+                "chainID": this.chainID,
+                asset,
+                ctx,
+                obj: JSON.stringify(obj)
+            })
+        }
+        return (asset);
+    }
+
     updateXCMTransferStorage(xcmtransfer) {
         //console.log(`adding xcmtransfer`, xcmtransfer)
+        try {
+            let errs = []
+            // check that xcmtransfer.rawAsset exists
+            if (xcmtransfer.rawAsset == undefined) {
+                errs.push("No rawAsset");
+            } else {
+                let assetChain = paraTool.makeAssetChain(xcmtransfer.rawAsset, xcmtransfer.chainID);
+                if (this.assetInfo[assetChain] == undefined) {
+                    errs.push(`Invalid asset-chain combination (${assetChain}) not found in assetManager.assetInfo`);
+                }
+            }
+            // check that xcmInteriorKey exists and matches 
+            if (xcmtransfer.xcmInteriorKey == undefined) {
+                errs.push("No xcmInteriorKey");
+            } else {
+                let xcmInteriorKey = xcmtransfer.xcmInteriorKey;
+                if (this.xcmAssetInfo[xcmInteriorKey] == undefined) {
+                    errs.push(`Invalid xcmInteriorKey (${xcmInteriorKey})`);
+                } else {
+                    let xcmsymbol = this.xcmAssetInfo[xcmInteriorKey].symbol;
+                    if (xcmtransfer.symbol == undefined && xcmsymbol !== undefined) {
+                        // NOTE: we are filling in the blanks using xcmInteriorKey here
+                        xcmtransfer.symbol = xcmsymbol
+                    }
+                    if (xcmsymbol != xcmtransfer.symbol) {
+                        errs.push(`Invalid symbol (${xcmtransfer.symbol}, Expected: ${xcmsymbol} from ${xcmInteriorKey}) not found in assetManager.xcmAssetInfo [${Object.keys(this.xcmAssetInfo.length)}]`);
+                    }
+                }
+            }
+
+            // check that symbol~relayChain exists
+            if (xcmtransfer.symbol == undefined || xcmtransfer.relayChain == undefined) {
+                errs.push(`No symbol (${xcmtransfer.symbol})/relaychain (${xcmtransfer.relayChain})`);
+            } else {
+                let symbolRelayChain = paraTool.makeAssetChain(xcmtransfer.symbol, xcmtransfer.relayChain);
+                if (this.xcmSymbolInfo[symbolRelayChain] == undefined) {
+                    errs.push(`Invalid symbol relaychain (${symbolRelayChain}) not found in assetManager.xcmSymbolInfo`);
+                } else {}
+            }
+
+            if (errs.length > 0) {
+                console.log(errs);
+                this.logger.error({
+                    "op": "updateXCMTransferStorage referential integrity checkviolation",
+                    "chainID": this.chainID,
+                    "errs": errs,
+                    "xcmtransfer": xcmtransfer
+
+                })
+            } else {
+                this.logger.info({
+                    "op": "updateXCMTransferStorage SUCC",
+                    "chainID": this.chainID,
+                    "xcmtransfer": xcmtransfer
+                })
+            }
+        } catch (err) {
+            console.log(err);
+            this.logger.error({
+                "op": "updateXCMTransferStorage ERROR",
+                "err": err
+            })
+        }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
     }
 
@@ -3946,7 +4041,7 @@ module.exports = class Indexer extends AssetManager {
         let rows = [];
         for (const address of addresses) {
             let r = this.addressBalanceRequest[address];
-	    if ( r == undefined ) continue;
+            if (r == undefined) continue;
             let free_balance = 0;
             let reserved_balance = 0;
             let miscFrozen_balance = 0;

@@ -1707,6 +1707,7 @@ module.exports = class ChainParser {
                 // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                 if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                     let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
+                    rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingXTokensEvent - processV1ConcreteFungible", asset)
                     let aa = {
                         asset: targetedAsset,
                         rawAsset: rawTargetedAsset,
@@ -1887,6 +1888,7 @@ module.exports = class ChainParser {
                     let asset = a.asset
                     if (asset != undefined && asset.fun !== undefined && asset.fun.fungible !== undefined) {
                         let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
+                        rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingXTransfer - processV1ConcreteFungible", asset)
                         let aa = {
                             asset: targetedAsset,
                             rawAsset: rawTargetedAsset,
@@ -2069,6 +2071,7 @@ module.exports = class ChainParser {
                             // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                                 let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
+                                rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingXTokensTransfer - processV1ConcreteFungible", asset)
                                 let aa = {
                                     asset: targetedAsset,
                                     rawAsset: rawTargetedAsset,
@@ -2588,6 +2591,7 @@ module.exports = class ChainParser {
                                 //let amountSent = 0;
                                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] processV0ConcreteFungible`)
                                 let [targetedAsset, rawTargetedAsset, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
+                                rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingPolkadotXcm - processV0ConcreteFungible", fungibleAsset)
                                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`targetedAsset=${targetedAsset}, amountSent=${amountSent}`)
                                 let aa = {
                                     asset: targetedAsset,
@@ -2611,6 +2615,7 @@ module.exports = class ChainParser {
                             // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                                 let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
+                                rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingPolkadotXcm - processV1ConcreteFungible", asset)
                                 let aa = {
                                     asset: targetedAsset,
                                     rawAsset: rawTargetedAsset,
@@ -2813,6 +2818,7 @@ module.exports = class ChainParser {
                                 //let rawTargetedAsset = false;
                                 //let amountSent = 0;
                                 let [targetedAsset, rawTargetedAsset, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
+                                rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingXcmPallet - processV0ConcreteFungible", fungibleAsset)
                                 let aa = {
                                     asset: targetedAsset,
                                     rawAsset: rawTargetedAsset,
@@ -2854,6 +2860,7 @@ module.exports = class ChainParser {
                             */
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                                 let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
+                                rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingXcmPallet - processV1ConcreteFungible", asset)
                                 let aa = {
                                     asset: targetedAsset,
                                     rawAsset: rawTargetedAsset,
