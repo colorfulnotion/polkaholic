@@ -1193,10 +1193,10 @@ module.exports = class Indexer extends AssetManager {
                 let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
                     `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, `'${r.xcmSymbol}'`, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey
                 ].join(",") + ")";
-                if (r.symbol !== undefined && r.symbol !== false && this.validXcmSymbol(r.symbol, r.chainID, "xcmtransfer", t)) {
+                if (r.xcmSymbol !== undefined && r.xcmSymbol !== false && this.validXcmSymbol(r.xcmSymbol, r.chainID, "xcmtransfer", t)) {
                     xcmtransfers.push(t);
                 } else {
-                    console.log(`invalid asset`, r.asset, r.chainID, "xcmtransfer")
+                    console.log(`invalid asset`, r.xcmSymbol, r.chainID, "xcmtransfer", r)
                 }
                 if (numXCMTransfersOut[r.blockNumber] == undefined) {
                     numXCMTransfersOut[r.blockNumber] = 1;
@@ -1240,13 +1240,15 @@ module.exports = class Indexer extends AssetManager {
             for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
                 let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
                 // ["chainIDDest", "eventID"] + ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT", "nativeAssetChain", "xcmInteriorKey"
-                let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
+                //let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
                 let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
-                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.asset}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.rawAsset}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, nativeAssetChain, xcmInteriorKey].join(",") + ")";
-                if (this.validAsset(r.asset, r.chainIDDest, "xcmtransfer", t)) {
+                //["chainIDDest", "eventID"]
+                //["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"]
+                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.xcmSymbol}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.relayChain}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, xcmInteriorKey].join(",") + ")";
+                if (r.xcmSymbol != false || this.validXCMSymbol(r.xcmSymbol, r.chainIDDest, "xcmtransfer", t)) {
                     xcmtransferdestcandidates.push(t);
                 } else {
-                    console.log("--INVALID", t);
+                    console.log("--INVALID dest candidate", r);
                 }
             }
             this.xcmtransferdestcandidate = {};
@@ -1256,9 +1258,9 @@ module.exports = class Indexer extends AssetManager {
                     await this.upsertSQL({
                         "table": "xcmtransferdestcandidate",
                         "keys": ["chainIDDest", "eventID"],
-                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT", "nativeAssetChain", "xcmInteriorKey"],
+                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"],
                         "data": xcmtransferdestcandidates,
-                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT", "nativeAssetChain", "xcmInteriorKey"]
+                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"]
                     });
                 }
             } catch (err0) {
@@ -1334,12 +1336,41 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    check_refintegrity_asset_signal(symbol, ctx = "", obj = null) {
+        let chainIDDest = this.chainIDDest
+        let relayChain = this.relayChain
+        let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
+        let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+        let targetedXcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`check_refintegrity_asset_signal symbol=${symbol}, relayChain=${relayChain}, cchainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=`, obj)
+        if (targetedXcmInteriorKey == false){
+            this.logger.error({
+                "op": "check_refintegrity_asset_signal_xcmkey",
+                "chainID": chainID,
+                symbolRelayChain,
+                ctx,
+                obj: JSON.stringify(obj)
+            })
+        }
+        let destinationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainIDDest)
+        if (destinationAsset == undefined){
+            this.logger.error({
+                "op": "check_refintegrity_asset_signal_dest",
+                "chainID": chainIDDest,
+                symbolRelayChain,
+                ctx,
+                obj: JSON.stringify(obj)
+            })
+        }
+        return (targetedXcmInteriorKey);
+    }
+
     check_refintegrity_symbol(symbol, relayChain, chainID, chainIDDest, ctx = "", obj = null) {
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
-        let targetedXcmInteriorKey = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-        let originationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainID)
-        let destinationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainIDDest)
-        if (targetedXcmInteriorKey == undefined || targetedXcmInteriorKey === false){
+        let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+        let targetedXcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`check_refintegrity_symbol symbol=${symbol}, relayChain=${relayChain}, chainID=${chainID}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=`, obj)
+        if (targetedXcmInteriorKey == false){
             this.logger.error({
                 "op": "check_refintegrity_symbol_xcmkey",
                 "chainID": chainID,
@@ -1348,6 +1379,8 @@ module.exports = class Indexer extends AssetManager {
                 obj: JSON.stringify(obj)
             })
         }
+        let originationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainID)
+        let destinationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainIDDest)
         if (originationAsset == undefined){
             this.logger.error({
                 "op": "check_refintegrity_symbol_origination",

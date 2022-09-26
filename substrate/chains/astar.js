@@ -432,7 +432,7 @@ module.exports = class AstarParser extends ChainParser {
                 let relayChain = xcmtransfer.relayChain
                 let chainID = xcmtransfer.chainID
                 let chainIDDest = xcmtransfer.chainIDDest
-                let [targetedXcmInteriorKey] = this.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "astar processOutgoingXTokens - processXcmGenericCurrencyID")
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "astar processOutgoingXTokens - processXcmGenericCurrencyID")
                 xcmtransfer.xcmSymbol = xcmAssetSymbol
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
@@ -510,7 +510,7 @@ module.exports = class AstarParser extends ChainParser {
                 let rawAssetID = `${params.asset_id[i]}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
                 if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
                 let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
-                let [targetedXcmInteriorKey] = this.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "astar processOutgoingEthereum - processXcmGenericCurrencyID", rawAssetID)
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "astar processOutgoingEthereum - processXcmGenericCurrencyID", rawAssetID)
 
                 //let assetString = this.processGenericCurrencyID(indexer, rawAssetID);
                 //let rawAssetString = this.processRawGenericCurrencyID(indexer, rawAssetID);
@@ -534,7 +534,7 @@ module.exports = class AstarParser extends ChainParser {
                 let amountSent = assetAndAmountSent.amountSent
                 let transferIndex = assetAndAmountSent.transferIndex
                 let isFeeItem = assetAndAmountSent.isFeeItem
-                if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent)) {
+                if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent)) {
                     if (extrinsic.xcms == undefined) extrinsic.xcms = []
                     let xcmIndex = extrinsic.xcms.length
                     let r = {
@@ -594,7 +594,7 @@ module.exports = class AstarParser extends ChainParser {
                 let relayChain = xcmtransfer.relayChain
                 let chainID = xcmtransfer.chainID
                 let chainIDDest = xcmtransfer.chainIDDest
-                let [targetedXcmInteriorKey] = this.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "astar processOutgoingXTokens - processXcmGenericCurrencyID")
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "astar processOutgoingXcmPallet - processXcmGenericCurrencyID")
                 xcmtransfer.xcmSymbol = xcmAssetSymbol
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
