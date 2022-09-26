@@ -1363,7 +1363,7 @@ module.exports = class Indexer extends AssetManager {
                     errs.push(`Invalid asset-chain combination (${assetChain}) not found in assetManager.assetInfo`);
                 }
             }
-            // check that xcmInteriorKey exists and matches 
+            // check that xcmInteriorKey exists and matches
             if (xcmtransfer.xcmInteriorKey == undefined) {
                 errs.push("No xcmInteriorKey");
             } else {
@@ -6578,6 +6578,26 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
+    getNativeSymbol() {
+        let symbol = this.getChainSymbol(this.chainID);
+        if (symbol) {
+            return symbol
+        } else {
+            return (false);
+        }
+    }
+
+    getRelayChainSymbol() {
+        let relayChain = this.relayChain
+        let relayChainID = paraTool.getRelayChainID(relayChain)
+        let symbol = this.getChainSymbol(relayChainID);
+        if (symbol) {
+            return symbol
+        } else {
+            return (false);
+        }
+    }
+
     getNativeAssetChain() {
         let nativeAsset = this.getNativeAsset();
         if (!nativeAsset) return (false);
@@ -6587,7 +6607,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
     getRelayChainAsset() {
         let relayChain = this.relayChain
-        let relayChainID = (relayChain == 'polkadot') ? 0 : 2
+        let relayChainID = paraTool.getRelayChainID(relayChain)
         let symbol = this.getChainSymbol(relayChainID);
         if (symbol) {
             return JSON.stringify({

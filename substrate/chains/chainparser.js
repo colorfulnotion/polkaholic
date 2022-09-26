@@ -2184,6 +2184,7 @@ module.exports = class ChainParser {
     }
 
     //This is the V1 format
+    // TODO: want [symbol, relayChain] (ex. ["DOT", "polkadot"])
     processV1ConcreteFungible(indexer, fungibleAsset) {
         //v1
         // only parse the currency_id here
@@ -2252,10 +2253,12 @@ module.exports = class ChainParser {
         let paraIDExtra = paraTool.getParaIDExtra(relayChain)
         let targetedAsset = false;
         let rawTargetedAsset = false;
+        let targetSymbol = false;
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`processV1ConcreteFungible asset`, fungibleAsset)
         if (fungibleAsset.id != undefined && fungibleAsset.id.null !== undefined) {
-            targetedAsset = indexer.getNativeAsset()
-            rawTargetedAsset = indexer.getNativeAsset()
+            targetSymbol = indexer.getNativeSymbol()
+            //targetedAsset = indexer.getNativeAsset()
+            //rawTargetedAsset = indexer.getNativeAsset()
         } else if (fungibleAsset.id != undefined && fungibleAsset.id.concrete !== undefined) {
             //v1_id_concrete
             let v1_id_concrete = fungibleAsset.id.concrete
@@ -2266,14 +2269,16 @@ module.exports = class ChainParser {
                 if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.here !== undefined) {
                     if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 0) {
                         //normal case?
-                        targetedAsset = indexer.getNativeAsset()
-                        rawTargetedAsset = indexer.getNativeAsset()
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:0, here`, targetedAsset)
+                        targetSymbol = indexer.getNativeSymbol()
+                        //targetedAsset = indexer.getNativeAsset()
+                        //rawTargetedAsset = indexer.getNativeAsset()
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:0, here`, targetSymbol)
                     } else if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 1) {
                         //ump
-                        targetedAsset = indexer.getRelayChainAsset()
-                        rawTargetedAsset = indexer.getRelayChainAsset()
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:1, here`, targetedAsset)
+                        targetSymbol = indexer.getRelayChainSymbol()
+                        //targetedAsset = indexer.getRelayChainAsset()
+                        //rawTargetedAsset = indexer.getRelayChainAsset()
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:1, here`, targetSymbol)
                     }
                     //} else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
                 } else {
@@ -2311,22 +2316,28 @@ module.exports = class ChainParser {
                     let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                     let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                     if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
-                        targetedAsset = cachedXcmAssetInfo.asset
-                        rawTargetedAsset = cachedXcmAssetInfo.asset
+                        targetSymbol = cachedXcmAssetInfo.symbol
+                        //targetedAsset = cachedXcmAssetInfo.asset
+                        //rawTargetedAsset = cachedXcmAssetInfo.asset
                         if (cachedXcmAssetInfo.paraID == 1000) {
                             //statemine/statemint
                             let nativeChainID = paraIDExtra + 1000
                             let t = JSON.parse(targetedAsset)
                             let currencyID = t.Token
                             let symbol = indexer.getCurrencyIDSymbol(currencyID, nativeChainID);
+                            /*
                             targetedAsset = JSON.stringify({
                                 Token: symbol
                             })
+                            */
+                            //REVIEW USDT
+                            targetSymbol = symbol
                         }
                     } else {
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
-                        targetedAsset = interiorVStr
-                        rawTargetedAsset = interiorVStr
+                        //lookup failed... should store the interiorVStr some where else for further debugging
+                        //targetedAsset = interiorVStr
+                        //rawTargetedAsset = interiorVStr
                     }
                 }
 
@@ -2336,7 +2347,8 @@ module.exports = class ChainParser {
         } else {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible fungibleAsset unknown id not found?`, fungibleAsset)
         }
-        return [targetedAsset, rawTargetedAsset]
+        return [targetSymbol, relayChain]
+        //return [targetedAsset, rawTargetedAsset]
     }
 
     processBeneficiary(indexer, beneficiary, relayChain = 'polkadot', decorate = false) {
