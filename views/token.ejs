@@ -32,10 +32,12 @@
 		<td><%- uiTool.currencyFormat(contract.priceUSD); %>
 		</td>
 	</tr>
+<% if ( contract.totalSupply ) { %>
 	<tr>
 		<td>Total Supply:</td>
 		<td><%- uiTool.presentFloat(contract.totalSupply); %></td>
 	</tr>
+<% } %>
 	<tr>
 		<td>Fully Diluted Market Cap:</td>
 		<td><%- uiTool.currencyFormat(contract.totalSupply*contract.priceUSD) %></td>
