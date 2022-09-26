@@ -680,7 +680,7 @@ function showxcmtransfers(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     if (row.fromAddress !== undefined) {
-                        let sender = (row.sender)? row.sender : row.fromAddress
+                        let sender = (row.sender) ? row.sender : row.fromAddress
                         if (row.fromAddress.toLowerCase() == address) {
                             return presentRawIDwithIdenticon(sender);
                             //return getShortHash(sender, false);
@@ -698,7 +698,7 @@ function showxcmtransfers(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     if (row.destAddress !== undefined) {
-                        let beneficiary = (row.beneficiary)? row.beneficiary : row.destAddress
+                        let beneficiary = (row.beneficiary) ? row.beneficiary : row.destAddress
                         if (row.destAddress.toLowerCase() == address.toLowerCase()) {
                             return presentRawIDwithIdenticon(beneficiary);
                             //return getShortHash(beneficiary, false);

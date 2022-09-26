@@ -1318,8 +1318,103 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    check_refintegrity_asset(asset, ctx = "", obj = null) {
+        let assetChain = paraTool.makeAssetChain(asset, this.chainID);
+        if (this.assetInfo[assetChain] == undefined) {
+            let parsedAsset = JSON.parse(asset);
+            if (parsedAsset.Token) {
+                let symbol = parsedAsset.Token;
+                let relayChain = paraTool.getRelayChainByChainID(this.chainID);
+                let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
+                let chain_assetInfo_symbol = this.getChainXCMAssetBySymbol(symbol, relayChain, this.chainID);
+                if (chain_assetInfo_symbol && chain_assetInfo_symbol.asset) {
+                    this.logger.warn({
+                        "op": "check_refintegrity_asset CORRECTED",
+                        "chainID": this.chainID,
+                        asset,
+                        corrected: chain_assetInfo_symbol.asset,
+                        ctx,
+                        obj: JSON.stringify(obj)
+                    })
+                    return (chain_assetInfo_symbol.asset);
+                }
+            }
+            this.logger.error({
+                "op": "check_refintegrity_asset",
+                "chainID": this.chainID,
+                asset,
+                ctx,
+                obj: JSON.stringify(obj)
+            })
+        }
+        return (asset);
+    }
+
     updateXCMTransferStorage(xcmtransfer) {
         //console.log(`adding xcmtransfer`, xcmtransfer)
+        try {
+            let errs = []
+            // check that xcmtransfer.rawAsset exists
+            if (xcmtransfer.rawAsset == undefined) {
+                errs.push("No rawAsset");
+            } else {
+                let assetChain = paraTool.makeAssetChain(xcmtransfer.rawAsset, xcmtransfer.chainID);
+                if (this.assetInfo[assetChain] == undefined) {
+                    errs.push(`Invalid asset-chain combination (${assetChain}) not found in assetManager.assetInfo`);
+                }
+            }
+            // check that xcmInteriorKey exists and matches 
+            if (xcmtransfer.xcmInteriorKey == undefined) {
+                errs.push("No xcmInteriorKey");
+            } else {
+                let xcmInteriorKey = xcmtransfer.xcmInteriorKey;
+                if (this.xcmAssetInfo[xcmInteriorKey] == undefined) {
+                    errs.push(`Invalid xcmInteriorKey (${xcmInteriorKey})`);
+                } else {
+                    let xcmsymbol = this.xcmAssetInfo[xcmInteriorKey].symbol;
+                    if (xcmtransfer.symbol == undefined && xcmsymbol !== undefined) {
+                        // NOTE: we are filling in the blanks using xcmInteriorKey here
+                        xcmtransfer.symbol = xcmsymbol
+                    }
+                    if (xcmsymbol != xcmtransfer.symbol) {
+                        errs.push(`Invalid symbol (${xcmtransfer.symbol}, Expected: ${xcmsymbol} from ${xcmInteriorKey}) not found in assetManager.xcmAssetInfo [${Object.keys(this.xcmAssetInfo.length)}]`);
+                    }
+                }
+            }
+
+            // check that symbol~relayChain exists
+            if (xcmtransfer.symbol == undefined || xcmtransfer.relayChain == undefined) {
+                errs.push(`No symbol (${xcmtransfer.symbol})/relaychain (${xcmtransfer.relayChain})`);
+            } else {
+                let symbolRelayChain = paraTool.makeAssetChain(xcmtransfer.symbol, xcmtransfer.relayChain);
+                if (this.xcmSymbolInfo[symbolRelayChain] == undefined) {
+                    errs.push(`Invalid symbol relaychain (${symbolRelayChain}) not found in assetManager.xcmSymbolInfo`);
+                } else {}
+            }
+
+            if (errs.length > 0) {
+                console.log(errs);
+                this.logger.error({
+                    "op": "updateXCMTransferStorage referential integrity checkviolation",
+                    "chainID": this.chainID,
+                    "errs": errs,
+                    "xcmtransfer": xcmtransfer
+
+                })
+            } else {
+                this.logger.info({
+                    "op": "updateXCMTransferStorage SUCC",
+                    "chainID": this.chainID,
+                    "xcmtransfer": xcmtransfer
+                })
+            }
+        } catch (err) {
+            console.log(err);
+            this.logger.error({
+                "op": "updateXCMTransferStorage ERROR",
+                "err": err
+            })
+        }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
     }
 
@@ -3602,12 +3697,17 @@ module.exports = class Indexer extends AssetManager {
         if (symbol && decimals !== false) {
             feedReward["rawAmount"] = feedReward["amount"];
             feedReward["amount"] = feedReward["amount"] / 10 ** decimals;
-            var [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(feedReward["amount"], asset, this.chainID, blockTS)
+            let p = await this.computePriceUSD({
+                val: feedReward["amount"],
+                asset: asset,
+                chainID: this.chainID,
+                ts: blockTS
+            })
             feedReward["asset"] = asset
             feedReward["symbol"] = symbol
             feedReward["decimals"] = decimals
-            feedReward["amountUSD"] = balanceUSD
-            feedReward["priceUSD"] = priceUSD
+            feedReward["amountUSD"] = p.valUSD
+            feedReward["priceUSD"] = p.priceUSD
         } else if (feedReward["amount"] != undefined) {
             feedReward["rawAmount"] = feedReward["amount"]
             feedReward["amount"] = null
@@ -3941,6 +4041,7 @@ module.exports = class Indexer extends AssetManager {
         let rows = [];
         for (const address of addresses) {
             let r = this.addressBalanceRequest[address];
+            if (r == undefined) continue;
             let free_balance = 0;
             let reserved_balance = 0;
             let miscFrozen_balance = 0;
@@ -4424,7 +4525,7 @@ module.exports = class Indexer extends AssetManager {
             blockStats.blockHashEVM = evmBlock.hash;
             blockStats.parentHashEVM = evmBlock.parentHash;
             blockStats.numTransactionsEVM = evmBlock.transactions.length;
-            blockStats.numTransactionsInternalEVM = evmBlock.transactionsInternal.length;
+            blockStats.numTransactionsInternalEVM = evmBlock.transactionsInternal ? evmBlock.transactionsInternal.length : 0;
             blockStats.gasUsed = evmBlock.gasUsed;
             blockStats.gasLimit = evmBlock.gasLimit;
         }
@@ -5397,7 +5498,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     let rawReceipt = current.Receipts[idx];
                     let rawTransactionStatus = current.TransactionStatuses[idx];
                     let [tx, receipt] = this.combine_tx_with_receipt_status(rawTransaction, rawReceipt, rawTransactionStatus, idx, current.evmBlockHash, current.blockNumber, current.blockTS, prevCumulativeGasUsed);
-                    if (receipt){
+                    if (receipt) {
                         prevCumulativeGasUsed = receipt.cumulativeGasUsed
                     }
                     b.transactions.push(tx);
@@ -5959,7 +6060,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 feedTransfer["rawAsset"] = fdata.rawAsset
                 feedTransfer["rawAmount"] = fdata.rawAmount
 
-                // get asset/decimals and computeUSD result for amountUSD
+                // get asset/decimals and pricing result for amountUSD
                 /*
                   rawAmount: the original amount
                   Amount: rawAmount adjusted by decimals
@@ -5969,28 +6070,21 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
                 if (symbol && decimals !== false) {
                     //asset = `{"Token":"${symbol}"}`
-                    let amount = fdata.rawAmount / 10 ** decimals
-                    let amountUSD = 0;
-                    let [balanceUSD, priceUSD, _unusedPriceUSDCurrent] = await this.computeUSD(amount, asset, chainID, blockTS)
-                    if (!priceUSD) {
-                        //computeUSD failed with asset
-                        //let alternativeAsset = `{"Token":"${fdata.rawAsset}"}`
-                        let alternativeAsset = `${fdata.rawAsset}`
-                        let [balanceUSD2, priceUSD2, _unusedPriceUSDCurrent2] = await this.computeUSD(amount, alternativeAsset, chainID, blockTS)
-                        if (priceUSD2 > 0) {
-                            //console.log(`[sucess] decorateFeedTransfer alternativeAsset=${alternativeAsset}`)
-                            amountUSD = balanceUSD2
-                            priceUSD = priceUSD2
-                        }
-                    } else {
-                        amountUSD = balanceUSD
-                    }
+                    let amount = fdata.rawAmount / 10 ** decimals;
+                    let p = await this.computePriceUSD({
+                        val: amount,
+                        asset: asset,
+                        chainID: chainID,
+                        ts: blockTS
+                    })
+                    feedTransfer["amount"] = amount;
                     feedTransfer["asset"] = asset
-                    feedTransfer["amount"] = amount
                     feedTransfer["symbol"] = symbol
                     feedTransfer["decimals"] = decimals
-                    feedTransfer["amountUSD"] = amountUSD
-                    feedTransfer["priceUSD"] = priceUSD
+                    if (p) {
+                        feedTransfer["amountUSD"] = p.valUSD;
+                        feedTransfer["priceUSD"] = p.priceUSD;
+                    }
                 } else if (fdata.rawAmount != undefined) {
                     feedTransfer["amount"] = null
                     feedTransfer["asset"] = null

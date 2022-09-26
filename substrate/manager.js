@@ -1595,7 +1595,11 @@ module.exports = class Manager extends AssetManager {
             let paraChainName = this.getChainName(paraChainID);
             let relayChainName = this.getChainName(crowdloan.chainID);
             let relayChainAsset = this.getChainAsset(crowdloan.chainID);
-            let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(crowdloan.amount, relayChainAsset, crowdloan.ts)
+            let p = await this.computePriceUSD({
+                val: crowdloan.amount,
+                assetChain: relayChainAsset,
+                ts: crowdloan.ts
+            })
             let description = `${paraChainName} Crowdloan Address/Referral (${relayChainName}) ${uiTool.presentCurrency(amountUSD)}`
             let metadata = {
                 datasource: "crowdloan",
@@ -1605,10 +1609,12 @@ module.exports = class Manager extends AssetManager {
                 paraChainID,
                 amount: crowdloan.amount,
                 amountUSD,
-                priceUSD,
                 paraID: crowdloan.paraID,
                 blockNumber: crowdloan.blockNumber,
                 ts: crowdloan.ts
+            }
+            if (p) {
+                metadata.priceUSD = p.priceUSD
             }
             if (paraChainID && paraChainName && relayChainName) {
                 // forward direction (fromAddress => memo)

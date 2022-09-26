@@ -26,13 +26,13 @@ const {
 } = require('cluster');
 const fs = require('fs');
 const {
-    Keyring
+    Keyring,
+    ApiPromise
 } = require("@polkadot/api");
 const {
     bnToHex,
     hexToBn,
 } = require("@polkadot/util");
-
 
 
 module.exports = class PriceManager extends Query {
@@ -76,15 +76,18 @@ module.exports = class PriceManager extends Query {
         return (false);
     }
 
-    get_symbol(assetChain) {
-        if (this.assetInfo[assetChain] != undefined) {
-            return this.assetInfo[assetChain].symbol;
+    isXCAsset(asset, chainID) {
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
+        if (this.assetInfo[assetChain]) {
+            let assetInfo = this.assetInfo[assetChain];
+            return [assetInfo.isXCAsset, assetInfo.symbol, assetInfo.relayChain];
+        } else {
+            console.log("missing", assetChain);
         }
-        return null;
+        return [null, null, null];
     }
 
-
-    getPathExtensions(path) {
+    getPathExtensions(path, router = null, maxDepth = 2, isEVM = true) {
         let extensions = [];
         let tailAssetChain = path[path.length - 1].dest; // the last element, which is an assetChain
         if (tailAssetChain == undefined) {
@@ -95,62 +98,13 @@ module.exports = class PriceManager extends Query {
         for (const assetChain of Object.keys(this.assetInfo)) {
             let [asset, cID] = paraTool.parseAssetChain(assetChain);
             let assetInfo = this.assetInfo[assetChain];
-            if (assetInfo.routeDisabled) {
-
-            } else if ((assetInfo.assetType == paraTool.assetTypeERC20LiquidityPair || assetInfo.assetType == paraTool.assetTypeLiquidityPair || assetInfo.assetType == paraTool.assetTypeXCAsset || assetInfo.assetType == paraTool.assetTypeXCMTransfer) && (assetInfo.token0 && assetInfo.token1)) {
-                let chainIDDest = null;
-                if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
-                    chainIDDest = assetInfo.chainIDDest;
-                }
-                let debug = (assetInfo.assetType == paraTool.assetTypeXCMTransfer);
-
+            if ((assetInfo.assetType == paraTool.assetTypeERC20LiquidityPair || assetInfo.assetType == paraTool.assetTypeLiquidityPair) && (assetInfo.token0 && assetInfo.token1)) {
                 let token0chain = paraTool.makeAssetChain(assetInfo.token0, assetInfo.chainID);
                 let token1chain = paraTool.makeAssetChain(assetInfo.token1, assetInfo.chainID);
-                if (assetInfo.symbol == "ZLK-LP") {
-                    // skip for now
-                } else if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
-                    let x = JSON.parse(asset)
-                    if (x.xcmtransfer) {
-                        let symbol = x.xcmtransfer.symbol;
-                        let chainIDDest = x.xcmtransfer.chainIDDest;
-                        token0chain = paraTool.makeAssetChain(assetInfo.token0, cID);
-                        token1chain = paraTool.makeAssetChain(assetInfo.token1, chainIDDest);
-                        if ((cID == tailAssetChainID) && this.explored[token1chain] == undefined && (symbol == this.get_symbol(tailAssetChain))) {
-                            // extend with a.token1
-                            let newpath = [...path];
-                            newpath.push({
-                                route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
-                                dest: token1chain,
-                                symbol: assetInfo.symbol,
-                                token0Symbol: assetInfo.token0Symbol,
-                                token1Symbol: assetInfo.token1Symbol,
-                                s: 1
-                            });
-                            if (debug) {
-                                console.log("extending0 xcmtransfer", assetChain, newpath);
-                            }
-                            extensions.push(newpath);
-                            this.explored[token1chain] = true;
-                        } else if ((chainIDDest == tailAssetChainID) && this.explored[token0chain] == undefined && (symbol == this.get_symbol(tailAssetChain))) {
-                            // extend with a.token0
-                            let newpath = [...path];
-                            newpath.push({
-                                route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
-                                dest: token0chain,
-                                symbol: assetInfo.symbol,
-                                token0Symbol: assetInfo.token0Symbol,
-                                token1Symbol: assetInfo.token1Symbol,
-                                s: 0
-                            });
-                            if (debug) {
-                                console.log("extending1 xcmtransfer", assetChain, newpath);
-                            }
-                            extensions.push(newpath);
-                            this.explored[token0chain] = true;
-                        }
-                    }
-                } else if (assetInfo.token0 == tailAsset && (cID == tailAssetChainID) && this.explored[token1chain] == undefined) {
+                if (router && assetInfo.assetName != router.routerName && isEVM) {
 
+
+                } else if (assetInfo.token0 == tailAsset && (cID == tailAssetChainID) && this.path_not_explored(path, assetInfo, maxDepth)) {
                     // extend with a.token1
                     let newpath = [...path];
                     newpath.push({
@@ -159,11 +113,12 @@ module.exports = class PriceManager extends Query {
                         symbol: assetInfo.symbol,
                         token0Symbol: assetInfo.token0Symbol,
                         token1Symbol: assetInfo.token1Symbol,
+                        createTS: assetInfo.createTS,
                         s: 1
                     });
                     extensions.push(newpath);
-                    this.explored[token1chain] = true;
-                } else if (assetInfo.token1 == tailAsset && (cID == tailAssetChainID) && this.explored[token0chain] == undefined) {
+
+                } else if (assetInfo.token1 == tailAsset && (cID == tailAssetChainID) && this.path_not_explored(path, assetInfo, maxDepth)) {
                     // extend with a.token0
                     let newpath = [...path];
                     newpath.push({
@@ -172,10 +127,10 @@ module.exports = class PriceManager extends Query {
                         symbol: assetInfo.symbol,
                         token0Symbol: assetInfo.token0Symbol,
                         token1Symbol: assetInfo.token1Symbol,
+                        createTS: assetInfo.createTS,
                         s: 0
                     });
                     extensions.push(newpath);
-                    this.explored[token0chain] = true;
                 }
             }
         }
@@ -192,59 +147,21 @@ module.exports = class PriceManager extends Query {
         return (true);
     }
 
-    recentRoutes = {};
-
-    async compute_route_rat(p, sym) {
-        //if ( p.symbol == "ZLK-LP" ) return([null, null]);
-        if (this.assetInfo[p.route] == undefined) {
-            return [null, null, null];
-        } else if (this.assetInfo[p.route].numHolders < 5) {
-            return [null, null, null];
-        }
-        let [asset, chainID] = paraTool.parseAssetChain(p.route);
-        let sql = `select close from assetlog where asset = '${asset}' and chainID = ${chainID} order by indexTS desc limit 1` /// and indexTS > UNIX_TIMESTAMP(date_sub(Now(), interval 100 hour))
-        let recents = await this.poolREADONLY.query(sql)
-        if (recents.length > 0) {
-            let close = recents[0].close;
-            if (p.token0Symbol == sym) {
-                return [1.0 / close, p.token1Symbol, this.assetInfo[p.route].numHolders];
-            } else if (p.token1Symbol == sym) {
-                return [close, p.token0Symbol, this.assetInfo[p.route].numHolders];
-            }
-        }
-        return [null, null, null];
-    }
-
-    async compute_path_rat(path) {
-        let rat = 1.0;
-        let sym = path[0].symbol;
-        for (let i = 1; i < path.length; i++) {
-            let [route_rat, new_sym, numHolders] = await this.compute_route_rat(path[i], sym);
-            if (route_rat && new_sym) {
-                path[i].rat = route_rat;
-                path[i].numHolders = numHolders;
-                rat *= route_rat;
-                sym = new_sym
-            } else {
-                return (null);
-            }
-        }
-        return rat;
-    }
-
     async getChainRouters(chainID = -1) {
-        // and assetRouter.chainID = '${chainID}'
-        let sql = `select assetRouter.assetName, assetRouter.router as address, convert(asset.abiRaw using utf8) as ABI, numLPs from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRouter.router = asset.asset where assetRouter.chainID = asset.chainID and asset.isRouter = 1`;
+        let sql = `select assetRouter.chainID, assetRouter.assetName as routerName, assetRouter.router as address, convert(asset.abiRaw using utf8) as ABI, numLPs 
+from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRouter.router = asset.asset where assetRouter.chainID = asset.chainID and asset.isRouter = 1 and assetRouter.chainID = '${chainID}'`;
+        console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         let routers = {};
         if (recs.length > 0) {
             for (const r of recs) {
-                routers[r.assetName] = r;
+                routers[r.routerName] = r;
             }
         }
         return routers;
     }
 
+    // TODO use createTS to return not just path but the max createTS observed
     async getRouterPaths(paths, routers, allowMultipleRouters = false) {
         let filtered = [];
         for (let b = 0; b < paths.length; b++) {
@@ -293,491 +210,155 @@ module.exports = class PriceManager extends Query {
         }
         return (filtered);
     }
-    async showAssetCycles(symbol = "WGLMR", chainID = 2004, addr = "0xeaf3223589ed19bcd171875ac1d0f99d31a5969c") {
-        await this.init(); /// sets up this.assetInfo
-        let chain = await this.getChain(chainID);
-        const routers = await this.getChainRouters(chainID);
-        let complex = [];
-
-        // find all "complex" cycles using 1 OR MORE routers (e.g Stella-Flare-Stella) where we can run 1+ EVM calls to get a quote
-        let sql = `select asset.asset, asset.chainID, paths from assetcycle join asset on asset.chainID = assetcycle.chainID and asset.asset = assetcycle.asset and asset.symbol = '${symbol}' and asset.chainID = ${chainID} order by numHolders desc limit 100;`
-        let assetChains = await this.poolREADONLY.query(sql);
-        for (let a = 0; a < assetChains.length; a++) {
-            let r = assetChains[a];
-            let paths = JSON.parse(r.paths);
-            let routerPaths = await this.getRouterPaths(paths, routers, true); // true = allow multiple routers
-            if (routerPaths.length > 0) {
-
-                complex = complex.concat(routerPaths);
-            }
+    async getBlockHashByBlockNumber(chainID, bn) {
+        let blockHashes = await this.poolREADONLY.query(`select blockHash from block${chainID} where blockNumber = '${bn}'`);
+        if (blockHashes.length == 0) {
+            return null;
         }
+        return blockHashes[0].blockHash;
+    }
 
-        let id = chain.id;
-        const provider = new ethers.providers.JsonRpcProvider(
-            chain.RPCBackfill, {
-                chainId: chain.ss58Format,
-                name: id
-            }
-        );
-        let dec = 18 // TODO: this.getAssetDecimal(asset)
-        let batchAbi = await fs.readFileSync("batch-abi.json", "utf8")
-        //console.log(batchAbi);
-        let pk = await fs.readFileSync("/root/.walletevm2")
-        pk = pk.toString().trim();
-        let execute = false
-        let wallet = new ethers.Wallet(pk.toString(), provider);
-        let isFirstExecute = true
-        let s = "3000000000000000000"; // 3GLMR
-        let start = ethers.BigNumber.from(s);
-        let newStart = ethers.BigNumber.from(s);
-        while (isFirstExecute) {
-            console.log("READY", complex.length);
-            isFirstExecute = false
-            for (const c of complex) {
+    // Asset Model Generation: For parachain DEX (Acala/Karura, Parallel/Heiko), use parachain SDK to get data
+    async assetpricelogGenerationParachain(chainID = -1, startDate = "2022-09-23", endDate = null, interval = "daily") {
+        await this.init();
+        // a Parachain with a DEX behaves like a single centralized EVM router with router
+        let chain = await this.getChain(chainID);
+        let router = {
+            chainID: chain.chainID,
+            routerName: chain.id
+        }
+        let routerAssets = await this.getChainRouterAssets(router, false);
+        let routerPaths = await this.getRouterAssetPaths(router, routerAssets, 2, false);
+        await this.setupAPI(chain);
+        let xcmassetpricelog = [];
+        let assetpricelog = [];
+        let vals = ["priceUSD", "priceUSD10", "priceUSD100", "priceUSD1000", "liquid", "path"];
+        let routerAssetChain = `parachain~${chainID}`
+        const indexTS = Math.floor(this.getCurrentTS() / 3600) * 3600;
+        let blocks = await this.get_blocks_by_interval(chainID, startDate, endDate, interval);
+        const {
+            FixedPointNumber,
+            Token,
+            TokenPair
+        } = require("@acala-network/sdk-core");
+        const {
+            WalletPromise
+        } = require("@acala-network/sdk-wallet");
+        const {
+            SwapPromise
+        } = require("@acala-network/sdk-swap");
+        for (const assetChain of Object.keys(routerPaths)) {
+            // console.log(assetChain, routerPaths[assetChain]); // routerPaths, JSON.stringify(routerPaths, null, 4));
+            let [asset, chain] = paraTool.parseAssetChain(assetChain);
+            let [isXCAsset, symbol, relayChain] = this.isXCAsset(asset, chainID);
+            let paths = routerPaths[assetChain];
+            for (const path of paths) {
+                let hop = path[1] // only one path is handled by acala SDK, check parallel
                 try {
-                    let routerAmounts = []
-                    for (const x of c) {
-                        // take a router and its paths, use the Contract to call getAmountsOut and figure out how much of the end asset exists after the path
-                        let routerName = x[0];
-                        let path = x.slice(1);
-                        let router = routers[routerName];
-                        let abiRaw = JSON.parse(router.ABI);
-                        let abi = abiRaw.result;
-                        const contract = new ethers.Contract(router.address, abi, wallet);
-                        const rawResult = await contract.getAmountsOut(newStart, path);
-                        let newStartRaw = rawResult.toString().split(",");
-                        newStart = ethers.BigNumber.from(newStartRaw[newStartRaw.length - 1]);
-                        let r = {
-                            start: newStartRaw[0],
-                            minOut: newStartRaw[newStartRaw.length - 1],
-                        }
-                        routerAmounts.push(r)
-                        console.log("routerName", routerName, "@", router.address, "path", path, "getAmountsOut=", newStartRaw, "newStart=", newStart.toString());
-                    }
-                    console.log(`routerAmounts`, routerAmounts)
-                    if (c.length == 1 && newStart.gt(start)) {
-                        let execute = false;
-                        console.log("SUCCESS single-hop", execute, c, newStart.toString());
-                        if (execute) {
-                            let deadline = this.getCurrentTS() + 600;
-                            let amountOutMin = 200;
-                            let value = s;
-                            let x = c[0];
-                            let routerName = x[0];
-                            let path = x.slice(1);
-                            let router = routers[routerName];
-                            let abiRaw = JSON.parse(router.ABI);
-                            let abi = abiRaw.result;
-                            const contract = new ethers.Contract(router.address, abi, wallet);
-                            const gasEst = await contract.estimateGas.swapExactTokensForTokens(start, amountOutMin, path, addr, deadline);
-                            let gasLimit = gasEst.mul(125).div(100).toString();
-                            console.log("gasESTIMATE", gasLimit);
-                            const receipt = await contract.swapExactTokensForTokens(start, amountOutMin, path, addr, deadline, {
-                                gasLimit
-                            });
-                            console.log(receipt)
-                            process.exit(0);
-                        }
-                    } else {
-                        // https://docs.moonbeam.network/builders/pallets-precompiles/precompiles/batch/
-                        let totalGasLimit = 0
-                        let singleGasLimit = 0
-                        let txIdx = 0
-                        await this.setupAPI(chain)
-                        let batch_to = [];
-                        let batch_value = [];
-                        let batch_callData = [];
-                        let batch_gasLimit = [];
-                        for (let t = 0; t < c.length; t++) {
-                            let x = c[t];
-                            txIdx = t
-                            let routerAmount = routerAmounts[t]
-                            console.log(`x${t}`, x, `start=${routerAmount.start.toString()}, minOut=${routerAmount.minOut.toString()}`)
-                            let deadline = this.getCurrentTS() + 600;
-                            let amountOutMin = 200;
-                            let value = s;
-                            let routerName = x[0];
-                            let path = x.slice(1);
-                            let router = routers[routerName];
-                            let abiRaw = JSON.parse(router.ABI);
-                            let abi = abiRaw.result;
-                            let routerAddr = router.address
-                            var contract = new ethers.Contract(routerAddr, abi, wallet);
-                            let routerStart = ethers.BigNumber.from(routerAmount.start);
-                            let routerMinOut = ethers.BigNumber.from(routerAmount.minOut);
-                            let isEstGasOK = false
-                            console.log(`tx${t} routerAddr=${routerAddr} start=${routerAmount.start}, amountOutMin=${routerAmount.minOut}, path=${path}, addr=${addr}, deadline=${deadline}`)
-                            try {
-                                var singleGasEst = await contract.estimateGas.swapExactTokensForTokens(routerStart, routerMinOut, path, addr, deadline);
-                                singleGasLimit = singleGasEst.mul(125).div(100).toString();
-                                console.log(`tx${t} estimateGas singleGasLimit=${singleGasLimit}, total=${totalGasLimit}`);
-                                isEstGasOK = true
-                            } catch (singleGasEstErr) {
-                                console.log(`tx${t} estimateGas singleGasEstErr`, singleGasEstErr.toString());
-                                //totalGasLimit = totalGasLimit*2
-                                //process.exit(0);
+                    for (const b of blocks) {
+                        let blockHash = await this.getBlockHashByBlockNumber(chainID, b.bn0)
+                        if (blockHash == null) continue;
+                        let api = this.api // TODO: await this.api.at(blockHash)
+                        let indexTS = b.indexTS;
+                        let priceUSD = [];
+                        let verificationPath = null;
+                        if (chainID == paraTool.chainIDAcala || chainID == paraTool.chainIDKarura) {
+                            const swapPromise = new SwapPromise(api);
+                            const wallet = new WalletPromise(api);
+                            let tokenPath = [wallet.getToken(hop.token0Symbol), wallet.getToken(hop.token1Symbol)];
+                            // CHECK directionality of pair usage
+                            for (let d = 0; d < 4; d++) {
+                                let amountIn = (10 ** (d));
+                                if (hop.s == 0) tokenPath = tokenPath.reverse();
+                                let amountInFP = new FixedPointNumber(amountIn, tokenPath[0].decimals);
+                                let parameters = await swapPromise.swap(tokenPath, amountInFP, "EXACT_INPUT");
+                                let amountOut = parameters.output.balance;
+                                let rate = amountIn.toString() / amountOut.toString();
+                                priceUSD.push(rate);
+                                verificationPath = tokenPath
                             }
-                            if (isEstGasOK){
-                                totalGasLimit +=singleGasLimit
-                            }else{
-                                totalGasLimit += totalGasLimit
-                            }
-                            console.log(`tx${t} accumulate gasLimit=${totalGasLimit}`);
-                            const txInput = await contract.populateTransaction.swapExactTokensForTokens(routerStart, routerMinOut, path, addr, deadline);
-                            console.log(`tx${t} txInput`, txInput)
-                            //txInput.nonce = await wallet.getTransactionCount();
-                            //txInput.gasPrice = 100000000000
-                            //let gasLimit = gasEst.mul(125).div(100).toString();
-                            //const txSigned = await wallet.signTransaction(txInput);
-                            //console.log(`tx${t} txSigned`, txSigned)
-                            batch_to.push(routerAddr);
-                            batch_value.push(0);
-                            batch_callData.push(txInput.data)
-                            //batch_callData.push(txSigned);
-                            batch_gasLimit.push(0); // use contract.estimateGas to compute gasEst
+                        } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDParallelHeiko) {
+                            // TODO:
                         }
-
-                        //unwrap WGLMR
-                        let isUnwrap = true
-                        let unwrapGasLimit = 0
-                        let finalRouterAmount = routerAmounts[routerAmounts.length-1]
-                        if (isUnwrap){
-                            txIdx+=1
-                            unwrapGasLimit = 100000
-                            let unwrapABI = '[{"constant":false,"inputs":[{"name":"wad","type":"uint256"}],"name":"withdraw","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}]'
-                            let wGLMRAddr = '0xacc15dc74880c9944775448304b263d191c6077f'
-                            var wGLMRcontract = new ethers.Contract(wGLMRAddr, JSON.parse(unwrapABI), wallet);
-                            let finalRouterOut = ethers.BigNumber.from(finalRouterAmount.minOut);
-                            let isEstGasOK = false
-                            console.log(`tx${txIdx} WGLMRAddr=${wGLMRAddr} finalRouterOut=${finalRouterAmount.minOut}`)
-                            try {
-                                var singleGasEst = await wGLMRcontract.estimateGas.withdraw(finalRouterOut);
-                                singleGasLimit = singleGasEst.mul(125).div(100).toString();
-                                console.log(`tx${txIdx} estimateGas singleGasLimit=${singleGasLimit}, total=${totalGasLimit}`);
-                                isEstGasOK = true
-                            } catch (singleGasEstErr) {
-                                console.log(`tx${txIdx} estimateGas singleGasEstErr`, singleGasEstErr.toString());
+                        console.log(assetChain, priceUSD);
+                        let liquid = this.isPriceUSDArrayLiquid(priceUSD);
+                        if (isXCAsset) {
+                            xcmassetpricelog.push(`('${symbol}', '${relayChain}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
+                            if (xcmassetpricelog.length > 100) {
+                                await this.upsertSQL({
+                                    "table": "xcmassetpricelog",
+                                    "keys": ["symbol", "relayChain", "routerAssetChain", "indexTS"],
+                                    "vals": vals,
+                                    "data": xcmassetpricelog,
+                                    "replace": vals
+                                })
+                                console.log("xcmassetpricelog", xcmassetpricelog.length);
+                                xcmassetpricelog = []
                             }
-                            if (isEstGasOK){
-                                totalGasLimit +=singleGasLimit
-                            }else{
-                                totalGasLimit += 100000
-                            }
-                            console.log(`tx${txIdx+1} accumulate gasLimit=${totalGasLimit}`);
-                            var txInput = await wGLMRcontract.populateTransaction.withdraw(finalRouterOut);
-                            console.log(`tx${txIdx+1} txInput`, txInput)
-                            batch_to.push(wGLMRAddr);
-                            batch_value.push(0);
-                            batch_callData.push(txInput.data)
-                            //batch_callData.push(txSigned);
-                            batch_gasLimit.push(0); // use contract.estimateGas to compute gasEst
-                        }
-                        let isXCM = true
-                        let xcmGasLimit = 0
-                        if (isXCM){
-                            xcmGasLimit = 2000000
-                            txIdx+=1
-                            //xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary)
-                            let isbeneficiaryEVM = false
-                            let xTokensContractAddress = '0x0000000000000000000000000000000000000804'
-                            let currencyAddress = '0x0000000000000000000000000000000000000802'
-                            console.log()
-                            //let amount = 0.26
-                            let amount = paraTool.dechexToInt(finalRouterAmount.minOut) / 10**18
-                            let decimals = 18
-                            let beneficiarySubstrate = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c'
-                            let beneficiaryEVM = '0xeaf3223589ed19bcd171875ac1d0f99d31a5969c'
-                            let beneficiary = (isbeneficiaryEVM) ? beneficiaryEVM : beneficiarySubstrate
-                            let chainIDDest = paraTool.chainIDParallel
-                            var xcmTxStruct = ethTool.xTokenBuilder(this.web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
-                            console.log(`xTokenBuilder`, xcmTxStruct)
-                            batch_to.push(xTokensContractAddress);
-                            batch_value.push(0);
-                            batch_callData.push(xcmTxStruct.data)
-                            batch_gasLimit.push(0);
-                            console.log(`tx${txIdx} accumulate gasLimit=${totalGasLimit}`);
-                        }
-
-                        console.log(`batch_to`, batch_to);
-                        console.log(`batch_value`, batch_value);
-                        console.log(`batch_callData`, batch_callData);
-                        console.log(`batch_gasLimit`, batch_gasLimit);
-                        let batchPrecompileAddress = "0x0000000000000000000000000000000000000808";
-                        const batch_contract = new ethers.Contract(batchPrecompileAddress, batchAbi, wallet);
-                        let batchCase = 'batchSome' //batchSomeUntilFailure//batchAll
-                        var gasEst;
-                        try {
-                            if (batchCase == 'batchSome'){
-                                gasEst = await batch_contract.estimateGas.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit);
-                            }else if(batchCase == 'batchSomeUntilFailure'){
-                                gasEst = await batch_contract.estimateGas.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit);
-                            }else{
-                                gasEst = await batch_contract.estimateGas.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit);
-                            }
-                            //var gasEst = await batch_contract.estimateGas.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit);
-                            //var gasEst = await batch_contract.estimateGas.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit);
-                            //var gasEst = await batch_contract.estimateGas.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit);
-                        } catch (batchErr) {
-                            console.log("estimateGas batch", batchErr.toString());
-                            process.exit(0);
-                        }
-                        let swapGasLimit = 3000000
-                        let extraGasLimit = swapGasLimit+unwrapGasLimit+xcmGasLimit
-                        let gasLimit = gasEst.add(extraGasLimit).mul(150).div(100).toString();
-                        //totalGasLimit += gasLimit
-                        console.log(`gasESTIMATE Final=${gasLimit}`);
-                        let shouldBroadcast = 0
-                        if (shouldBroadcast){
-                            try {
-                                var receipt;
-                                if (batchCase == 'batchSome'){
-                                    receipt = await batch_contract.batchSome(batch_to, batch_value, batch_callData, batch_gasLimit, {
-                                        gasLimit
-                                    });
-                                }else if(batchCase == 'batchSomeUntilFailure'){
-                                    receipt = await batch_contract.batchSomeUntilFailure(batch_to, batch_value, batch_callData, batch_gasLimit, {
-                                        gasLimit
-                                    });
-                                }else{
-                                    receipt = await batch_contract.batchAll(batch_to, batch_value, batch_callData, batch_gasLimit, {
-                                        gasLimit
-                                    });
-                                }
-                                console.log("receipt", receipt)
-                                process.exit(0);
-                            } catch (err) {
-                                console.log("batchAll", err);
-                                process.exit(0);
+                        } else {
+                            assetpricelog.push(`('${asset}', '${chainID}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(path))})`);
+                            if (assetpricelog.length > 100) {
+                                await this.upsertSQL({
+                                    "table": "assetpricelog",
+                                    "keys": ["asset", "chainID", "routerAssetChain", "indexTS"],
+                                    "vals": vals,
+                                    "data": assetpricelog,
+                                    "replace": vals
+                                })
+                                console.log("assetpricelog", assetpricelog.length);
+                                assetpricelog = [];
                             }
                         }
-                        break;
                     }
                 } catch (err) {
                     console.log(err)
                 }
             }
         }
-
+        console.log("xcmassetpricelog", xcmassetpricelog);
+        console.log("assetpricelog", assetpricelog);
+        await this.upsertSQL({
+            "table": "xcmassetpricelog",
+            "keys": ["symbol", "relayChain", "routerAssetChain", "indexTS"],
+            "vals": vals,
+            "data": xcmassetpricelog,
+            "replace": vals
+        })
+        await this.upsertSQL({
+            "table": "assetpricelog",
+            "keys": ["asset", "chainID", "routerAssetChain", "indexTS"],
+            "vals": vals,
+            "data": assetpricelog,
+            "replace": vals
+        })
+        console.log("routerAssetChain", routerAssetChain);
     }
 
-    getPathExtensionsBFS(path, maxDepth = 2) {
-        let extensions = [];
-        let tailAssetChain = path[path.length - 1].dest; // the last element, which is an assetChain
-        if (tailAssetChain == undefined) {
-            return (extensions);
+    async getChainRouterAssets(router, isEVM = true) {
+        let sql = `select token0, token1, token0symbol, token1symbol, FROM_UNIXTIME(createDT) as createTS from asset where assetType =  'ERC20LP'   and chainID = '${router.chainID}' and assetName = '${router.routerName}'`
+        if (isEVM == false) {
+            sql = `select token0, token1, token0symbol, token1symbol, FROM_UNIXTIME(createDT) as createTS from asset where assetType = 'LiquidityPair' and chainID = '${router.chainID}'`
         }
-        let whitelisted = [];
-
-        let [tailAsset, tailAssetChainID] = paraTool.parseAssetChain(tailAssetChain);
-        for (const assetChain of Object.keys(this.assetInfo)) {
-            let [asset, cID] = paraTool.parseAssetChain(assetChain);
-            let assetInfo = this.assetInfo[assetChain];
-            if (assetInfo.routeDisabled) {
-                // aUSD hack
-            } else if ((assetInfo.assetType == paraTool.assetTypeERC20LiquidityPair || assetInfo.assetType == paraTool.assetTypeLiquidityPair || assetInfo.assetType == paraTool.assetTypeXCAsset || assetInfo.assetType == paraTool.assetTypeXCMTransfer) && (assetInfo.token0 && assetInfo.token1)) {
-                let chainIDDest = null;
-                if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
-                    chainIDDest = assetInfo.chainIDDest;
-                }
-                let debug = (assetInfo.assetType == paraTool.assetTypeXCMTransfer);
-                let token0chain = paraTool.makeAssetChain(assetInfo.token0, assetInfo.chainID);
-                let token1chain = paraTool.makeAssetChain(assetInfo.token1, assetInfo.chainID);
-                if (assetInfo.assetType == paraTool.assetTypeXCMTransfer) {
-                    let x = JSON.parse(asset)
-                    if (x.xcmtransfer) {
-                        let symbol = x.xcmtransfer.symbol;
-                        let chainIDDest = x.xcmtransfer.chainIDDest;
-                        if ((cID == tailAssetChainID) && (symbol == this.get_symbol(tailAssetChain)) && this.path_not_explored(path, assetInfo, maxDepth)) {
-                            // extend with a.token1
-                            let newpath = [...path];
-                            let token1chain = paraTool.makeAssetChain(assetInfo.token1, chainIDDest);
-                            newpath.push({
-                                route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
-                                dest: token1chain,
-                                symbol: assetInfo.symbol,
-                                token0Symbol: assetInfo.token0Symbol,
-                                token1Symbol: assetInfo.token1Symbol,
-                                s: 1
-                            });
-                            console.log("extending0 xcmtransfer", assetChain, newpath);
-                            extensions.push(newpath);
-
-                        } else if ((chainIDDest == tailAssetChainID) && (symbol == this.get_symbol(tailAssetChain)) && this.path_not_explored(path, assetInfo, maxDepth)) {
-                            // extend with a.token0
-                            let newpath = [...path];
-                            let token0chain = paraTool.makeAssetChain(assetInfo.token0, cID);
-                            newpath.push({
-                                route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
-                                dest: token0chain,
-                                symbol: assetInfo.symbol,
-                                token0Symbol: assetInfo.token0Symbol,
-                                token1Symbol: assetInfo.token1Symbol,
-                                s: 0
-                            });
-                            console.log("extending1 xcmtransfer", assetChain, newpath);
-                            extensions.push(newpath);
-                        }
-                    }
-                } else if (assetInfo.numHolders < 5) {} else if (assetInfo.token0 == tailAsset && (cID == tailAssetChainID) && this.path_not_explored(path, assetInfo, maxDepth)) {
-                    // extend with a.token1
-                    let newpath = [...path];
-                    newpath.push({
-                        route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
-                        assetName: assetInfo.assetName,
-                        dest: token1chain,
-                        symbol: assetInfo.symbol,
-                        token0Symbol: assetInfo.token0Symbol,
-                        token1Symbol: assetInfo.token1Symbol,
-                        s: 1
-                    });
-                    extensions.push(newpath);
-                } else if (assetInfo.token1 == tailAsset && (cID == tailAssetChainID) && this.path_not_explored(path, assetInfo, maxDepth)) {
-                    // extend with a.token0
-                    let newpath = [...path];
-                    newpath.push({
-                        route: paraTool.makeAssetChain(assetInfo.asset, assetInfo.chainID),
-                        assetName: assetInfo.assetName,
-                        dest: token0chain,
-                        symbol: assetInfo.symbol,
-                        token0Symbol: assetInfo.token0Symbol,
-                        token1Symbol: assetInfo.token1Symbol,
-                        s: 0
-                    });
-                    extensions.push(newpath);
-                }
-            }
+        let assets = await this.poolREADONLY.query(sql)
+        let routerAssets = {};
+        for (const a of assets) {
+            routerAssets[a.token0] = a.token0symbol;
+            routerAssets[a.token1] = a.token1symbol;
         }
-        return (extensions);
+        return (routerAssets);
     }
 
-    async load_xc_assetInfo() {
-        let sql = `select asset, chainID, xcContractAddress, symbol from asset where xcContractAddress is not null and assetType = 'Token' and routeDisabled = 0 order by chainID, asset;`
-        let routes = await this.poolREADONLY.query(sql)
-        for (let i = 0; i < routes.length; i++) {
-            let r = routes[i];
-            let asset = JSON.stringify({
-                "xcAsset": r.symbol
-            });
-            let assetChain = paraTool.makeAssetChain(asset, r.chainID);
-            let xcAsset = {
-                assetType: paraTool.assetTypeXCAsset,
-                asset: asset, // this is the virtual "mapper"
-                chainID: r.chainID,
-                token0: r.asset, // {"Token":...} which is NOT the same!
-                token1: r.xcContractAddress, // 0x... which not the same as token0!
-                token0Symbol: r.symbol,
-                token1Symbol: r.symbol,
-                symbol: r.symbol
-            }
-            /*
-            {
-              assetType: 'XCAsset',
-              chainID: 2004,
-              token0: '{"Token":"42259045809535163221576417993425387648"}',
-              token1: '0xffffffff1fcacbd218edc0eba20fc2308c778080',
-              token0Symbol: 'xcDOT',
-              token1Symbol: 'xcDOT',
-              symbol: 'xcDOT'
-            }
-            */
-            // console.log(assetChain, xcAsset);
-            this.assetInfo[assetChain] = xcAsset;
-        }
-        // for actually observed xcmtransfers from chainID to chainIDDest, add assetInfo
-        /* insert into xcmtransferroute ( asset, assetDest, symbol, chainID, chainIDDest, cnt) (select asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest, count(*) as cnt  from xcmtransfer,  xcmasset, asset, asset as assetDest  where xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey and        xcmasset.xcmInteriorKey = asset.xcmInteriorKey and asset.chainID = xcmtransfer.chainID and        xcmasset.xcmInteriorKey = assetDest.xcmInteriorKey and assetDest.chainID = xcmtransfer.chainIDDest and        sourceTS > UNIX_TIMESTAMP(date_sub(Now(), interval 30 day)) and assetDest.assetType = "Token" and asset.assetType = "Token" group by asset.asset, assetDest.asset, xcmasset.symbol, xcmtransfer.chainID, xcmtransfer.chainIDDest) on duplicate key update asset = values(asset), assetDest = values(assetDest), cnt = values(cnt); */
-        let sql2 = `select asset, assetDest, symbol, chainID, chainIDDest from xcmtransferroute where cnt > 0 and routeDisabled = 0`
-        let xcmroutes = await this.poolREADONLY.query(sql2)
-        for (let i = 0; i < xcmroutes.length; i++) {
-            let r = xcmroutes[i];
-            let bridge = {
-                "xcmtransfer": {
-                    symbol: r.symbol,
-                    chainIDDest: r.chainIDDest
-                }
-            };
-            let asset = JSON.stringify(bridge);
-            let assetChain = paraTool.makeAssetChain(asset, r.chainID);
-            let xcmtransfer = {
-                assetType: paraTool.assetTypeXCMTransfer,
-                asset: asset, // this is the virtual "mapper"
-                chainID: r.chainID,
-                chainIDDest: r.chainIDDest,
-                token0: r.asset,
-                token1: r.assetDest,
-                token0Symbol: r.symbol, // could be the symbol name on chainID     (e.g. xcDOT) instead of the "universal" one (DOT)
-                token1Symbol: r.symbol, // could be the symbol name on chainIDDest
-                symbol: r.symbol
-            }
-            this.assetInfo[assetChain] = xcmtransfer;
-        }
-    }
-
-    async checkRoutes(chainID = -1) {
-        await this.init(); /// sets up this.assetInfo
-        let chain = await this.getChain(chainID)
-        let dec = 18 // TODO: this.getAssetDecimal(asset)
-        let pk = await fs.readFileSync("/root/.walletevm2")
-        pk = pk.toString().trim();
-        let execute = false
-        let id = chain.id;
-        const provider = new ethers.providers.JsonRpcProvider(
-            chain.RPCBackfill, {
-                chainId: chain.ss58Format,
-                name: id
-            }
-        );
-        let wallet = new ethers.Wallet(pk.toString(), provider);
-
-        let cnt = 0;
-        let ts = this.getCurrentTS();
-        let ts1 = this.getCurrentTS() - 86400;
-        const routers = await this.getChainRouters(chainID);
-        for (const assetChain of Object.keys(this.assetInfo)) {
-            let [asset, cID] = paraTool.parseAssetChain(assetChain);
-            let assetInfo = this.assetInfo[assetChain];
-            if ((chainID >= 0 && cID != chainID) || assetInfo.routeDisabled) {
-
-            } else if (assetInfo.assetType == paraTool.assetTypeERC20) {
-                if (assetInfo.priceUSDpaths) {
-                    let routerPaths = await this.getRouterPaths(assetInfo.priceUSDpaths, routers, false); // false = single routers only
-                    if (routerPaths.length > 0) {
-                        // evaluate the first one
-                        let c = routerPaths[0];
-                        let s = "1000000000000000000";
-                        let start = ethers.BigNumber.from(s);
-                        let newStart = ethers.BigNumber.from(s);
-                        for (const x of c) {
-                            // take a router and its paths, use the Contract to call getAmountsOut and figure out how much of the end asset exists after the path
-                            let routerName = x[0];
-                            let path = x.slice(1);
-                            let router = routers[routerName];
-                            let abiRaw = JSON.parse(router.ABI);
-                            let abi = abiRaw.result;
-                            const contract = new ethers.Contract(router.address, abi, wallet); // TODO how to get a different blockhash/ts
-                            const rawResult = await contract.getAmountsOut(newStart, path);
-                            let newStartRaw = rawResult.toString().split(",");
-                            newStart = ethers.BigNumber.from(newStartRaw[newStartRaw.length - 1]);
-                        }
-                        console.log(assetInfo, c, newStart.toString());
-                    }
-                }
-            }
-        }
-    }
-
-    async computePriceUSDPaths() {
-        await this.init(); /// sets up this.assetInfo
-        await this.load_xc_assetInfo();
-
-        await this.checkRoutes(2004);
-        process.exit(0);
+    async getRouterAssetPaths(router, routerAssets, maxDepth, isEVM) {
         // add the roots:
-        for (const assetChain of Object.keys(this.assetInfo)) {
+        this.explored = {};
+        this.resultPaths = {};
+
+        for (const asset of Object.keys(routerAssets)) {
+            let assetChain = paraTool.makeAssetChain(asset, router.chainID);
             let assetInfo = this.assetInfo[assetChain];
-            if (assetInfo.routeDisabled) {
-                console.log("DISABLED", assetInfo);
-            } else if (assetInfo.isUSD) {
-                console.log("ENABLED", assetChain);
+            console.log("getRP", asset, assetInfo);
+            if (assetInfo && assetInfo.isUSD) {
+                console.log("getRouterAssetPaths: isUSD start", assetChain, assetInfo);
                 this.enqueue([{
                     dest: assetChain,
                     symbol: assetInfo.symbol
@@ -785,16 +366,14 @@ module.exports = class PriceManager extends Query {
                 this.explored[assetChain] = true;
             }
         }
-
         let path = false;
         while (path = this.dequeue()) {
-            let extensions = this.getPathExtensions(path);
+            let extensions = this.getPathExtensions(path, router, maxDepth, isEVM);
             for (let e = 0; e < extensions.length; e++) {
                 let p = extensions[e];
                 let tailAssetChain = p[p.length - 1].dest;
                 if (tailAssetChain == undefined) {
                     console.log("FAIL xxx", p);
-                    process.exit(1);
                 }
                 if (this.resultPaths[tailAssetChain] == undefined) {
                     this.resultPaths[tailAssetChain] = [];
@@ -803,87 +382,179 @@ module.exports = class PriceManager extends Query {
                 this.enqueue(extensions[e]);
             }
         }
-        let cnt = 0;
-        for (const assetChain of Object.keys(this.resultPaths)) {
-            let paths = this.resultPaths[assetChain];
-            let pathsString = JSON.stringify(paths);
-            let [asset, chainID] = paraTool.parseAssetChain(assetChain);
-            let sql = `update asset set priceUSDpaths = ` + mysql.escape(pathsString) + ` where asset = '${asset}' and chainID = '${chainID}'`
-            console.log("RESULT", assetChain, paths, sql);
-            this.batchedSQL.push(sql);
-            cnt++;
-        }
-        await this.update_batchedSQL();
-        console.log("updated paths: ", cnt);
+        return this.resultPaths;
     }
 
-    async computeAssetCycles(symbol = "xcGLMR", maxDepth = 2) {
-        await this.init(); /// sets up this.assetInfo
-        await this.load_xc_assetInfo();
-        // add the roots:
-
-        for (const assetChain of Object.keys(this.assetInfo)) {
-            let assetInfo = this.assetInfo[assetChain];
-            if (assetInfo.routeDisabled) {
-                console.log("DISABLED", assetInfo);
-            } else if (assetInfo.symbol == symbol) {
-                console.log("ENABLED", assetChain);
-                this.enqueue([{
-                    dest: assetChain,
-                    symbol: assetInfo.symbol
-                }]);
-                this.resultPaths[assetChain] = [];
-            }
-        }
-        let path = false;
-        while (path = this.dequeue()) {
-            let tailPath = path[path.length - 1].dest;
-            console.log("DEQUEUE", this.resultPaths[path[0].dest].length, tailPath, this.queueHead, this.queueTail);
-            if (tailPath == path[0].dest && path.length > 1) {
-                this.resultPaths[path[0].dest].push(path);
-            }
-            let extensions = this.getPathExtensionsBFS(path, maxDepth);
-            for (let e = 0; e < extensions.length; e++) {
-                let p = extensions[e];
-                if (p.length <= maxDepth) {
-                    let tailAssetChain = p[p.length - 1].dest;
-                    this.enqueue(extensions[e]);
+    // Maps router path like
+    // [ { dest: '0x818ec0a7fe18ff94269904fced6ae3dae6d6dc0b~2004', symbol: 'USDC' },
+    //  { route: '0x0557949ea1f39e08233246d15af6c24cf8b92b82~2004',    dest: '0xffffffff5ac1f9a51a93f5c527385edf7fe98a52~2004',    symbol: 'BEAM-LP',    token0Symbol: 'USDC',    token1Symbol: 'xcIBTC',    s: 1  } ]
+    // into ['0x818ec0a7fe18ff94269904fced6ae3dae6d6dc0b' '0xffffffff5ac1f9a51a93f5c527385edf7fe98a52'] that a router contract can accept as an argument */
+    getRouterPathFromAnnotatedPath(annotatedPath) {
+        let path = [];
+        let pathStartTS = 0; // this will be maximum of all LPs
+        for (let p = 0; p < annotatedPath.length; p++) {
+            let assetChain = annotatedPath[p].dest;
+            if (assetChain) {
+                if (annotatedPath[p].createTS && annotatedPath[p].createTS > pathStartTS) {
+                    pathStartTS = annotatedPath[p].createTS;
                 }
+                let [asset, _] = paraTool.parseAssetChain(assetChain);
+                path.push(asset);
+            } else {
+                // TODO: throw error
             }
         }
-
-        // create table assetcycle (asset varchar(67), chainID int, paths mediumblob, lastUpdateDT datetime, primary key (asset, chainID));
-        for (const assetChain of Object.keys(this.resultPaths)) {
-            let paths = this.resultPaths[assetChain];
-            let pathlength = paths.length;
-            let pathsString = JSON.stringify(paths);
-            let [asset, chainID] = paraTool.parseAssetChain(assetChain);
-            console.log(assetChain, paths.length);
-            let sql = `insert into assetcycle (asset, chainID, paths, pathlength, lastUpdateDT) values ('${asset}', '${chainID}', ` + mysql.escape(pathsString) + `, '${pathlength}', Now()) on duplicate key update paths = values(paths), lastUpdateDT = values(lastUpdateDT), pathlength = values(pathlength)`
-            this.batchedSQL.push(sql);
-        }
-        await this.update_batchedSQL();
+        return [path, pathStartTS];
     }
 
-    date_key_to_ts(datekey = "2021-12-21") {
-        let logDT = datekey.replaceAll('-', "")
-        var y = logDT.substr(0, 4),
-            m = logDT.substr(4, 2),
-            d = logDT.substr(6, 2)
-        let a = new Date(`${y}-${m}-${d}`)
-        let logDTTS = a.getTime() / 1000;
-        return logDTTS
+    async get_blocks_by_interval(chainID, startDate, endDate, interval = "daily") {
+        let w = endDate ? ` and blockDT <= ${endDate}` : "and blockDT <= Now()"
+        // SETUP: pull hourly blockNumber starts beginning at startDate
+        let sql = `select floor(unix_timestamp(blockDT)/3600)*3600 as indexTS, min(blockNumber) bn0, max(blockNumber) bn1 from block${chainID} where blockDT >= '${startDate}' ${w} and blockDT is not null group by indexTS order by indexTS desc limit 300`;
+        if (interval == "daily") {
+            sql = `select floor(unix_timestamp(blockDT)/86400)*86400 as indexTS, min(blockNumber) bn0, max(blockNumber) bn1 from block${chainID} where blockDT >= '${startDate}' ${w} and blockDT is not null group by indexTS order by indexTS desc limit 300`;
+        }
+        return await this.poolREADONLY.query(sql);
+    }
+
+    isPriceUSDArrayLiquid(priceUSD) {
+        if (priceUSD.length < 4) return (false);
+        return ((priceUSD[1] / priceUSD[0]) > 1.1) || ((priceUSD[2] / priceUSD[0]) > 1.4) || ((priceUSD[3] / priceUSD[0]) > 2.0) ? 0 : 1;
+    }
+    // AssetModel Generation: For routers with (chain.isEVM = 1)
+    // (1) generate a single-router analysis extending BFS from USD known to the router
+    // (2) use ethers blockTag and block table for chain to genrate priceUSD for every hour, storing in assetpricelog or xcmassetpricelog based on whether its an xcasset
+    async updateAssetPriceLog(chainID = -1, startDate = "2022-05-01", endDate = null, interval = "daily") {
+        await this.init(); /// sets up this.assetInfo
+        let chain = await this.getChain(chainID)
+
+        // get chain routers, and for each router, get assets covered by the router, and compute paths for the router extending from USD to all those assets
+        const routers = await this.getChainRouters(chainID);
+        for (const routerName of Object.keys(routers)) {
+            let router = routers[routerName];
+            // compute paths out of USD
+            let assets = await this.getChainRouterAssets(router);
+            router.paths = await this.getRouterAssetPaths(router, assets);
+        }
+
+        // SETUP: ethers provider/wallet for chain
+        let pk = await fs.readFileSync("/root/.walletevm2")
+        pk = pk.toString().trim();
+        let execute = false
+        let id = chain.id;
+        const provider = new ethers.providers.JsonRpcProvider(
+            chain.RPCBackfill, {
+                chainId: chain.evmChainID,
+                name: id
+            }
+        );
+        let wallet = new ethers.Wallet(pk.toString(), provider);
+
+        let blocks = await this.get_blocks_by_interval(chainID, startDate, endDate, interval);
+        console.log(chain.RPCBackfill, chain, blocks);
+        // for each path in router paths, use the hourly blockNumber from "blocks" to compute how much $1 gets you for the token
+        for (const routerName of Object.keys(routers)) {
+            // take a router and its paths, use the Contract to call getAmountsOut and figure out how much of the end asset exists after the path
+            let router = routers[routerName];
+            if (!router.paths) continue;
+            let abiRaw = JSON.parse(router.ABI);
+            let abi = abiRaw.result;
+            let assetpricelog = [];
+            let routerAssetChain = paraTool.makeAssetChain(router.address, chainID)
+            let xcmassetpricelog = [];
+            try {
+                const contract = new ethers.Contract(router.address, abi, wallet);
+                let vals = ["priceUSD", "priceUSD10", "priceUSD100", "priceUSD1000", "liquid", "path"];
+                //console.log("ROUTER PATHS for", routerName, JSON.stringify(router.paths, null, 4));
+                for (const assetChain of Object.keys(router.paths)) {
+                    let [asset, cID] = paraTool.parseAssetChain(assetChain);
+                    let dec = this.getAssetDecimal(asset, chainID)
+                    let [isXCAsset, symbol, relayChain] = this.isXCAsset(asset, chainID);
+                    for (const annotatedPath of router.paths[assetChain]) {
+                        let [path, pathStartTS] = this.getRouterPathFromAnnotatedPath(annotatedPath); // eg. path = ["0x818ec0a7fe18ff94269904fced6ae3dae6d6dc0b", "0xffffffff1fcacbd218edc0eba20fc2308c778080"];
+
+                        let usdAsset = path[0]
+                        let decUSD = this.getAssetDecimal(usdAsset, chainID) // 6
+                        // perform historical analysis of the asset using the path, varying "blockTag" and recording results
+                        for (const b of blocks) {
+                            let indexTS = b.indexTS;
+                            if (indexTS < pathStartTS) continue;
+                            let blockTag = paraTool.bnToHex(b.bn0);
+                            try {
+                                let priceUSD = [];
+                                for (let d = 0; d < 4; d++) {
+                                    let s = (10 ** (d + decUSD)).toString() // $1 (d=0), $10 (d=1), $100 (d=2), $1000 (d=3)
+                                    let start = ethers.BigNumber.from(s);
+                                    const rawResult = await contract.getAmountsOut(start, path, {
+                                        blockTag
+                                    });
+                                    let outarr = rawResult.toString().split(",");
+                                    let p = outarr[outarr.length - 1] / 10 ** dec; // its the LAST amount that matters
+                                    priceUSD.push((10 ** d) / p); // 
+                                }
+                                let liquid = this.isPriceUSDArrayLiquid(priceUSD);
+                                console.log("router", routerName, router.address, "Valuing:", symbol, asset, "starting with", usdAsset, "priceUSD=", priceUSD, annotatedPath);
+                                if (isXCAsset) {
+                                    xcmassetpricelog.push(`('${symbol}', '${relayChain}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(path))})`);
+                                    if (xcmassetpricelog.length > 100) {
+                                        await this.upsertSQL({
+                                            "table": "xcmassetpricelog",
+                                            "keys": ["symbol", "relayChain", "routerAssetChain", "indexTS"],
+                                            "vals": vals,
+                                            "data": xcmassetpricelog,
+                                            "replace": vals
+                                        })
+                                        console.log("xcmassetpricelog", xcmassetpricelog.length);
+                                        xcmassetpricelog = []
+                                    }
+                                } else {
+                                    assetpricelog.push(`('${asset}', '${chainID}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(path))})`);
+                                    if (assetpricelog.length > 100) {
+                                        await this.upsertSQL({
+                                            "table": "assetpricelog",
+                                            "keys": ["asset", "chainID", "routerAssetChain", "indexTS"],
+                                            "vals": vals,
+                                            "data": assetpricelog,
+                                            "replace": vals
+                                        })
+                                        console.log("assetpricelog", assetpricelog.length);
+                                        assetpricelog = [];
+                                    }
+                                }
+                            } catch (err) {
+                                console.log(err);
+                            }
+                        }
+                    }
+                }
+
+                await this.upsertSQL({
+                    "table": "assetpricelog",
+                    "keys": ["asset", "chainID", "routerAssetChain", "indexTS"],
+                    "vals": vals,
+                    "data": assetpricelog,
+                    "replace": vals
+                })
+
+                await this.upsertSQL({
+                    "table": "xcmassetpricelog",
+                    "keys": ["symbol", "relayChain", "routerAssetChain", "indexTS"],
+                    "vals": vals,
+                    "data": xcmassetpricelog,
+                    "replace": vals
+                })
+            } catch (error) {
+                console.log(error)
+                process.exit(0);
+            }
+        }
     }
 
     // update assetlog with prices/market_caps/volumes from coingecko API
-    async update_coingecko_market_chart(id, symbol, chainID, startTS, endTS, asset = "chain") {
+    async update_coingecko_market_chart(id, symbol, relayChain, startTS, endTS) {
         const axios = require("axios");
         var url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=USD&from=${startTS}&to=${endTS}`;
         try {
-            // {"id":"11653-nottingham","symbol":"realtoken-s-11653-nottingham-rd-detroit-mi","name":"RealT Token - 11653 Nottingham Rd, Detroit, MI 48224"}
-            //var url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=USD&days=1&interval=hourly`;
-            //var startTS = 1637222401
-            //var endTS = 1637226001
             console.log("update_coingecko_market_chart URL", url)
             var headers = {
                 "accept": "application/json"
@@ -913,22 +584,17 @@ module.exports = class PriceManager extends Query {
             for (const t of prices_arr) {
                 var tm = Math.round(t[0] / 1000);
                 let hourlyKey = this.hourly_key_from_ts(tm);
-                out.push(`('${asset}', '${chainID}', '${hourlyKey}','${paraTool.assetSourceCoingecko}','${t[1]}', '${total_volumes[hourlyKey]}', '${market_caps[hourlyKey]}')`);
+                out.push(`('${symbol}', '${relayChain}', '${hourlyKey}','website~${paraTool.assetSourceCoingecko}','${t[1]}', '${total_volumes[hourlyKey]}', '${market_caps[hourlyKey]}')`);
             }
             if (out.length > 0) {
                 await this.upsertSQL({
-                    "table": "assetlog",
-                    "keys": ["asset", "chainID", "indexTS", "source"],
+                    "table": "xcmassetpricelog",
+                    "keys": ["symbol", "relayChain", "indexTS", "routerAssetChain"],
                     "vals": ["priceUSD", "total_volumes", "market_caps"],
                     "data": out,
                     "replace": ["priceUSD", "total_volumes", "market_caps"]
                 })
-                let sql = "";
-                if (asset == "chain") {
-                    sql = `update chain set coingeckoLastUpdateDT = Now() where chainID = ${chainID}`
-                } else {
-                    sql = `update asset set coingeckoLastUpdateDT = Now() where asset = '${asset}'`
-                }
+                let sql = `update xcmasset set coingeckoLastUpdateDT = Now() where symbol = '${symbol}' and relayChain = '${relayChain}'`
                 this.batchedSQL.push(sql);
                 await this.update_batchedSQL(true);
             }
@@ -942,41 +608,38 @@ module.exports = class PriceManager extends Query {
         return false;
     }
 
-    /*
-    {
-    "polkadot": {
-    "usd": 20.98,
-    "usd_market_cap": 22698288092.099922,
-    "usd_24h_vol": 1050989653.3115339,
-    "usd_24h_change": -5.3150672466158575,
-    "last_updated_at": 1644528830
-    }
-    }
-    */
-    async fetch_coin_prices_percentages(assetMap, coingeckoIDList) {
+    async fetch_coin_prices_percentages(coingeckoIDList) {
         const axios = require("axios");
         let coingeckoIDs = encodeURIComponent(coingeckoIDList.join(','))
 
         try {
             let url = `https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoIDs}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_last_updated_at=true`
-            console.log("fetch_coin_prices_percentages URL", url, "assetMap", assetMap)
+            console.log("fetch_coin_prices_percentages URL", url)
             const resp = await axios.get(url, {
                 headers: {
                     "accept": "application/json"
                 }
             });
             let priceData = resp.data
-
-            for (const k of Object.keys(priceData)) {
-                let data = priceData[k]
-                let asset = assetMap[k]
-                if (asset != undefined && Object.keys(data).length !== 0) {
-                    //found in map, prepare sql update statement
+            for (const coingeckoID of Object.keys(priceData)) {
+                let data = priceData[coingeckoID]
+                /* data will be like:
+                {
+                "polkadot": {
+                "usd": 20.98,
+                "usd_market_cap": 22698288092.099922,
+                "usd_24h_vol": 1050989653.3115339,
+                "usd_24h_change": -5.3150672466158575,
+                "last_updated_at": 1644528830
+                }
+                }
+                */
+                if (Object.keys(data).length !== 0) {
+                    // found in map, prepare sql update statement
                     let priceUSD = (data.usd != undefined) ? data.usd : 0
                     let priceUSDPercentChange = (data.usd_24h_change != undefined) ? data.usd_24h_change : 0
                     let lastPriceUpdateTS = (data.last_updated_at != undefined) ? data.last_updated_at : 0
-                    let sql = `update asset set priceUSD=${priceUSD}, priceUSDPercentChange=${priceUSDPercentChange}, lastPriceUpdateDT=FROM_UNIXTIME(${lastPriceUpdateTS}) where asset = '${asset}';`
-                    console.log(sql)
+                    let sql = `update xcmasset set priceUSD=${priceUSD}, priceUSDPercentChange=${priceUSDPercentChange}, lastPriceUpdateDT=FROM_UNIXTIME(${lastPriceUpdateTS}) where coingeckoID = '${coingeckoID}';`
                     this.batchedSQL.push(sql);
                 }
                 await this.update_batchedSQL();
@@ -992,35 +655,15 @@ module.exports = class PriceManager extends Query {
     }
 
     async getCoinPricesRange(startTS, endTS) {
-        var coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, asset, chainID from chain where symbol is not null and coingeckoID is not null and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) order by coingeckoLastUpdateDT limit 1000`);
-        console.log(`nativeChainAsset coingeckoIDs list=${coingeckoIDs.length}`)
+        var coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, symbol, relayChain from xcmasset where coingeckoID is not null and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) order by coingeckoLastUpdateDT limit 1000`);
+        console.log(`getCoinPricesRange ${coingeckoIDs.length}`)
         let batchSize = 86400 * 30
         for (let currDailyTS = startTS; currDailyTS < endTS; currDailyTS += batchSize) {
             let currDailyEndTS = currDailyTS + batchSize
             for (const ids of coingeckoIDs) {
-                let asset = JSON.parse(ids.asset);
-                if (asset && asset.Token && ids.coingeckoID.length > 0) {
-                    let symbol = asset.Token
-                    await this.update_coingecko_market_chart(ids.coingeckoID, symbol, ids.chainID, currDailyTS, currDailyEndTS, "chain");
-                    console.log(`got ${symbol}`);
-                    await this.sleep(5000);
-                }
-            }
-        }
-
-        // to cover cases like RMRK which are not specifically attached to any chain
-        coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, asset, chainID from asset where symbol is not null and coingeckoID is not null and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) order by coingeckoLastUpdateDT limit 1000`);
-        console.log(`non-nativeChainAsset coingeckoIDs list=${coingeckoIDs.length}`)
-        for (let currDailyTS = startTS; currDailyTS < endTS; currDailyTS += batchSize) {
-            let currDailyEndTS = currDailyTS + batchSize
-            for (const ids of coingeckoIDs) {
-                let asset = JSON.parse(ids.asset);
-                if (asset && asset.Token && ids.coingeckoID.length > 0) {
-                    let symbol = asset.Token
-                    await this.update_coingecko_market_chart(ids.coingeckoID, symbol, ids.chainID, currDailyTS, currDailyEndTS, ids.asset);
-                    console.log(`got ${symbol}`);
-                    await this.sleep(5000);
-                }
+                await this.update_coingecko_market_chart(ids.coingeckoID, ids.symbol, ids.relayChain, currDailyTS, currDailyEndTS);
+                console.log(`got ${ids.symbol}`);
+                await this.sleep(5000);
             }
         }
     }
@@ -1028,40 +671,19 @@ module.exports = class PriceManager extends Query {
     async getCoinPrices(lookback = 7) {
         let startTS = (lookback > 0) ? Math.floor(Date.now() / 1000) - 86400 * lookback : Math.floor(Date.now() / 1000) - 3600 * 24;
         let endTS = startTS + 86401
-        var coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, asset, chainID from chain where asset is not null and coingeckoID is not null and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) limit 20`);
-
+        var coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, symbol, relayChain from xcmasset where coingeckoID is not null and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) limit 20`);
         let assetMap = {}
         let coingeckoIDList = []
         for (const ids of coingeckoIDs) {
             try {
-                let asset = JSON.parse(ids.asset);
-                if (asset.Token && assetMap[ids.coingeckoID] == undefined) {
-                    let symbol = asset.Token;
-                    coingeckoIDList.push(ids.coingeckoID)
-                    await this.update_coingecko_market_chart(ids.coingeckoID, symbol, ids.chainID, startTS, endTS, "chain");
-                    await this.sleep(5000);
-                    assetMap[ids.coingeckoID] = ids.asset
-                }
-            } catch (e) {}
-        }
-        console.log(assetMap);
-
-        // to cover cases like RMRK which are not specifically attached to any chain
-        coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, asset, chainID from asset where symbol is not null and coingeckoID is not null and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) limit 20`);
-        for (const ids of coingeckoIDs) {
-            try {
-                let asset = JSON.parse(ids.asset);
-                if (asset.Token && assetMap[ids.coingeckoID] == undefined) {
-                    let symbol = asset.Token;
-                    coingeckoIDList.push(ids.coingeckoID)
-                    await this.update_coingecko_market_chart(ids.coingeckoID, symbol, ids.chainID, startTS, endTS, ids.asset);
-                    await this.sleep(5000);
-                    assetMap[ids.coingeckoID] = ids.asset
-                }
+                console.log(ids);
+                await this.update_coingecko_market_chart(ids.coingeckoID, ids.symbol, ids.relayChain, startTS, endTS, "chain");
+                coingeckoIDList.push(ids.coingeckoID)
+                await this.sleep(5000);
             } catch (e) {
                 console.log(e)
             }
         }
-        await this.fetch_coin_prices_percentages(assetMap, coingeckoIDList);
+        await this.fetch_coin_prices_percentages(coingeckoIDList);
     }
 }

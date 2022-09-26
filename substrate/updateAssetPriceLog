@@ -7,15 +7,15 @@ var PriceManager = require("./priceManager");
 var ParaTool = require("./paraTool");
 
 async function main() {
-    let chainID = -1;
+    let chainID = 2000;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
-            chainID = val;
-	}
+	    chainID = parseInt(val, 10);
+        }
     });
     var priceManager = new PriceManager();
-
-    await priceManager.checkRoutes(chainID);
+    await priceManager.assetpricelogGenerationParachain(chainID);
+    //await priceManager.updateAssetPriceLog(chainID);
 }
 
 main()

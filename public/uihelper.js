@@ -575,14 +575,14 @@ function presentIDRow(row, fld) {
     return res;
 }
 
-function presentRawIDwithIdenticon(id, imageSize='25rpx') {
+function presentRawIDwithIdenticon(id, imageSize = '25rpx') {
     return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/> ${getShortHash(id, false)}`;
 }
 
-function presentIDwithIdenticon(id, imageSize='25rpx') {
-    if (id.length == 42){
+function presentIDwithIdenticon(id, imageSize = '25rpx') {
+    if (id.length == 42) {
         return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
-    }else{
+    } else {
         return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
     }
 }

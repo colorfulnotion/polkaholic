@@ -1018,7 +1018,7 @@ module.exports = class Query extends AssetManager {
             if (chains.length == 1) {
                 let chainInfo = chains[0]
                 if (chainInfo.isEVM) {
-                    let evmChains = await this.poolREADONLY.query(`select
+                    let evmChains = await this.poolREADONLY.query(`select evmChainID,
                   numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d,
                   numReceiptsEVM, numReceiptsEVM7d, numReceiptsEVM30d,
                   floor(gasUsed / (numEVMBlocks+1)) as gasUsed,
@@ -1056,7 +1056,42 @@ module.exports = class Query extends AssetManager {
         return s;
     }
 
-    async getXCMTransfers(filters = {}, limit = 1000, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+    // use rawAsset
+    getXCMTransferAssetInfo(x) {
+        let rawassetChain = paraTool.makeAssetChain(x.rawAsset, x.chainID);
+        if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
+            return (this.assetInfo[rawassetChain]);
+        }
+        // Because new XCasset Interior keys are discovered by the first parachain registry that correctly registers it,
+        // there should be NO reason to look up anything else here, but since we have some data clean up to do, however, we do this which should arrive at the same result as the above
+        // (a) x.asset 
+        // (b) x.nativeAssetChain,
+        // (c) x.xcmInteriorKey
+
+        // (a) find assetInfo by x.asset / chainID
+        let assetChain = paraTool.makeAssetChain(x.asset, x.chainID);
+        if (this.assetInfo[assetChain] && this.assetInfo[assetChain].decimals != undefined) {
+            return (this.assetInfo[assetChain]);
+        }
+
+        // (b) find assetInfo by x.nativeAssetChain
+        if (this.assetInfo[x.nativeAssetChain] && this.assetInfo[x.nativeAssetChain].decimals != undefined) {
+            return (this.assetInfo[x.nativeAssetChain]);
+        }
+
+        // (c) find assetInfo by x.xcmInteriorKey
+        // TODO
+
+        // However, we should seek referential integrity:
+        //  1. between xcmtransfer.rawAsset/chainID and asset.asset/chainID
+        //  2. between xcmtransfer.xcmInteriorKey   and xcmsset.xcmInteriorKey OR xcmtransfer.nativeSymbol/relayChain and xcmAsset.symbol/relayChain
+        // Next steps:
+        //  (A) have xcmtransfer.asset hold asset.rawAsset -- this will make (a) unnecessary
+        //  (B) put xcmAsset.symbol (which is known because of (2)) in xcmtransfer.nativeSymbol and drop xcmtransfer.nativeAssetChain -- this will make (b) unnecessary
+        return null;
+    }
+
+    async getXCMTransfers(filters = {}, limit = 10, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let chainList = filters.chainList ? filters.chainList : [];
@@ -1077,133 +1112,123 @@ module.exports = class Query extends AssetManager {
             console.log(filters, xcmtransfers, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
                 let x = xcmtransfers[i];
-                x.asset = this.trimquote(x.asset); // temporary hack
-                if (x.asset.includes("Token")) {
-                    let decimals = false;
-                    let targetChainID = x.chainID // the chainID to use for price lookup
-                    let targetAsset = x.rawAsset // the asset to use for price lookup
-                    let defaultAsset = x.asset // the "default" asset (human readable?)
+                x.chainName = this.getChainName(x.chainID);
+                [x.chainID, x.id] = this.convertChainID(x.chainID)
 
-                    if (x.nativeAssetChain != undefined) {
-                        let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(x.nativeAssetChain)
-                        targetAsset = nativeAsset
-                        targetChainID = nativeChainID
-                        defaultAsset = nativeAsset // use nativeAsset as defaultAsset (if set)
-                    }
-
-
-                    let rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
-                    if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
-                        decimals = this.assetInfo[rawassetChain].decimals;
-                    } else {
-                        //missing
-                        let [nativeChainID, isFound] = await this.getNativeAssetChainID(defaultAsset)
-                        if (isFound) {
-                            targetChainID = nativeChainID
-                            rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
-                        }
-                        if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
-                            decimals = this.assetInfo[rawassetChain].decimals;
+                // looks up assetInfo
+                let assetInfo = this.getXCMTransferAssetInfo(x);
+                if (assetInfo) { // assetInfo.{ asset, chainID, decimals, xcmInteriorKey, symbol, (localSymbol, currencyID) } should all be perfectly known
+                    x.decimals = assetInfo.decimals;
+                    x.amountSent = x.amountSent / 10 ** x.decimals;
+                    x.amountReceived = x.amountReceived / 10 ** x.decimals;
+                    x.xcmFee = x.amountSent - x.amountReceived
+                    let chainIDOriginationInfo = this.chainInfos[x.chainID]
+                    if (chainIDOriginationInfo != undefined && chainIDOriginationInfo.ss58Format != undefined) {
+                        if (x.fromAddress != undefined) {
+                            if (x.fromAddress.length == 42) x.sender = x.fromAddress
+                            if (x.fromAddress.length == 66) x.sender = paraTool.getAddress(x.fromAddress, chainIDOriginationInfo.ss58Format)
                         }
                     }
 
-                    if (this.assetInfo[rawassetChain]) {
-                        //let decimals = this.assetInfo[assetChain].decimals;
-                        let chainIDOriginationInfo = this.chainInfos[x.chainID]
-                        if (chainIDOriginationInfo != undefined && chainIDOriginationInfo.ss58Format != undefined) {
-                            if (x.fromAddress != undefined) {
-                                if (x.fromAddress.length == 42) x.sender = x.fromAddress
-                                if (x.fromAddress.length == 66) x.sender = paraTool.getAddress(x.fromAddress, chainIDOriginationInfo.ss58Format)
-                            }
+                    // these attributes should always be in assetInfo
+                    if (assetInfo.symbol) x.symbol = assetInfo.symbol;
+                    if (assetInfo.xcmInteriorKey) x.xcmInteriorKey = assetInfo.xcmInteriorKey;
+                    // these attributes may not be in assetInfo (xcDOT is only placed if different; currencyID is not used by all parachains)
+                    if (assetInfo.localSymbol) x.localSymbol = assetInfo.localSymbol;
+                    if (assetInfo.currencyID) x.localSymbol = assetInfo.localSymbol;
+
+                    if (decorateUSD) {
+                        let p = await this.computePriceUSD({
+                            val: x.amountSent,
+                            assetChain: assetInfo.assetChain,
+                            chainID: x.chainID,
+                            ts: x.sourceTS
+                        });
+                        if (p) {
+                            x.amountSentUSD = p.valUSD;
+                            x.priceUSD = p.priceUSD;
+                            x.priceUSDCurrent = p.priceUSDCurrent;
+                            x.amountReceivedUSD = x.amountReceived * p.priceUSD;
+                            x.xcmFeeUSD = x.xcmFee * p.priceUSD;
                         }
-                        let chainIDDestInfo = this.chainInfos[x.chainIDDest]
-                        if (chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
-                            if (x.destAddress != undefined) {
-                                if (x.destAddress.length == 42) x.beneficiary = x.destAddress
-                                if (x.destAddress.length == 66) x.beneficiary = paraTool.getAddress(x.destAddress, chainIDDestInfo.ss58Format)
-                            }
-                        }
-                        if (decimals !== false) {
-                            x.amountSent = x.amountSent / 10 ** decimals;
-                            x.amountReceived = x.amountReceived / 10 ** decimals;
-                            x.xcmFee = x.amountSent - x.amountReceived
-                            if (decorateUSD) {
-                                let [amountSentUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(x.amountSent, targetAsset, targetChainID, x.sourceTS);
-                                x.amountSentUSD = amountSentUSD;
-                                x.priceUSD = priceUSD;
-                                x.priceUSDCurrent = priceUSDCurrent;
-                                x.amountReceivedUSD = x.amountReceived * priceUSD;
-                                x.xcmFeeUSD = x.xcmFee * priceUSD;
-                            }
-                            x.chainName = this.getChainName(x.chainID);
-                            [x.chainID, x.id] = this.convertChainID(x.chainID)
-
-                            if (x.chainIDDest != undefined) {
-                                [x.chainIDDest, x.idDest] = this.convertChainID(x.chainIDDest)
-                                x.chainDestName = this.getChainName(x.chainIDDest);
-                                let sectionPieces = x.sectionMethod.split(':')
-                                let symbol = this.getXcmAssetInfoSymbol(x.xcmInteriorKey);
-                                let r = {
-                                    extrinsicHash: x.extrinsicHash,
-                                    extrinsicID: x.extrinsicID,
-                                    incomplete: x.incomplete,
-                                    status: x.status,
-
-                                    section: sectionPieces[0],
-                                    method: sectionPieces[1],
-
-                                    // relayChain
-                                    relayChain: x.relayChain,
-
-                                    //source section
-                                    sender: x.sender,           //AccountKey20 or SS58
-                                    fromAddress: x.fromAddress,
-                                    id: x.id,
-                                    chainID: x.chainID,
-                                    chainName: x.chainName,
-                                    blockNumber: x.blockNumber,
-                                    sourceTS: x.sourceTS,
-
-                                    //dest section
-                                    beneficiary: x.beneficiary,  //AccountKey20 or SS58
-                                    destAddress: x.destAddress,
-                                    idDest: x.idDest,
-                                    chainIDDest: x.chainIDDest,
-                                    chainDestName: x.chainDestName,
-                                    blockNumberDest: x.blockNumberDest,
-                                    destTS: x.destTS,
-
-                                    asset: defaultAsset, //this is default asset (somewhat human-readable)
-                                    symbol: symbol,
-                                    rawAsset: x.rawAsset, //this is the rawAsset
-                                    amountSent: x.amountSent,
-                                    amountSentUSD: x.amountSentUSD,
-                                    amountReceived: x.amountReceived,
-                                    amountReceivedUSD: x.amountReceivedUSD,
-                                    xcmFee: x.xcmFee,
-                                    xcmFeeUSD: x.xcmFeeUSD,
-                                    priceUSD: x.priceUSD,
-                                    priceUSDCurrent: x.priceUSDCurrent,
-                                }
-                                if (decorate) {
-                                    this.decorateAddress(r, "fromAddress", decorateAddr, decorateRelated)
-                                    this.decorateAddress(r, "destAddress", decorateAddr, decorateRelated)
-                                }
-                                out.push(this.clean_extrinsic_object(r));
-                            } else {
-                                console.log("getXCMTransfers: cannot find decimals:" + x.chainIDDest);
-                            }
-                            //out.push(this.clean_extrinsic_object(r));
-                        } else {
-                            console.log("getXCMTransfers: cannot find decimals:" + rawassetChain);
-                        }
-                    } else {
-                        console.log("getXCMTransfers: cannot find assetChain: " + rawassetChain);
                     }
+                } else {
+                    console.log("MISSING", x.asset, x.chainID);
                 }
+                let section = null,
+                    method = null;
+                if (x.chainIDDest != undefined) {
+                    let chainIDDestInfo = this.chainInfos[x.chainIDDest]
+                    if (chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
+                        if (x.destAddress != undefined) {
+                            if (x.destAddress.length == 42) x.beneficiary = x.destAddress
+                            if (x.destAddress.length == 66) x.beneficiary = paraTool.getAddress(x.destAddress, chainIDDestInfo.ss58Format)
+                        }
+                    }
+                    [x.chainIDDest, x.idDest] = this.convertChainID(x.chainIDDest)
+                    x.chainDestName = this.getChainName(x.chainIDDest);
+                    let sectionPieces = x.sectionMethod.split(':')
+                    if (sectionPieces.length == 2) {
+                        section = sectionPieces[0];
+                        method = sectionPieces[1];
+                    }
+                    if (x.priceUSD) x.amountReceivedUSD = x.amountReceived * x.priceUSD;
+                }
+
+                let r = {
+                    extrinsicHash: x.extrinsicHash,
+                    extrinsicID: x.extrinsicID,
+                    incomplete: x.incomplete,
+                    status: x.status,
+
+                    section: section,
+                    method: method,
+
+                    // relayChain
+                    relayChain: x.relayChain,
+
+                    //source section
+                    sender: x.sender, //AccountKey20 or SS58
+                    fromAddress: x.fromAddress,
+                    id: x.id,
+                    chainID: x.chainID,
+                    chainName: x.chainName,
+                    blockNumber: x.blockNumber,
+                    sourceTS: x.sourceTS,
+
+                    //dest section
+                    beneficiary: x.beneficiary, //AccountKey20 or SS58
+                    destAddress: x.destAddress,
+                    idDest: x.idDest,
+                    chainIDDest: x.chainIDDest,
+                    chainDestName: x.chainDestName,
+                    blockNumberDest: x.blockNumberDest,
+                    destTS: x.destTS,
+
+                    asset: x.rawAsset, // previously, this was some "cleaned" asset but should be the same
+                    rawAsset: x.rawAsset, //this is the rawAsset, but should be the same as the above.
+                    symbol: x.symbol, // this should always be in the xcmAsset table, and could be x.nativeSymbol
+                    localSymbol: x.localSymbol,
+                    currencyID: x.currencyID,
+
+                    amountSent: x.amountSent,
+                    amountSentUSD: x.amountSentUSD,
+                    amountReceived: x.amountReceived,
+                    amountReceivedUSD: x.amountReceivedUSD,
+                    xcmFee: x.xcmFee,
+                    xcmFeeUSD: x.xcmFeeUSD,
+                    priceUSD: x.priceUSD,
+                    priceUSDCurrent: x.priceUSDCurrent,
+                }
+                if (decorate) {
+                    this.decorateAddress(r, "fromAddress", decorateAddr, decorateRelated)
+                    this.decorateAddress(r, "destAddress", decorateAddr, decorateRelated)
+                }
+                out.push(this.clean_extrinsic_object(r));
             }
+
         } catch (err) {
-            console.log(`getXCMTransfers err`, err.toString())
+            console.log(`getXCMTransfers err`, err)
             this.logger.error({
                 "op": "query.getXCMTransfers",
                 address,
@@ -1356,10 +1381,17 @@ module.exports = class Query extends AssetManager {
                     let cFee = (isPending) ? 0 : c.fee
                     //await this.decorateUSD(c, "value", chainAsset, c.chainID, cTimestamp, decorateUSD)
                     if (decorateUSD) {
-                        let [valueUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(c.value, chainAsset, c.chainID, cTimestamp);
-                        c.valueUSD = valueUSD;
-                        c.priceUSD = priceUSD;
-                        c.priceUSDCurrent = priceUSDCurrent;
+                        let p = await this.computePriceUSD({
+                            val: c.value,
+                            asset: chainAsset,
+                            chainID: c.chainID,
+                            ts: cTimestamp
+                        });
+                        if (p) {
+                            c.valueUSD = p.valUSD;
+                            c.priceUSD = p.priceUSD;
+                            c.priceUSDCurrent = p.priceUSDCurrent;
+                        }
                     }
 
                     c.symbol = this.getChainSymbol(c.chainID);
@@ -1396,10 +1428,17 @@ module.exports = class Query extends AssetManager {
                                 if (t.assetInfo.decimals !== false) {
                                     t.value = t.value / 10 ** t.assetInfo.decimals;
                                     if (decorateUSD) {
-                                        let [valueUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(t.value, tokenAsset, c.chainID, cTimestamp);
-                                        t.valueUSD = valueUSD;
-                                        t.priceUSD = priceUSD;
-                                        t.priceUSDCurrent = priceUSDCurrent;
+                                        let p = await this.computePriceUSD({
+                                            val: t.value,
+                                            asset: tokenAsset,
+                                            chainID: c.chainID,
+                                            ts: cTimestamp
+                                        });
+                                        if (p) {
+                                            t.valueUSD = p.valUSD;
+                                            t.priceUSD = p.priceUSD;
+                                            t.priceUSDCurrent = p.priceUSDCurrent;
+                                        }
                                     }
                                 }
                             }
@@ -1476,12 +1515,19 @@ module.exports = class Query extends AssetManager {
                                 }
                                 */
                                 if (decorateUSD) {
-                                    let [amountSentUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(xcm.amountSent, xcm.asset, xcm.chainID, xcm.destTS);
-                                    xcm.amountSentUSD = amountSentUSD;
-                                    xcm.amountReceivedUSD = priceUSD * xcm.amountReceived;
-                                    xcm.feeUSD = priceUSD * xcm.fee
-                                    xcm.priceUSD = priceUSD;
-                                    xcm.priceUSDCurrent = priceUSDCurrent;
+                                    let p = await this.computePriceUSD({
+                                        val: xcm.amountSent,
+                                        asset: xcm.asset,
+                                        chainID: xcm.chainID,
+                                        ts: xcm.destTS
+                                    });
+                                    if (p) {
+                                        xcm.amountSentUSD = p.valUSD;
+                                        xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
+                                        xcm.feeUSD = p.priceUSD * xcm.fee
+                                        xcm.priceUSD = p.priceUSD;
+                                        xcm.priceUSDCurrent = p.priceUSDCurrent;
+                                    }
                                 }
                                 xcm.symbol = this.getAssetSymbol(xcm.asset);
                             }
@@ -1574,11 +1620,14 @@ module.exports = class Query extends AssetManager {
                         let b = [a.indexTS * 1000, a.priceUSD]
                         results.push(b);
                     } else {
-                        let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, asset, chainID, a.indexTS);
-                        if (!priceUSD) {
-                            priceUSD = 0;
+                        let p = await this.computePriceUSD({
+                            asset,
+                            chainID,
+                            ts: a.indexTS
+                        });
+                        if (p) {
+                            results.push([a.indexTS * 1000, p.priceUSD, p.priceUSDCurrent]);
                         }
-                        results.push([a.indexTS * 1000, priceUSD, priceUSDCurrent]);
                     }
                 }
                 return (results);
@@ -1644,10 +1693,17 @@ module.exports = class Query extends AssetManager {
                     try {
                         let token0Volume = parseFloat(d.token0Volume);
                         let token1Volume = parseFloat(d.token1Volume);
-                        let [_, token0USD, token0USDCurrent] = await this.computeUSD(1.0, token0, chainID, ts);
-                        let [__, token1USD, token1USDCurrent] = await this.computeUSD(1.0, token1, chainID, ts);
+                        let p0 = await this.computePriceUSD({
+                            asset: token0,
+                            chainID,
+                            ts
+                        });
+                        let p1 = await this.computePriceUSD(1.0, {
+                            asset: token1,
+                            chainID
+                        }, ts);
                         // this is the amount of swap volume
-                        volumeUSD = token0Volume * token0USD + token1Volume * token1USD;
+                        volumeUSD = token0Volume * p0.priceUSD + token1Volume * p1.priceUSD;
                     } catch (err) {
                         console.log("computevolumeUSD", token0, token1, err);
                     }
@@ -1677,6 +1733,11 @@ module.exports = class Query extends AssetManager {
             console.log("getAssetHolders", sql)
             let holders = await this.poolREADONLY.query(sql);
             let ts = this.currentTS();
+            let p = await this.computePriceUSD({
+                asset,
+                chainID
+            });
+            let priceUSDCurrent = p.priceUSDCurrent ? p.priceUSDCurrent : 0
             for (let i = 0; i < holders.length; i++) {
                 holders[i].free = parseFloat(holders[i].free);
                 holders[i].reserved = parseFloat(holders[i].reserved);
@@ -1685,8 +1746,7 @@ module.exports = class Query extends AssetManager {
 
                 // transferable = free - misc_frozen
                 holders[i].transferable = holders[i].free - holders[i].miscFrozen;
-                let [transferableUSD, _, priceUSDCurrent] = await this.computeUSD(holders[i].transferable, asset, chainID, ts);
-                holders[i].transferableUSD = transferableUSD;
+                holders[i].transferableUSD = holders[i].transferable * priceUSDCurrent;
 
                 // balance = free + reserved
                 holders[i].balance = holders[i].free + holders[i].reserved;
@@ -1723,10 +1783,11 @@ module.exports = class Query extends AssetManager {
             asset.id = id;
             asset.chainName = chainName;
             asset.iconUrl = chainInfo.iconUrl;
-            let ts = this.currentTS();
-            let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, asset.asset, asset.chainID, ts);
-            asset.priceUSD = priceUSDCurrent;
-
+            let p = await this.computePriceUSD({
+                asset: asset.asset,
+                chainID: asset.chainID
+            });
+            asset.priceUSD = p ? p.priceUSDCurrent : 0;
             return asset;
         } catch (err) {
             console.log(err);
@@ -1818,7 +1879,11 @@ module.exports = class Query extends AssetManager {
                 tvlMiscFrozen: 0,
                 tvlFrozen: 0
             };
-            let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, v.chainID, ts);
+            let p = await this.computePriceUSD({
+                asset: v.asset,
+                chainID: v.chainID
+            });
+            let priceUSDCurrent = p ? p.priceUSDCurrent : 0
             a.priceUSD = priceUSDCurrent;
             if (a.priceUSD == null) a.priceUSD = 0
             if (a.totalFree == null) a.totalFree = 0
@@ -1833,7 +1898,6 @@ module.exports = class Query extends AssetManager {
             a.tvlMiscFrozen = a.priceUSD * a.totalMiscFrozen
             a.totalFrozen = parseFloat(v.totalFrozen)
             a.tvlFrozen = a.priceUSD * a.totalFrozen
-
             let assetType = (a.assetType) ? a.assetType : false;
             if (holdings[assetType] !== undefined) {
                 let h = holdings[assetType];
@@ -1989,13 +2053,22 @@ module.exports = class Query extends AssetManager {
                         priceUSD: 0,
                         tvlFree: 0
                     }
-                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, v.chainID, ts)
-                    a.priceUSD = priceUSDCurrent;
+                    let p = await this.computePriceUSD({
+                        asset: v.asset,
+                        chainID: v.chainID
+                    })
+                    a.priceUSD = p.priceUSDCurrent;
                     let latestDexRec = await this.getDexRec(v.asset, v.chainID, ts);
                     a.token0Supply = latestDexRec.lp0;
                     a.token1Supply = latestDexRec.lp1;
-                    let priceUSD0 = await this.getTokenPriceUSD(v.token0, v.chainID, ts);
-                    let priceUSD1 = await this.getTokenPriceUSD(v.token1, v.chainID, ts);
+                    let priceUSD0 = await this.computePriceUSD({
+                        asset: v.token0,
+                        chainID: v.chainID
+                    });
+                    let priceUSD1 = await this.computePriceUSD({
+                        asset: v.token1,
+                        chainID: v.chainID
+                    });
                     a.tvlFree = priceUSD0 * a.token0Supply + priceUSD1 * a.token1Supply;
                 } else {
                     //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
@@ -2023,9 +2096,12 @@ module.exports = class Query extends AssetManager {
                         tvlMiscFrozen: 0,
                         tvlFrozen: 0
                     }
-                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(1.0, v.asset, v.chainID, ts);
-                    a.priceUSD = priceUSD;
-                    if (a.priceUSD == null) a.priceUSD = 0
+                    let p = await this.computePriceUSD({
+                        asset: v.asset,
+                        chainID: v.chainID,
+                        ts
+                    });
+                    a.priceUSD = p ? p.priceUSD : 0;
                     if (v.assetType == "ERC20") {
                         a.totalSupply = parseFloat(v.totalSupply)
                         a.tvlFree = a.priceUSD * a.totalSupply
@@ -2561,12 +2637,19 @@ module.exports = class Query extends AssetManager {
                                 let cTimestamp = c.timestamp
                                 let chainAsset = this.getChainAsset(c.chainID)
                                 if (decorateUSD) {
-                                    let [valueUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(c.value, chainAsset, c.chainID, cTimestamp);
-                                    c.valueUSD = valueUSD;
-                                    c.priceUSD = priceUSD;
-                                    c.priceUSDCurrent = priceUSDCurrent;
-                                    c.symbol = this.getChainSymbol(c.chainID);
-                                    c.feeUSD = c.fee * c.priceUSD;
+                                    let p = await this.computePriceUSD({
+                                        val: c.value,
+                                        asset: chainAsset,
+                                        chainID: c.chainID,
+                                        ts: cTimestamp
+                                    });
+                                    if (p) {
+                                        c.valueUSD = p.valUSD;
+                                        c.priceUSD = p.priceUSD;
+                                        c.priceUSDCurrent = p.priceUSDCurrent;
+                                        c.symbol = p.symbol;
+                                        c.feeUSD = c.fee * c.priceUSD;
+                                    }
                                 } else {
                                     c.symbol = this.getChainSymbol(c.chainID);
                                 }
@@ -2586,10 +2669,17 @@ module.exports = class Query extends AssetManager {
                                             if (t.assetInfo.decimals !== false) {
                                                 t.value = t.value / 10 ** t.assetInfo.decimals;
                                                 if (decorateUSD) {
-                                                    let [valueUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(t.value, tokenAsset, c.chainID, cTimestamp);
-                                                    t.valueUSD = valueUSD;
-                                                    t.priceUSD = priceUSD;
-                                                    t.priceUSDCurrent = priceUSDCurrent;
+                                                    let p = await this.computePriceUSD({
+                                                        val: t.value,
+                                                        asset: tokenAsset,
+                                                        chainID: c.chainID,
+                                                        ts: cTimestamp
+                                                    });
+                                                    if (p) {
+                                                        t.valueUSD = p.valUSD;
+                                                        t.priceUSD = p.priceUSD;
+                                                        t.priceUSDCurrent = p.priceUSDCurrent;
+                                                    }
                                                 }
                                             }
                                         }
@@ -3335,10 +3425,17 @@ module.exports = class Query extends AssetManager {
                                 t['chainName'] = this.getChainName(t["chainID"]);
                                 t['asset'] = this.getChainAsset(t["chainID"]);
                                 if (decorateUSD) {
-                                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(t['amount'], t['asset'], t['chainID'], t['ts']);
-                                    t['amountUSD'] = amountUSD;
-                                    t['priceUSD'] = priceUSD;
-                                    t['priceUSDCurrent'] = priceUSDCurrent;
+                                    let p = await this.computePriceUSD({
+                                        val: t['amount'],
+                                        asset: t['asset'],
+                                        chainID: t['chainID'],
+                                        ts: t['ts']
+                                    });
+                                    if (p) {
+                                        t['amountUSD'] = p.valUSD;
+                                        t['priceUSD'] = p.priceUSD;
+                                        t['priceUSDCurrent'] = p.priceUSDCurrent;
+                                    }
                                 }
                                 let relayChain = paraTool.getRelayChainByChainID(parseInt(t['chainID'], 10))
                                 t['chainIDDest'] = paraTool.getChainIDFromParaIDAndRelayChain(parseInt(t['paraID'], 10), relayChain);
@@ -3418,10 +3515,17 @@ module.exports = class Query extends AssetManager {
                                 t['id'] = id
                                 t['asset'] = this.getChainAsset(t["chainID"]);
                                 if (decorateUSD) {
-                                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(t['amount'], t['asset'], t['chainID'], t['ts']);
-                                    t['amountUSD'] = amountUSD;
-                                    t['priceUSD'] = priceUSD;
-                                    t['priceUSDCurrent'] = priceUSDCurrent;
+                                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computePriceUSD({
+                                        val: t['amount'],
+                                        asset: t['asset'],
+                                        chainID: t['chainID'],
+                                        ts: t['ts']
+                                    });
+                                    if (p) {
+                                        t['amountUSD'] = p.valUSD;
+                                        t['priceUSD'] = p.priceUSD;
+                                        t['priceUSDCurrent'] = p.priceUSDCurrent;
+                                    }
                                 }
                                 if (TSStart && (t['ts'] == TSStart) && (p < pageIndex)) {
                                     console.log("SKIPPING (p<pageIndex)", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
@@ -3692,11 +3796,14 @@ module.exports = class Query extends AssetManager {
             let extraRecs = await this.poolREADONLY.query(sql)
             if (extraRecs.length > 0) {
                 let e = extraRecs[0];
-                var [_, _, priceUSDCurrent] = await this.computeUSD(1.0, e.asset, e.chainID, this.getCurrentTS());
+                var p = await this.computePriceUSD({
+                    asset: e.asset,
+                    chainID: e.chainID
+                });
                 contract.assetName = e.assetName;
                 contract.symbol = e.symbol;
                 contract.localSymbol = e.localSymbol;
-                contract.priceUSD = priceUSDCurrent;
+                contract.priceUSD = p.priceUSDCurrent;
                 contract.totalSupply = e.totalSupply;
                 contract.numHolders = e.numHolders;
                 contract.decimals = e.decimals;
@@ -4341,16 +4448,19 @@ module.exports = class Query extends AssetManager {
             var fee = (extrinsic.fee != undefined) ? (extrinsic.fee) : 0
             var tip = (extrinsic.tip != undefined) ? (extrinsic.tip) : 0
             var targetAsset = `{"Token":"${chainSymbol}"}`
+            extrinsic.chainSymbol = chainSymbol
             if (decorateUSD) {
-                var [balanceUSDFee, priceUSD, priceUSDCurrent] = await this.computeUSD(fee, targetAsset, chainID, extrinsic.ts);
-                var [balanceUSDTip, _, __] = await this.computeUSD(tip, targetAsset, chainID, extrinsic.ts);
-                extrinsic.chainSymbol = chainSymbol
-                if (balanceUSDFee) extrinsic.feeUSD = balanceUSDFee
-                if (balanceUSDTip) extrinsic.tipUSD = balanceUSDTip
-                if (priceUSD) extrinsic.priceUSD = priceUSD
-                if (priceUSDCurrent) extrinsic.priceUSDCurrent = priceUSDCurrent
-            } else {
-                extrinsic.chainSymbol = chainSymbol
+                let p = await this.computePriceUSD({
+                    asset: targetAsset,
+                    chainID,
+                    ts: extrinsic.ts
+                });
+                if (p) {
+                    extrinsic.priceUSD = p.priceUSD
+                    extrinsic.feeUSD = fee * p.priceUSD
+                    extrinsic.tipUSD = tip * p.priceUSD
+                    extrinsic.priceUSDCurrent = p.priceUSDCurrent
+                }
             }
         } catch (err) {
             this.logger.error({
@@ -4434,13 +4544,18 @@ module.exports = class Query extends AssetManager {
                         bal = bal / 10 ** chainDecimals // always get here
                     }
                     if (decorateUSD) {
-                        var [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(bal, targetAsset, chainID, ts)
+                        let p = await this.computePriceUSD({
+                            val: bal,
+                            asset: targetAsset,
+                            chainID,
+                            ts
+                        })
                         decodedData[idx].symbol = chainSymbol
                         decodedData[idx].dataRaw = bal
-                        if (balanceUSD) {
-                            decodedData[idx].dataUSD = balanceUSD
-                            decodedData[idx].priceUSD = priceUSD
-                            decodedData[idx].priceUSDCurrent = priceUSDCurrent
+                        if (p) {
+                            decodedData[idx].dataUSD = p.valUSD
+                            decodedData[idx].priceUSD = p.priceUSD
+                            decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
                         }
                     } else {
                         decodedData[idx].symbol = chainSymbol
@@ -4465,13 +4580,18 @@ module.exports = class Query extends AssetManager {
                     bal = bal / 10 ** chainDecimals // always get here
                 }
                 if (decorateUSD) {
-                    var [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(bal, targetAsset, chainID, ts)
+                    var p = await this.computePriceUSD({
+                        val: bal,
+                        asset: targetAsset,
+                        chainID,
+                        ts
+                    })
                     decodedData[2].symbol = chainSymbol
                     decodedData[2].dataRaw = bal
-                    if (balanceUSD) {
-                        decodedData[2].dataUSD = balanceUSD
-                        decodedData[2].priceUSD = priceUSD
-                        decodedData[2].priceUSDCurrent = priceUSDCurrent
+                    if (p) {
+                        decodedData[2].dataUSD = p.valUSD
+                        decodedData[2].priceUSD = p.priceUSD
+                        decodedData[2].priceUSDCurrent = p.priceUSDCurrent
                     }
                 } else {
                     decodedData[2].symbol = chainSymbol
@@ -4498,13 +4618,18 @@ module.exports = class Query extends AssetManager {
                 }
 
                 if (decorateUSD) {
-                    let [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(bal, targetAsset, chainID, ts)
+                    let p = await this.computePriceUSD({
+                        val: bal,
+                        asset: targetAsset,
+                        chainID,
+                        ts
+                    })
                     decodedData[2].symbol = chainSymbol
                     decodedData[2].dataRaw = bal
-                    if (balanceUSD) {
-                        decodedData[2].dataUSD = balanceUSD
-                        decodedData[2].priceUSD = priceUSD
-                        decodedData[2].priceUSDCurrent = priceUSDCurrent
+                    if (p) {
+                        decodedData[2].dataUSD = p.valUSD
+                        decodedData[2].priceUSD = p.priceUSD
+                        decodedData[2].priceUSDCurrent = p.priceUSDCurrent
                     }
                 } else {
                     decodedData[idx].symbol = chainSymbol
@@ -4540,24 +4665,15 @@ module.exports = class Query extends AssetManager {
 
         if (decorateUSD) {
             var targetAsset = feedtransfer.asset
-            let [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(bal, targetAsset, chainID, feedtransfer.ts)
-            if (!priceUSD && feedtransfer.decimals != undefined) {
-                //computeUSD failed with asset
-                //let alternativeAsset = `{"Token":"${feedtransfer.rawAsset}"}`
-                var alternativeAsset = `${feedtransfer.rawAsset}`
-                //console.log(`fallback alternativeAsset = ${alternativeAsset}`)
-                let [balanceUSD2, priceUSD2, priceUSDCurrent2] = await this.computeUSD(bal, alternativeAsset, chainID, feedtransfer.ts)
-                if (priceUSD2 > 0) {
-                    //console.log(`[sucess] decorateQueryFeedTransfer alternativeAsset=${alternativeAsset}`)
-                    balanceUSD = balanceUSD2
-                    priceUSD = priceUSD2
-                    priceUSDCurrent = priceUSDCurrent2
-                }
-            }
-
-            if (balanceUSD) {
-                res.dataUSD = balanceUSD
-                res.priceUSD = priceUSD
+            let p = await this.computePriceUSD({
+                val: bal,
+                asset: targetAsset,
+                chainID,
+                ts: feedtransfer.ts
+            })
+            if (p) {
+                res.dataUSD = p.valUSD
+                res.priceUSD = p.priceUSD
                 res.priceUSDCurrent = priceUSDCurrent
             }
         }
@@ -4630,11 +4746,16 @@ module.exports = class Query extends AssetManager {
             dFeedtransfer.value = dFeedtransfer.valueRaw / 10 ** assetInfo.decimals;
             dFeedtransfer.symbol = assetInfo.symbol;
             if (decorateUSD) {
-                let [balanceUSD, priceUSD, priceUSDCurrent] = await this.computeUSD(dFeedtransfer.value, asset, chainID, feedtransfer.ts)
-                if (balanceUSD) {
-                    dFeedtransfer.valueUSD = balanceUSD
-                    dFeedtransfer.priceUSD = priceUSD
-                    dFeedtransfer.priceUSDCurrent = priceUSDCurrent
+                let p = await this.computePriceUSD({
+                    val: dFeedtransfer.value,
+                    asset,
+                    chainID,
+                    ts: feedtransfer.ts
+                })
+                if (p) {
+                    dFeedtransfer.valueUSD = p.valUSD
+                    dFeedtransfer.priceUSD = p.priceUSD
+                    dFeedtransfer.priceUSDCurrent = p.priceUSDCurrent
                 }
             }
             console.log("DECORATE", decorateUSD, asset, dFeedtransfer);
@@ -5182,7 +5303,7 @@ module.exports = class Query extends AssetManager {
             r.msg = JSON.parse(r.msg.toString());
             r.chainName = this.getChainName(chainID);
             r.chainDestName = this.getChainName(chainIDDest);
-            if (r.beneficiaries != undefined){
+            if (r.beneficiaries != undefined) {
                 let chainIDDestInfo = this.chainInfos[chainIDDest]
                 if (chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
                     if (r.beneficiaries != undefined) {
@@ -6319,56 +6440,30 @@ module.exports = class Query extends AssetManager {
     }
 
     async decorateXCMAssetReference(assetChain, blockTS = 0, decorate = true, decorateExtra = true) {
-        //{"Token":"KSM"}~2
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let xcmInteriorKey = null;
-        let decimals;
-        let symbol;
-        let rawassetChain = assetChain
-        let [targetAsset, targetChainID] = paraTool.parseAssetChain(rawassetChain)
-        let xcmAssetInfo = this.getXcmAssetInfoByNativeAssetChain(rawassetChain)
-        if (xcmAssetInfo != undefined) {
-            xcmInteriorKey = xcmAssetInfo.xcmInteriorKey
-        }
-        if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
-            decimals = this.assetInfo[rawassetChain].decimals;
-            symbol = this.assetInfo[rawassetChain].symbol
-        } else {
-            let [nativeAsset, _] = paraTool.parseAssetChain(rawassetChain)
-            let [nativeChainID, isFound] = await this.getNativeAssetChainID(nativeAsset)
-            if (isFound) {
-                targetChainID = nativeChainID
-                rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
+        if (this.assetInfo[assetChain]) {
+            let [asset, chainID] = paraTool.parseAssetChain(assetChain)
+            let dXCMAsset = {
+                xcmInteriorKey: this.assetInfo[rawassetChain].xcmInteriorKey,
+                assetChain: assetChain,
+                asset: asset,
+                chainID: chainID,
+                decimals: this.assetInfo[rawassetChain].decimals,
+                symbol: this.assetInfo[rawassetChain].symbol,
             }
-            if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
-                decimals = this.assetInfo[rawassetChain].decimals;
-                symbol = this.assetInfo[rawassetChain].symbol
-            } else {
-                console.log(`*decimals not found assetChain=${assetChain}`)
-            }
-        }
-        let dXCMAsset = {
-            xcmInteriorKey: xcmInteriorKey,
-            assetChain: rawassetChain,
-            asset: targetAsset,
-            chainID: targetChainID,
-            decimals: decimals,
-            symbol: symbol,
-        }
-        if (this.assetInfo[rawassetChain]) {
             if (decorateUSD) {
-                let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1, targetAsset, targetChainID, blockTS);
-                dXCMAsset.priceUSD = priceUSD
-                dXCMAsset.priceUSDCurrent = priceUSDCurrent
-            }
-            if (this.assetInfo[rawassetChain]) {
-                if (decorateUSD) {
-                    let [_, priceUSD, priceUSDCurrent] = await this.computeUSD(1, targetAsset, targetChainID, blockTS);
-                    dXCMAsset.priceUSD = priceUSD
-                    dXCMAsset.priceUSDCurrent = priceUSDCurrent
-                }
+                let p = await this.computePriceUSD({
+                    asset,
+                    chainID,
+                    ts: blockTS
+                });
+                dXCMAsset.priceUSD = p.priceUSD
+                dXCMAsset.priceUSDCurrent = p.priceUSDCurrent
             }
             return dXCMAsset
+        } else {
+            // should not happen.
+            console.log(`*decimals not found assetChain=${assetChain}`)
         }
     }
 
