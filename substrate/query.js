@@ -3515,7 +3515,7 @@ module.exports = class Query extends AssetManager {
                                 t['id'] = id
                                 t['asset'] = this.getChainAsset(t["chainID"]);
                                 if (decorateUSD) {
-                                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computePriceUSD({
+                                    let p = await this.computePriceUSD({
                                         val: t['amount'],
                                         asset: t['asset'],
                                         chainID: t['chainID'],
@@ -3532,7 +3532,6 @@ module.exports = class Query extends AssetManager {
                                     // skip this until hitting pageIndex
                                     p++;
                                 } else if (numItems < maxRows) {
-                                    console.log("INCLUDING", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
                                     p++;
                                     rewards.push(t);
                                     numItems++;
@@ -3803,7 +3802,7 @@ module.exports = class Query extends AssetManager {
                 contract.assetName = e.assetName;
                 contract.symbol = e.symbol;
                 contract.localSymbol = e.localSymbol;
-                contract.priceUSD = p.priceUSDCurrent;
+                if (p) contract.priceUSD = p.priceUSDCurrent;
                 contract.totalSupply = e.totalSupply;
                 contract.numHolders = e.numHolders;
                 contract.decimals = e.decimals;

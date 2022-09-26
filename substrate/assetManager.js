@@ -1171,37 +1171,37 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             }
             break;
             case paraTool.assetTypeLoan: {
-                let parsedAsset = JSON.parse(asset);
+                let parsedAsset = JSON.parse(q.asset);
                 if (parsedAsset.Loan !== undefined) {
                     let loanedAsset = JSON.stringify(parsedAsset.Loan);
-                    res.priceUSD = await this.getTokenPriceUSD(loanedAsset, chainID, ts); //this is actually collateral..
-                    res.priceUSDCurrent = await this.getTokenPriceUSD(loanedAsset, chainID); //this is actually collateral..
+                    res.priceUSD = await this.getTokenPriceUSD(loanedAsset, q.chainID, ts); //this is actually collateral..
+                    res.priceUSDCurrent = await this.getTokenPriceUSD(loanedAsset, q.chainID); //this is actually collateral..
                     if (q.val) res.valUSD = q.val * res.priceUSD
                     return res
                 }
             }
             break;
             case paraTool.assetTypeCDPSupply: {
-                let parsedAsset = JSON.parse(asset);
+                let parsedAsset = JSON.parse(q.asset);
                 if (parsedAsset.CDP_Supply !== undefined) {
                     let suppliedAsset = JSON.stringify(parsedAsset.CDP_Supply);
                     return await this.computePriceUSD({
                         val,
                         asset: suppliedAsset,
-                        chainID: chainID,
+                        chainID: q.chainID,
                         ts
                     });
                 }
             }
             break;
             case paraTool.assetTypeCDPBorrow: {
-                let parsedAsset = JSON.parse(asset);
+                let parsedAsset = JSON.parse(q.asset);
                 if (parsedAsset.CDP_Borrow !== undefined) {
                     let borrowedAsset = JSON.stringify(parsedAsset.CDP_Borrow);
                     return await this.computePriceUSD({
                         val,
                         asset: borrowedAsset,
-                        chainID: chainID,
+                        chainID: q.chainID,
                         ts
                     });
                 }

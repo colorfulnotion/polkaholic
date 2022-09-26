@@ -5,7 +5,11 @@ let suggest = false; // disabled for now
 <div class="card mb-3">
   <div class="row g-0">
     <div class="col-md-2  text-center">
+<% if ( account.address.length == 42 ) { %>
+      <%- uiTool.presentBlockies(account.address); %>
+<% } else { %>
       <img src="/identicon/<%= account.address; %>"  class="rounded-start"  width="128"  loading="lazy" class="card-img-center"/>
+<% } %>
     </div>
     <div class="col-md-8">
       <div class="card-body">

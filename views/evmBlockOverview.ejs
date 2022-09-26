@@ -60,7 +60,7 @@ if ( block && block.transactions ) { %>
   <tr>
     <td>By Collator</td>
     <td>
-        <img src="/identicon/<%= block.miner; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+        <%- uiTool.presentBlockies(block.miner, 50) %>
         <a href='/address/<%= paraTool.getPubKey(block.miner) %>'>
           <code><%= block.miner; %></code>
         </a>

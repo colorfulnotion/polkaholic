@@ -80,7 +80,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <td>Account</td>
       <td>
         <% if (f.signer){  %>
-          <img src="/identicon/<%= f.signer; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+	  <%- uiTool.presentBlockies(f.signer) %>
           <a href='/account/<%= paraTool.getPubKey(f.signer) %>'>
             <code><%= f.signer; %></code>
           </a>
