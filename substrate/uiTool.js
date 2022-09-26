@@ -21,6 +21,12 @@ const {
 var util_crypto_1 = require("@polkadot/util-crypto");
 
 const assetChainSeparator = "~" // TODO: redundant, get from paraTool instead
+const {
+    createCanvas
+} = require('canvas');
+const {
+    renderIcon
+} = require('@download/blockies');
 
 function currency_format(c, priceUSD = false, priceUSDCurrent = false, isDefaultOriginal = true) {
     if (isNaN(c)) {
@@ -671,5 +677,19 @@ module.exports = {
     },
     presentGasPrice: function(valGwei, chainSymbol = 'ChainToken') {
         return presentGasPrice(valGwei, chainSymbol)
+    },
+    presentBlockies: function(address, sz = 128) {
+        const canvas = createCanvas(sz, sz);
+        let cl = `class="rounded-start"  width="${sz}"  loading="lazy" class="card-img-center"`
+        var icon = renderIcon({
+                seed: address.toLowerCase(), // seed used to generate icon data, default: random
+                //color: '#dfe', // to manually specify the icon color, default: random
+                //bgcolor: '#aaa', // choose a different background color, default: white
+                size: 8, // width/height of the icon in blocks, default: 10
+                scale: 4 // width/height of each block in pixels, default: 5
+            },
+            canvas
+        );
+        return ('<img src="' + canvas.toDataURL() + `" ${cl} />`)
     }
 };

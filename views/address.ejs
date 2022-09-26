@@ -2,7 +2,7 @@
 <div class="card mb-3">
   <div class="row g-0">
     <div class="col-md-2  text-center">
-      <img src="/identicon/<%= address; %>"  class="rounded-start"  width="128"  loading="lazy" class="card-img-center"/><br/>
+      <%- uiTool.presentBlockies(address); %><br/>
       <% if ( contract ) { %>
           <%- contract.assetType %>
       <% } %>

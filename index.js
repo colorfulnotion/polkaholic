@@ -22,6 +22,7 @@ var session = require('express-session')
 const paraTool = require('./substrate/paraTool');
 const util = require("util");
 const identicon = require('./substrate/identicon');
+const blockies = require('./substrate/blockies');
 const uiTool = require('./substrate/uiTool');
 const prodConfig = require('./substrate/config');
 const port = 3000;
@@ -634,6 +635,23 @@ app.get('/identicon/:address', async (req, res) => {
         })
         let address = req.params["address"];
         let out = identicon.generateIdenticon(address, false);
+        res.write(out);
+        res.end();
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/blockies/:address', async (req, res) => {
+    try {
+        res.set({
+            'Content-Type': 'image/svg+xml',
+            'Access-Control-Allow-Origin': '*'
+        })
+        let address = req.params["address"];
+        let out = blockies.generateBlockies(address);
         res.write(out);
         res.end();
     } catch (err) {
