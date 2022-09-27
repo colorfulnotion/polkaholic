@@ -149,16 +149,68 @@ async function main() {
             }
         ]
     };
-    for (const chainID of Object.keys(testcases)) {
-        var indexer = new Indexer();
-        await indexer.assetManagerInit();
-        let chain = await indexer.getChain(chainID);
-        await indexer.setup_chainParser(chain, paraTool.debugTracing);
-        indexer.relayChain = paraTool.getRelayChainByChainID(chainID)
-        for (const c of testcases[chainID]) {
-            let [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
-            // the signature could instead be:  let [symbol, relayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
-            console.log(`relaychain=${indexer.relayChain}, chainID=${chainID},targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
+
+    let isManual = false
+    if (isManual){
+        console.log(`test manual violations`)
+        for (const chainID of Object.keys(testcases)) {
+            var indexer = new Indexer();
+            await indexer.assetManagerInit();
+            let chain = await indexer.getChain(chainID);
+            await indexer.setup_chainParser(chain, paraTool.debugTracing);
+            indexer.relayChain = paraTool.getRelayChainByChainID(chainID);
+            indexer.chainID = chainID;
+            for (const c of testcases[chainID]) {
+                let [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
+                console.log(`relaychain=${indexer.relayChain}, chainID=${chainID},targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
+            }
+        }
+    }else{
+        console.log(`auto fetch violations`)
+        var defaultIndexer = new Indexer();
+        let violationType = 'symbol' //'signal'
+        let xcmViolations = await defaultIndexer.getXcmViolation(violationType)
+        for (const chainID of Object.keys(xcmViolations)) {
+            var indexer = new Indexer();
+            await indexer.assetManagerInit();
+            let chain = await indexer.getChain(chainID);
+            await indexer.setup_chainParser(chain, paraTool.debugTracing);
+            indexer.relayChain = paraTool.getRelayChainByChainID(chainID);
+            indexer.chainID = chainID;
+            let targetedSymbol, targetedRelayChain;
+            for (const c of xcmViolations[chainID]) {
+                let callerFunc = c.caller
+                let parserFunc = c.parser
+                let instruction = c.instruction
+                switch (parserFunc) {
+                    case 'processV0ConcreteFungible':
+                        [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV0ConcreteFungible(indexer, instruction);
+                        break;
+                    case 'processV1ConcreteFungible':
+                        [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, instruction);
+                        break;
+                    case 'processFeeLocation':
+                        [targetedSymbol, targetedRelayChain] = indexer.chainParser.processFeeLocation(indexer, instruction)
+                        break;
+                    case 'getNativeSymbol':
+                        targetedSymbol = indexer.chainParser.getNativeSymbol() // no instruction
+                        break;
+                    case 'processXcmGenericCurrencyID':
+                        targetedSymbol = indexer.chainParser.processXcmGenericCurrencyID(instruction)
+                        break;
+                    case 'processXcmDecHexCurrencyID':
+                        targetedSymbol = indexer.chainParser.processXcmDecHexCurrencyID(instruction)
+                        break;
+                    default:
+                        console.log(`unhandled ${parserFunc}`)
+                        break;
+                }
+                if (targetedSymbol == false){
+                    console.log(`NOT OK [${parserFunc}] [${callerFunc}] relaychain=${indexer.relayChain}, chainID=${chainID}, targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
+                }else{
+                    console.log(`[${parserFunc}] [${callerFunc}] relaychain=${indexer.relayChain}, chainID=${chainID}, targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
+                }
+            }
         }
     }
 }

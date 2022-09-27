@@ -1421,10 +1421,10 @@ module.exports = class Indexer extends AssetManager {
                         violation: JSON.stringify(violation)
                     })
                 }
-                console.log(`check_refintegrity_signal violation`, violation)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`check_refintegrity_signal violation`, violation)
                 this.updateXCMViolation(violation, ctx)
             } catch (e){
-                console.log(`check_refintegrity_signal error=${e.toString()}`)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`check_refintegrity_signal error=${e.toString()}`)
             }
         }
         return (targetedXcmInteriorKey);
@@ -1484,10 +1484,10 @@ module.exports = class Indexer extends AssetManager {
                         violation: JSON.stringify(violation)
                     })
                 }
-                console.log(`check_refintegrity_symbol violation`, violation)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`check_refintegrity_symbol violation`, violation)
                 this.updateXCMViolation(violation, ctx)
             } catch (e){
-                console.log(`check_refintegrity_symbol error=${e.toString()}`)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`check_refintegrity_symbol error=${e.toString()}`)
             }
         }
         return (targetedXcmInteriorKey);
@@ -7497,8 +7497,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         this.resetAddressStorageStat()
         this.resetAssetholderStat()
     }
-
-
 
     async dump_update_block_stats(chainID, statRows, indexTS) {
         let i = 0;
