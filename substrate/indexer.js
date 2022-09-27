@@ -1337,15 +1337,15 @@ module.exports = class Indexer extends AssetManager {
     }
 
     check_refintegrity_asset_signal(symbol, ctx = "", obj = null) {
-        let chainIDDest = this.chainIDDest
+        let chainIDDest = this.chainID //because we are looking from receiver's perspective
         let relayChain = this.relayChain
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
         let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
         let targetedXcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`check_refintegrity_asset_signal symbol=${symbol}, relayChain=${relayChain}, cchainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=`, obj)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`*** check_refintegrity_asset_signal symbol=${symbol}, relayChain=${relayChain}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=${JSON.stringify(obj)}`)
         if (targetedXcmInteriorKey == false){
             this.logger.error({
-                "op": "check_refintegrity_asset_signal_xcmkey",
+                "op": "check_refintegrity_asset_signal_xcmkey ERR",
                 "chainID": chainID,
                 symbolRelayChain,
                 ctx,
@@ -1355,7 +1355,7 @@ module.exports = class Indexer extends AssetManager {
         let destinationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainIDDest)
         if (destinationAsset == undefined){
             this.logger.error({
-                "op": "check_refintegrity_asset_signal_dest",
+                "op": "check_refintegrity_asset_signal_dest ERR",
                 "chainID": chainIDDest,
                 symbolRelayChain,
                 ctx,
@@ -1369,10 +1369,10 @@ module.exports = class Indexer extends AssetManager {
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
         let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
         let targetedXcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`check_refintegrity_symbol symbol=${symbol}, relayChain=${relayChain}, chainID=${chainID}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=`, obj)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`**check_refintegrity_symbol symbol=${symbol}, relayChain=${relayChain}, chainID=${chainID}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=${JSON.stringify(obj)}`)
         if (targetedXcmInteriorKey == false){
             this.logger.error({
-                "op": "check_refintegrity_symbol_xcmkey",
+                "op": "check_refintegrity_symbol_xcmkey ERR",
                 "chainID": chainID,
                 symbolRelayChain,
                 ctx,
@@ -1383,7 +1383,7 @@ module.exports = class Indexer extends AssetManager {
         let destinationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainIDDest)
         if (originationAsset == undefined){
             this.logger.error({
-                "op": "check_refintegrity_symbol_origination",
+                "op": "check_refintegrity_symbol_origination ERR",
                 "chainID": chainID,
                 symbolRelayChain,
                 ctx,
@@ -1392,7 +1392,7 @@ module.exports = class Indexer extends AssetManager {
         }
         if (destinationAsset == undefined){
             this.logger.error({
-                "op": "check_refintegrity_symbol_destination",
+                "op": "check_refintegrity_symbol_destination ERR",
                 "chainID": chainIDDest,
                 symbolRelayChain,
                 ctx,
