@@ -1056,40 +1056,6 @@ module.exports = class Query extends AssetManager {
         return s;
     }
 
-    // use rawAsset
-    getXCMTransferAssetInfo(x) {
-        let rawassetChain = paraTool.makeAssetChain(x.rawAsset, x.chainID);
-        if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
-            return (this.assetInfo[rawassetChain]);
-        }
-        // Because new XCasset Interior keys are discovered by the first parachain registry that correctly registers it,
-        // there should be NO reason to look up anything else here, but since we have some data clean up to do, however, we do this which should arrive at the same result as the above
-        // (a) x.asset 
-        // (b) x.nativeAssetChain,
-        // (c) x.xcmInteriorKey
-
-        // (a) find assetInfo by x.asset / chainID
-        let assetChain = paraTool.makeAssetChain(x.asset, x.chainID);
-        if (this.assetInfo[assetChain] && this.assetInfo[assetChain].decimals != undefined) {
-            return (this.assetInfo[assetChain]);
-        }
-
-        // (b) find assetInfo by x.nativeAssetChain
-        if (this.assetInfo[x.nativeAssetChain] && this.assetInfo[x.nativeAssetChain].decimals != undefined) {
-            return (this.assetInfo[x.nativeAssetChain]);
-        }
-
-        // (c) find assetInfo by x.xcmInteriorKey
-        // TODO
-
-        // However, we should seek referential integrity:
-        //  1. between xcmtransfer.rawAsset/chainID and asset.asset/chainID
-        //  2. between xcmtransfer.xcmInteriorKey   and xcmsset.xcmInteriorKey OR xcmtransfer.nativeSymbol/relayChain and xcmAsset.symbol/relayChain
-        // Next steps:
-        //  (A) have xcmtransfer.asset hold asset.rawAsset -- this will make (a) unnecessary
-        //  (B) put xcmAsset.symbol (which is known because of (2)) in xcmtransfer.nativeSymbol and drop xcmtransfer.nativeAssetChain -- this will make (b) unnecessary
-        return null;
-    }
 
     async getXCMTransfers(filters = {}, limit = 10, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
@@ -1107,7 +1073,7 @@ module.exports = class Query extends AssetManager {
             if (chainList.length > 0) {
                 chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
             }
-            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, xcmInteriorKey, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(asset) > 3 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`
+            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(symbol) > 3 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
             console.log(filters, xcmtransfers, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
@@ -1116,8 +1082,9 @@ module.exports = class Query extends AssetManager {
                 [x.chainID, x.id] = this.convertChainID(x.chainID)
 
                 // looks up assetInfo
-                let assetInfo = this.getXCMTransferAssetInfo(x);
-                if (assetInfo) { // assetInfo.{ asset, chainID, decimals, xcmInteriorKey, symbol, (localSymbol, currencyID) } should all be perfectly known
+		let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
+                let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
+                if (assetInfo) { 
                     x.decimals = assetInfo.decimals;
                     x.amountSent = x.amountSent / 10 ** x.decimals;
                     x.amountReceived = x.amountReceived / 10 ** x.decimals;
@@ -1127,31 +1094,11 @@ module.exports = class Query extends AssetManager {
                         if (x.fromAddress != undefined) {
                             if (x.fromAddress.length == 42) x.sender = x.fromAddress
                             if (x.fromAddress.length == 66) x.sender = paraTool.getAddress(x.fromAddress, chainIDOriginationInfo.ss58Format)
-                        }
+			}
                     }
 
-                    // these attributes should always be in assetInfo
-                    if (assetInfo.symbol) x.symbol = assetInfo.symbol;
-                    if (assetInfo.xcmInteriorKey) x.xcmInteriorKey = assetInfo.xcmInteriorKey;
-                    // these attributes may not be in assetInfo (xcDOT is only placed if different; currencyID is not used by all parachains)
-                    if (assetInfo.localSymbol) x.localSymbol = assetInfo.localSymbol;
-                    if (assetInfo.currencyID) x.localSymbol = assetInfo.localSymbol;
-
-                    if (decorateUSD) {
-                        let p = await this.computePriceUSD({
-                            val: x.amountSent,
-                            assetChain: assetInfo.assetChain,
-                            chainID: x.chainID,
-                            ts: x.sourceTS
-                        });
-                        if (p) {
-                            x.amountSentUSD = p.valUSD;
-                            x.priceUSD = p.priceUSD;
-                            x.priceUSDCurrent = p.priceUSDCurrent;
-                            x.amountReceivedUSD = x.amountReceived * p.priceUSD;
-                            x.xcmFeeUSD = x.xcmFee * p.priceUSD;
-                        }
-                    }
+                    x.symbol = assetInfo.symbol;
+                    //if (assetInfo.localSymbol) x.localSymbol = assetInfo.localSymbol;
                 } else {
                     console.log("MISSING", x.asset, x.chainID);
                 }
@@ -1172,7 +1119,6 @@ module.exports = class Query extends AssetManager {
                         section = sectionPieces[0];
                         method = sectionPieces[1];
                     }
-                    if (x.priceUSD) x.amountReceivedUSD = x.amountReceived * x.priceUSD;
                 }
 
                 let r = {
@@ -1205,10 +1151,8 @@ module.exports = class Query extends AssetManager {
                     blockNumberDest: x.blockNumberDest,
                     destTS: x.destTS,
 
-                    asset: x.rawAsset, // previously, this was some "cleaned" asset but should be the same
-                    rawAsset: x.rawAsset, //this is the rawAsset, but should be the same as the above.
-                    symbol: x.symbol, // this should always be in the xcmAsset table, and could be x.nativeSymbol
-                    localSymbol: x.localSymbol,
+                    symbol: x.symbol, 
+                    //localSymbol: x.localSymbol,
                     currencyID: x.currencyID,
 
                     amountSent: x.amountSent,
@@ -3515,7 +3459,7 @@ module.exports = class Query extends AssetManager {
                                 t['id'] = id
                                 t['asset'] = this.getChainAsset(t["chainID"]);
                                 if (decorateUSD) {
-                                    let [amountUSD, priceUSD, priceUSDCurrent] = await this.computePriceUSD({
+                                    let p = await this.computePriceUSD({
                                         val: t['amount'],
                                         asset: t['asset'],
                                         chainID: t['chainID'],
@@ -3532,7 +3476,6 @@ module.exports = class Query extends AssetManager {
                                     // skip this until hitting pageIndex
                                     p++;
                                 } else if (numItems < maxRows) {
-                                    console.log("INCLUDING", "ts", ts, "ts0", t['ts'], "p", p, "pageIndex", pageIndex)
                                     p++;
                                     rewards.push(t);
                                     numItems++;

@@ -43,6 +43,7 @@ module.exports = class Indexer extends AssetManager {
     tallyAsset = {};
     xcmtransfer = {};
     xcmtransferdestcandidate = {};
+    xcmViolation = {};
     incomingXcmState = {}
 
     currentSessionValidators = [];
@@ -1245,7 +1246,7 @@ module.exports = class Indexer extends AssetManager {
                 //["chainIDDest", "eventID"]
                 //["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"]
                 let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.xcmSymbol}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.relayChain}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, xcmInteriorKey].join(",") + ")";
-                if (r.xcmSymbol != false || this.validXCMSymbol(r.xcmSymbol, r.chainIDDest, "xcmtransfer", t)) {
+                if ( ( r.xcmSymbol ) && this.validXCMSymbol(r.xcmSymbol, r.chainIDDest, "xcmtransfer", t)) {
                     xcmtransferdestcandidates.push(t);
                 } else {
                     console.log("--INVALID dest candidate", r);
@@ -1265,6 +1266,40 @@ module.exports = class Indexer extends AssetManager {
                 }
             } catch (err0) {
                 console.log(err0);
+            }
+        }
+
+        let xcmViolationKeys = Object.keys(this.xcmViolation)
+        //console.log(`xcmViolationKeys`, xcmViolationKeys)
+        if (xcmViolationKeys.length > 0) {
+            let xcmViolationRecs = [];
+            for (let i = 0; i < xcmViolationKeys.length; i++) {
+                let v = this.xcmViolation[xcmViolationKeys[i]];
+
+                let chainIDDest = (v.chainIDDest != undefined) ? `'${v.chainIDDest}'` : `NULL`
+                let errorcase = (v.errorcase != undefined && v.errorcase !="") ? `'${v.errorcase}'` : `NULL`
+                //["chainID", "instructionHash", "sourceBlocknumber"]
+                //["chainIDDest", "violationType", "parser", "caller", "errorcase", "instruction", "sourceTS", "indexDT"]
+                let t = "(" + [`'${v.chainID}'`, `'${v.instructionHash}'`, `'${v.sourceBlocknumber}'`,
+                chainIDDest, `'${v.violationType}'`, `'${v.parser}'`, `'${v.caller}'`, errorcase, `'${v.instruction}'`, `'${v.sourceTS}'`, `Now()`].join(",") + ")";
+                xcmViolationRecs.push(t);
+            }
+            this.xcmViolation = {};
+            let sqlDebug = true
+            try {
+                // these events we can't say for sure without matching to recent sends
+                if (xcmViolationRecs.length > 0) {
+                    let vals = ["chainIDDest", "violationType", "parser", "caller", "errorcase", "instruction", "sourceTS", "indexDT"]
+                    await this.upsertSQL({
+                        "table": "xcmViolation",
+                        "keys": ["chainID", "instructionHash", "sourceBlocknumber"],
+                        "vals": vals,
+                        "data": xcmViolationRecs,
+                        "replace": vals
+                    }, sqlDebug);
+                }
+            } catch (err1) {
+                console.log(err1);
             }
         }
     }
@@ -1336,68 +1371,124 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    check_refintegrity_asset_signal(symbol, ctx = "", obj = null) {
+    check_refintegrity_xcm_signal(symbol, parser = "NA", ctx = "", obj = null) {
+        let errorcase = []
+        let errorMsg = []
         let chainIDDest = this.chainID //because we are looking from receiver's perspective
         let relayChain = this.relayChain
+        let sourceBlocknumber = this.chainParser.parserBlockNumber
+        let sourceTS = this.chainParser.parserTS
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
         let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
         let targetedXcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`*** check_refintegrity_asset_signal symbol=${symbol}, relayChain=${relayChain}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=${JSON.stringify(obj)}`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`*** check_refintegrity_xcm_signal symbol=${symbol}, relayChain=${relayChain}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=${JSON.stringify(obj)}`)
         if (targetedXcmInteriorKey == false){
-            this.logger.error({
-                "op": "check_refintegrity_asset_signal_xcmkey ERR",
-                "chainID": chainID,
-                symbolRelayChain,
-                ctx,
-                obj: JSON.stringify(obj)
-            })
+            errorcase.push('xcmkey')
+            errorMsg.push(`xcmkey ERR ${targetedXcmInteriorKey} not found(symbolRelayChain=${symbolRelayChain})`)
         }
         let destinationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainIDDest)
         if (destinationAsset == undefined){
-            this.logger.error({
-                "op": "check_refintegrity_asset_signal_dest ERR",
-                "chainID": chainIDDest,
-                symbolRelayChain,
-                ctx,
-                obj: JSON.stringify(obj)
-            })
+            errorcase.push('dest')
+            errorMsg.push(`destination ERR symbol=${symbol}, relayChain=${relayChain}, chainIDDest=${chainIDDest})`)
+        }
+        let errorDetected = (errorcase.length > 0)? true : false
+        if (errorDetected){
+            try {
+                let objStr = JSON.stringify(obj)
+                let violation = {
+                    violationType: 'signal',
+                    chainID: chainIDDest,
+                    chainIDDest: null,
+                    parser: parser,
+                    caller: ctx,
+                    errorcase: errorcase.join('|'),
+                    instruction: objStr,
+                    instructionHash: paraTool.Blake256FromStr(objStr),
+                    sourceBlocknumber: sourceBlocknumber,
+                    sourceTS: sourceTS,
+                }
+                if (errorDetected > 0){
+                    this.logger.error({
+                        "op": "check_refintegrity_xcm_signal ERR",
+                        "bn": sourceBlocknumber,
+                        "ts": sourceTS,
+                        "chainID": chainIDDest,
+                        symbolRelayChain,
+                        parser,
+                        ctx,
+                        "msg": errorMsg,
+                        obj: JSON.stringify(obj),
+                        violation: JSON.stringify(violation)
+                    })
+                }
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`check_refintegrity_xcm_signal violation`, violation)
+                this.updateXCMViolation(violation, ctx)
+            } catch (e){
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`check_refintegrity_xcm_signal error=${e.toString()}`)
+            }
         }
         return (targetedXcmInteriorKey);
     }
 
-    check_refintegrity_symbol(symbol, relayChain, chainID, chainIDDest, ctx = "", obj = null) {
+    check_refintegrity_xcm_symbol(symbol, relayChain, chainID, chainIDDest, parser = "NA", ctx = "", obj = null) {
+        let errorcase = []
+        let errorMsg = []
+        let sourceBlocknumber = this.chainParser.parserBlockNumber
+        let sourceTS = this.chainParser.parserTS
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
         let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
         let targetedXcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`**check_refintegrity_symbol symbol=${symbol}, relayChain=${relayChain}, chainID=${chainID}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=${JSON.stringify(obj)}`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`**check_refintegrity_xcm_symbol symbol=${symbol}, relayChain=${relayChain}, chainID=${chainID}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=${JSON.stringify(obj)}`)
         if (targetedXcmInteriorKey == false){
-            this.logger.error({
-                "op": "check_refintegrity_symbol_xcmkey ERR",
-                "chainID": chainID,
-                symbolRelayChain,
-                ctx,
-                obj: JSON.stringify(obj)
-            })
+            errorcase.push('xcmkey')
+            errorMsg.push(`xcmkey ERR ${targetedXcmInteriorKey} not found(symbolRelayChain=${symbolRelayChain})`)
         }
         let originationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainID)
         let destinationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainIDDest)
         if (originationAsset == undefined){
-            this.logger.error({
-                "op": "check_refintegrity_symbol_origination ERR",
-                "chainID": chainID,
-                symbolRelayChain,
-                ctx,
-                obj: JSON.stringify(obj)
-            })
+            errorcase.push('source')
+            errorMsg.push(`source ERR symbol=${symbol}, relayChain=${relayChain}, chainID=${chainID}`)
         }
         if (destinationAsset == undefined){
-            this.logger.error({
-                "op": "check_refintegrity_symbol_destination ERR",
-                "chainID": chainIDDest,
-                symbolRelayChain,
-                ctx,
-                obj: JSON.stringify(obj)
-            })
+            errorcase.push('dest')
+            errorMsg.push(`destination ERR symbol=${symbol}, relayChain=${relayChain}, chainIDDest=${chainIDDest}`)
+        }
+        let errorDetected = (errorcase.length > 0)? true : false
+        if (errorDetected){
+            try {
+                let objStr = JSON.stringify(obj)
+                let violation = {
+                    violationType: 'symbol',
+                    chainID: chainID,
+                    chainIDDest: chainIDDest,
+                    parser: parser,
+                    caller: ctx,
+                    errorcase: errorcase.join('|'),
+                    instruction: objStr,
+                    instructionHash: paraTool.Blake256FromStr(objStr),
+                    sourceBlocknumber: sourceBlocknumber,
+                    sourceTS: sourceTS,
+                }
+                if (errorDetected){
+                    this.logger.error({
+                        "op": "check_refintegrity_xcm_symbol ERR",
+                        "bn": sourceBlocknumber,
+                        "ts": sourceTS,
+                        "chainID": chainID,
+                        "chainIDDest": chainIDDest,
+                        symbolRelayChain,
+                        parser,
+                        ctx,
+                        "msg": errorMsg,
+                        obj: JSON.stringify(obj),
+                        violation: JSON.stringify(violation)
+                    })
+                }
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`check_refintegrity_xcm_symbol violation`, violation)
+                this.updateXCMViolation(violation, ctx)
+            } catch (e){
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`check_refintegrity_xcm_symbol error=${e.toString()}`)
+            }
         }
         return (targetedXcmInteriorKey);
     }
@@ -1516,6 +1607,16 @@ module.exports = class Indexer extends AssetManager {
             }
         } else {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
+        }
+    }
+
+    // update xcmViolation
+    updateXCMViolation(v, caller = false) {
+        //potentially add sentAt here, but it's 2-4
+        let k = `${v.chainID}-${v.instructionHash}` // instructionHash is meaningless here other than preventing duplication
+        if (this.xcmViolation[k] == undefined) {
+            this.xcmViolation[k] = v
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`add ${caller} xcm violation`, this.xcmViolation[k]);
         }
     }
 
@@ -7396,8 +7497,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         this.resetAddressStorageStat()
         this.resetAssetholderStat()
     }
-
-
 
     async dump_update_block_stats(chainID, statRows, indexTS) {
         let i = 0;

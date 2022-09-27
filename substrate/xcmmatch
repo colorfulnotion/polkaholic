@@ -47,8 +47,6 @@ async function main() {
             let lastGeneralUpdateTSAgo = manager.getCurrentTS() - lastGeneralUpdateTS
 	    if ( lastGeneralUpdateTSAgo > 3600 ) {
 		await manager.update_xcmlogs(1);
-		await manager.updateXcmInteriorOut(true)
-		await manager.updateXcmInteriorOut(false)
 		await manager.updateXcAssetContractAddr()
 		await manager.updateXcmTransferRoute();
 		await manager.updateHrmpChannelEvents();

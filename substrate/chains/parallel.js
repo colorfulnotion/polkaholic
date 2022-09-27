@@ -97,7 +97,7 @@ module.exports = class ParallelParser extends ChainParser {
                 let relayChain = xcmtransfer.relayChain
                 let chainID = xcmtransfer.chainID
                 let chainIDDest = xcmtransfer.chainIDDest
-                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "parallel processOutgoingXTokens - processXcmGenericCurrencyID")
+                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "parallel processOutgoingXTokens", a.currency_id)
                 xcmtransfer.xcmSymbol = xcmAssetSymbol
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
@@ -134,7 +134,7 @@ module.exports = class ParallelParser extends ChainParser {
                 let relayChain = xcmtransfer.relayChain
                 let chainID = xcmtransfer.chainID
                 let chainIDDest = xcmtransfer.chainIDDest
-                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "parallel processOutgoingXcmPallet - processXcmGenericCurrencyID")
+                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "processXcmDecHexCurrencyID", "parallel processOutgoingXcmPallet", a.currency_id)
                 xcmtransfer.xcmSymbol = xcmAssetSymbol
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)

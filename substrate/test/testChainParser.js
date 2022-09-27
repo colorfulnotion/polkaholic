@@ -1,6 +1,7 @@
 #!/usr/bin/env node
- // Usage:  testChainParser 
+ // Usage:  testChainParser
 const Indexer = require("../indexer");
+const paraTool = require("../paraTool");
 
 async function main() {
     let testcases = {
@@ -110,6 +111,7 @@ async function main() {
                     "fungible": "0x000000000000000000f22a491e8dd34f"
                 }
             },
+            {"id":{"concrete":{"parents":1,"interior":{"x3":[{"parachain":1000},{"palletInstance":50},{"generalIndex":8}]}}},"fun":{"fungible":850059116249}}
         ],
         22007: [
             // Current: {"Token":"KINT"}  Should be: {"Token":"18446744073709551622"}  DIFFERENT: KINT
@@ -130,17 +132,85 @@ async function main() {
                     "fungible": 100000000000
                 }
             }
+        ],
+        2030: [
+            {
+              "id": {
+                "concrete": {
+                  "parents": 1,
+                  "interior": {
+                    "here": null
+                  }
+                }
+              },
+              "fun": {
+                "fungible": 9864879524
+              }
+            }
         ]
     };
-    for (const chainID of Object.keys(testcases)) {
-        var indexer = new Indexer();
-        await indexer.assetManagerInit();
-        let chain = await indexer.getChain(chainID);
-        await indexer.setup_chainParser(chain, indexer.debugLevel);
-        for (const c of testcases[chainID]) {
-            let [targetedAsset, rawTargetedAsset] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
-            // the signature could instead be:  let [symbol, relayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
-            console.log(chainID, c, targetedAsset, rawTargetedAsset);
+
+    let isManual = false
+    if (isManual){
+        console.log(`test manual violations`)
+        for (const chainID of Object.keys(testcases)) {
+            var indexer = new Indexer();
+            await indexer.assetManagerInit();
+            let chain = await indexer.getChain(chainID);
+            await indexer.setup_chainParser(chain, paraTool.debugTracing);
+            indexer.relayChain = paraTool.getRelayChainByChainID(chainID);
+            indexer.chainID = chainID;
+            for (const c of testcases[chainID]) {
+                let [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
+                console.log(`relaychain=${indexer.relayChain}, chainID=${chainID},targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
+            }
+        }
+    }else{
+        console.log(`auto fetch violations`)
+        var defaultIndexer = new Indexer();
+        let violationType = 'symbol' //'signal'
+        let xcmViolations = await defaultIndexer.getXcmViolation(violationType)
+        for (const chainID of Object.keys(xcmViolations)) {
+            var indexer = new Indexer();
+            await indexer.assetManagerInit();
+            let chain = await indexer.getChain(chainID);
+            await indexer.setup_chainParser(chain, paraTool.debugTracing);
+            indexer.relayChain = paraTool.getRelayChainByChainID(chainID);
+            indexer.chainID = chainID;
+            let targetedSymbol, targetedRelayChain;
+            for (const c of xcmViolations[chainID]) {
+                let callerFunc = c.caller
+                let parserFunc = c.parser
+                let instruction = c.instruction
+                switch (parserFunc) {
+                    case 'processV0ConcreteFungible':
+                        [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV0ConcreteFungible(indexer, instruction);
+                        break;
+                    case 'processV1ConcreteFungible':
+                        [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, instruction);
+                        break;
+                    case 'processFeeLocation':
+                        [targetedSymbol, targetedRelayChain] = indexer.chainParser.processFeeLocation(indexer, instruction)
+                        break;
+                    case 'getNativeSymbol':
+                        targetedSymbol = indexer.chainParser.getNativeSymbol() // no instruction
+                        break;
+                    case 'processXcmGenericCurrencyID':
+                        targetedSymbol = indexer.chainParser.processXcmGenericCurrencyID(instruction)
+                        break;
+                    case 'processXcmDecHexCurrencyID':
+                        targetedSymbol = indexer.chainParser.processXcmDecHexCurrencyID(instruction)
+                        break;
+                    default:
+                        console.log(`unhandled ${parserFunc}`)
+                        break;
+                }
+                if (targetedSymbol == false){
+                    console.log(`NOT OK [${parserFunc}] [${callerFunc}] relaychain=${indexer.relayChain}, chainID=${chainID}, targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
+                }else{
+                    console.log(`[${parserFunc}] [${callerFunc}] relaychain=${indexer.relayChain}, chainID=${chainID}, targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
+                }
+            }
         }
     }
 }
