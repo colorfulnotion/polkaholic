@@ -1346,7 +1346,7 @@ module.exports = class Indexer extends AssetManager {
         if (targetedXcmInteriorKey == false){
             this.logger.error({
                 "op": "check_refintegrity_asset_signal_xcmkey ERR",
-                "chainID": chainID,
+                "chainID": this.chainID,
                 symbolRelayChain,
                 ctx,
                 obj: JSON.stringify(obj)
