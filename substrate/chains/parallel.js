@@ -81,10 +81,10 @@ module.exports = class ParallelParser extends ChainParser {
           "currency_id": 101,
         */
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel processOutgoingXTokens start`)
-        let assetString = false
         let a = args
+        let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            assetString = this.processDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
         }
         //let generalOutgoingXcmList = super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress)
         super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
@@ -93,8 +93,13 @@ module.exports = class ParallelParser extends ChainParser {
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`parallel processOutgoingXTokens xcmPallet missing`)
-            } else if (assetString) {
-                xcmtransfer.asset = assetString
+            } else if (xcmAssetSymbol) {
+                let relayChain = xcmtransfer.relayChain
+                let chainID = xcmtransfer.chainID
+                let chainIDDest = xcmtransfer.chainIDDest
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "parallel processOutgoingXTokens - processXcmGenericCurrencyID")
+                xcmtransfer.xcmSymbol = xcmAssetSymbol
+                xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`parallel processOutgoingXTokens xcmPallet assetString missing`)
@@ -113,10 +118,10 @@ module.exports = class ParallelParser extends ChainParser {
           "currency_id": 101,
         */
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel processOutgoingXcmPallet start`)
-        let assetString = false
         let a = args
+        let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            assetString = this.processDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
         }
         //let generalOutgoingXcmList = super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress)
         super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
@@ -125,8 +130,13 @@ module.exports = class ParallelParser extends ChainParser {
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`parallel processOutgoingXcmPallet xcmPallet missing`)
-            } else if (assetString) {
-                xcmtransfer.asset = assetString
+            } else if (xcmAssetSymbol) {
+                let relayChain = xcmtransfer.relayChain
+                let chainID = xcmtransfer.chainID
+                let chainIDDest = xcmtransfer.chainIDDest
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "parallel processOutgoingXcmPallet - processXcmGenericCurrencyID")
+                xcmtransfer.xcmSymbol = xcmAssetSymbol
+                xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`parallel processOutgoingXcmPallet assetString missing`)

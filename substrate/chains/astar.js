@@ -405,19 +405,19 @@ module.exports = class AstarParser extends ChainParser {
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // need additional processing for currency_id part
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXTokens start`)
-        let assetString = false
         let a = args
+        let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            assetString = this.processDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
         }
         /* 0xb64a6325b5374ed3efca6628337aab00aff1febff06d6977bc6f192690126996
         currency_id": {
           "selfReserve": null
         }
         */
-        if (!assetString) {
+        if (!xcmAssetSymbol) {
             if (a.currency_id != undefined && a.currency_id.selfReserve !== undefined) {
-                assetString = indexer.getNativeAsset();
+                xcmAssetSymbol = indexer.getNativeSymbol();
             }
         }
         //let generalOutgoingXcmList = super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress)
@@ -427,11 +427,18 @@ module.exports = class AstarParser extends ChainParser {
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXTokens xcmPallet missing`)
-            } else if (assetString) {
-                xcmtransfer.asset = assetString
+            } else if (xcmAssetSymbol) {
+                //xcmtransfer.asset = assetString
+                let relayChain = xcmtransfer.relayChain
+                let chainID = xcmtransfer.chainID
+                let chainIDDest = xcmtransfer.chainIDDest
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "astar processOutgoingXTokens - processXcmGenericCurrencyID")
+                xcmtransfer.xcmSymbol = xcmAssetSymbol
+                xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXTokens xcmPallet assetString missing`)
+                //TODO
                 outgoingXcmList.push(xcmtransfer)
             }
         }
@@ -475,22 +482,6 @@ module.exports = class AstarParser extends ChainParser {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] Invalid EVM asset Input`)
                 return
             }
-            for (let i = 0; i < params.asset_id.length; i++) {
-                let rawAssetID = `${params.asset_id[i]}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
-                if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
-                let assetString = this.processGenericCurrencyID(indexer, rawAssetID);
-                let rawAssetString = this.processRawGenericCurrencyID(indexer, rawAssetID);
-                let assetAmount = paraTool.dechexToInt(params.asset_amount[i])
-                let aa = {
-                    asset: assetString,
-                    rawAsset: rawAssetString,
-                    amountSent: assetAmount,
-                    transferIndex: transferIndex,
-                    isFeeItem: (feeIdx == i) ? 1 : 0,
-                }
-                assetAndAmountSents.push(aa)
-                transferIndex++
-            }
             if (this.debugLevel >= paraTool.debugVerbose) console.log(assetAndAmountSents)
             let outgoingEtherumXCM = []
             if (extrinsic.xcms == undefined) extrinsic.xcms = []
@@ -515,13 +506,35 @@ module.exports = class AstarParser extends ChainParser {
 
             let evmMethod = `${a.signature.split('(')[0]}:${a.methodID}`
 
+            for (let i = 0; i < params.asset_id.length; i++) {
+                let rawAssetID = `${params.asset_id[i]}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
+                if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
+                let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "astar processOutgoingEthereum - processXcmGenericCurrencyID", rawAssetID)
+
+                //let assetString = this.processGenericCurrencyID(indexer, rawAssetID);
+                //let rawAssetString = this.processRawGenericCurrencyID(indexer, rawAssetID);
+                let assetAmount = paraTool.dechexToInt(params.asset_amount[i])
+                let aa = {
+                    //asset: assetString,
+                    //rawAsset: rawAssetString,
+                    xcmInteriorKey: targetedXcmInteriorKey,
+                    xcmSymbol: targetedSymbol,
+                    amountSent: assetAmount,
+                    transferIndex: transferIndex,
+                    isFeeItem: (feeIdx == i) ? 1 : 0,
+                }
+                assetAndAmountSents.push(aa)
+                transferIndex++
+            }
+
             for (const assetAndAmountSent of assetAndAmountSents) {
-                let asset = assetAndAmountSent.asset
-                let rawAsset = assetAndAmountSent.rawAsset
+                let targetedSymbol = assetAndAmountSent.xcmSymbol
+                let targetedXcmInteriorKey = assetAndAmountSent.xcmInteriorKey
                 let amountSent = assetAndAmountSent.amountSent
                 let transferIndex = assetAndAmountSent.transferIndex
                 let isFeeItem = assetAndAmountSent.isFeeItem
-                if (assetAndAmountSent != undefined && asset && paraTool.validAmount(amountSent)) {
+                if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent)) {
                     if (extrinsic.xcms == undefined) extrinsic.xcms = []
                     let xcmIndex = extrinsic.xcms.length
                     let r = {
@@ -538,19 +551,14 @@ module.exports = class AstarParser extends ChainParser {
                         blockNumber: this.parserBlockNumber,
                         fromAddress: fromAddress,
                         destAddress: destAddress,
-                        asset: asset,
-                        rawAsset: rawAsset,
                         sourceTS: feed.ts,
                         amountSent: amountSent,
                         incomplete: incomplete,
                         isFeeItem: isFeeItem,
                         msgHash: '0x',
                         sentAt: this.parserWatermark,
-                    }
-                    let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
-                    if (isXCMAssetFound) {
-                        if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                        if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                        xcmSymbol: targetedSymbol,
+                        xcmInteriorKey: targetedXcmInteriorKey,
                     }
                     //if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
                     console.log(`processOutgoingEthereum`, r)
@@ -570,10 +578,10 @@ module.exports = class AstarParser extends ChainParser {
     processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // TODO: have not seen case like this yet
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXcmPallet start`)
-        let assetString = false
         let a = args
+        let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            assetString = this.processDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
         }
         //let generalOutgoingXcmList = super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress)
         super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
@@ -582,8 +590,13 @@ module.exports = class AstarParser extends ChainParser {
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXcmPallet xcmPallet missing`)
-            } else if (assetString) {
-                xcmtransfer.asset = assetString
+            } else if (xcmAssetSymbol) {
+                let relayChain = xcmtransfer.relayChain
+                let chainID = xcmtransfer.chainID
+                let chainIDDest = xcmtransfer.chainIDDest
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "astar processOutgoingXcmPallet - processXcmGenericCurrencyID")
+                xcmtransfer.xcmSymbol = xcmAssetSymbol
+                xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXcmPallet assetString missing`)

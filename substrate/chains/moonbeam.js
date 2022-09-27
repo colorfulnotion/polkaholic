@@ -171,13 +171,10 @@ module.exports = class MoonbeamParser extends ChainParser {
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // need additional processing for currency_id part
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXTokens start`)
-        let assetString = false
         let a = args
+        let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            assetString = this.processDecHexCurrencyID(indexer, a.currency_id)
-            if (assetString) {
-                assetString = assetString.replace('xc', '') //temporary hack to remove the xc in asset..
-            }
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
         }
         //let generalOutgoingXcmList = super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
         super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
@@ -186,8 +183,13 @@ module.exports = class MoonbeamParser extends ChainParser {
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] moonbeam processOutgoingXTokens xcmPallet missing`)
-            } else if (assetString) {
-                xcmtransfer.asset = assetString
+            } else if (xcmAssetSymbol) {
+                let relayChain = xcmtransfer.relayChain
+                let chainID = xcmtransfer.chainID
+                let chainIDDest = xcmtransfer.chainIDDest
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "moonbeam processOutgoingXTokens - processXcmGenericCurrencyID")
+                xcmtransfer.xcmSymbol = xcmAssetSymbol
+                xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] moonbeam processOutgoingXTokens xcmPallet assetString missing`)
@@ -202,14 +204,12 @@ module.exports = class MoonbeamParser extends ChainParser {
     processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // TODO: have not seen case like this yet
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXcmPallet start`)
-        let assetString = false
         let a = args
+        let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            assetString = this.processDecHexCurrencyID(indexer, a.currency_id)
-            if (assetString) {
-                assetString = assetString.replace('xc', '') //temporary hack to remove the xc in asset..
-            }
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
         }
+
         //let generalOutgoingXcmList = super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
         super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
         let generalOutgoingXcmList = (extrinsic.xcms != undefined) ? extrinsic.xcms : []
@@ -217,8 +217,13 @@ module.exports = class MoonbeamParser extends ChainParser {
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`moonbeam processOutgoingXcmPallet xcmPallet missing`)
-            } else if (assetString) {
-                xcmtransfer.asset = assetString
+            } else if (xcmAssetSymbol) {
+                let relayChain = xcmtransfer.relayChain
+                let chainID = xcmtransfer.chainID
+                let chainIDDest = xcmtransfer.chainIDDest
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "moonbeam processOutgoingXcmPallet - processXcmGenericCurrencyID")
+                xcmtransfer.xcmSymbol = xcmAssetSymbol
+                xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`moonbeam processOutgoingXcmPallet assetString missing`)
@@ -269,6 +274,8 @@ module.exports = class MoonbeamParser extends ChainParser {
             isFeeItem: isFeeItem,
             msgHash: '0x',
             sentAt: this.parserWatermark,
+            xcmSymbol: targetedSymbol,
+            xcmInteriorKey: targetedXcmInteriorKey,
             innerCall: innerCall,
         }
         try {
@@ -305,23 +312,22 @@ module.exports = class MoonbeamParser extends ChainParser {
                 // index: skipped for now
 
                 // currency_id processing
-                asset = this.processGenericCurrencyID(indexer, a.currency_id) //inferred approach
-                rawAsset = this.processRawGenericCurrencyID(indexer, a.currency_id)
+                //asset = this.processGenericCurrencyID(indexer, a.currency_id) //inferred approach
+                //rawAsset = this.processRawGenericCurrencyID(indexer, a.currency_id)
+
+                let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processOutgoingXCMTransactor - xcmTransactor:transactThroughDerivative", a.currency_id)
 
                 //inner_call processing
                 innerCall = (a.inner_call != undefined) ? a.inner_call : 'notfound'
-                r.asset = asset
-                r.rawAsset = rawAsset
+                //r.asset = asset
+                //r.rawAsset = rawAsset
+                r.xcmInteriorKey = targetedXcmInteriorKey,
+                r.xcmSymbol = targetedSymbol,
                 r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
                 console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} here 4`)
-
-                let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(chainID, asset, rawAsset)
-                if (isXCMAssetFound) {
-                    if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                    if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
-                }
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivative`, r)
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
@@ -334,24 +340,27 @@ module.exports = class MoonbeamParser extends ChainParser {
                 // index: skipped for now
 
                 // fee_location processing
+                let targetedSymbol = false
+                let targetedXcmInteriorKey = false
                 if (a !== undefined && a.fee_location !== undefined) {
                     let feelocation = a.fee_location
-                    let [feeAsset, feeRawAsset] = this.processFeeLocation(indexer, feelocation, relayChain)
-                    if (feeAsset) asset = feeAsset
-                    if (feeRawAsset) rawAsset = feeRawAsset
+                    let [feeSymbol, feeRelayChain] = this.processFeeLocation(indexer, feelocation, relayChain)
+                    if (feeSymbol) {
+                        targetedSymbol = feeSymbol
+                        let [feeXcmInteriorKey] = indexer.check_refintegrity_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processOutgoingXCMTransactor -xcmTransactor:transactThroughDerivativeMultilocation", feelocation)
+                        if (feeXcmInteriorKey) targetedXcmInteriorKey = feeXcmInteriorKey
+                    }
                 }
 
                 // inner_call processing
                 innerCall = (a.inner_call != undefined) ? a.inner_call : 'notfound'
-                r.asset = asset
-                r.rawAsset = rawAsset
+                //r.asset = asset
+                //r.rawAsset = rawAsset
+                r.xcmInteriorKey = targetedXcmInteriorKey,
+                r.xcmSymbol = targetedSymbol
                 r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
-                if (isXCMAssetFound) {
-                    if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                    if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
-                }
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivativeMultilocation`, r)
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
@@ -421,27 +430,29 @@ module.exports = class MoonbeamParser extends ChainParser {
                 }
 
                 // fee_location processing
+                let targetedSymbol = false
+                let targetedXcmInteriorKey = false
                 if (a !== undefined && a.fee_location !== undefined) {
                     let feelocation = a.fee_location
-                    let [feeAsset, feeRawAsset] = this.processFeeLocation(indexer, feelocation, relayChain)
-                    if (feeAsset) asset = feeAsset
-                    if (feeRawAsset) rawAsset = feeRawAsset
+                    let [feeSymbol, feeRelayChain] = this.processFeeLocation(indexer, feelocation, relayChain)
+                    if (feeSymbol) {
+                        targetedSymbol = feeSymbol
+                        let [feeXcmInteriorKey] = indexer.check_refintegrity_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "xcmTransactor:transactThroughSignedMultilocation", feelocation)
+                        if (feeXcmInteriorKey) targetedXcmInteriorKey = feeXcmInteriorKey
+                    }
                 }
 
                 // get msgHash, innerCall from event
                 let [msgHash, innerCall] = this.getMsgHashAndInnerCall(indexer, extrinsic, feed)
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSignedMultilocation msgHash=${msgHash}, innerCall=${innerCall}`)
-                r.asset = asset
-                r.rawAsset = rawAsset
+                //r.asset = asset
+                //r.rawAsset = rawAsset
+                r.xcmInteriorKey = targetedXcmInteriorKey,
+                r.xcmSymbol = targetedSymbol
                 r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
                 r.msgHash = msgHash
-                let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(chainID, asset, rawAsset)
-                if (isXCMAssetFound) {
-                    if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                    if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
-                }
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSignedMultilocation`, r)
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
@@ -494,23 +505,21 @@ module.exports = class MoonbeamParser extends ChainParser {
                 }
 
                 // fee_current_id processing
-                asset = this.processGenericCurrencyID(indexer, a.fee_currency_id) //inferred approach
-                rawAsset = this.processRawGenericCurrencyID(indexer, a.fee_currency_id)
+                //asset = this.processGenericCurrencyID(indexer, a.fee_currency_id) //inferred approach
+                //rawAsset = this.processRawGenericCurrencyID(indexer, a.fee_currency_id)
+                let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processOutgoingXCMTransactor - xcmTransactor:transactThroughSigned", a.currency_id)
+
 
                 // get msgHash, innerCall from event
                 let [msgHash, innerCall] = this.getMsgHashAndInnerCall(indexer, extrinsic, feed)
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned msgHash=${msgHash}, innerCall=${innerCall}`)
-                r.asset = asset
-                r.rawAsset = rawAsset
+                r.xcmInteriorKey = targetedXcmInteriorKey,
+                r.xcmSymbol = targetedSymbol,
                 r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
                 r.msgHash = msgHash
-                let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(chainID, asset, rawAsset)
-                if (isXCMAssetFound) {
-                    if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                    if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
-                }
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned`, r)
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
@@ -525,26 +534,26 @@ module.exports = class MoonbeamParser extends ChainParser {
                 // fee_payer processing -- skip
 
                 // fee_location processing
+                let targetedSymbol = false
+                let targetedXcmInteriorKey = false
                 if (a !== undefined && a.fee_location !== undefined) {
                     let feelocation = a.fee_location
-                    let [feeAsset, feeRawAsset] = this.processFeeLocation(indexer, feelocation, relayChain)
-                    if (feeAsset) asset = feeAsset
-                    if (feeRawAsset) rawAsset = feeRawAsset
+                    let [feeSymbol, feeRelayChain] = this.processFeeLocation(indexer, feelocation, relayChain)
+                    if (feeSymbol) {
+                        targetedSymbol = feeSymbol
+                        let [feeXcmInteriorKey] = indexer.check_refintegrity_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processOutgoingXCMTransactor - xcmTransactor:transactThroughSovereign", feelocation)
+                        if (feeXcmInteriorKey) targetedXcmInteriorKey = feeXcmInteriorKey
+                    }
                 }
 
                 // inner_call processing
                 innerCall = (a.inner_call != undefined) ? a.inner_call : 'notfound'
-                r.asset = asset
-                r.rawAsset = rawAsset
+                r.xcmInteriorKey = targetedXcmInteriorKey,
+                r.xcmSymbol = targetedSymbol,
                 r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
                 r.msgHash = msgHash
-                let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(chainID, asset, rawAsset)
-                if (isXCMAssetFound) {
-                    if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                    if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
-                }
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSovereign`, r)
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
@@ -659,6 +668,7 @@ module.exports = class MoonbeamParser extends ChainParser {
         let paraIDExtra = paraTool.getParaIDExtra(relayChain)
         let targetedAsset = false;
         let rawTargetedAsset = false;
+        let targetSymbol = false;
         if (feelocation.v1 != undefined) {
             let feelocation_v1 = feelocation.v1
             let feelocation_v1_interior = feelocation_v1.interior
@@ -666,14 +676,16 @@ module.exports = class MoonbeamParser extends ChainParser {
             if (feelocation_v1_interior != undefined && feelocation_v1_parents.here !== undefined) {
                 if (feelocation_v1_parents != undefined && feelocation_v1_parents == 0) {
                     //normal case?
-                    targetedAsset = indexer.getNativeAsset()
-                    rawTargetedAsset = indexer.getNativeAsset()
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processFeeLocation targetedAsset parents:0, here`, targetedAsset)
+                    targetSymbol = indexer.getNativeSymbol()
+                    //targetedAsset = indexer.getNativeSymbol()
+                    //rawTargetedAsset = indexer.getNativeSymbol()
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processFeeLocation targetedAsset parents:0, here`, targetedSymbol)
                 } else if (feelocation_v1_parents != undefined && feelocation_v1_parents == 1) {
                     //ump
-                    targetedAsset = indexer.getRelayChainAsset()
-                    rawTargetedAsset = indexer.getRelayChainAsset()
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processFeeLocation targetedAsset parents:1, here`, targetedAsset)
+                    targetSymbol = indexer.getRelayChainSymbol()
+                    //targetedAsset = indexer.getRelayChainAsset()
+                    //rawTargetedAsset = indexer.getRelayChainAsset()
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processFeeLocation targetedAsset parents:1, here`, targetedSymbol)
                 }
                 //} else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
             } else {
@@ -711,28 +723,27 @@ module.exports = class MoonbeamParser extends ChainParser {
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
+                    targetSymbol = cachedXcmAssetInfo.symbol
                     targetedAsset = cachedXcmAssetInfo.asset
-                    rawTargetedAsset = cachedXcmAssetInfo.asset
+                    //rawTargetedAsset = cachedXcmAssetInfo.asset
                     if (cachedXcmAssetInfo.paraID == 1000) {
                         //statemine/statemint
                         let nativeChainID = paraIDExtra + 1000
                         let t = JSON.parse(targetedAsset)
                         let currencyID = t.Token
                         let symbol = indexer.getCurrencyIDSymbol(currencyID, nativeChainID);
-                        targetedAsset = JSON.stringify({
-                            Token: symbol
-                        })
+                        targetSymbol = symbol
                     }
                 } else {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${feelocation_v1_interiorVal}] [${xType}]`, xcmInteriorKey)
-                    targetedAsset = interiorVStr
-                    rawTargetedAsset = interiorVStr
+                    //targetedAsset = interiorVStr
+                    //rawTargetedAsset = interiorVStr
                 }
             }
 
         } else {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processFeeLocation unknown unknown!`, JSON.stringify(feelocation, null, 2))
         }
-        return [targetedAsset, rawTargetedAsset]
+        return [targetSymbol, relayChain]
     }
 }
