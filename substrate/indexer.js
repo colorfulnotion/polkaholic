@@ -1336,68 +1336,135 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    check_refintegrity_asset_signal(symbol, ctx = "", obj = null) {
+    check_refintegrity_signal(symbol, parser = "NA", ctx = "", obj = null) {
+        let errorcase = []
         let chainIDDest = this.chainID //because we are looking from receiver's perspective
         let relayChain = this.relayChain
+        let sourceBlocknumber = this.chainParser.parserBlockNumber
+        let sourceTS = this.chainParser.parserTS
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
         let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
         let targetedXcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`*** check_refintegrity_asset_signal symbol=${symbol}, relayChain=${relayChain}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=${JSON.stringify(obj)}`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`*** check_refintegrity_signal symbol=${symbol}, relayChain=${relayChain}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=${JSON.stringify(obj)}`)
         if (targetedXcmInteriorKey == false){
+            errorcase.push('xcmkey')
             this.logger.error({
-                "op": "check_refintegrity_asset_signal_xcmkey ERR",
-                "chainID": this.chainID,
+                "op": "check_refintegrity_signal_xcmkey ERR",
+                "chainID": chainIDDest,
+                "bn": sourceBlocknumber,
                 symbolRelayChain,
                 ctx,
+                "msg": `check_refintegrity_signal xcmkey ERR ${targetedXcmInteriorKey} not found(SRC=${symbolRelayChain})`,
                 obj: JSON.stringify(obj)
             })
         }
         let destinationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainIDDest)
         if (destinationAsset == undefined){
+            errorcase.push('dest')
             this.logger.error({
-                "op": "check_refintegrity_asset_signal_dest ERR",
+                "op": "check_refintegrity_signal_dest ERR",
                 "chainID": chainIDDest,
+                "bn": sourceBlocknumber,
                 symbolRelayChain,
                 ctx,
+                "msg": `check_refintegrity_signal origination ERR S=${symbol}, R=${relayChain}, C=${chainID})`,
                 obj: JSON.stringify(obj)
             })
+        }
+        if (errorcase.length > 0 || true){
+            try {
+                let objStr = JSON.stringify(obj)
+                let eLog = {
+                    violationType: 'signal',
+                    chainID: chainIDDest,
+                    chainIDDest: null,
+                    parser: parser,
+                    caller: ctx,
+                    errorcase: errorcase,
+                    instruction: objStr,
+                    instructionHash: paraTool.Blake256FromStr(objStr),
+                    sourceBlocknumber: sourceBlocknumber,
+                    sourceTS: sourceTS,
+                }
+                console.log(`check_refintegrity_signal eLog`, eLog)
+            } catch (e){
+                console.log(`check_refintegrity_signal eLog error=${e.toString()}`)
+            }
         }
         return (targetedXcmInteriorKey);
     }
 
-    check_refintegrity_symbol(symbol, relayChain, chainID, chainIDDest, ctx = "", obj = null) {
+    check_refintegrity_symbol(symbol, relayChain, chainID, chainIDDest, parser = "NA", ctx = "", obj = null) {
+        let errorcase = []
+        let sourceBlocknumber = this.chainParser.parserBlockNumber
+        let sourceTS = this.chainParser.parserTS
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
         let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
         let targetedXcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
         if (this.debugLevel >= paraTool.debugInfo) console.log(`**check_refintegrity_symbol symbol=${symbol}, relayChain=${relayChain}, chainID=${chainID}, chainIDDest=${chainIDDest}, symbolRelayChain=${symbolRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, obj=${JSON.stringify(obj)}`)
         if (targetedXcmInteriorKey == false){
+            errorcase.push('xcmkey')
             this.logger.error({
                 "op": "check_refintegrity_symbol_xcmkey ERR",
+                "bn": sourceBlocknumber,
                 "chainID": chainID,
+                "chainIDDest": chainIDDest,
                 symbolRelayChain,
+                parser,
                 ctx,
+                "msg": `check_refintegrity_symbol destination ERR S=${symbol}, R=${relayChain}, C=${chainID}, CDest=${chainIDDest})`,
                 obj: JSON.stringify(obj)
             })
         }
         let originationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainID)
         let destinationAsset = this.getChainXCMAssetBySymbol(symbol, relayChain, chainIDDest)
         if (originationAsset == undefined){
+            errorcase.push('source')
             this.logger.error({
                 "op": "check_refintegrity_symbol_origination ERR",
+                "bn": sourceBlocknumber,
                 "chainID": chainID,
+                "chainIDDest": chainIDDest,
                 symbolRelayChain,
+                parser,
                 ctx,
+                "msg": `check_refintegrity_symbol origination ERR S=${symbol}, R=${relayChain}, C=${chainID}, CDest=${chainIDDest})`,
                 obj: JSON.stringify(obj)
             })
         }
         if (destinationAsset == undefined){
+            errorcase.push('dest')
             this.logger.error({
                 "op": "check_refintegrity_symbol_destination ERR",
-                "chainID": chainIDDest,
+                "bn": sourceBlocknumber,
+                "chainID": chainID,
+                "chainIDDest": chainIDDest,
                 symbolRelayChain,
+                parser,
                 ctx,
+                "msg": `check_refintegrity_symbol destination ERR S=${symbol}, R=${relayChain}, C=${chainID}, CDest=${chainIDDest})`,
                 obj: JSON.stringify(obj)
             })
+        }
+        if (errorcase.length > 0 || true){
+            try {
+                let objStr = JSON.stringify(obj)
+                let eLog = {
+                    violationType: 'symbol',
+                    chainID: chainID,
+                    chainIDDest: chainIDDest,
+                    parser: parser,
+                    caller: ctx,
+                    errorcase: errorcase,
+                    instruction: objStr,
+                    instructionHash: paraTool.Blake256FromStr(objStr),
+                    sourceBlocknumber: sourceBlocknumber,
+                    sourceTS: sourceTS,
+                }
+                console.log(`check_refintegrity_symbol eLog`, eLog)
+            } catch (e){
+                console.log(`check_refintegrity_symbol eLog error=${e.toString()}`)
+            }
         }
         return (targetedXcmInteriorKey);
     }

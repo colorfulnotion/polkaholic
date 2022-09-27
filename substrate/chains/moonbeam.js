@@ -187,7 +187,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 let relayChain = xcmtransfer.relayChain
                 let chainID = xcmtransfer.chainID
                 let chainIDDest = xcmtransfer.chainIDDest
-                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "moonbeam processOutgoingXTokens - processXcmGenericCurrencyID")
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "processXcmDecHexCurrencyID", "moonbeam processOutgoingXTokens")
                 xcmtransfer.xcmSymbol = xcmAssetSymbol
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
@@ -221,7 +221,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 let relayChain = xcmtransfer.relayChain
                 let chainID = xcmtransfer.chainID
                 let chainIDDest = xcmtransfer.chainIDDest
-                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "moonbeam processOutgoingXcmPallet - processXcmGenericCurrencyID")
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(xcmAssetSymbol, relayChain, chainID, chainIDDest, "processXcmDecHexCurrencyID", "moonbeam processOutgoingXcmPallet")
                 xcmtransfer.xcmSymbol = xcmAssetSymbol
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
@@ -316,7 +316,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 //rawAsset = this.processRawGenericCurrencyID(indexer, a.currency_id)
 
                 let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
-                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processOutgoingXCMTransactor - xcmTransactor:transactThroughDerivative", a.currency_id)
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughDerivative", a.currency_id)
 
                 //inner_call processing
                 innerCall = (a.inner_call != undefined) ? a.inner_call : 'notfound'
@@ -347,7 +347,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                     let [feeSymbol, feeRelayChain] = this.processFeeLocation(indexer, feelocation, relayChain)
                     if (feeSymbol) {
                         targetedSymbol = feeSymbol
-                        let [feeXcmInteriorKey] = indexer.check_refintegrity_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processOutgoingXCMTransactor -xcmTransactor:transactThroughDerivativeMultilocation", feelocation)
+                        let [feeXcmInteriorKey] = indexer.check_refintegrity_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processFeeLocation", "moonbeam xcmTransactor:transactThroughDerivativeMultilocation", feelocation)
                         if (feeXcmInteriorKey) targetedXcmInteriorKey = feeXcmInteriorKey
                     }
                 }
@@ -437,7 +437,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                     let [feeSymbol, feeRelayChain] = this.processFeeLocation(indexer, feelocation, relayChain)
                     if (feeSymbol) {
                         targetedSymbol = feeSymbol
-                        let [feeXcmInteriorKey] = indexer.check_refintegrity_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "xcmTransactor:transactThroughSignedMultilocation", feelocation)
+                        let [feeXcmInteriorKey] = indexer.check_refintegrity_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processFeeLocation", "moonbeam xcmTransactor:transactThroughSignedMultilocation", feelocation)
                         if (feeXcmInteriorKey) targetedXcmInteriorKey = feeXcmInteriorKey
                     }
                 }
@@ -508,7 +508,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 //asset = this.processGenericCurrencyID(indexer, a.fee_currency_id) //inferred approach
                 //rawAsset = this.processRawGenericCurrencyID(indexer, a.fee_currency_id)
                 let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
-                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processOutgoingXCMTransactor - xcmTransactor:transactThroughSigned", a.currency_id)
+                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.currency_id)
 
 
                 // get msgHash, innerCall from event
@@ -541,7 +541,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                     let [feeSymbol, feeRelayChain] = this.processFeeLocation(indexer, feelocation, relayChain)
                     if (feeSymbol) {
                         targetedSymbol = feeSymbol
-                        let [feeXcmInteriorKey] = indexer.check_refintegrity_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processOutgoingXCMTransactor - xcmTransactor:transactThroughSovereign", feelocation)
+                        let [feeXcmInteriorKey] = indexer.check_refintegrity_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processFeeLocation", "moonbeam xcmTransactor:transactThroughSovereign", feelocation)
                         if (feeXcmInteriorKey) targetedXcmInteriorKey = feeXcmInteriorKey
                     }
                 }

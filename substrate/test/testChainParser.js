@@ -1,6 +1,7 @@
 #!/usr/bin/env node
- // Usage:  testChainParser 
+ // Usage:  testChainParser
 const Indexer = require("../indexer");
+const paraTool = require("../paraTool");
 
 async function main() {
     let testcases = {
@@ -110,6 +111,7 @@ async function main() {
                     "fungible": "0x000000000000000000f22a491e8dd34f"
                 }
             },
+            {"id":{"concrete":{"parents":1,"interior":{"x3":[{"parachain":1000},{"palletInstance":50},{"generalIndex":8}]}}},"fun":{"fungible":850059116249}}
         ],
         22007: [
             // Current: {"Token":"KINT"}  Should be: {"Token":"18446744073709551622"}  DIFFERENT: KINT
@@ -130,17 +132,33 @@ async function main() {
                     "fungible": 100000000000
                 }
             }
+        ],
+        2030: [
+            {
+              "id": {
+                "concrete": {
+                  "parents": 1,
+                  "interior": {
+                    "here": null
+                  }
+                }
+              },
+              "fun": {
+                "fungible": 9864879524
+              }
+            }
         ]
     };
     for (const chainID of Object.keys(testcases)) {
         var indexer = new Indexer();
         await indexer.assetManagerInit();
         let chain = await indexer.getChain(chainID);
-        await indexer.setup_chainParser(chain, indexer.debugLevel);
+        await indexer.setup_chainParser(chain, paraTool.debugTracing);
+        indexer.relayChain = paraTool.getRelayChainByChainID(chainID)
         for (const c of testcases[chainID]) {
-            let [targetedAsset, rawTargetedAsset] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
+            let [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
             // the signature could instead be:  let [symbol, relayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
-            console.log(chainID, c, targetedAsset, rawTargetedAsset);
+            console.log(`relaychain=${indexer.relayChain}, chainID=${chainID},targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
         }
     }
 }

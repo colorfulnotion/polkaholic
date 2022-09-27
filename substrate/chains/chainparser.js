@@ -1709,7 +1709,7 @@ module.exports = class ChainParser {
                     //rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingXTokensEvent - processV1ConcreteFungible", asset)
                     let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
                     //console.log(`processOutgoingXTokensEvent asset targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}`, asset)
-                    let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processOutgoingXTokensEvent - processV1ConcreteFungible", asset)
+                    let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTokensEvent ${section_method}`, asset)
                     let aa = {
                         //asset: targetedAsset,
                         //rawAsset: rawTargetedAsset,
@@ -1887,7 +1887,7 @@ module.exports = class ChainParser {
                     let asset = a.asset
                     if (asset != undefined && asset.fun !== undefined && asset.fun.fungible !== undefined) {
                         let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
-                        let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processOutgoingXTransfer - processV1ConcreteFungible", asset)
+                        let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTransfer ${section_method}`, asset)
                         let aa = {
                             xcmInteriorKey: targetedXcmInteriorKey,
                             xcmSymbol: targetedSymbol,
@@ -2002,7 +2002,7 @@ module.exports = class ChainParser {
                       "amount": 42000000000000,
                     */
                     let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
-                    let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processOutgoingXTokensTransfer - processXcmGenericCurrencyID", a.currency_id)
+                    let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", `processOutgoingXTokensTransfer ${section_method}`, a.currency_id)
                     //let rawAssetString = this.processRawGenericCurrencyID(indexer, a.currency_id)
                     //MK REVIEW
                     let aa = {
@@ -2023,7 +2023,7 @@ module.exports = class ChainParser {
                     let transferIndex = 0
                     for (const c of currencies) {
                         let targetedSymbol = this.processXcmGenericCurrencyID(indexer, c[0]) //inferred approach
-                        let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processOutgoingXTokensTransfer - xTokens:transferMulticurrencies", c[0])
+                        let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", `processOutgoingXTokensTransfer ${section_method}`, c[0])
                         let aa = {
                             //asset: this.processGenericCurrencyID(indexer, c[0]), //inferred approach
                             //rawAsset: this.processRawGenericCurrencyID(indexer, c[0]),
@@ -2077,7 +2077,7 @@ module.exports = class ChainParser {
                             // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                                 let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
-                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processOutgoingXTokensTransfer - processV1ConcreteFungible", asset)
+                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTokensTransfer ${section_method}`, asset)
                                 let aa = {
                                     xcmInteriorKey: targetedXcmInteriorKey,
                                     xcmSymbol: targetedSymbol,
@@ -2613,7 +2613,7 @@ module.exports = class ChainParser {
                                 //let [targetedAsset, rawTargetedAsset, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
                                 //rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingPolkadotXcm - processV0ConcreteFungible", fungibleAsset)
                                 let [targetedSymbol, targetedRelayChain, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
-                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processOutgoingPolkadotXcm - processV0ConcreteFungible", fungibleAsset)
+                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV0ConcreteFungible", `processOutgoingPolkadotXcm ${section_method}`, fungibleAsset)
                                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`targetedSymbol=${targetedSymbol}, amountSent=${amountSent}`)
                                 let aa = {
                                     //asset: targetedAsset,
@@ -2639,7 +2639,7 @@ module.exports = class ChainParser {
                             // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                                 let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
-                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processOutgoingPolkadotXcm - processV1ConcreteFungible", asset)
+                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingPolkadotXcm ${section_method}`, asset)
                                 let aa = {
                                     xcmInteriorKey: targetedXcmInteriorKey,
                                     xcmSymbol: targetedSymbol,
@@ -2913,7 +2913,7 @@ module.exports = class ChainParser {
                                 */
                                 let fungibleAsset = asset.concreteFungible;
                                 let [targetedSymbol, targetedRelayChain, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
-                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processOutgoingXcmPallet - processV0ConcreteFungible", fungibleAsset)
+                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV0ConcreteFungible", `processOutgoingXcmPallet ${section_method}`, fungibleAsset)
                                 let aa = {
                                     xcmInteriorKey: targetedXcmInteriorKey,
                                     xcmSymbol: targetedSymbol,
@@ -2955,7 +2955,7 @@ module.exports = class ChainParser {
                             */
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                                 let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
-                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processOutgoingXcmPallet - processV1ConcreteFungible", asset)
+                                let targetedXcmInteriorKey = indexer.check_refintegrity_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXcmPallet ${section_method}`, asset)
                                 let aa = {
                                     xcmInteriorKey: targetedXcmInteriorKey,
                                     xcmSymbol: targetedSymbol,
@@ -4490,7 +4490,7 @@ module.exports = class ChainParser {
         //let rawAssetString = indexer.getNativeAsset();
         let relayChain = indexer.relayChain
         let targetedSymbol = indexer.getNativeSymbol()
-        let targetedXcmInteriorKey = indexer.check_refintegrity_asset_signal(targetedSymbol, "processBalancesDepositSignal")
+        let targetedXcmInteriorKey = indexer.check_refintegrity_signal(targetedSymbol, "getNativeSymbol", "balances(Deposit)", targetedSymbol)
 
         let fromAddress = paraTool.getPubKey(d[0]);
         let amountReceived = paraTool.dechexToInt(d[1]);
@@ -4533,7 +4533,7 @@ module.exports = class ChainParser {
         //let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         let relayChain = indexer.relayChain
         let targetedSymbol = this.processXcmGenericCurrencyID(indexer, d[0]) //inferred approach
-        let targetedXcmInteriorKey = indexer.check_refintegrity_asset_signal(targetedSymbol, "processCurrenciesDepositedSignal")
+        let targetedXcmInteriorKey = indexer.check_refintegrity_signal(targetedSymbol, "processXcmGenericCurrencyID", "currencies(Deposited)", d[0])
 
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
@@ -4574,7 +4574,7 @@ module.exports = class ChainParser {
         //let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         let relayChain = indexer.relayChain
         let targetedSymbol = this.processXcmGenericCurrencyID(indexer, d[0]) //inferred approach
-        let targetedXcmInteriorKey = indexer.check_refintegrity_asset_signal(targetedSymbol, "processTokensDepositedSignal")
+        let targetedXcmInteriorKey = indexer.check_refintegrity_signal(targetedSymbol, "processXcmGenericCurrencyID", "tokens(Deposited)", d[0])
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
         //console.log(`[${fromAddress}] ${assetString}`, amountReceived, `finalized=${finalized}`)
@@ -4633,7 +4633,7 @@ module.exports = class ChainParser {
         */
         let relayChain = indexer.relayChain
         let targetedSymbol = this.processXcmGenericCurrencyID(indexer, d[0]) //inferred approach
-        let targetedXcmInteriorKey = indexer.check_refintegrity_asset_signal(targetedSymbol, "processAssetsIssuedSignal")
+        let targetedXcmInteriorKey = indexer.check_refintegrity_signal(targetedSymbol, "processXcmGenericCurrencyID", "assets(Issued)", d[0])
 
         //TODO: not sure here..
         //let assetString = this.processGenericCurrencyID(indexer, d[0]);

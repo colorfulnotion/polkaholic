@@ -1169,6 +1169,10 @@ module.exports = {
         let res = blake2AsHex(hexToU8a(s), 64)
         return res.slice(2)
     },
+    Blake256FromStr: function(s) {
+        let res = blake2AsHex(stringToU8a(s), 256)
+        return res.slice(2)
+    },
     verifyprefix: function(currencyStr = "45bc486788b29b5a0100810082") {
         // pairs
         //45bc486788b29b5a0100810082  =XXHash(0x0100810082)
