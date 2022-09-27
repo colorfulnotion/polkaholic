@@ -2811,6 +2811,84 @@ module.exports = class ChainParser {
                 let a = args;
                 let assetAndAmountSents = [];
 
+                // !!!! beneficiary processing + dest processing MUST happen before asset
+                // beneficiary processing -- TODO: check that fromAddress is in beneficiary
+                if (a.beneficiary !== undefined) {
+                    let beneficiary = a.beneficiary
+                    if (beneficiary.v0 !== undefined) {
+                        let beneficiary_v0 = beneficiary.v0
+                        //console.log("beneficiary v0=", JSON.stringify(a.beneficiary.v0));
+                        if (beneficiary_v0.x1 != undefined) {
+                            //0x0db891b6d6af60401a21f72761ed04a6024bf37b6cdeaab62d0bc3963c5c9357
+                            [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary_v0.x1, relayChain)
+                        } else if (beneficiary_v0.x2 !== undefined) {
+                            // I think this this can happen when xcmPallet to para?
+                            [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary_v0.x2, relayChain)
+                        }
+
+                    } else if (beneficiary.v1 !== undefined) {
+                        //console.log(`beneficiary.v1 case`, JSON.stringify(beneficiary.v1, null, 2))
+                        //console.log("beneficiary v1=", JSON.stringify(a.beneficiary.v1));
+                        //0xfda47f26aa64e7824f6791162bfa87de83bfaa67c57f614299b5e1b687eb13b2
+                        //0x3a47436114ee38a5d93cb3f248127464dd1be797cdf174f8759bfcbf6503952c
+                        if (beneficiary.v1.interior !== undefined) {
+                            let beneficiaryV1Interior = beneficiary.v1.interior;
+                            // dest for relaychain
+                            if (beneficiaryV1Interior.x1 !== undefined) {
+                                [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV1Interior.x1, relayChain)
+                            } else if (beneficiaryV1Interior.x2 !== undefined) {
+                                [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV1Interior.x2, relayChain)
+                            } else {
+                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1.interior unknown case`, beneficiaryV1Interior)
+                            }
+                        } else {
+                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1 unknown case`, beneficiary.v1)
+                        }
+                    } else if (beneficiary.x1 !== undefined) {
+                        //0x2cfbeb75fe9a1e13a3a6cf700c27d1afd53c7f164c127e60763c2e27b959e195
+                        [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary.x1, relayChain)
+                    } else if (beneficiary.x2 !== undefined) {
+                        //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
+                        [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x2, relayChain)
+                    } else {
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown beneficiary`, beneficiary)
+                    }
+                }
+                // dest processing
+                let dest = a.dest;
+                let destAddress2 = false; // not used
+                if (dest.v0 !== undefined) {
+                    //todo: extract
+                    let dest_v0 = dest.v0
+                    if (dest_v0.x1 !== undefined) {
+                        [paraIDDest, chainIDDest] = this.processDestV0X1(dest_v0.x1, relayChain)
+                    } else if (dest_v0.x2 !== undefined) {
+                        /*
+                        {"x2":[{"parent":null},{"parachain":2000}]}
+                        */
+                        [paraIDDest, chainIDDest] = this.processDestV0X2(dest_v0.x2, relayChain)
+
+                    } else {
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
+                        chainIDDest = false
+                    }
+                } else if ((dest.v1 !== undefined) && (dest.v1.interior !== undefined)) {
+                    // xcmPallet dest.v1.interior does not have id?
+                    let destV1Interior = dest.v1.interior
+                    if (destV1Interior.x1 !== undefined) {
+                        // {"v1":{"parents":0,"interior":{"x1":{"parachain":2012}}}}
+                        //[paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
+                        [paraIDDest, chainIDDest] = this.processDestV0X1(destV1Interior.x1, relayChain)
+                    } else if (destV1Interior.x2 !== undefined) {
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
+                        // dest for parachain, add 20000 for kusama-relay
+                        [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
+                    } else {
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
+                        chainIDDest = false
+                    }
+                }
+
                 // asset processing
                 //console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method}`, JSON.stringify(a, null, 2))
                 if (a !== undefined && a.assets !== undefined) {
@@ -2891,83 +2969,6 @@ module.exports = class ChainParser {
                                 asset = false;
                             }
                             transferIndex++
-                        }
-                    }
-
-                    // beneficiary processing -- TODO: check that fromAddress is in beneficiary
-                    if (a.beneficiary !== undefined) {
-                        let beneficiary = a.beneficiary
-                        if (beneficiary.v0 !== undefined) {
-                            let beneficiary_v0 = beneficiary.v0
-                            //console.log("beneficiary v0=", JSON.stringify(a.beneficiary.v0));
-                            if (beneficiary_v0.x1 != undefined) {
-                                //0x0db891b6d6af60401a21f72761ed04a6024bf37b6cdeaab62d0bc3963c5c9357
-                                [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary_v0.x1, relayChain)
-                            } else if (beneficiary_v0.x2 !== undefined) {
-                                // I think this this can happen when xcmPallet to para?
-                                [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary_v0.x2, relayChain)
-                            }
-
-                        } else if (beneficiary.v1 !== undefined) {
-                            //console.log(`beneficiary.v1 case`, JSON.stringify(beneficiary.v1, null, 2))
-                            //console.log("beneficiary v1=", JSON.stringify(a.beneficiary.v1));
-                            //0xfda47f26aa64e7824f6791162bfa87de83bfaa67c57f614299b5e1b687eb13b2
-                            //0x3a47436114ee38a5d93cb3f248127464dd1be797cdf174f8759bfcbf6503952c
-                            if (beneficiary.v1.interior !== undefined) {
-                                let beneficiaryV1Interior = beneficiary.v1.interior;
-                                // dest for relaychain
-                                if (beneficiaryV1Interior.x1 !== undefined) {
-                                    [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV1Interior.x1, relayChain)
-                                } else if (beneficiaryV1Interior.x2 !== undefined) {
-                                    [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV1Interior.x2, relayChain)
-                                } else {
-                                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1.interior unknown case`, beneficiaryV1Interior)
-                                }
-                            } else {
-                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1 unknown case`, beneficiary.v1)
-                            }
-                        } else if (beneficiary.x1 !== undefined) {
-                            //0x2cfbeb75fe9a1e13a3a6cf700c27d1afd53c7f164c127e60763c2e27b959e195
-                            [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary.x1, relayChain)
-                        } else if (beneficiary.x2 !== undefined) {
-                            //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
-                            [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x2, relayChain)
-                        } else {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown beneficiary`, beneficiary)
-                        }
-                    }
-                    // dest processing
-                    let dest = a.dest;
-                    let destAddress2 = false; // not used
-                    if (dest.v0 !== undefined) {
-                        //todo: extract
-                        let dest_v0 = dest.v0
-                        if (dest_v0.x1 !== undefined) {
-                            [paraIDDest, chainIDDest] = this.processDestV0X1(dest_v0.x1, relayChain)
-                        } else if (dest_v0.x2 !== undefined) {
-                            /*
-                            {"x2":[{"parent":null},{"parachain":2000}]}
-                            */
-                            [paraIDDest, chainIDDest] = this.processDestV0X2(dest_v0.x2, relayChain)
-
-                        } else {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
-                            chainIDDest = false
-                        }
-                    } else if ((dest.v1 !== undefined) && (dest.v1.interior !== undefined)) {
-                        // xcmPallet dest.v1.interior does not have id?
-                        let destV1Interior = dest.v1.interior
-                        if (destV1Interior.x1 !== undefined) {
-                            // {"v1":{"parents":0,"interior":{"x1":{"parachain":2012}}}}
-                            //[paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
-                            [paraIDDest, chainIDDest] = this.processDestV0X1(destV1Interior.x1, relayChain)
-                        } else if (destV1Interior.x2 !== undefined) {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
-                            // dest for parachain, add 20000 for kusama-relay
-                            [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
-                        } else {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
-                            chainIDDest = false
                         }
                     }
 
