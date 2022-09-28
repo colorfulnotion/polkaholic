@@ -1,12 +1,16 @@
 #!/usr/bin/env node
- // Usage:  xcmmatch [lookbackDays]
+ // Usage:  xcmmatch [lookbackDays] [rematch]
 var XCMManager = require("./xcmmanager");
 
 async function main() {
     let lookbackDays = 0;
+    let forceRematch = 0;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             lookbackDays = parseInt(val, 10);
+        }
+        if (index == 3 && val.length > 0) {
+            forceRematch = parseInt(val, 10);
         }
     });
 
@@ -18,7 +22,7 @@ async function main() {
     await manager.setupAPI(chain);
 
     if (lookbackDays > 0) {
-        await manager.xcmanalytics(chain, lookbackDays)
+        await manager.xcmanalytics(chain, lookbackDays, forceRematch)
         process.exit(0);
     }
 

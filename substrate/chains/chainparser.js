@@ -4127,13 +4127,23 @@ module.exports = class ChainParser {
 
     //acala/karura/bifrost/basilisk
     //assetRegistry.assetMetadatas
+    //assetRegistry.currencyMetadatas
     async fetchAssetRegistry(indexer) {
         if (!indexer.api) {
             console.log(`[fetchAssetRegistry] Fatal indexer.api not initiated`)
             return
         }
         var a;
+        let isAcala = true
         switch (indexer.chainID) {
+            case paraTool.chainIDBifrostDOT:
+            case paraTool.chainIDBifrostKSM:
+                console.log(`fetch assetRegistry:currencyMetadatas`)
+                a = await indexer.api.query.assetRegistry.currencyMetadatas.entries()
+                isAcala = false
+                break;
+            case paraTool.chainIDAcala:
+            case paraTool.chainIDKarura:
             default:
                 console.log(`fetch assetRegistry:assetMetadatas`)
                 a = await indexer.api.query.assetRegistry.assetMetadatas.entries()
