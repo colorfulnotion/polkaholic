@@ -11,7 +11,7 @@
     <% let url = ( account.address.length == 42 ) ? `/address/${account.address}` : `/account/${account.address}`;
        let accountTxt = (accounts.length == 1) ? `Account` : `Account #${j+1}`
     %>
-      <B><%=accountTxt%> </B> <img src="/identicon/<%= account.address; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+      <B><%=accountTxt%> </B> <%- uiTool.presentBlockiesOrIdenticon(account.address, 25) %>
       <a href='<%= url; %>'>
         <code><%= account.address; %></code>
       </a>
