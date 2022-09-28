@@ -440,8 +440,10 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(v.xcmConcept, v.relayChain);
                 let decimals = this.assetInfo[nativeAssetChain].decimals;
                 let symbol = this.assetInfo[nativeAssetChain].symbol;
+                let isUSD = this.assetInfo[nativeAssetChain].isUSD;
                 a = {
                     chainID: v.chainID,
+		    isUSD: isUSD, 
                     xcmConcept: v.xcmConcept,
                     asset: v.asset,
                     decimals: decimals,
@@ -465,7 +467,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
         }
 
-        let xcmAssets = await this.poolREADONLY.query("select xcmInteriorKey, symbol, relayChain, nativeAssetChain, decimals, parent as parents from xcmasset");
+        let xcmAssets = await this.poolREADONLY.query("select xcmInteriorKey, symbol, relayChain, nativeAssetChain, isUSD, decimals, parent as parents from xcmasset");
         for (let i = 0; i < xcmAssets.length; i++) {
             let v = xcmAssets[i];
             if (xcmAssetInfo[v.xcmInteriorKey] == undefined) {
@@ -1047,6 +1049,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             return (a - b.ts);
         }
         let q = queryRaw;
+
         let assetInfo = null;
         if (typeof queryRaw == "string") {
             if (q.substring(0, 2) == "0x") q = q.toLowerCase();
@@ -1075,7 +1078,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             assetInfo = this.xcmSymbolInfo[symbolRelayChain];
             if (assetInfo) q.isXCAsset = true;
         }
-        let res = {}
+	let res = {}
         if (assetInfo) {
             q.symbol = assetInfo.symbol
             if (assetInfo.relayChain) {
@@ -1093,7 +1096,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             res.assetInfo = assetInfo
             res.priceUSDCurrent = assetInfo.priceUSD;
         } else {
-            return null;
+	    return null;
         }
         // see if we can find price via direct lookup
         if (assetInfo.isUSD > 0) {
@@ -1102,6 +1105,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             if (q.val) res.valUSD = q.val;
             return res;
         }
+
         // console.log("computePriceUSD", q, "assetInfo", assetInfo);
         let priceUSDCurrent = assetInfo.priceUSD;
         let currentTS = this.getCurrentTS();

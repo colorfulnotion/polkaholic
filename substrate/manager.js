@@ -47,10 +47,7 @@ module.exports = class Manager extends AssetManager {
 
     // xcmanalytics
     xcmAddress = null;
-    potentialAssetChains = null;
     parachainID = null;
-    concept = null;
-
 
     async getFinalizedBlockInfo(chainID, api) {
         let done = false;
