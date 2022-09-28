@@ -447,6 +447,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     parents: v.parents,
                     xcmInteriorKey: xcmInteriorKey,
                     nativeAssetChain: nativeAssetChain,
+		    assetType: "Token" 
                 }
                 if (symbol) {
                     let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain);
@@ -627,7 +628,15 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         //console.log(`this.assetInfo`, assetInfo)
         this.currencyIDInfo = currencyIDInfo;
     }
-
+    validXCMSymbol(symbol, chainID, ctx, o) {
+	let relayChain = paraTool.getRelayChainByChainID(chainID);
+        let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
+        if (this.symbolRelayChainAsset[symbolRelayChain]) {
+            return true;
+        }
+        return false;
+    }
+    
     getChainXCMAssetBySymbol(symbol, relayChain, chainID) {
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
         if (this.symbolRelayChainAsset[symbolRelayChain] == undefined || this.symbolRelayChainAsset[symbolRelayChain][chainID] == undefined) {
@@ -1059,11 +1068,10 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             if (assetInfo) q.isXCAsset = true;
         } else if (q.symbol != undefined && q.relayChain != undefined) {
             let symbolRelayChain = paraTool.makeAssetChain(q.symbol, q.relayChain);
-            let assetInfo = this.xcmSymbolInfo[symbolRelayChain];
+            assetInfo = this.xcmSymbolInfo[symbolRelayChain];
             if (assetInfo) q.isXCAsset = true;
         }
         let res = {}
-        //console.log("computePriceUSD", q, "assetInfo", assetInfo);
         if (assetInfo) {
             q.symbol = assetInfo.symbol
             if (assetInfo.relayChain) {
@@ -1090,6 +1098,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             if (q.val) res.valUSD = q.val;
             return res;
         }
+        // console.log("computePriceUSD", q, "assetInfo", assetInfo);
         let priceUSDCurrent = assetInfo.priceUSD;
         let currentTS = this.getCurrentTS();
         switch (assetInfo.assetType) {

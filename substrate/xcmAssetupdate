@@ -10,8 +10,8 @@ async function main() {
         }
     });
     var manager = new XCMManager();
-    await manager.updateXcmInteriorOut(true)
-    await manager.updateXcmInteriorOut(false)
+    //  await manager.updateXcmInteriorOut(true)
+    //await manager.updateXcmInteriorOut(false)
 }
 
 

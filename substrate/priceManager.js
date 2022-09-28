@@ -219,7 +219,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     }
 
     // Asset Model Generation: For parachain DEX (Acala/Karura, Parallel/Heiko), use parachain SDK to get data
-    async assetpricelogGenerationParachain(chainID = -1, startDate = "2022-09-23", endDate = null, interval = "daily") {
+    async assetpricelogGenerationParachain(chainID = -1, startDate = "2022-09-27", endDate = null, interval = "daily") {
         await this.init();
         // a Parachain with a DEX behaves like a single centralized EVM router with router
         let chain = await this.getChain(chainID);
@@ -229,6 +229,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         }
         let routerAssets = await this.getChainRouterAssets(router, false);
         let routerPaths = await this.getRouterAssetPaths(router, routerAssets, 2, false);
+	console.log(JSON.stringify(routerPaths, null, 4));
         await this.setupAPI(chain);
         let xcmassetpricelog = [];
         let assetpricelog = [];
@@ -236,7 +237,8 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         let routerAssetChain = `parachain~${chainID}`
         const indexTS = Math.floor(this.getCurrentTS() / 3600) * 3600;
         let blocks = await this.get_blocks_by_interval(chainID, startDate, endDate, interval);
-        const {
+
+	const {
             FixedPointNumber,
             Token,
             TokenPair
@@ -265,7 +267,12 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                         if (chainID == paraTool.chainIDAcala || chainID == paraTool.chainIDKarura) {
                             const swapPromise = new SwapPromise(api);
                             const wallet = new WalletPromise(api);
-                            let tokenPath = [wallet.getToken(hop.token0Symbol), wallet.getToken(hop.token1Symbol)];
+			    let token0 = hop.token0Symbol;
+			    let token1 = hop.token1Symbol;
+			    if ( token0 == "lcDOT" ) token0 = "lc://13";
+			    if ( token1 == "lcDOT" ) token1 = "lc://13";
+                            let tokenPath = [wallet.getToken(token0), wallet.getToken(token1)];
+			    console.log("TOKEN PATH", tokenPath, wallet);
                             // CHECK directionality of pair usage
                             for (let d = 0; d < 4; d++) {
                                 let amountIn = (10 ** (d));
@@ -280,8 +287,9 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                         } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDParallelHeiko) {
                             // TODO:
                         }
-                        console.log(assetChain, priceUSD);
+			let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
                         let liquid = this.isPriceUSDArrayLiquid(priceUSD);
+                        console.log(logDT, hr, assetChain, liquid, priceUSD);
                         if (isXCAsset) {
                             xcmassetpricelog.push(`('${symbol}', '${relayChain}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
                             if (xcmassetpricelog.length > 100) {
@@ -311,7 +319,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                         }
                     }
                 } catch (err) {
-                    console.log(err)
+                    console.log(hop, err)
                 }
             }
         }
@@ -545,7 +553,6 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                 })
             } catch (error) {
                 console.log(error)
-                process.exit(0);
             }
         }
     }

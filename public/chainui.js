@@ -315,26 +315,19 @@ async function showxcmtransfers(filter = {}) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         try {
-                            let parsedAsset = JSON.parse(row.asset);
-                            let symbol = parsedAsset.Token;
-                            let assetChain = row.asset + "~" + row.chainID;
+                            let symbol = row.symbol;
                             if (symbol !== undefined) {
-                                return presentTokenCount(data) + " " + presentAsset(row);
-                            } else {
-                                return row.asset;
+                                return presentTokenCount(data) + " " + symbol
                             }
                         } catch (err) {
-                            console.log("row.asset", row.asset, err);
+                            console.log("rowsymbol", row, err);
                         }
                     } else {
                         try {
-                            let parsedAsset = JSON.parse(row.asset);
-                            let symbol = parsedAsset.Token;
+                            let symbol = row.symbol
                             if (symbol !== undefined) {
                                 return data + " " + symbol
-                            } else {
-                                return data + " " + row.asset;
-                            }
+			    }
                         } catch (err) {
                             return ""
                         }
