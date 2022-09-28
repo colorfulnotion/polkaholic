@@ -1141,7 +1141,6 @@ order by msgHash, diffSentAt, diffTS`
                 if (p) {
                     priceUSD = p.priceUSD;
 		    decimals = p.assetInfo ? p.assetInfo.decimals : null;
-		    console.log("OHDEAD", p);
 		    if ( decimals ) {
 			amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
 			amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
