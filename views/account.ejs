@@ -6,7 +6,7 @@ let suggest = false; // disabled for now
   <div class="row g-0">
     <div class="col-md-2  text-center">
 <% if ( account.address.length == 42 ) { %>
-      <%- uiTool.presentBlockies(account.address); %>
+      <%- uiTool.presentBlockiesOrIdenticon(account.address); %>
 <% } else { %>
       <img src="/identicon/<%= account.address; %>"  class="rounded-start"  width="128"  loading="lazy" class="card-img-center"/>
 <% } %>

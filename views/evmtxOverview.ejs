@@ -49,12 +49,14 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
     <tr>
       <td>From</td>
       <td>
+    <%- uiTool.presentBlockiesOrIdenticon(f.from, 20) %>
 	<%- uiTool.presentAddress(f.from) %>
       </td>
     </tr>
     <tr>
       <td>Interacted With (To)</td>
       <td>
+    <%- uiTool.presentBlockiesOrIdenticon(f.to, 20) %>
 	<%- uiTool.presentAddress(f.to) %>
       </td>
     </tr>

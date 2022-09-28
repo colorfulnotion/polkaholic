@@ -2,7 +2,7 @@
 <div class="card mb-3">
   <div class="row g-0">
     <div class="col-md-2  text-center">
-      <%- uiTool.presentBlockies(address); %><br/>
+      <%- uiTool.presentBlockiesOrIdenticon(address); %><br/>
       <% if ( contract ) { %>
           <%- contract.assetType %>
       <% } %>
@@ -11,7 +11,7 @@
       <div class="card-body">
         <h5 class="card-title">
 	<% if ( contract ) { %>
-	Contract <%- contract.asset; %> 
+	Contract <%- contract.asset; %>
 	<% } else { %>
 	Address	<%- address; %>
 	<% } %>
@@ -57,7 +57,7 @@
 		<td><%- include("addressTokens", { account }) %></td>
 	</tr>
 	</table>
-	
+
       </div>
     </div>
   </div>
