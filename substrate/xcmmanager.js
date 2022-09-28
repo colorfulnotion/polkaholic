@@ -673,10 +673,14 @@ order by msgHash, diffSentAt, diffTS`
                   parents: 0 -> referring to itself
                   parents: 1 -> referring to parents (relaychain)
                 */
-                let targetAsset = (parents == 0) ? this.getNativeChainAsset(chainIDDest) : this.getNativeChainAsset(relayChainID)
-                //let targetAsset = (parents == 0) ? this.getNativeChainAsset(relayChainID) : this.getNativeChainAsset(relayChainID)
-                //console.log(`[paranets=${parents}] ${chainID} ${chainIDDest} ${JSON.stringify(interior)} -> ${targetAsset}`)
-                return targetAsset
+                let targetAssetChain = (parents == 0) ? this.getNativeChainAsset(chainIDDest) : this.getNativeChainAsset(relayChainID)
+                let [targetAsset, targetChainID] = paraTool.parseAssetChain(targetAssetChain)
+                let targetSymbol = this.getAssetSymbol(targetAsset, targetChainID)
+                let symbolRelayChain = paraTool.makeAssetChain(targetSymbol, relayChain);
+                let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+                let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
+                //console.log(`[paranets=${parents}] ${chainID} ${chainIDDest} ${JSON.stringify(interior)} -> ${targetAssetChain}, symbolRelayChain=${symbolRelayChain}, xcmInteriorKey=${xcmInteriorKey}, xcmAssetInfo`, xcmAssetInfo)
+                return [targetAssetChain, xcmInteriorKey]
             } else {
                 let interiorVal = interior[interiorType]
                 if (parents == 1 || (chainIDDest == relayChainID)) {
@@ -699,24 +703,25 @@ order by msgHash, diffSentAt, diffTS`
                         //new_interiorVal.concat(interiorVal)
                     } else {
                         console.log(`expansion error. expecting array`, JSON.stringify(interior))
-                        return false
+                        return [false, false]
                     }
                     console.log(`${chainID}, ${chainIDDest} [parents=${parents}] expandedkey ${JSON.stringify(interiorVal)} ->  ${JSON.stringify(new_interiorVal)}`)
                     interiorVal = new_interiorVal
                 }
                 let interiorVStr = JSON.stringify(interiorVal)
                 let res = this.getXCMAsset(interiorVStr, relayChain)
+                let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain);
                 if (res) {
-                    //console.log(`get_concrete_assetChain FOUND ${chainID}, ${chainIDDest} [parents=${parents}] [${interiorType}] ${JSON.stringify(interior)} -> ${res}`)
-                    return res;
+                    console.log(`get_concrete_assetChain FOUND ${chainID}, ${chainIDDest} [parents=${parents}] [${interiorType}] ${JSON.stringify(interior)} -> ${res}, ${xcmInteriorKey}`)
+                    return [res, xcmInteriorKey];
                 } else {
                     console.log(`get_concrete_assetChain error ${chainID}, ${chainIDDest} [parents=${parents}] [${interiorType}] ${JSON.stringify(interior)}`)
-                    return false
+                    return [false, false]
                 }
             }
         } else {
             console.log("get_concrete_assetChain FAILED2 - parents/interior not set", c);
-            return null;
+            return [null, false];
         }
     }
 
@@ -725,11 +730,12 @@ order by msgHash, diffSentAt, diffTS`
         if (c.id != undefined) {
             if (c.id.concrete != undefined) {
                 if (ctx == "buyExecution") {} else {
-                    let assetChain = this.get_concrete_assetChain(analysis, c.id.concrete, chainID, chainIDDest);
+                    let [assetChain, xcmInteriorKey] = this.get_concrete_assetChain(analysis, c.id.concrete, chainID, chainIDDest);
                     if (assetChain && (analysis.assetChains[assetChain] == undefined)) {
                         analysis.assetChains[assetChain] = 1;
-                        //console.log("PUSHING", assetChain, c.id.concrete);
-                        return assetChain;
+                        analysis.xcmInteriorKeys[xcmInteriorKey] = 1;
+                        //console.log("PUSHING", assetChain, xcmInteriorKey,  c.id.concrete);
+                        return [assetChain, xcmInteriorKey];
                     } else {
                         console.log("analyzeXCM_MultiAsset MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.id.concrete));
                     }
@@ -738,18 +744,19 @@ order by msgHash, diffSentAt, diffTS`
                 console.log("analyzeXCM_MultiAsset NOT CONCRETE PROBLEM", chainID, chainIDDest, JSON.stringify(c))
             }
         } else if (c.concreteFungible != undefined) {
-            let assetChain = this.get_concrete_assetChain(analysis, c.concreteFungible.id, chainID, chainIDDest);
+            let [assetChain, xcmInteriorKey] = this.get_concrete_assetChain(analysis, c.concreteFungible.id, chainID, chainIDDest);
             if (assetChain && (analysis.assetChains[assetChain] == undefined)) {
                 analysis.assetChains[assetChain] = 1;
-                //console.log("PUSHING", assetChain, c.id.concrete);
-                return assetChain;
+                analysis.xcmInteriorKeys[xcmInteriorKey] = 1;
+                //console.log("PUSHING", assetChain, xcmInteriorKey, c.id.concrete);
+                return [assetChain, xcmInteriorKey];
             } else {
                 console.log("analyzeXCM_MultiAsset V0 MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.concreteFungible.id));
             }
         } else {
             console.log("analyzeXCM_MultiAsset NO ID PROBLEM", chainID, chainIDDest, JSON.stringify(c))
         }
-        return (false);
+        return [false, false];
     }
 
     analyzeXCM_MultiAssetFilter(analysis, c, fld, chainID, chainIDDest, ctx) {
@@ -760,9 +767,9 @@ order by msgHash, diffSentAt, diffTS`
             // analyzeXCM_MultiAssetFilter 22085 2 {"definite":[{"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10000000000}}]}
             if (Array.isArray(c[fld])) {
                 for (let i = 0; i < c[fld].length; i++) {
-                    let ac = this.analyzeXCM_MultiAsset(analysis, c[fld][i], chainID, chainIDDest, "multiassetfilter")
+                    let [ac, xcmKey] = this.analyzeXCM_MultiAsset(analysis, c[fld][i], chainID, chainIDDest, "multiassetfilter")
                     if (ac) {
-                        console.log("analyzeXCM_MultiAssetFilter", ctx, chainID, chainIDDest, JSON.stringify(c[fld][i]), ac);
+                        console.log("analyzeXCM_MultiAssetFilter", ctx, chainID, chainIDDest, JSON.stringify(c[fld][i]), ac, xcmKey);
                     }
                 }
             }
@@ -1056,7 +1063,8 @@ order by msgHash, diffSentAt, diffTS`
     performAnalysisInstructions(msg, chainID, chainIDDest) {
         let analysis = {
             xcmAddresses: [],
-            assetChains: {}
+            assetChains: {},
+            xcmInteriorKeys: {}
         }
         this.chainParserInit(chainID, this.debugLevel);
         let version = Object.keys(msg)[0]
@@ -1089,7 +1097,7 @@ order by msgHash, diffSentAt, diffTS`
         //console.log(paraTool.removeNewLine(sql))
         let xcmRecs = await this.pool.query(sql);
         let out = [];
-        let vals = ["chainID", "chainIDDest", "parentInclusionFingerprints", "instructionFingerprints", "assetChains", "beneficiaries2"];
+        let vals = ["chainID", "chainIDDest", "parentInclusionFingerprints", "instructionFingerprints", "assetChains", "beneficiaries2", "xcmInteriorKeys"];
         let parentIncFingerprints = [];
         console.log("computeXCMFingerprints:", xcmRecs.length, sql)
         for (let r = 0; r < xcmRecs.length; r++) {
@@ -1099,7 +1107,9 @@ order by msgHash, diffSentAt, diffTS`
                 if (r == 0) lastTS = rec.blockTS;
                 let analysis = this.performAnalysisInstructions(msg, rec.chainID, rec.chainIDDest)
                 let assetChains = Object.keys(analysis.assetChains);
+                let xcmInteriorKeysRaw = Object.keys(analysis.xcmInteriorKeys);
                 let beneficiaries2 = (analysis.xcmAddresses.length > 0) ? `'${analysis.xcmAddresses.join('|')}'` : `'Null'`
+                let xcmInteriorKeys = (xcmInteriorKeysRaw.length > 0) ? `'${xcmInteriorKeysRaw.join('|')}'` : `'Null'`
                 var xcmObj = this.api.registry.createType('XcmVersionedXcm', rec.msgHex.toString());
                 let parentInclusionFingerprints = [];
                 let instructionFingerprints = []
@@ -1113,8 +1123,10 @@ order by msgHash, diffSentAt, diffTS`
                         });
                     }
                 }
+                let res = `('${rec.msgHash}', '${rec.blockNumber}', '${rec.incoming}', '${rec.chainID}', '${rec.chainIDDest}', '${JSON.stringify(parentInclusionFingerprints)}', '${JSON.stringify(instructionFingerprints)}', ${mysql.escape(JSON.stringify(assetChains))}, ${beneficiaries2}, ${xcmInteriorKeys})`
+                //console.log(`computeXCMFingerprint`, res)
+                out.push(res);
 
-                out.push(`('${rec.msgHash}', '${rec.blockNumber}', '${rec.incoming}', '${rec.chainID}', '${rec.chainIDDest}', '${JSON.stringify(parentInclusionFingerprints)}', '${JSON.stringify(instructionFingerprints)}', ${mysql.escape(JSON.stringify(assetChains))}, ${beneficiaries2})`);
             } catch (err) {
                 console.log(err);
             }
@@ -1126,14 +1138,15 @@ order by msgHash, diffSentAt, diffTS`
         }
 
         if (out.length > 0) {
-            console.log("computeXCMFingerprints", out.length);
+            console.log(`computeXCMFingerprints len=${out.length}`);
+            let sqlDebug = false
             await this.upsertSQL({
                 "table": "xcmmessages",
                 "keys": ["msgHash", "blockNumber", "incoming"],
                 "vals": vals,
                 "data": out,
                 "replace": vals
-            });
+            }, sqlDebug);
             out = [];
         }
         return lastTS;
@@ -1190,6 +1203,7 @@ order by msgHash, diffSentAt, diffTS`
           xcmmessages.executedEventID,
           xcmmessages.destStatus,
           xcmmessages.errorDesc,
+          xcmmessages.xcmInteriorKeys as xcmInteriorKeys0,
           d.eventID, d.symbol, d.relayChain, d.amountReceived, d.blockNumberDest, d.destTS, d.msgHash as candidateMsgHash
         from xcmmessages, xcmtransferdestcandidate as d
  where  d.fromAddress = xcmmessages.beneficiaries and
@@ -1234,6 +1248,8 @@ order by msgHash, diffSentAt, diffTS`
                 let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
                 let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
                 let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
+                let xcmInteriorKey0 = m.xcmInteriorKeys0 // from computeXCMFingerprints
+                if (xcmInteriorKey != xcmInteriorKey0) console.log(`mismatch xcmInteriorKey0=${xcmInteriorKey0}, xcmInteriorKey=${xcmInteriorKey}`)
                 let p = await this.computePriceUSD({
                     symbol: m.symbol,
 		    relayChain: m.relayChain,
@@ -1309,13 +1325,13 @@ order by msgHash, diffSentAt, diffTS`
                     }
                 }
                 if (xcmInteriorKeys.length > 0) {
-                    console.log(`${k}`, r)
+                    //console.log(`${k}`, r)
                     xcmInteriorKeysStr = `'${xcmInteriorKeys.join('|')}'`
                     localKeyMap[msgHash] = xcmInteriorKeysStr
                 }else if (localKeyMap[msgHash] != undefined){
                     xcmInteriorKeysStr = localKeyMap[msgHash]
                 }
-                console.log(`${k}, xcmInteriorKeys=${xcmInteriorKeys}, xcmInteriorKeysStr=${xcmInteriorKeysStr}`)
+                //console.log(`${k}, xcmInteriorKeys=${xcmInteriorKeysStr}`)
                 let ar = JSON.stringify(r);
                 if (ar.length < 1024) {
                     let valueUSD = this.sum_assetsReceived(r);

@@ -31,10 +31,10 @@ const MAX_PRICEUSD = 100000.00;
 module.exports = class AssetManager extends PolkaholicDB {
 
     assetInfo = {};
-    xcmAssetInfo = {}; // xcmInteriorKey   -> 
-    xcmInteriorInfo = {}; // nativeAssetChain -> 
+    xcmAssetInfo = {}; // xcmInteriorKey   ->
+    xcmInteriorInfo = {}; // nativeAssetChain ->
     // TODO:fuse these together
-    xcmSymbolInfo = {}; // symbolRelayChain -> 
+    xcmSymbolInfo = {}; // symbolRelayChain ->
     symbolRelayChainAsset = {}; // symbolRelayChain -> { ${chainID}: assetInfo }
     assetlog = {};
     ratelog = {};
@@ -83,7 +83,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         /*
         } else if (chainID == paraTool.chainIDBifrostDOT || chainID == paraTool.chainIDBifrostKSM) {
             this.chainParser = new BifrostParser();
-        */    
+        */
         } else if (chainID == paraTool.chainIDAstar || chainID == paraTool.chainIDShiden || chainID == paraTool.chainIDShibuya) {
             this.chainParser = new AstarParser();
         } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
@@ -434,7 +434,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         for (let i = 0; i < xcmAssetRecs.length; i++) {
             let v = xcmAssetRecs[i];
             let a = {}
-            // add assetChain (string) 
+            // add assetChain (string)
             let nativeAssetChain = paraTool.makeAssetChain(v.asset, v.chainID)
             if (this.assetInfo[nativeAssetChain] && this.assetInfo[nativeAssetChain].decimals != undefined && this.assetInfo[nativeAssetChain].symbol != undefined) {
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(v.xcmConcept, v.relayChain);
@@ -451,7 +451,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     parents: v.parents,
                     xcmInteriorKey: xcmInteriorKey,
                     nativeAssetChain: nativeAssetChain,
-		    assetType: "Token" 
+		    assetType: "Token"
                 }
                 if (symbol) {
                     let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain);
@@ -521,7 +521,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorStr, relayChain);
         let xcmAsset = this.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
         if (xcmAsset && xcmAsset.nativeAssetChain != undefined) {
-            console.log(`Found ${xcmInteriorKey} -> ${xcmAsset.nativeAssetChain}`)
+            //console.log(`Found ${xcmInteriorKey} -> ${xcmAsset.nativeAssetChain}`)
             return xcmAsset.nativeAssetChain
         } else {
             console.log(`getXCMAsset NOT Found/Missing ${xcmInteriorKey}`)
@@ -640,7 +640,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         }
         return false;
     }
-    
+
     getChainXCMAssetBySymbol(symbol, relayChain, chainID) {
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
         if (this.symbolRelayChainAsset[symbolRelayChain] == undefined || this.symbolRelayChainAsset[symbolRelayChain][chainID] == undefined) {
