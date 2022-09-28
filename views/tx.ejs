@@ -44,6 +44,13 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
         </tr>
     <% } %>
 
+    <% if ( f.xcmdest ) { %>
+        <tr>
+          <td>Destination Status</td>
+          <td><%- include("xcmdest", {extrinsicHash: f.extrinsicHash, xcmdest: f.xcmdest}); %></td>
+        </tr>
+    <% } %>
+    
     <tr>
       <td>Finalized</td>
       <td><span id="status"><%- include("finalized", {finalized: (f.status=="finalized" || f.status == "finalizeddest")}); %></span></td>
@@ -107,12 +114,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <td>Result</td>
       <td><%- include("txResult", {success: txResult, errorMsg: errStr}); %></td>
     </tr>
-<% if ( f.xcmdest ) { %>
-    <tr>
-      <td>Destination Status</td>
-      <td><%- include("xcmdest", {extrinsicHash: f.extrinsicHash, xcmdest: f.xcmdest}); %></td>
-    </tr>
-<% } %>
+
       <td>Spec Version</td>
       <td>
         <%- uiTool.presentSpecVersion(f.id, f.specVersion); %>
