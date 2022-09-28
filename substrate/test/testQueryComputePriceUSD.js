@@ -119,6 +119,12 @@ async function main() {
         	'sKSM-parallel' : '{"Token":"1000"}~2012',
         	'HKO-parallel' : '{"Token":"HKO"}~22085', */
     }
+    assets = {
+	"KUSD": {
+            asset: '{"Token":"KUSD"}',
+            chainID: '22000'
+        }
+    }
 
     let ts = query.currentTS();
     for (const testcaseName of Object.keys(assets)) {

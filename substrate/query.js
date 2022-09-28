@@ -4821,50 +4821,32 @@ module.exports = class Query extends AssetManager {
         if (w.length > 0) {
             wstr = " WHERE " + wstr
         }
-        let sql = `select msgHash, extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, asset, rawAsset, nativeAssetChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, amountSentUSD, amountReceivedUSD from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
+        let sql = `select msgHash, extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, amountSentUSD, amountReceivedUSD from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
         let xcmtransfers = await this.poolREADONLY.query(sql);
         let out = [];
         for (let i = 0; i < xcmtransfers.length; i++) {
-            // TODO: abstract the { asset, rawAsset, nativeAssetChain } dataset out of xcmtransfers table and use computeUSD / getDecimals to do the work rather than this being in 4 places that are solely xcmtransfers related:  -- the rawAsset/nativeAssetChain => asset mappings should be in another table!
             let x = xcmtransfers[i];
             try {
-                x.asset = this.trimquote(x.asset); // temporary hack
-                if (x.asset.includes("Token")) {
-                    let decimals = false;
-                    let targetChainID = x.chainID // the chainID to use for price lookup
-                    let targetAsset = x.rawAsset // the asset to use for price lookup
-
-                    if (x.nativeAssetChain != undefined) {
-                        let [nativeAsset, nativeChainID] = paraTool.parseAssetChain(x.nativeAssetChain)
-                        targetAsset = nativeAsset
-                        targetChainID = nativeChainID
-                    }
+		let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
+		let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
+		if ( assetInfo && assetInfo.decimals ) {
+                    decimals = assetInfo[rawassetChain].decimals;
                     if (decorate) {
                         this.decorateAddress(x, "fromAddress", decorateAddr, decorateRelated)
                         this.decorateAddress(x, "destAddress", decorateAddr, decorateRelated)
                     }
-                    let rawassetChain = paraTool.makeAssetChain(targetAsset, targetChainID);
-                    if (this.assetInfo[rawassetChain] && this.assetInfo[rawassetChain].decimals != undefined) {
-                        decimals = this.assetInfo[rawassetChain].decimals;
-                    }
-
                     if (x.msgHash == undefined) x.msgHash = '0x'
-
-                    if (this.assetInfo[rawassetChain]) {
-                        if (decimals !== false) {
-                            let amountSent = (x.amountSent != undefined) ? x.amountSent / 10 ** decimals : 0
-                            let amountReceived = (x.amountReceived != undefined) ? x.amountReceived / 10 ** decimals : 0;
-                            x.amountSent = amountSent
-                            x.amountReceived = amountReceived
-                            let [_, id] = this.convertChainID(x.chainID)
-                            x.chainName = this.getChainName(x.chainID);
-                            let [__, idDest] = this.convertChainID(x.chainIDDest)
-                            x.id = id
-                            x.idDest = idDest
-                            x.chainDestName = this.getChainName(x.chainIDDest);
-                            out.push(x);
-                        }
-                    }
+                    let amountSent = (x.amountSent != undefined) ? x.amountSent / 10 ** decimals : 0
+                    let amountReceived = (x.amountReceived != undefined) ? x.amountReceived / 10 ** decimals : 0;
+                    x.amountSent = amountSent
+                    x.amountReceived = amountReceived
+                    let [_, id] = this.convertChainID(x.chainID)
+                    x.chainName = this.getChainName(x.chainID);
+                    let [__, idDest] = this.convertChainID(x.chainIDDest)
+                    x.id = id
+                    x.idDest = idDest
+                    x.chainDestName = this.getChainName(x.chainIDDest);
+                    out.push(x);
                 }
             } catch (e) {
                 this.logger.error({
@@ -6387,12 +6369,12 @@ module.exports = class Query extends AssetManager {
         if (this.assetInfo[assetChain]) {
             let [asset, chainID] = paraTool.parseAssetChain(assetChain)
             let dXCMAsset = {
-                xcmInteriorKey: this.assetInfo[rawassetChain].xcmInteriorKey,
+                xcmInteriorKey: this.assetInfo[assetChain].xcmInteriorKey,
                 assetChain: assetChain,
                 asset: asset,
                 chainID: chainID,
-                decimals: this.assetInfo[rawassetChain].decimals,
-                symbol: this.assetInfo[rawassetChain].symbol,
+                decimals: this.assetInfo[assetChain].decimals,
+                symbol: this.assetInfo[assetChain].symbol,
             }
             if (decorateUSD) {
                 let p = await this.computePriceUSD({
