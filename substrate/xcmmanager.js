@@ -1228,9 +1228,11 @@ order by msgHash, diffSentAt, diffTS`
                 let amountReceived = m.amountReceived;
                 let targetChainID = m.chainIDDest
                 let symbol = m.symbol
-		let decimals = null;
-                let xcmInteriorKey = false
+		        let decimals = null;
                 let isIncompleteRec = true
+                let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
+                let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+                let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
                 let p = await this.computePriceUSD({
                     symbol: m.symbol,
 		    relayChain: m.relayChain,
