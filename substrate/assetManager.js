@@ -80,6 +80,10 @@ module.exports = class AssetManager extends PolkaholicDB {
         if (this.chainParser && (this.chainParserChainID == chainID)) return;
         if (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala) {
             this.chainParser = new AcalaParser();
+        /*
+        } else if (chainID == paraTool.chainIDBifrostDOT || chainID == paraTool.chainIDBifrostKSM) {
+            this.chainParser = new BifrostParser();
+        */    
         } else if (chainID == paraTool.chainIDAstar || chainID == paraTool.chainIDShiden || chainID == paraTool.chainIDShibuya) {
             this.chainParser = new AstarParser();
         } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
