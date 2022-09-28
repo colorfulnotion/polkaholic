@@ -678,9 +678,29 @@ module.exports = {
     presentGasPrice: function(valGwei, chainSymbol = 'ChainToken') {
         return presentGasPrice(valGwei, chainSymbol)
     },
+
+    presentBlockiesOrIdenticon: function(address, sz = 128){
+        if (address.length == '42'){
+            const canvas = createCanvas(sz, sz);
+            let cl = `width="${sz}px"  loading="lazy"`
+            var icon = renderIcon({
+                    seed: address.toLowerCase(), // seed used to generate icon data, default: random
+                    //color: '#dfe', // to manually specify the icon color, default: random
+                    //bgcolor: '#aaa', // choose a different background color, default: white
+                    size: 8, // width/height of the icon in blocks, default: 10
+                    scale: 4 // width/height of each block in pixels, default: 5
+                },
+                canvas
+            );
+            return ('<img class="circularImage" src="' + canvas.toDataURL() + `" ${cl} />`)
+        }else{
+            return(`<img class="circularImage" src="/identicon/${address}" width="${sz}px"  loading="lazy"/>`)
+        }
+    },
+
     presentBlockies: function(address, sz = 128) {
         const canvas = createCanvas(sz, sz);
-        let cl = `class="rounded-start"  width="${sz}"  loading="lazy" class="card-img-center"`
+        let cl = `class="roundimage"  width="${sz}"  loading="lazy"`
         var icon = renderIcon({
                 seed: address.toLowerCase(), // seed used to generate icon data, default: random
                 //color: '#dfe', // to manually specify the icon color, default: random
