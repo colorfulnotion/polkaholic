@@ -424,11 +424,11 @@ module.exports = class XCMManager extends AssetManager {
         d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
         length(xcmtransfer.extrinsicID) > 0 and
         xcmtransfer.amountSent >= d.amountReceived
-having ( ( rat > ${ratMin} and rat <= 1.0 ) or
-(symbol = "DOT" and amountSent - amountReceived < 500000000) or
-(symbol = 'KSM' and amountSent - amountReceived < 1000000000) or
-(symbol = 'KAR' and amountSent - amountReceived < 10000000000 ) )
-order by chainID, extrinsicHash, diffTS`
+ having ( ( rat > ${ratMin} and rat <= 1.0 ) or
+ (symbol = "DOT" and amountSent - amountReceived < 500000000) or
+ (symbol = 'KSM' and amountSent - amountReceived < 1000000000) or
+ (symbol = 'KAR' and amountSent - amountReceived < 10000000000 ) )
+ order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
         console.log(`match_xcm [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
@@ -462,7 +462,7 @@ order by chainID, extrinsicHash, diffTS`
 		    let relayChain = d.relayChain;
                     if (priceSource) {
                         priceUSD = priceSource.priceUSD;
-			let decimals = priceSource.assetInfo.decimals;
+			            let decimals = priceSource.assetInfo.decimals;
                         amountSent = parseFloat(d.amountSent) / 10 ** decimals;
                         amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
                         amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
@@ -1228,6 +1228,7 @@ order by msgHash, diffSentAt, diffTS`
                 let amountReceived = m.amountReceived;
                 let targetChainID = m.chainIDDest
                 let symbol = m.symbol
+                let relayChain = m.relayChain
 		        let decimals = null;
                 let isIncompleteRec = true
                 let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
