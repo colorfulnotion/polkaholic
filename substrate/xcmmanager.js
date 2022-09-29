@@ -1,11 +1,11 @@
 // Copyright 2022 Colorful Notion, Inc.
 // This file is part of Polkaholic
-
+const Query = require('./query');
 const AssetManager = require("./assetManager");
 const mysql = require("mysql2");
 const paraTool = require("./paraTool");
 
-module.exports = class XCMManager extends AssetManager {
+module.exports = class XCMManager extends Query {
     constructor() {
         super("manager")
     }
@@ -266,7 +266,7 @@ module.exports = class XCMManager extends AssetManager {
 
     // xcmtransfer_match matches cross transfers between SENDING events held in "xcmtransfer"  and CANDIDATE destination events (from various xcm received messages on a destination chain)
     // this will be phased out soon
-    async xcmtransfer_match(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200) {
+    async xcmtransfer_match(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200, forceRematch = false) {
         let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds}` : ""
         // match xcmtransferdestcandidate of the last 2 hours
         //   (a) > 95% amountReceived / amountSent
@@ -304,11 +304,11 @@ module.exports = class XCMManager extends AssetManager {
         d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
         length(xcmtransfer.extrinsicID) > 0 and
         xcmtransfer.amountSent >= d.amountReceived
- having ( ( rat > ${ratMin} and rat <= 1.0 ) or
- (symbol = "DOT" and amountSent - amountReceived < 500000000) or
- (symbol = 'KSM' and amountSent - amountReceived < 1000000000) or
- (symbol = 'KAR' and amountSent - amountReceived < 10000000000 ) )
- order by chainID, extrinsicHash, diffTS`
+  having ( ( rat > ${ratMin} and rat <= 1.0 ) or
+  (symbol = "DOT" and amountSent - amountReceived < 500000000) or
+  (symbol = 'KSM' and amountSent - amountReceived < 1000000000) or
+  (symbol = 'KAR' and amountSent - amountReceived < 10000000000 ) ) 
+  order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
         console.log(`match_xcm [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
@@ -377,6 +377,14 @@ module.exports = class XCMManager extends AssetManager {
                     matched[d.eventID] = true;
 
                     // problem: this does not store the "dust" fee (which has rat << 1) in bigtable
+                    // TODO: generate xcmInfo struct
+
+                    let extrinsicHash = d.extrinsicHash
+                    let substratetx = await this.getTransaction(substrateTXHash);
+                    if (substratetx != undefined){
+                        console.log(`extrinsicHash=${extrinsicHash}`, substratetx)
+                    }
+
                     let match = {
                         chainID: d.chainID,
                         chainIDDest: d.chainIDDest,
@@ -1341,7 +1349,7 @@ order by msgHash`
         // marks duplicates in xcmmessages
         await this.xcmmessages_dedup(t0, t1);
 
-        await this.xcmtransfer_match(t0, t1, .97);
+        await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
 
         // do it again
         numRecs = await this.xcmmessages_match(t0, t1);
