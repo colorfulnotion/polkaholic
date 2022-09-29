@@ -54,7 +54,7 @@
          Origination [Para ID: <%= xcm.origination.paraID %>]: <%= uiTool.capitalizeFirstLetter(xcm.origination.id) %>
        <% } %>
       </h5>
-     
+
       <p class="text-muted mb-2 fw-bold"><%- uiTool.presentTS(xcm.origination.ts) %></p>
       <% if ( xcm.origination.transactionHash ) { %>
        <B> Transaction Hash: </b><%- uiTool.presentTx(xcm.origination.transactionHash) %>
@@ -62,12 +62,12 @@
        <B> Extrinsic ID: </B> <%- uiTool.presentExtrinsicID(xcm.origination.extrinsicID, xcm.origination.extrinsicHash); %>
       <% } %>
       <br/>
-      
+
       <B>Sender:</B>
-      <% if ( xcm.origination.fromAddress ) {
-        let sender = (xcm.origination.fromSS58Address != undefined)? xcm.origination.fromSS58Address : xcm.origination.fromAddress
+      <% if ( xcm.origination.sender ) {
+        let sender = xcm.origination.sender
       %>
-      <img src="/identicon/<%= sender; %>" class="rounded-start"  width="25px"  loading="lazy"/>
+      <%- uiTool.presentBlockiesOrIdenticon(sender, 25) %>
       <a href='/account/<%= sender %>'>
         <code><%= sender; %></code>
       </a>
@@ -76,8 +76,8 @@
       <br/>
 
       <p class="text-muted">
-      <%- include("module", {chainID: xcm.origination.id, section: xcm.origination.section, method: xcm.origination.method}); %><br/>
-      <B>Sent</B>: <%- uiTool.presentNumber(xcm.origination.amountSent) %> <%= xcm.symbol; %> <%= uiTool.currencyFormat(xcm.origination.amountSentUSD) %><br/>
+      <B>Module</B>: <%- include("module", {chainID: xcm.origination.id, section: xcm.origination.section, method: xcm.origination.method}); %><br/>
+      <B>Sent</B>: <%- uiTool.presentNumber(xcm.origination.amountSent) %> <%= xcm.symbol; %> (<%= uiTool.currencyFormat(xcm.origination.amountSentUSD)%>)<br/>
       <b>Sent at Block</B>: <%- uiTool.presentBlock(xcm.origination.chainID, xcm.origination.blockNumber); %><br/>
       <B>TX Fees:</B>
          <%- uiTool.presentNumber(xcm.origination.txFee) %> <%= xcm.origination.txFeeSymbol %>
@@ -104,18 +104,18 @@
        <B> Received At Block:</B> <a href='/block/<%= xcm.destination.id %>/<%= xcm.blockNumberDest %>'><%= xcm.destination.blockNumber %></a>
        <% } %>
        <br/>
-       
+
        <B>Beneficiary:</B>
        <% if ( xcm.destination.beneficiary ) {
-           let dest = (xcm.destination.beneficiarySS58Address != undefined)? xcm.destination.beneficiarySS58Address : xcm.destination.beneficiary;
+           let beneficiary = xcm.destination.beneficiary;
        %>
-       <img src="/identicon/<%= dest; %>" class="rounded-start"  width="25px"  loading="lazy"/>
-       <a href='/account/<%= dest %>'>
-         <code><%= dest; %></code>
+       <%- uiTool.presentBlockiesOrIdenticon(beneficiary, 25) %>
+       <a href='/account/<%= beneficiary %>'>
+         <code><%= beneficiary; %></code>
        </a>
        <% } %>
        <br/>
-       
+
       <B>Execution Status:</B>
        <% if ( xcm.destination.status == -1 ) { %>
        <button type="button" class="btn btn-warning text-capitalize">Unknown</button>
