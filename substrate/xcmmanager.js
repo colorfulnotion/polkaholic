@@ -263,7 +263,7 @@ module.exports = class XCMManager extends Query {
         }, sqlDebug); */
     }
 
-    async buildXcmInfo(substrateTx, matchRec){
+    async buildSuccessXcmInfo(substrateTx, matchRec){
         let decorate = true
         let decorateExtra = ["usd", "address", "related", "data"]
         let d = substrateTx
@@ -549,7 +549,233 @@ module.exports = class XCMManager extends Query {
                     let substratetx = await this.getTransaction(substrateTxHash);
                     let xcmInfo, xcmOld;
                     if (substratetx != undefined){
-                        [xcmInfo, xcmOld] = await this.buildXcmInfo(substratetx, match)
+                        [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
+                    }
+                    console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
+
+                    let xcmInfoStr = (xcmInfo != undefined)? JSON.stringify(xcmInfo): false
+                    let xcmInfoBlob = (xcmInfoStr != false)? mysql.escape(xcmInfoStr): 'NULL'
+                    let sqlB = `update xcmtransfer
+            set blockNumberDest = ${d.blockNumberDest},
+                destTS = ${d.destTS},
+                amountSentUSD = '${amountSentUSD}',
+                amountReceivedUSD = '${amountReceivedUSD}',
+                priceUSD = '${priceUSD}',
+                matched = 1,
+                matchedExtrinsicID = '${d.destExtrinsicID}',
+                matchedEventID = '${d.eventID}',
+                xcmInfo = ${xcmInfoBlob}
+             where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
+                    console.log(`match_xcm (B)`)
+                    console.log(paraTool.removeNewLine(sqlB))
+                    this.batchedSQL.push(sqlB);
+                    matches++;
+
+                    // 1. write "addressExtrinsic" feedxcmdest with row key address-extrinsicHash and column extrinsicHash#chainID-extrinsicID-transferIndex
+                    //    * we use the SENDING chainID + the sender extrinsicID as the column for the "feedxcmdest" column family
+                    let rowKey = `${d.fromAddress.toLowerCase()}#${d.extrinsicHash}` // NOTE: this matches "feed"
+                    let cres = {
+                        key: rowKey,
+                        data: {
+                            feedxcminfo: {}
+                            //feedxcmdest: {},
+                        }
+                    };
+                    let extrinsicHashEventID = `${d.extrinsicHash}#${d.chainID}-${d.extrinsicID}-${d.transferIndex}`
+                    cres['data']['feedxcminfo'][extrinsicHashEventID] = {
+                        value: JSON.stringify(xcmInfo),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    /*
+                    cres['data']['feedxcmdest'][extrinsicHashEventID] = {
+                        value: JSON.stringify(match),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    */
+                    addressextrinsic.push(cres);
+
+                    // 2. write "hashes" feedxcmdest with row key extrinsicHash and column extrinsicHash#chainID-extrinsicID (same as 1)
+                    let hres = {
+                        key: d.extrinsicHash,
+                        data: {
+                            feedxcminfo: {}
+                            //feedxcmdest: {}
+                        }
+                    }
+                    hres['data']['feedxcminfo'][extrinsicHashEventID] = {
+                        //value: JSON.stringify(match),
+                        value: JSON.stringify(xcmInfo),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    /*
+                    hres['data']['feedxcmdest'][extrinsicHashEventID] = {
+                        value: JSON.stringify(match),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    */
+                    console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
+                    hashes.push(hres)
+                } else {
+                    //console.log("SKIP", matched[d.extrinsicHash], matched[d.eventID]);
+                }
+            }
+            if (addressextrinsic.length > 0) {
+                await this.insertBTRows(this.btAddressExtrinsic, addressextrinsic, "addressextrinsic")
+            }
+            if (hashes.length > 0) {
+                await this.insertBTRows(this.btHashes, hashes, "addressextrinsic")
+            }
+            if (addressextrinsic.length > 0 || hashes.length > 0) {
+                await this.update_batchedSQL();
+            }
+        } catch (err) {
+            console.log("WRITE_FEEDXCMDEST", err)
+	    process.exit(0);
+        }
+        let logDT = new Date(startTS * 1000)
+        console.log(`match_xcm ${startTS} covered ${logDT}`)
+    }
+
+    async xcmtransfer_match_failure(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200, forceRematch = false) {
+        let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds}` : ""
+        // match xcmtransferdestcandidate of the last 2 hours
+        //   (a) > 95% amountReceived / amountSent
+        //   (b) asset match
+        //   (c) time difference matching has to be less than 7200 (and greater than 0)
+        //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
+        // In case of ties, the FIRST one ( "order by diffTS" ) covers this
+        let rematchClause = forceRematch? `xcmtransfer.matched >= 0 and d.matched >= 0 and `: `xcmtransfer.matched = 0 and d.matched = 0 and `
+        let sqlA = `select
+          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, d.symbol, d.relayChain,
+          (d.destts - xcmtransfer.sourceTS) as diffTS,
+          xcmtransfer.extrinsicID,
+          xcmtransfer.amountSent,
+          xcmtransfer.transferIndex,
+          xcmtransfer.sourceTS,
+          xcmtransfer.fromAddress as senderAddress,
+          xcmtransfer.destAddress,
+          xcmtransfer.msgHash,
+          xcmtransfer.sentAt,
+          xcmtransfer.blockNumber,
+          xcmtransfer.sectionMethod,
+          d.eventID,
+          d.extrinsicID as destExtrinsicID,
+          d.blockNumberDest,
+          d.amountReceived,
+          d.destTS,
+          d.amountReceived / xcmtransfer.amountSent as rat
+        from xcmtransfer, xcmtransferdestcandidate as d
+ where  d.fromAddress = xcmtransfer.destAddress and
+        d.chainIDDest = xcmtransfer.chainIDDest and
+        ((d.symbol = xcmtransfer.symbol) and (d.relayChain = xcmtransfer.relayChain)) and
+        xcmtransfer.sourceTS >= ${startTS} and
+        xcmtransfer.xcmInteriorKey = d.xcmInteriorKey and
+        d.destTS >= ${startTS} and ${rematchClause}
+        xcmtransfer.incomplete = 0 and
+        d.destTS - xcmtransfer.sourceTS >= 0 and
+        d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
+        length(xcmtransfer.extrinsicID) > 0 and
+        xcmtransfer.amountSent >= d.amountReceived
+  having ( ( rat > ${ratMin} and rat <= 1.0 ) or
+  (symbol = "DOT" and amountSent - amountReceived < 500000000) or
+  (symbol = 'KSM' and amountSent - amountReceived < 1000000000) or
+  (symbol = 'KAR' and amountSent - amountReceived < 10000000000 ) )
+  order by chainID, extrinsicHash, diffTS`
+        let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
+        let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
+        console.log(`match_xcm_failure [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
+        console.log(`match_xcm_failure (A)`)
+        console.log(paraTool.removeNewLine(sqlA))
+        return
+        try {
+            let xcmmatches = await this.poolREADONLY.query(sqlA);
+            let addressextrinsic = []
+            let hashes = []
+            let matched = {}
+            let matches = 0;
+            if (xcmmatches.length > 0) {
+                console.log(`[Found] match_xcm_failure (A) len=${xcmmatches.length}`)
+            } else {
+                //enable this for debugging
+                //console.log("[Empty] match_xcm", sqlA)
+            }
+            for (let i = 0; i < xcmmatches.length; i++) {
+                let d = xcmmatches[i];
+                if (matched[d.extrinsicHash] == undefined && matched[d.eventID] == undefined) {
+                    let priceUSD = 0;
+		            let amountSent = 0;
+		            let amountReceived = 0;
+                    let amountSentUSD = 0;
+                    let amountReceivedUSD = 0;
+                    let chainID = d.chainID
+                    let priceSource = await this.computePriceUSD({
+                        symbol: d.symbol,
+			            relayChain: d.relayChain,
+                        ts: d.sourceTS
+                    });
+		            let symbol = d.symbol;
+		            let relayChain = d.relayChain;
+                    if (priceSource) {
+                        priceUSD = priceSource.priceUSD;
+			            let decimals = priceSource.assetInfo.decimals;
+                        amountSent = parseFloat(d.amountSent) / 10 ** decimals;
+                        amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
+                        amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
+                        amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                    } else {
+                        console.log(`XCM Asset not found [${d.extrinsicHash}], symbol=${d.symbol}, relayChain=${d.relayChain}`)
+                    }
+                    // (a) with extrinsicID, we get both the fee (rat << 1) ANDthe transferred item for when one is isFeeItem=0 and another is isFeeItem=1; ... otherwise we get (b) with just the eventID
+                    let w = d.destExtrinsicID && (d.destExtrinsicID.length > 0) ? `extrinsicID = '${d.destExtrinsicID}'` : `eventID = '${d.eventID}'`;
+                    let sqlC = `update xcmtransferdestcandidate set matched = 1, matchedExtrinsicHash = '${d.extrinsicHash}' where ${w}`
+                    console.log(`match_xcm_failure (C)`)
+                    console.log(paraTool.removeNewLine(sqlC))
+                    this.batchedSQL.push(sqlC);
+                    // never match more than once, by marking both the sending record and the receiving record
+                    matched[d.extrinsicHash] = true;
+                    matched[d.eventID] = true;
+
+                    let xcmSection = (d.sectionMethod != undefined)? d.sectionMethod : null
+                    let xcmMethod = null
+                    let sectionMethodPieces = d.sectionMethod.split(':')
+                    if (sectionMethodPieces.length == 2){
+                        xcmSection = sectionMethodPieces[0]
+                        xcmMethod = sectionMethodPieces[1]
+                    }
+
+                    // problem: this does not store the "dust" fee (which has rat << 1) in bigtable
+
+                    // we use matchRec to build xcmInfo
+                    let match = {
+                        chainID: d.chainID,
+                        blockNumber: paraTool.dechexToInt(d.blockNumber),
+                        chainIDDest: d.chainIDDest,
+                        blockNumberDest: d.blockNumberDest,
+                        symbol: d.symbol,
+                        relayChain: d.relayChain,
+                        priceUSD: priceUSD,
+                        amountSent: amountSent,
+                        amountReceived: amountReceived,
+                        amountSentUSD: amountSentUSD,
+                        amountReceivedUSD: amountReceivedUSD,
+                        fromAddress: d.senderAddress, //from xcmtransfer.fromAddress
+                        destAddress: d.fromAddress, //from xcmtransferdestcandidate.fromAddress
+                        msgHash: (d.msgHash != undefined) ? d.msgHash : '0x',
+                        sentAt: (d.sentAt != undefined) ? d.sentAt : null,
+                        xcmSection: xcmSection,
+                        xcmMethod: xcmMethod,
+                        extrinsicHash: d.extrinsicHash,
+                        extrinsicID: d.extrinsicID,
+                        destExtrinsicID: d.destExtrinsicID,
+                        destEventID: d.eventID,
+                        sourceTS: d.sourceTS,
+                        destTS: d.destTS
+                    }
+                    let substrateTxHash = d.extrinsicHash
+                    let substratetx = await this.getTransaction(substrateTxHash);
+                    let xcmInfo, xcmOld;
+                    if (substratetx != undefined){
+                        [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
                     }
                     console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
 
@@ -1524,15 +1750,18 @@ order by msgHash`
 
         // computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints}
         let lastTS = await this.computeXCMFingerprints(t0, t1);
-
+*/
         // xcmmatch2_matcher computes assetsReceived by matching xcmmessages.beneficiaries(2) to xcmtransferdestcandidate
         await this.xcmmatch2_matcher(t0, t1, forceRematch, 120)
 
         // marks duplicates in xcmmessages
         await this.xcmmessages_dedup(t0, t1);
-*/
 
-        await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
+
+        //await this.xcmtransfer_match_failure(t0, t1, .97, 7200, forceRematch);
+
+        //await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
+
 
 /*
         // do it again
