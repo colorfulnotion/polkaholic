@@ -6997,55 +6997,40 @@ module.exports = class Query extends AssetManager {
         await this.update_batchedSQL();
     }
 
+
     async getXCMInfo(hash)  {
-	return {
-	    "symbol": "GLMR",
-	    "priceUSD": 0.4430889152,
-	    "priceUSDCurrent": .504718427,
-	    "origination": {
-		"id": "moonbeam",
-		"paraID": 2004,
-		"chainIDName": "Moonbeam",
-		"chainID": 2004,
-		"fromAddress": "0xe95ee4a899718488aba3a5edcd061d1320baed3a",
-		"amountSent": 10.576562227002592,
-		"amountSentUSD": 10.576562227002592,
-		"txFee": 0.003606092,
-		"txFeeUSD": 0.0015964190180269564,
-		"txFeeSymbol": "GLMR",
-		"blockNumber": 1930924,
-		"extrinsicID": "1930924-50",
-		"extrinsicHash": "0xa2ee0f96a8c4d022b19c866ca9085f7091e5efdbae7f2a84c37ae0867f93a3fa",
-		"transactionHash": "0xa2ee0f96a8c4d022b19c866ca9085f7091e5efdbae7f2a84c37ae0867f93a3fa",
-		"section": "ethereum",
-		"method": "transact",
-		"msgHash": "0xaf33f855861f548a89005819448e37e1bd37b84a2805de98681992e08068171f",
-	    	"sentAt": 12343212,
-		"ts": 1663959276
-	    },
-	    "relayChain": {
-		"relayChain": "polkadot",
-	    	"sentAt": 12343212,
-	    },
-	    "destination": {
-		"status": 1,
-		"id": "acala",
-		"paraID": 2000,
-		"chainIDName": "Acala",
-		"chainID": 2000,
-		"beneficiary": "25jJWAx87efC2rWDUixZVZNaQd1oxUPeCS3BaBDuNUNUE3ak",
-		"beneficiarySS58Address": "25jJWAx87efC2rWDUixZVZNaQd1oxUPeCS3BaBDuNUNUE3ak",
-		"blockNumber": 1923245,
-		"amountReceived": 10.56729262700259,
-		"amountReceivedUSD": 10.56729262700259,
-		"teleportFee": 0.009269600000001432,
-		"teleportFeeUSD": 0.004107257008346604,
-		"teleportFeeChainSymbol": "GLMR",
-		"extrinsicID": "1923245-1",
-		"eventID": "2000-1923245-1-1",
-		"ts": 1663959288
-	    },
-	    "version": "v2"
-	}
+        const filter = {
+            column: {
+                cellLimit: 1
+            },
+        };
+        if (!this.validAddress(hash)) {
+            throw new paraTool.InvalidError(`Invalid Extrinsic Hash: ${hash}`)
+        }
+        try {
+            const [row] = await this.btHashes.row(hash).get({
+                filter
+            });
+            let rowData = row.data;
+            let feedXCMInfoData = false
+            if (rowData["feedxcminfo"]){
+                feedXCMInfoData = rowData["feedxcminfo"]
+            }
+            if (feedXCMInfoData){
+                for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
+                    const cell = feedXCMInfoData[extrinsicHashEventID][0];
+                    let xcmInfo = JSON.parse(cell.value);
+                    return xcmInfo;
+                }
+            }else{
+                throw new paraTool.InvalidError(`${hash} not found`)
+            }
+        } catch (e){
+            throw new paraTool.InvalidError(`Invalid ${hash}, err=${e.toString()}`)
+        }
+        /*
+        let testS = '{"symbol":"GLMR","priceUSD":0.4430889152,"priceUSDCurrent":0.504718427,"origination":{"chainName":"Moonbeam","chainID":2004,"id":"moonbeam","paraID":2004,"sender":"0xe95ee4a899718488aba3a5edcd061d1320baed3a","amountSent":10.576562227002592,"amountSentUSD":10.576562227002592,"txFee":0.003606092,"txFeeUSD":0.0015964190180269564,"txFeeSymbol":"GLMR","blockNumber":1930924,"extrinsicID":"1930924-50","extrinsicHash":"0xa2ee0f96a8c4d022b19c866ca9085f7091e5efdbae7f2a84c37ae0867f93a3fa","transactionHash":"0xa2ee0f96a8c4d022b19c866ca9085f7091e5efdbae7f2a84c37ae0867f93a3fa","section":"ethereum","method":"transact","msgHash":"0xaf33f855861f548a89005819448e37e1bd37b84a2805de98681992e08068171f","sentAt":12343212,"ts":1663959276},"relayChain":{"relayChain":"polkadot","sentAt":12343212},"destination":{"status":1,"chainIDName":"Acala","id":"acala","paraID":2000,"chainID":2000,"beneficiary":"25jJWAx87efC2rWDUixZVZNaQd1oxUPeCS3BaBDuNUNUE3ak","beneficiarySS58Address":"25jJWAx87efC2rWDUixZVZNaQd1oxUPeCS3BaBDuNUNUE3ak","amountReceived":10.56729262700259,"amountReceivedUSD":10.56729262700259,"teleportFee":0.009269600000001432,"teleportFeeUSD":0.004107257008346604,"teleportFeeChainSymbol":"GLMR","blockNumber":1923245,"extrinsicID":"1923245-1","eventID":"2000-1923245-1-1","ts":1663959288},"version":"v2"}'
+        return JSON.parse(testS)
+        */
     }
 }

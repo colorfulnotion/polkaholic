@@ -271,17 +271,23 @@ module.exports = class XCMManager extends Query {
         let sourceTxFee = d.fee
         let sourceTxFeeUSD = d.feeUSD
         let sourceChainSymbol = d.chainSymbol
+        let evmTransactionHash = null
         if (d.evm != undefined && d.evm.transactionHash != undefined){
-            let evmtx = await this.getTransaction(d.evm.transactionHash, decorate, decorateExtra, false);
+            evmTransactionHash = d.evm.transactionHash
+            let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
             sourceTxFee = evmtx.fee
             sourceTxFeeUSD = evmtx.feeUSD
             sourceChainSymbol = evmtx.symbol
         }
 
-        console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUS=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
+        console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
         console.log(`rawXCM`, xcm)
-        xcm.chainIDName = this.getChainName(xcm.chainID);
-        xcm.chainIDDestName = this.getChainName(xcm.chainIDDest);
+        xcm.chainName = this.getChainName(xcm.chainID);
+        xcm.chainDestName = this.getChainName(xcm.chainIDDest);
+        xcm.id = this.getIDByChainID(xcm.chainID)
+        xcm.idDest = this.getIDByChainID(xcm.chainIDDest)
+        xcm.paraID = paraTool.getParaIDfromChainID(xcm.chainID)
+        xcm.paraIDDest = paraTool.getParaIDfromChainID(xcm.chainIDDest)
         let chainIDDestInfo = this.chainInfos[xcm.chainIDDest]
         if (xcm.chainIDDest != undefined && chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
             if (xcm.destAddress != undefined) {
@@ -340,6 +346,7 @@ module.exports = class XCMManager extends Query {
                 ts: xcm.destTS
             });
             if (p) {
+                console.log(`p found`, p)
                 xcm.amountSentUSD = p.valUSD;
                 xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
                 xcm.feeUSD = p.priceUSD * xcm.fee
@@ -349,36 +356,55 @@ module.exports = class XCMManager extends Query {
         }
         let xcmInfo = {
             symbol: xcm.symbol,
-            relayChain: xcm.relayChain,
+            priceUSD: xcm.priceUSD,
+            relayChain: null,
             origination: null,
             destination: null,
             version: (isNewFormat)? 'V2' : 'V1'
         }
+        xcmInfo.relayChain = {
+            relayChain: xcm.relayChain,
+            relayAt: xcm.sentAt, //?
+        }
+
         xcmInfo.origination = {
-            chainIDName: xcm.chainIDName,
+            chainName: xcm.chainName,
+            id: xcm.id,
             chainID: xcm.chainID,
-            fromAddress: xcm.fromAddress,
+            paraID: xcm.paraID,
+            sender: xcm.fromAddress,
             amountSent: xcm.amountSent,
+            amountSentUSD: xcm.amountSentUSD,
             txFee: xcm.sourceTxFee,
             txFeeUSD: xcm.sourceTxFeeUSD,
             txFeeSymbol: xcm.sourceChainSymbol,
+            blockNumber: xcm.blockNumber,
+            section: xcm.xcmSection,
+            method: xcm.xcmMethod,
             extrinsicID: xcm.extrinsicID,
             extrinsicHash: xcm.extrinsicHash,
+            transactionHash: evmTransactionHash,
             msgHash: xcm.msgHash,
-            sourceTS: xcm.sourceTS,
+            sentAt: xcm.sentAt,
+            ts: xcm.sourceTS,
+            complete: true,
         }
+        if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
-            chainIDDestName: xcm.chainIDDestName,
-            chainIDDest: xcm.chainIDDest,
-            destAddress: xcm.destAddress,
-            blockNumberDest: xcm.blockNumberDest,
+            chainName: xcm.chainDestName,
+            id: xcm.idDest,
+            chainID: xcm.chainIDDest,
+            paraID: xcm.paraIDDest,
+            beneficiary: xcm.destAddress,
             amountReceived: xcm.amountReceived,
             teleportFee: xcm.fee,
             teleportFeeUSD: xcm.feeUSD,
             teleportFeeChainSymbol: xcm.symbol,
-            destExtrinsicID: xcm.destExtrinsicID,
-            destEventID: xcm.eventID,
-            destTS: xcm.destTS,
+            blockNumber: xcm.blockNumberDest,
+            extrinsicID: xcm.destExtrinsicID,
+            eventID: xcm.destEventID,
+            ts: xcm.destTS,
+            status: true,
         }
         return [xcmInfo, xcm] //TODO: drop xcm format
 }
@@ -404,6 +430,9 @@ module.exports = class XCMManager extends Query {
           xcmtransfer.fromAddress as senderAddress,
           xcmtransfer.destAddress,
           xcmtransfer.msgHash,
+          xcmtransfer.sentAt,
+          xcmtransfer.blockNumber,
+          xcmtransfer.sectionMethod,
           d.eventID,
           d.extrinsicID as destExtrinsicID,
           d.blockNumberDest,
@@ -448,18 +477,18 @@ module.exports = class XCMManager extends Query {
                 let d = xcmmatches[i];
                 if (matched[d.extrinsicHash] == undefined && matched[d.eventID] == undefined) {
                     let priceUSD = 0;
-		    let amountSent = 0;
-		    let amountReceived = 0;
+		            let amountSent = 0;
+		            let amountReceived = 0;
                     let amountSentUSD = 0;
                     let amountReceivedUSD = 0;
                     let chainID = d.chainID
                     let priceSource = await this.computePriceUSD({
                         symbol: d.symbol,
-			relayChain: d.relayChain,
+			            relayChain: d.relayChain,
                         ts: d.sourceTS
                     });
-		    let symbol = d.symbol;
-		    let relayChain = d.relayChain;
+		            let symbol = d.symbol;
+		            let relayChain = d.relayChain;
                     if (priceSource) {
                         priceUSD = priceSource.priceUSD;
 			            let decimals = priceSource.assetInfo.decimals;
@@ -480,16 +509,25 @@ module.exports = class XCMManager extends Query {
                     matched[d.extrinsicHash] = true;
                     matched[d.eventID] = true;
 
+                    let xcmSection = (d.sectionMethod != undefined)? d.sectionMethod : null
+                    let xcmMethod = null
+                    let sectionMethodPieces = d.sectionMethod.split(':')
+                    if (sectionMethodPieces.length == 2){
+                        xcmSection = sectionMethodPieces[0]
+                        xcmMethod = sectionMethodPieces[1]
+                    }
+
                     // problem: this does not store the "dust" fee (which has rat << 1) in bigtable
-                    // TODO: generate xcmInfo struct
 
                     // we use matchRec to build xcmInfo
                     let match = {
                         chainID: d.chainID,
+                        blockNumber: paraTool.dechexToInt(d.blockNumber),
                         chainIDDest: d.chainIDDest,
                         blockNumberDest: d.blockNumberDest,
                         symbol: d.symbol,
                         relayChain: d.relayChain,
+                        priceUSD: priceUSD,
                         amountSent: amountSent,
                         amountReceived: amountReceived,
                         amountSentUSD: amountSentUSD,
@@ -497,10 +535,13 @@ module.exports = class XCMManager extends Query {
                         fromAddress: d.senderAddress, //from xcmtransfer.fromAddress
                         destAddress: d.fromAddress, //from xcmtransferdestcandidate.fromAddress
                         msgHash: (d.msgHash != undefined) ? d.msgHash : '0x',
+                        sentAt: (d.sentAt != undefined) ? d.sentAt : null,
+                        xcmSection: xcmSection,
+                        xcmMethod: xcmMethod,
                         extrinsicHash: d.extrinsicHash,
                         extrinsicID: d.extrinsicID,
                         destExtrinsicID: d.destExtrinsicID,
-                        eventID: d.eventID,
+                        destEventID: d.eventID,
                         sourceTS: d.sourceTS,
                         destTS: d.destTS
                     }
