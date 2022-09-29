@@ -470,20 +470,6 @@ module.exports = class XCMManager extends Query {
                     } else {
                         console.log(`XCM Asset not found [${d.extrinsicHash}], symbol=${d.symbol}, relayChain=${d.relayChain}`)
                     }
-                    let sqlB = `update xcmtransfer
-            set blockNumberDest = ${d.blockNumberDest},
-                destTS = ${d.destTS},
-                amountSentUSD = '${amountSentUSD}',
-                amountReceivedUSD = '${amountReceivedUSD}',
-                priceUSD = '${priceUSD}',
-                matched = 1,
-                matchedExtrinsicID = '${d.destExtrinsicID}',
-                matchedEventID = '${d.eventID}'
-            where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
-                    //console.log(`match_xcm (B)`)
-                    //console.log(paraTool.removeNewLine(sqlB))
-                    this.batchedSQL.push(sqlB);
-                    matches++;
                     // (a) with extrinsicID, we get both the fee (rat << 1) ANDthe transferred item for when one is isFeeItem=0 and another is isFeeItem=1; ... otherwise we get (b) with just the eventID
                     let w = d.destExtrinsicID && (d.destExtrinsicID.length > 0) ? `extrinsicID = '${d.destExtrinsicID}'` : `eventID = '${d.eventID}'`;
                     let sqlC = `update xcmtransferdestcandidate set matched = 1, matchedExtrinsicHash = '${d.extrinsicHash}' where ${w}`
@@ -526,33 +512,66 @@ module.exports = class XCMManager extends Query {
                     }
                     console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
 
+                    let xcmInfoStr = (xcmInfo != undefined)? JSON.stringify(xcmInfo): false
+                    let xcmInfoBlob = (xcmInfoStr != false)? mysql.escape(xcmInfoStr): 'NULL'
+                    let sqlB = `update xcmtransfer
+            set blockNumberDest = ${d.blockNumberDest},
+                destTS = ${d.destTS},
+                amountSentUSD = '${amountSentUSD}',
+                amountReceivedUSD = '${amountReceivedUSD}',
+                priceUSD = '${priceUSD}',
+                matched = 1,
+                matchedExtrinsicID = '${d.destExtrinsicID}',
+                matchedEventID = '${d.eventID}',
+                xcmInfo = ${xcmInfoBlob}
+             where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
+                    console.log(`match_xcm (B)`)
+                    console.log(paraTool.removeNewLine(sqlB))
+                    this.batchedSQL.push(sqlB);
+                    matches++;
+
                     // 1. write "addressExtrinsic" feedxcmdest with row key address-extrinsicHash and column extrinsicHash#chainID-extrinsicID-transferIndex
                     //    * we use the SENDING chainID + the sender extrinsicID as the column for the "feedxcmdest" column family
                     let rowKey = `${d.fromAddress.toLowerCase()}#${d.extrinsicHash}` // NOTE: this matches "feed"
                     let cres = {
                         key: rowKey,
                         data: {
-                            feedxcmdest: {},
+                            feedxcminfo: {}
+                            //feedxcmdest: {},
                         }
                     };
                     let extrinsicHashEventID = `${d.extrinsicHash}#${d.chainID}-${d.extrinsicID}-${d.transferIndex}`
+                    cres['data']['feedxcminfo'][extrinsicHashEventID] = {
+                        value: JSON.stringify(xcmInfo),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    /*
                     cres['data']['feedxcmdest'][extrinsicHashEventID] = {
                         value: JSON.stringify(match),
                         timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
                     };
+                    */
                     addressextrinsic.push(cres);
 
                     // 2. write "hashes" feedxcmdest with row key extrinsicHash and column extrinsicHash#chainID-extrinsicID (same as 1)
                     let hres = {
                         key: d.extrinsicHash,
                         data: {
-                            feedxcmdest: {}
+                            feedxcminfo: {}
+                            //feedxcmdest: {}
                         }
                     }
+                    hres['data']['feedxcminfo'][extrinsicHashEventID] = {
+                        //value: JSON.stringify(match),
+                        value: JSON.stringify(xcmInfo),
+                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
+                    };
+                    /*
                     hres['data']['feedxcmdest'][extrinsicHashEventID] = {
                         value: JSON.stringify(match),
                         timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
                     };
+                    */
                     console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
                     hashes.push(hres)
                 } else {

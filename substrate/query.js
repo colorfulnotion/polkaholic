@@ -1074,7 +1074,7 @@ module.exports = class Query extends AssetManager {
             if (chainList.length > 0) {
                 chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
             }
-            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(symbol) > 3 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`
+            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain, xcmInfo from xcmtransfer where length(symbol) > 3 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
             console.log(filters, xcmtransfers, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
@@ -1121,7 +1121,12 @@ module.exports = class Query extends AssetManager {
                         method = sectionPieces[1];
                     }
                 }
-
+                let parsedXcmInfo;
+                try {
+                    parsedXcmInfo = JSON.parse(`${x.xcmInfo}`)
+                } catch (e){
+                    parsedXcmInfo = false
+                }
                 let r = {
                     extrinsicHash: x.extrinsicHash,
                     extrinsicID: x.extrinsicID,
@@ -1165,6 +1170,7 @@ module.exports = class Query extends AssetManager {
                     priceUSD: x.priceUSD,
                     priceUSDCurrent: x.priceUSDCurrent,
                 }
+                if (parsedXcmInfo) r.xcmInfo = parsedXcmInfo
                 if (decorate) {
                     this.decorateAddress(r, "fromAddress", decorateAddr, decorateRelated)
                     this.decorateAddress(r, "destAddress", decorateAddr, decorateRelated)
@@ -1280,6 +1286,8 @@ module.exports = class Query extends AssetManager {
             let feedData = false
             let feedTX = false
             let feedXCMDestData = false
+            let feedXCMInfoData = false
+
             let feedXCMDestDataFromSubstrate = false
             let status = ""
             let isPending = false
@@ -1304,6 +1312,10 @@ module.exports = class Query extends AssetManager {
             }
             if (rowData["feedxcmdest"]) {
                 feedXCMDestData = rowData["feedxcmdest"]
+                status = "finalizeddest"
+            }
+            if (rowData["feedxcminfo"]){
+                feedXCMInfoData = rowData["feedxcminfo"]
                 status = "finalizeddest"
             }
             if (feedTX) {
@@ -1395,7 +1407,10 @@ module.exports = class Query extends AssetManager {
                         try {
                             let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
                             console.log("FETCH XCMTRANSFER", substratetx);
-                            if (substratetx.xcmdest != undefined) {
+                            if (substratetx.xcmInfo != undefined) {
+                                c.xcmInfo = substratetx.xcmInfo;
+                                console.log(`SET XCMINFO`, c.xcmInfo);
+                            } else if (substratetx.xcmdest != undefined) {
                                 c.xcmdest = substratetx.xcmdest;
                                 c.xcmInfo = substratetx.xcmInfo;
                                 feedXCMDestDataFromSubstrate = true
@@ -1429,6 +1444,16 @@ module.exports = class Query extends AssetManager {
                 //d.status = status;
 
                 try {
+                    if (feedXCMInfoData){
+                        for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
+                            const cell = feedXCMInfoData[extrinsicHashEventID][0];
+                            let xcmInfo = JSON.parse(cell.value);
+                            c.xcmInfo = xcmInfo;
+                            break;
+                        }
+                        d.xcmInfo = c.xcmInfo
+                        return d;
+                    }
                     if (feedXCMDestDataFromSubstrate){
                         d.xcmdest = c.xcmdest
                         d.xcmInfo = c.xcmInfo
