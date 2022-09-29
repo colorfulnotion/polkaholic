@@ -1477,6 +1477,8 @@ order by msgHash`
 
     async xcmanalytics_period(chain, t0, t1 = null, forceRematch = false) {
         // xcmmessages_match matches incoming=0 and incoming=1 records
+
+/*
         let numRecs = await this.xcmmessages_match(t0, t1);
 
         // computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints}
@@ -1487,14 +1489,17 @@ order by msgHash`
 
         // marks duplicates in xcmmessages
         await this.xcmmessages_dedup(t0, t1);
+*/
 
         await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
 
+/*
         // do it again
         numRecs = await this.xcmmessages_match(t0, t1);
 
         //await this.writeBTHashes_feedxcmmessages(t0, t1);
         return [numRecs, lastTS];
+*/
     }
 
     async xcmanalytics(chain, lookbackDays, forceRematch = false) {
