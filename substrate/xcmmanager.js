@@ -642,52 +642,40 @@ module.exports = class XCMManager extends Query {
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
         console.log(`match_xcm_failure [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
         console.log(`match_xcm_failure (A)`)
-        
-        let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds}` : ""
+
+        let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS} ` : ""
         // match xcmtransferdestcandidate of the last 2 hours
         //   (a) > 95% amountReceived / amountSent
         //   (b) asset match
         //   (c) time difference matching has to be less than 7200 (and greater than 0)
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
-        let rematchClause = forceRematch? `xcmtransfer.matched >= 0 and d.matched >= 0 and `: `xcmtransfer.matched = 0 and d.matched = 0 and `
+        let rematchClause = forceRematch? `xcmtransfer.matched >= 0 and `: `xcmtransfer.matched = 0 and `
         let sqlA = `select
-          chainID, extrinsicHash, d.chainIDDest, d.fromAddress, d.symbol, d.relayChain,
-          (d.destts - xcmtransfer.sourceTS) as diffTS,
+          chainID, extrinsicHash, chainIDDest, fromAddress, symbol, relayChain,
           xcmtransfer.extrinsicID,
           xcmtransfer.amountSent,
           xcmtransfer.transferIndex,
           xcmtransfer.sourceTS,
+          xcmtransfer.destTS,
           xcmtransfer.fromAddress as senderAddress,
           xcmtransfer.destAddress,
           xcmtransfer.msgHash,
           xcmtransfer.sentAt,
           xcmtransfer.blockNumber,
           xcmtransfer.sectionMethod,
-          d.eventID,
-          d.extrinsicID as destExtrinsicID,
-          d.blockNumberDest,
-          d.amountReceived,
-          d.destTS,
-          d.amountReceived / xcmtransfer.amountSent as rat
-        from xcmtransfer, xcmtransferdestcandidate as d
- where  d.fromAddress = xcmtransfer.destAddress and
-        d.chainIDDest = xcmtransfer.chainIDDest and
-        ((d.symbol = xcmtransfer.symbol) and (d.relayChain = xcmtransfer.relayChain)) and
-        xcmtransfer.sourceTS >= ${startTS} and
-        xcmtransfer.xcmInteriorKey = d.xcmInteriorKey and
-        d.destTS >= ${startTS} and ${rematchClause}
+          xcmtransfer.executedEventID,
+          xcmtransfer.destStatus,
+          xcmtransfer.errorDesc,
+          xcmtransfer.blockNumberDest
+        from xcmtransfer
+ where  xcmtransfer.destStatus = 0 and
+        xcmtransfer.sourceTS >= ${startTS} ${endWhere}
+        and ${rematchClause}
         xcmtransfer.incomplete = 0 and
-        d.destTS - xcmtransfer.sourceTS >= 0 and
-        d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
-        length(xcmtransfer.extrinsicID) > 0 and
-        xcmtransfer.amountSent >= d.amountReceived
-  having ( ( rat > ${ratMin} and rat <= 1.0 ) or
-  (symbol = "DOT" and amountSent - amountReceived < 500000000) or
-  (symbol = 'KSM' and amountSent - amountReceived < 1000000000) or
-  (symbol = 'KAR' and amountSent - amountReceived < 10000000000 ) )
-  order by chainID, extrinsicHash, diffTS`
-
+        length(xcmtransfer.extrinsicID) > 0
+  order by chainID, extrinsicHash`
+        console.log(sqlA)
         console.log(paraTool.removeNewLine(sqlA))
         return
         try {
@@ -1471,14 +1459,14 @@ order by msgHash, diffSentAt, diffTS`
         await this.update_batchedSQL();
 
         // update xcmtransfer's (update executedEventID, errorDesc, destStatus) using incoming xcmMsg
-        let sqlA1 = `update xcmtransfer, xcmmessages set xcmtransfer.executedEventID = xcmmessages.executedEventID, xcmtransfer.errorDesc = xcmmessages.errorDesc, xcmtransfer.destStatus = xcmmessages.destStatus
+        let sqlA1 = `update xcmtransfer, xcmmessages set xcmtransfer.executedEventID = xcmmessages.executedEventID, xcmtransfer.errorDesc = xcmmessages.errorDesc, xcmtransfer.destStatus = xcmmessages.destStatus,  xcmtransfer.destTS = xcmmessages.destTS, xcmtransfer.blockNumberDest = xcmmessages.destBlocknumber
                where xcmmessages.incoming = 1 and xcmtransfer.msgHash = xcmmessages.msgHash and
                  xcmtransfer.chainIDDest = xcmmessages.chainIDDest and xcmtransfer.chainID = xcmmessages.chainID and
                  xcmtransfer.msgHash is not null and
                  xcmmessages.blockTS >= ${startTS} and
                  xcmtransfer.sourceTS >= ${startTS} and
                  abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4 ${endWhere}`
-
+        this.batchedSQL.push(sqlA1);
         console.log(`xcmmatch2_matcher (A1)`)
         console.log(paraTool.removeNewLine(sqlA1))
         await this.update_batchedSQL();
@@ -1678,7 +1666,7 @@ order by msgHash, diffSentAt, diffTS`
                         errorDesc,
                         executedEventID
                     } = statusXCMTransfer[k];
-                    //Important only update xcmtransfer.assetsReceived, xcmtransfer.amountReceivedUSD2 {destStatus, errorDesc, executedEventID} will be updated via sql1A
+                    //Important only update xcmtransfer.assetsReceived, xcmtransfer.amountReceivedUSD2 {destStatus, errorDesc, executedEventID} will be updated via sqlA1
                     let sqlD = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)}, amountReceivedUSD2 = '${valueUSD}' where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
                     //console.log(`xcmmatch2_matcher (d)`, paraTool.removeNewLine(sqlD))
                     this.batchedSQL.push(sqlD);
