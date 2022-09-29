@@ -274,6 +274,7 @@ module.exports = class XCMManager extends Query {
         //   (c) time difference matching has to be less than 7200 (and greater than 0)
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
+        let rematchClause = forceRematch? `xcmtransfer.matched >= 0 and d.matched >= 0 and `: `xcmtransfer.matched = 0 and d.matched = 0 and `
         let sqlA = `select
           chainID, extrinsicHash, d.chainIDDest, d.fromAddress, d.symbol, d.relayChain,
           (d.destts - xcmtransfer.sourceTS) as diffTS,
@@ -296,9 +297,7 @@ module.exports = class XCMManager extends Query {
         ((d.symbol = xcmtransfer.symbol) and (d.relayChain = xcmtransfer.relayChain)) and
         xcmtransfer.sourceTS >= ${startTS} and
         xcmtransfer.xcmInteriorKey = d.xcmInteriorKey and
-        d.destTS >= ${startTS} and
-        xcmtransfer.matched = 0 and
-        d.matched = 0 and
+        d.destTS >= ${startTS} and ${rematchClause}
         xcmtransfer.incomplete = 0 and
         d.destTS - xcmtransfer.sourceTS >= 0 and
         d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
@@ -307,7 +306,7 @@ module.exports = class XCMManager extends Query {
   having ( ( rat > ${ratMin} and rat <= 1.0 ) or
   (symbol = "DOT" and amountSent - amountReceived < 500000000) or
   (symbol = 'KSM' and amountSent - amountReceived < 1000000000) or
-  (symbol = 'KAR' and amountSent - amountReceived < 10000000000 ) ) 
+  (symbol = 'KAR' and amountSent - amountReceived < 10000000000 ) )
   order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
@@ -379,10 +378,10 @@ module.exports = class XCMManager extends Query {
                     // problem: this does not store the "dust" fee (which has rat << 1) in bigtable
                     // TODO: generate xcmInfo struct
 
-                    let extrinsicHash = d.extrinsicHash
-                    let substratetx = await this.getTransaction(substrateTXHash);
+                    let substrateTxHash = d.extrinsicHash
+                    let substratetx = await this.getTransaction(substrateTxHash);
                     if (substratetx != undefined){
-                        console.log(`extrinsicHash=${extrinsicHash}`, substratetx)
+                        console.log(`extrinsicHash=${substrateTxHash}`, substratetx)
                     }
 
                     let match = {
