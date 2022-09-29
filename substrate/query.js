@@ -865,7 +865,7 @@ module.exports = class Query extends AssetManager {
             chainID: null,
             blockNumber: null,
         };
-        let families = ['feed', 'feedunfinalized', 'feedevmunfinalized', 'feedpending', 'feedxcmdest'] // 3 columnfamily
+        let families = ['feed', 'feedunfinalized', 'feedevmunfinalized', 'feedpending', 'feedxcmdest', 'feedxcminfo'] // 3 columnfamily
         try {
             // TODO: use getRow
             let [rows] = await this.btHashes.getRows({
@@ -879,7 +879,10 @@ module.exports = class Query extends AssetManager {
                 let txcells = false;
                 let data = false
 
-                if (rowData["feedxcmdest"]) {
+                if (rowData["feedxcminfo"] ){
+                    data = rowData["feedxcminfo"]
+                    res.status = 'finalizeddest'
+                } else if (rowData["feedxcmdest"]) {
                     data = rowData["feedxcmdest"]
                     res.status = 'finalizeddest'
                 } else if (rowData["feed"]) {
@@ -1460,6 +1463,7 @@ module.exports = class Query extends AssetManager {
                         return d;
                     }
                     return d;
+                    // TODO: modernize UI to use xcmInfo and retire all the code below
                     if (feedXCMDestData) {
                         let sourceTxFee = d.fee
                         let sourceTxFeeUSD = d.feeUSD
