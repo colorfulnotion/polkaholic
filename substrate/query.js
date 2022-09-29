@@ -1434,6 +1434,7 @@ module.exports = class Query extends AssetManager {
                         d.xcmInfo = c.xcmInfo
                         return d;
                     }
+                    return d;
                     if (feedXCMDestData) {
                         let sourceTxFee = d.fee
                         let sourceTxFeeUSD = d.feeUSD
