@@ -1,21 +1,28 @@
 #!/usr/bin/env node
 /*
- Usage: checkRoutes [symbol]
+ Usage: updateAssetCcheckRoutes [symbol]
 */
 
 var PriceManager = require("./priceManager");
 var ParaTool = require("./paraTool");
 
 async function main() {
-    let chainID = 2000;
+    let chainID = -1;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
 	    chainID = parseInt(val, 10);
         }
     });
-    var priceManager = new PriceManager();
-    await priceManager.assetpricelogGenerationParachain(chainID);
-    //await priceManager.updateAssetPriceLog(chainID);
+    if ( chainID == -1 ) {
+	let chainIDs = [2004, 2000, 22023, 22000, 2006, 22007];
+	for ( const chainID of chainIDs) {
+	    let priceManager = new PriceManager();
+	    await priceManager.updateAssetPriceLog(chainID);
+	}
+    } else {
+	let priceManager = new PriceManager();
+	await priceManager.updateAssetPriceLog(chainID);
+    }
 }
 
 main()
