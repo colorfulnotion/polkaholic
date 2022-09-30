@@ -4341,7 +4341,7 @@ module.exports = class ChainParser {
                 let xcmAssetSymbol = assetInfo.symbol
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> xcmAssetSymbol ${xcmAssetSymbol}`)
                 return xcmAssetSymbol
-            }else{
+            } else {
                 //TODO: not found case
             }
         }
@@ -4360,7 +4360,7 @@ module.exports = class ChainParser {
                 let xcmAssetSymbol = assetInfo.symbol
                 if (this.debugLevel >= paraTool.debugTracing) console.log(`convert currency_id [${JSON.stringify(currency_id)}] ->  xcmAssetSymbol ${xcmAssetSymbol}`)
                 return xcmAssetSymbol
-            }else{
+            } else {
                 //TODO
             }
         }

@@ -44,10 +44,10 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
         </tr>
     <% } %>
 
-    <% if ( f.xcmdest ) { %>
+    <% if ( f.xcmInfo ) {  %>
         <tr>
-          <td>Destination Status</td>
-          <td><%- include("xcmdest", {extrinsicHash: f.extrinsicHash, xcmdest: f.xcmdest}); %></td>
+          <td>XCM Timeline</td>
+          <td><%- include("xcminfo", {xcm: f.xcmInfo}); %></td>
         </tr>
     <% } %>
     

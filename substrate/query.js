@@ -865,7 +865,7 @@ module.exports = class Query extends AssetManager {
             chainID: null,
             blockNumber: null,
         };
-        let families = ['feed', 'feedunfinalized', 'feedevmunfinalized', 'feedpending', 'feedxcmdest'] // 3 columnfamily
+        let families = ['feed', 'feedunfinalized', 'feedevmunfinalized', 'feedpending', 'feedxcmdest', 'feedxcminfo'] // 3 columnfamily
         try {
             // TODO: use getRow
             let [rows] = await this.btHashes.getRows({
@@ -879,7 +879,10 @@ module.exports = class Query extends AssetManager {
                 let txcells = false;
                 let data = false
 
-                if (rowData["feedxcmdest"]) {
+                if (rowData["feedxcminfo"]) {
+                    data = rowData["feedxcminfo"]
+                    res.status = 'finalizeddest'
+                } else if (rowData["feedxcmdest"]) {
                     data = rowData["feedxcmdest"]
                     res.status = 'finalizeddest'
                 } else if (rowData["feed"]) {
@@ -1074,7 +1077,7 @@ module.exports = class Query extends AssetManager {
             if (chainList.length > 0) {
                 chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
             }
-            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain from xcmtransfer where length(symbol) > 3 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`
+            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain, xcmInfo from xcmtransfer where length(symbol) > 0 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
             console.log(filters, xcmtransfers, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
@@ -1083,7 +1086,7 @@ module.exports = class Query extends AssetManager {
                 [x.chainID, x.id] = this.convertChainID(x.chainID)
 
                 // looks up assetInfo
-		let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
+                let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
                 let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
                 if (assetInfo) {
                     x.decimals = assetInfo.decimals;
@@ -1095,7 +1098,7 @@ module.exports = class Query extends AssetManager {
                         if (x.fromAddress != undefined) {
                             if (x.fromAddress.length == 42) x.sender = x.fromAddress
                             if (x.fromAddress.length == 66) x.sender = paraTool.getAddress(x.fromAddress, chainIDOriginationInfo.ss58Format)
-			}
+                        }
                     }
 
                     x.symbol = assetInfo.symbol;
@@ -1121,7 +1124,20 @@ module.exports = class Query extends AssetManager {
                         method = sectionPieces[1];
                     }
                 }
-
+                let parsedXcmInfo;
+                try {
+                    parsedXcmInfo = JSON.parse(`${x.xcmInfo}`)
+                    if (parsedXcmInfo.origination) {
+                        x.amountSent = parsedXcmInfo.origination.amountSent;
+                        x.amountSentUSD = parsedXcmInfo.origination.amountSentUSD;
+                    }
+                    if (parsedXcmInfo.destination) {
+                        x.amountReceivedUSD = parsedXcmInfo.destination.amountReceivedUSD;
+                        x.amountReceived = parsedXcmInfo.destination.amountReceived;
+                    }
+                } catch (e) {
+                    parsedXcmInfo = false
+                }
                 let r = {
                     extrinsicHash: x.extrinsicHash,
                     extrinsicID: x.extrinsicID,
@@ -1165,6 +1181,7 @@ module.exports = class Query extends AssetManager {
                     priceUSD: x.priceUSD,
                     priceUSDCurrent: x.priceUSDCurrent,
                 }
+                if (parsedXcmInfo) r.xcmInfo = parsedXcmInfo
                 if (decorate) {
                     this.decorateAddress(r, "fromAddress", decorateAddr, decorateRelated)
                     this.decorateAddress(r, "destAddress", decorateAddr, decorateRelated)
@@ -1280,6 +1297,8 @@ module.exports = class Query extends AssetManager {
             let feedData = false
             let feedTX = false
             let feedXCMDestData = false
+            let feedXCMInfoData = false
+
             let feedXCMDestDataFromSubstrate = false
             let status = ""
             let isPending = false
@@ -1304,6 +1323,10 @@ module.exports = class Query extends AssetManager {
             }
             if (rowData["feedxcmdest"]) {
                 feedXCMDestData = rowData["feedxcmdest"]
+                status = "finalizeddest"
+            }
+            if (rowData["feedxcminfo"]) {
+                feedXCMInfoData = rowData["feedxcminfo"]
                 status = "finalizeddest"
             }
             if (feedTX) {
@@ -1394,10 +1417,10 @@ module.exports = class Query extends AssetManager {
                         //  fetch substrate extrinsicHash
                         try {
                             let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
-                            console.log("FETCH XCMTRANSFER", substratetx);
-                            if (substratetx.xcmdest != undefined) {
-                                c.xcmdest = substratetx.xcmdest;
+                            if (substratetx.xcmInfo != undefined) {
                                 c.xcmInfo = substratetx.xcmInfo;
+                            } else if (substratetx.xcmdest != undefined) {
+                                c.xcmdest = substratetx.xcmdest;
                                 feedXCMDestDataFromSubstrate = true
                                 console.log(`feedXCMDestDataFromSubstrate=${feedXCMDestDataFromSubstrate}, SET XCMTDEST`, c.xcmdest);
                             }
@@ -1429,16 +1452,28 @@ module.exports = class Query extends AssetManager {
                 //d.status = status;
 
                 try {
-                    if (feedXCMDestDataFromSubstrate){
+                    if (feedXCMInfoData) {
+                        for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
+                            const cell = feedXCMInfoData[extrinsicHashEventID][0];
+                            let xcmInfo = JSON.parse(cell.value);
+                            c.xcmInfo = xcmInfo;
+                            break;
+                        }
+                        d.xcmInfo = c.xcmInfo
+                        return d;
+                    }
+                    if (feedXCMDestDataFromSubstrate) {
                         d.xcmdest = c.xcmdest
                         d.xcmInfo = c.xcmInfo
                         return d;
                     }
+                    return d;
+                    // TODO: modernize UI to use xcmInfo and retire all the code below
                     if (feedXCMDestData) {
                         let sourceTxFee = d.fee
                         let sourceTxFeeUSD = d.feeUSD
                         let sourceChainSymbol = d.chainSymbol
-                        if (d.evm != undefined && d.evm.transactionHash != undefined){
+                        if (d.evm != undefined && d.evm.transactionHash != undefined) {
                             let evmtx = await this.getTransaction(d.evm.transactionHash, decorate, decorateExtra, false);
                             sourceTxFee = evmtx.fee
                             sourceTxFeeUSD = evmtx.feeUSD
@@ -1468,22 +1503,22 @@ module.exports = class Query extends AssetManager {
 
                             let decimals = false
                             let isNewFormat = true
-                            if (xcm.asset != undefined){
+                            if (xcm.asset != undefined) {
                                 isNewFormat = false
                             }
 
                             let symbolRelayChain = paraTool.makeAssetChain(xcm.symbol, xcm.relayChain);
                             let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-                            if (xcmAssetInfo != undefined && xcmAssetInfo.decimals){
+                            if (xcmAssetInfo != undefined && xcmAssetInfo.decimals) {
                                 decimals = xcmAssetInfo.decimals
                             }
-                            if (!isNewFormat){
+                            if (!isNewFormat) {
                                 if (decimals === false) {
                                     decimals = this.getAssetDecimal(xcm.asset, xcm.chainID)
-                                }else if (decimals === false) {
+                                } else if (decimals === false) {
                                     decimals = this.getAssetDecimal(xcm.asset, xcm.chainIDDest)
                                 }
-                                if (decimals !== false){
+                                if (decimals !== false) {
                                     xcm.amountSent = xcm.amountSent / 10 ** decimals;
                                     xcm.amountReceived = xcm.amountReceived / 10 ** decimals;
                                 }
@@ -1525,7 +1560,7 @@ module.exports = class Query extends AssetManager {
                                 relayChain: xcm.relayChain,
                                 origination: null,
                                 destination: null,
-                                version: (isNewFormat)? 'V2' : 'V1'
+                                version: (isNewFormat) ? 'V2' : 'V1'
                             }
                             xcmInfo.origination = {
                                 chainIDName: xcm.chainIDName,
@@ -1554,7 +1589,7 @@ module.exports = class Query extends AssetManager {
                                 destTS: xcm.destTS,
                             }
                             //console.log("XCM final", xcm);
-                            xcm.version = (isNewFormat)? 'V2' : 'V1'
+                            xcm.version = (isNewFormat) ? 'V2' : 'V1'
                             d.xcmdest = xcm;
                             d.xcmInfo = xcmInfo;
                             /*
@@ -4322,10 +4357,8 @@ module.exports = class Query extends AssetManager {
                     } else if (args.transaction.legacy != undefined) {
                         evmTx = args.transaction.legacy
                     }
-                    console.log(`evmTx`, evmTx)
                     if (decorate && evmTx) {
                         let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
-                        console.log(`output`, output)
                         if (output != undefined) {
                             args.decodedEvmInput = output
                         }
@@ -4697,7 +4730,7 @@ module.exports = class Query extends AssetManager {
             if (p) {
                 res.dataUSD = p.valUSD
                 res.priceUSD = p.priceUSD
-                res.priceUSDCurrent = priceUSDCurrent
+                res.priceUSDCurrent = p.priceUSDCurrent
             }
         }
 
@@ -4907,9 +4940,9 @@ module.exports = class Query extends AssetManager {
         for (let i = 0; i < xcmtransfers.length; i++) {
             let x = xcmtransfers[i];
             try {
-		let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
-		let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
-		if ( assetInfo && assetInfo.decimals ) {
+                let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
+                let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
+                if (assetInfo && assetInfo.decimals) {
                     decimals = assetInfo[rawassetChain].decimals;
                     if (decorate) {
                         this.decorateAddress(x, "fromAddress", decorateAddr, decorateRelated)
@@ -6651,7 +6684,11 @@ module.exports = class Query extends AssetManager {
     async get_xcm_messages_extrinsic(extrinsicHash) {
         let sql = `select chainID, chainIDDest, relayChain, blockTS, blockNumber, msgType, msgHash, msgHex, msgStr, assetChains, incoming, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetsReceived, version, executedEventID, destStatus, errorDesc from xcmmessages where extrinsicHash = '${extrinsicHash}' order by blockTS, incoming`
         console.log(`get_xcm_messages_extrinsic sql=${sql}`)
-        return this.fetch_xcmmessages_chainpaths(sql);
+        let [xcmmessages, chainpaths] = await this.fetch_xcmmessages_chainpaths(sql);
+        let sqlx = `select extrinsicHash, extrinsicID, sectionMethod, chainID, paraID, chainIDDest, paraIDDest, blockNumber, blockNumberDest, fromAddress, destAddress, symbol, amountSent, sourceTS, destTS, amountSent, amountReceived, amountSentUSD, amountReceivedUSD, priceUSD, relayChain, msgHash, sentAt, executedEventID, status, incomplete, destStatus, errorDesc from xcmtransfer where extrinsicHash = '${extrinsicHash}'`
+        let extrinsics = await this.poolREADONLY.query(sqlx);
+        let extrinsic = (extrinsics.length > 0) ? extrinsics[0] : {};
+        return [extrinsic, xcmmessages, chainpaths]
     }
 
     chainpaths_contains(chainpaths, chainID, blockNumber) {
@@ -6687,6 +6724,7 @@ module.exports = class Query extends AssetManager {
         try {
             let xcmmessages = [];
             let chainpaths = {};
+            let extrinsic = {};
             let extrinsicHash = null;
             let extrinsicID = null;
             if (hashType == "xcm") {
@@ -6701,7 +6739,7 @@ module.exports = class Query extends AssetManager {
                         // ALL the XCM messages related to extrinsic are fetched here ( A =m1=> B =m2=> C ) for the timeline of an extrinsicHash (hashType="extrinsic") OR all the sibling xcmmessages of a XCM msgHash (hashType="xcm")
                         extrinsicID = x.extrinsicID;
                         extrinsicHash = x.extrinsicHash;
-                        [xcmmessages, chainpaths] = await this.get_xcm_messages_extrinsic(extrinsicHash);
+                        [extrinsic, xcmmessages, chainpaths] = await this.get_xcm_messages_extrinsic(extrinsicHash);
                     } else {
                         // all we have is the single message, but we might have parents and/or children
                         [xcmmessages, chainpaths] = await this.get_xcm_messages_parents_children(x);
@@ -6712,7 +6750,7 @@ module.exports = class Query extends AssetManager {
             } else if (hashType == "extrinsic") {
                 extrinsicHash = hash;
                 //console.log(`getXCMTimeline type=extrinsic, hash=${extrinsicHash}`)
-                [xcmmessages, chainpaths] = await this.get_xcm_messages_extrinsic(extrinsicHash);
+                [extrinsic, xcmmessages, chainpaths] = await this.get_xcm_messages_extrinsic(extrinsicHash);
             }
 
             // get eventIDs in assetsReceived, which may also contain additional chainpaths
@@ -6815,7 +6853,7 @@ module.exports = class Query extends AssetManager {
             decorated_xcmmessages.sort(function(a, b) {
                 return (a.blockTS - b.blockTS);
             })
-            return [timeline, decorated_xcmmessages];
+            return [extrinsic, timeline, decorated_xcmmessages];
         } catch (err) {
             console.log(err);
             return [
@@ -6962,4 +7000,40 @@ module.exports = class Query extends AssetManager {
         await this.update_batchedSQL();
     }
 
+
+    async getXCMInfo(hash) {
+        const filter = {
+            column: {
+                cellLimit: 1
+            },
+        };
+        if (!this.validAddress(hash)) {
+            throw new paraTool.InvalidError(`Invalid Extrinsic Hash: ${hash}`)
+        }
+        try {
+            const [row] = await this.btHashes.row(hash).get({
+                filter
+            });
+            let rowData = row.data;
+            let feedXCMInfoData = false
+            if (rowData["feedxcminfo"]) {
+                feedXCMInfoData = rowData["feedxcminfo"]
+            }
+            if (feedXCMInfoData) {
+                for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
+                    const cell = feedXCMInfoData[extrinsicHashEventID][0];
+                    let xcmInfo = JSON.parse(cell.value);
+                    return xcmInfo;
+                }
+            } else {
+                throw new paraTool.InvalidError(`${hash} not found`)
+            }
+        } catch (e) {
+            throw new paraTool.InvalidError(`Invalid ${hash}, err=${e.toString()}`)
+        }
+        /*
+        let testS = '{"symbol":"GLMR","priceUSD":0.4430889152,"priceUSDCurrent":0.504718427,"origination":{"chainName":"Moonbeam","chainID":2004,"id":"moonbeam","paraID":2004,"sender":"0xe95ee4a899718488aba3a5edcd061d1320baed3a","amountSent":10.576562227002592,"amountSentUSD":10.576562227002592,"txFee":0.003606092,"txFeeUSD":0.0015964190180269564,"txFeeSymbol":"GLMR","blockNumber":1930924,"extrinsicID":"1930924-50","extrinsicHash":"0xa2ee0f96a8c4d022b19c866ca9085f7091e5efdbae7f2a84c37ae0867f93a3fa","transactionHash":"0xa2ee0f96a8c4d022b19c866ca9085f7091e5efdbae7f2a84c37ae0867f93a3fa","section":"ethereum","method":"transact","msgHash":"0xaf33f855861f548a89005819448e37e1bd37b84a2805de98681992e08068171f","sentAt":12343212,"ts":1663959276},"relayChain":{"relayChain":"polkadot","sentAt":12343212},"destination":{"status":1,"chainIDName":"Acala","id":"acala","paraID":2000,"chainID":2000,"beneficiary":"25jJWAx87efC2rWDUixZVZNaQd1oxUPeCS3BaBDuNUNUE3ak","beneficiarySS58Address":"25jJWAx87efC2rWDUixZVZNaQd1oxUPeCS3BaBDuNUNUE3ak","amountReceived":10.56729262700259,"amountReceivedUSD":10.56729262700259,"teleportFee":0.009269600000001432,"teleportFeeUSD":0.004107257008346604,"teleportFeeChainSymbol":"GLMR","blockNumber":1923245,"extrinsicID":"1923245-1","eventID":"2000-1923245-1-1","ts":1663959288},"version":"v2"}'
+        return JSON.parse(testS)
+        */
+    }
 }

@@ -327,7 +327,7 @@ async function showxcmtransfers(filter = {}) {
                             let symbol = row.symbol
                             if (symbol !== undefined) {
                                 return data + " " + symbol
-			    }
+                            }
                         } catch (err) {
                             return ""
                         }
@@ -389,9 +389,7 @@ async function showxcmtransfers(filter = {}) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash, false);
-                        let timelineURL = `/timeline/${row.extrinsicHash}`
-                        let timelineLink = `<div class="explorer"><a href="${timelineURL}">timeline</a></div>`
-                        return `${presentChain(row.id, row.chainName)} (${s}) ` + timelineLink
+                        return `${presentChain(row.id, row.chainName)} (${s}) `
                     } else {
                         try {
                             return data + " " + row.extrinsicID + " " + row.extrinsicHash;
