@@ -16,6 +16,7 @@ async function main() {
 
     let lastUpdateTS = 0;
     var manager = new XCMManager();
+    manager.init_xcm_error_map();
     await manager.xcm_init()
     await manager.assetManagerInit();
     let chain = await manager.getChain(2);

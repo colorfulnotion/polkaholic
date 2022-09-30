@@ -640,8 +640,7 @@ function showxcmtransfers(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     try {
-                        let parsedAsset = JSON.parse(row.asset);
-                        let symbol = parsedAsset.Token;
+                        let symbol = row.symbol;
                         if (symbol !== undefined) {
                             row.symbol = symbol;
                             return presentTokenCount(data) + " " + presentAsset(row);
@@ -650,11 +649,11 @@ function showxcmtransfers(address, chainListStr = 'all') {
                         }
                     } catch (err) {
                         return "unk";
+			console.log(row);
                     }
                 } else {
                     try {
-                        let parsedAsset = JSON.parse(row.asset);
-                        let symbol = parsedAsset.Token;
+                        let symbol = row.symbol;
                         return data + " " + symbol;
                     } catch (err) {
                         return "unk";
