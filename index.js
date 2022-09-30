@@ -1662,7 +1662,7 @@ app.get('/xcminfo/:hash?', async (req, res) => {
     try {
         let hash = req.params['hash'] ? req.params['hash'] : null;
         let [decorate, decorateExtra] = decorateOptUI(req)
-	    let xcmInfo = await query.getXCMInfo(hash);
+        let xcmInfo = await query.getXCMInfo(hash);
         res.render('xcminfo', {
             hash: hash,
             xcm: xcmInfo,

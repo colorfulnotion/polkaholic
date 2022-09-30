@@ -879,7 +879,7 @@ module.exports = class Query extends AssetManager {
                 let txcells = false;
                 let data = false
 
-                if (rowData["feedxcminfo"] ){
+                if (rowData["feedxcminfo"]) {
                     data = rowData["feedxcminfo"]
                     res.status = 'finalizeddest'
                 } else if (rowData["feedxcmdest"]) {
@@ -1086,11 +1086,11 @@ module.exports = class Query extends AssetManager {
                 [x.chainID, x.id] = this.convertChainID(x.chainID)
 
                 // looks up assetInfo
-		let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
+                let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
                 let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
                 if (assetInfo) {
                     x.decimals = assetInfo.decimals;
-                    x.amountSent = x.amountSent / 10 ** x.decimals;
+                    x.amowuntSent = x.amountSent / 10 ** x.decimals;
                     x.amountReceived = x.amountReceived / 10 ** x.decimals;
                     x.xcmFee = x.amountSent - x.amountReceived
                     let chainIDOriginationInfo = this.chainInfos[x.chainID]
@@ -1098,7 +1098,7 @@ module.exports = class Query extends AssetManager {
                         if (x.fromAddress != undefined) {
                             if (x.fromAddress.length == 42) x.sender = x.fromAddress
                             if (x.fromAddress.length == 66) x.sender = paraTool.getAddress(x.fromAddress, chainIDOriginationInfo.ss58Format)
-			}
+                        }
                     }
 
                     x.symbol = assetInfo.symbol;
@@ -1127,7 +1127,7 @@ module.exports = class Query extends AssetManager {
                 let parsedXcmInfo;
                 try {
                     parsedXcmInfo = JSON.parse(`${x.xcmInfo}`)
-                } catch (e){
+                } catch (e) {
                     parsedXcmInfo = false
                 }
                 let r = {
@@ -1317,7 +1317,7 @@ module.exports = class Query extends AssetManager {
                 feedXCMDestData = rowData["feedxcmdest"]
                 status = "finalizeddest"
             }
-            if (rowData["feedxcminfo"]){
+            if (rowData["feedxcminfo"]) {
                 feedXCMInfoData = rowData["feedxcminfo"]
                 status = "finalizeddest"
             }
@@ -1409,13 +1409,10 @@ module.exports = class Query extends AssetManager {
                         //  fetch substrate extrinsicHash
                         try {
                             let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
-                            console.log("FETCH XCMTRANSFER", substratetx);
                             if (substratetx.xcmInfo != undefined) {
                                 c.xcmInfo = substratetx.xcmInfo;
-                                console.log(`SET XCMINFO`, c.xcmInfo);
                             } else if (substratetx.xcmdest != undefined) {
                                 c.xcmdest = substratetx.xcmdest;
-                                c.xcmInfo = substratetx.xcmInfo;
                                 feedXCMDestDataFromSubstrate = true
                                 console.log(`feedXCMDestDataFromSubstrate=${feedXCMDestDataFromSubstrate}, SET XCMTDEST`, c.xcmdest);
                             }
@@ -1447,7 +1444,7 @@ module.exports = class Query extends AssetManager {
                 //d.status = status;
 
                 try {
-                    if (feedXCMInfoData){
+                    if (feedXCMInfoData) {
                         for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
                             const cell = feedXCMInfoData[extrinsicHashEventID][0];
                             let xcmInfo = JSON.parse(cell.value);
@@ -1457,7 +1454,7 @@ module.exports = class Query extends AssetManager {
                         d.xcmInfo = c.xcmInfo
                         return d;
                     }
-                    if (feedXCMDestDataFromSubstrate){
+                    if (feedXCMDestDataFromSubstrate) {
                         d.xcmdest = c.xcmdest
                         d.xcmInfo = c.xcmInfo
                         return d;
@@ -1468,7 +1465,7 @@ module.exports = class Query extends AssetManager {
                         let sourceTxFee = d.fee
                         let sourceTxFeeUSD = d.feeUSD
                         let sourceChainSymbol = d.chainSymbol
-                        if (d.evm != undefined && d.evm.transactionHash != undefined){
+                        if (d.evm != undefined && d.evm.transactionHash != undefined) {
                             let evmtx = await this.getTransaction(d.evm.transactionHash, decorate, decorateExtra, false);
                             sourceTxFee = evmtx.fee
                             sourceTxFeeUSD = evmtx.feeUSD
@@ -1498,22 +1495,22 @@ module.exports = class Query extends AssetManager {
 
                             let decimals = false
                             let isNewFormat = true
-                            if (xcm.asset != undefined){
+                            if (xcm.asset != undefined) {
                                 isNewFormat = false
                             }
 
                             let symbolRelayChain = paraTool.makeAssetChain(xcm.symbol, xcm.relayChain);
                             let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-                            if (xcmAssetInfo != undefined && xcmAssetInfo.decimals){
+                            if (xcmAssetInfo != undefined && xcmAssetInfo.decimals) {
                                 decimals = xcmAssetInfo.decimals
                             }
-                            if (!isNewFormat){
+                            if (!isNewFormat) {
                                 if (decimals === false) {
                                     decimals = this.getAssetDecimal(xcm.asset, xcm.chainID)
-                                }else if (decimals === false) {
+                                } else if (decimals === false) {
                                     decimals = this.getAssetDecimal(xcm.asset, xcm.chainIDDest)
                                 }
-                                if (decimals !== false){
+                                if (decimals !== false) {
                                     xcm.amountSent = xcm.amountSent / 10 ** decimals;
                                     xcm.amountReceived = xcm.amountReceived / 10 ** decimals;
                                 }
@@ -1555,7 +1552,7 @@ module.exports = class Query extends AssetManager {
                                 relayChain: xcm.relayChain,
                                 origination: null,
                                 destination: null,
-                                version: (isNewFormat)? 'V2' : 'V1'
+                                version: (isNewFormat) ? 'V2' : 'V1'
                             }
                             xcmInfo.origination = {
                                 chainIDName: xcm.chainIDName,
@@ -1584,7 +1581,7 @@ module.exports = class Query extends AssetManager {
                                 destTS: xcm.destTS,
                             }
                             //console.log("XCM final", xcm);
-                            xcm.version = (isNewFormat)? 'V2' : 'V1'
+                            xcm.version = (isNewFormat) ? 'V2' : 'V1'
                             d.xcmdest = xcm;
                             d.xcmInfo = xcmInfo;
                             /*
@@ -4352,10 +4349,8 @@ module.exports = class Query extends AssetManager {
                     } else if (args.transaction.legacy != undefined) {
                         evmTx = args.transaction.legacy
                     }
-                    console.log(`evmTx`, evmTx)
                     if (decorate && evmTx) {
                         let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
-                        console.log(`output`, output)
                         if (output != undefined) {
                             args.decodedEvmInput = output
                         }
@@ -4937,9 +4932,9 @@ module.exports = class Query extends AssetManager {
         for (let i = 0; i < xcmtransfers.length; i++) {
             let x = xcmtransfers[i];
             try {
-		let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
-		let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
-		if ( assetInfo && assetInfo.decimals ) {
+                let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
+                let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
+                if (assetInfo && assetInfo.decimals) {
                     decimals = assetInfo[rawassetChain].decimals;
                     if (decorate) {
                         this.decorateAddress(x, "fromAddress", decorateAddr, decorateRelated)
@@ -6683,9 +6678,9 @@ module.exports = class Query extends AssetManager {
         console.log(`get_xcm_messages_extrinsic sql=${sql}`)
         let [xcmmessages, chainpaths] = await this.fetch_xcmmessages_chainpaths(sql);
         let sqlx = `select extrinsicHash, extrinsicID, sectionMethod, chainID, paraID, chainIDDest, paraIDDest, blockNumber, blockNumberDest, fromAddress, destAddress, symbol, amountSent, sourceTS, destTS, amountSent, amountReceived, amountSentUSD, amountReceivedUSD, priceUSD, relayChain, msgHash, sentAt, executedEventID, status, incomplete, destStatus, errorDesc from xcmtransfer where extrinsicHash = '${extrinsicHash}'`
-	let extrinsics = await this.poolREADONLY.query(sqlx);
-	let extrinsic = ( extrinsics.length > 0 ) ? extrinsics[0] : {};
-	return [extrinsic, xcmmessages, chainpaths]
+        let extrinsics = await this.poolREADONLY.query(sqlx);
+        let extrinsic = (extrinsics.length > 0) ? extrinsics[0] : {};
+        return [extrinsic, xcmmessages, chainpaths]
     }
 
     chainpaths_contains(chainpaths, chainID, blockNumber) {
@@ -6721,7 +6716,7 @@ module.exports = class Query extends AssetManager {
         try {
             let xcmmessages = [];
             let chainpaths = {};
-	    let extrinsic = {};
+            let extrinsic = {};
             let extrinsicHash = null;
             let extrinsicID = null;
             if (hashType == "xcm") {
@@ -6998,7 +6993,7 @@ module.exports = class Query extends AssetManager {
     }
 
 
-    async getXCMInfo(hash)  {
+    async getXCMInfo(hash) {
         const filter = {
             column: {
                 cellLimit: 1
@@ -7013,19 +7008,19 @@ module.exports = class Query extends AssetManager {
             });
             let rowData = row.data;
             let feedXCMInfoData = false
-            if (rowData["feedxcminfo"]){
+            if (rowData["feedxcminfo"]) {
                 feedXCMInfoData = rowData["feedxcminfo"]
             }
-            if (feedXCMInfoData){
+            if (feedXCMInfoData) {
                 for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
                     const cell = feedXCMInfoData[extrinsicHashEventID][0];
                     let xcmInfo = JSON.parse(cell.value);
                     return xcmInfo;
                 }
-            }else{
+            } else {
                 throw new paraTool.InvalidError(`${hash} not found`)
             }
-        } catch (e){
+        } catch (e) {
             throw new paraTool.InvalidError(`Invalid ${hash}, err=${e.toString()}`)
         }
         /*

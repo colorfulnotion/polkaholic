@@ -1,45 +1,6 @@
-<%- include('header', {chainInfo: chainInfo, title: "XCM Timeline"}); %>
-<nav aria-label="breadcrumb">
-  <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="/">Polkaholic</a></li>
-    <li class="breadcrumb-item"><a href="/chains/polkadot#xcmtransfers">XCM Transfers</a></li>
-      <li class="breadcrumb-item">XCM Transfer <a href='/tx/<%= hash; %>'><%- uiTool.getShortHash(hash, true, false); %></a></li>
-    <li class="breadcrumb-item active" aria-current="page">XCM Timeline</li>
-  </ol>
-</nav>
-<style>
-.timeline-with-icons {
-  border-left: 1px solid hsl(0, 0%, 90%);
-  position: relative;
-  list-style: none;
-}
 
-.timeline-with-icons .timeline-item {
-  position: relative;
-}
+<div style='padding-left: 2px; margin-left: 2px; border: 1px solid block;'>
 
-.timeline-with-icons .timeline-item:after {
-  position: absolute;
-  display: block;
-  top: 0;
-}
-
-.timeline-with-icons .timeline-icon {
-  position: absolute;
-  left: -48px;
-  background-color: hsl(217, 88.2%, 90%);
-  color: hsl(217, 88.8%, 35.1%);
-  border-radius: 50%;
-  height: 31px;
-  width: 31px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-</style>
-
-<div style='padding-left: 20px; margin-left: 20px'>
-<section class="py-5">
   <ul class="timeline-with-icons">
 
  <!-- Section: Origination -->
@@ -47,15 +8,16 @@
       <span class="timeline-icon">
         <i class="fas fa-paper-plane text-primary fa-sm fa-fw"></i>
       </span>
-      <h5 class="fw-bold">
+      <h6 class="fw-bold">
        <% if ( xcm.origination.paraID == 0 ) { %>
          Origination [RelayChain] <%= uiTool.capitalizeFirstLetter(xcm.origination.id) %>
        <%} else {  %>
          Origination [Para ID: <%= xcm.origination.paraID %>]: <%= uiTool.capitalizeFirstLetter(xcm.origination.id) %>
        <% } %>
-      </h5>
+      </h6>
 
       <p class="text-muted mb-2 fw-bold"><%- uiTool.presentTS(xcm.origination.ts) %></p>
+      <p class="text-muted">
       <% if ( xcm.origination.transactionHash ) { %>
        <B> Transaction Hash: </b><%- uiTool.presentTx(xcm.origination.transactionHash) %>
       <% } else { %>
@@ -68,76 +30,95 @@
         let sender = xcm.origination.sender
       %>
       <%- uiTool.presentBlockiesOrIdenticon(sender, 25) %>
-      <a href='/account/<%= sender %>'>
-        <code><%= sender; %></code>
-      </a>
+      <%- uiTool.presentID(sender); %>
 
       <% } %>
       <br/>
 
-      <p class="text-muted">
       <B>Module</B>: <%- include("module", {chainID: xcm.origination.id, section: xcm.origination.section, method: xcm.origination.method}); %><br/>
       <B>Sent</B>: <%- uiTool.presentNumber(xcm.origination.amountSent) %> <%= xcm.symbol; %> (<%= uiTool.currencyFormat(xcm.origination.amountSentUSD)%>)<br/>
-      <b>Sent at Block</B>: <%- uiTool.presentBlock(xcm.origination.chainID, xcm.origination.blockNumber); %><br/>
+      <b>Sent At Block</B>: <a href='/block/<%= xcm.origination.id %>/<%= xcm.origination.blockNumber; %>'><code><%= xcm.origination.blockNumber; %></code></a><br/>
       <B>TX Fees:</B>
          <%- uiTool.presentNumber(xcm.origination.txFee) %> <%= xcm.origination.txFeeSymbol %>
          (<%- uiTool.currencyFormat(xcm.origination.txFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)<br/>
       </p>
     </li>
 
+ <!-- Section: RelayChain -->
+<% if ( xcm.relayChain ) { %>
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-spinner text-primary fa-sm fa-fw"></i>
+      </span>
+      <h6 class="fw-bold">
+      Relay Chain: <%= xcm.relayChain.relayChain; %>
+      </h6>
+
+      <p class="text-muted">
+      <% if ( xcm.relayChain.relayAt ) { %>
+      <B>Relayed At Block:</B>
+      <a href='/block/<%= xcm.relayChain.relayChain %>/<%= xcm.relayChain.relayAt; %>'>
+        <code><%= xcm.relayChain.relayAt; %></code>
+      </a>
+      <% } %>
+    </li>
+<% } %>
  <!-- Section: Destination Chain -->
     <li class="timeline-item mb-5">
       <span class="timeline-icon">
         <i class="fas fa-hand-holding-usd text-primary fa-sm fa-fw"></i>
       </span>
-      <h5 class="fw-bold">
+      <h6 class="fw-bold">
         <% if ( xcm.destination.paraID == 0 ) { %>
         Destination: [RelayChain]</B> <%= uiTool.capitalizeFirstLetter(xcm.destination.id) %>
         <% } else { %>
         Destination: [Para ID: <%= xcm.destination.paraID %>]</B> <%= uiTool.capitalizeFirstLetter(xcm.destination.id) %>
         <% } %>
-      </h5>
+      </h6>
+      <% if ( xcm.destination.ts ) { %>
       <p class="text-muted mb-2 fw-bold"><%- uiTool.presentTS(xcm.destination.ts) %></p>
-
+      <% } %>
       <p class="text-muted">
        <% if ( xcm.destination.blockNumber ) { %>
-       <B> Received At Block:</B> <a href='/block/<%= xcm.destination.id %>/<%= xcm.blockNumberDest %>'><%= xcm.destination.blockNumber %></a>
-       <% } %>
+       <B> Received At Block:</B> <a href='/block/<%= xcm.destination.id %>/<%= xcm.destination.blockNumber %>'>
+         <code><%= xcm.destination.blockNumber %></a></code>
        <br/>
+       <% } %>
 
        <B>Beneficiary:</B>
        <% if ( xcm.destination.beneficiary ) {
            let beneficiary = xcm.destination.beneficiary;
        %>
-       <%- uiTool.presentBlockiesOrIdenticon(beneficiary, 25) %>
-       <a href='/account/<%= beneficiary %>'>
-         <code><%= beneficiary; %></code>
-       </a>
+       <%- uiTool.presentBlockiesOrIdenticon(beneficiary, 25) %><%- uiTool.presentID(beneficiary); %>
        <% } %>
        <br/>
 
       <B>Execution Status:</B>
-       <% if ( xcm.destination.status == -1 ) { %>
-       <button type="button" class="btn btn-warning text-capitalize">Unknown</button>
-       <% } else if ( xcm.destination.status == 0 ) { %>
-         <% if ( xcm.destination.errorDesc ) { %>
-	    <button type="button" class="btn btn-danger text-capitalize"><%= xcm.destination.errorDesc %></button>
-	 <% } %>
-       <% } else if ( xcm.destination.status == 1 ) { %>
+       <% if ( xcm.destination.status ) { %>
 	    <button type="button" class="btn btn-success text-capitalize">Success</button>
+       <% } else { %>
+         <% if ( xcm.destination.error ) { %>
+	    <button type="button" class="btn btn-danger text-capitalize"><%= xcm.destination.error.errorType %></button><br/>
+            <%= xcm.destination.error.errorDesc; %><br/>
+	 <% } %>
        <% } %>
 	 <br/>
-	 <% if ( xcm.destination.executedEventID ) { %>
-         <%- include("eventaccordion", {eventID: xcm.executedEventID}); %>
+	 <% if ( xcm.destination.eventID ) { %>
+         <B> Event ID:</B> <%= xcm.destination.eventID %><br/>
+	 <%- include("eventaccordion", {eventID: xcm.destination.eventID}); %>
 	 <% } %>
+	 <br/>
+       <% if ( xcm.destination.teleportFee ) { %>
+      <p class="text-muted">
       <B>Teleport Fees:</B>
-      <%- uiTool.presentNumber(xcm.destination.teleportFee) %> <%= xcm.destination.teleportFeeChainSymbol %> (<%- uiTool.currencyFormat(xcm.destination.teleportFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)<br/>
+      <%- uiTool.presentNumber(xcm.destination.teleportFee) %> <%= xcm.destination.teleportFeeChainSymbol %> (<%- uiTool.currencyFormat(xcm.destination.teleportFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)
       </p>
+       <% } %>
     </li>
 
   </ul>
-</section>
+
 </div>
 
 
-<%- include('footer', {apiUrl: "/"}); %>
+

@@ -111,7 +111,25 @@ async function main() {
                     "fungible": "0x000000000000000000f22a491e8dd34f"
                 }
             },
-            {"id":{"concrete":{"parents":1,"interior":{"x3":[{"parachain":1000},{"palletInstance":50},{"generalIndex":8}]}}},"fun":{"fungible":850059116249}}
+            {
+                "id": {
+                    "concrete": {
+                        "parents": 1,
+                        "interior": {
+                            "x3": [{
+                                "parachain": 1000
+                            }, {
+                                "palletInstance": 50
+                            }, {
+                                "generalIndex": 8
+                            }]
+                        }
+                    }
+                },
+                "fun": {
+                    "fungible": 850059116249
+                }
+            }
         ],
         22007: [
             // Current: {"Token":"KINT"}  Should be: {"Token":"18446744073709551622"}  DIFFERENT: KINT
@@ -133,25 +151,23 @@ async function main() {
                 }
             }
         ],
-        2030: [
-            {
-              "id": {
+        2030: [{
+            "id": {
                 "concrete": {
-                  "parents": 1,
-                  "interior": {
-                    "here": null
-                  }
+                    "parents": 1,
+                    "interior": {
+                        "here": null
+                    }
                 }
-              },
-              "fun": {
+            },
+            "fun": {
                 "fungible": 9864879524
-              }
             }
-        ]
+        }]
     };
 
     let isManual = false
-    if (isManual){
+    if (isManual) {
         console.log(`test manual violations`)
         for (const chainID of Object.keys(testcases)) {
             var indexer = new Indexer();
@@ -165,7 +181,7 @@ async function main() {
                 console.log(`relaychain=${indexer.relayChain}, chainID=${chainID},targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
             }
         }
-    }else{
+    } else {
         console.log(`auto fetch violations`)
         var defaultIndexer = new Indexer();
         let violationType = 'symbol' //'signal'
@@ -205,9 +221,9 @@ async function main() {
                         console.log(`unhandled ${parserFunc}`)
                         break;
                 }
-                if (targetedSymbol == false){
+                if (targetedSymbol == false) {
                     console.log(`NOT OK [${parserFunc}] [${callerFunc}] relaychain=${indexer.relayChain}, chainID=${chainID}, targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
-                }else{
+                } else {
                     console.log(`[${parserFunc}] [${callerFunc}] relaychain=${indexer.relayChain}, chainID=${chainID}, targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
                 }
             }
