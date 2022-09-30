@@ -80,10 +80,10 @@ module.exports = class AssetManager extends PolkaholicDB {
         if (this.chainParser && (this.chainParserChainID == chainID)) return;
         if (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala) {
             this.chainParser = new AcalaParser();
-        /*
-        } else if (chainID == paraTool.chainIDBifrostDOT || chainID == paraTool.chainIDBifrostKSM) {
-            this.chainParser = new BifrostParser();
-        */
+            /*
+            } else if (chainID == paraTool.chainIDBifrostDOT || chainID == paraTool.chainIDBifrostKSM) {
+                this.chainParser = new BifrostParser();
+            */
         } else if (chainID == paraTool.chainIDAstar || chainID == paraTool.chainIDShiden || chainID == paraTool.chainIDShibuya) {
             this.chainParser = new AstarParser();
         } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
@@ -443,7 +443,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                 let isUSD = this.assetInfo[nativeAssetChain].isUSD;
                 a = {
                     chainID: v.chainID,
-		    isUSD: isUSD, 
+                    isUSD: isUSD,
                     xcmConcept: v.xcmConcept,
                     asset: v.asset,
                     decimals: decimals,
@@ -453,7 +453,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                     parents: v.parents,
                     xcmInteriorKey: xcmInteriorKey,
                     nativeAssetChain: nativeAssetChain,
-		    assetType: "Token"
+                    assetType: "Token"
                 }
                 if (symbol) {
                     let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain);
@@ -635,7 +635,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         this.currencyIDInfo = currencyIDInfo;
     }
     validXCMSymbol(symbol, chainID, ctx, o) {
-	let relayChain = paraTool.getRelayChainByChainID(chainID);
+        let relayChain = paraTool.getRelayChainByChainID(chainID);
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
         if (this.symbolRelayChainAsset[symbolRelayChain]) {
             return true;
@@ -1078,7 +1078,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             assetInfo = this.xcmSymbolInfo[symbolRelayChain];
             if (assetInfo) q.isXCAsset = true;
         }
-	let res = {}
+        let res = {}
         if (assetInfo) {
             q.symbol = assetInfo.symbol
             if (assetInfo.relayChain) {
@@ -1096,7 +1096,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             res.assetInfo = assetInfo
             res.priceUSDCurrent = assetInfo.priceUSD;
         } else {
-	    return null;
+            return null;
         }
         // see if we can find price via direct lookup
         if (assetInfo.isUSD > 0) {
@@ -1141,15 +1141,15 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             	    ~= 0.16695672518
             */
             {
-                let dexRec = await this.getDexRec(asset, chainID, ts);
+                let dexRec = await this.getDexRec(q.asset, q.chainID, ts);
                 if (dexRec == undefined) {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned assetChain=${assetChain}`);
                     return [false, false, false];
                 }
-                let priceUSD0 = await this.getTokenPriceUSD(assetInfo.token0, chainID, ts);
-                let priceUSD1 = await this.getTokenPriceUSD(assetInfo.token1, chainID, ts);
-                let priceUSD0Current = await this.getTokenPriceUSD(assetInfo.token0, chainID);
-                let priceUSD1Current = await this.getTokenPriceUSD(assetInfo.token1, chainID);
+                let priceUSD0 = await this.getTokenPriceUSD(assetInfo.token0, q.chainID, ts);
+                let priceUSD1 = await this.getTokenPriceUSD(assetInfo.token1, q.chainID, ts);
+                let priceUSD0Current = await this.getTokenPriceUSD(assetInfo.token0, q.chainID);
+                let priceUSD1Current = await this.getTokenPriceUSD(assetInfo.token1, q.chainID);
                 let issuance = dexRec.issuance;
                 let x0 = dexRec.lp0 / issuance;
                 let x1 = dexRec.lp1 / issuance;

@@ -120,7 +120,7 @@ async function main() {
         	'HKO-parallel' : '{"Token":"HKO"}~22085', */
     }
     assets = {
-	"KUSD": {
+        "KUSD": {
             asset: '{"Token":"KUSD"}',
             chainID: '22000'
         }

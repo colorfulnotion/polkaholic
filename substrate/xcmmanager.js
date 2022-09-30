@@ -13,7 +13,7 @@ module.exports = class XCMManager extends Query {
     xcmErrorMap = {}
     lastupdateTS = 0
 
-    init_xcm_error_map(){
+    init_xcm_error_map() {
         this.loadXCMErrorDescription()
     }
 
@@ -268,7 +268,7 @@ module.exports = class XCMManager extends Query {
         }, sqlDebug); */
     }
 
-    async buildSuccessXcmInfo(substrateTx, matchRec){
+    async buildSuccessXcmInfo(substrateTx, matchRec) {
         let decorate = true
         let decorateExtra = ["usd", "address", "related", "data"]
         let d = substrateTx
@@ -277,7 +277,7 @@ module.exports = class XCMManager extends Query {
         let sourceTxFeeUSD = d.feeUSD
         let sourceChainSymbol = d.chainSymbol
         let evmTransactionHash = null
-        if (d.evm != undefined && d.evm.transactionHash != undefined){
+        if (d.evm != undefined && d.evm.transactionHash != undefined) {
             evmTransactionHash = d.evm.transactionHash
             let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
             sourceTxFee = evmtx.fee
@@ -309,22 +309,22 @@ module.exports = class XCMManager extends Query {
 
         let decimals = false
         let isNewFormat = true
-        if (xcm.asset != undefined){
+        if (xcm.asset != undefined) {
             isNewFormat = false
         }
 
         let symbolRelayChain = paraTool.makeAssetChain(xcm.symbol, xcm.relayChain);
         let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-        if (xcmAssetInfo != undefined && xcmAssetInfo.decimals){
+        if (xcmAssetInfo != undefined && xcmAssetInfo.decimals) {
             decimals = xcmAssetInfo.decimals
         }
-        if (!isNewFormat){
+        if (!isNewFormat) {
             if (decimals === false) {
                 decimals = this.getAssetDecimal(xcm.asset, xcm.chainID)
-            }else if (decimals === false) {
+            } else if (decimals === false) {
                 decimals = this.getAssetDecimal(xcm.asset, xcm.chainIDDest)
             }
-            if (decimals !== false){
+            if (decimals !== false) {
                 xcm.amountSent = xcm.amountSent / 10 ** decimals;
                 xcm.amountReceived = xcm.amountReceived / 10 ** decimals;
             }
@@ -365,7 +365,7 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            version: (isNewFormat)? 'V2' : 'V1'
+            version: (isNewFormat) ? 'V2' : 'V1'
         }
         xcmInfo.relayChain = {
             relayChain: xcm.relayChain,
@@ -412,192 +412,192 @@ module.exports = class XCMManager extends Query {
             status: true,
         }
         return [xcmInfo, xcm] //TODO: drop xcm format
-}
-
-
-
-async buildFailedXcmInfo(substrateTx, failedRecord){
-    let decorate = true
-    let decorateExtra = ["usd", "address", "related", "data"]
-    let d = substrateTx
-    let xcm = failedRecord
-    let sourceTxFee = d.fee
-    let sourceTxFeeUSD = d.feeUSD
-    let sourceChainSymbol = d.chainSymbol
-    let evmTransactionHash = null
-    if (d.evm != undefined && d.evm.transactionHash != undefined){
-        evmTransactionHash = d.evm.transactionHash
-        let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
-        sourceTxFee = evmtx.fee
-        sourceTxFeeUSD = evmtx.feeUSD
-        sourceChainSymbol = evmtx.symbol
     }
 
-    console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
-    console.log(`rawXCM`, xcm)
-    xcm.chainName = this.getChainName(xcm.chainID);
-    xcm.chainDestName = this.getChainName(xcm.chainIDDest);
-    xcm.id = this.getIDByChainID(xcm.chainID)
-    xcm.idDest = this.getIDByChainID(xcm.chainIDDest)
-    xcm.paraID = paraTool.getParaIDfromChainID(xcm.chainID)
-    xcm.paraIDDest = paraTool.getParaIDfromChainID(xcm.chainIDDest)
-    let chainIDDestInfo = this.chainInfos[xcm.chainIDDest]
-    if (xcm.chainIDDest != undefined && chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
-        if (xcm.destAddress != undefined) {
-            if (xcm.destAddress.length == 42) xcm.destAddress = xcm.destAddress
-            if (xcm.destAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.destAddress, chainIDDestInfo.ss58Format)
-        } else if (xcm.fromAddress != undefined) {
-            if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
-            if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
+
+
+    async buildFailedXcmInfo(substrateTx, failedRecord) {
+        let decorate = true
+        let decorateExtra = ["usd", "address", "related", "data"]
+        let d = substrateTx
+        let xcm = failedRecord
+        let sourceTxFee = d.fee
+        let sourceTxFeeUSD = d.feeUSD
+        let sourceChainSymbol = d.chainSymbol
+        let evmTransactionHash = null
+        if (d.evm != undefined && d.evm.transactionHash != undefined) {
+            evmTransactionHash = d.evm.transactionHash
+            let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
+            sourceTxFee = evmtx.fee
+            sourceTxFeeUSD = evmtx.feeUSD
+            sourceChainSymbol = evmtx.symbol
+        }
+
+        console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
+        console.log(`rawXCM`, xcm)
+        xcm.chainName = this.getChainName(xcm.chainID);
+        xcm.chainDestName = this.getChainName(xcm.chainIDDest);
+        xcm.id = this.getIDByChainID(xcm.chainID)
+        xcm.idDest = this.getIDByChainID(xcm.chainIDDest)
+        xcm.paraID = paraTool.getParaIDfromChainID(xcm.chainID)
+        xcm.paraIDDest = paraTool.getParaIDfromChainID(xcm.chainIDDest)
+        let chainIDDestInfo = this.chainInfos[xcm.chainIDDest]
+        if (xcm.chainIDDest != undefined && chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
+            if (xcm.destAddress != undefined) {
+                if (xcm.destAddress.length == 42) xcm.destAddress = xcm.destAddress
+                if (xcm.destAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.destAddress, chainIDDestInfo.ss58Format)
+            } else if (xcm.fromAddress != undefined) {
+                if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
+                if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
+            }
+        }
+        if (d.signer != undefined) {
+            xcm.fromAddress = d.signer
+        }
+
+        let decimals = false
+        let isNewFormat = true
+        if (xcm.asset != undefined) {
+            isNewFormat = false
+        }
+
+        let symbolRelayChain = paraTool.makeAssetChain(xcm.symbol, xcm.relayChain);
+        let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+        if (xcmAssetInfo != undefined && xcmAssetInfo.decimals) {
+            decimals = xcmAssetInfo.decimals
+        }
+
+        //fee -> initiation only; teleport fee are irrelevant
+        if (decimals !== false) {
+            xcm.sourceTxFee = sourceTxFee
+            xcm.sourceTxFeeUSD = sourceTxFeeUSD
+            xcm.sourceChainSymbol = sourceChainSymbol
+        }
+        let xcmInfo = {
+            symbol: xcm.symbol,
+            priceUSD: xcm.priceUSD,
+            relayChain: null,
+            origination: null,
+            destination: null,
+            version: (isNewFormat) ? 'V2' : 'V1'
+        }
+        xcmInfo.relayChain = {
+            relayChain: xcm.relayChain,
+            relayAt: (xcm.failureType == 'failedOrigination') ? null : xcm.sentAt, // failedOrigination are not relayed
+        }
+
+        xcmInfo.origination = {
+            chainName: xcm.chainName,
+            id: xcm.id,
+            chainID: xcm.chainID,
+            paraID: xcm.paraID,
+            sender: xcm.fromAddress,
+            amountSent: (xcm.failureType == 'failedOrigination') ? 0 : xcm.amountSent, //failedOrigination deosn't send anything
+            amountSentUSD: (xcm.failureType == 'failedOrigination') ? 0 : xcm.amountSentUSD, //failedOrigination deosn't send anything
+            txFee: xcm.sourceTxFee,
+            txFeeUSD: xcm.sourceTxFeeUSD,
+            txFeeSymbol: xcm.sourceChainSymbol,
+            blockNumber: xcm.blockNumber,
+            section: xcm.xcmSection,
+            method: xcm.xcmMethod,
+            extrinsicID: xcm.extrinsicID,
+            extrinsicHash: xcm.extrinsicHash,
+            transactionHash: evmTransactionHash,
+            msgHash: xcm.msgHash,
+            sentAt: xcm.sentAt,
+            ts: xcm.sourceTS,
+            complete: (xcm.failureType == 'failedOrigination') ? false : true,
+        }
+        if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
+        xcmInfo.destination = {
+            chainName: xcm.chainDestName,
+            id: xcm.idDest,
+            chainID: xcm.chainIDDest,
+            paraID: xcm.paraIDDest,
+            beneficiary: xcm.destAddress,
+            amountReceived: 0,
+            amountReceivedUSD: 0,
+            teleportFee: 0,
+            teleportFeeUSD: 0,
+            teleportFeeChainSymbol: xcm.symbol,
+            blockNumber: xcm.blockNumberDest,
+            extrinsicID: null,
+            eventID: xcm.executedEventID,
+            ts: xcm.destTS,
+            status: false,
+            error: {},
+        }
+        if (xcm.failureType == 'failedDestination') {
+            xcmInfo.destination.error = this.getXcmErrorDescription(xcm.errorDesc)
+        } else {
+            xcmInfo.destination.extrinsicID = null
+            xcmInfo.destination.error = {
+                errorCode: `NA`,
+                errorType: `FailedAtOriginationChain`,
+                errorDesc: `XCM Failed at origination Chain.`,
+            }
+        }
+        return [xcmInfo, xcm] //TODO: drop xcm format
+    }
+
+    getXcmErrorDescription(errorDesc = 'complete:AssetsTrapped') {
+        /*
+        complete:AssetsTrapped
+        error:barrier
+        */
+        let errPieces = errorDesc.split(':')
+        let status = errPieces[0]
+        let errorType = (errPieces.length == 2) ? errPieces[1] : 'NA'
+        if (this.xcmErrorMap[errorType.toLowerCase()] != undefined) {
+            return this.xcmErrorMap[errorType.toLowerCase()]
+        } else {
+            return {
+                errorCode: `NA`,
+                errorType: errorType,
+                errorDesc: `NA`,
+            }
         }
     }
-    if (d.signer != undefined) {
-        xcm.fromAddress = d.signer
-    }
 
-    let decimals = false
-    let isNewFormat = true
-    if (xcm.asset != undefined){
-        isNewFormat = false
-    }
-
-    let symbolRelayChain = paraTool.makeAssetChain(xcm.symbol, xcm.relayChain);
-    let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-    if (xcmAssetInfo != undefined && xcmAssetInfo.decimals){
-        decimals = xcmAssetInfo.decimals
-    }
-
-    //fee -> initiation only; teleport fee are irrelevant
-    if (decimals !== false) {
-        xcm.sourceTxFee = sourceTxFee
-        xcm.sourceTxFeeUSD = sourceTxFeeUSD
-        xcm.sourceChainSymbol = sourceChainSymbol
-    }
-    let xcmInfo = {
-        symbol: xcm.symbol,
-        priceUSD: xcm.priceUSD,
-        relayChain: null,
-        origination: null,
-        destination: null,
-        version: (isNewFormat)? 'V2' : 'V1'
-    }
-    xcmInfo.relayChain = {
-        relayChain: xcm.relayChain,
-        relayAt: (xcm.failureType == 'failedOrigination')? null : xcm.sentAt, // failedOrigination are not relayed
-    }
-
-    xcmInfo.origination = {
-        chainName: xcm.chainName,
-        id: xcm.id,
-        chainID: xcm.chainID,
-        paraID: xcm.paraID,
-        sender: xcm.fromAddress,
-        amountSent: (xcm.failureType == 'failedOrigination')? 0 :xcm.amountSent,        //failedOrigination deosn't send anything
-        amountSentUSD: (xcm.failureType == 'failedOrigination')? 0 :xcm.amountSentUSD,  //failedOrigination deosn't send anything
-        txFee: xcm.sourceTxFee,
-        txFeeUSD: xcm.sourceTxFeeUSD,
-        txFeeSymbol: xcm.sourceChainSymbol,
-        blockNumber: xcm.blockNumber,
-        section: xcm.xcmSection,
-        method: xcm.xcmMethod,
-        extrinsicID: xcm.extrinsicID,
-        extrinsicHash: xcm.extrinsicHash,
-        transactionHash: evmTransactionHash,
-        msgHash: xcm.msgHash,
-        sentAt: xcm.sentAt,
-        ts: xcm.sourceTS,
-        complete: (xcm.failureType == 'failedOrigination')? false: true,
-    }
-    if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
-    xcmInfo.destination = {
-        chainName: xcm.chainDestName,
-        id: xcm.idDest,
-        chainID: xcm.chainIDDest,
-        paraID: xcm.paraIDDest,
-        beneficiary: xcm.destAddress,
-        amountReceived: 0,
-        amountReceivedUSD: 0,
-        teleportFee: 0,
-        teleportFeeUSD: 0,
-        teleportFeeChainSymbol: xcm.symbol,
-        blockNumber: xcm.blockNumberDest,
-        extrinsicID: null,
-        eventID: xcm.executedEventID,
-        ts: xcm.destTS,
-        status: false,
-        error: {},
-    }
-    if (xcm.failureType == 'failedDestination'){
-        xcmInfo.destination.error = this.getXcmErrorDescription(xcm.errorDesc)
-    }else{
-        xcmInfo.destination.extrinsicID = null
-        xcmInfo.destination.error = {
-            errorCode: `NA`,
-            errorType: `FailedAtOriginationChain`,
-            errorDesc: `XCM Failed at oreigination Chain. Please contact ${xcm.chainName} team for assistance`,
+    loadXCMErrorDescription() {
+        let errorMap = {}
+        let officialErrors = [
+            'Overflow|0|An arithmetic overflow happened.',
+            'Unimplemented|1|The instruction is intentionally unsupported.',
+            'UntrustedReserveLocation|2|Origin Register does not contain a value value for a reserve transfer notification.',
+            'UntrustedTeleportLocation|3|Origin Register does not contain a value value for a teleport notification.',
+            'MultiLocationFull|4|`MultiLocation` value too large to descend further.',
+            'MultiLocationNotInvertible|5|`MultiLocation` value ascend more parents than known ancestors of local location.',
+            'BadOrigin|6|The Origin Register does not contain a valid value for instruction.',
+            'InvalidLocation|7|The location parameter is not a valid value for the instruction.',
+            'AssetNotFound|8|The given asset is not handled.',
+            'FailedToTransactAsset|9|An asset transaction (like withdraw or deposit) failed (typically due to type conversions).',
+            'NotWithdrawable|10|An asset cannot be withdrawn, potentially due to lack of ownership, availability or rights.',
+            'LocationCannotHold|11|An asset cannot be deposited under the ownership of a particular location.',
+            'ExceedsMaxMessageSize|12|Attempt to send a message greater than the maximum supported by the transport protocol.',
+            'DestinationUnsupported|13|The given message cannot be translated into a format supported by the destination.',
+            'Transport|14|Destination is routable, but there is some issue with the transport mechanism.',
+            'Unroutable|15|Destination is known to be unroutable.',
+            'UnknownClaim|16|Used by `ClaimAsset` when the given claim could not be recognized/found.',
+            'FailedToDecode|17|Used by `Transact` when the functor cannot be decoded.',
+            'TooMuchWeightRequired|18|Used by `Transact` to indicate that the given weight limit could be breached by the functor.',
+            'NotHoldingFees|19|Used by `BuyExecution` when the Holding Register does not contain payable fees.',
+            'TooExpensive|20|Used by `BuyExecution` when the fees declared to purchase weight are insufficient.',
+            'Trap(u64)|21|Used by the `Trap` instruction to force an error intentionally. Its code is included.',
+            'ExpectationFalse|22|Used by `ExpectAsset`, `ExpectError` and `ExpectOrigin` when the expectation was not true.'
+        ]
+        for (const officialErr of officialErrors) {
+            let e = officialErr.split('|')
+            let errDetail = {
+                errorCode: parseInt(e[1]),
+                errorType: e[0],
+                errorDesc: e[2],
+            }
+            errorMap[errDetail.errorType.toLowerCase()] = errDetail
         }
+        //console.log(errorMap)
+        this.xcmErrorMap = errorMap
     }
-    return [xcmInfo, xcm] //TODO: drop xcm format
-}
-
-getXcmErrorDescription(errorDesc = 'complete:AssetsTrapped'){
-    /*
-    complete:AssetsTrapped
-    error:barrier
-    */
-    let errPieces = errorDesc.split(':')
-    let status = errPieces[0]
-    let errorType = (errPieces.length == 2)? errPieces[1] : 'NA'
-    if (this.xcmErrorMap[errorType.toLowerCase()] != undefined){
-        return this.xcmErrorMap[errorType.toLowerCase()]
-    }else{
-        return {
-            errorCode: `NA`,
-            errorType: errorType,
-            errorDesc: `NA`,
-        }
-    }
-}
-
-loadXCMErrorDescription(){
-    let errorMap = {}
-    let officialErrors = [
-        'Overflow|0|An arithmetic overflow happened.',
-        'Unimplemented|1|The instruction is intentionally unsupported.',
-        'UntrustedReserveLocation|2|Origin Register does not contain a value value for a reserve transfer notification.',
-        'UntrustedTeleportLocation|3|Origin Register does not contain a value value for a teleport notification.',
-        'MultiLocationFull|4|`MultiLocation` value too large to descend further.',
-        'MultiLocationNotInvertible|5|`MultiLocation` value ascend more parents than known ancestors of local location.',
-        'BadOrigin|6|The Origin Register does not contain a valid value for instruction.',
-        'InvalidLocation|7|The location parameter is not a valid value for the instruction.',
-        'AssetNotFound|8|The given asset is not handled.',
-        'FailedToTransactAsset|9|An asset transaction (like withdraw or deposit) failed (typically due to type conversions).',
-        'NotWithdrawable|10|An asset cannot be withdrawn, potentially due to lack of ownership, availability or rights.',
-        'LocationCannotHold|11|An asset cannot be deposited under the ownership of a particular location.',
-        'ExceedsMaxMessageSize|12|Attempt to send a message greater than the maximum supported by the transport protocol.',
-        'DestinationUnsupported|13|The given message cannot be translated into a format supported by the destination.',
-        'Transport|14|Destination is routable, but there is some issue with the transport mechanism.',
-        'Unroutable|15|Destination is known to be unroutable.',
-        'UnknownClaim|16|Used by `ClaimAsset` when the given claim could not be recognized/found.',
-        'FailedToDecode|17|Used by `Transact` when the functor cannot be decoded.',
-        'TooMuchWeightRequired|18|Used by `Transact` to indicate that the given weight limit could be breached by the functor.',
-        'NotHoldingFees|19|Used by `BuyExecution` when the Holding Register does not contain payable fees.',
-        'TooExpensive|20|Used by `BuyExecution` when the fees declared to purchase weight are insufficient.',
-        'Trap(u64)|21|Used by the `Trap` instruction to force an error intentionally. Its code is included.',
-        'ExpectationFalse|22|Used by `ExpectAsset`, `ExpectError` and `ExpectOrigin` when the expectation was not true.'
-    ]
-    for (const officialErr of officialErrors){
-        let e = officialErr.split('|')
-        let errDetail = {
-            errorCode: parseInt(e[1]),
-            errorType: e[0],
-            errorDesc: e[2],
-        }
-        errorMap[errDetail.errorType.toLowerCase()] = errDetail
-    }
-    //console.log(errorMap)
-    this.xcmErrorMap = errorMap
-}
     // xcmtransfer_match matches cross transfers between SENDING events held in "xcmtransfer"  and CANDIDATE destination events (from various xcm received messages on a destination chain)
     // this will be phased out soon
     async xcmtransfer_match(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200, forceRematch = false) {
@@ -608,7 +608,7 @@ loadXCMErrorDescription(){
         //   (c) time difference matching has to be less than 7200 (and greater than 0)
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
-        let rematchClause = forceRematch? `xcmtransfer.matched >= 0 and d.matched >= 0 and `: `xcmtransfer.matched = 0 and d.matched = 0 and `
+        let rematchClause = forceRematch ? `xcmtransfer.matched >= 0 and d.matched >= 0 and ` : `xcmtransfer.matched = 0 and d.matched = 0 and `
         let sqlA = `select
           chainID, extrinsicHash, d.chainIDDest, d.fromAddress, d.symbol, d.relayChain,
           (d.destts - xcmtransfer.sourceTS) as diffTS,
@@ -666,21 +666,21 @@ loadXCMErrorDescription(){
                 let d = xcmmatches[i];
                 if (matched[d.extrinsicHash] == undefined && matched[d.eventID] == undefined) {
                     let priceUSD = 0;
-		            let amountSent = 0;
-		            let amountReceived = 0;
+                    let amountSent = 0;
+                    let amountReceived = 0;
                     let amountSentUSD = 0;
                     let amountReceivedUSD = 0;
                     let chainID = d.chainID
                     let priceSource = await this.computePriceUSD({
                         symbol: d.symbol,
-			            relayChain: d.relayChain,
+                        relayChain: d.relayChain,
                         ts: d.sourceTS
                     });
-		            let symbol = d.symbol;
-		            let relayChain = d.relayChain;
+                    let symbol = d.symbol;
+                    let relayChain = d.relayChain;
                     if (priceSource) {
                         priceUSD = priceSource.priceUSD;
-			            let decimals = priceSource.assetInfo.decimals;
+                        let decimals = priceSource.assetInfo.decimals;
                         amountSent = parseFloat(d.amountSent) / 10 ** decimals;
                         amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
                         amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
@@ -698,10 +698,10 @@ loadXCMErrorDescription(){
                     matched[d.extrinsicHash] = true;
                     matched[d.eventID] = true;
 
-                    let xcmSection = (d.sectionMethod != undefined)? d.sectionMethod : null
+                    let xcmSection = (d.sectionMethod != undefined) ? d.sectionMethod : null
                     let xcmMethod = null
                     let sectionMethodPieces = d.sectionMethod.split(':')
-                    if (sectionMethodPieces.length == 2){
+                    if (sectionMethodPieces.length == 2) {
                         xcmSection = sectionMethodPieces[0]
                         xcmMethod = sectionMethodPieces[1]
                     }
@@ -737,13 +737,13 @@ loadXCMErrorDescription(){
                     let substrateTxHash = d.extrinsicHash
                     let substratetx = await this.getTransaction(substrateTxHash);
                     let xcmInfo, xcmOld;
-                    if (substratetx != undefined){
+                    if (substratetx != undefined) {
                         [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
                     }
                     console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
 
-                    let xcmInfoStr = (xcmInfo != undefined)? JSON.stringify(xcmInfo): false
-                    let xcmInfoBlob = (xcmInfoStr != false)? mysql.escape(xcmInfoStr): 'NULL'
+                    let xcmInfoStr = (xcmInfo != undefined) ? JSON.stringify(xcmInfo) : false
+                    let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
                     let sqlB = `update xcmtransfer
             set blockNumberDest = ${d.blockNumberDest},
                 destTS = ${d.destTS},
@@ -819,7 +819,7 @@ loadXCMErrorDescription(){
             }
         } catch (err) {
             console.log("WRITE_FEEDXCMDEST", err)
-	    process.exit(0);
+            process.exit(0);
         }
         let logDT = new Date(startTS * 1000)
         console.log(`match_xcm ${startTS} covered ${logDT}`)
@@ -839,7 +839,7 @@ loadXCMErrorDescription(){
         //   (c) time difference matching has to be less than 7200 (and greater than 0)
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
-        let rematchClause = forceRematch? `xcmtransfer.matched >= 0 and `: `xcmtransfer.matched = 0 and `
+        let rematchClause = forceRematch ? `xcmtransfer.matched >= 0 and ` : `xcmtransfer.matched = 0 and `
         let sqlA = `select
           chainID, extrinsicHash, chainIDDest, fromAddress, symbol, relayChain,
           xcmtransfer.extrinsicID,
@@ -883,23 +883,23 @@ loadXCMErrorDescription(){
             //TODO: how to handle multiAsset case?
             for (let i = 0; i < xcmmatches.length; i++) {
                 let d = xcmmatches[i];
-                let failureType = (d.incomplete == 1)? 'failedOrigination' : 'failedDestination'
+                let failureType = (d.incomplete == 1) ? 'failedOrigination' : 'failedDestination'
                 console.log(`failureType = ${failureType}`, d)
                 if (matched[d.extrinsicHash] == undefined) {
                     let priceUSD = 0;
-		            let amountSent = 0;
+                    let amountSent = 0;
                     let amountSentUSD = 0;
                     let chainID = d.chainID
                     let priceSource = await this.computePriceUSD({
                         symbol: d.symbol,
-			            relayChain: d.relayChain,
+                        relayChain: d.relayChain,
                         ts: d.sourceTS
                     });
-		            let symbol = d.symbol;
-		            let relayChain = d.relayChain;
+                    let symbol = d.symbol;
+                    let relayChain = d.relayChain;
                     if (priceSource) {
                         priceUSD = priceSource.priceUSD;
-			            let decimals = priceSource.assetInfo.decimals;
+                        let decimals = priceSource.assetInfo.decimals;
                         amountSent = parseFloat(d.amountSent) / 10 ** decimals;
                         amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
                     } else {
@@ -916,10 +916,10 @@ loadXCMErrorDescription(){
                     // never match more than once, by marking both the sending record and the receiving record
                     matched[d.extrinsicHash] = true;
 
-                    let xcmSection = (d.sectionMethod != undefined)? d.sectionMethod : null
+                    let xcmSection = (d.sectionMethod != undefined) ? d.sectionMethod : null
                     let xcmMethod = null
                     let sectionMethodPieces = d.sectionMethod.split(':')
-                    if (sectionMethodPieces.length == 2){
+                    if (sectionMethodPieces.length == 2) {
                         xcmSection = sectionMethodPieces[0]
                         xcmMethod = sectionMethodPieces[1]
                     }
@@ -939,7 +939,7 @@ loadXCMErrorDescription(){
                         amountSent: amountSent,
                         amountSentUSD: amountSentUSD,
                         fromAddress: d.senderAddress, //from xcmtransfer.fromAddress
-                        destAddress: d.fromAddress,   //from xcmtransfer.destAddress
+                        destAddress: d.fromAddress, //from xcmtransfer.destAddress
                         msgHash: (d.msgHash != undefined) ? d.msgHash : '0x', // 'failedOrigination' has no msgHash
                         sentAt: (d.sentAt != undefined) ? d.sentAt : null,
                         xcmSection: xcmSection,
@@ -957,13 +957,13 @@ loadXCMErrorDescription(){
                     let substrateTxHash = d.extrinsicHash
                     let substratetx = await this.getTransaction(substrateTxHash);
                     let xcmInfo, xcmOld;
-                    if (substratetx != undefined){
+                    if (substratetx != undefined) {
                         [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord)
                     }
                     console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
 
-                    let xcmInfoStr = (xcmInfo != undefined)? JSON.stringify(xcmInfo): false
-                    let xcmInfoBlob = (xcmInfoStr != false)? mysql.escape(xcmInfoStr): 'NULL'
+                    let xcmInfoStr = (xcmInfo != undefined) ? JSON.stringify(xcmInfo) : false
+                    let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
                     let sqlB = `update xcmtransfer
             set blockNumberDest = ${d.blockNumberDest},
                 destTS = ${d.destTS},
@@ -1038,7 +1038,7 @@ loadXCMErrorDescription(){
             }
         } catch (err) {
             console.log("WRITE_FEEDXCMDEST", err)
-	    process.exit(0);
+            process.exit(0);
         }
         let logDT = new Date(startTS * 1000)
         console.log(`match_xcm_failure ${startTS} covered ${logDT}`)
@@ -1156,7 +1156,7 @@ order by msgHash, diffSentAt, diffTS`
                 let targetSymbol = this.getAssetSymbol(targetAsset, targetChainID)
                 let symbolRelayChain = paraTool.makeAssetChain(targetSymbol, relayChain);
                 let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-                let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
+                let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined) ? false : xcmAssetInfo.xcmInteriorKey
                 //console.log(`[paranets=${parents}] ${chainID} ${chainIDDest} ${JSON.stringify(interior)} -> ${targetAssetChain}, symbolRelayChain=${symbolRelayChain}, xcmInteriorKey=${xcmInteriorKey}, xcmAssetInfo`, xcmAssetInfo)
                 return [targetAssetChain, xcmInteriorKey]
             } else {
@@ -1681,7 +1681,7 @@ order by msgHash, diffSentAt, diffTS`
         // No way to get "sentAt" in xcmtransferdestcandidate to tighten this?
 
         endWhere = endTS ? `and xcmmessages.blockTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds} ` : "";
-        let rematchClause = forceRematch? ``: `xcmmessages.assetsReceived is Null and`
+        let rematchClause = forceRematch ? `` : `xcmmessages.assetsReceived is Null and`
         let sqlC = `select  xcmmessages.chainID, xcmmessages.chainIDDest,
           (d.destts - xcmmessages.blockTS) as diffTS,
           (d.sentAt - xcmmessages.sentAt) as diffSentAt,
@@ -1735,27 +1735,27 @@ order by msgHash, diffSentAt, diffTS`
                 let targetChainID = m.chainIDDest
                 let symbol = m.symbol
                 let relayChain = m.relayChain
-		        let decimals = null;
+                let decimals = null;
                 let isIncompleteRec = true
                 let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
                 let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-                let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined)? false : xcmAssetInfo.xcmInteriorKey
+                let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined) ? false : xcmAssetInfo.xcmInteriorKey
                 let xcmInteriorKey0 = m.xcmInteriorKeys0 // from computeXCMFingerprints
                 if (xcmInteriorKey != xcmInteriorKey0) console.log(`mismatch xcmInteriorKey0=${xcmInteriorKey0}, xcmInteriorKey=${xcmInteriorKey}`)
                 let p = await this.computePriceUSD({
                     symbol: m.symbol,
-		    relayChain: m.relayChain,
+                    relayChain: m.relayChain,
                     ts: m.blockTS
                 });
                 //console.log(`getting price targetAsset=${targetAsset}, targetChainID=${targetChainID}, ts=${m.blockTS}, priceUSDblockTS=${priceUSDblockTS}`)
                 if (p) {
                     priceUSD = p.priceUSD;
-		    decimals = p.assetInfo ? p.assetInfo.decimals : null;
-		    if ( decimals ) {
-			amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
-			amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
-			isIncompleteRec = false
-		    }
+                    decimals = p.assetInfo ? p.assetInfo.decimals : null;
+                    if (decimals) {
+                        amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
+                        amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
+                        isIncompleteRec = false
+                    }
                 } else {
                     //not found..
                 }
@@ -1771,7 +1771,7 @@ order by msgHash, diffSentAt, diffTS`
                 if (isIncompleteRec) {
                     console.log(`Incomplete destMatch`, destMatch)
                 } else {
-                    destMatch.decimals =  decimals;
+                    destMatch.decimals = decimals;
                     //console.log(`OK destMatch`, destMatch)
                 }
 
@@ -1810,8 +1810,8 @@ order by msgHash, diffSentAt, diffTS`
                 let xcmInteriorKeysStr = 'NULL'
                 let [msgHash, blockNumber, chainID, chainIDDest] = k.split("-");
                 let r = assetsReceived[k]; //assetsReceived array
-                for (const a of r){
-                    if (a.xcmInteriorKey != undefined){
+                for (const a of r) {
+                    if (a.xcmInteriorKey != undefined) {
                         xcmInteriorKeys.push(a.xcmInteriorKey)
                     }
                 }
@@ -1819,7 +1819,7 @@ order by msgHash, diffSentAt, diffTS`
                     //console.log(`${k}`, r)
                     xcmInteriorKeysStr = `'${xcmInteriorKeys.join('|')}'`
                     localKeyMap[msgHash] = xcmInteriorKeysStr
-                }else if (localKeyMap[msgHash] != undefined){
+                } else if (localKeyMap[msgHash] != undefined) {
                     xcmInteriorKeysStr = localKeyMap[msgHash]
                 }
                 //console.log(`${k}, xcmInteriorKeys=${xcmInteriorKeysStr}`)
@@ -2030,7 +2030,7 @@ order by chainID, extrinsicHash`
                 });
                 if (p) {
                     let priceUSD = p.priceUSD
-		    let decimals = p.assetInfo ? p.assetInfo.decimals : null;
+                    let decimals = p.assetInfo ? p.assetInfo.decimals : null;
                     let amountSent = parseFloat(m.amountSent) / 10 ** decimals;
                     let amountReceived = parseFloat(m.amountReceived) / 10 ** decimals;
                     let amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
@@ -2040,8 +2040,8 @@ order by chainID, extrinsicHash`
                     this.batchedSQL.push(sql);
                     await this.update_batchedSQL()
                 } else {
-		    console.log("MISS", m.symbol, m.relayChain, priceTS);
-		}
+                    console.log("MISS", m.symbol, m.relayChain, priceTS);
+                }
             }
 
         } catch (err) {

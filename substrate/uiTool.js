@@ -191,7 +191,8 @@ function address_link(id, allowCopy = true, shortHash = true) {
 
 function account_link_full(id, allowCopy = true) {
     let accountID = paraTool.getPubKey(id);
-    let out = `<a href='/account/${accountID}'>` + id + `</a>`;
+    let view = (accountID.length == 42) ? 'address' : 'account';
+    let out = `<a href='/${view}/${accountID}'>` + id + `</a>`;
     if (allowCopy) out += copyToClipboard(id);
     return out;
 }
@@ -679,8 +680,8 @@ module.exports = {
         return presentGasPrice(valGwei, chainSymbol)
     },
 
-    presentBlockiesOrIdenticon: function(address, sz = 128){
-        if (address.length == '42'){
+    presentBlockiesOrIdenticon: function(address, sz = 128) {
+        if (address.length == '42') {
             const canvas = createCanvas(sz, sz);
             let cl = `width="${sz}px"  loading="lazy"`
             var icon = renderIcon({
@@ -693,8 +694,8 @@ module.exports = {
                 canvas
             );
             return ('<img class="circularImage" src="' + canvas.toDataURL() + `" ${cl} />`)
-        }else{
-            return(`<img class="circularImage" src="/identicon/${address}" width="${sz}px"  loading="lazy"/>`)
+        } else {
+            return (`<img class="circularImage" src="/identicon/${address}" width="${sz}px"  loading="lazy"/>`)
         }
     },
 

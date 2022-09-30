@@ -564,23 +564,23 @@ module.exports = class PolkaholicDB {
         await this.update_batchedSQL(sqlMax);
     }
 
-/*
-chainID: 0
-chainIDDest: 1000
-violationType: symbol
- parser: processV1ConcreteFungible
- caller: processOutgoingXcmPallet xcmPallet:limitedTeleportAssets
-errorcase: NULL
-instruction: {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":11000000000}}
-instructionHash: caad52bdc0938215c32c6778f2e1a1701e35ce397e72d1534cda9b09caa02c07
-sourceBlocknumber: 12224070
-sourceTS: 1664234238
-indexDT: 2022-09-27 21:50:39
-*/
-    async getXcmViolation(violationType = 'symbol'){
+    /*
+    chainID: 0
+    chainIDDest: 1000
+    violationType: symbol
+     parser: processV1ConcreteFungible
+     caller: processOutgoingXcmPallet xcmPallet:limitedTeleportAssets
+    errorcase: NULL
+    instruction: {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":11000000000}}
+    instructionHash: caad52bdc0938215c32c6778f2e1a1701e35ce397e72d1534cda9b09caa02c07
+    sourceBlocknumber: 12224070
+    sourceTS: 1664234238
+    indexDT: 2022-09-27 21:50:39
+    */
+    async getXcmViolation(violationType = 'symbol') {
         let xcmViolations = await this.poolREADONLY.query(`select chainID, chainIDDest, violationType, parser, caller, errorcase, instruction, sourceBlocknumber, sourceTS, indexDT from xcmViolation where violationType='${violationType}' order by chainID`)
         let res = {}
-        for (const v of xcmViolations){
+        for (const v of xcmViolations) {
             let chainID = v.chainID
             if (res[chainID] == undefined) res[chainID] = []
             v.instruction = JSON.parse(`${v.instruction}`)
