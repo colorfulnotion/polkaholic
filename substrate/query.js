@@ -4727,7 +4727,7 @@ module.exports = class Query extends AssetManager {
             if (p) {
                 res.dataUSD = p.valUSD
                 res.priceUSD = p.priceUSD
-                res.priceUSDCurrent = priceUSDCurrent
+                res.priceUSDCurrent = p.priceUSDCurrent
             }
         }
 
