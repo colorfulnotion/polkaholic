@@ -402,6 +402,7 @@ module.exports = class XCMManager extends Query {
             paraID: xcm.paraIDDest,
             beneficiary: xcm.destAddress,
             amountReceived: xcm.amountReceived,
+            amountReceivedUSD: xcm.amountReceivedUSD,
             teleportFee: xcm.fee,
             teleportFeeUSD: xcm.feeUSD,
             teleportFeeChainSymbol: xcm.symbol,
