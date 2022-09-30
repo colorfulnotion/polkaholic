@@ -1639,12 +1639,33 @@ app.get('/timeline/:hash/:hashType?/:blockNumber?', async (req, res) => {
         let hashType = req.params['hashType'] ? req.params['hashType'] : "extrinsic";
         let blockNumber = (req.params['blockNumber'] && hashType == "xcm") ? req.params['blockNumber'] : null;
         let [decorate, decorateExtra] = decorateOptUI(req)
-        let [timeline, xcmmessages] = await query.getXCMTimeline(hash, hashType, blockNumber, decorate, decorateExtra)
+        let [_, timeline, xcmmessages] = await query.getXCMTimeline(hash, hashType, blockNumber, decorate, decorateExtra)
         res.render('timeline', {
             timeline: timeline,
             hash: hash,
             hashType: hashType,
             xcmmessages: xcmmessages,
+            apiUrl: "/",
+            chainInfo: query.getChainInfo()
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+
+// Sample cases:
+// /xcmtransfer/0x00068acbbecec355f0c495389a29d7829f265553e258ad44d37bd52130bc44be
+app.get('/xcminfo/:hash?', async (req, res) => {
+    try {
+        let hash = req.params['hash'] ? req.params['hash'] : null;
+        let [decorate, decorateExtra] = decorateOptUI(req)
+	    let xcmInfo = await query.getXCMInfo(hash);
+        res.render('xcminfo', {
+            hash: hash,
+            xcm: xcmInfo,
             apiUrl: "/",
             chainInfo: query.getChainInfo()
         });
