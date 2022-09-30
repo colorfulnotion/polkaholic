@@ -680,10 +680,10 @@ module.exports = {
         return presentGasPrice(valGwei, chainSymbol)
     },
 
-    presentBlockiesOrIdenticon: function(address, sz = 128) {
-        if (address.length == '42') {
-            const canvas = createCanvas(sz, sz);
+    presentBlockiesOrIdenticon: function(address, sz = 128){
+        if (address.length == '42'){
             let cl = `width="${sz}px"  loading="lazy"`
+            const canvas = createCanvas(sz, sz);
             var icon = renderIcon({
                     seed: address.toLowerCase(), // seed used to generate icon data, default: random
                     //color: '#dfe', // to manually specify the icon color, default: random
@@ -701,7 +701,7 @@ module.exports = {
 
     presentBlockies: function(address, sz = 128) {
         const canvas = createCanvas(sz, sz);
-        let cl = `class="roundimage"  width="${sz}"  loading="lazy"`
+        let cl = `width="${sz}"  loading="lazy"`
         var icon = renderIcon({
                 seed: address.toLowerCase(), // seed used to generate icon data, default: random
                 //color: '#dfe', // to manually specify the icon color, default: random
@@ -711,6 +711,6 @@ module.exports = {
             },
             canvas
         );
-        return ('<img src="' + canvas.toDataURL() + `" ${cl} />`)
+        return ('<img class="circularImage" src="' + canvas.toDataURL() + `" ${cl} />`)
     }
 };
