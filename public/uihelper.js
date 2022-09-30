@@ -576,12 +576,38 @@ function presentIDRow(row, fld) {
 }
 
 function presentRawIDwithIdenticon(id, imageSize = '25rpx') {
-    return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/> ${getShortHash(id, false)}`;
+    if (id.length == 42) {
+        let cl = `width="${imageSize}"  loading="lazy"`
+        let canvas = blockies.create({ // All options are optional
+            seed: id.toLowerCase(), // seed used to generate icon data, default: random
+            //color: '#dfe', // to manually specify the icon color, default: random
+            //bgcolor: '#aaa', // choose a different background color, default: random
+            size: 8, // width/height of the icon in blocks, default: 8
+            scale: 4, // width/height of each block in pixels, default: 4
+            //spotcolor: '#000' // each pixel has a 13% chance of being of a third color,
+            // default: random. Set to -1 to disable it. These "spots" create structures
+            // that look like eyes, mouths and noses.
+        });
+        return (`<img class="circularImage" src="${canvas.toDataURL()}" ${cl} /> ${getShortHash(id, false)}`)
+    } else {
+        return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/> ${getShortHash(id, false)}`;
+    }
 }
 
 function presentIDwithIdenticon(id, imageSize = '25rpx') {
     if (id.length == 42) {
-        return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
+        let cl = `width="${imageSize}"  loading="lazy"`
+        let canvas = blockies.create({ // All options are optional
+            seed: id.toLowerCase(), // seed used to generate icon data, default: random
+            //color: '#dfe', // to manually specify the icon color, default: random
+            //bgcolor: '#aaa', // choose a different background color, default: random
+            size: 8, // width/height of the icon in blocks, default: 8
+            scale: 4, // width/height of each block in pixels, default: 4
+            //spotcolor: '#000' // each pixel has a 13% chance of being of a third color,
+            // default: random. Set to -1 to disable it. These "spots" create structures
+            // that look like eyes, mouths and noses.
+        });
+        return (`<img class="circularImage" src="${canvas.toDataURL()}" ${cl} /><a href="/account/${id}">${getShortHash(id)} </a>`)
     } else {
         return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
     }

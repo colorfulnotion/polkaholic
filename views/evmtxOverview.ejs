@@ -22,10 +22,10 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td><%- uiTool.presentFullTx(tx.substrate.extrinsicHash); %> <a href='/tx/<%= tx.substrate.extrinsicHash; %>'><%= f.chainName; %> <%= tx.substrate.extrinsicID; %></a></td>
     </tr>
     <% } %>
-<% if ( f.xcmdest != undefined ) { %>
+<% if ( f.xcmInfo != undefined ) { %>
     <tr>
-      <td>Destination Status</td>
-      <td><%- include("xcmdest", {extrinsicHash: f.xcmdest.LextrinsicHash, xcmdest: f.xcmdest}); %></td>
+      <td>XCM Timeline</td>
+      <td><%- include("xcminfo", {xcm: f.xcmInfo}); %></td>
     </tr>
 <% } %>
     <tr>
