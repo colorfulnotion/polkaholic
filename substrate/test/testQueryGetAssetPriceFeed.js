@@ -6,14 +6,19 @@ async function main() {
     let debugLevel = 0
     var query = new Query(debugLevel);
     await query.init();
-    let assetChain = '{"Token":"DOT"}#0'
-    process.argv.forEach(function(val, index, array) {
-        if (index == 2 && val.length > 0) {
-            assetChain = val;
-        }
-    });
-    var a = await query.getAssetPriceFeed(assetChain);
-    console.log(JSON.stringify(a));
+    let testcases =
+	[ {symbol: "DOT", relayChain: "polkadot"},
+	  {symbol: "INTR", relayChain: "polkadot"},
+	  {symbol: "IBTC", relayChain: "polkadot"},
+	  {symbol: "KAR", relayChain: "kusama"}
+	  // add asset/chainID combinations: WGLMR, WASTR, axlATOM, STELLA, ...
+	]
+    let interval = "hourly";
+    for ( const q of testcases ) {
+	var a = await query.getAssetPriceFeed(q, interval);
+	console.log(JSON.stringify(a));
+	process.exit(0);
+    }
 }
 
 main()

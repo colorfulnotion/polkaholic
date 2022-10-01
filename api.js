@@ -474,11 +474,16 @@ app.get('/xcmassetlog/:chainID/:chainIDDest/:symbol?', async (req, res) => {
     }
 })
 
-// Usage: https://api.polkaholic.io/asset/pricefeed/%7B"Token"%3A"GLMR"%7D%231284
-app.get('/asset/pricefeed/:assetChain', async (req, res) => {
+// Usage: https://api.polkaholic.io/asset/pricefeed/DOT/polkadot
+app.get('/asset/pricefeed/:symbol/:relayChain/:routerAssetChain?', async (req, res) => {
     try {
-        let assetChain = req.params["assetChain"];
-        let balances = await query.getAssetPriceFeed(assetChain);
+        let symbol = req.params["symbol"];
+        let relayChain = req.params["relayChain"];
+	let q = { symbol, relayChain };
+	if ( req.params["routerAssetChain"] ) {
+	    q.routerAssetChain = req.params["routerAssetChain"];
+	}
+        let balances = await query.getAssetPriceFeed(q);
         res.write(JSON.stringify(balances));
         await query.tallyAPIKey(getapikey(req));
         res.end();

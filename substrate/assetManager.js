@@ -38,6 +38,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     symbolRelayChainAsset = {}; // symbolRelayChain -> { ${chainID}: assetInfo }
     assetlog = {};
     ratelog = {};
+    routers = {};
     assetlogTTL = 0;
     ercTokenList = {};
     currencyIDInfo = {};
@@ -474,6 +475,15 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                 xcmAssetInfo[v.xcmInteriorKey] = v;
             }
         }
+	let routerRecs = await this.poolREADONLY.query("select routerAssetChain, routerName from router");
+	let routers = {};
+	for (let i = 0; i < routerRecs.length; i++) {
+            let v = routerRecs[i];
+            if (routers[v.routerAssetChain] == undefined) {
+                routers[v.routerAssetChain] = v;
+            }
+        }
+	this.routers = routers;
         this.xcmAssetInfo = xcmAssetInfo; // key: xcmInteriorKey => a (1, ignore asset/chain)
         this.xcmInteriorInfo = xcmInteriorInfo; // key: asset~chainID  => a (N)
         this.xcmSymbolInfo = xcmSymbolInfo; // key: symbol~relayChain => a (1, ignore asset/chain)

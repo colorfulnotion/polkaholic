@@ -1501,71 +1501,66 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async getAssetPriceFeed(chainID, asset, limit = 3000) {
-        let assetChain = paraTool.makeAssetChain(asset, chainID);
-        if (this.assetInfo[assetChain] == undefined) {
-            throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
-        }
+    async getAssetPriceFeed(q, interval = "hourly", limit = 2160) {
+	let lookback = 90;
+	let w = [];
+	switch ( interval ) {
+	case "5min":
+	    w.push("indexTS % 300 = 0")
+	    lookback = 7;
+	    break;
+	case "hourly":
+	    w.push("indexTS % 3600 = 0")
+	    lookback = 90;
+	    break;
+	default: 
+	case "daily":
+	    w.push("indexTS % 86400 = 0")
+	    break;
+	}
+	w.push(`indexTS >= UNIX_TIMESTAMP( date_sub(Now(), INTERVAL ${lookback} DAY ) )`);
+	let tbl = "assetpricelog";
+	if ( q.symbol && q.relayChain ) {
+	    let symbolRelayChain = paraTool.makeAssetChain(q.symbol, q.relayChain);
+	    if ( this.xcmSymbolInfo[symbolRelayChain] == undefined) {
+		throw new paraTool.InvalidError(`Invalid symbol relay chain: ${q.symbol}/${q.relayChain}`)
+            }
+	    tbl = "xcmassetpricelog";
+            w.push(`symbol = '${q.symbol}'`)
+            w.push(`relayChain = '${q.relayChain}'`)
+	} else if ( q.asset && q.chainID )  {
+	    let assetChain = paraTool.makeAssetChain(q.asset, q.chainID);
+	    if ( this.assetInfo[assetChain]  == undefined ) {
+		throw new paraTool.InvalidError(`Invalid asset: ${q.asset} on ${q.chainID}`)
+	    } 
+            w.push(`asset = '${q.asset}'`)
+            w.push(`chainID = '${q.chainID}'`)
+	}
+	if ( q.routerAssetChain ) {
+	    w.push(`routerAssetChain = '${q.routerAssetChain}'`)
+	}
+	let wstr = w.join(" and ");
+        let assetlog = await this.poolREADONLY.query(`select indexTS, priceUSD, routerAssetChain, verificationPath, liquid from ${tbl} where ${wstr} order by indexTS  limit ${limit*10}`);
         try {
-            let [asset, chainID] = paraTool.parseAssetChain(assetChain)
-            let assetInfo = this.assetInfo[assetChain];
-            let w = ` and chainID = '${chainID}'`
-            let sql = `select indexTS, priceUSD from assetlog where asset = '${asset}' ${w} and indexTS >= UNIX_TIMESTAMP( date_sub(Now(), INTERVAL 90 DAY ) ) order by indexTS  limit ${limit}`
-            let assetlog = await this.poolREADONLY.query(sql);
-            if (assetlog.length > 0) {
-                let results = [];
+            if (assetlog && assetlog.length > 0) {
+                let priceinfo = {};
                 for (let i = 0; i < assetlog.length; i++) {
                     let a = assetlog[i];
-                    if (a.priceUSD > 0) {
-                        let b = [a.indexTS * 1000, a.priceUSD]
-                        results.push(b);
-                    } else {
-                        let p = await this.computePriceUSD({
-                            asset,
-                            chainID,
-                            ts: a.indexTS
-                        });
-                        if (p) {
-                            results.push([a.indexTS * 1000, p.priceUSD, p.priceUSDCurrent]);
-                        }
-                    }
+		    // choose the most liquid (0 is most liquid, 1 is less liquid)
+		    if ( priceinfo[a.indexTS] == undefined || priceinfo[a.indexTS].liquid > a.liquid ) {
+			priceinfo[a.indexTS] = a;
+		    }
                 }
+                let results = [];
+		for ( const indexTS of Object.keys(priceinfo) ) {
+		    results.push([indexTS * 1000, priceinfo[indexTS].priceUSD]);
+		}
                 return (results);
-            }
-            if (assetInfo !== undefined && assetInfo.priceUSDpaths !== undefined) {
-                let priceUSDpaths = assetInfo.priceUSDpaths;
-                let out = [];
-                let priceUSDpath = assetInfo.priceUSDpaths[0];
-                let currentTS = this.currentTS();
-                let startTS = currentTS - 3600 * 24 * 90;
-                for (let ts = startTS; ts < currentTS; ts += 3600) {
-                    let v = 1.0;
-                    let succ = true;
-                    for (let j = priceUSDpath.length - 1; j > 0; j--) {
-                        let r = priceUSDpath[j];
-                        let dexrec = await this.getDexRec(r.route, chainID, ts);
-                        if (dexrec) {
-                            let s = parseInt(r.s, 10);
-                            if (s == 1) {
-                                v *= dexrec.close;
-                            } else {
-                                v /= dexrec.close;
-                            }
-                        } else {
-                            succ = false;
-                            console.log("getAssetPriceFeed - MISSING route", r.route);
-                        }
-                    }
-                    if (succ) {
-                        out.push([ts * 1000, v])
-                    }
-                }
-                return (out);
             }
         } catch (err) {
             this.logger.error({
                 "op": "query.getAssetPriceFeed",
-                assetChain,
+                q,
                 err
             });
         }
@@ -1741,19 +1736,37 @@ module.exports = class Query extends AssetManager {
         return (assets);
     }
 
-    async getSymbolAssets(symbol, address = false) {
+    async getSymbolPriceUSDCurrentRouterAsset(symbol, relayChain = null) {
+	let sql = `select indexTS, xcmassetpricelog.routerAssetChain, router.routerName, liquid, priceUSD from xcmassetpricelog left join router on xcmassetpricelog.routerAssetChain = router.routerAssetChain where symbol = '${symbol}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose 
+        let routerChainRecs = await this.poolREADONLY.query(sql)
+	let routerChains = {}
+        if (routerChainRecs.length > 0) {
+	    for ( const r of routerChainRecs ) {
+		if ( routerChains[r.routerAssetChain] == undefined || routerChains[r.routerAssetChain].indexTS < r.indexTS ) {
+		    routerChains[r.routerAssetChain] = r;
+		}
+	    }
+	    let routerAssetChains = [];
+	    for ( const r of Object.keys(routerChains) ) {
+		routerAssetChains.push(routerChains[r]);
+	    }
+	    // sort by liquid
+	    routerAssetChains.sort( function(a, b) {
+		return a.liquid - b.liquid
+	    });
+	    return routerAssetChains;
+	}
+	return [];
+    }
+    
+    async getSymbolAssets(symbol) {
         let sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.symbol as localSymbol, asset.chainName, asset.currencyID, numHolders, totalFree, totalReserved, totalMiscFrozen, totalFrozen from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey and xcmasset.symbol = '${symbol}' order by numHolders desc;`
+	console.log("getSymbolAssets", sql);
         let assets = await this.poolREADONLY.query(sql)
         if (assets.length == 0) {
             throw new NotFoundError(`Invalid symbol: ${symbol}`)
         }
 
-        let holdings = null
-        try {
-            holdings = (this.validAddress(address)) ? await this.getRealtimeAsset(address) : false;
-        } catch (err) {
-            // its ok to have an miss here, no need to log it
-        }
 
         let ts = this.getCurrentTS();
         for (let i = 0; i < assets.length; i++) {
@@ -1766,26 +1779,21 @@ module.exports = class Query extends AssetManager {
                 numHolders: v.numHolders,
                 asset: v.asset,
                 symbol: v.symbol,
+		relayChain: v.relayChain,
                 decimals: v.decimals,
                 chainID: v.chainID,
                 chainName: v.chainName,
                 currencyID: v.currencyID,
+		priceUSD: v.priceUSD,
                 id,
                 chainName,
                 localSymbol: v.localSymbol,
-                priceUSD: 0,
                 tvlFree: 0,
                 tvlReserved: 0,
                 tvlMiscFrozen: 0,
                 tvlFrozen: 0
             };
-            let p = await this.computePriceUSD({
-                asset: v.asset,
-                chainID: v.chainID
-            });
-            let priceUSDCurrent = p ? p.priceUSDCurrent : 0
-            a.priceUSD = priceUSDCurrent;
-            if (a.priceUSD == null) a.priceUSD = 0
+
             if (a.totalFree == null) a.totalFree = 0
             if (a.totalReserved == null) a.totalReserved = 0
             if (a.totalFrozen == null) a.totalFrozen = 0
@@ -1798,16 +1806,6 @@ module.exports = class Query extends AssetManager {
             a.tvlMiscFrozen = a.priceUSD * a.totalMiscFrozen
             a.totalFrozen = parseFloat(v.totalFrozen)
             a.tvlFrozen = a.priceUSD * a.totalFrozen
-            let assetType = (a.assetType) ? a.assetType : false;
-            if (holdings[assetType] !== undefined) {
-                let h = holdings[assetType];
-                for (let j = 0; j < h.length; j++) {
-                    let b = h[j];
-                    if ((b.assetInfo.asset == a.asset) && (b.assetInfo.chainID == a.chainID)) {
-                        a.accountState = b.state;
-                    }
-                }
-            }
             assets[i] = a
         }
         return assets;
