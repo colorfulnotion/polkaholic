@@ -819,8 +819,9 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             assetlog.isXCAsset = (a.xcmInteriorKey && a.xcmInteriorKey.length > 0)
         }
         let lookbackDays = 3650
+	let liquidMax = 0.5  // e^.5 = 1.65
         if (assetlog.assetType == paraTool.assetTypeToken || assetlog.assetType == paraTool.assetTypeERC20) {
-            let sql = assetlog.isXCAsset ? `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from xcmassetpricelog where symbol = '${q.symbol}' and relayChain = '${q.relayChain}' order by indexTS;` : `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from assetpricelog where asset = '${q.asset}' and chainID = '${q.chainID}' order by indexTS;`
+            let sql = assetlog.isXCAsset ? `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from xcmassetpricelog where symbol = '${q.symbol}' and relayChain = '${q.relayChain}' and liquid < '${liquidMax}' order by indexTS;` : `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from assetpricelog where asset = '${q.asset}' and chainID = '${q.chainID}' and liquid < '${liquidMax}' order by indexTS;`
             let recs = await this.poolREADONLY.query(sql);
 
             assetlog.prices = [];
