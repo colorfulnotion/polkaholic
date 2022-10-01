@@ -284,7 +284,7 @@ module.exports = class XCMManager extends Query {
             sourceTxFeeUSD = evmtx.feeUSD
             sourceChainSymbol = evmtx.symbol
         }
-
+        if (sourceTxFeeUSD == undefined) sourceTxFeeUSD = 0
         console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
         console.log(`rawXCM`, xcm)
         xcm.chainName = this.getChainName(xcm.chainID);
@@ -672,18 +672,26 @@ module.exports = class XCMManager extends Query {
                     let amountSentUSD = 0;
                     let amountReceivedUSD = 0;
                     let chainID = d.chainID
+                    let decimals = false
+                    let symbol = d.symbol;
+                    let relayChain = d.relayChain;
+                    let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
+                    let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+                    if (xcmAssetInfo != undefined && xcmAssetInfo.decimals != undefined){
+                        decimals = xcmAssetInfo.decimals
+                    }
+                    if (decimals !== false){
+                        amountSent = parseFloat(d.amountSent) / 10 ** decimals;
+                        amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
+                    }
                     let priceSource = await this.computePriceUSD({
                         symbol: d.symbol,
                         relayChain: d.relayChain,
                         ts: d.sourceTS
                     });
-                    let symbol = d.symbol;
-                    let relayChain = d.relayChain;
+
                     if (priceSource) {
                         priceUSD = priceSource.priceUSD;
-                        let decimals = priceSource.assetInfo.decimals;
-                        amountSent = parseFloat(d.amountSent) / 10 ** decimals;
-                        amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
                         amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
                         amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
                     } else {
@@ -890,18 +898,29 @@ module.exports = class XCMManager extends Query {
                     let priceUSD = 0;
                     let amountSent = 0;
                     let amountSentUSD = 0;
+                    let amountReceived = 0;
+                    let amountReceivedUSD = 0;
                     let chainID = d.chainID
+                    let decimals = false
+                    let symbol = d.symbol;
+                    let relayChain = d.relayChain;
+                    let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
+                    let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+                    if (xcmAssetInfo != undefined && xcmAssetInfo.decimals != undefined){
+                        decimals = xcmAssetInfo.decimals
+                    }
+                    if (decimals !== false){
+                        amountSent = parseFloat(d.amountSent) / 10 ** decimals;
+                        amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
+                    }
+
                     let priceSource = await this.computePriceUSD({
                         symbol: d.symbol,
                         relayChain: d.relayChain,
                         ts: d.sourceTS
                     });
-                    let symbol = d.symbol;
-                    let relayChain = d.relayChain;
                     if (priceSource) {
                         priceUSD = priceSource.priceUSD;
-                        let decimals = priceSource.assetInfo.decimals;
-                        amountSent = parseFloat(d.amountSent) / 10 ** decimals;
                         amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
                     } else {
                         console.log(`XCM Asset not found [${d.extrinsicHash}], symbol=${d.symbol}, relayChain=${d.relayChain}`)
@@ -938,7 +957,9 @@ module.exports = class XCMManager extends Query {
                         relayChain: d.relayChain,
                         priceUSD: priceUSD,
                         amountSent: amountSent,
+                        amountReceived: amountReceived,
                         amountSentUSD: amountSentUSD,
+                        amountReceivedUSD: amountReceivedUSD,
                         fromAddress: d.senderAddress, //from xcmtransfer.fromAddress
                         destAddress: d.fromAddress, //from xcmtransfer.destAddress
                         msgHash: (d.msgHash != undefined) ? d.msgHash : '0x', // 'failedOrigination' has no msgHash
