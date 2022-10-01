@@ -998,7 +998,7 @@ module.exports = class XCMManager extends Query {
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
                     console.log(`match_xcm_failure (B)`)
                     console.log(paraTool.removeNewLine(sqlB))
-                    //this.batchedSQL.push(sqlB);
+                    this.batchedSQL.push(sqlB);
                     matches++;
 
                     // 1. write "addressExtrinsic" feedxcmdest with row key address-extrinsicHash and column extrinsicHash#chainID-extrinsicID-transferIndex
