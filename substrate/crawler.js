@@ -1021,7 +1021,7 @@ module.exports = class Crawler extends Indexer {
                 w = ` and round(indexTS/3600) % ${nmax} = ${n}`;
             }
         }
-        var sql = `select chainID, indexTS from indexlog where indexed = 0 and readyForIndexing = 1 and chainID = '${chain.chainID}' and indexTS < UNIX_TIMESTAMP(Now()) - 3600 and attempted < 10 ${w} order by attempted, indexTS`;
+        var sql = `select chainID, indexTS from indexlog where indexed = 0 and readyForIndexing = 1 and chainID = '${chain.chainID}' and indexTS < UNIX_TIMESTAMP(Now()) - 3600 and attempted < 1 ${w} order by attempted, indexTS`;
         var indexlogs = await this.pool.query(sql);
         if (indexlogs.length == 0) {
             console.log(`indexChain ${chain.chainID}: no work to do`, sql)

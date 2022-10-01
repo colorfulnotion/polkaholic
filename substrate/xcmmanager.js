@@ -677,10 +677,10 @@ module.exports = class XCMManager extends Query {
                     let relayChain = d.relayChain;
                     let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
                     let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-                    if (xcmAssetInfo != undefined && xcmAssetInfo.decimals != undefined){
+                    if (xcmAssetInfo != undefined && xcmAssetInfo.decimals != undefined) {
                         decimals = xcmAssetInfo.decimals
                     }
-                    if (decimals !== false){
+                    if (decimals !== false) {
                         amountSent = parseFloat(d.amountSent) / 10 ** decimals;
                         amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
                     }
@@ -906,10 +906,10 @@ module.exports = class XCMManager extends Query {
                     let relayChain = d.relayChain;
                     let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);
                     let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-                    if (xcmAssetInfo != undefined && xcmAssetInfo.decimals != undefined){
+                    if (xcmAssetInfo != undefined && xcmAssetInfo.decimals != undefined) {
                         decimals = xcmAssetInfo.decimals
                     }
-                    if (decimals !== false){
+                    if (decimals !== false) {
                         amountSent = parseFloat(d.amountSent) / 10 ** decimals;
                         amountReceived = parseFloat(d.amountReceived) / 10 ** decimals;
                     }

@@ -38,6 +38,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     symbolRelayChainAsset = {}; // symbolRelayChain -> { ${chainID}: assetInfo }
     assetlog = {};
     ratelog = {};
+    routers = {};
     assetlogTTL = 0;
     ercTokenList = {};
     currencyIDInfo = {};
@@ -474,6 +475,15 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                 xcmAssetInfo[v.xcmInteriorKey] = v;
             }
         }
+        let routerRecs = await this.poolREADONLY.query("select routerAssetChain, routerName from router");
+        let routers = {};
+        for (let i = 0; i < routerRecs.length; i++) {
+            let v = routerRecs[i];
+            if (routers[v.routerAssetChain] == undefined) {
+                routers[v.routerAssetChain] = v;
+            }
+        }
+        this.routers = routers;
         this.xcmAssetInfo = xcmAssetInfo; // key: xcmInteriorKey => a (1, ignore asset/chain)
         this.xcmInteriorInfo = xcmInteriorInfo; // key: asset~chainID  => a (N)
         this.xcmSymbolInfo = xcmSymbolInfo; // key: symbol~relayChain => a (1, ignore asset/chain)
@@ -819,7 +829,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             assetlog.isXCAsset = (a.xcmInteriorKey && a.xcmInteriorKey.length > 0)
         }
         let lookbackDays = 3650
-	let liquidMax = 0.5  // e^.5 = 1.65
+        let liquidMax = 0.5 // e^.5 = 1.65
         if (assetlog.assetType == paraTool.assetTypeToken || assetlog.assetType == paraTool.assetTypeERC20) {
             let sql = assetlog.isXCAsset ? `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from xcmassetpricelog where symbol = '${q.symbol}' and relayChain = '${q.relayChain}' and liquid < '${liquidMax}' order by indexTS;` : `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from assetpricelog where asset = '${q.asset}' and chainID = '${q.chainID}' and liquid < '${liquidMax}' order by indexTS;`
             let recs = await this.poolREADONLY.query(sql);

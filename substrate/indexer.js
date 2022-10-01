@@ -1579,12 +1579,6 @@ module.exports = class Indexer extends AssetManager {
                     "xcmtransfer": xcmtransfer
 
                 })
-            } else {
-                this.logger.info({
-                    "op": "updateXCMTransferStorage SUCC",
-                    "chainID": this.chainID,
-                    "xcmtransfer": xcmtransfer
-                })
             }
         } catch (err) {
             console.log(err);
@@ -1905,7 +1899,7 @@ module.exports = class Indexer extends AssetManager {
                     assetName: this.clip_string(assetInfo.name),
                     symbol: assetInfo.symbol,
                     decimals: assetInfo.decimal,
-                    creator:  creator,
+                    creator: creator,
                     createdAtTx: createdAtTx,
                     // LP specific info
                     token0: token0,
@@ -2353,7 +2347,7 @@ module.exports = class Indexer extends AssetManager {
                         let createdAtTxSql = (assetInfo.createdAtTx != undefined) ? `'${assetInfo.createdAtTx}'` : 'NULL';
                         let createDTSql = (assetInfo.createTS != undefined) ? `FROM_UNIXTIME('${assetInfo.createTS}')` : 'NULL'
                         let creator = (assetInfo.creator != undefined) ? assetInfo.creator.toLowerCase() : null;
-                        let createdAtTx =(assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
+                        let createdAtTx = (assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
 
                         let isEnumerable = (assetInfo.isEnumerable !== undefined && assetInfo.isEnumerable) ? 1 : 0;
                         let isMetadataSupported = (assetInfo.isMetadataSupported !== undefined && assetInfo.isMetadataSupported) ? 1 : 0;
@@ -2390,7 +2384,7 @@ module.exports = class Indexer extends AssetManager {
                         let createdAtTxSql = (assetInfo.createdAtTx != undefined) ? `'${assetInfo.createdAtTx}'` : 'NULL';
                         let createDTSql = (assetInfo.createTS != undefined) ? `FROM_UNIXTIME('${assetInfo.createTS}')` : 'NULL'
                         let creator = (assetInfo.creator != undefined) ? assetInfo.creator.toLowerCase() : null;
-                        let createdAtTx =(assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
+                        let createdAtTx = (assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
 
                         let isEnumerable = (assetInfo.isEnumerable) ? 1 : 0
                         let isMetadataSupported = (assetInfo.isMetadataSupported) ? 1 : 0
@@ -2453,7 +2447,7 @@ module.exports = class Indexer extends AssetManager {
                     let createdAtTxSql = (assetInfo.createdAtTx != undefined) ? `'${assetInfo.createdAtTx}'` : 'NULL';
                     let createDTSql = (assetInfo.createTS != undefined) ? `FROM_UNIXTIME('${assetInfo.createTS}')` : 'NULL'
                     let creator = (assetInfo.creator != undefined) ? assetInfo.creator.toLowerCase() : null;
-                    let createdAtTx =(assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
+                    let createdAtTx = (assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
                     let o = `('${assetKey}', '${chainID}', '${assetInfo.assetType}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${createDTSql}, ${creatorSql}, ${createdAtTxSql})`;
                     if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
                         contracts.push(o);
@@ -3706,14 +3700,14 @@ module.exports = class Indexer extends AssetManager {
             }
             //if (extrinsicHash == '0xd50a05196fcc5794b44b19502dcb4aaa573fea0a510120fb1966fdd5ad76f119') console.log('events', data, dataType, decodedData)
             if (dataType != undefined && Array.isArray(dataType)) {
-                if (pallet_method == 'tokens:Withdrawn'){
+                if (pallet_method == 'tokens:Withdrawn') {
                     //this is normal case for txfees
-                    if (data != undefined && Array.isArray(data) && (this.chainID == paraTool.chainIDKintsugi || this.chainID == paraTool.chainIDInterlay) ) {
+                    if (data != undefined && Array.isArray(data) && (this.chainID == paraTool.chainIDKintsugi || this.chainID == paraTool.chainIDInterlay)) {
                         try {
                             //this assumes that transaction is paid by nativeAsset
                             let isNativeToken = true
                             let feeToken = data[0]
-                            if (feeToken.token != undefined){
+                            if (feeToken.token != undefined) {
                                 if (feeToken.token != this.getNativeSymbol()) {
                                     isNativeToken = false
                                     console.log(`[${extrinsicID}] ${extrinsicHash} nonNative feeToken ${feeToken.token}`)

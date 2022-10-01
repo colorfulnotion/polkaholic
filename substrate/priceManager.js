@@ -636,28 +636,28 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
 
     async update_coingecko_backfill(startDate = '2022-01-01', endDate = '2022-04-01') {
         let coingeckoRecs = await this.poolREADONLY.query(`select coingeckoID, symbol, relayChain from xcmasset where coingeckoID is not null`);
-	let coingeckoids = {};
-	for ( let r = 0; r < coingeckoRecs.length; r++ ) {
-	    let rec = coingeckoRecs[r];
-	    let symbolRelayChain = paraTool.makeAssetChain(rec.symbol, rec.relayChain);
-	    coingeckoids[ symbolRelayChain ] = rec.coingeckoID;
-	}
+        let coingeckoids = {};
+        for (let r = 0; r < coingeckoRecs.length; r++) {
+            let rec = coingeckoRecs[r];
+            let symbolRelayChain = paraTool.makeAssetChain(rec.symbol, rec.relayChain);
+            coingeckoids[symbolRelayChain] = rec.coingeckoID;
+        }
 
-	let sql = `select symbol, relayChain, logDT, min(unix_timestamp(logDT)) as startTS, count(*) cnt from indexlog left join xcmassetpricelog on indexlog.indexTS = xcmassetpricelog.indexTS where indexlog.chainID = 0 and indexlog.logDT >= '${startDate}' and logDT <= '${endDate}' and symbol in ( select symbol from xcmasset where coingeckoid is not null ) and relayChain in ( 'polkadot', 'kusama' ) and routerAssetChain like '%coingecko%' group by symbol, relayChain, logDT having count(*) != 24 order by logDT`;
+        let sql = `select symbol, relayChain, logDT, min(unix_timestamp(logDT)) as startTS, count(*) cnt from indexlog left join xcmassetpricelog on indexlog.indexTS = xcmassetpricelog.indexTS where indexlog.chainID = 0 and indexlog.logDT >= '${startDate}' and logDT <= '${endDate}' and symbol in ( select symbol from xcmasset where coingeckoid is not null ) and relayChain in ( 'polkadot', 'kusama' ) and routerAssetChain like '%coingecko%' group by symbol, relayChain, logDT having count(*) != 24 order by logDT`;
         var fixes = await this.poolREADONLY.query(sql);
-	for ( let f = 0; f < fixes.length; f++ ) {
-	    let fix = fixes[f];
-	    let symbolRelayChain = paraTool.makeAssetChain(fix.symbol, fix.relayChain);
-	    let id =  coingeckoids[symbolRelayChain];
-	    if ( id ) {
-		let startTS = fix.startTS;
-		let endTS = fix.startTS + 86400;
-		await this.update_coingecko_market_chart(id, fix.symbol, fix.relayChain, startTS, endTS);
-		await this.sleep(5000);
-	    }
-	}
+        for (let f = 0; f < fixes.length; f++) {
+            let fix = fixes[f];
+            let symbolRelayChain = paraTool.makeAssetChain(fix.symbol, fix.relayChain);
+            let id = coingeckoids[symbolRelayChain];
+            if (id) {
+                let startTS = fix.startTS;
+                let endTS = fix.startTS + 86400;
+                await this.update_coingecko_market_chart(id, fix.symbol, fix.relayChain, startTS, endTS);
+                await this.sleep(5000);
+            }
+        }
     }
-    
+
     // update assetlog with prices/market_caps/volumes from coingecko API
     async update_coingecko_market_chart(id, symbol, relayChain, startTS, endTS) {
         const axios = require("axios");

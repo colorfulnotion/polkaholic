@@ -1430,9 +1430,13 @@ app.get('/symbol/:symbol', async (req, res) => {
     try {
         let symbol = req.params["symbol"];
         let chains = await query.getSymbolAssets(symbol);
+        let relayChain = (chains.length > 0 && chains[0].relayChain) ? chains[0].relayChain : 'polkadot';
+        let priceUSD_routerAsset = await query.getSymbolPriceUSDCurrentRouterAsset(symbol, relayChain);
         res.render('symbol', {
             symbol: symbol,
+            relayChain: relayChain,
             chainInfo: query.getChainInfo(),
+            priceUSD_routerAsset,
             addresses: addresses,
             accounts: accounts,
             chains: chains,
