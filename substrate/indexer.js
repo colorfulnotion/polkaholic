@@ -3706,6 +3706,30 @@ module.exports = class Indexer extends AssetManager {
             }
             //if (extrinsicHash == '0xd50a05196fcc5794b44b19502dcb4aaa573fea0a510120fb1966fdd5ad76f119') console.log('events', data, dataType, decodedData)
             if (dataType != undefined && Array.isArray(dataType)) {
+                if (pallet_method == 'tokens:Withdrawn'){
+                    //this is normal case for txfees
+                    if (data != undefined && Array.isArray(data) && (this.chainID == paraTool.chainIDKintsugi || this.chainID == paraTool.chainIDInterlay) ) {
+                        try {
+                            //this assumes that transaction is paid by nativeAsset
+                            let isNativeToken = true
+                            let feeToken = data[0]
+                            if (feeToken.token != undefined){
+                                if (feeToken.token != this.getNativeSymbol()) {
+                                    isNativeToken = false
+                                    console.log(`[${extrinsicID}] ${extrinsicHash} nonNative feeToken ${feeToken.token}`)
+                                }
+                            }
+                            let withdrawTxFee = paraTool.dechexToInt(data[2])
+                            if (!isUnsignedHead && signer == data[1] && isNativeToken) {
+                                withdrawFee = withdrawTxFee
+                                //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
+                                res.fee = withdrawFee
+                            }
+                        } catch (e) {
+                            console.log('unable to compute Withdraw fees!!', data, e)
+                        }
+                    }
+                }
                 if (pallet_method == 'balances:Withdraw') {
                     //this is normal case for txfees
                     if (data != undefined && Array.isArray(data)) {

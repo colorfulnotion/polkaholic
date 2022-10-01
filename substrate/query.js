@@ -1132,12 +1132,8 @@ module.exports = class Query extends AssetManager {
                         x.amountSentUSD = parsedXcmInfo.origination.amountSentUSD;
                     }
                     if (parsedXcmInfo.destination) {
+                        x.amountReceivedUSD = parsedXcmInfo.destination.amountReceivedUSD;
                         x.amountReceived = parsedXcmInfo.destination.amountReceived;
-			if ( parsedXcmInfo.destination.amountReceivedUSD ) {
-                            x.amountReceivedUSD = parsedXcmInfo.destination.amountReceivedUSD;
-			} else {
-                            x.amountReceivedUSD = parsedXcmInfo.destination.amountReceived * parsedXcmInfo.priceUSD;
-			}
                     }
                 } catch (e) {
                     parsedXcmInfo = false
@@ -1321,6 +1317,10 @@ module.exports = class Query extends AssetManager {
             }
             if (feedData && feedData["tx"]) {
                 feedTX = feedData["tx"]
+            }
+            if (rowData["feedxcminfo"]) {
+                feedXCMInfoData = rowData["feedxcminfo"]
+                status = "finalizeddest"
             }
             if (rowData["feedxcminfo"]) {
                 feedXCMInfoData = rowData["feedxcminfo"]

@@ -914,14 +914,27 @@ module.exports = class ChainParser {
                     }
                 }
                 console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
+                //console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] eventRange`,eventRange)
                 //update xcmMessages
                 indexer.updateMPState(mpState)
                 //only compute candiate mpState is successful
                 if (mpState.success === true) {
+                    let candiateCnt = 0
                     for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
                         let e = eventRange[i]
                         let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
                         if (candidate) {
+                            candiateCnt++
+                            indexer.updateXCMTransferDestCandidate(candidate, caller)
+                        }
+                    }
+                    console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
+                    if (candiateCnt == 0){
+                        let lastEvent = eventRange[eventRange.length-1]
+                        let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, lastEvent, mpState, finalized)
+                        console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
+                        if (candidate) {
+                            candiateCnt++
                             indexer.updateXCMTransferDestCandidate(candidate, caller)
                         }
                     }
@@ -1391,6 +1404,7 @@ module.exports = class ChainParser {
         let palletMethod = `${pallet}(${method})` //event
         let candidate = false;
         let caller = false;
+        //console.log(`processIncomingAssetSignal ${e.eventID} ${palletMethod}`)
         switch (palletMethod) {
             case 'balances(Deposit)':
                 //kusama/polkadot format
