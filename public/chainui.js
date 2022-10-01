@@ -403,14 +403,23 @@ async function showxcmtransfers(filter = {}) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         try {
+			    let str = `<button type="button" class="btn btn-warning text-capitalize">Unknown</button>`
+			    let unk = true;
+                            if ( row.xcmInfo && row.xcmInfo.destination ) {
+				if ( row.xcmInfo.destination.status ) {
+				    str = `<button type="button" class="btn btn-success text-capitalize">Success</button>`
+				    unk = false;
+				} else if ( row.xcmInfo.destination.error ) {
+				    str = `<button type="button" class="btn btn-danger text-capitalize">${row.xcmInfo.destination.error.errorType}</button>`
+				    unk = false;
+				} 
+			    }
+			    if ( unk ) {
+				console.log(row.xcmInfo);
+			    }
                             if (row.chainIDDest != undefined && row.chainDestName) {
-                                if (row.incomplete !== undefined && row.incomplete > 0) {
-                                    return "Incomplete " + presentSuccessFailure(false);
-                                } else if (row.blockNumberDest) {
-                                    return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest) + presentSuccessFailure(true);
-                                } else {
-                                    return presentChain(row.idDest, row.chainDestName);
-                                }
+				
+			        return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest) + "<BR>" + str;
                             } else {
                                 return "-"
                             }

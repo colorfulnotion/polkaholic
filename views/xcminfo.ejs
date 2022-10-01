@@ -17,6 +17,9 @@
       </h6>
 
       <p class="text-muted mb-2 fw-bold"><%- uiTool.presentTS(xcm.origination.ts) %></p>
+      <p class="mb-2">
+        <B>Sent</B>: <span class="fw-bold"><%- uiTool.presentFloat(xcm.origination.amountSent) %></span> <%= xcm.symbol; %> (<%= uiTool.currencyFormat(xcm.origination.amountSentUSD)%>)<br/>
+      </p>
       <p class="text-muted">
       <% if ( xcm.origination.transactionHash ) { %>
        <B> Transaction Hash: </b><%- uiTool.presentTx(xcm.origination.transactionHash) %>
@@ -36,10 +39,10 @@
       <br/>
 
       <B>Module</B>: <%- include("module", {chainID: xcm.origination.id, section: xcm.origination.section, method: xcm.origination.method}); %><br/>
-      <B>Sent</B>: <%- uiTool.presentNumber(xcm.origination.amountSent) %> <%= xcm.symbol; %> (<%= uiTool.currencyFormat(xcm.origination.amountSentUSD)%>)<br/>
       <b>Sent At Block</B>: <a href='/block/<%= xcm.origination.id %>/<%= xcm.origination.blockNumber; %>'><code><%= xcm.origination.blockNumber; %></code></a><br/>
+      <b>XCM Message Hash</b>: <a href='/xcmmessage/<%= xcm.origination.msgHash %>/<%= xcm.origination.sentAt %>'><%- uiTool.getShortHash(xcm.origination.msgHash) %></a><br/>
       <B>TX Fees:</B>
-         <%- uiTool.presentNumber(xcm.origination.txFee) %> <%= xcm.origination.txFeeSymbol %>
+         <%- uiTool.presentFloat(xcm.origination.txFee) %> <%= xcm.origination.txFeeSymbol %>
          (<%- uiTool.currencyFormat(xcm.origination.txFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)<br/>
       </p>
     </li>
@@ -78,6 +81,9 @@
       <% if ( xcm.destination.ts ) { %>
       <p class="text-muted mb-2 fw-bold"><%- uiTool.presentTS(xcm.destination.ts) %></p>
       <% } %>
+      <p class="mb-2">
+       <B>Received</B>: <span class="fw-bold"><%- uiTool.presentFloat(xcm.destination.amountReceived) %></span> <%= xcm.symbol; %> (<%= uiTool.currencyFormat(xcm.destination.amountReceivedUSD)%>)<br/>
+      </p>
       <p class="text-muted">
        <% if ( xcm.destination.blockNumber ) { %>
        <B> Received At Block:</B> <a href='/block/<%= xcm.destination.id %>/<%= xcm.destination.blockNumber %>'>
@@ -89,7 +95,8 @@
        <% if ( xcm.destination.beneficiary ) {
            let beneficiary = xcm.destination.beneficiary;
        %>
-       <%- uiTool.presentBlockiesOrIdenticon(beneficiary, 25) %><%- uiTool.presentID(beneficiary); %>
+       <%- uiTool.presentBlockiesOrIdenticon(beneficiary, 25) %>
+       <%- uiTool.presentID(beneficiary); %>
        <% } %>
        <br/>
 
@@ -111,14 +118,14 @@
        <% if ( xcm.destination.teleportFee ) { %>
       <p class="text-muted">
       <B>Teleport Fees:</B>
-      <%- uiTool.presentNumber(xcm.destination.teleportFee) %> <%= xcm.destination.teleportFeeChainSymbol %> (<%- uiTool.currencyFormat(xcm.destination.teleportFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)
+      <%- uiTool.presentFloat(xcm.destination.teleportFee) %> <%= xcm.destination.teleportFeeChainSymbol %> (<%- uiTool.currencyFormat(xcm.destination.teleportFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)
       </p>
        <% } %>
     </li>
 
   </ul>
-
+  <% if ( xcm.origination.ts && xcm.destination.ts  ) { %>
+  <%   let flightTime = xcm.destination.ts  - xcm.origination.ts; %>
+  <i>Flight time: <%= flightTime %> seconds</i>
+  <% } %>
 </div>
-
-
-

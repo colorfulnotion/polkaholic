@@ -1296,10 +1296,7 @@ module.exports = class Query extends AssetManager {
             let rowData = row.data;
             let feedData = false
             let feedTX = false
-            let feedXCMDestData = false
             let feedXCMInfoData = false
-
-            let feedXCMDestDataFromSubstrate = false
             let status = ""
             let isPending = false
             let isEVMUnfinalized = false
@@ -1321,8 +1318,8 @@ module.exports = class Query extends AssetManager {
             if (feedData && feedData["tx"]) {
                 feedTX = feedData["tx"]
             }
-            if (rowData["feedxcmdest"]) {
-                feedXCMDestData = rowData["feedxcmdest"]
+            if (rowData["feedxcminfo"]) {
+                feedXCMInfoData = rowData["feedxcminfo"]
                 status = "finalizeddest"
             }
             if (rowData["feedxcminfo"]) {
@@ -1419,10 +1416,6 @@ module.exports = class Query extends AssetManager {
                             let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
                             if (substratetx.xcmInfo != undefined) {
                                 c.xcmInfo = substratetx.xcmInfo;
-                            } else if (substratetx.xcmdest != undefined) {
-                                c.xcmdest = substratetx.xcmdest;
-                                feedXCMDestDataFromSubstrate = true
-                                console.log(`feedXCMDestDataFromSubstrate=${feedXCMDestDataFromSubstrate}, SET XCMTDEST`, c.xcmdest);
                             }
                         } catch (errS) {
                             console.log("FETCH XCMTRANSFER ERR", errS);
@@ -1447,9 +1440,6 @@ module.exports = class Query extends AssetManager {
                         d.specVersion = this.getSpecVersionForBlockNumber(d.chainID, d.blockNumber);
                     }
                 }
-                //d.chainName = this.getChainName(d.chainID)
-                //[d.id, d.chainID] = this.convertChainID(d.chainID)
-                //d.status = status;
 
                 try {
                     if (feedXCMInfoData) {
@@ -1460,162 +1450,13 @@ module.exports = class Query extends AssetManager {
                             break;
                         }
                         d.xcmInfo = c.xcmInfo
-                        return d;
-                    }
-                    if (feedXCMDestDataFromSubstrate) {
-                        d.xcmdest = c.xcmdest
-                        d.xcmInfo = c.xcmInfo
+			// TEMP:
+			if ( d.xcmInfo && d.xcmInfo.priceUSD != undefined && d.xcmInfo.destination != undefined && d.xcmInfo.destination.amountReceived != undefined) {
+			    d.xcmInfo.destination.amountReceivedUSD = d.xcmInfo.priceUSD * d.xcmInfo.destination.amountReceived
+			}
                         return d;
                     }
                     return d;
-                    // TODO: modernize UI to use xcmInfo and retire all the code below
-                    if (feedXCMDestData) {
-                        let sourceTxFee = d.fee
-                        let sourceTxFeeUSD = d.feeUSD
-                        let sourceChainSymbol = d.chainSymbol
-                        if (d.evm != undefined && d.evm.transactionHash != undefined) {
-                            let evmtx = await this.getTransaction(d.evm.transactionHash, decorate, decorateExtra, false);
-                            sourceTxFee = evmtx.fee
-                            sourceTxFeeUSD = evmtx.feeUSD
-                            sourceChainSymbol = evmtx.symbol
-                        }
-
-                        console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUS=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
-                        for (const extrinsicHashEventID of Object.keys(feedXCMDestData)) {
-                            const cell = feedXCMDestData[extrinsicHashEventID][0];
-                            let xcm = JSON.parse(cell.value);
-                            console.log(`rawXCM`, xcm)
-                            xcm.chainIDName = this.getChainName(xcm.chainID);
-                            xcm.chainIDDestName = this.getChainName(xcm.chainIDDest);
-                            let chainIDDestInfo = this.chainInfos[xcm.chainIDDest]
-                            if (xcm.chainIDDest != undefined && chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
-                                if (xcm.destAddress != undefined) {
-                                    if (xcm.destAddress.length == 42) xcm.destAddress = xcm.destAddress
-                                    if (xcm.destAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.destAddress, chainIDDestInfo.ss58Format)
-                                } else if (xcm.fromAddress != undefined) {
-                                    if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
-                                    if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
-                                }
-                            }
-                            if (d.signer != undefined) {
-                                xcm.fromAddress = d.signer
-                            }
-
-                            let decimals = false
-                            let isNewFormat = true
-                            if (xcm.asset != undefined) {
-                                isNewFormat = false
-                            }
-
-                            let symbolRelayChain = paraTool.makeAssetChain(xcm.symbol, xcm.relayChain);
-                            let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-                            if (xcmAssetInfo != undefined && xcmAssetInfo.decimals) {
-                                decimals = xcmAssetInfo.decimals
-                            }
-                            if (!isNewFormat) {
-                                if (decimals === false) {
-                                    decimals = this.getAssetDecimal(xcm.asset, xcm.chainID)
-                                } else if (decimals === false) {
-                                    decimals = this.getAssetDecimal(xcm.asset, xcm.chainIDDest)
-                                }
-                                if (decimals !== false) {
-                                    xcm.amountSent = xcm.amountSent / 10 ** decimals;
-                                    xcm.amountReceived = xcm.amountReceived / 10 ** decimals;
-                                }
-                                xcm.symbol = this.getAssetSymbol(xcm.asset);
-                            }
-
-                            //fee -> initiation + teleport fee
-                            if (decimals !== false) {
-                                xcm.fee = xcm.amountSent - xcm.amountReceived
-                                xcm.feeUSD = xcm.fee * (xcm.amountSentUSD / xcm.amountReceived) // temp hack
-                                xcm.sourceTxFee = sourceTxFee
-                                xcm.sourceTxFeeUSD = sourceTxFeeUSD
-                                xcm.sourceChainSymbol = sourceChainSymbol
-
-                                /*await this.decorateUSD(xcm, "amountSent", xcm.asset, xcm.chainID, xcm.destTS, decorateUSD)
-                                if (decorateUSD){
-                                  xcm.amountReceivedUSD = xcm.priceUSD * xcm.amountReceived;
-                                }
-                                */
-                                if (decorateUSD) {
-                                    let p = await this.computePriceUSD({
-                                        val: xcm.amountSent,
-                                        asset: xcm.asset,
-                                        chainID: xcm.chainID,
-                                        ts: xcm.destTS
-                                    });
-                                    if (p) {
-                                        xcm.amountSentUSD = p.valUSD;
-                                        xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
-                                        xcm.feeUSD = p.priceUSD * xcm.fee
-                                        xcm.priceUSD = p.priceUSD;
-                                        xcm.priceUSDCurrent = p.priceUSDCurrent;
-                                    }
-                                }
-                            }
-
-                            let xcmInfo = {
-                                symbol: xcm.symbol,
-                                relayChain: xcm.relayChain,
-                                origination: null,
-                                destination: null,
-                                version: (isNewFormat) ? 'V2' : 'V1'
-                            }
-                            xcmInfo.origination = {
-                                chainIDName: xcm.chainIDName,
-                                chainID: xcm.chainID,
-                                fromAddress: xcm.fromAddress,
-                                amountSent: xcm.amountSent,
-                                txFee: xcm.sourceTxFee,
-                                txFeeUSD: xcm.sourceTxFeeUSD,
-                                txFeeSymbol: xcm.sourceChainSymbol,
-                                extrinsicID: xcm.extrinsicID,
-                                extrinsicHash: xcm.extrinsicHash,
-                                msgHash: xcm.msgHash,
-                                sourceTS: xcm.sourceTS,
-                            }
-                            xcmInfo.destination = {
-                                chainIDDestName: xcm.chainIDDestName,
-                                chainIDDest: xcm.chainIDDest,
-                                destAddress: xcm.destAddress,
-                                blockNumberDest: xcm.blockNumberDest,
-                                amountReceived: xcm.amountReceived,
-                                teleportFee: xcm.fee,
-                                teleportFeeUSD: xcm.feeUSD,
-                                teleportFeeChainSymbol: xcm.symbol,
-                                destExtrinsicID: xcm.destExtrinsicID,
-                                destEventID: xcm.eventID,
-                                destTS: xcm.destTS,
-                            }
-                            //console.log("XCM final", xcm);
-                            xcm.version = (isNewFormat) ? 'V2' : 'V1'
-                            d.xcmdest = xcm;
-                            d.xcmInfo = xcmInfo;
-                            /*
-                            {
-                              chainID: 8,
-                              chainIDDest: 2,
-                              blockNumberDest: 12166647,
-                              asset: '{"Token":"KSM"}',
-                              amountSent: 3.077995000487,
-                              amountReceived: 3.077888333827,
-                              fromAddress: '0xc4961c3e6d56ab429c5adbf0b1ae16e7388406e7796e1f9113ef734fb7b7b31e',
-                              extrinsicHash: '0xea3edcd77feff932390f114bee12fa794cbcbf71ef98a76002758f429ecef31c',
-                              extrinsicID: '1739775-2',
-                              eventID: '2-12166647-1-14',
-                              sourceTS: 1649440375,
-                              destTS: 1649440386,
-                              chainIDName: 'Karura',
-                              chainIDDestName: 'Kusama',
-                              amountSentUSD: 614.0353786371526,
-                              priceUSD: 199.492,
-                              amountReceivedUSD: 614.0140994918158
-                            }
-                            */
-                            break;
-                        }
-                    }
                 } catch (err) {
                     console.log(err);
                     this.logger.warn({
