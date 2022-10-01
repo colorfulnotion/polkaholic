@@ -1866,8 +1866,11 @@ module.exports = class Indexer extends AssetManager {
         await this.fetchAssetHolderBalances(web3Api, chainID, tokenAddress, assetInfo.decimal, blockNumber, ts)
 
         let totalSupply = ethTool.validate_bigint(assetInfo.totalSupply);
-        let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
-        let createdAtTx = assetInfo.createdAtTx ? assetInfo.createdAtTx : "";
+        let creatorSql = (assetInfo.creator != undefined) ? `'${assetInfo.creator.toLowerCase()}'` : 'NULL';
+        let createdAtTxSql = (assetInfo.createdAtTx != undefined) ? `'${assetInfo.createdAtTx}'` : 'NULL';
+        let createDTSql = (assetInfo.createTS != undefined) ? `FROM_UNIXTIME('${assetInfo.createTS}')` : 'NULL'
+        let creator = (assetInfo.creator != undefined) ? assetInfo.creator.toLowerCase() : null;
+        let createdAtTx = (assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
         let lastState = JSON.stringify(assetInfo)
         let isLPToken = (assetInfo.lpInfo != undefined && assetInfo.lpInfo.tokenType == paraTool.assetTypeERC20LiquidityPair) ? true : false
 
@@ -1891,7 +1894,7 @@ module.exports = class Indexer extends AssetManager {
             }
             let token0 = lp20TokenInfo.token0.toLowerCase();
             let token1 = lp20TokenInfo.token1.toLowerCase();
-            var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20LiquidityPair}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}', '${token0}', '${token1}', ${lp20TokenInfo.token0Decimals}, ${lp20TokenInfo.token1Decimals}, ${lp20TokenInfo.token0Supply}, ${lp20TokenInfo.token1Supply}, '${lp20TokenInfo.token0Symbol}', '${lp20TokenInfo.token1Symbol}')`;
+            var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20LiquidityPair}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${createDTSql}, ${creatorSql}, ${createdAtTxSql}, '${token0}', '${token1}', ${lp20TokenInfo.token0Decimals}, ${lp20TokenInfo.token1Decimals}, ${lp20TokenInfo.token0Supply}, ${lp20TokenInfo.token1Supply}, '${lp20TokenInfo.token0Symbol}', '${lp20TokenInfo.token1Symbol}')`;
             if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
                 console.log(`erc20 LP`, o)
                 // write { asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol } to accountrealtime evmcontract:{chainID}
@@ -1902,7 +1905,7 @@ module.exports = class Indexer extends AssetManager {
                     assetName: this.clip_string(assetInfo.name),
                     symbol: assetInfo.symbol,
                     decimals: assetInfo.decimal,
-                    creator: creator,
+                    creator:  creator,
                     createdAtTx: createdAtTx,
                     // LP specific info
                     token0: token0,
@@ -1919,10 +1922,10 @@ module.exports = class Indexer extends AssetManager {
             // normal erc20 (non-lp token)
             // we will update total supply once per index_period
             //(asset, chainID, assetType, assetName, symbol, lastState, decimals, totalSupply, lastUpdateDT, lastUpdateBN, createDT, creator, createdAtTx, token0, token1, token0Decimals, token1Decimals, token0Supply, token1Supply, token0Symbol, token1Symbol) [token0, token1, token0Decimals, token1Decimals, token0Supply, token1Supply, token0Symbol, token1Symbol] all NULL
-            var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}', Null, Null, Null, Null, Null, Null, Null, Null)`;
+            var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${createDTSql}, ${creatorSql}, ${createdAtTxSql}, Null, Null, Null, Null, Null, Null, Null, Null)`;
             if (isXcAsset) {
                 let [assetK, _] = paraTool.parseAssetChain(assetChainStr)
-                o = `('${assetK}', '${chainID}', '${paraTool.assetTypeToken}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}', Null, Null, Null, Null, Null, Null, Null, Null)`;
+                o = `('${assetK}', '${chainID}', '${paraTool.assetTypeToken}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${createDTSql}, ${creatorSql}, ${createdAtTxSql}, Null, Null, Null, Null, Null, Null, Null, Null)`;
             }
             console.log(`erc20 nonLP, isXcAsset=${isXcAsset}`, o)
             if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
@@ -2346,8 +2349,12 @@ module.exports = class Indexer extends AssetManager {
                         //acala nft format unified with erc721
                         let deposit = assetInfo.deposit ? assetInfo.deposit : 0;
                         let sqlAssetKey = asset;
-                        let creator = (assetInfo.creator !== undefined) ? assetInfo.creator : "";
-                        let createdAtTx = (assetInfo.createdAtTx !== undefined) ? assetInfo.createdAtTx : "";
+                        let creatorSql = (assetInfo.creator != undefined) ? `'${assetInfo.creator.toLowerCase()}'` : 'NULL';
+                        let createdAtTxSql = (assetInfo.createdAtTx != undefined) ? `'${assetInfo.createdAtTx}'` : 'NULL';
+                        let createDTSql = (assetInfo.createTS != undefined) ? `FROM_UNIXTIME('${assetInfo.createTS}')` : 'NULL'
+                        let creator = (assetInfo.creator != undefined) ? assetInfo.creator.toLowerCase() : null;
+                        let createdAtTx =(assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
+
                         let isEnumerable = (assetInfo.isEnumerable !== undefined && assetInfo.isEnumerable) ? 1 : 0;
                         let isMetadataSupported = (assetInfo.isMetadataSupported !== undefined && assetInfo.isMetadataSupported) ? 1 : 0;
                         let metadata = assetInfo.metadata;
@@ -2356,7 +2363,7 @@ module.exports = class Indexer extends AssetManager {
                         let imageUrl = (assetInfo.imageUrl !== undefined) ? assetInfo.imageUrl : "";
                         let totalSupply = ethTool.validate_bigint(assetInfo.totalIssuance);
                         // sql will continue using contract address as asset key
-                        let sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.assetType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                        let sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.assetType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, ${createDTSql}, ${creatorSql}, ${createdAtTxSql})`;
                         if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql)) {
                             erc721classes.push(sql);
                         }
@@ -2379,8 +2386,12 @@ module.exports = class Indexer extends AssetManager {
                         let sql = '';
                         //erc721
                         let sqlAssetKey = assetInfo.tokenAddress.toLowerCase();
-                        let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
-                        let createdAtTx = assetInfo.createdAtTx ? assetInfo.createdAtTx : "";
+                        let creatorSql = (assetInfo.creator != undefined) ? `'${assetInfo.creator.toLowerCase()}'` : 'NULL';
+                        let createdAtTxSql = (assetInfo.createdAtTx != undefined) ? `'${assetInfo.createdAtTx}'` : 'NULL';
+                        let createDTSql = (assetInfo.createTS != undefined) ? `FROM_UNIXTIME('${assetInfo.createTS}')` : 'NULL'
+                        let creator = (assetInfo.creator != undefined) ? assetInfo.creator.toLowerCase() : null;
+                        let createdAtTx =(assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
+
                         let isEnumerable = (assetInfo.isEnumerable) ? 1 : 0
                         let isMetadataSupported = (assetInfo.isMetadataSupported) ? 1 : 0
                         let metadata = assetInfo.metadata
@@ -2396,9 +2407,9 @@ module.exports = class Indexer extends AssetManager {
                         // sql will continue using contract address as asset key
                         if (isMetadataSupported) {
                             //(asset, chainID, assetType, assetName, symbol, totalSupply, lastUpdateDT, lastUpdateBN, metadata, erc721isMetadata, erc721isEnumerable, tokenBaseURI, ipfsUrl, imageUrl, createDT, creator, createdAtTx)
-                            sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', ${mysql.escape(this.clip_string(metadata.name))}, ${mysql.escape(this.clip_string(metadata.symbol))}, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(JSON.stringify(metadata))},  '${isMetadataSupported}', '${isEnumerable}', '${baseURI}', '${ipfsUrl}', '${imageUrl}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                            sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', ${mysql.escape(this.clip_string(metadata.name))}, ${mysql.escape(this.clip_string(metadata.symbol))}, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${mysql.escape(JSON.stringify(metadata))},  '${isMetadataSupported}', '${isEnumerable}', '${baseURI}', '${ipfsUrl}', '${imageUrl}', ${createDTSql}, ${creatorSql}, ${createdAtTxSql})`;
                         } else {
-                            sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                            sql = `('${sqlAssetKey}', '${chainID}', '${assetInfo.tokenType}', Null, Null, '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', Null , '${isMetadataSupported}', '${isEnumerable}', ${mysql.escape(baseURI)}, ${mysql.escape(ipfsUrl)}, ${mysql.escape(imageUrl)}, ${createDTSql}, ${creatorSql}, ${createdAtTxSql} )`;
                         }
                         if (this.validAsset(sqlAssetKey, chainID, assetInfo.assetType, sql)) {
                             erc721classes.push(sql);
@@ -2438,9 +2449,12 @@ module.exports = class Indexer extends AssetManager {
                 //{"blockNumber":534657,"tokenAddress":"...","tokenType":"ERC20","name":"Stella LP","symbol":"STELLA LP","decimal":"18","totalSupply":142192.4834495356}
                 {
                     let assetKey = assetInfo.tokenAddress.toLowerCase();
-                    let creator = assetInfo.creator ? assetInfo.creator.toLowerCase() : "";
-                    let createdAtTx = assetInfo.createdAtTx ? assetInfo.createdAtTx : "";
-                    let o = `('${assetKey}', '${chainID}', '${assetInfo.assetType}', FROM_UNIXTIME('${ts}'), '${blockNumber}', FROM_UNIXTIME('${ts}'), '${creator}', '${createdAtTx}')`;
+                    let creatorSql = (assetInfo.creator != undefined) ? `'${assetInfo.creator.toLowerCase()}'` : 'NULL';
+                    let createdAtTxSql = (assetInfo.createdAtTx != undefined) ? `'${assetInfo.createdAtTx}'` : 'NULL';
+                    let createDTSql = (assetInfo.createTS != undefined) ? `FROM_UNIXTIME('${assetInfo.createTS}')` : 'NULL'
+                    let creator = (assetInfo.creator != undefined) ? assetInfo.creator.toLowerCase() : null;
+                    let createdAtTx =(assetInfo.createdAtTx != undefined) ? assetInfo.createdAtTx : null;
+                    let o = `('${assetKey}', '${chainID}', '${assetInfo.assetType}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${createDTSql}, ${creatorSql}, ${createdAtTxSql})`;
                     if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
                         contracts.push(o);
                     }
@@ -4801,6 +4815,7 @@ module.exports = class Indexer extends AssetManager {
         tokenInfo.creator = tx.from;
         tokenInfo.createdAtTx = tx.transactionHash;
         tokenInfo.assetType = assetType;
+        tokenInfo.createTS = tx.timestamp;
         if (this.tallyAsset[assetChain] == undefined) {
             this.tallyAsset[assetChain] = tokenInfo
             let contractAddress = tokenInfo.tokenAddress.toLowerCase()
