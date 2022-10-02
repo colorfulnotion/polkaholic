@@ -1579,12 +1579,6 @@ module.exports = class Indexer extends AssetManager {
                     "xcmtransfer": xcmtransfer
 
                 })
-            } else {
-                this.logger.info({
-                    "op": "updateXCMTransferStorage SUCC",
-                    "chainID": this.chainID,
-                    "xcmtransfer": xcmtransfer
-                })
             }
         } catch (err) {
             console.log(err);

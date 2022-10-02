@@ -931,13 +931,15 @@ module.exports = class ChainParser {
                     console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
                     if (candiateCnt == 0){
                         let lastEvent = eventRange[eventRange.length-1]
-                        let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, lastEvent, mpState, finalized)
-                        console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
-                        if (candidate) {
-                            candiateCnt++
-                            indexer.updateXCMTransferDestCandidate(candidate, caller)
-                        }
-                    }
+			if ( lastEvent ) {
+                            let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, lastEvent, mpState, finalized)
+                            console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
+                            if (candidate) {
+				candiateCnt++
+				indexer.updateXCMTransferDestCandidate(candidate, caller)
+                            }
+			}
+		    }
                 } else {
                     console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
                 }
@@ -1400,7 +1402,8 @@ module.exports = class ChainParser {
     }
 
     processIncomingAssetSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
-        let [pallet, method] = indexer.parseEventSectionMethod(e)
+
+	let [pallet, method] = indexer.parseEventSectionMethod(e)
         let palletMethod = `${pallet}(${method})` //event
         let candidate = false;
         let caller = false;
