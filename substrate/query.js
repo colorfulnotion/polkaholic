@@ -1678,11 +1678,6 @@ module.exports = class Query extends AssetManager {
             asset.id = id;
             asset.chainName = chainName;
             asset.iconUrl = chainInfo.iconUrl;
-            let p = await this.computePriceUSD({
-                asset: asset.asset,
-                chainID: asset.chainID
-            });
-            asset.priceUSD = p ? p.priceUSDCurrent : 0;
             return asset;
         } catch (err) {
             console.log(err);
@@ -1734,6 +1729,29 @@ module.exports = class Query extends AssetManager {
             });
         }
         return (assets);
+    }
+
+    async getAssetPriceUSDCurrentRouterAsset(asset, chainID) {
+        let sql = `select indexTS, assetpricelog.routerAssetChain, router.routerName, liquid, priceUSD from assetpricelog left join router on assetpricelog.routerAssetChain = router.routerAssetChain where asset = '${asset}' and chainID = '${chainID}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose 
+        let routerChainRecs = await this.poolREADONLY.query(sql)
+        let routerChains = {}
+        if (routerChainRecs.length > 0) {
+            for (const r of routerChainRecs) {
+                if (routerChains[r.routerAssetChain] == undefined || routerChains[r.routerAssetChain].indexTS < r.indexTS) {
+                    routerChains[r.routerAssetChain] = r;
+                }
+            }
+            let routerAssetChains = [];
+            for (const r of Object.keys(routerChains)) {
+                routerAssetChains.push(routerChains[r]);
+            }
+            // sort by liquid
+            routerAssetChains.sort(function(a, b) {
+                return a.liquid - b.liquid
+            });
+            return routerAssetChains;
+        }
+        return [];
     }
 
     async getSymbolPriceUSDCurrentRouterAsset(symbol, relayChain = null) {
@@ -1885,7 +1903,7 @@ module.exports = class Query extends AssetManager {
         return ([]);
     }
 
-    async getChainAssets(chainID_or_chainName = "all", address = false) {
+    async getChainAssets(chainID_or_chainName = "all", assetType = "Token") {
         var chainID = null,
             id = null,
             chain = {};
@@ -1897,12 +1915,6 @@ module.exports = class Query extends AssetManager {
             chain = await this.getChain(chainID)
         }
         let assets = [];
-        let holdings = null
-        try {
-            holdings = (this.validAddress(address)) ? await this.getRealtimeAsset(address) : false;
-        } catch (err) {
-            // its ok to have an miss here, no need to log it
-        }
 
         try {
             let w = "";
@@ -1916,8 +1928,17 @@ module.exports = class Query extends AssetManager {
             } else if (chainID > 2) {
                 w = `and asset.chainID = ${chainID}`
             }
+	    if ( assetType ) {
+		w += ` and asset.assetType = '${assetType}'`
+	    }
 
-            let sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w}  and assetType = 'Token' order by numHolders desc;`
+            let sql = null
+	    if ( assetType == "Token" ) {
+		sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w} order by numHolders desc;`
+	    } else { // ERC20, ERC20LP, Loan
+		sql = `select asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from asset where priceUSD > 0 ${w} order by numHolders desc;`
+	    }
+	    console.log(sql)
             assets = await this.poolREADONLY.query(sql);
             if (assets.length == 0) {
                 // TODO: throw NotFound error
@@ -1948,26 +1969,9 @@ module.exports = class Query extends AssetManager {
                         chainID: v.chainID,
                         chainName: v.chainName,
                         assetChain: assetChain,
-                        priceUSD: 0,
-                        tvlFree: 0
+                        priceUSD: v.priceUSD,
+                        tvlFree: v.totalSupply * v.priceUSD0
                     }
-                    let p = await this.computePriceUSD({
-                        asset: v.asset,
-                        chainID: v.chainID
-                    })
-                    a.priceUSD = p.priceUSDCurrent;
-                    let latestDexRec = await this.getDexRec(v.asset, v.chainID, ts);
-                    a.token0Supply = latestDexRec.lp0;
-                    a.token1Supply = latestDexRec.lp1;
-                    let priceUSD0 = await this.computePriceUSD({
-                        asset: v.token0,
-                        chainID: v.chainID
-                    });
-                    let priceUSD1 = await this.computePriceUSD({
-                        asset: v.token1,
-                        chainID: v.chainID
-                    });
-                    a.tvlFree = priceUSD0 * a.token0Supply + priceUSD1 * a.token1Supply;
                 } else {
                     //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
                     a = {
@@ -1984,7 +1988,7 @@ module.exports = class Query extends AssetManager {
                         localSymbol: v.localSymbol,
                         relayChain: v.relayChain,
                         assetChain: assetChain,
-                        priceUSD: 0,
+                        priceUSD: v.priceUSD,
                         totalFree: 0,
                         totalReserved: 0,
                         totalMiscFrozen: 0,
@@ -1994,12 +1998,6 @@ module.exports = class Query extends AssetManager {
                         tvlMiscFrozen: 0,
                         tvlFrozen: 0
                     }
-                    let p = await this.computePriceUSD({
-                        asset: v.asset,
-                        chainID: v.chainID,
-                        ts
-                    });
-                    a.priceUSD = p ? p.priceUSD : 0;
                     if (v.assetType == "ERC20") {
                         a.totalSupply = parseFloat(v.totalSupply)
                         a.tvlFree = a.priceUSD * a.totalSupply
@@ -2016,16 +2014,6 @@ module.exports = class Query extends AssetManager {
                     }
                 }
                 assets[i] = a
-                let assetType = (a.assetType) ? a.assetType : false;
-                if (holdings[assetType] !== undefined) {
-                    let h = holdings[assetType];
-                    for (let j = 0; j < h.length; j++) {
-                        let b = h[j];
-                        if ((b.assetInfo.asset == a.asset) && (b.assetInfo.chainID == a.chainID)) {
-                            a.accountState = b.state;
-                        }
-                    }
-                }
             }
         } catch (err) {
             console.log(err);

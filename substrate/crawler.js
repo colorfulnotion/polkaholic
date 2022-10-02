@@ -1261,7 +1261,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     // for any missing traces, this refetches the dataset
-    async crawlTraces(chainID, techniqueParams = ["mod", 0, 1], lookback = 1000) {
+    async crawlTraces(chainID, techniqueParams = ["mod", 0, 1], lookback = 7) {
         let chain = await this.setupChainAndAPI(chainID);
         await this.check_chain_endpoint_correctness(chain);
         let done = false;
@@ -1272,12 +1272,11 @@ module.exports = class Crawler extends Indexer {
             let startingBlock = parseInt(syncState.startingBlock.toString(), 10);
             console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
-            // blockDT >= date_sub(Now(), interval ${lookback} DAY)
-            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, attempted from block${chainID} where crawlTrace > 0 and length(blockHash) > 0  and attempted < ${maxTraceAttempts} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} order by crawlTrace desc,attempted, rand() limit 10000`
+            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, attempted from block${chainID} where crawlTrace = 1 and length(blockHash) > 0  and attempted < ${maxTraceAttempts} and blockDT >= date_sub(Now(), interval ${lookback} DAY) and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} limit 1000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
                 let endBN = techniqueParams[2];
-                sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, attempted from block${chainID} where crawlTrace > 0 and length(blockHash) > 0 and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < ${maxTraceAttempts} order by rand() limit 10000`
+                sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, attempted from block${chainID} where crawlTrace = 1 and length(blockHash) > 0 and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < ${maxTraceAttempts} order by rand() limit 1000`
             }
             console.log(sql);
             let tasks = await this.poolREADONLY.query(sql);

@@ -647,6 +647,153 @@ function showxcmassets(chainID) {
     loadData2(pathParams, tableName, true)
 }
 
+
+var initerc20assets = false;
+let erc20assetsTable = null;
+
+function showerc20assets(chainID) {
+    if (initerc20assets) return;
+    else initerc20assets = true;
+    let chainIDstr = (chainID == undefined) ? "all" : chainID.toString();
+    let pathParams = `chain/erc20/${chainIDstr}`
+    console.log(pathParams);
+    let tableName = '#tableerc20assets'
+    erc20assetsTable = $(tableName).DataTable({
+        order: [
+            [1, "desc"],
+            [6, "desc"],
+        ],
+        columnDefs: [{
+            "className": "dt-right",
+            "targets": [1, 3, 4, 5, 6]
+        }, {
+            "className": "dt-left",
+            "targets": [2]
+        }],
+        columns: [{
+            data: 'assetName',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.assetType == "ERC20LP") {
+                        return "x" // presentAssetPair(row.assetChain, row.symbol, row.token0, row.token1, row.token0Symbol, row.token1Symbol, chainID);
+                    } else if (row.assetType == "Loan") {
+                        return presentLoan(row.assetChain, row.asset);
+                    } else {
+			
+                        return `<A href="/asset/${row.chainID}/${row.asset}">${row.assetName}</A>`;
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'asset',
+            render: function(data, type, row, meta) {
+                if (row.asset != undefined) {
+                    try {
+                        let str = (row.localSymbol != undefined && row.localSymbol) ? row.localSymbol : "";
+                        let [accountState, balanceUSD] = get_accountState(row.asset, row.chainID, row.assetChain);
+                        if (!accountState) {
+                            if (type == 'display') {
+                                if (balanceUSD == null) {
+                                    return `-Connect Wallet [${str}]-`
+                                } else {
+                                    return "-";
+                                }
+                            } else {
+                                return 0;
+                            }
+                        } else if (accountState && accountState.free !== undefined) {
+                            if (type == 'display') {
+
+                                return presentTokenCount(accountState.free) + " " + str + " (" + currencyFormat(balanceUSD) + ")";
+                            } else {
+                                return balanceUSD + .000000001 * accountState.free;
+                            }
+                            return 0;
+                        } else {
+                            if (type == 'display') {
+                                return str;
+                            }
+                        }
+                        return 0;
+                    } catch (err) {
+                        console.log(err);
+                        return "-"
+                    }
+                }
+            }
+        }, {
+            data: 'chainID',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.chainID != undefined && row.currencyID != undefined) {
+
+                        let str = `${row.chainName} ${row.localSymbol}`;
+                        if (row.currencyID != row.localSymbol && row.currencyID != row.symbol) {
+                            str += ` (${row.currencyID})`
+                        }
+                        return `<a href='/asset/${row.chainID}/${row.currencyID}'>${str}</a>`
+                    } else {
+                        return "-";
+                        //return `<a href='/chain/${row.chainID}#xcmassets'>${row.chainName} ${row.symbol}</a>`
+                    }
+                } else {
+                    return row.assetName;
+                }
+                return data;
+            }
+        }, {
+            data: 'numHolders',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'priceUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'totalFree',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.totalFree !== undefined) {
+                        return presentTokenCount(data);
+                    }
+                }
+                if (row.totalFree !== undefined) {
+                    return data;
+                } else {
+                    return 0;
+                }
+            }
+        }, {
+            data: 'tvlFree',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.tvlFree != undefined) {
+                        return currencyFormat(data);
+                    }
+                } else {
+                    if (row.tvlFree != undefined) {
+                        return data;
+                    }
+                }
+                return 0;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, true)
+}
+
+
+
+
 function filterchains(relaychain = "all") {
     if (relaychain == "kusama" || relaychain == "polkadot") {
         console.log("filterchains", relaychain);

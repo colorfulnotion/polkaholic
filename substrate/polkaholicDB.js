@@ -691,7 +691,7 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async getContractABI() {
-        let contractabis = await this.poolREADONLY.query(`select signatureID, signature, abi, abiType, topicLength from contractabi order by numContracts desc`);
+        let contractabis = await this.poolREADONLY.query(`select signatureID, signature, abi, abiType, topicLength from contractabi`);
         let abis = {}
         for (const abi of contractabis) {
             let signatureID = abi.signatureID

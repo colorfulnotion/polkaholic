@@ -415,11 +415,18 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
 
 // Usage: https://api.polkaholic.io/chain/assets/10
 // Usage: https://api.polkaholic.io/chain/assets/acala
-app.get('/chain/assets/:chainID_or_chainName/:homePubkey?', async (req, res) => {
+app.get('/chain/:assetType/:chainID_or_chainName/:homePubkey?', async (req, res) => {
     try {
         let chainID_or_chainName = req.params["chainID_or_chainName"]
-        let homePubkey = req.params["homePubkey"];
-        let assets = await query.getChainAssets(chainID_or_chainName, homePubkey);
+        let assetType = req.params["assetType"];
+	if ( assetType == "assets" ) {
+	    assetType = "Token";
+	} else if ( assetType == "erc20" ) {
+	    assetType = "ERC20";
+	} else if ( assetType == "erc20lp" ) {
+	    assetType = "ERC20LP";
+	}
+        let assets = await query.getChainAssets(chainID_or_chainName, assetType);
         if (assets) {
             res.write(JSON.stringify(assets));
             await query.tallyAPIKey(getapikey(req));
@@ -467,6 +474,29 @@ app.get('/xcmassetlog/:chainID/:chainIDDest/:symbol?', async (req, res) => {
         } else {
             res.sendStatus(404);
         }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+// Usage: https://api.polkaholic.io/asset/pricefeed/DOT/polkadot
+app.get('/asset/pricelog/:asset/:chainID/:routerAssetChain?', async (req, res) => {
+    try {
+        let asset = req.params["asset"];
+        let chainID = req.params["chainID"];
+        let q = {
+            asset,
+            chainID
+        };
+        if (req.params["routerAssetChain"]) {
+            q.routerAssetChain = req.params["routerAssetChain"];
+        }
+        let balances = await query.getAssetPriceFeed(q);
+        res.write(JSON.stringify(balances));
+        await query.tallyAPIKey(getapikey(req));
+        res.end();
     } catch (err) {
         return res.status(400).json({
             error: err.toString()
