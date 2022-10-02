@@ -1972,10 +1972,8 @@ order by msgHash`
 	if ( forceRematch ) {
 	    console.log("FAILURE CASES ", t0, t1);
             await this.xcmtransfer_match_failure(t0, t1, .97, 7200, forceRematch);
-
-	    console.log("NORMAL CASES ", t0, t1);
-            let numRecs = 0, lastTS = 0;
-
+            console.log("NORMAL CASES ", t0, t1);
+                let numRecs = 0, lastTS = 0;
 	    await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
             return [0, 0];
 	} else {
