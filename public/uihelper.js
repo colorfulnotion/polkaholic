@@ -480,7 +480,8 @@ function presentAssetPair(row) {
     try {
         let asset0 = row.token0
         let asset1 = row.token1
-        let assetPair = `<a href='/token/${row.asset}/${row.chainID}'>${row.symbol}</a>`
+	let nm = row.chainName ? `${row.chainName} Pool` : `Pool`;
+        let assetPair = `<a href='/pool/${row.asset}/${row.chainID}'>${nm}</a>`
         return `${assetPair}: <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token0) + '">' + row.token0Symbol + `</a> / <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token1) + '">' + row.token1Symbol + '</a>';
     } catch (e) {
         console.log("presentAssetPair", row);
@@ -1179,6 +1180,12 @@ function setupcurrency() {
     } else {
         //console.log("no currency elements");
     }
+}
+
+function presentPercentage(val, decimals = 2) {
+    let value = val * 100
+    let n = Number(Math.round(value + 'e' + decimals) + 'e-' + decimals);
+    return `${n}%`
 }
 
 function parseErrorMsg(errorMsg) {

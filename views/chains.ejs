@@ -13,6 +13,8 @@ let tabs = [
 { title: "XCM Assets", target: "xcmassets", func: "showxcmassets" },
 { title: "XCM Transfers", target: "xcmtransfers", func: "showxcmtransfers" },
 { title: "XCM Messages", target: "xcmmessages", func: "showxcmmessages" },
+{ title: "Projects", target: "routers" },
+{ title: "Pools", target: "pools" },
 { title: "Top Accounts", target: "addresstopn", func: "showaddresstopn" }
 ];
 
@@ -103,7 +105,12 @@ for (let i=0; i<tabs.length; i++) {
       </thead>
     </table>
   </div>
-  <div class="tab-pane" id="addresstopn" role="tabpanel" aria-labelledby="addresstopn-tab">
+
+   <%- include("routerstab", {}) %>
+   <%- include("poolstab", {}) %>
+
+
+   <div class="tab-pane" id="addresstopn" role="tabpanel" aria-labelledby="addresstopn-tab">
     <select class="select" id="topN">
         <% for ( const f of topNfilters ) {
 	   let sel = ( f.filter == topN ) ? " SELECTED" : ""; %>

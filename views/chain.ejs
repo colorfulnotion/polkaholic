@@ -14,17 +14,22 @@
 <%
 let tabs = [
 { title: "Recent Blocks", target: "recentblocks" },
-{ title: "XCM Assets", target: "xcmassets", func: "showxcmassets" },
+{ title: "XCM Assets", target: "xcmassets" },
+//{ title: "Tokens", target: "tokens" },
 { title: "XCM Transfers", target: "xcmtransfers" },
 { title: "XCM Messages", target: "xcmmessages" },
+{ title: "Projects", target: "routers" },
+{ title: "Pools", target: "pools" },
 { title: "Daily Log", target: "chainlog" },
 { title: "Spec Versions", target: "specversions" },
 { title: "Chain Info", target: "chaininfo" }
 ];
+
 if ( chain.isWASM ) {
   tabs.splice(1, 0, { title: "Contracts", target: "wasmcontracts", func: "showwasmcontracts" });
   tabs.splice(2, 0, { title: "Code", target: "wasmcode", func: "showwasmcode" });
 }
+
 if ( chain.chainID > 2 ) {
   tabs.splice(4, 0, { title: "Channels", target: "channels" });
 }
@@ -155,6 +160,11 @@ for (let i=0; i<tabs.length; i++) {
   </thead>
 </table>
 </div>
+
+ <%- include("tokenstab", {}) %>
+ <%- include("routerstab", {}) %>
+ <%- include("poolstab", {}) %>
+
 
 <div class="tab-pane" id="chainpending" role="tabpanel" aria-labelledby="chainpending-tab">
   <table>

@@ -36,6 +36,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     // TODO:fuse these together
     xcmSymbolInfo = {}; // symbolRelayChain ->
     symbolRelayChainAsset = {}; // symbolRelayChain -> { ${chainID}: assetInfo }
+    xcContractAddress = {};
     assetlog = {};
     ratelog = {};
     routers = {};
@@ -110,10 +111,10 @@ module.exports = class AssetManager extends PolkaholicDB {
     // reads all the decimals from the chain table and then the asset mysql table
     async init_chainInfos() {
         //TODO: adjust getSystemProperties to handle case where chain that does not have a "asset" specified (or use left join here) will get one
-        var chains = await this.poolREADONLY.query(`select id, chain.chainID, chain.chainName, relayChain, paraID, ss58Format, isEVM, chain.iconUrl,
-asset.asset, asset.symbol, asset.decimals, asset.priceUSD, asset.priceUSDPercentChange,
+        var chains = await this.poolREADONLY.query(`select id, chain.chainID, chain.chainName, chain.relayChain, paraID, ss58Format, isEVM, chain.iconUrl,
+xcmasset.symbol, xcmasset.decimals, xcmasset.priceUSD, xcmasset.priceUSDPercentChange,
 githubURL, subscanURL, parachainsURL, dappURL, WSEndpoint
-from chain left join asset on chain.chainID = asset.chainID and chain.asset = asset.asset where ( crawling = 1 or paraID > 0 and id is not null);`);
+from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling = 1 or paraID > 0 and id is not null);`);
         var specVersions = await this.poolREADONLY.query(`select chainID, blockNumber, specVersion from specVersions order by chainID, blockNumber`);
         var assets = await this.poolREADONLY.query(`select asset, chainID, symbol, decimals from asset where decimals is not Null and asset not like '0x%' `);
         // +---------+-----------------------+---------------+-----------------------+----------+-------+----------+-----------------------+
@@ -550,11 +551,12 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
     }
 
     async init_asset_info() {
-        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.totalSupply, asset.asset, asset.symbol, asset.xcmInteriorKey, xcmasset.symbol as xcmasset_symbol, xcmasset.relayChain as xcmasset_relayChain, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.id, chain.chainName, asset.isUSD, asset.priceUSD, asset.priceUSDPercentChange,  asset.nativeAssetChain, currencyID, xcContractAddress, from_unixtime(createDT) as createTS from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow') order by chainID, assetType, asset");
+        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.totalSupply, asset.asset, asset.symbol, asset.xcmInteriorKey, xcmasset.symbol as xcmasset_symbol, xcmasset.relayChain as xcmasset_relayChain, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.id, chain.chainName, asset.isUSD, asset.priceUSD, asset.priceUSDPercentChange,  asset.nativeAssetChain, currencyID, xcContractAddress, from_unixtime(createDT) as createTS from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow')");
 
         let nassets = 0;
         let assetInfo = {};
         let currencyIDInfo = {};
+	let xcContractAddress = {};
         let symbolRelayChainAsset = {};
         for (let i = 0; i < assetRecs.length; i++) {
             let v = assetRecs[i];
@@ -563,6 +565,10 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             let vAsset = paraTool.VSTokenToToken(v.asset)
             let assetChain = paraTool.makeAssetChain(vAsset, v.chainID);
             let priceUSDpaths = (v.priceUSDpaths) ? JSON.parse(v.priceUSDpaths.toString()) : false;
+	    if ( v.asset == '{"StableAssetPoolToken":"0"}' ) {
+		v.assetType = 'LiquidityPair';
+	    }
+
             if (v.assetType == 'LiquidityPair' || v.assetType == 'ERC20LP') { //'ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special'
                 a = {
                     assetType: v.assetType,
@@ -636,12 +642,13 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             if (v.xcContractAddress) {
                 let xcassetChain = paraTool.makeAssetChain(v.xcContractAddress, v.chainID);
                 assetInfo[xcassetChain] = a;
+                xcContractAddress[v.xcContractAddress] = a;
             }
             nassets++;
         }
         this.assetInfo = assetInfo;
         this.symbolRelayChainAsset = symbolRelayChainAsset;
-        //console.log(`this.assetInfo`, assetInfo)
+        this.xcContractAddress = xcContractAddress;
         this.currencyIDInfo = currencyIDInfo;
     }
     validXCMSymbol(symbol, chainID, ctx, o) {
@@ -816,24 +823,18 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             assetlog.assetType = "Token";
             assetlog.symbol = q.symbol;
             assetlog.isXCAsset = q.isXCAsset;
-        } else {
-            let assets = await this.poolREADONLY.query(`select assetName, symbol, assetType, xcmInteriorKey from asset where asset = '${asset}' and chainID = '${chainID}' limit 1`)
-            if (assets.length == 0) {
-                assetlog.expireTS = currentTS + 15; // short for now
-                this.assetlog[assetChain] = assetlog;
-                return (this.assetlog[assetChain]);
-            }
-            let a = assets[0];
+        } else if ( this.assetInfo[assetChain] ) {
+	    let a = this.assetInfo[assetChain];
             assetlog.assetType = a.assetType;
             assetlog.symbol = a.symbol;
             assetlog.isXCAsset = (a.xcmInteriorKey && a.xcmInteriorKey.length > 0)
         }
+
         let lookbackDays = 3650
         let liquidMax = 0.5 // e^.5 = 1.65
         if (assetlog.assetType == paraTool.assetTypeToken || assetlog.assetType == paraTool.assetTypeERC20) {
-            let sql = assetlog.isXCAsset ? `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from xcmassetpricelog where symbol = '${q.symbol}' and relayChain = '${q.relayChain}' and liquid < '${liquidMax}' order by indexTS;` : `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from assetpricelog where asset = '${q.asset}' and chainID = '${q.chainID}' and liquid < '${liquidMax}' order by indexTS;`
+            let sql = assetlog.isXCAsset ? `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from xcmassetpricelog where symbol = '${q.symbol}' and relayChain = '${q.relayChain}' and liquid < '${liquidMax}' order by indexTS;` : `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from assetpricelog where asset = '${asset}' and chainID = '${chainID}' and liquid < '${liquidMax}' order by indexTS;`
             let recs = await this.poolREADONLY.query(sql);
-
             assetlog.prices = [];
 
             // organize them by indexTS =>
@@ -862,6 +863,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                 return a.ts - b.ts;
             })
         }
+
         // Loans [Acala/Karura] and CDPSupply/CDPBorrw [Parallel/Heiko]
         if (assetlog.assetType == "Loan") {
             let ratelogRecs = await this.poolREADONLY.query(`select assetlog.indexTS, asset.decimals, assetlog.debitexchangerate from assetlog, asset
@@ -915,12 +917,9 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
         }
 
         if (assetlog.assetType == "LiquidityPair" || assetlog.assetType == "ERC20LP") {
-            let sql = `select assetlog.indexTS, assetlog.issuance, assetlog.lp0, assetlog.lp1, assetlog.close, asset.numHolders
-          from assetlog, asset
-          where assetlog.asset = asset.asset and assetlog.chainID = asset.chainID and
-            indexTS > UNIX_TIMESTAMP(DATE_SUB(Now(), interval 180 DAY)) and
-            asset.assetType in ('LiquidityPair', 'ERC20LP') and
-            asset.asset = '${assetlog.asset}' and asset.chainID = '${assetlog.chainID}'
+            let sql = `select assetlog.indexTS, assetlog.issuance, assetlog.lp0, assetlog.lp1, assetlog.close
+          from assetlog
+          where indexTS > UNIX_TIMESTAMP(DATE_SUB(Now(), interval 180 DAY)) and assetlog.asset = '${asset}' and assetlog.chainID = '${chainID}'
           order by indexTS`;
             let dexRecs = await this.poolREADONLY.query(sql);
             let prevIssuance = 0;
@@ -1140,6 +1139,7 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
                 return null;
                 break;
             case paraTool.assetTypeERC20LiquidityPair:
+        case paraTool.assetTypeLiquidityPair:  {
             /*
             	    if WGLMR is $2.13 and GLINT is $0.003049, how much is 1 WGLMR/GLINT
             total lp0(WGLMR): 267712
@@ -1151,52 +1151,32 @@ from chain left join asset on chain.chainID = asset.chainID and chain.asset = as
             ~= 0.09882078431 + 0.06813594087
             	    ~= 0.16695672518
             */
-            {
-                let dexRec = await this.getDexRec(q.asset, q.chainID, ts);
-                if (dexRec == undefined) {
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned assetChain=${assetChain}`);
-                    return [false, false, false];
-                }
-                let priceUSD0 = await this.getTokenPriceUSD(assetInfo.token0, q.chainID, ts);
-                let priceUSD1 = await this.getTokenPriceUSD(assetInfo.token1, q.chainID, ts);
-                let priceUSD0Current = await this.getTokenPriceUSD(assetInfo.token0, q.chainID);
-                let priceUSD1Current = await this.getTokenPriceUSD(assetInfo.token1, q.chainID);
-                let issuance = dexRec.issuance;
-                let x0 = dexRec.lp0 / issuance;
-                let x1 = dexRec.lp1 / issuance;
-                res.priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
-                res.priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
-                if (q.val) res.valUSD = q.val * res.priceUSD
-                return res
+            let dexRec = await this.getDexRec(q.asset, q.chainID, ts);
+            if (!dexRec) {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned`, q);
+                return null
             }
-            break;
-            case paraTool.assetTypeLiquidityPair: {
-                let dexRec = await this.getDexRec(q.asset, q.chainID, ts);
-                if (!dexRec) {
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned`, q);
-                    return null
-                }
-
-                let priceUSD0 = await this.getTokenPriceUSD(assetInfo.token0, chainID, ts);
-                let priceUSD1 = await this.getTokenPriceUSD(assetInfo.token1, chainID, ts);
-                // special cases
-                if (priceUSD0 == 1 && (priceUSD1 == 0)) {
-                    priceUSD1 = dexRec.lp0 / dexRec.lp1;
-                }
-                if (priceUSD0 == 0 && (priceUSD1 == 1)) {
-                    priceUSD0 = dexRec.lp1 / dexRec.lp0;
-                }
-
-                let priceUSD0Current = await this.getTokenPriceUSD(assetInfo.token0, chainID);
-                let priceUSD1Current = await this.getTokenPriceUSD(assetInfo.token1, chainID);
-                let issuance = dexRec.issuance;
-                let x0 = dexRec.lp0 / issuance;
-                let x1 = dexRec.lp1 / issuance;
-                let priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
-                let priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
-                if (q.val) res.valUSD = q.val * priceUSD
+	    console.log("DEXREC", dexRec);
+	    
+            let p0 = await this.getTokenPriceUSD(assetInfo.token0, q.chainID, ts);
+            let p1 = await this.getTokenPriceUSD(assetInfo.token1, q.chainID, ts);
+	    if ( p0 && p1 ) {
+		let priceUSD1 =  (p0.priceUSD == 1 && (p1.priceUSD == 0)) ? dexRec.lp0 / dexRec.lp1 : p1.priceUSD;
+		let priceUSD0 =  (p0.priceUSD == 0 && (p1.priceUSD == 1)) ? dexRec.lp1 / dexRec.lp0 : p0.priceUSD;
+		let priceUSD1Current = (p0.priceUSDCurrent == 1 && (p1.priceUSDCurrent == 0)) ? dexRec.lp0 / dexRec.lp1 : p1.priceUSDCurrent;
+		let priceUSD0Current = (p0.priceUSDCurrent == 0 && (p1.priceUSDCurrent == 1)) ? dexRec.lp1 / dexRec.lp0 : p0.priceUSDCurrent;
+		let issuance = dexRec.issuance;
+		let x0 = dexRec.lp0 / issuance;
+		let x1 = dexRec.lp1 / issuance;
+		res.priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
+		//console.log("ts", ts, "x0", x0, "x1", x1, "p0", priceUSD0, "p1", priceUSD1, "RES", res.priceUSD);
+		res.priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
+		if (q.val) res.valUSD = q.val * res.priceUSD
                 return res
-            }
+            } else {
+		return null;
+	    }
+	}
             break;
             case paraTool.assetTypeLoan: {
                 let parsedAsset = JSON.parse(q.asset);
