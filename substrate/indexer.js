@@ -4534,7 +4534,7 @@ module.exports = class Indexer extends AssetManager {
                     // check if fallback is required
                     let fallbackRequired = false
                     for (const xcm of rExtrinsic.xcms) {
-                        if (xcm.destAddress == undefined) {
+                        if (xcm.destAddress == undefined || xcm.destAddress == false) {
                             if (xcm.msgHash != undefined) {
                                 let beneficiary = this.getBeneficiaryFromMsgHash(xcm.msgHash)
                                 if (beneficiary) {

@@ -1444,7 +1444,6 @@ module.exports = class ChainParser {
         //same as dest.v0.x1, dest.v1.interior.x1
         let paraIDDest = 0
         let chainIDDest = -1
-        let destAddress = null
         if (v0x1.parachain !== undefined) {
             //{ parachain: 2001 }
             paraIDDest = v0x1.parachain
@@ -1470,7 +1469,6 @@ module.exports = class ChainParser {
         //0x98324306c4ae1a6ecb9ab3798ba3a300e5a7cdef377fccb9ee716209d4c16891
         let paraIDDest = -1
         let chainIDDest = -1
-        let destAddress = null
         let relayChainID = paraTool.getRelayChainID(relayChain)
         let paraIDExtra = paraTool.getParaIDExtra(relayChain)
         if (Array.isArray(v0x2)) {
@@ -1497,23 +1495,37 @@ module.exports = class ChainParser {
         return [paraIDDest, chainIDDest]
     }
 
+    //{"parachain": 2000}
     processX1(x1, relayChain, decorate = false, indexer = false) {
         //same as beneficiary.v0.x1, dest.v1.interior.x1
         let paraIDDest = 0
         let chainIDDest = -1
-        let destAddress = null
+        let destAddress = false
         let relayChainID = paraTool.getRelayChainID(relayChain)
         let paraIDExtra = paraTool.getParaIDExtra(relayChain)
         chainIDDest = relayChainID
-        destAddress = this.processAccountKey(x1, decorate, indexer)
-        return [paraIDDest, chainIDDest, destAddress]
+        let targetdestAddress = this.processAccountKey(x1, decorate, indexer)
+        if (targetdestAddress) destAddress = targetdestAddress
+        if (x1 != undefined && x1.parachain != undefined){
+            paraIDDest = x1.parachain
+            chainIDDest = paraIDDest + paraIDExtra
+        }
+        let destObj = {
+            paraIDDest: 0,
+            chainIDDest: -1,
+            destAddress: false,
+        }
+        destObj.paraIDDest = paraIDDest
+        destObj.chainIDDest = chainIDDest
+        destObj.destAddress = destAddress
+        return [paraIDDest, chainIDDest, destAddress, destObj]
     }
 
     processX2(x2, relayChain, decorate = false, indexer = false) {
         //dest.v1.interior.x2
         let paraIDDest = -1
         let chainIDDest = -1
-        let destAddress = null
+        let destAddress = false
         let relayChainID = paraTool.getRelayChainID(relayChain)
         let paraIDExtra = paraTool.getParaIDExtra(relayChain)
         if (Array.isArray(x2)) {
@@ -1558,7 +1570,7 @@ module.exports = class ChainParser {
     */
         let paraIDDest = -1
         let chainIDDest = -1
-        let destAddress = null
+        let destAddress = false
         let relayChainID = paraTool.getRelayChainID(relayChain)
         let paraIDExtra = paraTool.getParaIDExtra(relayChain)
 
@@ -1584,7 +1596,7 @@ module.exports = class ChainParser {
     }
 
     processAccountKey(accKey, decorate = false, indexer = false) {
-        let destAddress = null
+        let destAddress = false
         if (accKey.accountId32 != undefined && accKey.accountId32.id != undefined) {
             destAddress = paraTool.getPubKey(accKey.accountId32.id);
             if (decorate && indexer) {
@@ -1794,43 +1806,61 @@ module.exports = class ChainParser {
     processDest(dest, relayChain) {
         let paraIDDest = -1;
         let chainIDDest = -1;
-        let destAddress = null;
+        let destAddress = false;
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest`, JSON.stringify(dest,null,4))
         if (dest.v1 !== undefined && dest.v1.interior !== undefined) {
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior`)
             let destV1Interior = dest.v1.interior;
             // dest for relaychain
             if (destV1Interior.x1 !== undefined) {
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior x1`)
                 // {"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}
-                [paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
+                let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX1(destV1Interior.x1, relayChain)
+                return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             } else if (destV1Interior.x2 !== undefined) {
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior x2`)
                 // dest for parachain, add 20000 for kusama-relay
                 // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
-                [paraIDDest, chainIDDest, destAddress] = this.processX2(destV1Interior.x2, relayChain)
+                let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX2(destV1Interior.x2, relayChain)
+                return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             }
         } else if (dest.x2 != undefined) {
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest dest x2`)
             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
-            [paraIDDest, chainIDDest, destAddress] = this.processX2(dest.x2, relayChain)
+            let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX2(dest.x2, relayChain)
+            return [targetParaIDDest, targetChainIDDest, targetDestAddress]
         } else if (dest.x3 != undefined) {
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest dest x3`)
             //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
-            [paraIDDest, chainIDDest, destAddress] = this.processX3(dest.x3, relayChain)
+            let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX3(dest.x3, relayChain)
+            return [targetParaIDDest, targetChainIDDest, targetDestAddress]
         } else if (dest.interior !== undefined) {
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior`)
             let destInterior = dest.interior;
             // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
             if (destInterior.x1 !== undefined) {
-                [paraIDDest, chainIDDest, destAddress] = this.processX1(destInterior.x1, relayChain)
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior x1`, JSON.stringify(destInterior.x1, null, 4))
+                let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX1(destInterior.x1, relayChain)
+                return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             } else if (destInterior.x2 !== undefined) {
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior x2`)
                 // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
                 // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
-                [paraIDDest, chainIDDest, destAddress] = this.processX2(destInterior.x2, relayChain)
+                let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX2(destInterior.x2, relayChain)
+                return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             } else if (destInterior.x3 !== undefined) {
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior x3`)
                 // 0x4508d07a10c09203fd9c9687712e3654a409ee2c6d023255a673c98d9812ea23
                 // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
-                [paraIDDest, chainIDDest, destAddress] = this.processX3(destInterior.x3, relayChain)
+                let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX3(destInterior.x3, relayChain)
+                return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             } else {
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`Unknown dest.interior`, JSON.stringify(dest, null, 2))
             }
         } else {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`Unknown dest`, JSON.stringify(dest, null, 2))
         }
+        //console.log(`processDest paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
         return [paraIDDest, chainIDDest, destAddress]
     }
 
