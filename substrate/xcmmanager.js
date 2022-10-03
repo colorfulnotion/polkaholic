@@ -641,7 +641,7 @@ module.exports = class XCMManager extends Query {
         d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
         length(xcmtransfer.extrinsicID) > 0 and
         xcmtransfer.amountSent >= d.amountReceived and
-          d.amountReceived / xcmtransfer.amountSent > ${ratMin} and
+          ((d.amountReceived / xcmtransfer.amountSent > ${ratMin}) or (d.msgHash = xcmtransfer.msgHash)) and
           d.amountReceived / xcmtransfer.amountSent <= 1.0
           order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
