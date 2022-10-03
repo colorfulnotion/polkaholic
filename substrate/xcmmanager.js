@@ -641,8 +641,9 @@ module.exports = class XCMManager extends Query {
         d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
         length(xcmtransfer.extrinsicID) > 0 and
         xcmtransfer.amountSent >= d.amountReceived and
-          d.amountReceived / xcmtransfer.amountSent > ${ratMin} and 
-          d.amountReceived / xcmtransfer.amountSent <= 1.0 `
+          d.amountReceived / xcmtransfer.amountSent > ${ratMin} and
+          d.amountReceived / xcmtransfer.amountSent <= 1.0 
+          order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
         console.log(`match_xcm [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
@@ -1969,10 +1970,10 @@ order by msgHash`
 	if ( forceRematch ) {
 	    console.log("FAILURE CASES ", t0, t1);
             await this.xcmtransfer_match_failure(t0, t1, .97, 7200, forceRematch);
-	    
+
 	    console.log("NORMAL CASES ", t0, t1);
             let numRecs = 0, lastTS = 0;
-	    
+
 	    await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
             return [0, 0];
 	} else {
@@ -1982,18 +1983,18 @@ order by msgHash`
             let lastTS = await this.computeXCMFingerprints(t0, t1);
             // xcmmatch2_matcher computes assetsReceived by matching xcmmessages.beneficiaries(2) to xcmtransferdestcandidate
             await this.xcmmatch2_matcher(t0, t1, forceRematch, 120)
-	    
+
             // marks duplicates in xcmmessages
             await this.xcmmessages_dedup(t0, t1);
-	    
+
 	    console.log("FAILURE CASES ", t0, t1);
             await this.xcmtransfer_match_failure(t0, t1, .97, 7200, forceRematch);
-	    
+
 	    console.log("NORMAL CASES ", t0, t1);
 	    await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
 
             numRecs = await this.xcmmessages_match(t0, t1);
-	    
+
             await this.writeBTHashes_feedxcmmessages(t0, t1);
             return [numRecs, lastTS];
 	}
