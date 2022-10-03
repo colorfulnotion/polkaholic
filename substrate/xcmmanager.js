@@ -2026,7 +2026,7 @@ order by msgHash`
                 timestamp: s.sourceTS * 1000
             };
             let msgHashRec = {
-                key: msgHash,
+                key: s.msgHash,
                 data: {},
             }
             msgHashRec.data["feedxcmmessages"] = hashrec
