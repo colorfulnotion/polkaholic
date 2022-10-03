@@ -4399,6 +4399,7 @@ module.exports = class ChainParser {
                 return xcmAssetSymbol
             } else {
                 //TODO: not found case
+                console.log(`processXcmDecHexCurrencyID assetID=${assetID}, rawAssetID=${rawAssetID}, parsedAsset=${parsedAsset}, assetInfo`, assetInfo)
             }
         }
         return assetString

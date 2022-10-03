@@ -613,6 +613,7 @@ module.exports = class XCMManager extends Query {
         let sqlA = `select
           chainID, extrinsicHash, d.chainIDDest, d.fromAddress, d.symbol, d.relayChain,
           (d.destts - xcmtransfer.sourceTS) as diffTS,
+          (d.sentAt - xcmtransfer.sentAt) as diffAT,
           xcmtransfer.extrinsicID,
           xcmtransfer.amountSent,
           xcmtransfer.transferIndex,
@@ -625,6 +626,7 @@ module.exports = class XCMManager extends Query {
           xcmtransfer.sectionMethod,
           d.eventID,
           d.extrinsicID as destExtrinsicID,
+          d.sentAt as destSentAt,
           d.blockNumberDest,
           d.amountReceived,
           d.destTS,
@@ -641,7 +643,7 @@ module.exports = class XCMManager extends Query {
         d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
         length(xcmtransfer.extrinsicID) > 0 and
         xcmtransfer.amountSent >= d.amountReceived and
-          ((d.amountReceived / xcmtransfer.amountSent > ${ratMin}) or (d.msgHash = xcmtransfer.msgHash)) and
+          ((d.amountReceived / xcmtransfer.amountSent > ${ratMin}) or (d.msgHash = xcmtransfer.msgHash and length(d.msgHash) = 66 and d.sentAt - xcmtransfer.sentAt >=0 and d.sentAt - xcmtransfer.sentAt <= 5) ) and
           d.amountReceived / xcmtransfer.amountSent <= 1.0
           order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
