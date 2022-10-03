@@ -642,7 +642,7 @@ module.exports = class XCMManager extends Query {
         length(xcmtransfer.extrinsicID) > 0 and
         xcmtransfer.amountSent >= d.amountReceived and
           d.amountReceived / xcmtransfer.amountSent > ${ratMin} and
-          d.amountReceived / xcmtransfer.amountSent <= 1.0 
+          d.amountReceived / xcmtransfer.amountSent <= 1.0
           order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
@@ -2013,7 +2013,7 @@ order by msgHash`
     async writeBTHashes_feedxcmmessages(startTS, endTS = null) {
         // write to hashes bigtable
         let sql = `select msgHash, chainID, chainIDDest, msgType, msgStr, relayChain, version, path, executedEventID, destStatus, errorDesc, extrinsicHash, extrinsicID, sectionMethod, assetChains,
-      parentMsgHash, parentSentAt, parentBlockNumber, childMsgHash, childSentAt, childBlocknumber, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, descBlocknumber, beneficiaries, assetsReceived, amountReceivedUSD
+      parentMsgHash, parentSentAt, parentBlockNumber, childMsgHash, childSentAt, childBlocknumber, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, beneficiaries, assetsReceived, amountReceivedUSD
       from xcmmessages where blockTS >= ${startTS} and blockTS <= ${endTS} and matched = 1 limit 1`
         let hashesRowsToInsert = [];
         let messages = await this.poolREADONLY.query(sql)
