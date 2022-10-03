@@ -2561,6 +2561,15 @@ module.exports = class ChainParser {
                     beneficiary[beneficiaryType] = beneficiaryV
                 }
                 break;
+            case 'x3':
+                [paraIDDest, chainIDDest, destAddress] = this.processX3(beneficiaryV, relayChain, true, indexer)
+                console.log(`x3!!!! paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`, JSON.stringify(beneficiaryV, null, 4))
+                if (isInterior) {
+                    beneficiary['interior'][beneficiaryType] = beneficiaryV
+                } else {
+                    beneficiary[beneficiaryType] = beneficiaryV
+                }
+                break;
             case 'v0':
                 let beneficiaryV0XType = Object.keys(beneficiaryV)[0]
                 let beneficiaryV0V = Object.keys(beneficiaryV0XType)[0]
