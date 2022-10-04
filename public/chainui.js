@@ -38,7 +38,7 @@ async function showxcmmessages(filter = {}) {
                     orthogonal: 'export'
                 }
             }],
-            pageLength: 25,
+            pageLength: 50,
             lengthMenu: [
                 [10, 25, 50, 100],
                 [10, 25, 50, 100]
@@ -293,7 +293,7 @@ async function showxcmtransfers(filter = {}) {
                     orthogonal: 'export'
                 }
             }],
-            pageLength: 25,
+            pageLength: 50,
             lengthMenu: [
                 [10, 25, 50, 100],
                 [10, 25, 50, 100]
