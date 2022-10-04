@@ -417,9 +417,10 @@ async function showxcmtransfers(filter = {}) {
                             if (unk) {
                                 console.log(row.xcmInfo);
                             }
-                            if (row.chainIDDest != undefined && row.chainDestName) {
-
+                            if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest != undefined) {
                                 return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest) + "<BR>" + str;
+                            } else if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest == undefined){
+                                return `${row.chainDestName}` + "<BR>" + str;
                             } else {
                                 return "-"
                             }
