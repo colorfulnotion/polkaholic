@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Usage:  xcmmatch [lookbackDays] [rematch]
+// Usage:  xcmperiod [forceRematch(Default true)] [chainID(default 'all')] [logDT] [hrs]
 var XCMManager = require("./xcmmanager");
 var paraTool = require("./paraTool");
 
 async function main() {
-    let chainID = paraTool.chainIDMoonbeam;
+    let chainID = 'all';
 
     var manager = new XCMManager();
     manager.init_xcm_error_map();
@@ -18,24 +18,29 @@ async function main() {
     //manager.setDebugLevel(paraTool.debugInfo)
     //manager.setDebugLevel(paraTool.debugVerbose)
     //manager.setDebugLevel(paraTool.debugTracing)
-    let logDT = "2021-11-18";
-    let hrs = [10];
-    let write_bq_log = true;
+    let [logDT, hr] = paraTool.ts_to_logDT_hr(Math.floor(Date.now() / 1000) - 3600)
+    //let logDT = "2021-11-18";
+    let hrs = [hr];
+    let forceRematch = true;
 
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
-            chainID = val;
+            forceRematch = parseInt(val, 10);
         }
         if (index == 3 && val.length > 0) {
-            logDT = val;
+            chainID = val;
         }
         if (index == 4 && val.length > 0) {
+            logDT = val;
+        }
+        if (index == 5 && val.length > 0) {
             hrs = val.split(",").map(hr => parseInt(hr, 10));
         }
     });
 
     for (const hr of hrs) {
-        await manager.matchPeriod(chainID, logDT, hr, write_bq_log);
+        console.log(`xcmperiod forceRematch=${forceRematch}, chainID=${chainID}, [${logDT} ${hr}]`)
+        await manager.matchPeriod(forceRematch, chainID, logDT, hr);
     }
 }
 
