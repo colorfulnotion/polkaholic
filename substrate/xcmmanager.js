@@ -675,7 +675,7 @@ module.exports = class XCMManager extends Query {
                 //console.log("[Empty] match_xcm", sqlA)
             }
             for (let i = 0; i < xcmmatches.length; i++) {
-		console.log("i", i);
+                console.log("i", i);
                 let d = xcmmatches[i];
                 if (matched[d.extrinsicHash] == undefined && matched[d.eventID] == undefined) {
                     let priceUSD = 0;
@@ -756,12 +756,12 @@ module.exports = class XCMManager extends Query {
                         destTS: d.destTS
                     }
                     let substrateTxHash = d.extrinsicHash
-		    let substratetx;
+                    let substratetx;
                     try {
-			substratetx = await this.getTransaction(substrateTxHash);
-		    } catch (err) {
-			console.log("looking for", substrateTxHash, err);
-		    }
+                        substratetx = await this.getTransaction(substrateTxHash);
+                    } catch (err) {
+                        console.log("looking for", substrateTxHash, err);
+                    }
                     let xcmInfo, xcmOld;
                     if (substratetx != undefined) {
                         [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
@@ -893,7 +893,7 @@ module.exports = class XCMManager extends Query {
         console.log("EXEC", paraTool.removeNewLine(sqlA))
         try {
             let xcmmatches = await this.poolREADONLY.query(sqlA);
-	    console.log("FIN", xcmmatches.length);
+            console.log("FIN", xcmmatches.length);
             let addressextrinsic = []
             let hashes = []
             let matched = {}
@@ -1980,16 +1980,17 @@ order by msgHash`
     }
 
     async xcmanalytics_period(chain, t0, t1 = null, forceRematch = false) {
-	if ( forceRematch ) {
-	    console.log("FAILURE CASES ", t0, t1);
+        if (forceRematch) {
+            console.log("FAILURE CASES ", t0, t1);
             await this.xcmtransfer_match_failure(t0, t1, .97, 7200, forceRematch);
 
-	    console.log("NORMAL CASES ", t0, t1);
-            let numRecs = 0, lastTS = 0;
+            console.log("NORMAL CASES ", t0, t1);
+            let numRecs = 0,
+                lastTS = 0;
 
-	    await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
+            await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
             return [0, 0];
-	} else {
+        } else {
             // xcmmessages_match matches incoming=0 and incoming=1 records
             let numRecs = await this.xcmmessages_match(t0, t1);
             // computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints}
@@ -2000,17 +2001,17 @@ order by msgHash`
             // marks duplicates in xcmmessages
             await this.xcmmessages_dedup(t0, t1);
 
-	    console.log("FAILURE CASES ", t0, t1);
+            console.log("FAILURE CASES ", t0, t1);
             await this.xcmtransfer_match_failure(t0, t1, .97, 7200, forceRematch);
 
-	    console.log("NORMAL CASES ", t0, t1);
-	    await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
+            console.log("NORMAL CASES ", t0, t1);
+            await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
 
             numRecs = await this.xcmmessages_match(t0, t1);
 
             await this.writeBTHashes_feedxcmmessages(t0, t1);
             return [numRecs, lastTS];
-	}
+        }
     }
 
     async xcmanalytics(chain, lookbackDays, forceRematch = false) {
