@@ -679,7 +679,7 @@ function showtokens(chainID) {
                     } else if (row.assetType == "Loan") {
                         return presentLoan(row.assetChain, row.asset);
                     } else {
-			
+
                         return `<A href="/asset/${row.chainID}/${row.asset}">${row.assetName}</A>`;
                     }
                 }

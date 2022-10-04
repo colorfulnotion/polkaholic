@@ -611,6 +611,10 @@ function showchaintab(hash) {
             showxcmassets(id);
             setupapidocs("chain", "assets", `${id}`);
             break;
+        case "#erc20assets":
+            showerc20assets(id);
+            setupapidocs("chain", "erc20", `${id}`);
+            break;
         case "#xcmtransfers":
             showxcmtransfers({
                 chainID: id

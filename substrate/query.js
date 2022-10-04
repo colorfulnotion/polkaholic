@@ -1732,7 +1732,7 @@ module.exports = class Query extends AssetManager {
     }
 
     async getAssetPriceUSDCurrentRouterAsset(asset, chainID) {
-        let sql = `select indexTS, assetpricelog.routerAssetChain, router.routerName, liquid, priceUSD from assetpricelog left join router on assetpricelog.routerAssetChain = router.routerAssetChain where assetpricelog.asset = '${asset}' and assetpricelog.chainID = '${chainID}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose 
+        let sql = `select indexTS, assetpricelog.routerAssetChain, router.routerName, liquid, priceUSD from assetpricelog left join router on assetpricelog.routerAssetChain = router.routerAssetChain where assetpricelog.asset = '${asset}' and assetpricelog.chainID = '${chainID}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose
         let routerChainRecs = await this.poolREADONLY.query(sql)
         let routerChains = {}
         if (routerChainRecs.length > 0) {
@@ -1755,7 +1755,7 @@ module.exports = class Query extends AssetManager {
     }
 
     async getSymbolPriceUSDCurrentRouterAsset(symbol, relayChain = null) {
-        let sql = `select indexTS, xcmassetpricelog.routerAssetChain, router.routerName, liquid, priceUSD from xcmassetpricelog left join router on xcmassetpricelog.routerAssetChain = router.routerAssetChain where symbol = '${symbol}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose 
+        let sql = `select indexTS, xcmassetpricelog.routerAssetChain, router.routerName, liquid, priceUSD from xcmassetpricelog left join router on xcmassetpricelog.routerAssetChain = router.routerAssetChain where symbol = '${symbol}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose
         let routerChainRecs = await this.poolREADONLY.query(sql)
         let routerChains = {}
         if (routerChainRecs.length > 0) {
@@ -3688,7 +3688,7 @@ module.exports = class Query extends AssetManager {
                     filter
 		});
             } catch (err) {
-		
+
             }
             let rowData = row.data;
             [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
@@ -6887,7 +6887,7 @@ module.exports = class Query extends AssetManager {
 	[router.asset, router.chainID] = paraTool.parseAssetChain(router.routerAssetChain);
 	let [chainID, id] = this.convertChainID(router.chainID);
 	router.id = id;
-	router.chainName = this.getChainName(chainID)	
+	router.chainName = this.getChainName(chainID)
 	return router;
     }
 
@@ -6908,7 +6908,7 @@ module.exports = class Query extends AssetManager {
 	}
 	return out;
     }
-        
+
     async getRouters(q, limit = 100)  {
 	let w = [];
 	if ( q.chainfilters ) {
@@ -6930,7 +6930,7 @@ module.exports = class Query extends AssetManager {
 
 	return routers;
     }
-    
+
     async getPool(asset, chainID) {
 	let sql = `select asset, chainID, assetName, token0, token1, token0Symbol, token1Symbol, symbol, decimals, priceUSD, totalFree, totalReserved, apy1d, apy7d, apy30d, feesUSD1d, feesUSD7d, feesUSD30d from asset where asset = '${asset}' and chainID = '${chainID}'`
 	let pools = await this.poolREADONLY.query(sql)
@@ -6985,7 +6985,7 @@ module.exports = class Query extends AssetManager {
 	}
 	return h;
     }
-    
+
     async getPools(q) {
         try {
 	    console.log("getPools", q);

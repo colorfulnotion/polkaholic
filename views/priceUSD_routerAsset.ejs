@@ -33,7 +33,7 @@ for ( const p of priceUSD_routerAsset ) {
       <td>
 <% if ( p.liquid < 0.1 ) { %>
    <button type="button" class="btn btn-success">High</button>
-<% } else if ( p.liquid < 1.0 ) { %>  
+<% } else if ( p.liquid < 1.0 ) { %>
    <button type="button" class="btn btn-warning">Low</button>
 <% } else { %>
    <button type="button" class="btn btn-danger">NOT LIQUID</button>
@@ -48,7 +48,7 @@ for ( const p of priceUSD_routerAsset ) {
   <div class="col-md-6">
    <div id="container" style="width: 100%"></div>
   </div>
-  
+
 </div>
 <% } %>
 <script>
