@@ -17,6 +17,17 @@ module.exports = class XCMManager extends Query {
         this.loadXCMErrorDescription()
     }
 
+    setDebugLevel(debugLevel = paraTool.debugInfo) {
+        this.debugLevel = debugLevel
+    }
+
+    async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
+        let chain = await this.getChain(chainID, withSpecVersions);
+        await this.setupAPI(chain, backfill);
+        this.relayChain = chain.relayChain;
+        return (chain);
+    }
+
     // generates xcmmessagelog, xcmassetlog, and tallies activity in last 24h/7d/30 in channel, xcmasset
     async update_xcmlogs(lookbackDays = 1) {
         // tally all the symbols
@@ -2040,12 +2051,18 @@ order by msgHash`
     }
 
     async matchPeriod(chainID, logDT, hr, write_bq_log = false) {
+        console.log(`matchPeriod chainID=${logDT} hr=${hr}`)
         let indexTSPeriod = paraTool.logDT_hr_to_ts(logDT, hr);
         var sql = `select floor(UNIX_TIMESTAMP(blockDT)/3600)*3600 as indexTS, min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT >= FROM_UNIXTIME(${indexTSPeriod}) and blockDT < FROM_UNIXTIME(${indexTSPeriod+3600}) group by indexTS order by indexTS;`
         var periods = await this.poolREADONLY.query(sql);
+        console.log(sql)
+        console.log(`periods`, periods)
+
+        //console.log(`matchPeriod chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end}), indexTS=${indexTS} [${logDT} ${hr}]`)
+        console.log(`matchPeriod chainID=${chainID} [${logDT} ${hr}]`)
 
         let chain = await this.setupChainAndAPI(chainID);
-        console.log(chain);
+        //console.log(chain);
 
         let indexPeriodProcessedCnt = 0
         for (let i = 0; i < periods.length; i++) {
