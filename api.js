@@ -413,14 +413,25 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
     }
 })
 
-// Usage: https://api.polkaholic.io/chain/assets/10
-// Usage: https://api.polkaholic.io/chain/assets/acala
-app.get('/chain/assets/:chainID_or_chainName/:homePubkey?', async (req, res) => {
+// Usage: https://api.polkaholic.io/chain/tokens/2004
+// Usage: https://api.polkaholic.io/chain/routers/2004
+// Usage: https://api.polkaholic.io/chain/pools/2004
+app.get('/chain/:assetType/:chainID_or_chainName?', async (req, res) => {
     try {
-        let chainID_or_chainName = req.params["chainID_or_chainName"]
-        let homePubkey = req.params["homePubkey"];
-        let assets = await query.getChainAssets(chainID_or_chainName, homePubkey);
-        if (assets) {
+        let chainID_or_chainName = req.params["chainID_or_chainName"] ? req.params["chainID_or_chainName"]  : null
+        let assetType = req.params["assetType"];
+        let assets = null;
+	if ( assetType == "pools" ) {
+	    assets = await query.getPools({chainfilters: [chainID_or_chainName]});
+	} else if ( assetType == "routers" ) {
+	    assets = await query.getRouters({chainfilters: [chainID_or_chainName]});
+	} else if ( assetType == "channels" ) {
+	    assets =await query.getChainChannels(chainID_or_chainName);
+	} else {
+	    assets = await query.getChainAssets(chainID_or_chainName, "Token");
+	}
+
+	if (assets) {
             res.write(JSON.stringify(assets));
             await query.tallyAPIKey(getapikey(req));
             res.end();
@@ -434,14 +445,19 @@ app.get('/chain/assets/:chainID_or_chainName/:homePubkey?', async (req, res) => 
     }
 })
 
-// Usage: https://api.polkaholic.io/chain/channels/10
-// Usage: https://api.polkaholic.io/chain/channels/acala
-app.get('/chain/channels/:chainID_or_chainName/:homePubkey?', async (req, res) => {
+// Usage: https://api.polkaholic.io/pools/router/0x70085a09d30d6f8c4ecf6ee10120d1847383bb57~2004
+app.get('/pools/:assetType/:routerAssetChain', async (req, res) => {
     try {
-        let chainID_or_chainName = req.params["chainID_or_chainName"]
-        let channels = await query.getChainChannels(chainID_or_chainName);
-        if (channels) {
-            res.write(JSON.stringify(channels));
+        let routerAssetChain = req.params["routerAssetChain"] ? req.params["routerAssetChain"]  : null
+        let assetType = req.params["assetType"];
+        let pools = null;
+	if ( assetType == "router" ) {
+	    pools = await query.getPools({routerAssetChain});
+	} else {
+	    pools = await query.getPools({});
+	}
+        if (pools) {
+            res.write(JSON.stringify(pools));
             await query.tallyAPIKey(getapikey(req));
             res.end();
         } else {
@@ -467,6 +483,29 @@ app.get('/xcmassetlog/:chainID/:chainIDDest/:symbol?', async (req, res) => {
         } else {
             res.sendStatus(404);
         }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+// Usage: https://api.polkaholic.io/asset/pricefeed/DOT/polkadot
+app.get('/asset/pricelog/:asset/:chainID/:routerAssetChain?', async (req, res) => {
+    try {
+        let asset = req.params["asset"];
+        let chainID = req.params["chainID"];
+        let q = {
+            asset,
+            chainID
+        };
+        if (req.params["routerAssetChain"]) {
+            q.routerAssetChain = req.params["routerAssetChain"];
+        }
+        let balances = await query.getAssetPriceFeed(q);
+        res.write(JSON.stringify(balances));
+        await query.tallyAPIKey(getapikey(req));
+        res.end();
     } catch (err) {
         return res.status(400).json({
             error: err.toString()

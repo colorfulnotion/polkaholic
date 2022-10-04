@@ -330,6 +330,14 @@ function showchainstab(hash) {
             setupapidocs("chains", "list");
             showxcmassets(null);
             break;
+        case "#routers":
+            setupapidocs("routers", "list");
+            showrouters(null);
+            break;
+        case "#pools":
+            setupapidocs("pools", "list");
+        showpools("all", "chain");
+            break;
         case "#xcmtransfers":
             setupapidocs("xcmtransfers");
             showxcmtransfers();

@@ -8,6 +8,12 @@
   </ol>
 </nav>
 
+<script src="https://code.highcharts.com/stock/highstock.js"></script>
+<script src="https://code.highcharts.com/stock/modules/data.js"></script>
+<script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
+<script src="https://code.highcharts.com/stock/modules/export-data.js"></script>
+<%- include("priceUSD_routerAsset", { priceUSD_routerAsset, asset } ); %>
+
 <table class="table table-hover table-bordered">
   <tbody>
   <% if ( asset.currencyID ) { %>
@@ -33,7 +39,13 @@
 
     <tr>
       <td>Symbol</td>
-      <td><a href="/symbol/<%= asset.symbol %>"><%= asset.symbol %></a></td>
+      <td>
+      <% if ( asset.symbol ) { %>
+      <a href="/symbol/<%= asset.symbol %>"><%= asset.symbol %></a>
+      <% } else if ( asset.localSymbol ) { %>
+      <%= asset.localSymbol %>
+      <% } %>
+      </td>
     </tr>
 
     <tr>
@@ -53,6 +65,7 @@
     </tr>
 <% } %>
 </table>
+
 
 <div class="row">
 <%
@@ -95,7 +108,6 @@ if ( a.assetType == "ERC20LP" || a.assetType == "LiquidityPair" ) {
 let tabs = [
   { title: "Your Holdings", target: "accountassets" },
   { title: "Liquidity Pairs", target: "assetsrelated" },
-  { title: "Price History", target: "assethistory" },
   { title: "Top 1K Holders", target: "assetholders" }
 ];
 for (let i=0; i<tabs.length; i++) {
@@ -134,7 +146,6 @@ for (let i=0; i<tabs.length; i++) {
     <tr>
       <th scope="col">Asset</th>
       <th scope="col">Your Holdings</th>
-      <th scope="col">Decimals</th>
       <th scope="col"># Holders</th>
       <th scope="col">Current Price (USD)</th>
       <th scope="col">Total Free</th>
@@ -156,10 +167,6 @@ for (let i=0; i<tabs.length; i++) {
     </table>
   </div>
   
-  <div class="tab-pane" id="assethistory" role="tabpanel" aria-labelledby="history-tab">
-    <div id="container" class="chart"></div>
-  </div>
-
 </div>
 
 <script>

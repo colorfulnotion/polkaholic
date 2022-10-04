@@ -107,12 +107,6 @@ async function main() {
         },
         /*
         	// assets only on acala / karura: Token + LP
-                "DOT-lcDOT LP-acala": {assetChain:'[{"Token":"DOT"},{"LiquidCrowdloan":"13"}]~2000'},
-                "KAR-KSM LP-karura": '[{"Token":"KAR"},{"Token":"KSM"}]~22000',
-                "KAR-LKSM LP-karura": '[{"Token":"KAR"},{"Token":"LKSM"}]~22000',
-                "KUSD-BNC LP-karura": '[{"Token":"KUSD"},{"Token":"BNC"}]~22000',
-                'KUSD/CSM LP-karura': '[{"Token":"KUSD"},{"ForeignAsset":"5"}]~22000',
-        	'KSM/ARIS LP-karura': '[{"Token":"KSM"},{"ForeignAsset":"1"}]~22000',
 
         	// assets only on parallel / parallel-heiko : Token
         	'sDOT-parallel' : '{"Token":"1001"}~2012',
@@ -125,13 +119,35 @@ async function main() {
             chainID: '22000'
         }
     }
+    assets = {
+        "AcalaLP": {
+            asset: '[{"Token":"KAR"},{"Token":"LKSM"}]',
+            chainID: '22000',
+        }
+    }
+    assets = {
+        "DOT-lcDOT LP-acala": {assetChain:'[{"Token":"DOT"},{"LiquidCrowdloan":"13"}]~2000'},
+        "KAR-KSM LP-karura": {assetChain: '[{"Token":"KAR"},{"Token":"KSM"}]~22000'},
+        "KAR-LKSM LP-karura": {assetChain: '[{"Token":"KAR"},{"Token":"LKSM"}]~22000'},
+        "KUSD-BNC LP-karura": {assetChain: '[{"Token":"KUSD"},{"Token":"BNC"}]~22000'},
+        'KUSD/CSM LP-karura': {assetChain: '[{"Token":"KUSD"},{"ForeignAsset":"5"}]~22000'},
+        'KSM/ARIS LP-karura': {assetChain: '[{"Token":"KSM"},{"ForeignAsset":"1"}]~22000'},
+    }
+    assets = {
+	'stableassetpool-karura': {assetChain: `{"StableAssetPoolToken":"0"}~22000`}
+    }
 
     let ts = query.currentTS();
     for (const testcaseName of Object.keys(assets)) {
         let q = assets[testcaseName];
         console.log("INPUT", q, `(testcaseName=${testcaseName})`);
+	q.ts = ts;
         let res = await query.computePriceUSD(q);
-        console.log("OUTPUT", res, "\n");
+        if ( res ) {
+	    console.log("OUTPUT", ts, res.priceUSD);
+	} else {
+	    console.log("OUTPUT", ts, res);
+	}
     }
 }
 

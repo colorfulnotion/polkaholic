@@ -1350,7 +1350,7 @@ app.get('/address/:address/:chainID?', async (req, res) => {
         console.log(err)
         if (err instanceof paraTool.NotFoundError) {
             res.render('notfound', {
-                recordtype: "account",
+                recordtype: "Address",
                 chainInfo: query.getChainInfo()
             });
         } else {
@@ -1444,6 +1444,7 @@ app.get('/symbol/:symbol', async (req, res) => {
             docsSection: "get-symbol"
         });
     } catch (err) {
+
         return res.status(400).json({
             error: err.toString()
         });
@@ -1456,7 +1457,8 @@ app.get('/asset/:chainID/:currencyID', async (req, res) => {
         let chainID = req.params["chainID"];
         let currencyID = decodeURIComponent(req.params["currencyID"]);
         let asset = await query.getAsset(currencyID, chainID);
-        let accounts = [];
+        let priceUSD_routerAsset = await query.getAssetPriceUSDCurrentRouterAsset(asset.asset, asset.chainID);
+	let accounts = [];
         try {
             if (addresses) {
                 accounts = await query.getMultiAccount(addresses);
@@ -1469,12 +1471,14 @@ app.get('/asset/:chainID/:currencyID', async (req, res) => {
             currencyID: currencyID,
             chainID: chainID,
             chainInfo: query.getChainInfo(),
+	    priceUSD_routerAsset,
             addresses: addresses,
             accounts: accounts,
             apiUrl: req.path,
             docsSection: "get-asset"
         });
     } catch (err) {
+	console.log(err)
         return res.status(400).json({
             error: err.toString()
         });
@@ -1535,6 +1539,53 @@ app.get('/wasmcode/:codeHash/:chainID?', async (req, res) => {
             apiUrl: req.path,
             code: code,
             docsSection: "get-wasmcode"
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/router/:routerAssetChain/:symbol?', async (req, res) => {
+    try {
+        let q = { routerAssetChain: req.params['routerAssetChain'] };
+	if ( req.params['symbol'] ) {
+	    q.symbol = req.params['symbol'];
+	}
+	let router = await query.getRouter(q.routerAssetChain);
+	let pools = await query.getPools(q);
+        res.render('router', {
+	    router: router,
+            pools: pools,
+            chainInfo: query.getChainInfo(),
+            apiUrl: req.path,
+            docsSection: "get-pools"
+        });
+    } catch (err) {
+	console.log(err)
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/pool/:asset/:chainID', async (req, res) => {
+    try {
+        let asset = req.params['asset'];
+        let chainID = req.params['chainID'];
+	let pool = await query.getPool(asset, chainID);
+	let history = await query.getPoolHistory(asset, chainID);
+	let accounts = {}
+        res.render('pool', {
+	    asset,
+	    chainID,
+            pool,
+	    history,
+	    accounts,
+            chainInfo: query.getChainInfo(),
+            apiUrl: req.path,
+            docsSection: "get-pools"
         });
     } catch (err) {
         return res.status(400).json({

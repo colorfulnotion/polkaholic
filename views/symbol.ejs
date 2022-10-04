@@ -7,58 +7,7 @@
   </ol>
 </nav>
 
-<div class="row">
-  <div class="col-md-6">
-<table class="table">
-  <thead>
-    <tr>
-      <th scope="col">Price Source</th>
-      <th scope="col">Price</th>
-      <th scope="col">Last</th>
-      <th scope="col">Liquidity?</th>
-      <th scope="col">Chart</th>
-    </tr>
-  </thead>
-  <tbody>
-
-<%
-let routerAssetChain = null;
-let routerName = null;
-let liquid = 10;
-for ( const p of priceUSD_routerAsset ) {
-    if ( p.liquid < liquid ) {
-      routerAssetChain = p.routerAssetChain;
-      routerName = p.routerName;
-      liquid = p.liquid;
-    }
-%>
-    <tr>
-      <th scope="row"><%= p.routerName %></th>
-      <td><%= uiTool.currencyFormat(p.priceUSD); %></td>
-      <td><%= uiTool.presentTS(p.indexTS); %></td>
-      <td>
-<% if ( p.liquid < 0.1 ) { %>
-   <button type="button" class="btn btn-success">High</button>
-<% } else if ( p.liquid < 0.5 ) { %>
-   <button type="button" class="btn btn-warning">Low</button>
-<% } else if ( p.liquid < 3.0 ) { %>  
-   <button type="button" class="btn btn-danger">Very Low</button>
-<% } else { %>
-   <button type="button" class="btn btn-dark">NOT LIQUID (<%= p.liquid %>)</button>
-<% } %>
-</td>
-      <td><a href="javascript:showRouterAssetChainPrices('<%= p.routerAssetChain %>', '<%= p.routerName %>')" class="btn btn-primary">Chart</button></td>
-    </tr>
-<% } %>
-  </tbody>
-</table>
-   </div>
-  <div class="col-md-6">
-   <div id="container" style="width: 100%"></div>
-  </div>
-  
-</div>
-
+<%- include("priceUSD_routerAsset", { priceUSD_routerAsset, symbol, relayChain, asset: false } ); %>
 
 <!-- Nav tabs -->
 <ul class="nav nav-tabs" id="symbolTab" role="tablist">
@@ -108,8 +57,6 @@ for (let i=0; i<tabs.length; i++) {
 <script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
 <script src="https://code.highcharts.com/stock/modules/export-data.js"></script>
 
-
-
 <script>
 var symbol = '<%- symbol; %>';
 var tabs = <%- JSON.stringify(tabs); %>;
@@ -117,29 +64,20 @@ var accounts = <%- JSON.stringify(accounts); %>;
 var chains = <%- JSON.stringify(chains); %>;
 var priceUSD_routerAsset = <%- JSON.stringify(priceUSD_routerAsset); %>;
 var relayChain = chains[0].relayChain;
-function showRouterAssetChainPrices(routerAssetChain, routerName) {
-  let url = `${baseURL}/asset/pricefeed/${encodeURIComponent(symbol)}/${encodeURIComponent(relayChain)}/${encodeURIComponent(routerAssetChain)}`
-  var series_name = `USD Value`
-  var title_text = `${symbol} USD Value (Source: ${routerName})`;
-  Highcharts.getJSON(url, function(data) {
-    // Create the chart
-    Highcharts.stockChart('container', {
-      rangeSelector: {
-        selected: 1
-      },
-      title: {
-        text: title_text
-      },
-      series: [{
-        name: series_name,
-        data: data,
-        tooltip: {
-          valueDecimals: 3
-        }
-      }]
-    });
-});
+
+<%
+let routerAssetChain = null;
+let routerName = null;
+let liquid = 10;
+for ( const p of priceUSD_routerAsset ) {
+    if ( p.liquid < liquid ) {
+      routerAssetChain = p.routerAssetChain;
+      routerName = p.routerName;
+      liquid = p.liquid;
+    }
 }
+%>
+
 let routerAssetChain = "<%= routerAssetChain %>";
 let routerName = "<%= routerName; %>";
 showRouterAssetChainPrices(routerAssetChain, routerName);
