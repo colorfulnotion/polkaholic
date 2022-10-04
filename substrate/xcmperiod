@@ -1,0 +1,49 @@
+#!/usr/bin/env node
+// Usage:  xcmmatch [lookbackDays] [rematch]
+var XCMManager = require("./xcmmanager");
+var paraTool = require("./paraTool");
+
+async function main() {
+    let chainID = paraTool.chainIDMoonbeam;
+
+    var manager = new XCMManager();
+    manager.init_xcm_error_map();
+    await manager.xcm_init()
+    await manager.assetManagerInit();
+    let chain = await manager.getChain(2);
+    await manager.setupAPI(chain);
+
+    //manager.setDebugLevel(paraTool.debugNoLog)
+    manager.setDebugLevel(paraTool.debugErrorOnly)
+    //manager.setDebugLevel(paraTool.debugInfo)
+    //manager.setDebugLevel(paraTool.debugVerbose)
+    //manager.setDebugLevel(paraTool.debugTracing)
+    let logDT = "2021-11-18";
+    let hrs = [10];
+    let write_bq_log = true;
+
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+        if (index == 3 && val.length > 0) {
+            logDT = val;
+        }
+        if (index == 4 && val.length > 0) {
+            hrs = val.split(",").map(hr => parseInt(hr, 10));
+        }
+    });
+
+    for (const hr of hrs) {
+        await manager.matchPeriod(chainID, logDT, hr, write_bq_log);
+    }
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

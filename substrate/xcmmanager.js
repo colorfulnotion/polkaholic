@@ -1886,8 +1886,8 @@ order by msgHash, diffSentAt, diffTS`
                         errorDesc,
                         executedEventID
                     } = statusXCMTransfer[k];
-                    //Important only update xcmtransfer.assetsReceived, xcmtransfer.amountReceivedUSD2 {destStatus, errorDesc, executedEventID} will be updated via sqlA1
-                    let sqlD = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)}, amountReceivedUSD2 = '${valueUSD}' where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
+                    //Important only update xcmtransfer.assetsReceived, {destStatus, errorDesc, executedEventID} will be updated via sqlA1
+                    let sqlD = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)} where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
                     //console.log(`xcmmatch2_matcher (d)`, paraTool.removeNewLine(sqlD))
                     this.batchedSQL.push(sqlD);
                     await this.update_batchedSQL();
@@ -2036,6 +2036,34 @@ order by msgHash`
         }
         if (hashesRowsToInsert.length > 0) {
             await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+        }
+    }
+
+    async matchPeriod(chainID, logDT, hr, write_bq_log = false) {
+        let indexTSPeriod = paraTool.logDT_hr_to_ts(logDT, hr);
+        var sql = `select floor(UNIX_TIMESTAMP(blockDT)/3600)*3600 as indexTS, min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT >= FROM_UNIXTIME(${indexTSPeriod}) and blockDT < FROM_UNIXTIME(${indexTSPeriod+3600}) group by indexTS order by indexTS;`
+        var periods = await this.poolREADONLY.query(sql);
+
+        let chain = await this.setupChainAndAPI(chainID);
+        console.log(chain);
+
+        let indexPeriodProcessedCnt = 0
+        for (let i = 0; i < periods.length; i++) {
+            /*
+            let period = await this.get_chain_period_from_indexTS(this.chainID, periods[i].indexTS);
+            if (period) {
+                console.log(period);
+                let eventsperblock = parseFloat(period.eventsperblock);
+                let jmp = eventsperblock > 0 ? Math.round(7200 / eventsperblock) : 50;
+                if (jmp < 10) jmp = 10;
+                let elapsedTS = await this.index_blocks_period(chain, period, jmp, write_bq_log);
+                if (elapsedTS > 210) {
+                    indexPeriodProcessedCnt++
+                    console.log(`indexReindex unhealthy after ${indexPeriodProcessedCnt}`)
+                    process.exit(0)
+                }
+            }
+            */
         }
     }
 
