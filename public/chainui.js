@@ -221,9 +221,9 @@ async function showxcmmessages(filter = {}) {
                             let unk = true;
                             if (row.destStatus == -1) {
                                 let secondsago = Math.floor(Date.now() / 1000) - row.blockTS;
-                                if (secondsago < 90){
+                                if (secondsago < 90) {
                                     return `<button type="button" class="btn btn-info text-capitalize">Pending</button>`;
-                                }else{
+                                } else {
                                     return `<button type="button" class="btn btn-warning text-capitalize">Unknown</button>`;
                                 }
                             } else if (row.destStatus == 0) {
@@ -424,14 +424,14 @@ async function showxcmtransfers(filter = {}) {
                             }
                             if (unk) {
                                 let secondsago = Math.floor(Date.now() / 1000) - row.sourceTS;
-                                if (secondsago <= 90){
+                                if (secondsago <= 90) {
                                     str = pendingStr
                                 }
                                 console.log(row.xcmInfo);
                             }
                             if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest != undefined) {
                                 return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest) + "<BR>" + str;
-                            } else if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest == undefined){
+                            } else if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest == undefined) {
                                 return `${row.chainDestName}` + "<BR>" + str;
                             } else {
                                 return "-"

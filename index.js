@@ -1458,7 +1458,7 @@ app.get('/asset/:chainID/:currencyID', async (req, res) => {
         let currencyID = decodeURIComponent(req.params["currencyID"]);
         let asset = await query.getAsset(currencyID, chainID);
         let priceUSD_routerAsset = await query.getAssetPriceUSDCurrentRouterAsset(asset.asset, asset.chainID);
-	let accounts = [];
+        let accounts = [];
         try {
             if (addresses) {
                 accounts = await query.getMultiAccount(addresses);
@@ -1471,7 +1471,7 @@ app.get('/asset/:chainID/:currencyID', async (req, res) => {
             currencyID: currencyID,
             chainID: chainID,
             chainInfo: query.getChainInfo(),
-	    priceUSD_routerAsset,
+            priceUSD_routerAsset,
             addresses: addresses,
             accounts: accounts,
             apiUrl: req.path,
