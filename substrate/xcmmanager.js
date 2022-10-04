@@ -17,6 +17,17 @@ module.exports = class XCMManager extends Query {
         this.loadXCMErrorDescription()
     }
 
+    setDebugLevel(debugLevel = paraTool.debugInfo) {
+        this.debugLevel = debugLevel
+    }
+
+    async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
+        let chain = await this.getChain(chainID, withSpecVersions);
+        await this.setupAPI(chain, backfill);
+        this.relayChain = chain.relayChain;
+        return (chain);
+    }
+
     // generates xcmmessagelog, xcmassetlog, and tallies activity in last 24h/7d/30 in channel, xcmasset
     async update_xcmlogs(lookbackDays = 1) {
         // tally all the symbols
@@ -601,7 +612,7 @@ module.exports = class XCMManager extends Query {
     }
     // xcmtransfer_match matches cross transfers between SENDING events held in "xcmtransfer"  and CANDIDATE destination events (from various xcm received messages on a destination chain)
     // this will be phased out soon
-    async xcmtransfer_match(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200, forceRematch = false) {
+    async xcmtransfer_match(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200, forceRematch = false, targetChainID = 'all') {
         let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS} and d.destTS < ${endTS+lookbackSeconds}` : ""
         // match xcmtransferdestcandidate of the last 2 hours
         //   (a) > 95% amountReceived / amountSent
@@ -610,6 +621,7 @@ module.exports = class XCMManager extends Query {
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
         let rematchClause = forceRematch ? ` ` : `((xcmtransfer.matched = 0 and d.matched = 0) or xcmtransfer.xcmInfo is null) and `
+        let targetChainClause = (targetChainID == 'all')? ` ` : `(xcmtransfer.chainID = ${targetChainID} or xcmtransfer.chainIDDest = ${targetChainID}) and `
         let sqlA = `select
           chainID, extrinsicHash, d.chainIDDest, d.fromAddress, d.symbol, d.relayChain,
           (d.destts - xcmtransfer.sourceTS) as diffTS,
@@ -637,7 +649,7 @@ module.exports = class XCMManager extends Query {
         ((d.symbol = xcmtransfer.symbol) and (d.relayChain = xcmtransfer.relayChain)) and
         xcmtransfer.sourceTS >= ${startTS} and
         xcmtransfer.xcmInteriorKey = d.xcmInteriorKey and
-        d.destTS >= ${startTS} ${endWhere} and ${rematchClause}
+        d.destTS >= ${startTS} ${endWhere} and ${rematchClause} ${targetChainClause}
         xcmtransfer.incomplete = 0 and
         d.destTS - xcmtransfer.sourceTS >= 0 and
         d.destTS - xcmtransfer.sourceTS < ${lookbackSeconds} and
@@ -648,7 +660,7 @@ module.exports = class XCMManager extends Query {
           order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
-        console.log(`match_xcm [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
+        console.log(`match_xcm [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin} chain=${targetChainID}`)
         console.log(`match_xcm (A)`)
         console.log(paraTool.removeNewLine(sqlA))
         try {
@@ -664,7 +676,7 @@ module.exports = class XCMManager extends Query {
                 //console.log("[Empty] match_xcm", sqlA)
             }
             for (let i = 0; i < xcmmatches.length; i++) {
-		console.log("i", i);
+                console.log("i", i);
                 let d = xcmmatches[i];
                 if (matched[d.extrinsicHash] == undefined && matched[d.eventID] == undefined) {
                     let priceUSD = 0;
@@ -745,12 +757,12 @@ module.exports = class XCMManager extends Query {
                         destTS: d.destTS
                     }
                     let substrateTxHash = d.extrinsicHash
-		    let substratetx;
+                    let substratetx;
                     try {
-			substratetx = await this.getTransaction(substrateTxHash);
-		    } catch (err) {
-			console.log("looking for", substrateTxHash, err);
-		    }
+                        substratetx = await this.getTransaction(substrateTxHash);
+                    } catch (err) {
+                        console.log("looking for", substrateTxHash, err);
+                    }
                     let xcmInfo, xcmOld;
                     if (substratetx != undefined) {
                         [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
@@ -841,10 +853,10 @@ module.exports = class XCMManager extends Query {
     }
 
     //write xcmInfo for failure case
-    async xcmtransfer_match_failure(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200, forceRematch = false) {
+    async xcmtransfer_match_failure(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200, forceRematch = false, targetChainID = 'all') {
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
-        console.log(`match_xcm_failure [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
+        console.log(`match_xcm_failure [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin} chain=${targetChainID}`)
         console.log(`match_xcm_failure (A)`)
 
         let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS} ` : ""
@@ -855,6 +867,7 @@ module.exports = class XCMManager extends Query {
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
         let rematchClause = forceRematch ? `xcmtransfer.matched >= 0 and ` : `xcmtransfer.matched = 0 and `
+        let targetChainClause = (targetChainID == 'all')? ` ` : `(xcmtransfer.chainID = ${targetChainID} or xcmtransfer.chainIDDest = ${targetChainID}) and `
         let sqlA = `select
           chainID, extrinsicHash, chainIDDest, fromAddress, symbol, relayChain,
           xcmtransfer.extrinsicID,
@@ -876,13 +889,13 @@ module.exports = class XCMManager extends Query {
         from xcmtransfer
  where  ((xcmtransfer.destStatus = 0 and xcmtransfer.incomplete = 0) or xcmtransfer.incomplete = 1) and
         xcmtransfer.sourceTS >= ${startTS} ${endWhere}
-        and ${rematchClause}
+        and ${rematchClause} ${targetChainClause}
         length(xcmtransfer.extrinsicID) > 0
   order by chainID, extrinsicHash`
         console.log("EXEC", paraTool.removeNewLine(sqlA))
         try {
             let xcmmatches = await this.poolREADONLY.query(sqlA);
-	    console.log("FIN", xcmmatches.length);
+            console.log("FIN", xcmmatches.length);
             let addressextrinsic = []
             let hashes = []
             let matched = {}
@@ -1079,15 +1092,15 @@ module.exports = class XCMManager extends Query {
     //   (b) time difference between sentAt to be less than 4
     //   (c) with s and d blockTS being within lookbackSeconds (default 120) of each other
     // In case of ties, the FIRST one ( "order by diffTS" ) covers this
-    async xcmmessages_match(startTS, endTS = null, lookbackSeconds = 120) {
-        let endWhere = endTS ? `and s.blockTS < ${endTS} and d.blockTS < ${endTS+lookbackSeconds}` : ""
-
+    async xcmmessages_match(startTS, endTS = null, lookbackSeconds = 120, targetChainID ='all') {
+        let endWhere = endTS ? `and s.blockTS < ${endTS} and d.blockTS < ${endTS+lookbackSeconds}` : " "
+        let targetChainClause = (targetChainID == 'all')? ` ` : `(s.chainID = ${targetChainID} or s.chainIDDest = ${targetChainID}) and `
         let sqlA = `select
           s.msgHash, s.msgType, s.relayChain, s.blockNumber as s_blockNumber, d.blockNumber as d_blockNumber, s.sentAt as s_sentAt, d.sentAt as d_sentAt, s.chainID, s.chainIDDest, d.blockTS as destTS, s.blockTS as sourceTS, abs(d.blockTS - s.blockTS) as diffTS, (d.sentAt - s.sentAt) as diffSentAt, d.errorDesc as d_errorDesc, d.destStatus as d_destStatus, d.executedEventID as d_executedEventID
         from xcmmessages as s, xcmmessages as d
  where  d.msgHash = s.msgHash and
         d.chainID = s.chainID and
-        d.chainIDDest = s.chainIDDest and
+        d.chainIDDest = s.chainIDDest and ${targetChainClause}
         s.incoming = 0 and
         d.incoming = 1 and
         s.blockTS >= ${startTS} and
@@ -1096,8 +1109,8 @@ module.exports = class XCMManager extends Query {
         d.matched = 0 ${endWhere}
 having (diffSentAt >= 0 and diffSentAt <= 4)
 order by msgHash, diffSentAt, diffTS`
-        //console.log(`xcmmessages_match (A)`)
-        //console.log(paraTool.removeNewLine(sqlA))
+        console.log(`xcmmessages_match (A)`)
+        console.log(paraTool.removeNewLine(sqlA))
         try {
             let xcmmatches = await this.pool.query(sqlA);
             let matched = {}
@@ -1160,7 +1173,7 @@ order by msgHash, diffSentAt, diffTS`
 
     async xcm_init() {
         await this.init_chain_asset_and_nativeAsset() // this will init assetInfo and assetLog
-        console.log(`this.xcmAssetInfo`, this.xcmAssetInfo)
+        //console.log(`this.xcmAssetInfo`, this.xcmAssetInfo)
     }
 
     get_concrete_assetChain(analysis, c, chainID, chainIDDest) {
@@ -1596,10 +1609,11 @@ order by msgHash, diffSentAt, diffTS`
     //  (a) update instructionFingerprints + parentInclusionFingerprints using getXCMParentFingerprintsOfChild + getXCMChildFingerprints
     //  (b) if there are parentfingerprints detected, look for childfingerprints in the next step
     //  (c) compute assetChains and beneficiaries
-    async computeXCMFingerprints(startTS, endTS = null) {
+    async computeXCMFingerprints(startTS, endTS = null, targetChainID = 'all') {
         let lastTS = endTS;
+        let targetChainClause = (targetChainID == 'all')? ` ` : `(chainID = ${targetChainID} or chainIDDest = ${targetChainID}) and `
         let endWhere = (endTS) ? ` and blockTS <= ${endTS} ` : "";
-        let sql = `select msgHash, msgHex, blockNumber, sentAt, incoming, chainID, chainIDDest, msgStr, blockTS, assetChains, instructionFingerprints from xcmmessages where blockTS >= ${startTS} ${endWhere} order by blockTS desc`;
+        let sql = `select msgHash, msgHex, blockNumber, sentAt, incoming, chainID, chainIDDest, msgStr, blockTS, assetChains, instructionFingerprints from xcmmessages where blockTS >= ${startTS} ${targetChainClause} ${endWhere}  order by blockTS desc`;
         //console.log(`computeXCMFingerprints`)
         //console.log(paraTool.removeNewLine(sql))
         let xcmRecs = await this.pool.query(sql);
@@ -1659,16 +1673,17 @@ order by msgHash, diffSentAt, diffTS`
         return lastTS;
     }
 
-    async xcmmatch2_matcher(startTS, endTS = null, forceRematch = false, lookbackSeconds = 120) {
+    async xcmmatch2_matcher(startTS, endTS = null, forceRematch = false, lookbackSeconds = 120, targetChainID = 'all') {
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
-        console.log(`[${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}`)
+        console.log(`[${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds} chain=${targetChainID}`)
 
+        let targetChainClause = (targetChainID == 'all')? ` ` : `(xcmtransfer.chainID = ${targetChainID} or xcmtransfer.chainIDDest = ${targetChainID}) and `
         let endWhere = endTS ? `and xcmmessages.blockTS <= ${endTS} and xcmtransfer.sourceTS <= ${endTS}` : "";
         // set xcmmessages.{extrinsicID,extrinsicHash} based on xcmtransfer.msgHash / sentAt <= 4 difference
         let sqlA = `update xcmtransfer, xcmmessages set xcmmessages.extrinsicID = xcmtransfer.extrinsicID, xcmmessages.extrinsicHash = xcmtransfer.extrinsicHash, xcmmessages.sectionMethod = xcmtransfer.sectionMethod, xcmmessages.amountSentUSD = xcmtransfer.amountSentUSD
                where xcmtransfer.msgHash = xcmmessages.msgHash and
-                 xcmtransfer.chainIDDest = xcmmessages.chainIDDest and xcmtransfer.chainID = xcmmessages.chainID and
+                 xcmtransfer.chainIDDest = xcmmessages.chainIDDest and xcmtransfer.chainID = xcmmessages.chainID and ${targetChainClause}
                  xcmtransfer.msgHash is not null and
                  xcmmessages.blockTS >= ${startTS} and
                  xcmtransfer.sourceTS >= ${startTS} and
@@ -1886,8 +1901,8 @@ order by msgHash, diffSentAt, diffTS`
                         errorDesc,
                         executedEventID
                     } = statusXCMTransfer[k];
-                    //Important only update xcmtransfer.assetsReceived, xcmtransfer.amountReceivedUSD2 {destStatus, errorDesc, executedEventID} will be updated via sqlA1
-                    let sqlD = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)}, amountReceivedUSD2 = '${valueUSD}' where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
+                    //Important only update xcmtransfer.assetsReceived, {destStatus, errorDesc, executedEventID} will be updated via sqlA1
+                    let sqlD = `update xcmtransfer set assetsReceived = ${mysql.escape(ar)} where extrinsicHash = '${extrinsicHash}' and extrinsicID = '${extrinsicID}' and msgHash = '${msgHash}'`;
                     //console.log(`xcmmatch2_matcher (d)`, paraTool.removeNewLine(sqlD))
                     this.batchedSQL.push(sqlD);
                     await this.update_batchedSQL();
@@ -1915,14 +1930,15 @@ order by msgHash, diffSentAt, diffTS`
         return (valueUSD);
     }
     /* because the indexer may insert multiple xcmmessages record when a partcular xcmmessage sits in the chains message queue for 1 or more blocks, this xcmmessages_dedup process cleans out any records that exist after the above matching process */
-    async xcmmessages_dedup(startTS, endTS = null, lookbackSeconds = 120) {
+    async xcmmessages_dedup(startTS, endTS = null, lookbackSeconds = 120, targetChainID = 'all') {
         let endWhere = endTS ? `and s.blockTS < ${endTS} and d.blockTS < ${endTS+lookbackSeconds}` : "";
+        let targetChainClause = (targetChainID == 'all')? ` ` : `(s.chainID = ${targetChainID} or s.chainIDDest = ${targetChainID}) and `
         let sql = `select
           s.msgHash, s.blockNumber as s_blockNumber, s.incoming, (d.sentAt - s.sentAt) as diffSentAt
         from xcmmessages as s, xcmmessages as d
  where  d.msgHash = s.msgHash and
         d.chainID = s.chainID and
-        d.chainIDDest = s.chainIDDest and
+        d.chainIDDest = s.chainIDDest and ${targetChainClause}
         ( ( s.incoming = 0 and  d.incoming = 1 ) or ( s.incoming = 1 and d.incoming = 0 ) ) and
         s.blockTS >= ${startTS} and
         d.blockTS >= ${startTS} and
@@ -1968,38 +1984,43 @@ order by msgHash`
         } while (iterations < maxIterations);
     }
 
-    async xcmanalytics_period(chain, t0, t1 = null, forceRematch = false) {
-	if ( forceRematch ) {
-	    console.log("FAILURE CASES ", t0, t1);
-            await this.xcmtransfer_match_failure(t0, t1, .97, 7200, forceRematch);
+    async xcmanalytics_period(chain, t0, t1 = null, forceRematch = false, targetChainID = 'all') {
+        let rat = 0.97
+        let transferLookbackwindow = 7200
+        let msgLookbackwindow = 120
 
-	    console.log("NORMAL CASES ", t0, t1);
-            let numRecs = 0, lastTS = 0;
+        if (forceRematch) {
+            console.log(`[FORCED] FAILURE CASES ${t0} ${t1} (chain:${targetChainID})`);
+            await this.xcmtransfer_match_failure(t0, t1, rat, transferLookbackwindow, forceRematch, targetChainID);
 
-	    await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
+            console.log(`[FORCED] NORMAL CASES ${t0} ${t1} (chain:${targetChainID})`);
+            let numRecs = 0,
+                lastTS = 0;
+
+            await this.xcmtransfer_match(t0, t1, rat, transferLookbackwindow, forceRematch, targetChainID);
             return [0, 0];
-	} else {
+        } else {
             // xcmmessages_match matches incoming=0 and incoming=1 records
-            let numRecs = await this.xcmmessages_match(t0, t1);
+            let numRecs = await this.xcmmessages_match(t0, t1, msgLookbackwindow, targetChainID);
             // computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints}
-            let lastTS = await this.computeXCMFingerprints(t0, t1);
+            let lastTS = await this.computeXCMFingerprints(t0, t1, targetChainID);
             // xcmmatch2_matcher computes assetsReceived by matching xcmmessages.beneficiaries(2) to xcmtransferdestcandidate
-            await this.xcmmatch2_matcher(t0, t1, forceRematch, 120)
+            await this.xcmmatch2_matcher(t0, t1, forceRematch, msgLookbackwindow, targetChainID)
 
             // marks duplicates in xcmmessages
-            await this.xcmmessages_dedup(t0, t1);
+            await this.xcmmessages_dedup(t0, t1, msgLookbackwindow, targetChainID);
 
-	    console.log("FAILURE CASES ", t0, t1);
-            await this.xcmtransfer_match_failure(t0, t1, .97, 7200, forceRematch);
+            console.log(`FAILURE CASES ${t0} ${t1} (chain:${targetChainID})`);
+            await this.xcmtransfer_match_failure(t0, t1, rat, transferLookbackwindow, forceRematch, targetChainID);
 
-	    console.log("NORMAL CASES ", t0, t1);
-	    await this.xcmtransfer_match(t0, t1, .97, 7200, forceRematch);
+            console.log(`NORMAL CASES ${t0} ${t1} (chain:${targetChainID})`);
+            await this.xcmtransfer_match(t0, t1, rat, transferLookbackwindow, forceRematch, targetChainID);
 
-            numRecs = await this.xcmmessages_match(t0, t1);
+            numRecs = await this.xcmmessages_match(t0, t1, msgLookbackwindow, targetChainID);
 
             await this.writeBTHashes_feedxcmmessages(t0, t1);
             return [numRecs, lastTS];
-	}
+        }
     }
 
     async xcmanalytics(chain, lookbackDays, forceRematch = false) {
@@ -2036,6 +2057,29 @@ order by msgHash`
         }
         if (hashesRowsToInsert.length > 0) {
             await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+        }
+    }
+
+    async matchPeriod(forceRematch = true, chainID, logDT, hr) {
+        let targetChainID = chainID
+        if (chainID == 'all') chainID = '0'
+        let indexTSPeriod = paraTool.logDT_hr_to_ts(logDT, hr);
+        var sql = `select floor(UNIX_TIMESTAMP(blockDT)/3600)*3600 as indexTS, min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT >= FROM_UNIXTIME(${indexTSPeriod}) and blockDT < FROM_UNIXTIME(${indexTSPeriod+3600}) group by indexTS order by indexTS;`
+        var periods = await this.poolREADONLY.query(sql);
+        //console.log(sql)
+        //console.log(`periods`, periods)
+        console.log(`matchPeriod chain=${targetChainID} [${logDT} ${hr}]`)
+
+        let chain = await this.setupChainAndAPI(chainID);
+        //console.log(chain);
+
+        let indexPeriodProcessedCnt = 0
+        for (let i = 0; i < periods.length; i++) {
+            let period = periods[i]
+            let t0 = period.indexTS - 1
+            let t1 = period.indexTS + 3599
+            let forceRematch = true
+            await this.xcmanalytics_period(chain, t0, t1, forceRematch, targetChainID);
         }
     }
 

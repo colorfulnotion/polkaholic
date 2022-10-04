@@ -1928,17 +1928,17 @@ module.exports = class Query extends AssetManager {
             } else if (chainID > 2) {
                 w = `and asset.chainID = ${chainID}`
             }
-	    if ( assetType ) {
-		w += ` and asset.assetType = '${assetType}'`
-	    }
+            if (assetType) {
+                w += ` and asset.assetType = '${assetType}'`
+            }
 
             let sql = null
-	    if ( assetType == "Token" ) {
-		sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w} order by numHolders desc;`
-	    } else { // ERC20, ERC20LP, Loan
-		sql = `select asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from asset where priceUSD > 0 ${w} order by numHolders desc;`
-	    }
-	    console.log(sql)
+            if (assetType == "Token") {
+                sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w} order by numHolders desc;`
+            } else { // ERC20, ERC20LP, Loan
+                sql = `select asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from asset where priceUSD > 0 ${w} order by numHolders desc;`
+            }
+            console.log(sql)
             assets = await this.poolREADONLY.query(sql);
             if (assets.length == 0) {
                 // TODO: throw NotFound error

@@ -1506,7 +1506,7 @@ module.exports = class ChainParser {
         chainIDDest = relayChainID
         let targetdestAddress = this.processAccountKey(x1, decorate, indexer)
         if (targetdestAddress) destAddress = targetdestAddress
-        if (x1 != undefined && x1.parachain != undefined){
+        if (x1 != undefined && x1.parachain != undefined) {
             paraIDDest = x1.parachain
             chainIDDest = paraIDDest + paraIDExtra
         }
@@ -1807,7 +1807,7 @@ module.exports = class ChainParser {
         let paraIDDest = -1;
         let chainIDDest = -1;
         let destAddress = false;
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest`, JSON.stringify(dest,null,4))
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest`, JSON.stringify(dest, null, 4))
         if (dest.v1 !== undefined && dest.v1.interior !== undefined) {
             if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior`)
             let destV1Interior = dest.v1.interior;

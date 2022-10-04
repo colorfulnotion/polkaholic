@@ -38,7 +38,7 @@ async function showxcmmessages(filter = {}) {
                     orthogonal: 'export'
                 }
             }],
-            pageLength: 25,
+            pageLength: 50,
             lengthMenu: [
                 [10, 25, 50, 100],
                 [10, 25, 50, 100]
@@ -218,13 +218,20 @@ async function showxcmmessages(filter = {}) {
                         if (row.pending != undefined) {
                             return "Pending";
                         } else {
-
+                            let unk = true;
                             if (row.destStatus == -1) {
-                                return `<button type="button" class="btn btn-warning text-capitalize">Unknown</button>`;
+                                let secondsago = Math.floor(Date.now() / 1000) - row.blockTS;
+                                if (secondsago < 90) {
+                                    return `<button type="button" class="btn btn-info text-capitalize">Pending</button>`;
+                                } else {
+                                    return `<button type="button" class="btn btn-warning text-capitalize">Unknown</button>`;
+                                }
                             } else if (row.destStatus == 0) {
                                 if (row.errorDesc) {
+                                    unk = false;
                                     return `<button type="button" class="btn btn-danger text-capitalize">${row.errorDesc}</button>`;
                                 } else {
+                                    unk = false;
                                     return `<button type="button" class="btn btn-danger text-capitalize">FAIL</button>`;
                                 }
                             } else if (row.destStatus == 1) {
@@ -286,7 +293,7 @@ async function showxcmtransfers(filter = {}) {
                     orthogonal: 'export'
                 }
             }],
-            pageLength: 25,
+            pageLength: 50,
             lengthMenu: [
                 [10, 25, 50, 100],
                 [10, 25, 50, 100]
@@ -403,6 +410,7 @@ async function showxcmtransfers(filter = {}) {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         try {
+                            let pendingStr = `<button type="button" class="btn btn-info text-capitalize">Pending</button>`
                             let str = `<button type="button" class="btn btn-warning text-capitalize">Unknown</button>`
                             let unk = true;
                             if (row.xcmInfo && row.xcmInfo.destination) {
@@ -415,11 +423,16 @@ async function showxcmtransfers(filter = {}) {
                                 }
                             }
                             if (unk) {
+                                let secondsago = Math.floor(Date.now() / 1000) - row.sourceTS;
+                                if (secondsago <= 90) {
+                                    str = pendingStr
+                                }
                                 console.log(row.xcmInfo);
                             }
-                            if (row.chainIDDest != undefined && row.chainDestName) {
-
+                            if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest != undefined) {
                                 return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest) + "<BR>" + str;
+                            } else if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest == undefined) {
+                                return `${row.chainDestName}` + "<BR>" + str;
                             } else {
                                 return "-"
                             }
