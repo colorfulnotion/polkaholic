@@ -695,6 +695,7 @@ function VSTokenToToken(tokenStr) {
             })
         }
     } catch (e) {
+        //console.log(`VSTokenToToken tokenStr=${tokenStr}`, e.toString())
         return tokenStr
     }
     return tokenStr

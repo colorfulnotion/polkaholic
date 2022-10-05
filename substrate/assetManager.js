@@ -651,6 +651,7 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
             }
             nassets++;
         }
+        //console.log(assetInfo)
         this.assetInfo = assetInfo;
         this.symbolRelayChainAsset = symbolRelayChainAsset;
         this.xcContractAddress = xcContractAddress;

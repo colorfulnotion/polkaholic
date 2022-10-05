@@ -724,6 +724,7 @@ module.exports = class ParallelParser extends ChainParser {
     }
 
     async addCustomAsset(indexer) {
+        return
         if (indexer.chainID == paraTool.chainIDParallel) {
             let assetID1 = "1"
             let paraAssetToken1 = {
@@ -757,8 +758,34 @@ module.exports = class ParallelParser extends ChainParser {
         }
     }
 
+
+
     async processAMMPools(indexer, p, s, e2) {
+        /*
+          pv: '',
+          extra: [
+            baseAmount: 198469335084402,            --> LP0
+            quoteAmount: 6401542597144543000,       --> LP1
+            baseAmountLast: 0,
+            quoteAmountLast: 0,
+            lpTokenId: 6002,
+            blockTimestampLast: 1957289,
+            price0CumulativeLast: 7.072922374851117e+28,
+            price1CumulativeLast: 61491756223101530000,
+            asset: '6002',
+            decoratedAsset: { Token: 'LP-DOT/PARA' },
+            decimals: 12
+          ]
+        }
+        */
         if (this.debugLevel >= paraTool.debugInfo) console.log(`TODO: processAMMPools`, e2)
+        let lpAssetkey = this.elevatedAssetKey(paraTool.assetTypeLiquidityPair, e2.asset);
+        /*
+        let lp0 = e2['baseAmount'] / 10 ** decimals0;
+        let lp1 = e2['quoteAmount'] / 10 ** decimals1;
+        let rat = lp0 / lp1
+        indexer.updateAssetLiquidityPairPool(lpAssetkey, lp0, lp1, rat);
+        */
     }
 
     async processAssetLoanSupplyExchangeRate(indexer, p, s, e2) {
@@ -908,6 +935,101 @@ module.exports = class ParallelParser extends ChainParser {
 
         }
         await super.decorate_query_params(query, pallet_method, args, chainID, ts)
+    }
+
+    /*
+    [
+      [
+        [
+          1,001
+          101
+        ]
+        {
+          baseAmount: 1,930,305,373,455,317
+          quoteAmount: 1,990,639,687,294,530
+          baseAmountLast: 0
+          quoteAmountLast: 0
+          lpTokenId: 6,003
+          blockTimestampLast: 1,958,177
+          price0CumulativeLast: 1,964,478,483,515,298,864,738,273
+          price1CumulativeLast: 1,952,672,040,893,772,172,088,405
+        }
+      ]
+    ]
+    */
+    async updateLiquidityInfo(indexer) {
+        let a = await indexer.api.query.amm.pools.entries();
+        console.log(`updateLiquidityInfo called pairLen=${a.length}`)
+        let assetList = {}
+        a.forEach(async ([key, val]) => {
+            let assetMetadata = val.toHuman() //enabled
+            let lp = key.args.map((k) => k.toHuman())
+            let lpAsset = JSON.stringify(lp)
+            let lpAssetChain = paraTool.makeAssetChain(lpAsset, indexer.chainID);
+            //console.log(`LP ${lpAssetChain}, lpLen=${lp.length}`, assetMetadata, lp)
+            if (Array.isArray(lp) && lp.length == 2) {
+                let lpAssetID = this.cleanedAssetID(assetMetadata.lpTokenId)
+                let assetID0 = this.cleanedAssetID(lp[0])
+                let assetID1 = this.cleanedAssetID(lp[1])
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`updateLiquidityInfo assetID0=${assetID0}, assetID1=${assetID1}, lpAssetID=${lpAssetID}`)
+                let parsedLP0 = {
+                    Token: assetID0
+                }
+                let parsedLP1 = {
+                    Token: assetID1
+                }
+                let parsedLP = {
+                    Token: lpAssetID
+                }
+                var asset0 = JSON.stringify(parsedLP0);
+                var asset1 = JSON.stringify(parsedLP1);
+                var assetLP = JSON.stringify(parsedLP);
+                let assetChain0 = paraTool.makeAssetChain(asset0, indexer.chainID);
+                let assetChain1 = paraTool.makeAssetChain(asset1, indexer.chainID);
+                let assetChainLP = paraTool.makeAssetChain(assetLP, indexer.chainID);
+                let lpAsset = this.elevatedAssetKey(paraTool.assetTypeLiquidityPair, lpAssetID);
+                let lpAssetChain = paraTool.makeAssetChain(lpAsset, indexer.chainID);
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`updateLiquidityInfo assetChainLP=${assetChainLP}, LP0=${asset0}, LP1=${asset1}, lpAsset=${lpAsset}`)
+
+                let cachedLPAssetInfo = indexer.assetInfo[lpAssetChain]
+                if (cachedLPAssetInfo != undefined && cachedLPAssetInfo.token1Decimals != undefined && cachedLPAssetInfo.token0Decimals != undefined && cachedLPAssetInfo.assetName != undefined) {
+                    //cached found
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`cached AssetInfo found`, cachedLPAssetInfo)
+                    //assetList[asset] = cachedAssetInfo
+                } else {
+                    let token0 = indexer.assetInfo[assetChain0]
+                    //console.log(`token0`, token0)
+                    let token1 = indexer.assetInfo[assetChain1]
+                    //console.log(`token1`, token1)
+                    let tokenLP = indexer.assetInfo[assetChainLP]
+                    //console.log(`tokenLP`, tokenLP)
+                    if (token0 && token1 && tokenLP) {
+                        //build lp here
+                        let lpAssetInfo = {
+                            assetType: paraTool.assetTypeLiquidityPair,
+                            name: tokenLP.assetName,
+                            symbol: tokenLP.symbol,
+                            decimals: tokenLP.decimals,
+                            token0: token0.asset,
+                            token0decimals: token0.decimals,
+                            token0symbol: token0.symbol,
+                            token1: token1.asset,
+                            token1decimals: token1.decimals,
+                            token1symbol: token1.symbol,
+                        }
+                        console.log(`lpAssetInfo`, lpAssetInfo)
+                        assetList[lpAssetChain] = lpAssetInfo
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`lpAssetInfo [${lpAsset}]`, lpAssetInfo)
+                        await indexer.addLpAssetInfo(lpAsset, indexer.chainID, lpAssetInfo, 'updateLiquidityInfo');
+                    } else {
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`COULD NOT ADD asset -- no assetType ${assetChain0}, ${assetChain1} ${assetChainOriginal}`);
+                    }
+                }
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`NOT dex pair LP ${lpAssetChain}`, assetMetadata)
+            }
+        });
+        if (this.debugLevel >= paraTool.debugInfo && assetList.length > 0) console.log(`new liquidity found`, assetList);
     }
 
     isParallelLiquidityPair(symbol = 'LP-DOT/sDOT'){
