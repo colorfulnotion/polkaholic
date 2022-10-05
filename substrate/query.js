@@ -3652,17 +3652,17 @@ module.exports = class Query extends AssetManager {
         if (!this.validAddress(address)) {
             throw new paraTool.InvalidError(`Invalid address ${address}`)
         }
-	let realtime = {};
-	let contract = null;
-	if ( this.xcContractAddress[rawAddress] != undefined ) {
-	    contract = {};
-	    let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.xcContractAddress = '${rawAddress}' and asset.chainID = '${chainID}'`
+        let realtime = {};
+        let contract = null;
+        if (this.xcContractAddress[rawAddress] != undefined) {
+            contract = {};
+            let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.xcContractAddress = '${rawAddress}' and asset.chainID = '${chainID}'`
             let extraRecs = await this.poolREADONLY.query(sql)
-	    if (extraRecs.length > 0) {
+            if (extraRecs.length > 0) {
                 let e = extraRecs[0];
                 var p = await this.computePriceUSD({
-		    asset: e.asset,
-		    chainID: e.chainID
+                    asset: e.asset,
+                    chainID: e.chainID
                 });
                 contract.assetName = e.assetName;
                 contract.symbol = e.symbol;
@@ -3671,35 +3671,35 @@ module.exports = class Query extends AssetManager {
                 contract.totalSupply = e.totalSupply;
                 contract.numHolders = e.numHolders;
                 contract.decimals = e.decimals;
-	    }
+            }
             return [realtime, contract];
-	} else {
+        } else {
             let families = ["realtime", "evmcontract", "wasmcontract"];
             let row = false;
             try {
-		let [tblName, tblRealtime] = this.get_btTableRealtime()
-		const filter = [{
+                let [tblName, tblRealtime] = this.get_btTableRealtime()
+                const filter = [{
                     column: {
-			cellLimit: 1
+                        cellLimit: 1
                     },
                     families: families,
-		}];
-		[row] = await tblRealtime.row(address).get({
+                }];
+                [row] = await tblRealtime.row(address).get({
                     filter
-		});
+                });
             } catch (err) {
 
             }
             let rowData = row.data;
             [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
             if (contract) {
-		let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' and asset.chainID = '${chainID}'`
-            let extraRecs = await this.poolREADONLY.query(sql)
-		if (extraRecs.length > 0) {
+                let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' and asset.chainID = '${chainID}'`
+                let extraRecs = await this.poolREADONLY.query(sql)
+                if (extraRecs.length > 0) {
                     let e = extraRecs[0];
                     var p = await this.computePriceUSD({
-			asset: e.asset,
-			chainID: e.chainID
+                        asset: e.asset,
+                        chainID: e.chainID
                     });
                     contract.assetName = e.assetName;
                     contract.symbol = e.symbol;
@@ -3708,10 +3708,10 @@ module.exports = class Query extends AssetManager {
                     contract.totalSupply = e.totalSupply;
                     contract.numHolders = e.numHolders;
                     contract.decimals = e.decimals;
-		}
+                }
             }
             return [realtime, contract];
-	}
+        }
     }
 
 
@@ -6878,147 +6878,143 @@ module.exports = class Query extends AssetManager {
     }
 
     async getRouter(routerAssetChain) {
-	let sql = `select routerName, routerAssetChain, tvl from router where routerAssetChain = '${routerAssetChain}' limit 1`;
-	let routers = await this.poolREADONLY.query(sql)
-	if ( routers.length == 0 ) {
+        let sql = `select routerName, routerAssetChain, tvl from router where routerAssetChain = '${routerAssetChain}' limit 1`;
+        let routers = await this.poolREADONLY.query(sql)
+        if (routers.length == 0) {
             throw new paraTool.InvalidError(`${routerAssetChain} not found`)
-	}
-	let router = routers[0];
-	[router.asset, router.chainID] = paraTool.parseAssetChain(router.routerAssetChain);
-	let [chainID, id] = this.convertChainID(router.chainID);
-	router.id = id;
-	router.chainName = this.getChainName(chainID)
-	return router;
+        }
+        let router = routers[0];
+        [router.asset, router.chainID] = paraTool.parseAssetChain(router.routerAssetChain);
+        let [chainID, id] = this.convertChainID(router.chainID);
+        router.id = id;
+        router.chainName = this.getChainName(chainID)
+        return router;
     }
 
     canonicalize_chainfilters(chainfilters) {
-	if ( typeof chainfilters == "string" ) {
-	    if (chainfilters == "all") return [];
-	    chainfilters = chainfilters.split(",");
-	}
-	let out = [];
-	for ( let i = 0; i < chainfilters.length; i++ ) {
-	    let [chainID, id] = this.convertChainID(chainfilters[i]);
-	    console.log("LOOKUP", chainfilters[i], chainID, id);
-	    if ( id ) {
-		out.push(chainID);
-	    } else {
-		return null
-	    }
-	}
-	return out;
+        if (typeof chainfilters == "string") {
+            if (chainfilters == "all") return [];
+            chainfilters = chainfilters.split(",");
+        }
+        let out = [];
+        for (let i = 0; i < chainfilters.length; i++) {
+            let [chainID, id] = this.convertChainID(chainfilters[i]);
+            console.log("LOOKUP", chainfilters[i], chainID, id);
+            if (id) {
+                out.push(chainID);
+            } else {
+                return null
+            }
+        }
+        return out;
     }
 
-    async getRouters(q, limit = 100)  {
-	let w = [];
-	if ( q.chainfilters ) {
-	    let chainfilters = this.canonicalize_chainfilters(q.chainfilters);
-	    if ( chainfilters && ( chainfilters.length > 0 ) ) {
-		w.push(` chainID in (${chainfilters.join(",")})`)
-	    }
-	}
-	w.push("tvl > 0");
-	let wstr = ( w.length > 0 ) ? `where ${w.join(" and ")}` : "";
-	let sql = `select routerName, routerAssetChain, chainID, tvl from router ${wstr} order by tvl desc limit ${limit}`;
-	let routers = await this.poolREADONLY.query(sql)
-	for ( const r of routers ) {
-	    [r.asset, r.chainID] = paraTool.parseAssetChain(r.routerAssetChain);
-	    let [chainID, id] = this.convertChainID(r.chainID);
-	    r.id = id;
-	    r.chainName = this.getChainName(chainID)
-	}
+    async getRouters(q, limit = 100) {
+        let w = [];
+        if (q.chainfilters) {
+            let chainfilters = this.canonicalize_chainfilters(q.chainfilters);
+            if (chainfilters && (chainfilters.length > 0)) {
+                w.push(` chainID in (${chainfilters.join(",")})`)
+            }
+        }
+        w.push("tvl > 0");
+        let wstr = (w.length > 0) ? `where ${w.join(" and ")}` : "";
+        let sql = `select routerName, routerAssetChain, chainID, tvl from router ${wstr} order by tvl desc limit ${limit}`;
+        let routers = await this.poolREADONLY.query(sql)
+        for (const r of routers) {
+            [r.asset, r.chainID] = paraTool.parseAssetChain(r.routerAssetChain);
+            let [chainID, id] = this.convertChainID(r.chainID);
+            r.id = id;
+            r.chainName = this.getChainName(chainID)
+        }
 
-	return routers;
+        return routers;
     }
 
     async getPool(asset, chainID) {
-	let sql = `select asset, chainID, assetName, token0, token1, token0Symbol, token1Symbol, symbol, decimals, priceUSD, totalFree, totalReserved, apy1d, apy7d, apy30d, feesUSD1d, feesUSD7d, feesUSD30d from asset where asset = '${asset}' and chainID = '${chainID}'`
-	let pools = await this.poolREADONLY.query(sql)
-	if ( pools.length == 0 ) {
+        let sql = `select asset, chainID, assetName, token0, token1, token0Symbol, token1Symbol, symbol, decimals, priceUSD, totalFree, totalReserved, apy1d, apy7d, apy30d, feesUSD1d, feesUSD7d, feesUSD30d from asset where asset = '${asset}' and chainID = '${chainID}'`
+        let pools = await this.poolREADONLY.query(sql)
+        if (pools.length == 0) {
             throw new paraTool.InvalidError(`${asset}/${chainID} not found`)
-	}
-	let p = pools[0];
-	let [_, id] = this.convertChainID(chainID)
-	p.id = id
-	p.chainName = this.getChainName(chainID)
-	p.poolName = p.token0Symbol + "/" + p.token1Symbol;
-	p.tvlFree = p.priceUSD * p.totalFree;
-	p.tvlReserved = p.priceUSD * p.totalReserved;
-	console.log("getPool", p.priceUSD, p.totalFree, p.tvlFree, p.tvlReserved)
+        }
+        let p = pools[0];
+        let [_, id] = this.convertChainID(chainID)
+        p.id = id
+        p.chainName = this.getChainName(chainID)
+        p.poolName = p.token0Symbol + "/" + p.token1Symbol;
+        p.tvlFree = p.priceUSD * p.totalFree;
+        p.tvlReserved = p.priceUSD * p.totalReserved;
 
-	return p;
+        return p;
     }
 
     async getPoolHistory(asset, chainID, interval = "daily", lookbackDays = 14) {
 
-	let sql = `select indexTS, priceUSD, low, high, open, close, lp0, lp1, token0Volume, token1Volume, issuance, CONVERT(state using utf8) as state from assetlog where asset = '${asset}' and chainID = '${chainID}' and indexTS > UNIX_TIMESTAMP(date_sub(Now(), INTERVAL ${lookbackDays} DAY)) order by indexTS desc`
-	let recs = await this.poolREADONLY.query(sql)
-	let h = [];
-	let pool = await this.getPool(asset, chainID);
+        let sql = `select indexTS, priceUSD, low, high, open, close, lp0, lp1, token0Volume, token1Volume, issuance, CONVERT(state using utf8) as state from assetlog where asset = '${asset}' and chainID = '${chainID}' and indexTS > UNIX_TIMESTAMP(date_sub(Now(), INTERVAL ${lookbackDays} DAY)) order by indexTS desc`
+        let recs = await this.poolREADONLY.query(sql)
+        let h = [];
+        let pool = await this.getPool(asset, chainID);
 
-	let token0 = pool.token0;
-	let token1 = pool.token1;
-	for ( const r of recs ) {
-	    let p0 = await this.getTokenPriceUSD(token0, chainID, r.indexTS);
-	    let p1 = await this.getTokenPriceUSD(token1, chainID, r.indexTS);
-	    if ( p0 && p1 ) {
-		let issuance = parseFloat(r.issuance);
-		let tvlUSD = p0.priceUSD * r.lp0 + p1.priceUSD * r.lp1;
-		let priceUSD = tvlUSD / issuance;
-		let volumeUSD = parseFloat(r.token0Volume) * p0.priceUSD + parseFloat(r.token1Volume) * p1.priceUSD;
-		let state = JSON.parse(r.state);
-		let feesUSD = state.token0Fee * p0.priceUSD + state.token1Fee * p1.priceUSD;
-		let apy = (feesUSD / tvlUSD)*365*24;
-		h.push({indexTS: r.indexTS,
-			issuance: issuance,
-			priceUSD: priceUSD,
-			open: r.open,
-			low: r.low,
-			high: r.high,
-			close: r.close,
-			tvlUSD: tvlUSD,
-			volumeUSD: volumeUSD,
-			feesUSD: feesUSD,
-			apy: apy,
-		       });
-	    }
-	}
-	return h;
+        let token0 = pool.token0;
+        let token1 = pool.token1;
+        for (const r of recs) {
+            let p0 = await this.getTokenPriceUSD(token0, chainID, r.indexTS);
+            let p1 = await this.getTokenPriceUSD(token1, chainID, r.indexTS);
+            if (p0 && p1) {
+                let issuance = parseFloat(r.issuance);
+                let tvlUSD = p0.priceUSD * r.lp0 + p1.priceUSD * r.lp1;
+                let priceUSD = tvlUSD / issuance;
+                let volumeUSD = parseFloat(r.token0Volume) * p0.priceUSD + parseFloat(r.token1Volume) * p1.priceUSD;
+                let state = JSON.parse(r.state);
+                let feesUSD = state.token0Fee * p0.priceUSD + state.token1Fee * p1.priceUSD;
+                let apy = (feesUSD / tvlUSD) * 365 * 24;
+                h.push({
+                    indexTS: r.indexTS,
+                    issuance: issuance,
+                    priceUSD: priceUSD,
+                    open: r.open,
+                    low: r.low,
+                    high: r.high,
+                    close: r.close,
+                    tvlUSD: tvlUSD,
+                    volumeUSD: volumeUSD,
+                    feesUSD: feesUSD,
+                    apy: apy,
+                });
+            }
+        }
+        return h;
     }
 
     async getPools(q) {
         try {
-	    console.log("getPools", q);
-	    let w = [];
-	    if ( q.symbol ) {
-		w.push(`( token0symbol = '${q.symbol}' or token1Symbol = '${q.symbol}' )`);
-	    }
-	    if ( q.routerAssetChain ) {
-		w.push(`router.routerAssetChain = '${q.routerAssetChain}'`);
-	    } else if ( q.chainfilters ) {
-		let chainfilters = this.canonicalize_chainfilters(q.chainfilters)
-		w.push(`router.chainID in '${chainfilters.join(",")}'`);
-	    }
-	    let wstr = ( w.length > 0 ) ? " and " + w.join(" and ") : "";
-	    let sql = `select asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders, 0 as tvlFree, apy1d, apy7d, apy30d, feesUSD1d, feesUSD7d, feesUSD30d from asset, router where router.assetName = asset.assetName  ${wstr};`
-	    let pools = await this.poolREADONLY.query(sql)
-	    for ( let p of pools ) {
-		if ( p.totalFree == 0 ) {
-		    p.priceUSD = 0;
-		}
-		let [_, id] = this.convertChainID(p.chainID)
-		p.id = id
-		p.chainName = this.getChainName(p.chainID)
-		p.poolName = p.token0Symbol + "/" + p.token1Symbol;
-		p.tvlFree = p.priceUSD * p.totalFree;
-		p.tvlReserved = p.priceUSD * p.totalReserved;
-		if ( p.tvlFree > 0 ) {
-		    console.log("getPools", p.priceUSD, p.totalFree, p.tvlFree, p.tvlReserved)
-		}
-	    }
-	    return pools
+            let w = [];
+            if (q.symbol) {
+                w.push(`( token0symbol = '${q.symbol}' or token1Symbol = '${q.symbol}' )`);
+            }
+            if (q.routerAssetChain) {
+                w.push(`router.routerAssetChain = '${q.routerAssetChain}'`);
+            } else if (q.chainfilters) {
+                let chainfilters = this.canonicalize_chainfilters(q.chainfilters)
+                w.push(`router.chainID in '${chainfilters.join(",")}'`);
+            }
+            let wstr = (w.length > 0) ? " and " + w.join(" and ") : "";
+            let sql = `select asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders, 0 as tvlFree, apy1d, apy7d, apy30d, feesUSD1d, feesUSD7d, feesUSD30d from asset, router where router.assetName = asset.assetName  ${wstr};`
+            let pools = await this.poolREADONLY.query(sql)
+            for (let p of pools) {
+                if (p.totalFree == 0) {
+                    p.priceUSD = 0;
+                }
+                let [_, id] = this.convertChainID(p.chainID)
+                p.id = id
+                p.chainName = this.getChainName(p.chainID)
+                p.poolName = p.token0Symbol + "/" + p.token1Symbol;
+                p.tvlFree = p.priceUSD * p.totalFree;
+                p.tvlReserved = p.priceUSD * p.totalReserved;
+            }
+            return pools
         } catch (e) {
-	    console.log(e)
+            console.log(e)
             //throw new paraTool.InvalidError(`Invalid ${hash}, err=${e.toString()}`)
         }
     }

@@ -336,7 +336,7 @@ function showchainstab(hash) {
             break;
         case "#pools":
             setupapidocs("pools", "list");
-        showpools("all", "chain");
+            showpools("all", "chain");
             break;
         case "#xcmtransfers":
             setupapidocs("xcmtransfers");

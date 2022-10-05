@@ -148,7 +148,7 @@ module.exports = class PriceManager extends Query {
     }
 
     async getChainRouters(chainID = -1) {
-        let sql = `select assetRouter.chainID, assetRouter.assetName as routerName, assetRouter.router as address, convert(asset.abiRaw using utf8) as ABI, numLPs 
+        let sql = `select assetRouter.chainID, assetRouter.assetName as routerName, assetRouter.router as address, convert(asset.abiRaw using utf8) as ABI, numLPs
 from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRouter.router = asset.asset where assetRouter.chainID = asset.chainID and asset.isRouter = 1 and assetRouter.chainID = '${chainID}'`;
         console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
@@ -329,7 +329,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                             }
                         }
                         if (interval == "5min" && (z == blocks.length - 1)) {
-                            // priceUSDPercentChange 
+                            // priceUSDPercentChange
                             let priceUSD24hr = isXCAsset ? await this.get_xcasset_priceUSD(symbol, relayChain, indexTS - 86400) : await this.get_asset_priceUSD(asset, chainID, indexTS - 86400);
                             let priceUSDPercentChange = (priceUSD24hr > 0) ? 100 * (priceUSD[0] - priceUSD24hr) / priceUSD24hr : 0
                             let sql = isXCAsset ? `update xcmasset set priceUSD = '${priceUSD[0]}', lastPriceUpdateDT = from_unixtime(${indexTS}), verificationPath = ${mysql.escape(JSON.stringify(verificationPath))}, liquid = '${liquid}' where symbol = '${symbol}' and relayChain = '${relayChain}' and ( liquid > '${liquid}' or ( liquid > 0 and lastPriceUpdateDT < date_sub(Now(), interval 1 hour) ) ) ` : `update xcmasset set priceUSD = '${priceUSD[0]}', lastPriceUpdateDT = from_unixtime(${indexTS}) where symbol = '${symbol}' and relayChain = '${relayChain}' and ( liquid > '${liquid}' or ( liquid > 0 and lastPriceUpdateDT < date_sub(Now(), interval 1 hour) ) )`
@@ -505,7 +505,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
             let router = routers[routerName];
             // compute paths out of USD
             let assets = await this.getChainRouterAssets(router);
-            router.paths = await this.getRouterAssetPaths(router, assets);
+            router.paths = await this.getRouterAssetPaths(router, assets, 2);
         }
 
         // SETUP: ethers provider/wallet for chain
@@ -521,9 +521,11 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         );
         let wallet = new ethers.Wallet(pk.toString(), provider);
 
+        let liquidBest = {}
         let blocks = await this.get_blocks_by_interval(chainID, startDate, endDate, interval);
         console.log(chain.RPCBackfill, chain, blocks);
         // for each path in router paths, use the hourly blockNumber from "blocks" to compute how much $1 gets you for the token
+        const liquidMax = 3 // do not update price if exceeding this
         for (const routerName of Object.keys(routers)) {
             // take a router and its paths, use the Contract to call getAmountsOut and figure out how much of the end asset exists after the path
             let router = routers[routerName];
@@ -560,51 +562,63 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                                     blockNumber: b.bn0
                                 };
                                 for (let d = 0; d < 4; d++) {
-                                    let s = (10 ** (d + decUSD)).toString() // $1 (d=0), $10 (d=1), $100 (d=2), $1000 (d=3)
+                                    let s = (10 ** (d + decUSD)).toString() // $.001 (d=0), $10 (d=1), $100 (d=2), $1000 (d=3)
+                                    if (d == 0) s = "1000";
                                     let start = ethers.BigNumber.from(s);
                                     const rawResult = await contract.getAmountsOut(start, path, {
                                         blockTag
                                     });
                                     let outarr = rawResult.toString().split(",");
                                     let p = outarr[outarr.length - 1] / 10 ** dec; // its the LAST amount that matters
-                                    priceUSD.push((10 ** d) / p); // 
-                                }
-                                let liquid = this.priceUSDArrayLiquid(priceUSD);
-                                console.log("router", routerName, router.address, "Valuing:", symbol, asset, "starting with", usdAsset, "priceUSD=", priceUSD, annotatedPath);
-                                if (isXCAsset) {
-                                    xcmassetpricelog.push(`('${symbol}', '${relayChain}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
-                                    if (xcmassetpricelog.length > 100) {
-                                        await this.upsertSQL({
-                                            "table": "xcmassetpricelog",
-                                            "keys": ["symbol", "relayChain", "routerAssetChain", "indexTS"],
-                                            "vals": vals,
-                                            "data": xcmassetpricelog,
-                                            "replace": vals
-                                        })
-                                        console.log("xcmassetpricelog", xcmassetpricelog.length);
-                                        xcmassetpricelog = []
+                                    if (p > 0) {
+                                        if (d == 0) {
+                                            priceUSD.push(.001 / p);
+                                        } else {
+                                            priceUSD.push((10 ** (d)) / p);
+                                        }
                                     }
-                                } else {
-                                    assetpricelog.push(`('${asset}', '${chainID}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
-                                    if (assetpricelog.length > 100) {
-                                        await this.upsertSQL({
-                                            "table": "assetpricelog",
-                                            "keys": ["asset", "chainID", "routerAssetChain", "indexTS"],
-                                            "vals": vals,
-                                            "data": assetpricelog,
-                                            "replace": vals
-                                        })
-                                        console.log("assetpricelog", assetpricelog.length);
-                                        assetpricelog = [];
-                                    }
-
                                 }
-                                if (interval == "5min" && (z == blocks.length - 1)) {
-                                    let priceUSD24hr = isXCAsset ? await this.get_xcasset_priceUSD(symbol, relayChain, indexTS - 86400) : await this.get_asset_priceUSD(asset, chainID, indexTS - 86400);
-                                    let priceUSDPercentChange = (priceUSD24hr > 0) ? 100 * (priceUSD[0] - priceUSD24hr) / priceUSD24hr : 0
-                                    let sql = isXCAsset ? `update xcmasset set priceUSD = '${priceUSD[0]}', lastPriceUpdateDT = from_unixtime(${indexTS}), liquid = ${liquid}, priceUSDPercentChange = '${priceUSDPercentChange}', verificationPath = ${mysql.escape(JSON.stringify(verificationPath))} where symbol = '${symbol}' and relayChain = '${relayChain}' and ( liquid > '${liquid}' or liquid > 0 and lastPriceUpdateDT < date_sub(Now(), interval 1 hour) )` : `update asset set priceUSD = '${priceUSD[0]}', lastPriceUpdateDT = from_unixtime(${indexTS}), liquid = ${liquid}, priceUSDPercentChange = '${priceUSDPercentChange}', verificationPath = ${mysql.escape(JSON.stringify(verificationPath))} where asset = '${asset}' and chainID = '${chainID}' and ( liquid > '${liquid}' or liquid > 0 and lastPriceUpdateDT < date_sub(Now(), interval 1 hour) )`
-                                    console.log(sql);
-                                    this.batchedSQL.push(sql);
+                                if (priceUSD.length == 4 && priceUSD[0] < priceUSD[1]) {
+                                    let liquid = this.priceUSDArrayLiquid(priceUSD);
+                                    console.log("router", routerName, router.address, "Valuing:", symbol, asset, "starting with", usdAsset, "priceUSD=", priceUSD, annotatedPath);
+                                    if (isXCAsset) {
+                                        xcmassetpricelog.push(`('${symbol}', '${relayChain}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
+                                        if (xcmassetpricelog.length > 100) {
+                                            await this.upsertSQL({
+                                                "table": "xcmassetpricelog",
+                                                "keys": ["symbol", "relayChain", "routerAssetChain", "indexTS"],
+                                                "vals": vals,
+                                                "data": xcmassetpricelog,
+                                                "replace": vals
+                                            })
+                                            console.log("xcmassetpricelog", xcmassetpricelog.length);
+                                            xcmassetpricelog = []
+                                        }
+                                    } else {
+                                        assetpricelog.push(`('${asset}', '${chainID}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
+                                        if (assetpricelog.length > 100) {
+                                            await this.upsertSQL({
+                                                "table": "assetpricelog",
+                                                "keys": ["asset", "chainID", "routerAssetChain", "indexTS"],
+                                                "vals": vals,
+                                                "data": assetpricelog,
+                                                "replace": vals
+                                            })
+                                            console.log("assetpricelog", assetpricelog.length);
+                                            assetpricelog = [];
+                                        }
+                                    }
+                                    if (interval == "5min" && (z == blocks.length - 1) && liquid < liquidMax && liquid > 0) {
+                                        if (liquidBest[asset] == undefined || liquidBest[asset] > liquid) {
+                                            let priceUSD24hr = isXCAsset ? await this.get_xcasset_priceUSD(symbol, relayChain, indexTS - 86400) : await this.get_asset_priceUSD(asset, chainID, indexTS - 86400);
+                                            let priceUSDPercentChange = (priceUSD24hr > 0) ? 100 * (priceUSD[0] - priceUSD24hr) / priceUSD24hr : 0
+                                            let sql = isXCAsset ? `update xcmasset set priceUSD = '${priceUSD[0]}', lastPriceUpdateDT = from_unixtime(${indexTS}), liquid = ${liquid}, priceUSDPercentChange = '${priceUSDPercentChange}', verificationPath = ${mysql.escape(JSON.stringify(verificationPath))} where symbol = '${symbol}' and relayChain = '${relayChain}'` : `update asset set priceUSD = '${priceUSD[0]}', lastPriceUpdateDT = from_unixtime(${indexTS}), liquid = ${liquid}, priceUSDPercentChange = '${priceUSDPercentChange}', verificationPath = ${mysql.escape(JSON.stringify(verificationPath))} where asset = '${asset}' and chainID = '${chainID}'`
+                                            console.log(sql);
+                                            this.batchedSQL.push(sql);
+                                            await this.update_batchedSQL();
+                                            liquidBest[asset] = liquid
+                                        }
+                                    }
                                 }
                             } catch (err) {
                                 console.log(err);
@@ -612,7 +626,6 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                         }
                     }
                 }
-
                 await this.upsertSQL({
                     "table": "assetpricelog",
                     "keys": ["asset", "chainID", "routerAssetChain", "indexTS"],
@@ -805,4 +818,126 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         }
         await this.fetch_coin_prices_percentages(coingeckoIDList);
     }
+
+    async updateFeesAPY(chainID, test = false) {
+        let lookbackDaysRanges = [1, 7, 30];
+        for (const lookbackDays of lookbackDaysRanges) {
+            await this.update_fees_apy(chainID, lookbackDays, test);
+        }
+    }
+
+    async update_fees_apy(chainID, lookbackDays = 7, test = true) {
+        try {
+            let wstr = (test) ? " and asset.asset = '0xa927e1e1e044ca1d9fe1854585003477331fe2af'" : ""
+            let sql = `select asset.asset, asset.chainID, indexTS, token0, token1, token0Symbol, token1Symbol, symbol, lp0, lp1, totalFree, totalReserved, convert(state using utf8) state from assetlog, asset where assetlog.asset = asset.asset and assetlog.chainID = asset.chainID and indexTS >= unix_timestamp(date_sub(Now(), interval 24 * ${lookbackDays} hour)) and assetType = 'ERC20LP' and asset.chainID = ${chainID} and indexTS % 3600 = 0 ${wstr}`
+            var recs = await this.poolREADONLY.query(sql);
+            let assetrecs = {};
+            for (const r of recs) {
+                if (assetrecs[r.asset] == undefined) {
+                    assetrecs[r.asset] = [];
+                }
+                r.state = JSON.parse(r.state);
+                assetrecs[r.asset].push(r);
+            }
+            let out = [];
+            let vals = [`apy${lookbackDays}d`, `feesUSD${lookbackDays}d`, `tvlUSD`, `priceUSD`];
+            for (const asset of Object.keys(assetrecs)) {
+                let lp = assetrecs[asset][0]
+                let summary = await this.compute_apy_fees(assetrecs[asset], lp);
+                if (summary && summary.average_tvlUSD > 100) {
+                    console.log("lp", lp.token0Symbol, lp.token1Symbol, "summary", summary);
+                    out.push(`(${mysql.escape(asset)}, '${chainID}', '${summary.apy}', '${summary.daily_feesUSD*lookbackDays}', '${summary.tvlUSD}', '${summary.priceUSD}')`);
+                    if (out.length > 0) {
+                        await this.upsertSQL({
+                            "table": "asset",
+                            "keys": ["asset", "chainID"],
+                            "vals": vals,
+                            "data": out,
+                            "replace": vals
+                        });
+                        out = [];
+                    }
+                }
+            }
+            console.log(lookbackDays, out);
+            await this.upsertSQL({
+                "table": "asset",
+                "keys": ["asset", "chainID"],
+                "vals": vals,
+                "data": out,
+                "replace": vals
+            });
+        } catch (err) {
+            console.log(err);
+            process.exit(0);
+        }
+    }
+    async compute_apy_fees(hourlydata, lpRecord) {
+        let sum = {
+            token0Price: 0,
+            token1Price: 0,
+            token0Fee: 0,
+            token1Fee: 0,
+            issuance: 0,
+            tvlUSDLast: 0,
+            tvlUSD: 0,
+            tvlUSDTS: 0,
+            numHours: 0,
+            token0FeeUSD: 0,
+            token1FeeUSD: 0
+        }
+
+        let totalFree = null;
+        for (const x of hourlydata) {
+            // this gets the price of each token in the pair for each hour
+            let p0 = await this.getTokenPriceUSD(x.token0, x.chainID, x.indexTS + 1800)
+            let p1 = await this.getTokenPriceUSD(x.token1, x.chainID, x.indexTS + 1800)
+            if (p0 && p1) {
+                let s = x.state;
+                let tvlUSD = x.lp0 * p0.priceUSD + x.lp1 * p1.priceUSD;
+                sum.currToken0Price = p0.priceUSD
+                sum.currToken1Price = p1.priceUSD
+                sum.currToken0FeeUSD = (s.token0Volume) * 0.0025 * p0.priceUSD;
+                sum.currToken1FeeUSD = (s.token1Volume) * 0.0025 * p1.priceUSD;
+                if (x.indexTS > sum.tvlUSDTS) {
+                    sum.tvlUSDTS = x.indexTS;
+                    sum.tvlUSDLast = tvlUSD;
+                }
+                sum.tvlUSD += tvlUSD;
+                sum.token0Fee += (s.token0Volume) * 0.0025; // not used
+                sum.token1Fee += (s.token1Volume) * 0.0025; // not used
+                sum.token0FeeUSD += (s.token0Volume) * 0.0025 * p0.priceUSD;
+                sum.token1FeeUSD += (s.token1Volume) * 0.0025 * p1.priceUSD;
+                sum.issuance += s.issuance; // not used
+                sum.numHours++;
+                totalFree = x.totalFree;
+            }
+
+        }
+        if (sum.numHours > 0) {
+            let hourly_feesUSD = (sum.token0FeeUSD + sum.token1FeeUSD) / sum.numHours; // this works even if we have < 24 hours
+            let daily_feesUSD = 24 * hourly_feesUSD;
+            let average_tvlUSD = sum.tvlUSD / sum.numHours;
+            let average_issuance = sum.issuance / sum.numHours; // not used
+            let apy = (daily_feesUSD / average_tvlUSD) * 365;
+            let tvlUSD = sum.tvlUSDLast;
+            let priceUSD = (totalFree > 0) ? tvlUSD / totalFree : 0;
+            return {
+                apy,
+                daily_feesUSD,
+                tvlUSD,
+                average_tvlUSD,
+                average_issuance,
+                priceUSD
+            }
+        } else {
+            return null;
+        }
+
+        let sql = `update router, (select routerAssetChain, round(sum(asset.tvlUSD), 2) as tvlUSD from asset join router on asset.assetName=router.assetName group by routerAssetChain) as t set router.tvl = t.tvlUSD where router.routerAssetChain = t.routerAssetChain;`
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
+    }
+
+
 }

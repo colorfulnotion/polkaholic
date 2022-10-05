@@ -480,7 +480,7 @@ function presentAssetPair(row) {
     try {
         let asset0 = row.token0
         let asset1 = row.token1
-	let nm = row.chainName ? `${row.chainName} Pool` : `Pool`;
+        let nm = row.chainName ? `${row.chainName} Pool` : `Pool`;
         let assetPair = `<a href='/pool/${row.asset}/${row.chainID}'>${nm}</a>`
         return `${assetPair}: <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token0) + '">' + row.token0Symbol + `</a> / <a href="/asset/${row.chainID}/` + encodeURIComponent2(row.token1) + '">' + row.token1Symbol + '</a>';
     } catch (e) {

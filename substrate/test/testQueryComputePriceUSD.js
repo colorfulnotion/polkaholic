@@ -126,28 +126,42 @@ async function main() {
         }
     }
     assets = {
-        "DOT-lcDOT LP-acala": {assetChain:'[{"Token":"DOT"},{"LiquidCrowdloan":"13"}]~2000'},
-        "KAR-KSM LP-karura": {assetChain: '[{"Token":"KAR"},{"Token":"KSM"}]~22000'},
-        "KAR-LKSM LP-karura": {assetChain: '[{"Token":"KAR"},{"Token":"LKSM"}]~22000'},
-        "KUSD-BNC LP-karura": {assetChain: '[{"Token":"KUSD"},{"Token":"BNC"}]~22000'},
-        'KUSD/CSM LP-karura': {assetChain: '[{"Token":"KUSD"},{"ForeignAsset":"5"}]~22000'},
-        'KSM/ARIS LP-karura': {assetChain: '[{"Token":"KSM"},{"ForeignAsset":"1"}]~22000'},
+        "DOT-lcDOT LP-acala": {
+            assetChain: '[{"Token":"DOT"},{"LiquidCrowdloan":"13"}]~2000'
+        },
+        "KAR-KSM LP-karura": {
+            assetChain: '[{"Token":"KAR"},{"Token":"KSM"}]~22000'
+        },
+        "KAR-LKSM LP-karura": {
+            assetChain: '[{"Token":"KAR"},{"Token":"LKSM"}]~22000'
+        },
+        "KUSD-BNC LP-karura": {
+            assetChain: '[{"Token":"KUSD"},{"Token":"BNC"}]~22000'
+        },
+        'KUSD/CSM LP-karura': {
+            assetChain: '[{"Token":"KUSD"},{"ForeignAsset":"5"}]~22000'
+        },
+        'KSM/ARIS LP-karura': {
+            assetChain: '[{"Token":"KSM"},{"ForeignAsset":"1"}]~22000'
+        },
     }
     assets = {
-	'stableassetpool-karura': {assetChain: `{"StableAssetPoolToken":"0"}~22000`}
+        'stableassetpool-karura': {
+            assetChain: `{"StableAssetPoolToken":"0"}~22000`
+        }
     }
 
     let ts = query.currentTS();
     for (const testcaseName of Object.keys(assets)) {
         let q = assets[testcaseName];
         console.log("INPUT", q, `(testcaseName=${testcaseName})`);
-	q.ts = ts;
+        q.ts = ts;
         let res = await query.computePriceUSD(q);
-        if ( res ) {
-	    console.log("OUTPUT", ts, res.priceUSD);
-	} else {
-	    console.log("OUTPUT", ts, res);
-	}
+        if (res) {
+            console.log("OUTPUT", ts, res.priceUSD);
+        } else {
+            console.log("OUTPUT", ts, res);
+        }
     }
 }
 

@@ -1478,7 +1478,7 @@ app.get('/asset/:chainID/:currencyID', async (req, res) => {
             docsSection: "get-asset"
         });
     } catch (err) {
-	console.log(err)
+        console.log(err)
         return res.status(400).json({
             error: err.toString()
         });
@@ -1549,21 +1549,23 @@ app.get('/wasmcode/:codeHash/:chainID?', async (req, res) => {
 
 app.get('/router/:routerAssetChain/:symbol?', async (req, res) => {
     try {
-        let q = { routerAssetChain: req.params['routerAssetChain'] };
-	if ( req.params['symbol'] ) {
-	    q.symbol = req.params['symbol'];
-	}
-	let router = await query.getRouter(q.routerAssetChain);
-	let pools = await query.getPools(q);
+        let q = {
+            routerAssetChain: req.params['routerAssetChain']
+        };
+        if (req.params['symbol']) {
+            q.symbol = req.params['symbol'];
+        }
+        let router = await query.getRouter(q.routerAssetChain);
+        let pools = await query.getPools(q);
         res.render('router', {
-	    router: router,
+            router: router,
             pools: pools,
             chainInfo: query.getChainInfo(),
             apiUrl: req.path,
             docsSection: "get-pools"
         });
     } catch (err) {
-	console.log(err)
+        console.log(err)
         return res.status(400).json({
             error: err.toString()
         });
@@ -1574,15 +1576,15 @@ app.get('/pool/:asset/:chainID', async (req, res) => {
     try {
         let asset = req.params['asset'];
         let chainID = req.params['chainID'];
-	let pool = await query.getPool(asset, chainID);
-	let history = await query.getPoolHistory(asset, chainID);
-	let accounts = {}
+        let pool = await query.getPool(asset, chainID);
+        let history = await query.getPoolHistory(asset, chainID);
+        let accounts = {}
         res.render('pool', {
-	    asset,
-	    chainID,
+            asset,
+            chainID,
             pool,
-	    history,
-	    accounts,
+            history,
+            accounts,
             chainInfo: query.getChainInfo(),
             apiUrl: req.path,
             docsSection: "get-pools"
