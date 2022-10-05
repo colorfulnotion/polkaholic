@@ -10,7 +10,9 @@ async function main() {
 
     // get all the routers of a chain, eg Moonbeam
     let chainID = 2004;
-    let routers = await query.getRouters({chainfilters: [chainID]})
+    let routers = await query.getRouters({
+        chainfilters: [chainID]
+    })
     //console.log("routers", routers);
 
     // get a specific router eg Stellaswap router
@@ -19,7 +21,9 @@ async function main() {
     //console.log("router", router);
 
     // get all the pools of the above router 
-    let pools = await query.getPools({routerAssetChain: routerAssetChain})
+    let pools = await query.getPools({
+        routerAssetChain: routerAssetChain
+    })
     //let pools = await query.getPools({routerAssetChain: routerAssetChain, symbol: "xcDOT"})
     //console.log("pools", pools);
 

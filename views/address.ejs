@@ -48,8 +48,9 @@
 	<% } %>
 	<% if ( contract && ( contract.assetType == "ERC20" || contract.assetType == "ERC20LP" ) ) { console.log(contract);  %>
 	<tr>
-		<td>Token Tracker:</td>
-		<td><a href='/token/<%= address; %>'><%- contract.assetName %> (<%- contract.localSymbol; %>)</a> (<%- uiTool.currencyFormat(contract.priceUSD); %>)</td>
+<% console.log(contract); %>
+<td>Token Symbol:</td>
+		<td><%- contract.symbol; %></td>
 	</tr>
 	<% } %>
 	<tr>

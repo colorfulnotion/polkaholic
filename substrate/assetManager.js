@@ -556,7 +556,7 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
         let nassets = 0;
         let assetInfo = {};
         let currencyIDInfo = {};
-	let xcContractAddress = {};
+        let xcContractAddress = {};
         let symbolRelayChainAsset = {};
         for (let i = 0; i < assetRecs.length; i++) {
             let v = assetRecs[i];
@@ -565,9 +565,9 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
             let vAsset = paraTool.VSTokenToToken(v.asset)
             let assetChain = paraTool.makeAssetChain(vAsset, v.chainID);
             let priceUSDpaths = (v.priceUSDpaths) ? JSON.parse(v.priceUSDpaths.toString()) : false;
-	    if ( v.asset == '{"StableAssetPoolToken":"0"}' ) {
-		v.assetType = 'LiquidityPair';
-	    }
+            if (v.asset == '{"StableAssetPoolToken":"0"}') {
+                v.assetType = 'LiquidityPair';
+            }
 
             if (v.assetType == 'LiquidityPair' || v.assetType == 'ERC20LP') { //'ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special'
                 a = {
@@ -823,8 +823,8 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
             assetlog.assetType = "Token";
             assetlog.symbol = q.symbol;
             assetlog.isXCAsset = q.isXCAsset;
-        } else if ( this.assetInfo[assetChain] ) {
-	    let a = this.assetInfo[assetChain];
+        } else if (this.assetInfo[assetChain]) {
+            let a = this.assetInfo[assetChain];
             assetlog.assetType = a.assetType;
             assetlog.symbol = a.symbol;
             assetlog.isXCAsset = (a.xcmInteriorKey && a.xcmInteriorKey.length > 0)
@@ -1004,11 +1004,12 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
         return c
     }
 
-    async getTokenPriceUSD(asset, chainID, ts = null) {
+    async getTokenPriceUSD(asset, chainID, ts = null, liquidMax = 2.0) {
         return await this.computePriceUSD({
             asset,
             chainID,
-            ts
+            ts,
+            liquidMax
         })
     }
     // given multiple source, choose that with the highest liquidity
@@ -1131,6 +1132,11 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
                         //console.log("RESULT", result, "best", bestRouterAssetChainResult);
                         res.priceUSD = bestRouterAssetChainResult.p;
                         if (q.val) res.valUSD = q.val * res.priceUSD;
+                        if (q.liquidMax && bestRouterAssetChainResult.liquid > q.liquidMax) {
+                            return null;
+                        } else if (bestRouterAssetChainResult.liquid > 3) {
+                            return null;
+                        }
                         return res;
                     }
                 } else {
@@ -1139,44 +1145,43 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
                 return null;
                 break;
             case paraTool.assetTypeERC20LiquidityPair:
-        case paraTool.assetTypeLiquidityPair:  {
-            /*
-            	    if WGLMR is $2.13 and GLINT is $0.003049, how much is 1 WGLMR/GLINT
-            total lp0(WGLMR): 267712
-            total lp1(GLINT): 128949000
-            total LP issuance WGLMR/GLINT: 5770310
+            case paraTool.assetTypeLiquidityPair: {
+                /*
+                	    if WGLMR is $2.13 and GLINT is $0.003049, how much is 1 WGLMR/GLINT
+                total lp0(WGLMR): 267712
+                total lp1(GLINT): 128949000
+                total LP issuance WGLMR/GLINT: 5770310
 
-            1 share of WGLMR/GLINT is 267712/5770310 ~ 0.04639473442 WGLMR + 128949000/5770310  ~ 22.346979625 GLINT
-            ~= 2.13*0.04639473442 + 22.346979625*0.003049
-            ~= 0.09882078431 + 0.06813594087
-            	    ~= 0.16695672518
-            */
-            let dexRec = await this.getDexRec(q.asset, q.chainID, ts);
-            if (!dexRec) {
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned`, q);
-                return null
+                1 share of WGLMR/GLINT is 267712/5770310 ~ 0.04639473442 WGLMR + 128949000/5770310  ~ 22.346979625 GLINT
+                ~= 2.13*0.04639473442 + 22.346979625*0.003049
+                ~= 0.09882078431 + 0.06813594087
+                	    ~= 0.16695672518
+                */
+                let dexRec = await this.getDexRec(q.asset, q.chainID, ts);
+                if (!dexRec) {
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`${assetInfo.assetType} no assetpair info returned`, q);
+                    return null
+                }
+
+                let p0 = await this.getTokenPriceUSD(assetInfo.token0, q.chainID, ts);
+                let p1 = await this.getTokenPriceUSD(assetInfo.token1, q.chainID, ts);
+                if (p0 && p1) {
+                    let priceUSD1 = (p0.priceUSD == 1 && (p1.priceUSD == 0)) ? dexRec.lp0 / dexRec.lp1 : p1.priceUSD;
+                    let priceUSD0 = (p0.priceUSD == 0 && (p1.priceUSD == 1)) ? dexRec.lp1 / dexRec.lp0 : p0.priceUSD;
+                    let priceUSD1Current = (p0.priceUSDCurrent == 1 && (p1.priceUSDCurrent == 0)) ? dexRec.lp0 / dexRec.lp1 : p1.priceUSDCurrent;
+                    let priceUSD0Current = (p0.priceUSDCurrent == 0 && (p1.priceUSDCurrent == 1)) ? dexRec.lp1 / dexRec.lp0 : p0.priceUSDCurrent;
+                    let issuance = dexRec.issuance;
+                    let x0 = dexRec.lp0 / issuance;
+                    let x1 = dexRec.lp1 / issuance;
+                    res.priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
+                    //console.log("ts", ts, "x0", x0, "x1", x1, "p0", priceUSD0, "p1", priceUSD1, "RES", res.priceUSD);
+                    res.priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
+                    if (q.val) res.valUSD = q.val * res.priceUSD
+                    return res
+                } else {
+                    return null;
+                }
             }
-	    console.log("DEXREC", dexRec);
-	    
-            let p0 = await this.getTokenPriceUSD(assetInfo.token0, q.chainID, ts);
-            let p1 = await this.getTokenPriceUSD(assetInfo.token1, q.chainID, ts);
-	    if ( p0 && p1 ) {
-		let priceUSD1 =  (p0.priceUSD == 1 && (p1.priceUSD == 0)) ? dexRec.lp0 / dexRec.lp1 : p1.priceUSD;
-		let priceUSD0 =  (p0.priceUSD == 0 && (p1.priceUSD == 1)) ? dexRec.lp1 / dexRec.lp0 : p0.priceUSD;
-		let priceUSD1Current = (p0.priceUSDCurrent == 1 && (p1.priceUSDCurrent == 0)) ? dexRec.lp0 / dexRec.lp1 : p1.priceUSDCurrent;
-		let priceUSD0Current = (p0.priceUSDCurrent == 0 && (p1.priceUSDCurrent == 1)) ? dexRec.lp1 / dexRec.lp0 : p0.priceUSDCurrent;
-		let issuance = dexRec.issuance;
-		let x0 = dexRec.lp0 / issuance;
-		let x1 = dexRec.lp1 / issuance;
-		res.priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
-		//console.log("ts", ts, "x0", x0, "x1", x1, "p0", priceUSD0, "p1", priceUSD1, "RES", res.priceUSD);
-		res.priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
-		if (q.val) res.valUSD = q.val * res.priceUSD
-                return res
-            } else {
-		return null;
-	    }
-	}
             break;
             case paraTool.assetTypeLoan: {
                 let parsedAsset = JSON.parse(q.asset);

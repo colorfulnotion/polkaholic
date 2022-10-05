@@ -418,20 +418,24 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
 // Usage: https://api.polkaholic.io/chain/pools/2004
 app.get('/chain/:assetType/:chainID_or_chainName?', async (req, res) => {
     try {
-        let chainID_or_chainName = req.params["chainID_or_chainName"] ? req.params["chainID_or_chainName"]  : null
+        let chainID_or_chainName = req.params["chainID_or_chainName"] ? req.params["chainID_or_chainName"] : null
         let assetType = req.params["assetType"];
         let assets = null;
-	if ( assetType == "pools" ) {
-	    assets = await query.getPools({chainfilters: [chainID_or_chainName]});
-	} else if ( assetType == "routers" ) {
-	    assets = await query.getRouters({chainfilters: [chainID_or_chainName]});
-	} else if ( assetType == "channels" ) {
-	    assets =await query.getChainChannels(chainID_or_chainName);
-	} else {
-	    assets = await query.getChainAssets(chainID_or_chainName, "Token");
-	}
+        if (assetType == "pools") {
+            assets = await query.getPools({
+                chainfilters: [chainID_or_chainName]
+            });
+        } else if (assetType == "routers") {
+            assets = await query.getRouters({
+                chainfilters: [chainID_or_chainName]
+            });
+        } else if (assetType == "channels") {
+            assets = await query.getChainChannels(chainID_or_chainName);
+        } else {
+            assets = await query.getChainAssets(chainID_or_chainName, "Token");
+        }
 
-	if (assets) {
+        if (assets) {
             res.write(JSON.stringify(assets));
             await query.tallyAPIKey(getapikey(req));
             res.end();
@@ -448,14 +452,16 @@ app.get('/chain/:assetType/:chainID_or_chainName?', async (req, res) => {
 // Usage: https://api.polkaholic.io/pools/router/0x70085a09d30d6f8c4ecf6ee10120d1847383bb57~2004
 app.get('/pools/:assetType/:routerAssetChain', async (req, res) => {
     try {
-        let routerAssetChain = req.params["routerAssetChain"] ? req.params["routerAssetChain"]  : null
+        let routerAssetChain = req.params["routerAssetChain"] ? req.params["routerAssetChain"] : null
         let assetType = req.params["assetType"];
         let pools = null;
-	if ( assetType == "router" ) {
-	    pools = await query.getPools({routerAssetChain});
-	} else {
-	    pools = await query.getPools({});
-	}
+        if (assetType == "router") {
+            pools = await query.getPools({
+                routerAssetChain
+            });
+        } else {
+            pools = await query.getPools({});
+        }
         if (pools) {
             res.write(JSON.stringify(pools));
             await query.tallyAPIKey(getapikey(req));

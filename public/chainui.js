@@ -833,24 +833,24 @@ function showrouters(chainID) {
                 }
                 return data;
             }
-        },{
+        }, {
             data: 'chainName',
             render: function(data, type, row, meta) {
-		if ( row.chainName ) {
+                if (row.chainName) {
                     if (type == 'display') {
-			return `<A href="/chain/${row.id}#routers">${row.chainName}</A>`;
+                        return `<A href="/chain/${row.id}#routers">${row.chainName}</A>`;
                     }
                     return data;
-		}
-		return "-"
+                }
+                return "-"
             }
         }, {
             data: 'tvl',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-		    return currencyFormat(data);
+                    return currencyFormat(data);
                 } else
-		    return data;
+                    return data;
             }
         }]
     });
@@ -884,8 +884,8 @@ function showpools(asset, assetType = "router") {
                 if (type == 'display') {
                     return presentAssetPair(row);
                 } else {
-		    return row.token0Symbol + " " + row.token1Symbol
-		}
+                    return row.token0Symbol + " " + row.token1Symbol
+                }
                 return data;
             }
         }, {

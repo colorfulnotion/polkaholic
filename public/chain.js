@@ -634,7 +634,7 @@ function showchaintab(hash) {
             setupapidocs("chain", "tokens", `${id}`);
             break;
         case "#pools":
-        showpools(id, "chain");
+            showpools(id, "chain");
             setupapidocs("chain", "pools", `${id}`);
             break;
         case "#chainlog":

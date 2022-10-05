@@ -1,0 +1,38 @@
+#!/usr/bin/env node
+/*
+ Usage: updateFeesAPY [chainID]
+*/
+
+var PriceManager = require("./priceManager");
+var ParaTool = require("./paraTool");
+
+async function main() {
+    let chainID = -1;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+	    chainID = parseInt(val, 10);
+        }
+    });
+    if ( chainID == -1 ) {
+	let chainIDs = [2004, 2006];
+	for ( const chainID of chainIDs) {
+	    let priceManager = new PriceManager();
+	    await priceManager.init();
+
+	    await priceManager.updateFeesAPY(chainID);
+	}
+    } else {
+	let priceManager = new PriceManager();
+	await priceManager.init();
+	await priceManager.updateFeesAPY(chainID);
+    }
+}
+
+main()
+    .then(() => {
+	process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

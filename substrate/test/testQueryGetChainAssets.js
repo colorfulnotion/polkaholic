@@ -16,9 +16,9 @@ async function main() {
     let assetType = "ERC20"; // "Token"
     var chainassets = await query.getChainAssets(chainID, assetType);
     console.log(JSON.stringify(chainassets));
-    
-//    var symbolassets = await query.getSymbolAssets("DOT");
-  //  console.log(JSON.stringify(symbolassets));
+
+    //    var symbolassets = await query.getSymbolAssets("DOT");
+    //  console.log(JSON.stringify(symbolassets));
 }
 
 main()
