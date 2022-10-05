@@ -35,6 +35,7 @@ var debugLevel = paraTool.debugTracing
 var query = new Query(debugLevel);
 app.locals.paraTool = paraTool;
 app.locals.uiTool = uiTool;
+app.locals.query = query;
 app.locals.config = prodConfig;
 
 // For local web/API development, add this to your ~/.bashrc:

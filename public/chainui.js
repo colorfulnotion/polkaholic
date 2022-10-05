@@ -956,14 +956,14 @@ function showpools(asset, assetType = "router") {
                 }
             }
         }, {
-            data: 'tvlFree',
+            data: 'tvlUSD',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-                    if (row.tvlFree != undefined) {
+                    if (row.tvlUSD != undefined) {
                         return currencyFormat(data);
                     }
                 } else {
-                    if (row.tvlFree != undefined) {
+                    if (row.tvlUSD != undefined) {
                         return data;
                     }
                 }

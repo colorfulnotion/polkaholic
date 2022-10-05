@@ -151,6 +151,15 @@ async function main() {
         }
     }
 
+    assets = {
+        'SOLAR': {
+            assetChain: `0x6bd193ee6d2104f14f94e2ca6efefae561a4334b~22023`
+        },
+        'WMOVR': {
+            assetChain: `0x98878b06940ae243284ca214f92bb71a2b032b8a~22023`
+        }
+    }
+
     let ts = query.currentTS();
     for (const testcaseName of Object.keys(assets)) {
         let q = assets[testcaseName];
