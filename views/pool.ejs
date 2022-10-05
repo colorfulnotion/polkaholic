@@ -73,12 +73,67 @@
 </table>
 
 
+<div class="row">
+  <div class="col-sm-4">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title"><%- pool.token0Symbol %> / <%- pool.token1Symbol %></h5>
+        <div id="close"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">TVL (USD)</h5>
+	<div id="tvlUSD"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-4">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Volume (USD)</h5>
+        <div id="volumeUSD"></div>
+      </div>
+    </div>
+  </div>
+  
+</div>
+
+
+
 <script>
 var asset = '<%- asset; %>';
 var chain = '<%- chainID; %>';
-var history = <%- JSON.stringify(history); %>;
+var poolhistory = <%- JSON.stringify(history); %>;
 var accounts = <%- JSON.stringify(accounts); %>;
+function get_history_data(f) {
+  let out = [];
+  for (let i =0; i < poolhistory.length; i++) {
+    let h= poolhistory[i];
+    out.push([h.indexTS*1000, h[f]]);
+  }
+  return(out);
+}
+let fields = ["tvlUSD", "volumeUSD", "close"];
+for (const field of fields) {
+    Highcharts.stockChart(field, {
+      rangeSelector: {
+        selected: 1
+      },
+      series: [{
+        name: field,
+        data: get_history_data(field),
+        tooltip: {
+          valueDecimals: 3
+        }
+      }]
+    })
+}
 </script>
+
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script src="/assetui.js"></script>
 

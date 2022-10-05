@@ -6948,9 +6948,9 @@ module.exports = class Query extends AssetManager {
         return p;
     }
 
-    async getPoolHistory(asset, chainID, interval = "daily", lookbackDays = 14) {
-
-        let sql = `select indexTS, priceUSD, low, high, open, close, lp0, lp1, token0Volume, token1Volume, issuance, CONVERT(state using utf8) as state from assetlog where asset = '${asset}' and chainID = '${chainID}' and indexTS > UNIX_TIMESTAMP(date_sub(Now(), INTERVAL ${lookbackDays} DAY)) order by indexTS desc`
+    async getPoolHistory(asset, chainID, interval = "hourly", lookbackDays = 90) {
+        let sql = `select indexTS, priceUSD, low, high, open, close, lp0, lp1, token0Volume, token1Volume, issuance, CONVERT(state using utf8) as state from assetlog where asset = '${asset}' and chainID = '${chainID}' and indexTS > UNIX_TIMESTAMP(date_sub(Now(), INTERVAL ${lookbackDays} DAY)) and indexTS % 3600 = 0 order by indexTS desc`
+	console.log("getPoolHistory", sql);
         let recs = await this.poolREADONLY.query(sql)
         let h = [];
         let pool = await this.getPool(asset, chainID);
@@ -6958,16 +6958,16 @@ module.exports = class Query extends AssetManager {
         let token0 = pool.token0;
         let token1 = pool.token1;
         for (const r of recs) {
-            let p0 = await this.getTokenPriceUSD(token0, chainID, r.indexTS);
-            let p1 = await this.getTokenPriceUSD(token1, chainID, r.indexTS);
+            let p0 = await this.getTokenPriceUSD(token0, chainID, r.indexTS + 1800);
+            let p1 = await this.getTokenPriceUSD(token1, chainID, r.indexTS + 1800);
             if (p0 && p1) {
                 let issuance = parseFloat(r.issuance);
                 let tvlUSD = p0.priceUSD * r.lp0 + p1.priceUSD * r.lp1;
                 let priceUSD = tvlUSD / issuance;
-                let volumeUSD = parseFloat(r.token0Volume) * p0.priceUSD + parseFloat(r.token1Volume) * p1.priceUSD;
                 let state = JSON.parse(r.state);
-                let feesUSD = state.token0Fee * p0.priceUSD + state.token1Fee * p1.priceUSD;
-                let apy = (feesUSD / tvlUSD) * 365 * 24;
+                let volumeUSD = parseFloat(r.token0Volume) * p0.priceUSD + parseFloat(r.token1Volume) * p1.priceUSD;
+                let feesUSD = .0025 * volumeUSD; // (state.token0Volume) * 0.0025 * p0.priceUSD + (s.token1Volume) * 0.0025 * p1.priceUSD; 
+		let feesUSDimp = state.token0Fee * p0.priceUSD + state.token1Fee * p1.priceUSD;  // which could be negative
                 h.push({
                     indexTS: r.indexTS,
                     issuance: issuance,
@@ -6979,10 +6979,13 @@ module.exports = class Query extends AssetManager {
                     tvlUSD: tvlUSD,
                     volumeUSD: volumeUSD,
                     feesUSD: feesUSD,
-                    apy: apy,
+		    feesUSDimp: feesUSDimp
                 });
             }
         }
+	h.sort(function(a,b) {
+	    return(a.indexTS - b.indexTS);
+	});
         return h;
     }
 
