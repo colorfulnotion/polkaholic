@@ -251,6 +251,17 @@ module.exports = class ParallelParser extends ChainParser {
         return res
     }
 
+    getAssetsAssetVal(indexer, decoratedVal) {
+        let k = JSON.parse(decoratedVal)
+        let res = {}
+        let extraField = []
+        extraField['rawSupply'] = paraTool.dechexToInt(k.supply)
+        res["pv"] = k
+        res["extra"] = extraField
+        console.log(`Im here 2a`, res)
+        return res
+    }
+
     getLoanBorrowedIndexVal(indexer, decoratedVal) {
         let k = JSON.parse(decoratedVal)
         let res = {}
@@ -428,8 +439,9 @@ module.exports = class ParallelParser extends ChainParser {
         if (pallet_section == "assets:account") {
             // decoratedKey: ["100","hJHfe3mtq3Rx4gcUGtSjXwL4Wmq3Krtt3uumUhXG1rTq9WwZg"]
             return this.getAssetsAccountKey(indexer, decoratedKey);
-        } else if (pallet_section == "assets:assets") {
+        } else if (pallet_section == "assets:asset") {
             // decoratedKey: ["100"]
+            console.log(`im here 1 ${pallet_section}`, decoratedKey)
             return this.getAssetsAssetKey(indexer, decoratedKey);
         } else if (pallet_section == "oracle:values") {
             return this.getOracleValuesKey(indexer, decoratedKey);
@@ -485,6 +497,10 @@ module.exports = class ParallelParser extends ChainParser {
         if (pallet_section == "oracle:values") {
             //skip oracle:rawvalues
             return this.getOracleValuesVal(indexer, decoratedVal);
+        } else if (pallet_section == "assets:asset") {
+            // decoratedKey: ["100"]
+            console.log(`im here 2 ${pallet_section}`, decoratedVal, o)
+            return this.getAssetsAssetVal(indexer, decoratedVal);
         } else if (pallet_section == "amm:pools") {
             if (this.debugLevel >= paraTool.debugVerbose) console.log(`[amm] parallel parseStorageVal ps=${pallet_section}`, `decoratedVal=${decoratedVal}`)
             return this.getAmmPoolsVal(indexer, decoratedVal);
@@ -563,6 +579,49 @@ module.exports = class ParallelParser extends ChainParser {
     }
 
 
+    async processAssetsAsset(indexer, p, s, e2) {
+        //console.log(`im here 4 ${p}:${s}`, e2)
+        /*
+        {
+          bn: 1957244,
+          blockHash: '0x04f79cc42d0225603d161da62a6c14ce803ae2ade3035bfeae6f0ba6e3aa6db6',
+          p: 'Assets',
+          s: 'Asset',
+          decoratedAsset: { Token: 'LP-DOT/sDOT' },
+          decimals: 12,
+          asset: '"6003"',
+          rawSupply: 1901234944070782,
+          k: '682a59d51ab9e48a8c8cc418ff9708d2d34371a193a751eea5883e9553457b2e8dfa9317e7dfb7954c51df9bfd1cc1ca73170000',
+          v: 'f902981bc48f19eab52de7f8c981822cc15f26990d5e90faba03e15894c0daf39759981bc48f19eab52de7f8c981822cc15f26990d5e90faba03e15894c0daf39759981bc48f19eab52de7f8c981822cc15f26990d5e90faba03e15894c0daf39759981bc48f19eab52de7f8c981822cc15f26990d5e90faba03e15894c0daf397597ed479c129c106000000000000000000000000000000000000000000000000000100000000000000000000000000000001b7000000b70000000000000000',
+          pv: '{"owner":"p8ENzw1bAMXwkUHKySWPhDwD4tN3y4u3DrdAnArS8MBx7MRHP","issuer":"p8ENzw1bAMXwkUHKySWPhDwD4tN3y4u3DrdAnArS8MBx7MRHP","admin":"p8ENzw1bAMXwkUHKySWPhDwD4tN3y4u3DrdAnArS8MBx7MRHP","freezer":"p8ENzw1bAMXwkUHKySWPhDwD4tN3y4u3DrdAnArS8MBx7MRHP","supply":1901234944070782,"deposit":0,"minBalance":1,"isSufficient":true,"accounts":183,"sufficients":183,"approvals":0,"isFrozen":false}',
+          pv2: undefined
+        }
+        */
+        if (e2.pv == undefined)
+            return (false);
+        let v = JSON.parse(e2.pv);
+        let issuance = (e2.decimals != undefined && e2.rawSupply != undefined)? e2.rawSupply / 10**e2.decimals : 0
+        let isParallelLP = false
+        if (v != undefined) {
+            v.supply = issuance
+            if (e2.decoratedAsset != undefined && e2.decoratedAsset.Token != undefined){
+                let symbol = e2.decoratedAsset.Token
+                v.symbol = symbol
+                v.decimals = e2.decimals
+                isParallelLP = this.isParallelLiquidityPair(symbol)
+            }
+        }
+        let asset = e2.asset;
+        let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, asset);
+        console.log(`im here 4 processAssetsAsset rAssetkey=${rAssetkey}`, v)
+        if (isParallelLP){
+            let lpAssetkey = this.elevatedAssetKey(paraTool.assetTypeLiquidityPair, asset);
+            console.log(`im here 5 updating parallel LP rAssetkey=${lpAssetkey}`, v)
+            indexer.updateAssetIssuance(lpAssetkey, issuance, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain);
+        }
+        indexer.updateAssetMetadata(rAssetkey, v); // add currencyID
+    }
+
     async processAccountAsset(indexer, p, s, e2, rAssetkey, fromAddress) {
         let pallet_section = `${p}:${s}`
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel processAccountAsset ${pallet_section}`)
@@ -588,6 +647,7 @@ module.exports = class ParallelParser extends ChainParser {
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel processAsset ${pallet_section}`)
         switch (pallet_section) {
             case "Assets:Asset":
+                //console.log(`im here 3 ${pallet_section}`, e2)
                 await this.processAssetsAsset(indexer, p, s, e2);
                 break;
             case "Oracle:RawValues":
@@ -848,6 +908,14 @@ module.exports = class ParallelParser extends ChainParser {
 
         }
         await super.decorate_query_params(query, pallet_method, args, chainID, ts)
+    }
+
+    isParallelLiquidityPair(symbol = 'LP-DOT/sDOT'){
+        let isParallelLP = symbol.includes('LP')
+        if (isParallelLP){
+            //TODO: lookup lp0, lp1 in amm.pool
+        }
+        return isParallelLP
     }
 
 }

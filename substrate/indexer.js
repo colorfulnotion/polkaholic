@@ -6512,7 +6512,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (pallet_section == '...') {
                 continue
             }
-            //console.log(`processTrace ${pallet_section}`, e2)
+            //console.log(`processTrace ${pallet_section}`, a2)
             if (a2.mpType && a2.mpIsSet) {
                 await this.chainParser.processMP(this, p, s, a2)
             } else if (a2.mpIsEmpty) {
@@ -6530,8 +6530,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 await this.chainParser.processAsset(this, p, s, a2)
             } else {
                 if (this.unhandledTraceMap[pallet_section] == undefined) {
-                    console.log(`(not handled) ${pallet_section}`);
-                    //console.log(`(not handled) ${pallet_section}`, JSON.stringify(e2));
+                    //console.log(`(not handled) ${pallet_section}`);
+                    console.log(`(not handled) ${pallet_section}`, JSON.stringify(a2));
                     this.unhandledTraceMap[pallet_section] = 0;
                 }
                 this.unhandledTraceMap[pallet_section]++

@@ -3475,6 +3475,7 @@ module.exports = class ChainParser {
         var out = {};
         let assetID = this.cleanedAssetID(k[0]); //currencyID
         this.setAssetSymbolAndDecimals(indexer, assetID, out)
+        out.assetID = assetID
         return out
     }
 
@@ -3580,6 +3581,7 @@ module.exports = class ChainParser {
     }
 
     async processAssetsAsset(indexer, p, s, e2) {
+        console.log(`processAssetsAsset ${p}:${s}`, e2)
         /*
         processAssetsAsset Assets Asset {
           bn: 440631,
@@ -3598,6 +3600,7 @@ module.exports = class ChainParser {
         let v = JSON.parse(e2.pv);
         let asset = e2.asset;
         let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, asset);
+        console.log(`processAssetsAsset rAssetkey=${rAssetkey}`, v)
         indexer.updateAssetMetadata(rAssetkey, v); // add currencyID
     }
 
@@ -3634,7 +3637,7 @@ module.exports = class ChainParser {
             await this.processBalancesTotalIssuance(indexer, e2);
             //console.log(`TODO:${pallet_section}`, JSON.stringify(e2))
         } else if (pallet_section == 'Assets:Asset') {
-            await this.processAssetsAsset(indexer, p, s, e2, 'ump');
+            await this.processAssetsAsset(indexer, p, s, e2);
         } else {
             console.log(`process Asset: (unknown) ${pallet_section}`, JSON.stringify(e2));
         }
