@@ -36,8 +36,13 @@
 	   <td><a href='/address/<%- contract.token0 %>'><%- uiTool.getShortHash(contract.token0) %></a> / <a href='/address/<%- contract.token1 %>'><%- uiTool.getShortHash(contract.token1) %></a></td>
 	</tr>
 	<tr>
-	   <td>Token Symbol:</td>
-	   <td><a href='/symbol/<%- contract.token0Symbol %>'><%= contract.token0Symbol %></a> / <a href='/symbol/<%- contract.token1Symbol %>'><%= contract.token1Symbol %></a> </td>
+	   <td>
+	   <%
+	   let t0 = query.assetInfo[paraTool.makeAssetChain(contract.token0, contract.chainID)];
+	   let t1 = query.assetInfo[paraTool.makeAssetChain(contract.token1, contract.chainID)];
+	   %>
+           Token Symbol:</td>
+	   <td><%- include("symbollink", {assetInfo: t0}) %> / <%- include("symbollink", {assetInfo: t1}) %> </td>
 	</tr>
 	<% } %>
 	<% if ( contract && contract.creator && contract.createdAtTx ) {%>
