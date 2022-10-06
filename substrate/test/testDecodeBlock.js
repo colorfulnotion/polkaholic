@@ -5,14 +5,14 @@ async function main() {
         ApiPromise,
         WsProvider
     } = require('@polkadot/api');
-    const paraTool = require("./paraTool");
-    var [chainID, blockNumber, blockHash] = [0, 1325210, "0xa70a75c54a457a823f1a5492a39049869de880ad64486eae5bdf60f5403f6354"];
+    const paraTool = require("../paraTool");
+    var [chainID, blockNumber, blockHash] = [2000, 1325210, "0xa70a75c54a457a823f1a5492a39049869de880ad64486eae5bdf60f5403f6354"];
     var api = await ApiPromise.create({
         provider: new WsProvider((chainID == paraTool.chainIDAcala) ? "wss://acala-polkadot.api.onfinality.io/public-ws" : 'wss://rpc.polkadot.io') //wss://kusama-rpc.polkadot.io
     });
     await api.isReady;
 
-    const paraTool = require("./paraTool");
+    const paraTool = require("../paraTool");
     var [chainID, blockNumber, blockHash] = [0, 1325210, "0xa70a75c54a457a823f1a5492a39049869de880ad64486eae5bdf60f5403f6354"];
     var api = await ApiPromise.create({
         provider: new WsProvider((chainID == paraTool.chainIDAcala) ? "wss://acala-polkadot.api.onfinality.io/public-ws" : 'wss://statemine.api.onfinality.io/public-ws') //wss://kusama-rpc.polkadot.io

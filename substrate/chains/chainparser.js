@@ -142,7 +142,8 @@ module.exports = class ChainParser {
 
     elevatedAssetKeyWithQuote(elevation, rAssetkey) {
         let o = {};
-        o[elevation] = JSON.parse(`"${rAssetkey}"`);
+        let v = JSON.parse(rAssetkey);
+        o[elevation] = `${v}`
         let ak = JSON.stringify(o);
         return ak
     }
@@ -3646,7 +3647,7 @@ module.exports = class ChainParser {
         } else if (pallet_section == 'Assets:Asset') {
             await this.processAssetsAsset(indexer, p, s, e2);
         } else {
-            console.log(`process Asset: (unknown) ${pallet_section}`, JSON.stringify(e2));
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`process Asset: (unknown) ${pallet_section}`, JSON.stringify(e2));
         }
         return;
     }

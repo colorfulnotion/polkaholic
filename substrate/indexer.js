@@ -269,23 +269,6 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    getAssetIssuance(asset, assetType = paraTool.assetTypeLiquidityPair, assetSource = paraTool.assetSourceOnChain) {
-        if (this.init_asset(asset, assetType, assetSource, "assetIssuance")) {
-            //console.log(`getAssetIssuance`, asset, assetType)
-            return this.tallyAsset[asset].issuance
-        }
-    }
-
-    updateAssetIssuance(asset, issuance, assetType = paraTool.assetTypeLiquidityPair, assetSource = paraTool.assetSourceOnChain) {
-        console.log(`Before updateAssetIssuance this.tallyAsset[${asset}]`, this.tallyAsset[asset])
-        if (this.init_asset(asset, assetType, assetSource, "updateAssetIssuance")) {
-            console.log(`updateAssetIssuance`, asset, assetType, issuance)
-            this.tallyAsset[asset].issuance = issuance;
-            this.tallyAsset[asset].assetSourceMap[assetSource] = 1
-        }
-        console.log(`After updateAssetIssuance this.tallyAsset[${asset}]`, this.tallyAsset[asset])
-    }
-
     isValidLiquidityPair(asset) {
         // return if acala LP is found `[{"Token":"KAR"},{"Token":"KSM"}]#8`
         if (this.assetInfo[asset] != undefined) {
@@ -310,18 +293,15 @@ module.exports = class Indexer extends AssetManager {
 
 
     updateAssetLiquidityPairPool(asset, lp0, lp1, rat) {
-        console.log(`Before updateAssetLiquidityPairPool this.tallyAsset[${asset}]`, this.tallyAsset[asset])
         if (this.init_asset(asset, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain, "updateAssetLiquidityPairPool")) {
             //console.log(`*** updateAssetLiquidityPairPool`, asset, lp0, lp1)
             this.tallyAsset[asset].lp0.push(lp0)
             this.tallyAsset[asset].lp1.push(lp1)
             this.tallyAsset[asset].rat.push(rat)
         }
-        console.log(`After updateAssetLiquidityPairPool this.tallyAsset[${asset}]`, this.tallyAsset[asset])
     }
 
     updateAssetLiquidityPairTradingVolume(asset, token0In, token1In, token0Out, token1Out) {
-        console.log(`Before updateAssetLiquidityPairTradingVolume this.tallyAsset[${asset}]`, this.tallyAsset[asset])
         if (this.init_asset(asset, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain, "updateAssetLiquidityPairTradingVolume")) {
             //console.log(`updateAssetLiquidityPairTradingVolume`, asset)
             this.tallyAsset[asset].token0In += !isNaN(token0In) ? token0In : 0
@@ -330,7 +310,21 @@ module.exports = class Indexer extends AssetManager {
             this.tallyAsset[asset].token1Out += !isNaN(token1Out) ? token1Out : 0
             //this.tallyAsset[asset].assetSourceMap[assetSource] = 1
         }
-        console.log(`After updateAssetLiquidityPairTradingVolume this.tallyAsset[${asset}]`, this.tallyAsset[asset])
+    }
+
+    getAssetIssuance(asset, assetType = paraTool.assetTypeLiquidityPair, assetSource = paraTool.assetSourceOnChain) {
+        if (this.init_asset(asset, assetType, assetSource, "assetIssuance")) {
+            //console.log(`getAssetIssuance`, asset, assetType)
+            return this.tallyAsset[asset].issuance
+        }
+    }
+
+    updateAssetIssuance(asset, issuance, assetType = paraTool.assetTypeLiquidityPair, assetSource = paraTool.assetSourceOnChain) {
+        if (this.init_asset(asset, assetType, assetSource, "updateAssetIssuance")) {
+            //console.log(`updateAssetIssuance`, asset, assetType, issuance)
+            this.tallyAsset[asset].issuance = issuance;
+            this.tallyAsset[asset].assetSourceMap[assetSource] = 1
+        }
     }
 
     updateAssetERC20LiquidityPair(asset, lp0, lp1, rat, pair = false) {
@@ -2272,9 +2266,6 @@ module.exports = class Indexer extends AssetManager {
                         if (assetInfo.issuance !== undefined) {
                             r.issuance = assetInfo.issuance;
                             assetInfo.issuance = 0;
-                        }
-                        if (r.issuance == 0){
-                            //should call onchain data to receive issuance
                         }
                         if (assetInfo.token0In > 0 || assetInfo.token1In > 0) {
                             r.token0In = assetInfo.token0In
@@ -6548,7 +6539,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             } else {
                 if (this.unhandledTraceMap[pallet_section] == undefined) {
                     //console.log(`(not handled) ${pallet_section}`);
-                    console.log(`(not handled) ${pallet_section}`, JSON.stringify(a2));
+                    if (this.debugLevel >= paraTool.debugTracing) console.log(`(not handled) ${pallet_section}`, JSON.stringify(a2));
                     this.unhandledTraceMap[pallet_section] = 0;
                 }
                 this.unhandledTraceMap[pallet_section]++
