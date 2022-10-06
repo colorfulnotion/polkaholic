@@ -49,6 +49,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     chainParser = null; // initiated by setup_chainParser (=> chainParserInit)
     chainParserChainID = null;
 
+    lastEventReceivedTS = 0;
     constructor(debugLevel = false) {
         super()
     }
@@ -70,6 +71,10 @@ module.exports = class AssetManager extends PolkaholicDB {
         while (1) {
             await this.sleep(intervalSeconds * 1000);
             console.log("autoRefresh assets...")
+	    if ( this.getCurrentTS() - this.lastEventReceivedTS > 300 ) {
+		console.log("No event received in 5mins, terminating")
+		process.exit(1);
+	    }
             await this.assetManagerInit();
             if (this.web3Api) {
                 console.log("autoRefresh contractABI...")

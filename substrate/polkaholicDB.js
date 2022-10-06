@@ -716,6 +716,10 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async setupAPI(chain, backfill = false) {
+	if ( backfill ) {
+	    chain.WSEndpoint = chain.WSBackfill
+	    console.log("API using backfill endpoint", chain.WSEndpoint);
+	}
         if (!this.api) {
             this.api = await this.get_api(chain);
         }
