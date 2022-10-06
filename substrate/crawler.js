@@ -1289,9 +1289,9 @@ module.exports = class Crawler extends Indexer {
                 if (j > tasks.length) j = tasks.length;
                 let pieces = tasks.slice(i, j);
                 let res = pieces.map((t1) => {
-		    let t2 = {
+		        let t2 = {
                         chainID: chainID,
-			blockNumber: t1.blockNumber,
+                        blockNumber: t1.blockNumber,
                         blockHash: t1.blockHash,  // could be null
                         blockTS: t1.blockTS,  // could be null
                         attempted: t1.attempted // should be
