@@ -18,7 +18,13 @@
   <tbody>
     <tr>
       <td>Pool Address</td>
-      <td><%- uiTool.presentID(pool.asset) %> (<%= pool.assetName %> <%- pool.poolName %>)</td>
+      <td>
+      <% if ( pool.assetType == "LiquidityPair" ) { %>
+      <%= pool.assetName %> 
+      <% } else { %>
+      <%- uiTool.presentID(pool.asset) %> (<%= pool.assetName %> <%- pool.poolName %>)
+      <% } %>
+      </td>
     </tr>
     <tr>
       <td>Chain</td>
@@ -33,13 +39,17 @@
     <tr>
       <td width="200">Token0</td>
       <td>
-        <%- uiTool.presentID(pool.token0) %> (<%- pool.token0Symbol %>)
+      <% let t0 = query.assetInfo[paraTool.makeAssetChain(pool.token0, pool.chainID)];
+         let t1 = query.assetInfo[paraTool.makeAssetChain(pool.token1, pool.chainID)];
+      %>
+      <%- include("symbollink", {assetInfo: t0}) %>
+
       </td>
     </tr>
     <tr>
       <td width="200">Token1</td>
       <td>
-        <%- uiTool.presentID(pool.token1) %> (<%- pool.token1Symbol %>)
+      <%- include("symbollink", {assetInfo: t1}) %>
       </td>
     </tr>
     <tr>

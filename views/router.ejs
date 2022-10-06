@@ -27,11 +27,14 @@
         <%= uiTool.currencyFormat(router.tvl) %>
       </td>
     </tr>
-
+    <% if ( ! router.asset.includes("parachain") ) { %>
     <tr>
       <td>Project Address</td>
-      <td><a href="/address/<%= router.asset %>"><%= router.asset %></a></td>
+      <td>
+      <a href="/address/<%= router.asset %>"><%= router.asset %></a>
+      </td>
     </tr>
+    <% } %>    
   </body>
 </table>
 

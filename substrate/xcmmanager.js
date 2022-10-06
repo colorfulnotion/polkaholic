@@ -1167,8 +1167,16 @@ order by msgHash, diffSentAt, diffTS`
         }
     }
 
-    async xcmAUSDUpdate() {
-        // deleted
+    // update lpasset.{token0xcmchainID, token1xcmchainID} with the chainID of the asset using the xcmasset table
+    async xcmLiquidityPairsUpdate() {
+        for (let i = 0; i < 2; i++) {
+            let sql_lp = `update asset as lpasset, asset, xcmasset set lpasset.token0xcmchainID = xcmasset.xcmchainID where lpasset.token0 = asset.asset and lpasset.chainID = asset.chainID and xcmasset.xcmInteriorKey = asset.xcmInteriorKey and lpasset.assetType = 'LiquidityPair'`;
+            this.batchedSQL.push(sql_lp);
+            // on evm chains they have precompiles in xcContractAddress
+            let sql_evm = `update asset as lpasset, asset, xcmasset set lpasset.token0xcmchainID = xcmasset.xcmchainID where lpasset.token0 = asset.xcContractAddress and lpasset.chainID = asset.chainID and xcmasset.xcmInteriorKey = asset.xcmInteriorKey and lpasset.assetType = 'ERC20LP';`;
+            this.batchedSQL.push(sql_evm);
+        }
+        await this.update_batchedSQL()
     }
 
     async xcm_init() {

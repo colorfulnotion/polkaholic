@@ -1667,9 +1667,13 @@ module.exports = class Query extends AssetManager {
 
     async getAsset(currencyID, chainID) {
         try {
+            // look up asset/currencyID in xcContractAddress and map to asset
+            if (this.xcContractAddress[currencyID] != undefined) {
+                currencyID = this.xcContractAddress[currencyID].asset
+            }
             let assets = await this.poolREADONLY.query(`select asset.asset, asset.chainID, asset.assetType, asset.decimals, assetName, asset.symbol as localSymbol, asset.currencyID, asset.xcContractAddress, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.chainID = '${chainID}' and ( asset.currencyID = '${currencyID}' or asset.asset = '${currencyID}' ) order by asset.numHolders desc limit 1`);
             if (assets.length == 0) {
-                throw new paraTool.InvalidError(`Invalid currencyID: ${currencyID}`)
+                throw new paraTool.InvalidError(`Asset/currencyID not found: ${currencyID}`)
             }
             let chainInfo = this.chainInfos[chainID];
             let [__, id] = this.convertChainID(chainID)
@@ -1934,11 +1938,11 @@ module.exports = class Query extends AssetManager {
 
             let sql = null
             if (assetType == "Token") {
-                sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w} order by numHolders desc;`
+                sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w} order by numHolders desc;`
             } else { // ERC20, ERC20LP, Loan
                 sql = `select asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from asset where priceUSD > 0 ${w} order by numHolders desc;`
             }
-            console.log(sql)
+
             assets = await this.poolREADONLY.query(sql);
             if (assets.length == 0) {
                 // TODO: throw NotFound error
@@ -1998,6 +2002,7 @@ module.exports = class Query extends AssetManager {
                         tvlMiscFrozen: 0,
                         tvlFrozen: 0
                     }
+                    console.log("REC", v);
                     if (v.assetType == "ERC20") {
                         a.totalSupply = parseFloat(v.totalSupply)
                         a.tvlFree = a.priceUSD * a.totalSupply
@@ -6899,7 +6904,7 @@ module.exports = class Query extends AssetManager {
         let out = [];
         for (let i = 0; i < chainfilters.length; i++) {
             let [chainID, id] = this.convertChainID(chainfilters[i]);
-            console.log("LOOKUP", chainfilters[i], chainID, id);
+
             if (id) {
                 out.push(chainID);
             } else {
@@ -6932,7 +6937,7 @@ module.exports = class Query extends AssetManager {
     }
 
     async getPool(asset, chainID) {
-        let sql = `select asset, chainID, assetName, token0, token1, token0Symbol, token1Symbol, symbol, decimals, priceUSD, totalFree, totalReserved, apy1d, apy7d, apy30d, feesUSD1d, feesUSD7d, feesUSD30d from asset where asset = '${asset}' and chainID = '${chainID}'`
+        let sql = `select assetType, asset, chainID, assetName, token0, token1, token0Symbol, token1Symbol, symbol, decimals, priceUSD, totalFree, totalReserved, apy1d, apy7d, apy30d, feesUSD1d, feesUSD7d, feesUSD30d from asset where asset = '${asset}' and chainID = '${chainID}'`
         let pools = await this.poolREADONLY.query(sql)
         if (pools.length == 0) {
             throw new paraTool.InvalidError(`${asset}/${chainID} not found`)
@@ -6950,7 +6955,7 @@ module.exports = class Query extends AssetManager {
 
     async getPoolHistory(asset, chainID, interval = "hourly", lookbackDays = 90) {
         let sql = `select indexTS, priceUSD, low, high, open, close, lp0, lp1, token0Volume, token1Volume, issuance, CONVERT(state using utf8) as state from assetlog where asset = '${asset}' and chainID = '${chainID}' and indexTS > UNIX_TIMESTAMP(date_sub(Now(), INTERVAL ${lookbackDays} DAY)) and indexTS % 3600 = 0 order by indexTS desc`
-	console.log("getPoolHistory", sql);
+        console.log("getPoolHistory", sql);
         let recs = await this.poolREADONLY.query(sql)
         let h = [];
         let pool = await this.getPool(asset, chainID);
@@ -6967,7 +6972,7 @@ module.exports = class Query extends AssetManager {
                 let state = JSON.parse(r.state);
                 let volumeUSD = parseFloat(r.token0Volume) * p0.priceUSD + parseFloat(r.token1Volume) * p1.priceUSD;
                 let feesUSD = .0025 * volumeUSD; // (state.token0Volume) * 0.0025 * p0.priceUSD + (s.token1Volume) * 0.0025 * p1.priceUSD; 
-		let feesUSDimp = state.token0Fee * p0.priceUSD + state.token1Fee * p1.priceUSD;  // which could be negative
+                let feesUSDimp = state.token0Fee * p0.priceUSD + state.token1Fee * p1.priceUSD; // which could be negative
                 h.push({
                     indexTS: r.indexTS,
                     issuance: issuance,
@@ -6979,13 +6984,13 @@ module.exports = class Query extends AssetManager {
                     tvlUSD: tvlUSD,
                     volumeUSD: volumeUSD,
                     feesUSD: feesUSD,
-		    feesUSDimp: feesUSDimp
+                    feesUSDimp: feesUSDimp
                 });
             }
         }
-	h.sort(function(a,b) {
-	    return(a.indexTS - b.indexTS);
-	});
+        h.sort(function(a, b) {
+            return (a.indexTS - b.indexTS);
+        });
         return h;
     }
 
@@ -6996,13 +7001,26 @@ module.exports = class Query extends AssetManager {
                 w.push(`( token0symbol = '${q.symbol}' or token1Symbol = '${q.symbol}' )`);
             }
             if (q.routerAssetChain) {
-                w.push(`router.routerAssetChain = '${q.routerAssetChain}'`);
+                if (q.routerAssetChain.includes("parachain")) {
+                    let [_, chainID] = paraTool.parseAssetChain(q.routerAssetChain);
+                    w.push(`(asset.chainID = '${chainID}')`)
+                } else {
+                    w.push(`(assetName in (select assetName from router where routerAssetChain = '${q.routerAssetChain}'))`);
+                }
             } else if (q.chainfilters) {
                 let chainfilters = this.canonicalize_chainfilters(q.chainfilters)
-                w.push(`router.chainID in '${chainfilters.join(",")}'`);
+                if (chainfilters && chainfilters.length > 0) {
+                    w.push(`( chainID in (${chainfilters.join(",")}) or token0xcmchainID in (${chainfilters.join(",")}) or token1xcmchainID in (${chainfilters.join(",")}))`);
+                }
             }
-            let wstr = (w.length > 0) ? " and " + w.join(" and ") : "";
-            let sql = `select asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders, 0 as tvlFree, apy1d, apy7d, apy30d, feesUSD1d, feesUSD7d, feesUSD30d from asset, router where router.assetName = asset.assetName  ${wstr};`
+            if (w.length == 0) {
+                w.push(" tvlUSD > 0 ");
+            }
+            w.push(`assetType in ('ERC20LP', 'LiquidityPair')`);
+            let wstr = (w.length > 0) ? w.join(" and ") : "";
+            let sql = `select assetType, assetName, asset, chainID, priceUSD, symbol as localSymbol, decimals, currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders, tvlUSD, apy1d, apy7d, apy30d, feesUSD1d, feesUSD7d, feesUSD30d from asset where ${wstr};`
+            console.log(sql);
+
             let pools = await this.poolREADONLY.query(sql)
             for (let p of pools) {
                 if (p.totalFree == 0) {
@@ -7012,8 +7030,6 @@ module.exports = class Query extends AssetManager {
                 p.id = id
                 p.chainName = this.getChainName(p.chainID)
                 p.poolName = p.token0Symbol + "/" + p.token1Symbol;
-                p.tvlFree = p.priceUSD * p.totalFree;
-                p.tvlReserved = p.priceUSD * p.totalReserved;
             }
             return pools
         } catch (e) {
