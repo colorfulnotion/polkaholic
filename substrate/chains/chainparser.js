@@ -140,6 +140,13 @@ module.exports = class ChainParser {
         return ak
     }
 
+    elevatedAssetKeyWithQuote(elevation, rAssetkey) {
+        let o = {};
+        o[elevation] = JSON.parse(`"${rAssetkey}"`);
+        let ak = JSON.stringify(o);
+        return ak
+    }
+
     async getSystemProperties(indexer, chain) {
         let chainID = chain.chainID;
         let propsNative = await indexer.api.rpc.system.properties();

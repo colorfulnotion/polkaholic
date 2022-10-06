@@ -609,7 +609,7 @@ module.exports = class ParallelParser extends ChainParser {
         let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, asset);
         if (isParallelLP){
             let lpAssetkey = this.elevatedAssetKey(paraTool.assetTypeLiquidityPair, asset);
-            console.log(`updating parallel LP rAssetkey=${lpAssetkey}`, v)
+            console.log(`updateAssetIssuance LP=${lpAssetkey} issuance=${issuance}`)
             indexer.updateAssetIssuance(lpAssetkey, issuance, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain);
         }
         indexer.updateAssetMetadata(rAssetkey, v); // add currencyID
@@ -702,6 +702,21 @@ module.exports = class ParallelParser extends ChainParser {
         indexer.updateAssetPrice(assetString, price, paraTool.assetTypeToken, paraTool.assetSourceOracle)
     }
 
+    async getOnChainAssetIssuance(indexer, lpTokenID, decimals, blockHash) {
+        console.log(`getOnChainAssetIssuance lpToken=${lpTokenID}, decimals=${decimals}, blockHash=${blockHash}`)
+        let issuance = 0
+        try {
+            let v = await indexer.api.query.assets.asset.at(blockHash, lpTokenID);
+            let assetMetadata = v.toJSON()
+            console.log(`assetMetadata`, assetMetadata)
+            issuance = paraTool.dechexToInt(assetMetadata.supply) / 10 ** decimals
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`getOnChainAssetIssuance [blk=${blockHash}] [lpTokenID=${lpTokenID}] issuance=${issuance}`)
+        } catch (e) {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`getOnChainAssetIssuance [blk=${blockHash}] [lpTokenID=${lpTokenID}]`, e)
+        }
+        return issuance
+    }
+
     async getLiquidStakingExchangeRate(indexer, blockHash) {
         let exchangeRate = 0
         try {
@@ -771,13 +786,23 @@ module.exports = class ParallelParser extends ChainParser {
         }
         */
         if (this.debugLevel >= paraTool.debugInfo) console.log(`processAMMPools`, e2)
-        let lpAssetkey = this.elevatedAssetKey(paraTool.assetTypeLiquidityPair, e2.asset);
+        let lpAssetkey = this.elevatedAssetKeyWithQuote(paraTool.assetTypeLiquidityPair, e2.asset); // *** need extraquote
         let lpAssetChain = paraTool.makeAssetChain(lpAssetkey, indexer.chainID);
         let cachedLPAssetInfo = indexer.assetInfo[lpAssetChain]
         if (cachedLPAssetInfo != undefined && cachedLPAssetInfo.token0Decimals != undefined && cachedLPAssetInfo.token1Decimals != undefined){
             let lp0 = e2['baseAmount'] / 10 ** cachedLPAssetInfo.token0Decimals;
             let lp1 = e2['quoteAmount'] / 10 ** cachedLPAssetInfo.token1Decimals;
             let rat = lp0 / lp1
+
+            let cachedIssuance = indexer.getAssetIssuance(lpAssetkey, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain)
+            if (cachedIssuance == 0 ){
+                console.log(`processAMMPools ${lpAssetkey} missing issuance`)
+                // fetch issuance on chain
+                let issuance =  await this.getOnChainAssetIssuance(indexer, e2.lpTokenId, cachedLPAssetInfo.decimals, e2.blockHash)
+                if (issuance > 0){
+                    indexer.updateAssetIssuance(lpAssetkey, issuance, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain);
+                }
+            }
             console.log(`processAMMPools updateAssetLiquidityPairPool lpAssetkey=${lpAssetkey}, lp0=${lp0} (${cachedLPAssetInfo.token0Symbol}), lp1=${lp1} (${cachedLPAssetInfo.token1Symbol})`)
             indexer.updateAssetLiquidityPairPool(lpAssetkey, lp0, lp1, rat);
         }else{
@@ -985,7 +1010,7 @@ module.exports = class ParallelParser extends ChainParser {
                 let assetChain0 = paraTool.makeAssetChain(asset0, indexer.chainID);
                 let assetChain1 = paraTool.makeAssetChain(asset1, indexer.chainID);
                 let assetChainLP = paraTool.makeAssetChain(assetLP, indexer.chainID);
-                let lpAsset = this.elevatedAssetKey(paraTool.assetTypeLiquidityPair, lpAssetID);
+                let lpAsset = this.elevatedAssetKeyWithQuote(paraTool.assetTypeLiquidityPair, `"${lpAssetID}"`); //*** need extra quote here
                 let lpAssetChain = paraTool.makeAssetChain(lpAsset, indexer.chainID);
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`updateLiquidityInfo assetChainLP=${assetChainLP}, LP0=${asset0}, LP1=${asset1}, lpAsset=${lpAsset}`)
 
@@ -1127,7 +1152,7 @@ module.exports = class ParallelParser extends ChainParser {
                     "op": "parallel-process_amm_trade_event",
                     "msg": "parse amm swap failed",
                     "eventID": eventID,
-                    "traded" : JSON.stringify(traded),
+                    "traded" : JSON.stringify(traded)
                 });
 
             } else {
@@ -1175,7 +1200,7 @@ module.exports = class ParallelParser extends ChainParser {
 
     getLPAssetByCurrencyID(indexer, rawAssetID){
         let lpTokenID = this.cleanedAssetID(rawAssetID)
-        let lpAssetkey = this.elevatedAssetKey(paraTool.assetTypeLiquidityPair, lpTokenID);
+        let lpAssetkey = this.elevatedAssetKeyWithQuote(paraTool.assetTypeLiquidityPair, lpTokenID);
         let lpAssetChain = paraTool.makeAssetChain(lpAssetkey, indexer.chainID);
         let lpAssetInfo = indexer.assetInfo[lpAssetChain]
         if (lpAssetInfo != undefined && lpAssetInfo.token0Symbol != undefined && lpAssetInfo.token1Symbol != undefined){
