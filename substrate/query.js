@@ -374,11 +374,6 @@ module.exports = class Query extends AssetManager {
         return [];
     }
 
-    /*
-     insert into account ( address, numFollowing ) (select fromAddress, sum(isFollowing) numFollowing from follow group by fromAddress) on duplicate key update numFollowing = values(numFollowing);
-     insert into account ( address, numFollowers ) (select toAddress, sum(isFollowing) numFollowers from follow group by toAddress) on duplicate key update numFollowers = values(numFollowers);
-    */
-
     async registerUser(email, password) {
         email = this.canonicalizeEmail(email);
         if (!uiTool.validEmail(email)) {
@@ -1735,8 +1730,54 @@ module.exports = class Query extends AssetManager {
         return (assets);
     }
 
+    verificationURL(chainID, router) {
+	switch ( chainID ) {
+	case 2004:
+	    return `https://moonscan.io/address/${router}#readContract`
+	case 22023:
+	    return `https://moonriver.moonscan.io/address/${router}#readContract`
+	case 2006:
+	    return `https://blockscout.com/astar/${router}`
+	case 22007:
+	    return `https://blockscout.com/shiden/${router}`
+	}
+	return null;
+    }
+    unwrap_verificationPath(verificationPathRaw) {
+        try {
+            let res = {}
+            let vp = JSON.parse(verificationPathRaw);
+            for (const routerAssetChain of Object.keys(vp)) {
+                res.routerAssetChain = routerAssetChain;
+                [res.router, res.chainID] = paraTool.parseAssetChain(res.routerAssetChain);
+                if ( vp[routerAssetChain].path ) {
+		    res.chainName = this.getChainName(res.chainID);
+		    let [__, id] = this.convertChainID(res.chainID)
+		    res.id = id;
+		    res.path = vp[routerAssetChain].path;
+		    let verificationURL = this.verificationURL(res.chainID, res.router);
+		    if ( verificationURL ) {
+			res.verificationURL = verificationURL;
+		    }
+                    res.pathSymbols = res.path.map((asset) => {
+			let assetChain = paraTool.makeAssetChain(asset, res.chainID);
+			let symbol = (this.assetInfo[assetChain]) ? this.assetInfo[assetChain].symbol : "UNK"
+			return symbol;
+                    });
+                    res.blockNumber = vp[routerAssetChain].blockNumber;
+		}
+                return res;
+            }
+            return (vp);
+        } catch (err) {
+            console.log(err);
+            return null;
+        }
+
+    }
+
     async getAssetPriceUSDCurrentRouterAsset(asset, chainID) {
-        let sql = `select indexTS, assetpricelog.routerAssetChain, router.routerName, liquid, priceUSD from assetpricelog left join router on assetpricelog.routerAssetChain = router.routerAssetChain where assetpricelog.asset = '${asset}' and assetpricelog.chainID = '${chainID}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose
+        let sql = `select indexTS, assetpricelog.routerAssetChain, router.routerName, liquid, priceUSD, priceUSD10, priceUSD100, priceUSD1000, convert(verificationPath using utf8) verificationPath from assetpricelog left join router on assetpricelog.routerAssetChain = router.routerAssetChain where assetpricelog.asset = '${asset}' and assetpricelog.chainID = '${chainID}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose
         let routerChainRecs = await this.poolREADONLY.query(sql)
         let routerChains = {}
         if (routerChainRecs.length > 0) {
@@ -1753,13 +1794,16 @@ module.exports = class Query extends AssetManager {
             routerAssetChains.sort(function(a, b) {
                 return a.liquid - b.liquid
             });
+            for (const rac of routerAssetChains) {
+                rac.verificationPath = this.unwrap_verificationPath(rac.verificationPath);
+            }
             return routerAssetChains;
         }
         return [];
     }
 
     async getSymbolPriceUSDCurrentRouterAsset(symbol, relayChain = null) {
-        let sql = `select indexTS, xcmassetpricelog.routerAssetChain, router.routerName, liquid, priceUSD from xcmassetpricelog left join router on xcmassetpricelog.routerAssetChain = router.routerAssetChain where symbol = '${symbol}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose
+        let sql = `select indexTS, xcmassetpricelog.routerAssetChain, router.routerName, liquid, priceUSD, priceUSD10, priceUSD100, priceUSD1000, convert(verificationPath using utf8) verificationPath from xcmassetpricelog left join router on xcmassetpricelog.routerAssetChain = router.routerAssetChain where symbol = '${symbol}' and indexTS >= unix_timestamp(date_sub(Now(), interval 90 MINUTE)) order by indexTS Desc` // choose
         let routerChainRecs = await this.poolREADONLY.query(sql)
         let routerChains = {}
         if (routerChainRecs.length > 0) {
@@ -1776,6 +1820,9 @@ module.exports = class Query extends AssetManager {
             routerAssetChains.sort(function(a, b) {
                 return a.liquid - b.liquid
             });
+            for (const rac of routerAssetChains) {
+                rac.verificationPath = this.unwrap_verificationPath(rac.verificationPath);
+            }
             return routerAssetChains;
         }
         return [];

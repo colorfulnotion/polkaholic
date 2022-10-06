@@ -8,8 +8,7 @@ if ( nsources > 0 ) { %>
   <thead>
     <tr>
       <th scope="col">Price Source</th>
-      <th scope="col">Price</th>
-      <th scope="col">Last</th>
+      <th scope="col">Price (After Converting $) / Slippage</th>
       <th scope="col">Liquidity?</th>
       <th scope="col">Chart</th>
     </tr>
@@ -27,9 +26,20 @@ for ( const p of priceUSD_routerAsset ) {
     }
 %>
     <tr>
-      <th scope="row"><a href='/router/<%= p.routerAssetChain %>'><%= p.routerName %></a></th>
-      <td><%= uiTool.currencyFormat(p.priceUSD); %></td>
-      <td><%= uiTool.presentTS(p.indexTS); %></td>
+      <td><b><a href='/router/<%= p.routerAssetChain %>'><%= p.routerName %></a></b><br/>
+      <%- include("verificationPath", { vp: p.verificationPath }) %><br/>
+      <small><%= uiTool.presentTS(p.indexTS); %></small><br/>
+      
+</th>
+      <td><% if ( p.liquid < 3.0 ) { %>
+<b><%= uiTool.currencyFormat(p.priceUSD); %></b>&nbsp;($1)<br/>
+<%- include("priceslippage", { converting: 10, price: p.priceUSD10, orig: p.priceUSD }) %>
+<%- include("priceslippage", { converting: 100, price: p.priceUSD100, orig: p.priceUSD }) %>
+<%- include("priceslippage", { converting: 1000, price: p.priceUSD1000, orig: p.priceUSD }) %>
+<% } else {%>
+-
+<% } %>
+</td>
       <td>
 <% if ( p.liquid < 0.1 ) { %>
    <button type="button" class="btn btn-success">High</button>
@@ -39,7 +49,7 @@ for ( const p of priceUSD_routerAsset ) {
    <button type="button" class="btn btn-danger">NOT LIQUID</button>
 <% } %>
       </td>
-      <td><a class="btn-sm btn-primary" href="javascript:showRouterAssetChainPrices('<%= p.routerAssetChain %>', '<%= p.routerName %>')">Chart</a></td>
+      <td><a class="btn btn-primary" href="javascript:showRouterAssetChainPrices('<%= p.routerAssetChain %>', '<%= p.routerName %>')">Chart</a></td>
     </tr>
 <% } %>
   </tbody>
@@ -56,9 +66,9 @@ for ( const p of priceUSD_routerAsset ) {
 function showRouterAssetChainPrices(routerAssetChain, routerName) {
   var series_name = `USD Value`
 
-<% if ( asset ) { %>
+<% if ( asset ) { console.log(asset); %>
   let url = `${baseURL}/asset/pricelog/${encodeURIComponent(asset)}/${encodeURIComponent(chainID)}/${encodeURIComponent(routerAssetChain)}`
-  var title_text = `${asset.assetName} USD Value (Source: ${routerName})`;
+  var title_text = `USD Value (Source: ${routerName})`;
 <% } else { %>
   let url = `${baseURL}/asset/pricefeed/${encodeURIComponent(symbol)}/${encodeURIComponent(relayChain)}/${encodeURIComponent(routerAssetChain)}`
   var title_text = `${symbol} USD Value (Source: ${routerName})`;
