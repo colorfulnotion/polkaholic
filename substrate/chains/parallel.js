@@ -595,26 +595,24 @@ module.exports = class ParallelParser extends ChainParser {
             return (false);
         let v = JSON.parse(e2.pv);
         let issuance = (e2.decimals != undefined && e2.rawSupply != undefined)? e2.rawSupply / 10**e2.decimals : 0
-        let isParallelLP = false
+        let assetType = paraTool.assetTypeToken
         if (v != undefined) {
             v.supply = issuance
             if (e2.decoratedAsset != undefined && e2.decoratedAsset.Token != undefined){
                 let symbol = e2.decoratedAsset.Token
                 v.symbol = symbol
                 v.decimals = e2.decimals
-                isParallelLP = this.isParallelLiquidityPair(symbol)
+                if (this.isParallelLiquidityPair(symbol)) assetType = paraTool.assetTypeLiquidityPair
             }
         }
         let asset = e2.asset;
         let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, asset);
-        if (isParallelLP){
+        if (assetType == paraTool.assetTypeLiquidityPair){
             let lpAssetkey = this.elevatedAssetKey(paraTool.assetTypeLiquidityPair, asset);
-            indexer.updateAssetMetadata(rAssetkey, v, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain); // add currencyID
-            console.log(`updateAssetIssuance LP=${lpAssetkey} issuance=${issuance}`)
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`updateAssetIssuance LP=${lpAssetkey} issuance=${issuance}`)
             indexer.updateAssetIssuance(lpAssetkey, issuance, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain);
-        }else{
-            indexer.updateAssetMetadata(rAssetkey, v, paraTool.assetTypeToken, paraTool.assetSourceOnChain); // add currencyID
         }
+        indexer.updateAssetMetadata(rAssetkey, v, assetType, paraTool.assetSourceOnChain); // add currencyID
     }
 
     async processAccountAsset(indexer, p, s, e2, rAssetkey, fromAddress) {
@@ -674,6 +672,11 @@ module.exports = class ParallelParser extends ChainParser {
         let parsedAsset = {
             Token: assetID
         }
+        let assetType = paraTool.assetTypeToken
+        if (e2.decoratedAsset != undefined && e2.decoratedAsset.Token != undefined){
+            if (this.isParallelLiquidityPair(e2.decoratedAsset.Token)) assetType = paraTool.assetTypeLiquidityPair
+        }
+
         if (assetID == '0' || assetID == '1') {
             // manually write native token price
             let nativeAssetString = indexer.getNativeAsset();
@@ -700,8 +703,8 @@ module.exports = class ParallelParser extends ChainParser {
             }
         }
         let assetString = JSON.stringify(parsedAsset);
-        //console.log(`processAssetsOracles asset=${assetString}, price=${price}`, e2)
-        indexer.updateAssetPrice(assetString, price, paraTool.assetTypeToken, paraTool.assetSourceOracle)
+        if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAssetsOracles asset=${assetString}, price=${price} assetType=${assetType}`, e2)
+        indexer.updateAssetPrice(assetString, price, assetType, paraTool.assetSourceOracle)
     }
 
     async getOnChainAssetIssuance(indexer, lpTokenID, decimals, blockHash) {
@@ -1180,7 +1183,7 @@ module.exports = class ParallelParser extends ChainParser {
     }
 
     isParallelLiquidityPair(symbol = 'LP-DOT/sDOT'){
-        let isParallelLP = symbol.includes('LP')
+        let isParallelLP = symbol.includes('LP-')
         if (isParallelLP){
             //TODO: lookup lp0, lp1 in amm.pool
         }
