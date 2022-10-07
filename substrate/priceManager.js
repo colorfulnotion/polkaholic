@@ -281,7 +281,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                                 let parameters = await swapPromise.swap(tokenPath, amountInFP, "EXACT_INPUT");
                                 let amountOut = parameters.output.balance;
                                 let rate = amountIn.toString() / amountOut.toString();
-				//console.log(d, token0, token1, amountIn.toString(), amountOut.toString(), rate);
+                                //console.log(d, token0, token1, amountIn.toString(), amountOut.toString(), rate);
                                 priceUSD.push(rate);
                                 verificationPath = (chainID == paraTool.chainIDAcala) ? {
                                     acala: {
@@ -911,9 +911,9 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                 sum.numHours++;
                 totalFree = x.totalFree;
             } else {
-		//if ( p0 == null ) console.log("P0", x.token0)
-		//if ( p1 == null ) console.log("P1", x.token1)
-	    }
+                //if ( p0 == null ) console.log("P0", x.token0)
+                //if ( p1 == null ) console.log("P1", x.token1)
+            }
         }
         if (sum.numHours > 0) {
             let hourly_feesUSD = (sum.token0FeeUSD + sum.token1FeeUSD) / sum.numHours; // this works even if we have < 24 hours
