@@ -1,21 +1,25 @@
 #!/usr/bin/env node
  // Usage: while true; do ./indexChain 10; done
 var Crawler = require("./crawler");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
 
 async function main() {
-    let chainID = 2012;
+    let chainID = 2004;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = val;
         }
     });
     let crawler = new Crawler();
+    crawler.setDebugLevel(paraTool.debugTracing)
     crawler.exitOnDisconnect = true;
     let chain = await crawler.getChain(chainID);
     await crawler.setupAPI(chain);
     await crawler.assetManagerInit();
-    let blockNumber = 1037398;
-    let blockHash = "0x1a5636904ad7930989aaca0572b7fda3ab89dae96687c384099bfb99a0ed3087";
+    await crawler.setupChainAndAPI(chainID);
+    let blockNumber = 2009396;
+    let blockHash = "0x8a10e0777d4c2b55ca376dd78b8562cb4b0357c4e62b715b5ef6239665ede882";
     await crawler.index_block(chain, blockNumber, blockHash);
 }
 

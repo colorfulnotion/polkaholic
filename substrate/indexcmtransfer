@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+ // Usage:  indexcmtransfer [extrinsicHash]
+ // ./indexcmtransfer 0x381be996b2903aee14524e18dd4b0d436bb25271adfed154721020071eaecbbf
+var XCMManager = require("./xcmmanager");
+var Crawler = require("./crawler");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
+
+async function main() {
+    var manager = new XCMManager();
+
+    let blockNumber = 2009396;
+    let blockHash = "0x8a10e0777d4c2b55ca376dd78b8562cb4b0357c4e62b715b5ef6239665ede882";
+
+    let extrinsicHash = '0x381be996b2903aee14524e18dd4b0d436bb25271adfed154721020071eaecbbf'
+    let chainID = 2004;
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            extrinsicHash = val;
+        }
+        if (index == 3 && val.length > 0) {
+            chainID = val;
+        }
+    });
+
+    let txn = await manager.getTransaction(extrinsicHash);
+    console.log(`extrinsicHash`, txn)
+    if (txn.blockNumber){
+        blockNumber = txn.blockNumber
+    }
+    if (txn.blockHash){
+        blockHash = txn.blockHash
+    }
+    if (txn.chainID != undefined){
+        chainID = `${txn.chainID}`
+    }
+    let crawler = new Crawler();
+    crawler.setDebugLevel(paraTool.debugTracing)
+    crawler.exitOnDisconnect = true;
+    let chain = await crawler.getChain(chainID);
+    await crawler.setupAPI(chain);
+    await crawler.assetManagerInit();
+    await crawler.setupChainAndAPI(chainID);
+    console.log(`index_block chainID=${chainID}, bn=${blockNumber}, bh=${blockHash}`)
+    //`select floor(UNIX_TIMESTAMP(blockDT)/3600)*3600 as indexTS, min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT >= FROM_UNIXTIME(${indexTSPeriod}) and blockDT < FROM_UNIXTIME(${indexTSPeriod+3600}) group by indexTS order by indexTS;
+    await crawler.index_block(chain, blockNumber, blockHash);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
