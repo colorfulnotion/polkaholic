@@ -14,7 +14,9 @@ async function main() {
 
     var a = await api.query.assetManager.assetIdType.entries()
     var assetList = {}
-    a.forEach(async ([key, val]) => {
+    for (let i = 0; i < a.length; i++) {
+        let key = a[i][0];
+        let val = a[i][1];
         let assetID = cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
         //let assetID = key.args.map((k) => k.toHuman())[0] //input: assetIDWithComma
         let xcmAsset = val.toJSON().xcm
@@ -38,7 +40,7 @@ async function main() {
         }
         var asset = JSON.stringify(parsedAsset);
         console.log(`${asset} [${interiorK}]`, interiorV)
-    });
+    }
 
 }
 

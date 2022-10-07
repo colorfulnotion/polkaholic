@@ -596,7 +596,7 @@ module.exports = {
         return out;
     },
     getVerificationPath: function(symbols, path) {
-	let p = JSON.stringify(path).replaceAll('"', '');
+        let p = JSON.stringify(path).replaceAll('"', '');
         return JSON.stringify(symbols) + copyToClipboard(p);
     },
     getEVMMethod: function(sig) {

@@ -1731,17 +1731,17 @@ module.exports = class Query extends AssetManager {
     }
 
     verificationURL(chainID, router) {
-	switch ( chainID ) {
-	case 2004:
-	    return `https://moonscan.io/address/${router}#readContract`
-	case 22023:
-	    return `https://moonriver.moonscan.io/address/${router}#readContract`
-	case 2006:
-	    return `https://blockscout.com/astar/${router}`
-	case 22007:
-	    return `https://blockscout.com/shiden/${router}`
-	}
-	return null;
+        switch (chainID) {
+            case 2004:
+                return `https://moonscan.io/address/${router}#readContract`
+            case 22023:
+                return `https://moonriver.moonscan.io/address/${router}#readContract`
+            case 2006:
+                return `https://blockscout.com/astar/${router}`
+            case 22007:
+                return `https://blockscout.com/shiden/${router}`
+        }
+        return null;
     }
     unwrap_verificationPath(verificationPathRaw) {
         try {
@@ -1762,12 +1762,12 @@ module.exports = class Query extends AssetManager {
                 if ( vp[routerAssetChain].path ) {
 		    res.path = vp[routerAssetChain].path;
                     res.pathSymbols = res.path.map((asset) => {
-			let assetChain = paraTool.makeAssetChain(asset, res.chainID);
-			let symbol = (this.assetInfo[assetChain]) ? this.assetInfo[assetChain].symbol : "UNK"
-			return symbol;
+                        let assetChain = paraTool.makeAssetChain(asset, res.chainID);
+                        let symbol = (this.assetInfo[assetChain]) ? this.assetInfo[assetChain].symbol : "UNK"
+                        return symbol;
                     });
                     res.blockNumber = vp[routerAssetChain].blockNumber;
-		}
+                }
                 return res;
             }
             return (vp);
@@ -7020,7 +7020,7 @@ module.exports = class Query extends AssetManager {
                 let priceUSD = tvlUSD / issuance;
                 let state = JSON.parse(r.state);
                 let volumeUSD = parseFloat(r.token0Volume) * p0.priceUSD + parseFloat(r.token1Volume) * p1.priceUSD;
-                let feesUSD = .0025 * volumeUSD; // (state.token0Volume) * 0.0025 * p0.priceUSD + (s.token1Volume) * 0.0025 * p1.priceUSD; 
+                let feesUSD = .0025 * volumeUSD; // (state.token0Volume) * 0.0025 * p0.priceUSD + (s.token1Volume) * 0.0025 * p1.priceUSD;
                 let feesUSDimp = state.token0Fee * p0.priceUSD + state.token1Fee * p1.priceUSD; // which could be negative
                 h.push({
                     indexTS: r.indexTS,
