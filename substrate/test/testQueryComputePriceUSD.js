@@ -144,14 +144,9 @@ async function main() {
         'KSM/ARIS LP-karura': {
             assetChain: '[{"Token":"KSM"},{"ForeignAsset":"1"}]~22000'
         },
-    }
-    assets = {
         'stableassetpool-karura': {
             assetChain: `{"StableAssetPoolToken":"0"}~22000`
-        }
-    }
-
-    assets = {
+        },
         'SOLAR': {
             assetChain: `0x6bd193ee6d2104f14f94e2ca6efefae561a4334b~22023`
         },
@@ -160,6 +155,35 @@ async function main() {
         }
     }
 
+    assets = {
+	'PARA': {
+	    assetChain: '{"Token":"1"}~2012' 
+	},
+	'sDOT': {
+	    assetChain: '{"Token":"1001"}~2012'
+	},
+	'DOT': {
+	    assetChain: '{"Token":"101"}~2012'
+	},
+	'cDOT-6/13': {
+	    assetChain: '{"Token":"200060013"}~2012'
+	},
+	'cDOT-7/14': {
+	    assetChain: '{"Token":"200070014"}~2012'
+	},
+	'cDOT-8/15': {
+	    assetChain: '{"Token":"200080015"}~2012'
+	},
+	'GLMR': {
+	    assetChain: '{"Token":"114"}~2012'
+	},
+	'PHA': {
+	    assetChain: '{"Token":"115"}~2012'
+	},
+	'USDT': {
+	    assetChain: '{"Token":"102"}~2012'
+	}
+    }
     let ts = query.currentTS();
     for (const testcaseName of Object.keys(assets)) {
         let q = assets[testcaseName];

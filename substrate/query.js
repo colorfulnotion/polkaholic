@@ -1750,15 +1750,17 @@ module.exports = class Query extends AssetManager {
             for (const routerAssetChain of Object.keys(vp)) {
                 res.routerAssetChain = routerAssetChain;
                 [res.router, res.chainID] = paraTool.parseAssetChain(res.routerAssetChain);
-                if ( vp[routerAssetChain].path ) {
+		if ( res.chainID ) {
 		    res.chainName = this.getChainName(res.chainID);
 		    let [__, id] = this.convertChainID(res.chainID)
 		    res.id = id;
-		    res.path = vp[routerAssetChain].path;
 		    let verificationURL = this.verificationURL(res.chainID, res.router);
 		    if ( verificationURL ) {
 			res.verificationURL = verificationURL;
 		    }
+		}
+                if ( vp[routerAssetChain].path ) {
+		    res.path = vp[routerAssetChain].path;
                     res.pathSymbols = res.path.map((asset) => {
 			let assetChain = paraTool.makeAssetChain(asset, res.chainID);
 			let symbol = (this.assetInfo[assetChain]) ? this.assetInfo[assetChain].symbol : "UNK"

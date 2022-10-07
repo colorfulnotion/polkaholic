@@ -274,14 +274,14 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                             if (token1 == "lcDOT") token1 = "lc://13";
                             let tokenPath = [wallet.getToken(token0), wallet.getToken(token1)];
                             //console.log("TOKEN PATH", tokenPath, wallet);
-                            // CHECK directionality of pair usage
+                            //if (hop.s == 0) tokenPath = tokenPath.reverse(); // TODO: DOUBLECHECK directionality of pair usage
                             for (let d = 0; d < 4; d++) {
                                 let amountIn = (10 ** (d));
-                                if (hop.s == 0) tokenPath = tokenPath.reverse();
                                 let amountInFP = new FixedPointNumber(amountIn, tokenPath[0].decimals);
                                 let parameters = await swapPromise.swap(tokenPath, amountInFP, "EXACT_INPUT");
                                 let amountOut = parameters.output.balance;
                                 let rate = amountIn.toString() / amountOut.toString();
+				//console.log(d, token0, token1, amountIn.toString(), amountOut.toString(), rate);
                                 priceUSD.push(rate);
                                 verificationPath = (chainID == paraTool.chainIDAcala) ? {
                                     acala: {
@@ -350,7 +350,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         })
         let lookbackDaysRanges = [1, 7, 30];
         for (const lookbackDays of lookbackDaysRanges) {
-            await this.update_fees_apy(chainID, lookbackDays, true);
+            await this.update_fees_apy(chainID, lookbackDays, false);
         }
     }
 
@@ -827,7 +827,8 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     async update_fees_apy(chainID, lookbackDays = 7, isEVM = true) {
         try {
             let assetType = isEVM ? 'ERC20LP' : 'LiquidityPair'
-            let sql = `select asset.asset, asset.chainID, indexTS, token0, token1, token0Symbol, token1Symbol, symbol, lp0, lp1, totalFree, totalReserved, convert(state using utf8) state from assetlog, asset where assetlog.asset = asset.asset and assetlog.chainID = asset.chainID and indexTS >= unix_timestamp(date_sub(Now(), interval 24 * ${lookbackDays} hour)) and assetType = '${assetType}' and asset.chainID = ${chainID} and indexTS % 3600 = 0`
+            let sql = `select asset.asset, asset.chainID, indexTS, token0, token1, token0Symbol, token1Symbol, symbol, lp0, lp1, totalFree, totalReserved, convert(state using utf8) state from assetlog, asset where assetlog.asset = asset.asset and assetlog.chainID = asset.chainID and indexTS >= unix_timestamp(date_sub(Now(), interval 24 * ${lookbackDays} hour)) and assetType = '${assetType}' and asset.chainID = ${chainID} and indexTS % 3600 = 0 and state is not null`
+
             var recs = await this.poolREADONLY.query(sql);
             let assetrecs = {};
             for (const r of recs) {
@@ -909,8 +910,10 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                 sum.issuance += s.issuance; // not used
                 sum.numHours++;
                 totalFree = x.totalFree;
-            }
-
+            } else {
+		//if ( p0 == null ) console.log("P0", x.token0)
+		//if ( p1 == null ) console.log("P1", x.token1)
+	    }
         }
         if (sum.numHours > 0) {
             let hourly_feesUSD = (sum.token0FeeUSD + sum.token1FeeUSD) / sum.numHours; // this works even if we have < 24 hours
