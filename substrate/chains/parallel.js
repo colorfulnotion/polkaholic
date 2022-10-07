@@ -983,7 +983,12 @@ module.exports = class ParallelParser extends ChainParser {
         let a = await indexer.api.query.amm.pools.entries();
         console.log(`updateLiquidityInfo called pairLen=${a.length}`)
         let assetList = {}
-        a.forEach(async ([key, val]) => {
+        let isUpdated = false
+	console.log(a);
+        for (let i= 0; i < a.length; i++) {
+	    let key = a[i][0];
+	    let val = a[i][1];
+	    
             let assetMetadata = val.toHuman() //enabled
             let lp = key.args.map((k) => k.toHuman())
             let lpAsset = JSON.stringify(lp)
@@ -1009,14 +1014,14 @@ module.exports = class ParallelParser extends ChainParser {
                 let assetChain0 = paraTool.makeAssetChain(asset0, indexer.chainID);
                 let assetChain1 = paraTool.makeAssetChain(asset1, indexer.chainID);
                 let assetChainLP = paraTool.makeAssetChain(assetLP, indexer.chainID);
-                let lpAsset = this.elevatedAssetKeyWithQuote(paraTool.assetTypeLiquidityPair, `"${lpAssetID}"`); //*** need extra quote here
-                let lpAssetChain = paraTool.makeAssetChain(lpAsset, indexer.chainID);
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`updateLiquidityInfo assetChainLP=${assetChainLP}, LP0=${asset0}, LP1=${asset1}, lpAsset=${lpAsset}`)
 
-                let cachedLPAssetInfo = indexer.assetInfo[lpAssetChain]
+                //let lpAsset = this.elevatedAssetKeyWithQuot(paraTool.assetTypeToken, `"${lpAssetID}"`); //*** need extra quote here
+                //let lpAssetChain = paraTool.makeAssetChain(lpAsset, indexer.chainID);
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`updateLiquidityInfo assetChainLP=${assetChainLP}, LP0=${asset0}, LP1=${asset1}, lpAsset=${lpAsset}`)
+                let cachedLPAssetInfo = indexer.assetInfo[assetChainLP]
                 if (cachedLPAssetInfo != undefined && cachedLPAssetInfo.token1Decimals != undefined && cachedLPAssetInfo.token0Decimals != undefined && cachedLPAssetInfo.assetName != undefined) {
                     //cached found
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`cached AssetInfo found`, cachedLPAssetInfo)
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`cached AssetInfo found`, assetChainLP)
                     //assetList[asset] = cachedAssetInfo
                 } else {
                     let token0 = indexer.assetInfo[assetChain0]
@@ -1039,10 +1044,12 @@ module.exports = class ParallelParser extends ChainParser {
                             token1decimals: token1.decimals,
                             token1symbol: token1.symbol,
                         }
-                        console.log(`lpAssetInfo`, lpAssetInfo)
-                        assetList[lpAssetChain] = lpAssetInfo
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`lpAssetInfo [${lpAsset}]`, lpAssetInfo)
-                        await indexer.addLpAssetInfo(lpAsset, indexer.chainID, lpAssetInfo, 'updateLiquidityInfo');
+                        console.log(`lpAssetInfo ${assetChainLP}`, lpAssetInfo)
+                        assetList[assetChainLP] = lpAssetInfo
+                        //assetList[lpAssetChain] = lpAssetInfo
+                        //if (this.debugLevel >= paraTool.debugInfo) console.log(`lpAssetInfo [${lpAsset}]`, lpAssetInfo)
+                        await indexer.addLpAssetInfo(assetLP, indexer.chainID, lpAssetInfo, 'updateLiquidityInfo');
+                        isUpdated = true
                     } else {
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`COULD NOT ADD asset -- no assetType ${assetChain0}, ${assetChain1} ${assetChainOriginal}`);
                     }
@@ -1050,8 +1057,10 @@ module.exports = class ParallelParser extends ChainParser {
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`NOT dex pair LP ${lpAssetChain}`, assetMetadata)
             }
-        });
+        }
         if (this.debugLevel >= paraTool.debugInfo && assetList.length > 0) console.log(`new liquidity found`, assetList);
+        //if (isUpdated) await this.update_batchedSQL()
+        //process.exit(0)
     }
 
     //Trade using liquidity[trader, currency_id_in, currency_id_out, amount_in, amount_out, lp_token_id, new_quote_amount, new_base_amount]

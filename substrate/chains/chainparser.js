@@ -4154,8 +4154,10 @@ module.exports = class ChainParser {
                 a = await indexer.api.query.assets.metadata.entries()
                 break;
         }
-        if (!a) return
-
+        if (!a) {
+            console.log(`returned`)
+            return
+        }
         let assetList = {}
         a.forEach(async ([key, val]) => {
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
@@ -4181,6 +4183,9 @@ module.exports = class ChainParser {
                         assetType: paraTool.assetTypeToken,
                         currencyID: assetID
                     };
+                    if (indexer.chainID == paraTool.chainIDParallel ||  indexer.chainID == paraTool.chainIDHeiko){
+                        if (assetInfo.symbol.includes('LP-')) assetInfo.assetType = paraTool.assetTypeLiquidityPair
+                    }
                     assetList[asset] = assetInfo
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
                     await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAsset');
