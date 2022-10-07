@@ -286,7 +286,9 @@ module.exports = class AcalaParser extends ChainParser {
         let a = await indexer.api.query.dex.tradingPairStatuses.entries();
         console.log(`updateLiquidityInfo called pairLen=${a.length}`)
         let assetList = {}
-        a.forEach(async ([key, val]) => {
+        for (let i = 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
             let assetMetadata = val.toHuman() //enabled
             let lp = key.args.map((k) => k.toHuman())[0]
             let lpAsset = JSON.stringify(lp)
@@ -332,7 +334,7 @@ module.exports = class AcalaParser extends ChainParser {
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`NOT dex pair LP ${lpAssetChain}`, assetMetadata)
             }
-        });
+        }
         if (this.debugLevel >= paraTool.debugInfo && assetList.length > 0) console.log(`new liquidity found`, assetList);
     }
 
@@ -459,6 +461,29 @@ module.exports = class AcalaParser extends ChainParser {
             let lp1 = lp['token1'] / 10 ** decimals1;
             let rat = lp0 / lp1
             ///console.log("--- processDexLiquidityPool", JSON.stringify(pair[0]), JSON.stringify(pair[1]), "decimals0", decimals0, "decimals1", decimals1, "lp0", lp0, "lp1", lp1, "rat", rat, "lp", lp, "e2", e2);
+            let cachedIssuance = indexer.getAssetIssuance(pairKey, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain)
+            if (cachedIssuance == 0) {
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`processDexLiquidityPool ${pairKey} missing issuance`)
+                // fetch issuance on chain
+                let lpAssetChain = paraTool.makeAssetChain(pairKey, indexer.chainID);
+                let cachedLPAssetInfo = indexer.assetInfo[lpAssetChain]
+                if (cachedLPAssetInfo != undefined && cachedLPAssetInfo.decimals != undefined) {
+                    try {
+                        let parsedPairKey = JSON.parse(pairKey)
+                        let dexShareKey = JSON.stringify({
+                            DexShare: parsedPairKey
+                        })
+                        let issuance = await this.getOnChainAssetIssuance(indexer, dexShareKey, cachedLPAssetInfo.decimals, e2.blockHash)
+                        if (issuance > 0) {
+                            indexer.updateAssetIssuance(pairKey, issuance, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain);
+                        }
+                    } catch (err) {
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processDexLiquidityPool err`, err)
+                    }
+
+                }
+            }
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`updateAssetLiquidityPairPool pairKey=${pairKey}, lp0=${lp0} lp1=${lp1}`)
             indexer.updateAssetLiquidityPairPool(pairKey, lp0, lp1, rat);
         } else {
             indexer.logger.debug({
@@ -611,7 +636,7 @@ module.exports = class AcalaParser extends ChainParser {
                         //console.log(`process_dex_swap_event ${reversePairKey} Found (reversed) +${token1In}(${tok1}) -${token0Out}(${tok0})`)
                         indexer.updateAssetLiquidityPairTradingVolume(reversePairKey, token0In, token1In, token0Out, token1Out)
                     } else {
-                        console.log(`process_dex_swap_event - assetChain ${assetChain} NOT Found [${vol0},${vol1}]`)
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`process_dex_swap_event - assetChain ${assetChain} NOT Found [${vol0},${vol1}]`)
                         indexer.logger.debug({
                             "op": "acala-process_dex_swap_event",
                             "msg": "LiquidityPair"
@@ -835,7 +860,7 @@ module.exports = class AcalaParser extends ChainParser {
                     assetType = paraTool.assetTypeLiquidityPair; // TODO: check
                 }
             } catch (err) {
-                console.log("indexer.api.query.assetRegistry.assetMetadatas ERR", err);
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("indexer.api.query.assetRegistry.assetMetadatas ERR", err);
                 this.parserErrors++;
             }
         } else if (parsedAsset.LiquidCrowdloan && ((parsedAsset.LiquidCrowdloan == "13") || (parsedAsset.LiquidCrowdloan == 13))) {
@@ -846,7 +871,7 @@ module.exports = class AcalaParser extends ChainParser {
                 decimals = 10;
                 assetType = paraTool.assetTypeToken;
             } catch (err) {
-                console.log("indexer.api.query.assetRegistry.assetMetadatas ERR", err);
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("indexer.api.query.assetRegistry.assetMetadatas ERR", err);
                 this.parserErrors++;
             }
         } else if (parsedAsset.ForeignAsset) {
@@ -888,6 +913,19 @@ module.exports = class AcalaParser extends ChainParser {
         return (false);
     }
 
+
+    async getOnChainAssetIssuance(indexer, key, decimals, blockHash) {
+        //console.log(`getOnChainAssetIssuance key=${key}, decimals=${decimals}, blockHash=${blockHash}`)
+        let issuance = 0
+        try {
+            let v = await indexer.api.query.tokens.totalIssuance.at(blockHash, JSON.parse(key));
+            issuance = paraTool.dechexToInt(v.toJSON()) / 10 ** decimals
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`getOnChainAssetIssuance [blk=${blockHash}] [key=${key}] issuance=${issuance}`)
+        } catch (e) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getOnChainAssetIssuance [blk=${blockHash}] [key=${key}]`, e)
+        }
+        return issuance
+    }
 
     async processTokensAccounts(indexer, e2, rAssetkey, fromAddress) {
         let aa = {};

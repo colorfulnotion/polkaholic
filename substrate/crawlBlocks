@@ -2,9 +2,17 @@
  // Usage:  crawlBlocks [chainID]
 
 var Crawler = require("./crawler");
+var paraTool = require("./paraTool");
+
+
 async function main() {
     var chainID = -1;
     var crawler = new Crawler();
+    //crawler.setDebugLevel(paraTool.debugNoLog)
+    crawler.setDebugLevel(paraTool.debugErrorOnly)
+    //crawler.setDebugLevel(paraTool.debugInfo)
+    //crawler.setDebugLevel(paraTool.debugVerbose)
+    //crawler.setDebugLevel(paraTool.debugTracing)
     await crawler.assetManagerInit();
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {

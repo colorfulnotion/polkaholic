@@ -71,10 +71,10 @@ module.exports = class AssetManager extends PolkaholicDB {
         while (1) {
             await this.sleep(intervalSeconds * 1000);
             console.log("autoRefresh assets...")
-	    if ( this.getCurrentTS() - this.lastEventReceivedTS > 300 ) {
-		console.log("No event received in 5mins, terminating")
-		process.exit(1);
-	    }
+            if (this.getCurrentTS() - this.lastEventReceivedTS > 300) {
+                console.log("No event received in 5mins, terminating")
+                process.exit(1);
+            }
             await this.assetManagerInit();
             if (this.web3Api) {
                 console.log("autoRefresh contractABI...")
@@ -651,6 +651,7 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
             }
             nassets++;
         }
+        //console.log(assetInfo)
         this.assetInfo = assetInfo;
         this.symbolRelayChainAsset = symbolRelayChainAsset;
         this.xcContractAddress = xcContractAddress;
@@ -705,13 +706,14 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
         let isNativeChain = (assetInfo.isNativeChain != undefined) ? assetInfo.isNativeChain : 0 // DISCUSS
         let currencyID = (assetInfo.currencyID != undefined) ? `${assetInfo.currencyID}` : 'NULL'
         let decimals = (assetInfo.decimals != undefined) ? `${assetInfo.decimals}` : 'NULL'
+        let sqlDebug = true
         await this.upsertSQL({
             "table": "asset",
             "keys": ["asset", "chainID"],
             "vals": ["assetName", "symbol", "decimals", "assetType", "isNativeChain", "currencyID"],
             "data": [`( '${asset}', '${chainID}', '${assetInfo.name}', '${assetInfo.symbol}', ${decimals}, '${assetInfo.assetType}', '${isNativeChain}', ${currencyID} )`],
             "replaceIfNull": ["assetName", "symbol", "decimals", "assetType", "isNativeChain", "currencyID"]
-        });
+        }, sqlDebug);
         assetInfo.assetName = assetInfo.name //TODO: cached assetInfo from mysql has assetName but not "name"
         this.assetInfo[assetChain] = assetInfo;
         if (caller) {
@@ -730,13 +732,14 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
     async addXcmAssetInfo(xcmAssetInfo, caller = false) {
         let out = [`('${xcmAssetInfo.chainID}', '${xcmAssetInfo.xcmConcept}', '${xcmAssetInfo.asset}', '${xcmAssetInfo.paraID}', '${xcmAssetInfo.relayChain}', '${xcmAssetInfo.nativeAssetChain}', '${xcmAssetInfo.source}', Now())`]
         let vals = [`paraID`, `relayChain`, `nativeAssetChain`, `source`, `lastUpdateDT`]
+        let sqlDebug = true
         await this.upsertSQL({
             "table": "xcmConcept",
             "keys": ["chainID", "xcmConcept", "asset"],
             "vals": vals,
             "data": out,
             "replace": vals
-        });
+        }, sqlDebug);
         let xcmInteriorKey = xcmAssetInfo.xcmInteriorKey
         this.xcmAssetInfo[xcmInteriorKey] = xcmAssetInfo;
         if (caller) {
@@ -749,13 +752,17 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
 
     async addLpAssetInfo(lpAsset, chainID, lpAssetInfo, caller = false) {
         let lpAssetChain = paraTool.makeAssetChain(lpAsset, chainID);
+        let sqlDebug = true
         await this.upsertSQL({
             "table": "asset",
             "keys": ["asset", "chainID"],
             "vals": ["assetName", "symbol", "decimals", "assetType", 'token0', 'token0symbol', 'token0decimals', 'token1', 'token1symbol', 'token1decimals'],
             "data": [`( '${lpAsset}', '${chainID}', '${lpAssetInfo.name}', '${lpAssetInfo.symbol}', '${lpAssetInfo.decimals}', '${lpAssetInfo.assetType}', '${lpAssetInfo.token0}', '${lpAssetInfo.token0symbol}', '${lpAssetInfo.token0decimals}', '${lpAssetInfo.token1}', '${lpAssetInfo.token1symbol}', '${lpAssetInfo.token1decimals}')`],
-            "replaceIfNull": ["assetName", "symbol", "decimals", "assetType", 'token0', 'token0symbol', 'token0decimals', 'token1', 'token1symbol', 'token1decimals']
-        });
+            "replace": ["assetType"],
+            "replaceIfNull": ["assetName", "symbol", "decimals", 'token0', 'token0symbol', 'token0decimals', 'token1', 'token1symbol', 'token1decimals']
+        }, sqlDebug);
+
+
         lpAssetInfo.assetName = lpAssetInfo.name //TODO: cached assetInfo from mysql has assetName but not "name"
         this.assetInfo[lpAssetChain] = lpAssetInfo;
         if (caller) {
