@@ -286,7 +286,7 @@ module.exports = class AcalaParser extends ChainParser {
         let a = await indexer.api.query.dex.tradingPairStatuses.entries();
         console.log(`updateLiquidityInfo called pairLen=${a.length}`)
         let assetList = {}
-        for (let i= 0; i < a.length; i++) {
+        for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
             let assetMetadata = val.toHuman() //enabled
@@ -462,22 +462,22 @@ module.exports = class AcalaParser extends ChainParser {
             let rat = lp0 / lp1
             ///console.log("--- processDexLiquidityPool", JSON.stringify(pair[0]), JSON.stringify(pair[1]), "decimals0", decimals0, "decimals1", decimals1, "lp0", lp0, "lp1", lp1, "rat", rat, "lp", lp, "e2", e2);
             let cachedIssuance = indexer.getAssetIssuance(pairKey, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain)
-            if (cachedIssuance == 0 ){
+            if (cachedIssuance == 0) {
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`processDexLiquidityPool ${pairKey} missing issuance`)
                 // fetch issuance on chain
                 let lpAssetChain = paraTool.makeAssetChain(pairKey, indexer.chainID);
                 let cachedLPAssetInfo = indexer.assetInfo[lpAssetChain]
-                if (cachedLPAssetInfo != undefined && cachedLPAssetInfo.decimals != undefined){
+                if (cachedLPAssetInfo != undefined && cachedLPAssetInfo.decimals != undefined) {
                     try {
                         let parsedPairKey = JSON.parse(pairKey)
                         let dexShareKey = JSON.stringify({
                             DexShare: parsedPairKey
                         })
-                        let issuance =  await this.getOnChainAssetIssuance(indexer, dexShareKey, cachedLPAssetInfo.decimals, e2.blockHash)
-                        if (issuance > 0){
+                        let issuance = await this.getOnChainAssetIssuance(indexer, dexShareKey, cachedLPAssetInfo.decimals, e2.blockHash)
+                        if (issuance > 0) {
                             indexer.updateAssetIssuance(pairKey, issuance, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain);
                         }
-                    } catch (err){
+                    } catch (err) {
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processDexLiquidityPool err`, err)
                     }
 
@@ -636,7 +636,7 @@ module.exports = class AcalaParser extends ChainParser {
                         //console.log(`process_dex_swap_event ${reversePairKey} Found (reversed) +${token1In}(${tok1}) -${token0Out}(${tok0})`)
                         indexer.updateAssetLiquidityPairTradingVolume(reversePairKey, token0In, token1In, token0Out, token1Out)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly)  console.log(`process_dex_swap_event - assetChain ${assetChain} NOT Found [${vol0},${vol1}]`)
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`process_dex_swap_event - assetChain ${assetChain} NOT Found [${vol0},${vol1}]`)
                         indexer.logger.debug({
                             "op": "acala-process_dex_swap_event",
                             "msg": "LiquidityPair"

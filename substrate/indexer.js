@@ -251,7 +251,7 @@ module.exports = class Indexer extends AssetManager {
             //console.log(`updateAssetPrice`, asset, assetType, issuance)
             this.tallyAsset[asset].price = price;
             this.tallyAsset[asset].assetSourceMap[assetSource] = 1 // mark as used
-            if (assetType == paraTool.assetTypeLiquidityPair){
+            if (assetType == paraTool.assetTypeLiquidityPair) {
                 this.tallyAsset[asset].isDualAssetTypeToken = 1
             }
         }
@@ -2307,7 +2307,7 @@ module.exports = class Indexer extends AssetManager {
                                 assetlogLiquidityPairs.push(o);
                             }
                         }
-                        if (assetInfo.isDualAssetTypeToken){
+                        if (assetInfo.isDualAssetTypeToken) {
                             let issuance = assetInfo.issuance;
                             if (isFullPeriod) {
                                 let updIssuance = false
@@ -2505,7 +2505,7 @@ module.exports = class Indexer extends AssetManager {
             }
         }
 
-        let sqlDebug = (this.debugLevel >= paraTool.debugVerbose)? true : false
+        let sqlDebug = (this.debugLevel >= paraTool.debugVerbose) ? true : false
         // ---- asset: erc20s,
         await this.upsertSQL({
             "table": "asset",
@@ -2517,7 +2517,7 @@ module.exports = class Indexer extends AssetManager {
             "replace": ["assetType", "assetName", "symbol", "decimals", "token0", "token1", "token0Decimals", "token1Decimals", "token0Symbol", "token1Symbol"],
             "lastUpdateBN": ["lastUpdateBN", "lastUpdateDT", "totalSupply", "token0Supply", "token1Supply", "lastState"],
             "replaceIfNull": ["createDT", "creator", "createdAtTx"] // add currencyID
-        },sqlDebug);
+        }, sqlDebug);
 
 
         await this.upsertSQL({
@@ -2527,7 +2527,7 @@ module.exports = class Indexer extends AssetManager {
             "data": tokens,
             "replaceIfNull": ["assetType"], // add currencyID
             "lastUpdateBN": ["lastUpdateBN", "lastUpdateDT", "totalSupply"]
-        },sqlDebug);
+        }, sqlDebug);
 
         await this.upsertSQL({
             "table": "asset",
@@ -2537,7 +2537,7 @@ module.exports = class Indexer extends AssetManager {
             "replace": ["assetType", "assetName", "symbol", "erc721isMetadata", "erc721isMetadata"],
             "lastUpdateBN": ["totalSupply", "lastUpdateBN", "lastUpdateDT", "metadata", "tokenBaseURI", "ipfsUrl", "imageUrl"],
             "replaceIfNull": ["createDT", "creator", "createdAtTx"]
-        },sqlDebug);
+        }, sqlDebug);
         await this.upsertSQL({
             "table": "asset",
             "keys": ["asset", "chainID"],
@@ -2546,7 +2546,7 @@ module.exports = class Indexer extends AssetManager {
             "lastUpdateBN": ["lastUpdateBN", "lastUpdateDT"],
             "replace": ["assetType"],
             "replaceIfNull": ["createDT", "creator", "createdAtTx"]
-        },sqlDebug);
+        }, sqlDebug);
         // TODO: need new case for loans here to set asset for acala/parallel ... but how are they getting into "asset" now?
 
         // ---- assetlog
@@ -2572,7 +2572,7 @@ module.exports = class Indexer extends AssetManager {
             "vals": ["open", "close", "low", "high", "lp0", "lp1", "issuance", "token0Volume", "token1Volume", "state"],
             "data": assetlogLiquidityPairs,
             "replace": ["open", "close", "low", "high", "lp0", "lp1", "issuance", "token0Volume", "token1Volume", "state"]
-        },sqlDebug)
+        }, sqlDebug)
 
         await this.upsertSQL({
             "table": "assetlog",
@@ -2580,7 +2580,7 @@ module.exports = class Indexer extends AssetManager {
             "vals": ["issuance", "debitExchangeRate"],
             "data": assetlogLoans,
             "replace": ["issuance", "debitExchangeRate"]
-        },sqlDebug)
+        }, sqlDebug)
 
         await this.upsertSQL({
             "table": "assetlog",
@@ -2597,7 +2597,7 @@ module.exports = class Indexer extends AssetManager {
             "vals": ["holder", "lastUpdateDT", "lastUpdateBN", "meta", "tokenURI", "free"],
             "data": erc721tokens,
             "lastUpdateBN": ["holder", "free", "meta", "tokenURI", "lastUpdateBN", "lastUpdateDT"]
-        },sqlDebug)
+        }, sqlDebug)
 
         // reset assetChainMap after we have finised processing
         this.resetAssetChainMap()
@@ -6674,7 +6674,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             this.chainID == paraTool.chainIDListen ||
             this.chainID == paraTool.chainIDCrustShadow) {
             await this.chainParser.fetchAsset(this)
-            if (this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel){
+            if (this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel) {
                 await this.chainParser.fetchAsset(this)
                 await this.chainParser.updateLiquidityInfo(this)
             }

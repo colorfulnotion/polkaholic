@@ -26,7 +26,7 @@ module.exports = class BifrostParser extends ChainParser {
         if (!a) return
         let assetList = {}
         // remove the Id prefix here
-        for (let i= 0; i < a.length; i++) {
+        for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
             let assetMetadata = val.toHuman()

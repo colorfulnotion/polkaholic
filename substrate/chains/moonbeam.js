@@ -515,8 +515,8 @@ module.exports = class MoonbeamParser extends ChainParser {
                 let [msgHash, innerCall] = this.getMsgHashAndInnerCall(indexer, extrinsic, feed)
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned msgHash=${msgHash}, innerCall=${innerCall}`)
                 r.xcmInteriorKey = targetedXcmInteriorKey,
-                r.xcmSymbol = targetedSymbol,
-                r.chainIDDest = chainIDDest
+                    r.xcmSymbol = targetedSymbol,
+                    r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
                 r.msgHash = msgHash
@@ -549,8 +549,8 @@ module.exports = class MoonbeamParser extends ChainParser {
                 // inner_call processing
                 innerCall = (a.inner_call != undefined) ? a.inner_call : 'notfound'
                 r.xcmInteriorKey = targetedXcmInteriorKey,
-                r.xcmSymbol = targetedSymbol,
-                r.chainIDDest = chainIDDest
+                    r.xcmSymbol = targetedSymbol,
+                    r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
                 r.msgHash = msgHash

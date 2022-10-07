@@ -3713,7 +3713,7 @@ module.exports = class ChainParser {
         }
         if (!a) return
         let assetList = {}
-        for (let i= 0; i < a.length; i++) {
+        for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
@@ -3846,7 +3846,7 @@ module.exports = class ChainParser {
         }
         if (!a) return
         let assetList = {}
-        for (let i= 0; i < a.length; i++) {
+        for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
@@ -3992,7 +3992,7 @@ module.exports = class ChainParser {
         if (!a) return
         let assetList = {}
         let xcmInteriorUpdates = []
-        for (let i= 0; i < a.length; i++) {
+        for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
@@ -4162,7 +4162,7 @@ module.exports = class ChainParser {
             return
         }
         let assetList = {}
-        for (let i= 0; i < a.length; i++) {
+        for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
@@ -4188,7 +4188,7 @@ module.exports = class ChainParser {
                         assetType: paraTool.assetTypeToken,
                         currencyID: assetID
                     };
-                    if (indexer.chainID == paraTool.chainIDParallel ||  indexer.chainID == paraTool.chainIDHeiko){
+                    if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
                         if (assetInfo.symbol.includes('LP-')) assetInfo.assetType = paraTool.assetTypeLiquidityPair
                         console.log('im here fetchAsset assetInfo', assetInfo)
                     }
@@ -4231,7 +4231,7 @@ module.exports = class ChainParser {
         let assetList = {}
         //ForeignAssetId/{"NativeAssetId":{"Token":"XXX"}}/{"Erc20":"0x1f3a10587a20114ea25ba1b388ee2dd4a337ce27"}/{"StableAssetId":"0"}
         // remove the Id prefix here
-        for (let i= 0; i < a.length; i++) {
+        for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
             let assetMetadata = val.toHuman()
