@@ -1274,7 +1274,7 @@ module.exports = class Crawler extends Indexer {
             let startingBlock = parseInt(syncState.startingBlock.toString(), 10);
             console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
-            let startBN = chain.blocksFinalized - 150000 // dont do  a full table scan for chain 0/2 anymore 150000*6=10 days should be enough...
+	    let startBN = chain.blocksFinalized - 150000 // dont do  a full table scan for chain 0/2 anymore 150000*6=10 days should be enough...
             let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and attempted < ${maxTraceAttempts} and blockNumber > ${startBN} limit 1000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
@@ -1289,19 +1289,19 @@ module.exports = class Crawler extends Indexer {
                 if (j > tasks.length) j = tasks.length;
                 let pieces = tasks.slice(i, j);
                 let res = pieces.map((t1) => {
-                    let t2 = {
+		    let t2 = {
                         chainID: chainID,
-                        blockNumber: t1.blockNumber,
-                        blockHash: t1.blockHash, // could be null
-                        blockTS: t1.blockTS, // could be null
-                        attempted: t1.attempted // should be 
-                    };
-                    console.log(t2);
-                    if (t1.crawlBlock) {
-                        return this.crawl_block_trace(chain, t2)
-                    } else {
-                        return this.crawl_trace(chain, t2);
-                    }
+			blockNumber: t1.blockNumber,
+                        blockHash: t1.blockHash,  // could be null
+                        blockTS: t1.blockTS,  // could be null
+                        attempted: t1.attempted // should be
+		    };
+		    console.log(t2);
+		    if ( t1.crawlBlock ) {
+			return this.crawl_block_trace(chain, t2)
+		    } else {
+			return this.crawl_trace(chain, t2);
+		    }
                 });
                 let res2 = await Promise.all(res);
                 res2.forEach(async (t_trace) => {
@@ -1956,6 +1956,7 @@ create table talismanEndpoint (
 
         if (chain.blocksFinalized) this.finalizedHashes[chain.blocksFinalized] = "known";
         const unsubscribeFinalizedHeads = await this.api.rpc.chain.subscribeFinalizedHeads(async (header) => {
+	    this.lastEventReceivedTS = this.getCurrentTS(); // if no event received in 5mins, restart
             let bn = parseInt(header.number.toString(), 10);
             let finalizedHash = header.hash.toString();
             let parentHash = header.parentHash.toString();
@@ -2006,6 +2007,8 @@ create table talismanEndpoint (
         try {
             unsubscribeStorage = await this.api.rpc.state.subscribeStorage(async (results) => {
                 try {
+		    this.lastEventReceivedTS = this.getCurrentTS();  // if not received in 5mins, reset
+
                     // build block similar to sidecar
                     let blockHash = results.block.toHex();
                     let [signedBlock, events] = await this.crawlBlock(this.api, results.block.toHex());
