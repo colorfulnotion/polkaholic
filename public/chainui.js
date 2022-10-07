@@ -869,6 +869,7 @@ function showpools(asset, assetType = "router") {
     let tableName = '#tablepools'
     poolsTable = $(tableName).DataTable({
         order: [
+            [1, "desc"],
             [5, "desc"],
         ],
         columnDefs: [{

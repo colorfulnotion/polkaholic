@@ -14,11 +14,12 @@ async function main() {
         }
     });
     if ( chainID == -1 ) {
-	let chainIDs = [2004, 2000, 22023, 22000, 2006, 22007];
+	let chainIDs = [2006, 2004];
+	let priceManager = new PriceManager();
 	for ( const chainID of chainIDs) {
-	    let priceManager = new PriceManager();
-	    await priceManager.updateAssetPriceLog(chainID);
+	    await priceManager.updateAssetPriceLog(chainID, "latest");
 	}
+	await priceManager.computeBestCrossChainPriceUSD();
     } else {
 	let priceManager = new PriceManager();
 	await priceManager.updateAssetPriceLog(chainID);

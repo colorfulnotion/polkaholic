@@ -249,6 +249,8 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         const {
             SwapPromise
         } = require("@acala-network/sdk-swap");
+
+	const liquidMax = 3.0;  // do not update price if exceeding this
         for (const assetChain of Object.keys(routerPaths)) {
             // console.log(assetChain, routerPaths[assetChain]); // routerPaths, JSON.stringify(routerPaths, null, 4));
             let [asset, chain] = paraTool.parseAssetChain(assetChain);
@@ -274,14 +276,14 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                             if (token1 == "lcDOT") token1 = "lc://13";
                             let tokenPath = [wallet.getToken(token0), wallet.getToken(token1)];
                             //console.log("TOKEN PATH", tokenPath, wallet);
-                            // CHECK directionality of pair usage
+                            if (hop.s == 0) tokenPath = tokenPath.reverse(); // TODO: DOUBLECHECK directionality of pair usage
                             for (let d = 0; d < 4; d++) {
                                 let amountIn = (10 ** (d));
-                                if (hop.s == 0) tokenPath = tokenPath.reverse();
                                 let amountInFP = new FixedPointNumber(amountIn, tokenPath[0].decimals);
                                 let parameters = await swapPromise.swap(tokenPath, amountInFP, "EXACT_INPUT");
                                 let amountOut = parameters.output.balance;
                                 let rate = amountIn.toString() / amountOut.toString();
+                                //console.log(d, token0, token1, amountIn.toString(), amountOut.toString(), rate);
                                 priceUSD.push(rate);
                                 verificationPath = (chainID == paraTool.chainIDAcala) ? {
                                     acala: {
@@ -301,6 +303,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                         let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
                         let liquid = this.priceUSDArrayLiquid(priceUSD);
                         //console.log(logDT, hr, assetChain, liquid, priceUSD);
+			if ( liquid < liquidMax ) {
                         if (isXCAsset) {
                             xcmassetpricelog.push(`('${symbol}', '${relayChain}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
                             if (xcmassetpricelog.length > 100) {
@@ -327,6 +330,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                                 assetpricelog = [];
                             }
                         }
+			}
                     }
                 } catch (err) {
                     console.log(hop, err)
@@ -350,7 +354,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         })
         let lookbackDaysRanges = [1, 7, 30];
         for (const lookbackDays of lookbackDaysRanges) {
-            await this.update_fees_apy(chainID, lookbackDays, true);
+            await this.update_fees_apy(chainID, lookbackDays, false);
         }
     }
 
@@ -489,7 +493,130 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         // DELETE from assetpricelog where indexTS % 300 = 0 and indexTS % 3600 > 0 AND indexTS < unix_timestamp(date_sub(Now(), interval 48 hour));
         // DELETE from xcmassetpricelog where indexTS % 300 = 0 and indexTS % 3600 > 0 AND indexTS < unix_timestamp(date_sub(Now(), interval 48 hour));
     }
+    async compute_latest_evm(chainID, routers, isXCAsset = true) {
+	let chain = await this.getChain(chainID);
+        // SETUP: ethers provider/wallet for chain
+        let pk = await fs.readFileSync("/root/.walletevm2")
+        pk = pk.toString().trim();
+        let execute = false
+        let id = chain.id;
+        const provider = new ethers.providers.JsonRpcProvider(
+            chain.RPCBackfill, {
+                chainId: chain.evmChainID,
+                name: id
+            }
+        );
+        let wallet = new ethers.Wallet(pk.toString(), provider);
 
+        // for each path in router paths, use the hourly blockNumber from "blocks" to compute how much $1 gets you for the token
+        const liquidMax = 3.0 // do not update price if exceeding this
+
+	let sql = `select symbol, relayChain, routerAssetChain, convert(verificationPath using utf8) as verificationPath from xcmassetpricelog where verificationPath is not null and indexTS > unix_timestamp(Date_sub(Now(), interval 30 minute)) and routerAssetChain like '%${chainID}' order by indexTS desc`
+	console.log(sql);
+	if ( isXCAsset == false ) {
+	    sql = `select asset, chainID, routerAssetChain, convert(verificationPath using utf8) as verificationPath from assetpricelog where verificationPath is not null and indexTS > unix_timestamp(Date_sub(Now(), interval 30 minute)) and routerAssetChain like '%${chainID}' order by indexTS desc`
+	}
+	let recs = await this.poolREADONLY.query(sql);
+        let assetpricelog = [];
+        let xcmassetpricelog = [];
+        let vals = ["priceUSD", "priceUSD10", "priceUSD100", "priceUSD1000", "liquid", "verificationPath"];
+	let covered = {};
+	for (const rec of recs) {
+	    let k = isXCAsset ? `${rec.symbol}-${rec.relayChain}-${rec.routerAssetChain}` : `${rec.asset}-${rec.chainID}-${rec.routerAssetChain}`
+	    if ( covered[k] ) continue;
+	    if ( rec.verificationPath == null ) continue;
+	    covered[k] = true;
+	    let verificationPath = JSON.parse(rec.verificationPath);
+	    let routerAssetChain = Object.keys(verificationPath)[0];
+	    
+	    let [routerAddress, _chainID] = paraTool.parseAssetChain(routerAssetChain);
+	    let vp = verificationPath[routerAssetChain];
+	    let annotatedpath = vp.path;
+	    let bn = chain.blocksFinalized;
+	    let router = null;
+	    for ( const _routerName of Object.keys(routers) ) {
+		let q = routers[_routerName];
+		if ( q.address == routerAddress ) {
+		    router = q;
+		}
+	    }
+
+            // take a router and its paths, use the Contract to call getAmountsOut and figure out how much of the end asset exists after the path
+            if (!router) continue;
+            let abiRaw = JSON.parse(router.ABI);
+            let abi = abiRaw.result;
+            try {
+                let assetInfo = isXCAsset ? this.getXcmAssetInfoBySymbolKey(paraTool.makeAssetChain(rec.symbol, rec.relayChain)) : this.assetInfo[paraTool.makeAssetChain(rec.asset, rec.chainID)];
+                const contract = new ethers.Contract(router.address, abi, wallet);
+		if ( ! assetInfo ) {
+		    console.log("MISSING", rec);
+		    continue;
+		}
+		
+                let dec = assetInfo.decimals;
+                let blockTag = 'latest' // paraTool.bnToHex(bn);
+                try {
+		    let path = vp.path;
+                    let usdAsset = path[0]
+		    let decUSD = this.getAssetDecimal(usdAsset, chainID) // 6
+                    let priceUSD = [];
+                    let verificationPath = {}
+                    verificationPath[routerAssetChain] = {
+                        path,
+                        blockNumber: bn
+                    };
+                    for (let d = 0; d < 4; d++) {
+                        let s = (10 ** (d + decUSD)).toString() // $1 (d=0), $10 (d=1), $100 (d=2), $1000 (d=3)
+                        let start = ethers.BigNumber.from(s);
+                        const rawResult = await contract.getAmountsOut(start, path, {
+                            blockTag
+                        });
+                        let outarr = rawResult.toString().split(",");
+                        let p = outarr[outarr.length - 1] / 10 ** dec; // its the LAST amount that matters
+                        if (p > 0) {
+                            if (d == 0) {
+                                priceUSD.push(1 / p);
+                            } else {
+                                priceUSD.push((10 ** (d)) / p);
+                            }
+                        }
+                    }
+		    let indexTS = this.getCurrentTS();
+                    if (priceUSD.length == 4 && priceUSD[0] < priceUSD[1]) {
+                        let liquid = this.priceUSDArrayLiquid(priceUSD);
+			if ( liquid < liquidMax ) {
+			    if (isXCAsset) {
+				xcmassetpricelog.push(`('${rec.symbol}', '${rec.relayChain}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
+			    } else {
+				assetpricelog.push(`('${rec.asset}', '${rec.chainID}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
+			    }
+			}
+                    }
+                } catch (err) {
+                    console.log(err);
+                }
+            } catch (error) {
+                console.log(error)
+            }
+        }
+	console.log("updated", chainID, assetpricelog.length, xcmassetpricelog.length);
+        await this.upsertSQL({
+            "table": "assetpricelog",
+            "keys": ["asset", "chainID", "routerAssetChain", "indexTS"],
+            "vals": vals,
+            "data": assetpricelog,
+            "replace": vals
+        })
+	
+        await this.upsertSQL({
+            "table": "xcmassetpricelog",
+            "keys": ["symbol", "relayChain", "routerAssetChain", "indexTS"],
+            "vals": vals,
+            "data": xcmassetpricelog,
+            "replace": vals
+        })
+    }
+    
     // AssetModel Generation: For routers with (chain.isEVM = 1)
     // (1) generate a single-router analysis extending BFS from USD known to the router
     // (2) use ethers blockTag and block table for chain to genrate priceUSD for every hour, storing in assetpricelog or xcmassetpricelog based on whether its an xcasset
@@ -499,13 +626,18 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
 
         // get chain routers, and for each router, get assets covered by the router, and compute paths for the router extending from USD to all those assets
         const routers = await this.getChainRouters(chainID);
-        for (const routerName of Object.keys(routers)) {
-            let router = routers[routerName];
-            // compute paths out of USD
-            let assets = await this.getChainRouterAssets(router);
-            router.paths = await this.getRouterAssetPaths(router, assets, 3);
-        }
-
+	if ( interval == "latest" ) {
+	    await this.compute_latest_evm(chainID, routers, true)
+	    await this.compute_latest_evm(chainID, routers, false)
+	    return;
+	} else {
+            for (const routerName of Object.keys(routers)) {
+		let router = routers[routerName];
+		// compute paths out of USD
+		let assets = await this.getChainRouterAssets(router);
+		router.paths = await this.getRouterAssetPaths(router, assets, 3);
+            }
+	}
 
         // SETUP: ethers provider/wallet for chain
         let pk = await fs.readFileSync("/root/.walletevm2")
@@ -524,7 +656,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         let blocks = await this.get_blocks_by_interval(chainID, startDate, endDate, interval);
         console.log(chain.RPCBackfill, chain, blocks);
         // for each path in router paths, use the hourly blockNumber from "blocks" to compute how much $1 gets you for the token
-        const liquidMax = 3 // do not update price if exceeding this
+        const liquidMax = 3.0 // do not update price if exceeding this
         for (const routerName of Object.keys(routers)) {
             // take a router and its paths, use the Contract to call getAmountsOut and figure out how much of the end asset exists after the path
             let router = routers[routerName];
@@ -599,6 +731,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                             let priceUSD = best.priceUSD;
                             let liquid = best.liquid;
                             let verificationPath = best.verificationPath;
+			    if ( liquid < liquidMax ) {
                             //console.log("router", routerName, router.address, "Valuing:", symbol, asset, "starting with", usdAsset, "priceUSD=", priceUSD, annotatedPath);
                             if (isXCAsset) {
                                 xcmassetpricelog.push(`('${symbol}', '${relayChain}', '${routerAssetChain}', '${indexTS}', '${priceUSD[0]}', '${priceUSD[1]}', '${priceUSD[2]}', '${priceUSD[3]}', '${liquid}', ${mysql.escape(JSON.stringify(verificationPath))})`);
@@ -625,6 +758,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                                     assetpricelog = [];
                                 }
                             }
+			    }
                         }
                     }
                 }
@@ -827,7 +961,8 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     async update_fees_apy(chainID, lookbackDays = 7, isEVM = true) {
         try {
             let assetType = isEVM ? 'ERC20LP' : 'LiquidityPair'
-            let sql = `select asset.asset, asset.chainID, indexTS, token0, token1, token0Symbol, token1Symbol, symbol, lp0, lp1, totalFree, totalReserved, convert(state using utf8) state from assetlog, asset where assetlog.asset = asset.asset and assetlog.chainID = asset.chainID and indexTS >= unix_timestamp(date_sub(Now(), interval 24 * ${lookbackDays} hour)) and assetType = '${assetType}' and asset.chainID = ${chainID} and indexTS % 3600 = 0`
+            let sql = `select asset.asset, asset.chainID, indexTS, token0, token1, token0Symbol, token1Symbol, symbol, lp0, lp1, totalFree, totalReserved, convert(state using utf8) state from assetlog, asset where assetlog.asset = asset.asset and assetlog.chainID = asset.chainID and indexTS >= unix_timestamp(date_sub(Now(), interval 24 * ${lookbackDays} hour)) and assetType = '${assetType}' and asset.chainID = ${chainID} and indexTS % 3600 = 0 and state is not null`
+
             var recs = await this.poolREADONLY.query(sql);
             let assetrecs = {};
             for (const r of recs) {
@@ -909,8 +1044,10 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                 sum.issuance += s.issuance; // not used
                 sum.numHours++;
                 totalFree = x.totalFree;
+            } else {
+                //if ( p0 == null ) console.log("P0", x.token0)
+                //if ( p1 == null ) console.log("P1", x.token1)
             }
-
         }
         if (sum.numHours > 0) {
             let hourly_feesUSD = (sum.token0FeeUSD + sum.token1FeeUSD) / sum.numHours; // this works even if we have < 24 hours
@@ -943,10 +1080,10 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     // tally the most recent + most liquid price in "bestliquid" map and store in xcmasset/asset
     async compute_best_crosschain_priceUSD(isXCAsset) {
         let sql = (isXCAsset) ?
-            `select indexTS, symbol, relayChain, priceUSD, liquid, CONVERT(verificationPath using utf8) as verificationPath from xcmassetpricelog where indexTS >= Unix_timestamp(Date_sub(Now(), interval 60 minute))and indexTS % 300 = 0` :
-            `select indexTS, asset, chainID, priceUSD, liquid, CONVERT(verificationPath using utf8) as verificationPath from assetpricelog where indexTS >= Unix_timestamp(Date_sub(Now(), interval 60 minute)) and indexTS % 300 = 0`
+            `select indexTS, symbol, relayChain, priceUSD, liquid, CONVERT(verificationPath using utf8) as verificationPath from xcmassetpricelog where indexTS >= Unix_timestamp(Date_sub(Now(), interval 60 minute))` :
+            `select indexTS, asset, chainID, priceUSD, liquid, CONVERT(verificationPath using utf8) as verificationPath from assetpricelog where indexTS >= Unix_timestamp(Date_sub(Now(), interval 60 minute))`
         let recs = await this.poolREADONLY.query(sql);
-
+	console.log(sql);
         // compute the most recent and most liquid sources in bestliquid
         let bestliquid = {}
         for (const r of recs) {
@@ -969,6 +1106,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                 `update xcmasset set priceUSD = '${r.priceUSD}', lastPriceUpdateDT = from_unixtime(${r.indexTS}), liquid = ${r.liquid}, priceUSDPercentChange = '${priceUSDPercentChange}', verificationPath = ${mysql.escape(r.verificationPath)} where symbol = '${r.symbol}' and relayChain = '${r.relayChain}'` :
                 `update asset set priceUSD = '${r.priceUSD}', lastPriceUpdateDT = from_unixtime(${r.indexTS}), liquid = ${r.liquid}, priceUSDPercentChange = '${priceUSDPercentChange}', verificationPath = ${mysql.escape(r.verificationPath)} where asset = '${r.asset}' and chainID = '${r.chainID}'`;
             this.batchedSQL.push(sql);
+	    console.log(sql);
             await this.update_batchedSQL();
         }
     }

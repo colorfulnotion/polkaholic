@@ -5875,9 +5875,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                     let tAmount = (t.amount != undefined) ? `'${t.amount}'` : 'Null';
                                     let tAsset = (t.asset != undefined) ? `'${t.asset}'` : 'Null';
                                     let tSymbol = (t.symbol != undefined) ? `'${t.symbol}'` : 'Null';
-                                    let tDecimals = (t.decimals != undefined) ? `'${t.decimals}'` : 'Null';
+                                    let tDecimals = (t.decimals != undefined && t.decimals > 0) ? `'${t.decimals}'` : 'Null';
                                     let tRawAsset = (t.rawAsset != undefined) ? `'${t.rawAsset}'` : 'Null';
-                                    let tRawAmount = (t.rawAmount != undefined) ? `'${t.rawAmount}'` : 'Null';
+                                    let tRawAmount = (t.rawAmount != undefined && t.rawAmount >= 0) ? `'${t.rawAmount}'` : 'Null';
                                     let recentTransfer = `('${ext.extrinsicID}', '${this.chainID}', '${logDT}', '${hr}', '${ext.blockNumber}', '${ext.extrinsicHash}', '${t.section}', '${t.method}', '${t.fromAddress}', '${t.toAddress}', ${tAsset}, ${tSymbol}, ${tAmount}, '${priceUSD}', '${amountUSD}', '${ext.ts}', ${tRawAsset}, ${tRawAmount}, ${tDecimals})`
                                     //console.log(`recentTransfer`, recentTransfer)
                                     recentTransfers.push(recentTransfer);

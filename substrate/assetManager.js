@@ -550,6 +550,7 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
     getNativeChainAsset(chainID) {
         // TODO check
         let asset = this.getChainAsset(chainID)
+        if (asset == null) return null
         let nativeAssetChain = paraTool.makeAssetChain(asset, chainID);
         //console.log(`Convert to nativeAssetChain ${chainID} -> ${nativeAssetChain}`)
         return nativeAssetChain
@@ -846,6 +847,10 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
         let liquidMax = 0.5 // e^.5 = 1.65
         if (assetlog.assetType == paraTool.assetTypeToken || assetlog.assetType == paraTool.assetTypeERC20) {
             let sql = assetlog.isXCAsset ? `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from xcmassetpricelog where symbol = '${q.symbol}' and relayChain = '${q.relayChain}' and liquid < '${liquidMax}' order by indexTS;` : `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from assetpricelog where asset = '${asset}' and chainID = '${chainID}' and liquid < '${liquidMax}' order by indexTS;`
+            if (chainID == 2012 || chainID == 22085) {
+                // using parallel+heiko oracles while https://github.com/parallel-finance/parallel-js/issues/63
+                sql = `select indexTS, priceUSD, 0 as liquid, 'parachain~${chainID}' as routerAssetChain, '[]' as path from assetlog where asset = '${asset}' and chainID = '${chainID}' and indexTS > unix_timestamp(date_sub(Now(), interval 30 day)) order by indexTS`;
+            }
             let recs = await this.poolREADONLY.query(sql);
             assetlog.prices = [];
 
@@ -1637,6 +1642,7 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
         if (args[fld] == undefined) return;
         let val = args[fld] / 10 ** decimals;
         let targetAsset = this.getChainAsset(chainID)
+        if (targetAsset == null) return;
         let symbol = this.getChainSymbol(chainID)
 
         args[fld + "_symbol"] = symbol

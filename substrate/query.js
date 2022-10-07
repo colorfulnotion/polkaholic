@@ -1750,15 +1750,17 @@ module.exports = class Query extends AssetManager {
             for (const routerAssetChain of Object.keys(vp)) {
                 res.routerAssetChain = routerAssetChain;
                 [res.router, res.chainID] = paraTool.parseAssetChain(res.routerAssetChain);
-                if (vp[routerAssetChain].path) {
+                if (res.chainID) {
                     res.chainName = this.getChainName(res.chainID);
                     let [__, id] = this.convertChainID(res.chainID)
                     res.id = id;
-                    res.path = vp[routerAssetChain].path;
                     let verificationURL = this.verificationURL(res.chainID, res.router);
                     if (verificationURL) {
                         res.verificationURL = verificationURL;
                     }
+                }
+                if (vp[routerAssetChain].path) {
+                    res.path = vp[routerAssetChain].path;
                     res.pathSymbols = res.path.map((asset) => {
                         let assetChain = paraTool.makeAssetChain(asset, res.chainID);
                         let symbol = (this.assetInfo[assetChain]) ? this.assetInfo[assetChain].symbol : "UNK"
@@ -7018,7 +7020,7 @@ module.exports = class Query extends AssetManager {
                 let priceUSD = tvlUSD / issuance;
                 let state = JSON.parse(r.state);
                 let volumeUSD = parseFloat(r.token0Volume) * p0.priceUSD + parseFloat(r.token1Volume) * p1.priceUSD;
-                let feesUSD = .0025 * volumeUSD; // (state.token0Volume) * 0.0025 * p0.priceUSD + (s.token1Volume) * 0.0025 * p1.priceUSD; 
+                let feesUSD = .0025 * volumeUSD; // (state.token0Volume) * 0.0025 * p0.priceUSD + (s.token1Volume) * 0.0025 * p1.priceUSD;
                 let feesUSDimp = state.token0Fee * p0.priceUSD + state.token1Fee * p1.priceUSD; // which could be negative
                 h.push({
                     indexTS: r.indexTS,

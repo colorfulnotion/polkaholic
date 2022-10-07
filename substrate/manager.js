@@ -112,6 +112,7 @@ module.exports = class Manager extends AssetManager {
         }
     }
 
+
     async updateNonNativeBalances(chainID, perPagelimit = 1000) {
         await this.assetManagerInit();
         let chains = await this.pool.query(`select chainID, WSEndpoint, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
@@ -207,6 +208,13 @@ module.exports = class Manager extends AssetManager {
                         "Token": currencyID
                     })
                     let assetChain = paraTool.makeAssetChain(asset, chainID);
+                    if (this.assetInfo[assetChain] == undefined) {
+                        this.logger.fatal({
+                            "op": "updateNonNativeBalances - unknown asset",
+                            assetChain
+                        })
+                        process.exit(0);
+                    }
                     let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
 
                     let balance = 0;
@@ -260,6 +268,13 @@ module.exports = class Manager extends AssetManager {
                     }
                     let state = userTokenAccountBal;
                     let assetChain = paraTool.makeAssetChain(asset, chainID);
+                    if (this.assetInfo[assetChain] == undefined) {
+                        this.logger.fatal({
+                            "op": "updateNonNativeBalances - unknown asset",
+                            assetChain
+                        })
+                        process.exit(0);
+                    }
                     let symbol = this.assetInfo[assetChain] ? this.assetInfo[assetChain].symbol : null;
                     let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
                     let address = paraTool.getPubKey(account_id);
@@ -267,6 +282,8 @@ module.exports = class Manager extends AssetManager {
                     let reserved = 0;
                     let miscFrozen = 0;
                     let frozen = 0;
+
+
                     if (decimals !== false) {
                         if (state.free != undefined) {
                             free = state.free / 10 ** decimals;
@@ -332,6 +349,14 @@ module.exports = class Manager extends AssetManager {
             let address = reapedAccounts[a].address;
             let asset = reapedAccounts[a].asset;
             let assetChain = paraTool.makeAssetChain(asset, chainID);
+            if (this.assetInfo[assetChain] == undefined) {
+                this.logger.fatal({
+                    "op": "updateAddressBalances - unknown asset",
+                    assetChain
+                })
+                process.exit(0);
+            }
+
             let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
             rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
             console.log("REAPED ACCOUNT-ADDRESS", address, encodedAssetChain);
@@ -385,6 +410,13 @@ module.exports = class Manager extends AssetManager {
         let rows = [];
         let asset = this.getChainAsset(chainID);
         let assetChain = paraTool.makeAssetChain(asset, chainID);
+        if (this.assetInfo[assetChain] == undefined) {
+            this.logger.fatal({
+                "op": "updateNativeBalances - unknown asset",
+                assetChain
+            })
+            process.exit(0);
+        }
         let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
         let [tblName, tblRealtime] = this.get_btTableRealtime()
 
@@ -425,6 +457,7 @@ module.exports = class Manager extends AssetManager {
                 out.push(`('${pubkey}', '${account_id}', '${free_balance}', '${reserved_balance}', '${miscFrozen_balance}', '${feeFrozen_balance}', '${finalizedBlockHash}', Now(), '${bn}')`);
                 let rowKey = pubkey.toLowerCase()
                 console.log(rowKey, `cbt read accountrealtime prefix=${rowKey}`);
+                console.log("updateNativeBalances", encodedAssetChain);
                 rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn));
                 last_key = user[0];
             }
