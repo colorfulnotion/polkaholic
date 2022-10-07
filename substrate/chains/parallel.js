@@ -984,11 +984,9 @@ module.exports = class ParallelParser extends ChainParser {
         console.log(`updateLiquidityInfo called pairLen=${a.length}`)
         let assetList = {}
         let isUpdated = false
-	console.log(a);
         for (let i= 0; i < a.length; i++) {
-	    let key = a[i][0];
-	    let val = a[i][1];
-	    
+	        let key = a[i][0];
+	        let val = a[i][1];
             let assetMetadata = val.toHuman() //enabled
             let lp = key.args.map((k) => k.toHuman())
             let lpAsset = JSON.stringify(lp)
@@ -1059,8 +1057,6 @@ module.exports = class ParallelParser extends ChainParser {
             }
         }
         if (this.debugLevel >= paraTool.debugInfo && assetList.length > 0) console.log(`new liquidity found`, assetList);
-        //if (isUpdated) await this.update_batchedSQL()
-        //process.exit(0)
     }
 
     //Trade using liquidity[trader, currency_id_in, currency_id_out, amount_in, amount_out, lp_token_id, new_quote_amount, new_base_amount]

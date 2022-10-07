@@ -124,7 +124,9 @@ module.exports = class KicoParser extends ChainParser {
          }
        }
         */
-        a.forEach(async ([key, val]) => {
+        for (let i= 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let assetMeta = val.toHuman()
             let assetMetadata = assetMeta.metadata
@@ -158,7 +160,7 @@ module.exports = class KicoParser extends ChainParser {
                     console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
             }
-        });
+        }
         console.log(assetList);
     }
 }

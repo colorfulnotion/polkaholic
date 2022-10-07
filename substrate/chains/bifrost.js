@@ -26,7 +26,9 @@ module.exports = class BifrostParser extends ChainParser {
         if (!a) return
         let assetList = {}
         // remove the Id prefix here
-        a.forEach(async ([key, val]) => {
+        for (let i= 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
             let assetMetadata = val.toHuman()
             let parsedAsset = {}
             let assetKeyWithID = key.args.map((k) => k.toHuman())[0] //{"ForeignAssetId":"0"}
@@ -71,7 +73,7 @@ module.exports = class BifrostParser extends ChainParser {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
             }
-        });
+        }
         if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
     }
 

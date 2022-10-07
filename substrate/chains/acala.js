@@ -286,7 +286,9 @@ module.exports = class AcalaParser extends ChainParser {
         let a = await indexer.api.query.dex.tradingPairStatuses.entries();
         console.log(`updateLiquidityInfo called pairLen=${a.length}`)
         let assetList = {}
-        a.forEach(async ([key, val]) => {
+        for (let i= 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
             let assetMetadata = val.toHuman() //enabled
             let lp = key.args.map((k) => k.toHuman())[0]
             let lpAsset = JSON.stringify(lp)
@@ -332,7 +334,7 @@ module.exports = class AcalaParser extends ChainParser {
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`NOT dex pair LP ${lpAssetChain}`, assetMetadata)
             }
-        });
+        }
         if (this.debugLevel >= paraTool.debugInfo && assetList.length > 0) console.log(`new liquidity found`, assetList);
     }
 

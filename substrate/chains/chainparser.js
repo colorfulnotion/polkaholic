@@ -3713,8 +3713,9 @@ module.exports = class ChainParser {
         }
         if (!a) return
         let assetList = {}
-
-        a.forEach(async ([key, val]) => {
+        for (let i= 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let parsedAsset = {};
             if (isAcala) {
@@ -3820,7 +3821,7 @@ module.exports = class ChainParser {
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
-        });
+        }
     }
 
 
@@ -3845,8 +3846,9 @@ module.exports = class ChainParser {
         }
         if (!a) return
         let assetList = {}
-
-        a.forEach(async ([key, val]) => {
+        for (let i= 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let parsedAsset = {
                 Token: assetID
@@ -3964,7 +3966,7 @@ module.exports = class ChainParser {
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
-        });
+        }
     }
 
 
@@ -3990,8 +3992,9 @@ module.exports = class ChainParser {
         if (!a) return
         let assetList = {}
         let xcmInteriorUpdates = []
-
-        a.forEach(async ([key, val]) => {
+        for (let i= 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let parsedAsset = {
                 Token: assetID
@@ -4110,7 +4113,7 @@ module.exports = class ChainParser {
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
-        });
+        };
 
         if (xcmInteriorUpdates.length > 0) {
             let sqlDebug = true
@@ -4159,7 +4162,9 @@ module.exports = class ChainParser {
             return
         }
         let assetList = {}
-        a.forEach(async ([key, val]) => {
+        for (let i= 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
             let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let assetMetadata = val.toHuman()
             let parsedAsset = {
@@ -4185,6 +4190,7 @@ module.exports = class ChainParser {
                     };
                     if (indexer.chainID == paraTool.chainIDParallel ||  indexer.chainID == paraTool.chainIDHeiko){
                         if (assetInfo.symbol.includes('LP-')) assetInfo.assetType = paraTool.assetTypeLiquidityPair
+                        console.log('im here fetchAsset assetInfo', assetInfo)
                     }
                     assetList[asset] = assetInfo
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
@@ -4193,7 +4199,7 @@ module.exports = class ChainParser {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
             }
-        });
+        }
         if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
     }
 
@@ -4225,7 +4231,9 @@ module.exports = class ChainParser {
         let assetList = {}
         //ForeignAssetId/{"NativeAssetId":{"Token":"XXX"}}/{"Erc20":"0x1f3a10587a20114ea25ba1b388ee2dd4a337ce27"}/{"StableAssetId":"0"}
         // remove the Id prefix here
-        a.forEach(async ([key, val]) => {
+        for (let i= 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
             let assetMetadata = val.toHuman()
             let parsedAsset = {}
             let assetKeyWithID = key.args.map((k) => k.toHuman())[0] //{"ForeignAssetId":"0"}
@@ -4270,7 +4278,7 @@ module.exports = class ChainParser {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
             }
-        });
+        }
         if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
     }
 
