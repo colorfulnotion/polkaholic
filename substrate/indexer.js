@@ -350,8 +350,8 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    updateAssetMetadata(asset, metadata) {
-        if (this.init_asset(asset, paraTool.assetTypeToken, paraTool.assetSourceOnChain, "updateAssetMetadata")) { // add currencyID ? // not sure about the source type..
+    updateAssetMetadata(asset, metadata, assetType = paraTool.assetTypeToken, assetSource = paraTool.assetSourceOnChain) {
+        if (this.init_asset(asset, assetType, paraTool.assetSourceOnChain, "updateAssetMetadata")) { // add currencyID ? // not sure about the source type..
             this.tallyAsset[asset].metadata = metadata;
         }
     }

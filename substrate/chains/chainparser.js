@@ -3609,7 +3609,7 @@ module.exports = class ChainParser {
         let asset = e2.asset;
         let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, asset);
         console.log(`processAssetsAsset rAssetkey=${rAssetkey}`, v)
-        indexer.updateAssetMetadata(rAssetkey, v); // add currencyID
+        indexer.updateAssetMetadata(rAssetkey, v, paraTool.assetTypeToken, paraTool.assetSourceOnChain); // add currencyID
     }
 
     async processAccountAsset(indexer, p, s, e2, rAssetkey, fromAddress) {

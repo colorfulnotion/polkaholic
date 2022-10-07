@@ -609,10 +609,12 @@ module.exports = class ParallelParser extends ChainParser {
         let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, asset);
         if (isParallelLP){
             let lpAssetkey = this.elevatedAssetKey(paraTool.assetTypeLiquidityPair, asset);
+            indexer.updateAssetMetadata(rAssetkey, v, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain); // add currencyID
             console.log(`updateAssetIssuance LP=${lpAssetkey} issuance=${issuance}`)
             indexer.updateAssetIssuance(lpAssetkey, issuance, paraTool.assetTypeLiquidityPair, paraTool.assetSourceOnChain);
+        }else{
+            indexer.updateAssetMetadata(rAssetkey, v, paraTool.assetTypeToken, paraTool.assetSourceOnChain); // add currencyID
         }
-        indexer.updateAssetMetadata(rAssetkey, v); // add currencyID
     }
 
     async processAccountAsset(indexer, p, s, e2, rAssetkey, fromAddress) {
@@ -785,7 +787,7 @@ module.exports = class ParallelParser extends ChainParser {
         }
         */
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAMMPools`, e2)
-        let lpAssetkey = this.elevatedAssetKeyWithQuote(paraTool.assetTypeLiquidityPair, e2.asset); // *** need extraquote
+        let lpAssetkey = this.elevatedAssetKeyWithQuote(paraTool.assetTypeToken, e2.asset); // *** need extraquote
         let lpAssetChain = paraTool.makeAssetChain(lpAssetkey, indexer.chainID);
         let cachedLPAssetInfo = indexer.assetInfo[lpAssetChain]
         if (cachedLPAssetInfo != undefined && cachedLPAssetInfo.token0Decimals != undefined && cachedLPAssetInfo.token1Decimals != undefined){
@@ -1204,7 +1206,7 @@ module.exports = class ParallelParser extends ChainParser {
 
     getLPAssetByCurrencyID(indexer, rawAssetID){
         let lpTokenID = this.cleanedAssetID(rawAssetID)
-        let lpAssetkey = this.elevatedAssetKeyWithQuote(paraTool.assetTypeLiquidityPair, lpTokenID);
+        let lpAssetkey = this.elevatedAssetKeyWithQuote(paraTool.assetTypeToken, lpTokenID);
         let lpAssetChain = paraTool.makeAssetChain(lpAssetkey, indexer.chainID);
         let lpAssetInfo = indexer.assetInfo[lpAssetChain]
         if (lpAssetInfo != undefined && lpAssetInfo.token0Symbol != undefined && lpAssetInfo.token1Symbol != undefined){
