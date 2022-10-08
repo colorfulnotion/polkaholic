@@ -58,7 +58,7 @@ function build_block_trace_period(chain, startBN, endBN) {
     for (let i = startBN; i < endBN; i++) {
         let t = {
             chainID: chain.chainID,
-            blockNumber: startBN,
+            blockNumber: i,
             crawlTrace: 1,
         }
         if (chain.isEVM){
