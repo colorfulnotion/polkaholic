@@ -3,9 +3,8 @@ function showassettab(hash) {
         case "#accountassets":
             showaccountassets(asset, chainID);
             break;
-        case "#assetsrelated":
-            setupapidocs("asset", "assetsrelated");
-            showassetsrelated(asset, chainID);
+        case "#pools":
+            showpools(asset, "assetChain", chainID);
             break;
         case "#assetholders":
             setupapidocs("asset", "assetholders");

@@ -175,6 +175,19 @@ function showextrinsics(address, chainListStr = 'all') {
 
 var initevmtxs = false;
 
+function get_method(decodedInput) {
+    if (decodedInput) {
+        if (decodedInput.signature && decodedInput.signature.length > 0) {
+            let sa = decodedInput.signature.split("(")
+            return sa[0];
+        }
+        if (decodedInput.methodID && decodedInput.methodID.length > 0) {
+            return decodedInput.methodID;
+        }
+    }
+    return "Unknown"
+}
+
 function showevmtxs(address, chainListStr = 'all') {
     if (initevmtxs) return;
     else initevmtxs = true;
@@ -221,7 +234,7 @@ function showevmtxs(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     if (row.decodedInput !== undefined && row.transactionHash !== undefined) {
-                        let methodID = row.decodedInput.methodID
+                        let methodID = get_method(row.decodedInput)
                         return '<button type="button" class="btn btn-outline-primary text-capitalize">' + methodID + '</button>';
                     } else {
                         return "-";

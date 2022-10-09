@@ -9,6 +9,7 @@
     </div>
     <div class="col-md-8">
       <div class="card-body">
+<% if ( contract ) { %>
         <h5 class="card-title">Token: <%- contract.assetName; %></h5>
         <table class="table table-hover table-bordered">
 	<tr>
@@ -57,6 +58,9 @@
 	   <td><%= contract.decimals %></td>
 	</tr>
 	</table>
+<% } else { %>
+<h5>Contract Unknown</h5>
+<% } %>
       </div>
     </div>
   </div>
@@ -65,12 +69,13 @@
 <div id="unfinalized">
 </div>
 
+ 
 <!-- Nav tabs -->
 <ul class="nav nav-tabs" style="font-size:1rem" id="accountTab" role="tablist">
 <%
 let tabs = [
 { title: "Your Holdings", target: "accountassets" },
-{ title: "Liquidity Pools", target: "assetsrelated" },
+{ title: "Pools", target: "pools" },
 { title: "Transactions", target: "evmtxs" },
 { title: "Transfers", target: "transfers" },
 { title: "XCM Transfers", target: "xcmtransfers" },
@@ -157,20 +162,7 @@ for (let i=0; i<tabs.length; i++) {
     </table>
   </div>
 
-  <div class="tab-pane" id="assetsrelated" role="tabpanel" aria-labelledby="assetsrelated-tab">
-    <table id="tableassetsrelated" class="display" style='width: 100%'>
-    <thead>
-    <tr>
-      <th scope="col">Asset</th>
-      <th scope="col">Your Holdings</th>
-      <th scope="col"># Holders</th>
-      <th scope="col">Current Price (USD)</th>
-      <th scope="col">Total Free</th>
-      <th scope="col">TVL</th>
-    </tr>
-    </thead>
-    </table>
-  </div>
+  <%- include("poolstab", {}) %>
 
 </div>
 
@@ -187,4 +179,5 @@ var isEVM = 1;
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script src="/accountui.js"></script>
 <script src="/assetui.js"></script>
+<script src="/poolsui.js"></script>
 <script src="/token.js"></script>

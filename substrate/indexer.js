@@ -4986,7 +4986,8 @@ module.exports = class Indexer extends AssetManager {
 
         let nativeAsset = this.getNativeAsset();
         var sql = `select asset.asset, assetholder.holder, asset.decimals, asset.xcContractAddress, asset.assetType, assetholder.lastUpdateBN, UNIX_TIMESTAMP(assetholder.lastUpdateDT) as lastUpdateTS
-from assetholder${chainID} as assetholder, asset where assetholder.asset = asset.asset and asset.chainID = ${chainID} and assetholder.lastCrawlBN < assetholder.lastUpdateBN and asset.assetType in ( 'ERC20', 'Token' ) limit 100000`;
+from assetholder${chainID} as assetholder, asset where assetholder.asset = asset.asset and asset.chainID = ${chainID} and assetholder.lastCrawlBN < assetholder.lastUpdateBN and length(holder) = 42 limit 100000`;
+        // and asset.assetType in ( 'ERC20', 'ERC20LP', 'Token' )
         console.log(sql);
         let ts = this.getCurrentTS();
         var assetholderRecs = await this.poolREADONLY.query(sql);
@@ -5047,7 +5048,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         // holderBalances = await ethTool.getNativeChainBalances(web3Api, holders, bn)
                     } else {
                         let tokenAddress = asset;
-                        // TODO: if there is a mapping from asset => xcContractAddress,use that for the tokenAddress in this ethTool rpccall
+                        let assetInfo = this.assetInfo[assetChain];
+                        if (assetInfo.xcContractAddress) {
+                            // if there is a mapping from asset => xcContractAddress,use that for the tokenAddress in this ethTool rpccall
+                            tokenAddress = assetInfo.xcContractAddress;
+                        }
                         console.log("FETCH", tokenAddress, holders.length)
                         holderBalances = await ethTool.getTokenHoldersRawBalances(web3Api, tokenAddress, holders, tokenDecimal, bn)
                         if (holderBalances.holders.length != holders.length) {

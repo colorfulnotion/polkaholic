@@ -1619,7 +1619,7 @@ module.exports = class Query extends AssetManager {
         try {
             let [asset, chainID] = paraTool.parseAssetChain(assetChain)
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
-            let sql = `select holder, free, reserved, miscFrozen, frozen  from assetholder${chainID} where asset = '${asset}' ${w} order by free desc limit ${limit}`
+            let sql = `select holder, free, reserved, miscFrozen, frozen  from assetholder${chainID} where asset = '${asset}' and free > 0 ${w} order by free desc limit ${limit}`
             console.log("getAssetHolders", sql)
             let holders = await this.poolREADONLY.query(sql);
             let ts = this.currentTS();
@@ -7047,9 +7047,13 @@ module.exports = class Query extends AssetManager {
         try {
             let w = [];
             if (q.symbol) {
-                w.push(`( token0symbol = '${q.symbol}' or token1Symbol = '${q.symbol}' )`);
+		// this xc prefix is a hack but works so... hmm.
+                w.push(`( token0symbol = '${q.symbol}' or token1Symbol = '${q.symbol}' or token0symbol = 'xc${q.symbol}' or token1symbol = 'xc${q.symbol}')`);
             }
-            if (q.routerAssetChain) {
+            if (q.assetChain) {
+                let [asset, chainID] = paraTool.parseAssetChain(q.assetChain);
+                w.push(`( ( token0 = '${asset}' or token1 = '${asset}' ) and chainID = '${chainID}' )`);
+            } else if (q.routerAssetChain) {
                 if (q.routerAssetChain.includes("parachain")) {
                     let [_, chainID] = paraTool.parseAssetChain(q.routerAssetChain);
                     w.push(`(asset.chainID = '${chainID}')`)

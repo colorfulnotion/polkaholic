@@ -626,6 +626,7 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
                 if (v.xcmInteriorKey && v.xcmInteriorKey.length > 0) {
                     a.isXCAsset = true;
                     a.xcmInteriorKey = v.xcmInteriorKey;
+                    a.xcContractAddress = v.xcContractAddress;
                     if (v.xcmasset_symbol && a.symbol != v.xcmasset_symbol) {
                         a.localSymbol = a.symbol; // when present, this could override the symbol in a UI (e.g. xcDOT)
                     }

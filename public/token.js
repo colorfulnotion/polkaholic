@@ -3,9 +3,9 @@ function showtokentab(hash, chainListStr = 'all') {
         case "#accountassets":
             showaccountassets(address, chainID);
             break;
-        case "#assetsrelated":
-            showassetsrelated(address, chainID);
-            setupapidocs("asset", "related", address);
+        case "#pools":
+            showpools(address, "assetChain", chainID);
+            //setupapidocs("asset", "related", address);
             break;
         case "#evmtxs":
             showevmtxs(address, chainListStr);

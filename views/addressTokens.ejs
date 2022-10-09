@@ -46,7 +46,8 @@ for ( const chainID of Object.keys(chains) ) {
       let free = s && s.free ? s.free : 0;
       let balanceUSD = s && s.balanceUSD ? s.balanceUSD : 0;
       if ( a.asset && a.asset.includes("0x") ) {
-        out.push(`<option value='${a.asset}' data-mdb-secondary-text="${uiTool.presentFloat(free)} ${symbol}">${a.assetName} ${a.assetType} (${uiTool.currencyFormat(balanceUSD)})</option>`)
+        let detail = ( a.assetType == "ERC20LP" ) ? `${a.token0Symbol}/${a.token1Symbol}` : '';
+        out.push(`<option value='${a.asset}' data-mdb-secondary-text="${uiTool.presentFloat(free)} ${symbol}">${a.assetName} ${detail} ${a.assetType} (${uiTool.currencyFormat(balanceUSD)})</option>`)
       } else if ( a.asset ) {
         out.push(`<option value='${a.chainID}~~${a.asset}' data-mdb-secondary-text="${uiTool.presentFloat(free)} ${symbol}">${a.assetName} ${a.assetType} (${uiTool.currencyFormat(balanceUSD)})</option>`)
       }

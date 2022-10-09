@@ -149,6 +149,10 @@ function showsymboltab(hash) {
             setupapidocs("symbol", "chains");
             showchains(symbol);
             break;
+        case "#pools":
+        //setupapidocs("pools", "");
+        showpools(symbol, "symbol");
+            break;
     }
 }
 

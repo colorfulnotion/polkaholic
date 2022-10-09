@@ -463,6 +463,14 @@ app.get('/pools/:assetType/:routerAssetChain', async (req, res) => {
             pools = await query.getPools({
                 chainfilters: routerAssetChain
             });
+        } else if (assetType == "symbol" && routerAssetChain) {
+            pools = await query.getPools({
+                symbol: routerAssetChain
+            });
+        } else if (assetType == "assetChain" && routerAssetChain) {
+            pools = await query.getPools({
+                assetChain: routerAssetChain
+            });
         } else {
             pools = await query.getPools({});
         }

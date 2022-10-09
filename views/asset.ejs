@@ -107,7 +107,7 @@ if ( a.assetType == "ERC20LP" || a.assetType == "LiquidityPair" ) {
 <%
 let tabs = [
   { title: "Your Holdings", target: "accountassets" },
-  { title: "Liquidity Pairs", target: "assetsrelated" },
+  { title: "Pools", target: "pools" },
   { title: "Top 1K Holders", target: "assetholders" }
 ];
 for (let i=0; i<tabs.length; i++) {
@@ -140,20 +140,8 @@ for (let i=0; i<tabs.length; i++) {
     </table>
   </div>
 
-  <div class="tab-pane" id="assetsrelated" role="tabpanel" aria-labelledby="assetsrelated-tab">
-    <table id="tableassetsrelated" class="display" style='width: 100%'>
-    <thead>
-    <tr>
-      <th scope="col">Asset</th>
-      <th scope="col">Your Holdings</th>
-      <th scope="col"># Holders</th>
-      <th scope="col">Current Price (USD)</th>
-      <th scope="col">Total Free</th>
-      <th scope="col">TVL</th>
-    </tr>
-    </thead>
-    </table>
-  </div>
+  <%- include("poolstab", {}) %>
+
 
   <div class="tab-pane" id="assetholders" role="tabpanel" aria-labelledby="assetholders-tab">
     <table id="tableassetholders" class="display" style='width: 100%'>
@@ -178,4 +166,5 @@ var accounts = <%- JSON.stringify(accounts); %>;
 </script>
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script src="/assetui.js"></script>
+<script src="/poolsui.js"></script>
 <script src="/asset.js"></script>

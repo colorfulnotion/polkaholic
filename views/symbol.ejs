@@ -14,6 +14,7 @@
 <%
 let tabs = [
   { title: "Chains with Symbol", target: "chains" },
+  { title: "Pools", target: "pools" },
 ];
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
@@ -51,6 +52,7 @@ for (let i=0; i<tabs.length; i++) {
   </div>
 </div>
 
+ <%- include("poolstab", {}) %>
 
 <script src="https://code.highcharts.com/stock/highstock.js"></script>
 <script src="https://code.highcharts.com/stock/modules/data.js"></script>
@@ -86,3 +88,4 @@ showRouterAssetChainPrices(routerAssetChain, routerName);
 
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script src="/symbol.js"></script>
+<script src="/poolsui.js"></script>

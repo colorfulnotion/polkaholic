@@ -4,7 +4,7 @@ var Crawler = require("./crawler");
 
 async function main() {
     let chainID = -1;
-    let daysago = 365;
+    let daysago = 3;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = val;
@@ -13,10 +13,14 @@ async function main() {
             daysago = val;
         }
     });
+
+    
     if ( chainID >= 0 ) {
        let crawler = new Crawler();
 	crawler.exitOnDisconnect = true;
 	let chain = await crawler.getChain(chainID);
+	await crawler.assetManagerInit();
+	await crawler.updateChainAssetHoldersBalances(chain); 
 	await crawler.updateChainAssets(chainID, daysago);
     }
 }

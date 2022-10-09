@@ -83,6 +83,36 @@
 </table>
 
 
+
+
+
+<!-- Nav tabs -->
+<ul class="nav nav-tabs" id="poolTab" role="tablist">
+<%
+let tabs = [
+  { title: "Charts", target: "charts" },
+  { title: "Top 1K Holders", target: "assetholders" }
+];
+for (let i=0; i<tabs.length; i++) {
+  let t = tabs[i];
+  let title = t.title;
+  let target = t.target;
+  let id = target + "-tab";
+  let href = "#" + target;
+%>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
+  </li>
+<%
+}
+%>
+</ul>
+
+<!-- Tab panes -->
+<div class="tab-content">
+
+  <div class="tab-pane" id="charts" role="tabpanel" aria-labelledby="charts-tab">
+
 <div class="row">
   <div class="col-sm-4">
     <div class="card">
@@ -109,14 +139,31 @@
       </div>
     </div>
   </div>
-  
 </div>
 
 
 
+  </div>
+
+
+  <div class="tab-pane" id="assetholders" role="tabpanel" aria-labelledby="assetholders-tab">
+    <table id="tableassetholders" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th># (State)</th>
+          <th>Balance (USD)</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+  
+</div>
+
+
 <script>
 var asset = '<%- asset; %>';
-var chain = '<%- chainID; %>';
+var chainID = '<%- chainID; %>';
 var poolhistory = <%- JSON.stringify(history); %>;
 var accounts = <%- JSON.stringify(accounts); %>;
 function get_history_data(f) {
@@ -127,6 +174,7 @@ function get_history_data(f) {
   }
   return(out);
 }
+var tabs = <%- JSON.stringify(tabs); %>;
 let fields = ["tvlUSD", "volumeUSD", "close"];
 for (const field of fields) {
     Highcharts.stockChart(field, {
@@ -146,4 +194,5 @@ for (const field of fields) {
 
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script src="/assetui.js"></script>
+<script src="/pool.js"></script>
 
