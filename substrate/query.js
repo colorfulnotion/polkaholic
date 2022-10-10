@@ -4263,6 +4263,7 @@ module.exports = class Query extends AssetManager {
                     }
                 }
             }
+
             if (args.other_signatories != undefined) {
                 if (decorate) this.decorateAddresses(args, "other_signatories", decorateAddr, false) // ignore here?
             }
@@ -4295,6 +4296,7 @@ module.exports = class Query extends AssetManager {
                 await this.chainParser.decorate_query_params(this, pallet_method, args, chainID, ts, 0, decorate, decorateExtra)
             }
         } catch (err) {
+	    console.log(err);
             this.logger.error({
                 "op": "query.decorateParams",
                 section,
@@ -4377,7 +4379,30 @@ module.exports = class Query extends AssetManager {
             }
             //console.log(`decoratedExt after decorateEventModule [decorate=${decorate}, decorateUSD=${decorateUSD}]`, decoratedExt)
             if (ext.params != undefined && decorate) {
-                this.decorateParams(section, method, ext.params, chainID, ext.ts, 0, decorate, decorateData)
+                await this.decorateParams(section, method, ext.params, chainID, ext.ts, 0, decorate, decorateData)
+
+		// WASM decoration of contract metadata is done at the "extrinsic" level rather than "params" level
+		// for now, we ignore utility batch / proxy etc and put metadata up at the top level
+		if ( section == "contracts" && method == "call" ) {
+		    let args = ext.params
+		    if ( args.dest != undefined && args.dest.id != undefined ) {
+			try {
+			    // decode the call data using in the browser
+			    let wasmContract = await this.getWASMContract(args.dest.id, chainID)
+			    if ( wasmContract && wasmContract.metadata ) {
+				decoratedExt.metadata = wasmContract.metadata;
+			    }
+			} catch (err) {
+			    console.log(err);
+			    this.logger.error({
+				"op": "query.decorateParams - contract call",
+				args,
+				err
+			    });
+			}
+		    }
+		}
+		
             }
             //console.log(`decoratedExt after decorateParams [decorate=${decorate}, decorateUSD=${decorateUSD}]`, decoratedExt)
         } catch (err) {
@@ -6760,6 +6785,45 @@ module.exports = class Query extends AssetManager {
         }
     }
 
+    async getEVMContract(asset, chainID = null) {
+        try {
+            let w = (chainID) ? ` and chainID = '${chainID}'` : "";
+            let sql = `select asset.asset, asset.chainID, convert(asset.abiRaw using utf8) as ABI, convert(contractCode.code using utf8) code, addDT from asset left join contractCode on contractCode.asset = asset.asset and contractCode.chainID = asset.chainID where asset.asset = '${asset}' ${w} order by addDT desc limit 1`
+            let evmContracts = await this.poolREADONLY.query(sql);
+            if (evmContracts.length == 0) {
+                // return not found error
+                throw new paraTool.NotFoundError(`EVM Contract not found: ${asset}`)
+                return (false);
+            }
+            let evmContract = evmContracts[0];
+            let [_, id] = this.convertChainID(evmContract.chainID)
+            let chainName = this.getChainName(evmContract.chainID);
+	    evmContract.id = id;
+	    evmContract.chainName = chainName;
+	    try {
+		let code = JSON.parse(evmContract.code);
+		if ( Array.isArray(code.result) && code.result.length > 0 ) {
+		    let result = code.result[0];
+		    for ( const key of Object.keys(result) ) {
+			evmContract[key] = result[key];
+		    }
+		    evmContract.code = 'xxx'
+		    evmContract.ABI = JSON.parse(evmContract.ABI);
+		} else {
+		    let abiRaw = JSON.parse(evmContract.ABI);
+		    evmContract.ABI = abiRaw;
+		}
+	    } catch (err) {
+		
+	    }
+	    delete evmContract.code;
+	    delete evmContract.addDT;
+	    return evmContract;
+        } catch (err) {
+            console.log(err)
+        }
+    }
+
     async getWASMCode(codeHash, chainID = null) {
         try {
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
@@ -6778,19 +6842,19 @@ module.exports = class Query extends AssetManager {
             wasmCode.id = id;
             wasmCode.chainName = chainName;
             return wasmCode
-        } catch {
+        } catch (err) {
             console.log(err)
         }
     }
 
     async getWASMContract(address, chainID = null) {
-        let w = (chainID) ? ` and chainID = '${chainID}'` : "";
+	address = paraTool.getPubKey(address);
+        let w = (chainID) ? ` and contract.chainID = '${chainID}'` : "";
         let sql = `select address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, constructor, salt, blockTS, deployer, wasm, codeStoredBN, codeStoredTS, metadata from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
         let contracts = await this.poolREADONLY.query(sql);
         if (contracts.length == 0) {
             // return not found error
             throw new paraTool.NotFoundError(`WASM Contract not found: ${address}`)
-            return (false);
         }
         let contract = contracts[0];
         try {
@@ -6798,14 +6862,17 @@ module.exports = class Query extends AssetManager {
             let chainName = this.getChainName(contract.chainID);
             contract.id = id;
             contract.chainName = chainName;
+	    let chain = await this.getChain(contract.chainID);
+	    contract.addressPubKey = contract.address
+            contract.address = paraTool.getAddress(contract.addressPubKey, chain.ss58Format);
             contract.constructor = contract.constructor.toString();
             contract.salt = contract.salt.toString();
             contract.wasm = contract.wasm.toString();
             contract.metadata = contract.metadata ? contract.metadata.toString() : null;
         } catch (e) {
             console.log(e)
-
         }
+
         return contract;
     }
 

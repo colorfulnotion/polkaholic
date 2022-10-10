@@ -128,6 +128,22 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <td>Params</td>
       <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID } }); %></td>
     </tr>
+<% let decodeWASM = false;
+    if ( f.section == "contracts" && f.method == "call"  && f.metadata ) {  decodeWASM = true; %>
+    <tr>
+       <td>Decoded WASM Call Data</td>
+       <td>
+       <div id="decodedWASM"></div>
+       <script>function decodeWASM() { decodeWASMContractsCall('<%= f.chainID %>', <%- JSON.stringify(f.params); %>, <%- JSON.stringify(f.metadata); %>, "decodedWASM"); }</script>
+       </td>
+    </tr>
+    <tr>
+       <td>WASM Contract Metadata</td>
+       <td>
+       <%- include("decode", {id: "metadata", obj: JSON.parse(f.metadata), verify: null }); %>
+       </td>
+    </tr>
+<% } %>
     <tr>
 <% if ( f.xcmdest == undefined && false) { %>
     <td>Compare to</td>
@@ -157,7 +173,13 @@ let tabs = [];
 let txHash = '<%= tx.extrinsicHash; %>';
 let chainID = '<%= f.chainID; %>';
 let defHash = "#overview";
-showtxstatus("<%= tx.extrinsicHash %>");
+$(document).ready(function() {
+  showtxstatus("<%= tx.extrinsicHash %>");
+  <% if ( decodeWASM ) { %>
+    decodeWASM();
+  <% } %>
+});
 </script>
 
+<script src="/wasmcontractui.js"></script>
 <%- include('footer', {apiUrl: apiUrl}); %>

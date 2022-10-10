@@ -54,13 +54,22 @@ function getapikey(req) {
     let apikey = req.header('Authorization')
     if (!apikey) {
         let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        ip = ip.substring(7)
-        let ipPrefix = ip.split('.').slice(0, -1).join('.')
-        //::ffff:103.163.220.17 -> use sha1(103.163.220) = c88cbdf6f85088bb9df9529d7823c5a3c736bfc5 as key
-        apikey = paraTool.sha1(ipPrefix)
-        if (apikey.length > 32) {
-            apikey = apikey.substring(0, 32);
-        }
+        try {
+	    ip = ip.substring(7)
+            let ipPrefix = ip.split('.').slice(0, -1).join('.')
+            //::ffff:103.163.220.17 -> use sha1(103.163.220) = c88cbdf6f85088bb9df9529d7823c5a3c736bfc5 as key
+            apikey = paraTool.sha1(ipPrefix)
+            if (apikey.length > 32) {
+		apikey = apikey.substring(0, 32);
+            }
+	} catch (err) {
+	    query.logger.error({
+		"op": "getapikey",
+		err,
+		ip
+	    });
+	    
+	}
     }
     return (apikey);
 }
@@ -287,7 +296,27 @@ app.get('/addresstopn/:topN', async (req, res) => {
     }
 })
 
-// Used: https://api.polkaholic.io/code/shiden
+// Usage: https://api.polkaholic.io/contract/:asset/:chainID 
+app.get('/contract/:asset/:chainID_or_chainName?', async (req, res) => {
+    try {
+        let asset = req.params["asset"]
+        let chainID_or_chainName = req.params["chainID_or_chainName"] ? req.params["chainID_or_chainName"] : null;
+        let contract = await query.getEVMContract(asset, chainID_or_chainName);
+        if (contract) {
+            res.write(JSON.stringify(contract));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+// Usage: https://api.polkaholic.io/code/shiden
 app.get('/wasmcode/:chainID_or_chainName', async (req, res) => {
     try {
         let chainID_or_chainName = req.params["chainID_or_chainName"]
