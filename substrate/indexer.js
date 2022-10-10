@@ -6362,7 +6362,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     feedTransfer["asset"] = null
                     feedTransfer["symbol"] = null
                     feedTransfer["decimals"] = null
-                    console.log(`symbol, decimals unknown`, fdata);
+                    console.log(`[${eventID}] symbol, decimals unknown`, fdata);
                 }
 
                 feedTransfer["data"] = data
