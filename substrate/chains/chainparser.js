@@ -4184,7 +4184,7 @@ module.exports = class ChainParser {
             } else {
                 if (indexer.chainID == paraTool.chainIDListen) assetMetadata = assetMetadata.metadata
                 if (assetMetadata.decimals !== false && assetMetadata.symbol) {
-                    let name = (assetMetadata.name != undefined) ? assetMetadata.name : `${assetMetadata.symbol}` //Basilisk doens't habe assetName, use symbol in this case
+                    let name = (assetMetadata.name != undefined) ? assetMetadata.name : `${assetMetadata.symbol}` //Basilisk doens't have assetName, use symbol in this case
                     let assetInfo = {
                         name: name,
                         symbol: assetMetadata.symbol,
@@ -4199,6 +4199,61 @@ module.exports = class ChainParser {
                     assetList[asset] = assetInfo
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
                     await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAsset');
+                } else {
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+                }
+            }
+        }
+        if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
+    }
+
+    //localAssets.metadata
+    async fetchLocalAsset(indexer) {
+        if (!indexer.api) {
+            console.log(`[fetchLocalAsset] Fatal indexer.api not initiated`)
+            return
+        }
+        var a;
+        switch (indexer.chainID) {
+            default:
+                console.log(`fetch localAssets:metadata`)
+                a = await indexer.api.query.localAssets.metadata.entries()
+                break;
+        }
+        if (!a) {
+            console.log(`returned`)
+            return
+        }
+        let assetList = {}
+        for (let i = 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
+            let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let assetMetadata = val.toHuman()
+            let parsedAsset = {
+                Token: assetID
+            }
+            var asset = JSON.stringify(parsedAsset);
+            let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
+            let cachedAssetInfo = indexer.assetInfo[assetChain]
+            if (cachedAssetInfo != undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
+                //cached found
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
+                assetList[asset] = cachedAssetInfo
+            } else {
+                if (assetMetadata.decimals !== false && assetMetadata.symbol) {
+                    let name = (assetMetadata.name != undefined) ? assetMetadata.name : `${assetMetadata.symbol}`
+                    let assetInfo = {
+                        name: name,
+                        symbol: assetMetadata.symbol,
+                        decimals: assetMetadata.decimals,
+                        assetType: paraTool.assetTypeToken,
+                        currencyID: assetID,
+                        isLocalAsset: 1,
+                    };
+                    assetList[asset] = assetInfo
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
+                    await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'localAssets');
                 } else {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
