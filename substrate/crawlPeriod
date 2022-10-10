@@ -28,7 +28,7 @@ async function main() {
         }
     });
     if (isDefault){
-        if (chainID == paraTool.chainIDMoonbase){
+        if (chainID == paraTool.chainIDMoonbaseAlpha){
             startBN = 2841050
             endBN = 2841380
         }else if (chainID == paraTool.chainIDMoonbaseRelay){

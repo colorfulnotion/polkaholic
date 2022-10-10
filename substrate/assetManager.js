@@ -96,7 +96,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
             this.chainParser = new ParallelParser();
             await this.chainParser.addCustomAsset(this); // ????
-        } else if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase) {
+        } else if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta) {
             this.chainParser = new MoonbeamParser();
         } else if (chainID == paraTool.chainIDInterlay || chainID == paraTool.chainIDKintsugi) {
             this.chainParser = new InterlayParser();

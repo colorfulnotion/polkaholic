@@ -875,7 +875,7 @@ from chain where chainID = '${chainID}' limit 1`);
                 rpc: typesBundlePre900.typesBundlePre900.spec.moonriver.rpc
             });
             console.log(`You are connected to MOONRIVER chain ${chainID} endpoint=${endpoint} with types + rpc`);
-        } else if (chainID == paraTool.chainIDMoonbase) {
+        } else if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta) {
             const typesBundlePre900 = require("moonbeam-types-bundle");
             api = await ApiPromise.create({
                 provider: provider,

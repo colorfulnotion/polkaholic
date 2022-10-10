@@ -3838,7 +3838,7 @@ module.exports = class ChainParser {
         let paraIDExtra = paraTool.getParaIDExtra(relayChain)
 
         var a;
-        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase ||
+        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta ||
             indexer.chainID == paraTool.chainIDCrustShadow) {
             var a = await indexer.api.query.assetManager.assetIdType.entries()
         } else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
@@ -4379,7 +4379,7 @@ module.exports = class ChainParser {
             return this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
-        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
+        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
             //assets (default case)
             return this.processXcmDecHexCurrencyID(indexer, currency_id)
         } else {
@@ -4523,7 +4523,7 @@ module.exports = class ChainParser {
                 return this.getAssetRegistrySymbolAndDecimals(indexer, currency_id)
             } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
                 return this.getAssetRegistrySymbolAndDecimals(indexer, currency_id)
-            } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
+            } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
                 //assets (default case)
                 let [symbols, decimals, assetString] = this.getDecHexCurrencyIDSymbolAndDecimals(indexer, currency_id)
                 if (symbols) {
@@ -4549,7 +4549,7 @@ module.exports = class ChainParser {
             return this.processAssetRegistryCurrencyID(indexer, currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.processAssetRegistryCurrencyID(indexer, currency_id)
-        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
+        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
             //assets (default case)
             return this.processDecHexCurrencyID(indexer, currency_id)
         } else {
@@ -4565,7 +4565,7 @@ module.exports = class ChainParser {
             return this.token_to_string(currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.token_to_string(currency_id)
-        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
+        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
             //assets (default case)
             return this.processRawDecHexCurrencyID(indexer, currency_id)
         } else {
