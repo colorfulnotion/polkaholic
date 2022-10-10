@@ -323,6 +323,10 @@ module.exports = class PolkaholicDB {
             return this.chainInfos[chainID].name
         } else {
             console.log("getChainName FATAL ERROR: must call init", chainID)
+            let relay = paraTool.getRelayChainByChainID(chainID)
+            let paraID = paraTool.getParaIDfromChainID(chainID)
+            let name = `${relay}[paraID:${paraID}]`
+            return name
         }
     }
 
