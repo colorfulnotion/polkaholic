@@ -150,7 +150,7 @@ module.exports = class ChainParser {
 
     async getSystemProperties(indexer, chain) {
         let chainID = chain.chainID;
-        if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta) {
+        if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta || chainID == paraID.chainIDMoonbaseAlpha){
             //suppress DEV
             return
         }
@@ -158,7 +158,7 @@ module.exports = class ChainParser {
         let props = JSON.parse(propsNative.toString());
         // {"ss58Format":10,"tokenDecimals":[12,12,10,10],"tokenSymbol":["ACA","AUSD","DOT","LDOT"]}
         // NOT MAINTAINED let ss58Format = props.ss58Format;
-        //console.log(propsNative)
+        console.log(propsNative)
         if (props.tokenSymbol) {
             for (let i = 0; i < props.tokenSymbol.length; i++) {
                 let symbol = props.tokenSymbol[i];
