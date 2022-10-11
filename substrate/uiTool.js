@@ -309,8 +309,15 @@ function camel2title(camelCase) {
 }
 
 function capitalizeFirstLetter(string) {
+    if (string == undefined || string == false) return ''
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
+
+function presentTempChainIdentifer(chainID) {
+    if (chainID == undefined) return ""
+    return paraTool.getTempID(chainID)
+}
+
 
 function show_account_info(c, fld) {
     try {
@@ -588,6 +595,9 @@ module.exports = {
     currencyFormat: function(c, priceUSD = false, priceUSDCurrent = false) {
         return currency_format(c, priceUSD, priceUSDCurrent);
     },
+    presentTempChainIdentifer: function(chainID) {
+        return presentTempChainIdentifer(chainID)
+    },
     getShortHash: function(hash, shortHash = true, allowCopy = true) {
         let out = shortHash ? get_short_hash(hash) : hash;
         if (allowCopy && hash != null && (typeof hash == "string") && (hash.length > 0)) {
@@ -659,13 +669,13 @@ module.exports = {
     },
     getPublicWSEndpoints: function(chain) {
         let endpoints = [];
-        if (chain.WSEndpoint && chain.WSEndpoint.length > 0 && !chain.WSEndpoint.includes("polkaholic.io")) {
+        if (chain.WSEndpoint && chain.WSEndpoint.length > 0 && paraTool.isPublicEndpoint(chain.WSEndpoint)) {
             endpoints.push(chain.WSEndpoint);
         }
-        if (chain.WSEndpoint2 && chain.WSEndpoint2.length > 0 && !chain.WSEndpoint2.includes("polkaholic.io")) {
+        if (chain.WSEndpoint2 && chain.WSEndpoint2.length > 0 && paraTool.isPublicEndpoint(chain.WSEndpoint2)) {
             endpoints.push(chain.WSEndpoint2);
         }
-        if (chain.WSEndpoint3 && chain.WSEndpoint3.length > 0 && !chain.WSEndpoint3.includes("polkaholic.io")) {
+        if (chain.WSEndpoint3 && chain.WSEndpoint3.length > 0 && paraTool.isPublicEndpoint(chain.WSEndpoint3)) {
             endpoints.push(chain.WSEndpoint3);
         }
         return endpoints;

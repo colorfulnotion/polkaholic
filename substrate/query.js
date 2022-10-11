@@ -44,6 +44,13 @@ module.exports = class Query extends AssetManager {
         return (true);
     }
 
+    async setupQuerChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
+        let chain = await this.getChainWithVersion(chainID, withSpecVersions);
+        await this.setupAPI(chain, backfill);
+        this.relayChain = chain.relayChain;
+        return (chain);
+    }
+
     // this supports reloading of chains/assets/specVersions every 15m
     async autoUpdate(intervalSeconds = 900) {
         while (1) {
@@ -995,7 +1002,8 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async getChain(chainID_or_chainName, publicEndpoint = false) {
+    //WARNING: This call is exposed externally. should not include any non-public ws
+    async getChain(chainID_or_chainName, isExternal = false) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         if (chainID === false) {
             throw new paraTool.NotFoundError(`Chain not found: ${chainID_or_chainName}`)
@@ -1035,15 +1043,17 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                 }
-		if ( publicEndpoint ) {
-		    // hardcoded for publicEndpoint = true for now
-		    chainInfo.chainID = parseInt(chainInfo.chainID)
-		    if ( chainInfo.chainID == 2006 || chainInfo.chainID == 22007 ) {
-			chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
-		    } else if ( chainInfo.chainID == 2004 || chainInfo.chainID == 22023 ) {
-			chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
-		    }
-		}
+                if (isExternal) {
+                    if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint))  chainInfo.WSEndpoint = null
+                    if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint2)) chainInfo.WSEndpoint2 = null
+                    if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint3)) chainInfo.WSEndpoint3 = null
+                    // hardcoded for publicEndpoint = true for now
+                    chainInfo.chainID = parseInt(chainInfo.chainID)
+                    if ( ( chainInfo.chainID == 2006 || chainInfo.chainID == 22007 ) || ( chainInfo.chainID == 2004 || chainInfo.chainID == 22023 ) ) {
+                      chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
+                      chainInfo.WSEndpoint = `wss://${chainInfo.id}.api.onfinality.io/public-ws`
+                    }
+                }
                 return chainInfo
             }
         } catch (err) {
@@ -6062,14 +6072,23 @@ module.exports = class Query extends AssetManager {
     }
 
 
-    async getXCMMessage(msgHash, blockNumber = null, decorate = true, decorateExtra = true) {
+    async getXCMMessage(msgHash, number = null, decorate = true, decorateExtra = true) {
+        //search bn first, if not found, fall back to sentAt
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let w = (blockNumber) ? ` and sentAt = ${blockNumber}` : "";
-        let sql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, executedEventID, destStatus, errorDesc from xcmmessages
+        let w = (number) ? ` and sentAt = ${number}` : "";
+        let w1 = (number) ? ` and blockNumber = ${number}` : "";
+        let bnSql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, executedEventID, destStatus, errorDesc from xcmmessages
+        where msgHash = '${msgHash}' ${w1} order by blockTS desc limit 1`
+        let sentAtSql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, executedEventID, destStatus, errorDesc from xcmmessages
         where msgHash = '${msgHash}' ${w} order by blockTS desc limit 1`
-        let xcmrecs = await this.poolREADONLY.query(sql);
+        let xcmrecs = await this.poolREADONLY.query(bnSql);
         if (xcmrecs.length == 0) {
-            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${blockNumber}`)
+            console.log(`getXCMMessage [msgHash/bn = ${msgHash}/${number}] not found`, paraTool.removeNewLine(bnSql))
+            xcmrecs = await this.poolREADONLY.query(sentAtSql);
+        }
+        if (xcmrecs.length == 0) {
+            console.log(`getXCMMessage [msgHash/sentAt = ${msgHash}/${number}] not found`, paraTool.removeNewLine(bnSql))
+            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${number}`)
         }
         let x = xcmrecs[0];
         x.paraID = paraTool.getParaIDfromChainID(x.chainID)
@@ -6087,7 +6106,7 @@ module.exports = class Query extends AssetManager {
         x.msg = xcmMsg
         if (xcmMsg != undefined) {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
-            let dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
+            let dMsg = await this.decorateXCMMsg(x.chainID, x.chainIDDest, xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
             x.decodeMsg = dMsg
             if (dMsg.destAddress != undefined) {
                 x.destAddress = dMsg.destAddress
@@ -6100,10 +6119,17 @@ module.exports = class Query extends AssetManager {
         let [_, id] = this.convertChainID(x.chainID)
         x.chainName = this.getChainName(x.chainID);
         let [__, idDest] = this.convertChainID(x.chainIDDest)
-
+        x.chainDestName = this.getChainName(x.chainIDDest);
+        if (id == false){
+            //temporary id
+            id = paraTool.getTempID(x.chainID)
+        }
+        if (idDest == false){
+            //temporary idDest
+            idDest = paraTool.getTempID(x.chainIDDest)
+        }
         x.id = id
         x.idDest = idDest
-        x.chainDestName = this.getChainName(x.chainIDDest);
         return x;
     }
 
@@ -6156,8 +6182,27 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async decorateInternalXCMInstruction(dXcmMsg, internalXCM, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
-        this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
+/*
+{
+    "transact": {
+        "originType": "SovereignAccount",
+        "requireWeightAtMost": 10000000000,
+        "call": {
+            "encoded": "0x010008240533ee7b029e9570efca80a60d167584b74771741a064d07134be65ace2c10ca4192b91f5f31130000e8890423c78a01010800241333ee7b029e9570efca80a60d167584b747e41a900b94e647d7106899ca303b2f07cdd53f95130000e8890423c78a"
+        }
+    }
+},
+{
+    "transact": {
+        "originType": "SovereignAccount",
+        "requireWeightAtMost": 10000000000,
+        "call": {
+            "encoded": "0x260171741a064d07134be65ace2c10ca4192b91f5f3101e09304000000000000000000000000000000000000000000000000000000000000ddd3761511ae568ee614e232d553553faf729a820000000000000000000000000000000000000000000000000000000000000000910305e2ca1700000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000001df9bd10de107d2ce81a510eb158421000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000540000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000000000000000000014ef6b3b0a89d9c966bd9291130869140cde2b768800000000000000000000000000"
+        }
+    }
+},
+*/
+    async decorateInternalXCMInstruction(chainID, chainIDDest, dXcmMsg, internalXCM, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let dInstructionV = {}
         switch (instructionK) {
@@ -6217,6 +6262,18 @@ module.exports = class Query extends AssetManager {
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
                 break;
+            case "transact":
+                if (chainIDDest != undefined){
+                    //init with chainDest
+                    await this.setupQuerChainAndAPI(chainIDDest);
+                }
+                console.log(`decorateInternalXCMInstruction transact!!!`, instructionV)
+                let opaqueCall = instructionV.call.encoded
+                let res = this.chainParser.decodeDestination_call(this.api, opaqueCall)
+                instructionV.decodedCall = res
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break
             default:
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
@@ -6224,7 +6281,7 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async decorateXCMInstructionV1(dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
+    async decorateXCMInstructionV1(chainID, chainIDDest, dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
         this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let version = dXcmMsg.version
@@ -6252,7 +6309,7 @@ module.exports = class Query extends AssetManager {
                         let instructionXCMK = Object.keys(instructionV.effects[i])[0]
                         let instructionXCMV = instructionV.effects[i][instructionXCMK]
                         //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                        await this.decorateInternalXCMInstruction(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
+                        await this.decorateInternalXCMInstruction(chainID, chainIDDest, dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
                     }
                 }
                 dInstructionV[instructionK] = instructionV
@@ -6291,14 +6348,27 @@ module.exports = class Query extends AssetManager {
                         let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
                         let instructionXCMV = instructionV.xcm[i][instructionXCMK]
                         //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                        await this.decorateInternalXCMInstruction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
+                        await this.decorateInternalXCMInstruction(chainID, chainIDDest, dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
                     }
                 }
                 console.log(`depositReserveAsset final`, JSON.stringify(instructionV, null, 4))
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version] = dInstructionV
                 break;
+            case "transact":
+                if (chainIDDest != undefined){
+                    //init with chainDest
+                    await this.setupQuerChainAndAPI(chainIDDest);
+                }
+                console.log(`decorateXCMInstructionV1 transact!!!`, instructionV)
+                let opaqueCall = instructionV.call.encoded
+                let res = this.chainParser.decodeDestination_call(this.api, opaqueCall)
+                instructionV.decodedCall = res
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version] = dInstructionV
+                break
             default:
+                console.log(`unhandled case ${instructionK}`)
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version] = dInstructionV
                 break;
@@ -6306,8 +6376,13 @@ module.exports = class Query extends AssetManager {
         console.log('im here 2')
     }
 
-    async decorateXCMInstruction(dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
-        this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
+    async decorateXCMInstruction(chainID, chainIDDest, dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
+        if (chainIDDest != undefined){
+            //init with chainDest
+            this.chainParserInit(chainIDDest, this.debugLevel);
+        }else{
+            this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
+        }
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let version = dXcmMsg.version
         let dInstructionV = {}
@@ -6357,14 +6432,28 @@ module.exports = class Query extends AssetManager {
                         let instructionXCMK = Object.keys(instructionV.xcm[i])[0]
                         let instructionXCMV = instructionV.xcm[i][instructionXCMK]
                         //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
-                        await this.decorateInternalXCMInstruction(dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
+                        await this.decorateInternalXCMInstruction(chainID, chainIDDest, dXcmMsg, instructionV.xcm[i], instructionXCMK, instructionXCMV, blockTS, dAssetChains, decorate, decorateExtra)
                     }
                 }
                 console.log(`depositReserveAsset final`, JSON.stringify(instructionV, null, 4))
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version].push(dInstructionV)
                 break;
+            case "transact":
+                if (chainIDDest != undefined){
+                    //init with chainDest
+                    await this.setupQuerChainAndAPI(chainIDDest);
+                }
+                console.log(`decorateXCMInstruction transact!!!`, instructionV)
+                let opaqueCall = instructionV.call.encoded
+                let res = this.chainParser.decodeDestination_call(this.api, opaqueCall)
+                console.log(`transact!!`, res)
+                instructionV.decodedCall = res
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version].push(dInstructionV)
+                break
             default:
+                console.log(`unhandled case ${instructionK}`)
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version].push(dInstructionV)
                 break;
@@ -6372,7 +6461,8 @@ module.exports = class Query extends AssetManager {
     }
 
 
-    async decorateXCMMsg(xcmMsg, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
+    async decorateXCMMsg(chainID, chainIDDest, xcmMsg, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
+        console.log(`decorateXCMMsg chainID=${chainID}, chainIDDest=${chainIDDest}`)
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let dXcmMsg = {}
         let version = Object.keys(xcmMsg)[0]
@@ -6390,7 +6480,7 @@ module.exports = class Query extends AssetManager {
             let instructionV = xcmMsgV[instructionK]
             //console.log(`instructionK=${instructionK}, instructionV`, instructionV)
             dXcmMsg[version] = {}
-            await this.decorateXCMInstructionV1(dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
+            await this.decorateXCMInstructionV1(chainID, chainIDDest, dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
         } else if (version == 'v2') {
             dXcmMsg[version] = []
             for (let i = 0; i < xcmMsgV.length; i++) {
@@ -6402,7 +6492,7 @@ module.exports = class Query extends AssetManager {
                 let instructionK = xcmPath[i]
                 let instructionV = xcmMsgV[i][instructionK]
                 //console.log(`instructionK=${instructionK}, instructionV`, instructionV)
-                await this.decorateXCMInstruction(dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
+                await this.decorateXCMInstruction(chainID, chainIDDest, dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
             }
         } else if (version == 'v0') {
             //skip for now
@@ -6459,13 +6549,15 @@ module.exports = class Query extends AssetManager {
         let dMsg;
         if (xcmMsg != undefined) {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
-            dMsg = await this.decorateXCMMsg(xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
+            dMsg = await this.decorateXCMMsg(rawXcmRec.chainID, rawXcmRec.chainIDDest, xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
         }
         let destAddress = (dMsg.destAddress != undefined) ? dMsg.destAddress : null
         let destSS58Address = this.getSS58ByChainID(destAddress, rawXcmRec.chainIDDest)
 
         let [_, id] = this.convertChainID(rawXcmRec.chainID);
         let [__, idDest] = this.convertChainID(rawXcmRec.chainIDDest);
+        if (id == false) id = paraTool.getTempID(rawXcmRec.chainID)
+        if (idDest == false) idDest = paraTool.getTempID(rawXcmRec.chainIDDest)
         let assetsReceived = rawXcmRec.assetsReceived;
         let dXcm = {
             msgHash: rawXcmRec.msgHash,
@@ -6478,8 +6570,8 @@ module.exports = class Query extends AssetManager {
             received: rawXcmRec.received,
             relayChain: rawXcmRec.relayChain,
             paraID: rawXcmRec.paraID,
-            id,
-            idDest,
+            id: id,
+            idDest: idDest,
             blockTS: rawXcmRec.blockTS, //TODO: remove ambiguous blockTS
             receivedTS: rawXcmRec.receivedTS,
             sentTS: rawXcmRec.sentTS,

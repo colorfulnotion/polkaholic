@@ -150,7 +150,11 @@ let f = xcm;
     <tr>
       <td>Instructions</td>
       <td>
-        <%- include("decode", {"obj": f.msg, "id": "instructions", "verify": null}) %>
+         <%
+         let msg = f.msg
+         if ( f.decodeMsg ) msg = f.decodeMsg
+        %>
+        <%- include("decode", {"obj": msg, "id": "instructions", "verify": null}) %>
       </td>
     </tr>
 <% if ( false ) { %>

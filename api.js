@@ -422,7 +422,8 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
         //let chainID = parseInt(req.params["chainID"], 10);
         let chainID_or_chainName = req.params["chainID_or_chainName"]
         //let [chainID, id] = query.convertChainID(chainID_or_chainName)
-        let chain = await query.getChain(chainID_or_chainName);
+        let isExternal = true
+        let chain = await query.getChain(chainID_or_chainName, isExternal);
         if (chain) {
             let blocks = await query.getChainRecentBlocks(chainID_or_chainName);
             let r = {

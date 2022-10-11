@@ -668,6 +668,45 @@ from chain where chainID = '${chainID}' limit 1`);
         }
         return chain;
     }
+    async getChainWithVersion(chainID, withSpecVersions = false){
+        var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmChainID, evmRPC, evmRPCInternal, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus,
+numExtrinsics, numExtrinsics7d, numExtrinsics30d,
+numSignedExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d,
+numTransfers, numTransfers7d, numTransfers30d,
+numEvents, numEvents7d, numEvents30d,
+numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d,
+numReceiptsEVM, numReceiptsEVM7d, numReceiptsEVM30d,
+floor(gasUsed / (numEVMBlocks+1)) as gasUsed,
+floor(gasUsed7d / (numEVMBlocks7d+1)) as gasUsed7d,
+floor(gasUsed30d / (numEVMBlocks30d+1)) as gasUsed30d,
+floor(gasLimit / (numEVMBlocks+1)) as gasLimit,
+floor(gasLimit7d / (numEVMBlocks7d+1)) as gasLimit7d,
+floor(gasLimit30d / (numEVMBlocks30d+1)) as gasLimit30d,
+numXCMTransferIncoming, numXCMTransferIncoming7d, numXCMTransferIncoming30d,
+numXCMTransferOutgoing, numXCMTransferOutgoing7d, numXCMTransferOutgoing30d,
+valXCMTransferIncomingUSD, valXCMTransferIncomingUSD7d, valXCMTransferIncomingUSD30d,
+valXCMTransferOutgoingUSD, valXCMTransferOutgoingUSD7d, valXCMTransferOutgoingUSD30d
+from chain where chainID = '${chainID}' limit 1`);
+        if (chains.length == 0) return (false);
+        let chain = chains[0];
+        if (withSpecVersions) {
+            let specVersions = await this.poolREADONLY.query(`select specVersion, blockNumber, blockHash from specVersions where chainID = '${chainID}' and blockNumber > 0 order by specVersion`);
+            chain.specVersions = specVersions;
+        }
+        // because some chains don't have subscribeStorage support (and subscribeStorage updates blocksCovered...)
+        if (chain.blocksCovered == null || chain.blocksCovered < chain.blocksFinalized) {
+            chain.blocksCovered = chain.blocksFinalized
+        }
+        if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
+            let paraIDs = await this.poolREADONLY.query(`select paraID from chainparachain where chainID = '${chainID}'`);
+            for (let i = 0; i < paraIDs.length; i++) {
+                let paraID = paraIDs[i].paraID;
+                this.paraIDs.push(paraID);
+
+            }
+        }
+        return chain;
+    }
 
     async getWeb3Api(chain, backfill = false) {
         if (this.web3Api) return (this.web3Api);
