@@ -729,6 +729,14 @@ function contractAddrToXcAssetID(xcAssetAddress) {
     return xcAssetID
 }
 
+function is_public_endpoint(wss){
+    if (wss == undefined) return true
+    if (wss.includes("polkaholic.io") || wss.includes("g.moonbase")){
+        return false
+    }
+    return true
+}
+
 class NotFoundError extends Error {
     constructor(message) {
         // Needs to pass both `message` and `options` to install the "cause" property.
@@ -1423,5 +1431,8 @@ module.exports = {
     },
     removeNewLine: function(str) {
         return str.replace(/(\r\n|\n|\r)/gm, "").replace(/\s\s+/g, ' ')
+    },
+    isPublicEndpoint: function(endpoint) {
+        return is_public_endpoint(endpoint)
     },
 };

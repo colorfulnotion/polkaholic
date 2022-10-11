@@ -24,14 +24,17 @@
       <% } %>
       <% if ( chainID && (chainID == 2004 || chainID == 22023 || chainID == 61000) && b.evmBlock != undefined ) {
          let externalURL;
+         let imgURL;
          if (chainID == 2004){
              externalURL = `https://moonscan.io`
+             imgURL =  "https://cdn.polkaholic.io/moonscan.svg"
          }else if (chainID == 22023){
              externalURL = `https://moonriver.moonscan.io`
+             imgURL =  "https://cdn.polkaholic.io/moonriverscan.svg"
          }else if (chainID == 61000){
              externalURL = `https://moonbase.moonscan.io`
+             imgURL =  "https://polkadot.js.org/apps/static/moonbase_alpha.1299ae1a..png"
          }
-         let imgURL = (chainID == 2004) ? "https://cdn.polkaholic.io/moonscan.svg" : "https://cdn.polkaholic.io/moonriverscan.svg"
          let txURL = `${externalURL}/block/${b.evmBlock.hash}`;
          %>
       <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>

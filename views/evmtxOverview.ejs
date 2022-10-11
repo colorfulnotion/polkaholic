@@ -173,14 +173,17 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td>
         <% if ( f.chainID && (f.chainID == 2004 || f.chainID == 22023 || f.chainID == 61000)) {
             let externalURL;
-            if (chainID == 2004){
+            let imgURL;
+            if (f.chainID == 2004){
                 externalURL = `https://moonscan.io`
-            }else if (chainID == 22023){
+                imgURL =  "https://cdn.polkaholic.io/moonscan.svg"
+            }else if (f.chainID == 22023){
                 externalURL = `https://moonriver.moonscan.io`
-            }else if (chainID == 61000){
+                imgURL =  "https://cdn.polkaholic.io/moonriverscan.svg"
+            }else if (f.chainID == 61000){
                 externalURL = `https://moonbase.moonscan.io`
+                imgURL =  "https://polkadot.js.org/apps/static/moonbase_alpha.1299ae1a..png"
             }
-           let imgURL = (f.chainID == 2004) ? "https://cdn.polkaholic.io/moonscan.svg" : "https://cdn.polkaholic.io/moonriverscan.svg"
            let txURL = `${externalURL}/tx/${f.transactionHash}`;
            %>
         <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>

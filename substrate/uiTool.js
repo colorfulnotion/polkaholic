@@ -330,13 +330,6 @@ function show_account_info(c, fld) {
     }
 }
 
-function isPublicEndpoint(wss){
-    if (wss.includes("polkaholic.io") || wss.includes("g.moonbase")){
-        return false
-    }
-    return true
-}
-
 module.exports = {
     currencyFormat: function(c, _maximumFractionDigits = 2) {
         if (c < .01) _maximumFractionDigits = 3;
@@ -666,13 +659,13 @@ module.exports = {
     },
     getPublicWSEndpoints: function(chain) {
         let endpoints = [];
-        if (chain.WSEndpoint && chain.WSEndpoint.length > 0 && isPublicEndpoint(chain.WSEndpoint)) {
+        if (chain.WSEndpoint && chain.WSEndpoint.length > 0 && paraTool.isPublicEndpoint(chain.WSEndpoint)) {
             endpoints.push(chain.WSEndpoint);
         }
-        if (chain.WSEndpoint2 && chain.WSEndpoint2.length > 0 && isPublicEndpoint(chain.WSEndpoint2)) {
+        if (chain.WSEndpoint2 && chain.WSEndpoint2.length > 0 && paraTool.isPublicEndpoint(chain.WSEndpoint2)) {
             endpoints.push(chain.WSEndpoint2);
         }
-        if (chain.WSEndpoint3 && chain.WSEndpoint3.length > 0 && isPublicEndpoint(chain.WSEndpoint3)) {
+        if (chain.WSEndpoint3 && chain.WSEndpoint3.length > 0 && paraTool.isPublicEndpoint(chain.WSEndpoint3)) {
             endpoints.push(chain.WSEndpoint3);
         }
         return endpoints;

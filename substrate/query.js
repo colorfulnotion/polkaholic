@@ -995,7 +995,8 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async getChain(chainID_or_chainName, publicEndpoint = false) {
+    //WARNING: This call is exposed externally. should not include any non-public ws
+    async getChain(chainID_or_chainName, isExternal = false) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         if (chainID === false) {
             throw new paraTool.NotFoundError(`Chain not found: ${chainID_or_chainName}`)
@@ -1035,15 +1036,20 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                 }
-		if ( publicEndpoint ) {
-		    // hardcoded for publicEndpoint = true for now
-		    chainInfo.chainID = parseInt(chainInfo.chainID)
-		    if ( chainInfo.chainID == 2006 || chainInfo.chainID == 22007 ) {
-			chainInfo.RPCBackfill = `https://${chainInfo.id}.public.blastapi.io`
-		    } else if ( chainInfo.chainID == 2004 || chainInfo.chainID == 22023 ) {
-			chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
-		    }
-		}
+                if (isExternal){
+                    if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint))  chainInfo.WSEndpoint = null
+                    if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint2)) chainInfo.WSEndpoint2 = null
+                    if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint3)) chainInfo.WSEndpoint3 = null
+                }
+                if (isExternal) {
+                    // hardcoded for publicEndpoint = true for now
+                    chainInfo.chainID = parseInt(chainInfo.chainID)
+                    if ( chainInfo.chainID == 2006 || chainInfo.chainID == 22007 ) {
+                    chainInfo.RPCBackfill = `https://${chainInfo.id}.public.blastapi.io`
+                    } else if ( chainInfo.chainID == 2004 || chainInfo.chainID == 22023 ) {
+                    chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
+                    }
+                }
                 return chainInfo
             }
         } catch (err) {
@@ -6067,6 +6073,7 @@ module.exports = class Query extends AssetManager {
         let w = (blockNumber) ? ` and sentAt = ${blockNumber}` : "";
         let sql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, executedEventID, destStatus, errorDesc from xcmmessages
         where msgHash = '${msgHash}' ${w} order by blockTS desc limit 1`
+        console.log(`getXCMMessage`, paraTool.removeNewLine(sql))
         let xcmrecs = await this.poolREADONLY.query(sql);
         if (xcmrecs.length == 0) {
             throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${blockNumber}`)
