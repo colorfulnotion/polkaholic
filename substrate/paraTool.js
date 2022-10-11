@@ -910,7 +910,8 @@ module.exports = {
     chainIDUniqueOther: 255,
     chainIDPontem: 105,
     chainIDLaminar: 11,
-    chainIDMoonbase: 61000,
+    chainIDMoonbaseAlpha: 61000,
+    chainIDMoonbaseBeta: 60888,
     chainIDMoonbaseRelay: 60000,
 
     chainIDShibuya: 81000, //TODO: (Q:where is shibuya relay?)

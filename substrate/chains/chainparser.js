@@ -150,6 +150,10 @@ module.exports = class ChainParser {
 
     async getSystemProperties(indexer, chain) {
         let chainID = chain.chainID;
+        if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta ){
+            //suppress DEV
+            return
+        }
         let propsNative = await indexer.api.rpc.system.properties();
         let props = JSON.parse(propsNative.toString());
         // {"ss58Format":10,"tokenDecimals":[12,12,10,10],"tokenSymbol":["ACA","AUSD","DOT","LDOT"]}
@@ -3838,7 +3842,7 @@ module.exports = class ChainParser {
         let paraIDExtra = paraTool.getParaIDExtra(relayChain)
 
         var a;
-        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase ||
+        if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta ||
             indexer.chainID == paraTool.chainIDCrustShadow) {
             var a = await indexer.api.query.assetManager.assetIdType.entries()
         } else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
@@ -4180,7 +4184,7 @@ module.exports = class ChainParser {
             } else {
                 if (indexer.chainID == paraTool.chainIDListen) assetMetadata = assetMetadata.metadata
                 if (assetMetadata.decimals !== false && assetMetadata.symbol) {
-                    let name = (assetMetadata.name != undefined) ? assetMetadata.name : `${assetMetadata.symbol}` //Basilisk doens't habe assetName, use symbol in this case
+                    let name = (assetMetadata.name != undefined) ? assetMetadata.name : `${assetMetadata.symbol}` //Basilisk doens't have assetName, use symbol in this case
                     let assetInfo = {
                         name: name,
                         symbol: assetMetadata.symbol,
@@ -4195,6 +4199,61 @@ module.exports = class ChainParser {
                     assetList[asset] = assetInfo
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
                     await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAsset');
+                } else {
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+                }
+            }
+        }
+        if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
+    }
+
+    //localAssets.metadata
+    async fetchLocalAsset(indexer) {
+        if (!indexer.api) {
+            console.log(`[fetchLocalAsset] Fatal indexer.api not initiated`)
+            return
+        }
+        var a;
+        switch (indexer.chainID) {
+            default:
+                console.log(`fetch localAssets:metadata`)
+                a = await indexer.api.query.localAssets.metadata.entries()
+                break;
+        }
+        if (!a) {
+            console.log(`returned`)
+            return
+        }
+        let assetList = {}
+        for (let i = 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
+            let assetID = this.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let assetMetadata = val.toHuman()
+            let parsedAsset = {
+                Token: assetID
+            }
+            var asset = JSON.stringify(parsedAsset);
+            let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
+            let cachedAssetInfo = indexer.assetInfo[assetChain]
+            if (cachedAssetInfo != undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
+                //cached found
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
+                assetList[asset] = cachedAssetInfo
+            } else {
+                if (assetMetadata.decimals !== false && assetMetadata.symbol) {
+                    let name = (assetMetadata.name != undefined) ? assetMetadata.name : `${assetMetadata.symbol}`
+                    let assetInfo = {
+                        name: name,
+                        symbol: assetMetadata.symbol,
+                        decimals: assetMetadata.decimals,
+                        assetType: paraTool.assetTypeToken,
+                        currencyID: assetID,
+                        isLocalAsset: 1,
+                    };
+                    assetList[asset] = assetInfo
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
+                    await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'localAssets');
                 } else {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
@@ -4379,7 +4438,7 @@ module.exports = class ChainParser {
             return this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
-        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
+        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
             //assets (default case)
             return this.processXcmDecHexCurrencyID(indexer, currency_id)
         } else {
@@ -4523,7 +4582,7 @@ module.exports = class ChainParser {
                 return this.getAssetRegistrySymbolAndDecimals(indexer, currency_id)
             } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
                 return this.getAssetRegistrySymbolAndDecimals(indexer, currency_id)
-            } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
+            } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
                 //assets (default case)
                 let [symbols, decimals, assetString] = this.getDecHexCurrencyIDSymbolAndDecimals(indexer, currency_id)
                 if (symbols) {
@@ -4549,7 +4608,7 @@ module.exports = class ChainParser {
             return this.processAssetRegistryCurrencyID(indexer, currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.processAssetRegistryCurrencyID(indexer, currency_id)
-        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
+        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
             //assets (default case)
             return this.processDecHexCurrencyID(indexer, currency_id)
         } else {
@@ -4565,7 +4624,7 @@ module.exports = class ChainParser {
             return this.token_to_string(currency_id)
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.token_to_string(currency_id)
-        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbase) {
+        } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
             //assets (default case)
             return this.processRawDecHexCurrencyID(indexer, currency_id)
         } else {

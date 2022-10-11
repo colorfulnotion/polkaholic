@@ -5653,7 +5653,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     async getBlockAuthor(api, block, isNewSession = false, sessionIndex = false) {
-        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbase ||
+        if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta ||
             this.chainID == paraTool.chainIDRobonomics ||
             this.chainID == paraTool.chainIDQuartz
         ) {
@@ -6362,7 +6362,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     feedTransfer["asset"] = null
                     feedTransfer["symbol"] = null
                     feedTransfer["decimals"] = null
-                    console.log(`symbol, decimals unknown`, fdata);
+                    console.log(`[${eventID}] symbol, decimals unknown`, fdata);
                 }
 
                 feedTransfer["data"] = data
@@ -6668,7 +6668,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
         } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya ||
-            this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbase ||
+            this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta ||
             this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
             this.chainID == paraTool.chainIDStatemine || this.chainID == paraTool.chainIDStatemint ||
             this.chainID == paraTool.chainIDPhala || this.chainID == paraTool.chainIDKhala ||
@@ -6683,7 +6683,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 await this.chainParser.fetchAsset(this)
                 await this.chainParser.updateLiquidityInfo(this)
             }
-            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbase ||
+            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta){
+                await this.chainParser.fetchLocalAsset(this)
+            }
+            if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta ||
                 this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
                 this.chainID == paraTool.chainIDCrustShadow) {
                 console.log(`fetch assetManager:assetIdType`)

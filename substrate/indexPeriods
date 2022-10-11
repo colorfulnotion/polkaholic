@@ -10,7 +10,7 @@ async function main() {
     crawler.setDebugLevel(paraTool.debugErrorOnly)
     //crawler.setDebugLevel(paraTool.debugInfo)
     //crawler.setDebugLevel(paraTool.debugVerbose)
-    //crawler.setDebugLevel(paraTool.debugTracing)
+    crawler.setDebugLevel(paraTool.debugTracing)
     await crawler.assetManagerInit();
     let logDT = "2021-11-18";
     let hrs = [10];
