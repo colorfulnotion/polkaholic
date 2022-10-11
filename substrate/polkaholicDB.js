@@ -323,6 +323,10 @@ module.exports = class PolkaholicDB {
             return this.chainInfos[chainID].name
         } else {
             console.log("getChainName FATAL ERROR: must call init", chainID)
+            let relay = paraTool.getRelayChainByChainID(chainID)
+            let paraID = paraTool.getParaIDfromChainID(chainID)
+            let name = `${relay}[paraID:${paraID}]`
+            return name
         }
     }
 
@@ -875,7 +879,7 @@ from chain where chainID = '${chainID}' limit 1`);
                 rpc: typesBundlePre900.typesBundlePre900.spec.moonriver.rpc
             });
             console.log(`You are connected to MOONRIVER chain ${chainID} endpoint=${endpoint} with types + rpc`);
-        } else if (chainID == paraTool.chainIDMoonbase) {
+        } else if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta) {
             const typesBundlePre900 = require("moonbeam-types-bundle");
             api = await ApiPromise.create({
                 provider: provider,

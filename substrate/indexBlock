@@ -1,21 +1,38 @@
 #!/usr/bin/env node
  // Usage: while true; do ./indexChain 10; done
 var Crawler = require("./crawler");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
 
 async function main() {
-    let chainID = 2012;
+    let chainID = paraTool.chainIDMoonbase;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = val;
         }
     });
     let crawler = new Crawler();
+    crawler.setDebugLevel(paraTool.debugTracing)
     crawler.exitOnDisconnect = true;
     let chain = await crawler.getChain(chainID);
     await crawler.setupAPI(chain);
     await crawler.assetManagerInit();
-    let blockNumber = 1037398;
-    let blockHash = "0x1a5636904ad7930989aaca0572b7fda3ab89dae96687c384099bfb99a0ed3087";
+    await crawler.setupChainAndAPI(chainID);
+    let blockNumber = 2841368;
+    let blockHash = "0x869989d1bd2f311a3a2c8127a7828f439d772fd124241430876fa38c4b9381bc"; //substrate
+    //let evmBlockHash = "0xdf092452d679df2cef2d83dbf818f73cae470fca6192d646b04f383e35df60ee"; //evm
+    let t2 = null
+    /*{
+	chainID,
+	blockNumber,
+	crawlTrace: 1,
+	crawlBlockEVM: 1,
+	crawlReceiptsEVM: 1,
+	crawlTraceEVM: 1
+    }; */
+    if ( t2 ) {
+	await crawler.crawl_block_trace(chain, t2)
+    }
     await crawler.index_block(chain, blockNumber, blockHash);
 }
 

@@ -569,6 +569,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     let txType = (dTxn.type != undefined) ? dTxn.type : txLegacyType
     if (txType != txLegacyType && txType != tx1559Type) {
         console.log(`unknown txType=${dTxn.type}, dTxn`, dTxn)
+        //process.exit(0)
     }
     let fee = gasUsed * gasPrice
     let maxFeePerGas = (dTxn.maxFeePerGas != undefined) ? paraTool.dechexToInt(dTxn.maxFeePerGas) : 0

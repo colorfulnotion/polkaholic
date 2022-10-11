@@ -532,7 +532,7 @@ module.exports = class XCMTransfer extends AssetManager {
         let testcases = await this.poolREADONLY.query(sql);
         let autoTestcases = []
         for (const testcase of testcases) {
-            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam || testcase.chainID == paraTool.chainIDMoonbase ||
+            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam || testcase.chainID == paraTool.chainIDMoonbaseAlpha || testcase.chainID == paraTool.chainIDMoonbaseBeta ||
                 testcase.chainID == paraTool.chainIDAstar || testcase.chainID == paraTool.chainIDShiden || testcase.chainID == paraTool.chainIDShibuya
             ) {
                 autoTestcases.push(testcase)
@@ -745,7 +745,7 @@ module.exports = class XCMTransfer extends AssetManager {
             console.log("sectionMethod DISPATCH", sectionMethod);
             if ((chainID == 2 || chainID == 21000) && chainIDDest == 22000) version = "v0";
 
-            if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase) {
+            if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta) {
                 // mark isEVMTx as true
                 if (sectionMethod == 'ethereum:transact') {
                     sectionMethod = 'evm_xTokens_transfer'

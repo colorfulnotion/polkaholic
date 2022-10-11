@@ -1736,6 +1736,8 @@ module.exports = class Query extends AssetManager {
                 return `https://moonscan.io/address/${router}#readContract`
             case 22023:
                 return `https://moonriver.moonscan.io/address/${router}#readContract`
+            case 61000:
+                return `https://moonbase.moonscan.io/address/${router}#readContract`
             case 2006:
                 return `https://blockscout.com/astar/${router}`
             case 22007:
@@ -5274,8 +5276,7 @@ module.exports = class Query extends AssetManager {
                     }
                 }
             }
-            // TODO : use new abstraction in paraTool
-            r.relayChain = (r.chainIDDest != 2 && (r.chainIDDest < 10000)) ? 'polkadot' : 'kusama';
+            r.relayChain = paraTool.getParaIDfromChainID(r.chainIDDest)
             if (r.matched == 0 && (this.getCurrentTS() - r.blockTS < 60)) {
                 // if this record hasn't been matched, mark as pending / in transit if its very new (60s)
                 r.pending = 1;

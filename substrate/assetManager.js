@@ -96,7 +96,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
             this.chainParser = new ParallelParser();
             await this.chainParser.addCustomAsset(this); // ????
-        } else if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbase) {
+        } else if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta) {
             this.chainParser = new MoonbeamParser();
         } else if (chainID == paraTool.chainIDInterlay || chainID == paraTool.chainIDKintsugi) {
             this.chainParser = new InterlayParser();
@@ -708,13 +708,14 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
         let isNativeChain = (assetInfo.isNativeChain != undefined) ? assetInfo.isNativeChain : 0 // DISCUSS
         let currencyID = (assetInfo.currencyID != undefined) ? `${assetInfo.currencyID}` : 'NULL'
         let decimals = (assetInfo.decimals != undefined) ? `${assetInfo.decimals}` : 'NULL'
+        let isLocalAsset = (assetInfo.isLocalAsset != undefined)? assetInfo.isLocalAsset : 'NULL'
         let sqlDebug = true
         await this.upsertSQL({
             "table": "asset",
             "keys": ["asset", "chainID"],
-            "vals": ["assetName", "symbol", "decimals", "assetType", "isNativeChain", "currencyID"],
-            "data": [`( '${asset}', '${chainID}', '${assetInfo.name}', '${assetInfo.symbol}', ${decimals}, '${assetInfo.assetType}', '${isNativeChain}', ${currencyID} )`],
-            "replaceIfNull": ["assetName", "symbol", "decimals", "assetType", "isNativeChain", "currencyID"]
+            "vals": ["assetName", "symbol", "decimals", "assetType", "isNativeChain", "currencyID", "isLocalAsset"],
+            "data": [`( '${asset}', '${chainID}', '${assetInfo.name}', '${assetInfo.symbol}', ${decimals}, '${assetInfo.assetType}', '${isNativeChain}', ${currencyID}, ${isLocalAsset} )`],
+            "replaceIfNull": ["assetName", "symbol", "decimals", "assetType", "isNativeChain", "currencyID", "isLocalAsset"],
         }, sqlDebug);
         assetInfo.assetName = assetInfo.name //TODO: cached assetInfo from mysql has assetName but not "name"
         this.assetInfo[assetChain] = assetInfo;

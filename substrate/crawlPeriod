@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+ // Usage: while true; do ./indexChain 10; done
+var Crawler = require("./crawler");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
+
+/*
+Moonbase-alpha 2841050 - 2841380
+MoonBase-relay 6823857 - 6824665
+*/
+
+async function main() {
+    let chainID = paraTool.chainIDMoonbase;
+    let startBN = 2841368
+    let endBN = startBN+3600/12
+    let isDefault = true
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+        if (index == 3 && val.length > 0) {
+            startBN = val;
+            isDefault = false
+        }
+        if (index == 4 && val.length > 0) {
+            endBN = val;
+            isDefault = false
+        }
+    });
+    if (isDefault){
+        if (chainID == paraTool.chainIDMoonbaseAlpha){
+            startBN = 2841050
+            endBN = 2841380
+        }else if (chainID == paraTool.chainIDMoonbaseRelay){
+            startBN = 6823857
+            endBN = 6824665
+        }
+    }
+    console.log(`crawlPeriod chain=${chainID} [${startBN}-${endBN}]`)
+    let crawler = new Crawler();
+    crawler.setDebugLevel(paraTool.debugTracing)
+    crawler.exitOnDisconnect = true;
+    let chain = await crawler.getChain(chainID);
+    await crawler.setupAPI(chain);
+    await crawler.assetManagerInit();
+    await crawler.setupChainAndAPI(chainID);
+    let tList = build_block_trace_period(chain, startBN, endBN)
+    console.log(`tList`, tList)
+    for (let i = 0; i < tList.length; i++) {
+         let t =  tList[i]
+         console.log(`crawling ${i+1}/${tList.length}`, t)
+         await crawler.crawl_block_trace(chain, t)
+    }
+}
+
+function build_block_trace_period(chain, startBN, endBN) {
+    let tList = []
+    for (let i = startBN; i < endBN; i++) {
+        let t = {
+            chainID: chain.chainID,
+            blockNumber: i,
+            crawlTrace: 1,
+        }
+        if (chain.isEVM){
+            t.crawlBlockEVM = 1
+            t.crawlReceiptsEVM = 1
+            t.crawlReceiptsEVM = 1
+        }
+        tList.push(t)
+    };
+    return tList
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

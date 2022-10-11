@@ -171,8 +171,15 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
     <tr>
       <td>Compare to</td>
       <td>
-        <% if ( f.chainID && (f.chainID == 2004 || f.chainID == 22023)) {
-           let externalURL = (f.chainID == 2004)? `https://moonscan.io` : `https://moonriver.moonscan.io`
+        <% if ( f.chainID && (f.chainID == 2004 || f.chainID == 22023 || f.chainID == 61000)) {
+            let externalURL;
+            if (chainID == 2004){
+                externalURL = `https://moonscan.io`
+            }else if (chainID == 22023){
+                externalURL = `https://moonriver.moonscan.io`
+            }else if (chainID == 61000){
+                externalURL = `https://moonbase.moonscan.io`
+            }
            let imgURL = (f.chainID == 2004) ? "https://cdn.polkaholic.io/moonscan.svg" : "https://cdn.polkaholic.io/moonriverscan.svg"
            let txURL = `${externalURL}/tx/${f.transactionHash}`;
            %>
