@@ -57,6 +57,13 @@ let f = contract;
     </tr>
 
     <tr>
+       <td>WASM Contract Metadata</td>
+       <td>
+       <%- include("decode", {id: "metadata", obj: JSON.parse(contract.metadata), verify: null }); %>
+       </td>
+    </tr>
+
+    <tr>
       <td>WASM</td>
       <td>
           <textarea style='width: 800px; height: 400px'><%- contract.wasm %></textarea>

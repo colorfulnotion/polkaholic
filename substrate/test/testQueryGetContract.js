@@ -1,20 +1,20 @@
 #!/usr/bin/env node
- // Usage:  getAccount chainID
+ // Usage:  node testQueryGetAddress.js [address]
 const Query = require("../query");
 
 async function main() {
-    let debugLevel = 0
-    var query = new Query(debugLevel);
-    await query.init();
-
-    let txHash = "0x02e86275ad0f6129077b557042aca2fea5fad97c02fa75230ad17e08fd2b2eec";
+    var query = new Query();
+    let address = '0xf3a5454496e26ac57da879bf3285fa85debf0388';
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
-            txHash = val;
+            address = val;
         }
     });
-    var a = await query.getTransaction(txHash);
-    console.log(JSON.stringify(a));
+
+    await query.assetManagerInit();
+    let code = await query.getEVMContract(address)
+    console.log(address, "code", code);
+
 }
 
 main()

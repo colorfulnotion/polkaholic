@@ -708,7 +708,7 @@ from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( crawling
         let isNativeChain = (assetInfo.isNativeChain != undefined) ? assetInfo.isNativeChain : 0 // DISCUSS
         let currencyID = (assetInfo.currencyID != undefined) ? `${assetInfo.currencyID}` : 'NULL'
         let decimals = (assetInfo.decimals != undefined) ? `${assetInfo.decimals}` : 'NULL'
-        let isLocalAsset = (assetInfo.isLocalAsset != undefined)? assetInfo.isLocalAsset : 'NULL'
+        let isLocalAsset = (assetInfo.isLocalAsset != undefined) ? assetInfo.isLocalAsset : 'NULL'
         let sqlDebug = true
         await this.upsertSQL({
             "table": "asset",

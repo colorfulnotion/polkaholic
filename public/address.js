@@ -1,4 +1,4 @@
-function showaddresstab(hash) {
+function showaddresstab(hash, address, chainID) {
     switch (hash) {
         case "#evmtxs":
             showevmtxs(address);
@@ -15,6 +15,10 @@ function showaddresstab(hash) {
         case "#erc20":
             showerc20(address)
             setupapidocs("address", "erc20", address);
+            break;
+        case "#contract":
+            showcontract(address, chain)
+            setupapidocs("address", "contract", address);
             break;
         case "#internal":
             showinternal(address);
@@ -33,7 +37,7 @@ function setuptabs(tabs, address) {
             const hash = $(this).attr("href");
             let newUrl = `/address/` + address + `#${t.target}`
             setTimeout(() => {
-                showaddresstab(hash);
+                showaddresstab(hash, address, chainID);
             }, 250);
             history.replaceState(null, null, newUrl);
         })
