@@ -65,7 +65,7 @@ async function showxcmmessages(filter = {}) {
                             str = "<BR><i>Child Msg:</i> " + presentXCMMessageHash(row.childMsgHash, row.childBlocknumber);
                         }
                         str += "<BR><small>" + presentXCMTimeline(row.msgHash, "xcm", row.blockNumber) + "</small>";
-                        return presentXCMMessageHash(row.msgHash, row.sentAt) + str;
+                        return presentXCMMessageHash(row.msgHash, row.blockNumber) + str;
                         //return presentXCMMessageHash(row.msgHash, row.sentAt) + str;
                     } else {
                         return data;

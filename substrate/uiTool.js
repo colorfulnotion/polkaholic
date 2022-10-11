@@ -309,8 +309,15 @@ function camel2title(camelCase) {
 }
 
 function capitalizeFirstLetter(string) {
+    if (string == undefined || string == false) return ''
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
+
+function presentTempChainIdentifer(chainID) {
+    if (chainID == undefined) return ""
+    return paraTool.getTempID(chainID)
+}
+
 
 function show_account_info(c, fld) {
     try {
@@ -587,6 +594,9 @@ module.exports = {
     },
     currencyFormat: function(c, priceUSD = false, priceUSDCurrent = false) {
         return currency_format(c, priceUSD, priceUSDCurrent);
+    },
+    presentTempChainIdentifer: function(chainID) {
+        return presentTempChainIdentifer(chainID)
     },
     getShortHash: function(hash, shortHash = true, allowCopy = true) {
         let out = shortHash ? get_short_hash(hash) : hash;

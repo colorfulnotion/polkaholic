@@ -578,6 +578,17 @@ function unique(a) {
     });
 }
 
+function get_temp_id(chainID) {
+    let relayChain = getRelayChainByChainID(chainID)
+    let paraID = getParaIDfromChainID(chainID)
+    let tempID = `${relayChain}`
+    if (paraID != 0){
+        relayChain = relayChain.replace('-relay', '')
+        tempID = `${relayChain}-parachain-${paraID}`
+    }
+    return tempID
+}
+
 function getParaIDExtra(relaychain = 'polkadot') {
     switch (relaychain) {
         case 'polkadot':
@@ -1435,4 +1446,8 @@ module.exports = {
     isPublicEndpoint: function(endpoint) {
         return is_public_endpoint(endpoint)
     },
+    getTempID: function(chainID) {
+        return get_temp_id(chainID)
+    },
+
 };

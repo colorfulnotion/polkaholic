@@ -6118,11 +6118,11 @@ module.exports = class Query extends AssetManager {
         x.chainDestName = this.getChainName(x.chainIDDest);
         if (id == false){
             //temporary id
-            id = `${paraTool.getRelayChainByChainID(x.chainIDDest)}-parachain-${x.paraIDDest}`
+            id = paraTool.getTempID(x.chainID)
         }
         if (idDest == false){
             //temporary idDest
-            idDest = `${paraTool.getRelayChainByChainID(x.chainID)}-parachain-${x.paraID}`
+            idDest = paraTool.getTempID(x.chainIDDest)
         }
         x.id = id
         x.idDest = idDest
@@ -6488,6 +6488,8 @@ module.exports = class Query extends AssetManager {
 
         let [_, id] = this.convertChainID(rawXcmRec.chainID);
         let [__, idDest] = this.convertChainID(rawXcmRec.chainIDDest);
+        if (id == false) id = paraTool.getTempID(rawXcmRec.chainID)
+        if (idDest == false) idDest = paraTool.getTempID(rawXcmRec.chainIDDest)
         let assetsReceived = rawXcmRec.assetsReceived;
         let dXcm = {
             msgHash: rawXcmRec.msgHash,
@@ -6500,8 +6502,8 @@ module.exports = class Query extends AssetManager {
             received: rawXcmRec.received,
             relayChain: rawXcmRec.relayChain,
             paraID: rawXcmRec.paraID,
-            id,
-            idDest,
+            id: id,
+            idDest: idDest,
             blockTS: rawXcmRec.blockTS, //TODO: remove ambiguous blockTS
             receivedTS: rawXcmRec.receivedTS,
             sentTS: rawXcmRec.sentTS,
