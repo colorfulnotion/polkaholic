@@ -1336,11 +1336,14 @@ app.get('/address/:address/:chainID?', async (req, res) => {
         }
         let chainList = [];
         let [account, contract] = await query.getAddressContract(address, chainID);
+
+        let chain = contract && contract.chainID ? await query.getChain(contract.chainID, true) : null;
         res.render('address', {
             account: account,
             contract: contract,
             chainInfo: query.getChainInfo(),
             address: address,
+            chain: chain,
             claimed: false,
             apiUrl: req.path,
             requestedChainID: requestedChainID,

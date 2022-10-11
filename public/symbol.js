@@ -150,8 +150,8 @@ function showsymboltab(hash) {
             showchains(symbol);
             break;
         case "#pools":
-        //setupapidocs("pools", "");
-        showpools(symbol, "symbol");
+            //setupapidocs("pools", "");
+            showpools(symbol, "symbol");
             break;
     }
 }
