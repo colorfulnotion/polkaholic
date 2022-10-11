@@ -3,10 +3,10 @@ async function getAPI(chainID) {
     // hardcoded for now...
     let WSEndpoint = null
     if (chainID == 22007 || chainID == "shiden" ) {
-	WSEndpoint = "wss://shiden.public.blastapi.io";
+	WSEndpoint = "wss://shiden.api.onfinality.io/public-ws";
     }
     if (chainID == 2006 || chainID == "astar" ) {
-	WSEndpoint = "wss://astar.public.blastapi.io";
+	WSEndpoint = "wss://astar.api.onfinality.io/public-ws";
     }
     if ( WSEndpoint == null ) return(null);
     const {
@@ -31,7 +31,7 @@ async function decodeWASMContractsCall(chainID, args, metadata, divID) {
 	compactAddLength
     } = polkadotUtil;
     const contract = new ContractPromise(api, metadata, address);
-    
+
     let decodedMessage = contract.abi.decodeMessage(compactAddLength(hexToU8a(args.data)));
     let decodedArgs = decodedMessage.args;
     let argsDefs = decodedMessage.message.args;
@@ -50,7 +50,3 @@ async function decodeWASMContractsCall(chainID, args, metadata, divID) {
     out += "</table>";
     document.getElementById(divID).innerHTML = out;
 }
-
-
-
-

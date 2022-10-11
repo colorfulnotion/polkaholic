@@ -1043,18 +1043,15 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                 }
-                if (isExternal){
+                if (isExternal) {
                     if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint))  chainInfo.WSEndpoint = null
                     if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint2)) chainInfo.WSEndpoint2 = null
                     if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint3)) chainInfo.WSEndpoint3 = null
-                }
-                if (isExternal) {
                     // hardcoded for publicEndpoint = true for now
                     chainInfo.chainID = parseInt(chainInfo.chainID)
-                    if ( chainInfo.chainID == 2006 || chainInfo.chainID == 22007 ) {
-                    chainInfo.RPCBackfill = `https://${chainInfo.id}.public.blastapi.io`
-                    } else if ( chainInfo.chainID == 2004 || chainInfo.chainID == 22023 ) {
-                    chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
+                    if ( ( chainInfo.chainID == 2006 || chainInfo.chainID == 22007 ) || ( chainInfo.chainID == 2004 || chainInfo.chainID == 22023 ) ) {
+                      chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
+                      chainInfo.WSEndpoint = `wss://${chainInfo.id}.api.onfinality.io/public-ws`
                     }
                 }
                 return chainInfo
