@@ -6068,15 +6068,23 @@ module.exports = class Query extends AssetManager {
     }
 
 
-    async getXCMMessage(msgHash, blockNumber = null, decorate = true, decorateExtra = true) {
+    async getXCMMessage(msgHash, number = null, decorate = true, decorateExtra = true) {
+        //search bn first, if not found, fall back to sentAt
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
-        let w = (blockNumber) ? ` and sentAt = ${blockNumber}` : "";
-        let sql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, executedEventID, destStatus, errorDesc from xcmmessages
+        let w = (number) ? ` and sentAt = ${number}` : "";
+        let w1 = (number) ? ` and blockNumber = ${number}` : "";
+        let bnSql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, executedEventID, destStatus, errorDesc from xcmmessages
+        where msgHash = '${msgHash}' ${w1} order by blockTS desc limit 1`
+        let sentAtSql = `select msgHash, chainID, chainIDDest, sentAt, msgType, msgHex, msgStr as msg, blockTS, blockNumber, relayChain, version, path, extrinsicHash, extrinsicID, parentMsgHash, parentSentAt, parentBlocknumber, childMsgHash, childSentAt, childBlocknumber, assetChains, blockTS, incoming, sourceTS, destTS, sourceSentAt, destSentAt, sourceBlocknumber, destBlocknumber, executedEventID, destStatus, errorDesc from xcmmessages
         where msgHash = '${msgHash}' ${w} order by blockTS desc limit 1`
-        console.log(`getXCMMessage`, paraTool.removeNewLine(sql))
-        let xcmrecs = await this.poolREADONLY.query(sql);
+        let xcmrecs = await this.poolREADONLY.query(bnSql);
         if (xcmrecs.length == 0) {
-            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${blockNumber}`)
+            console.log(`getXCMMessage [msgHash/bn = ${msgHash}/${number}] not found`, paraTool.removeNewLine(bnSql))
+            xcmrecs = await this.poolREADONLY.query(sentAtSql);
+        }
+        if (xcmrecs.length == 0) {
+            console.log(`getXCMMessage [msgHash/sentAt = ${msgHash}/${number}] not found`, paraTool.removeNewLine(bnSql))
+            throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${number}`)
         }
         let x = xcmrecs[0];
         x.paraID = paraTool.getParaIDfromChainID(x.chainID)
@@ -6107,10 +6115,17 @@ module.exports = class Query extends AssetManager {
         let [_, id] = this.convertChainID(x.chainID)
         x.chainName = this.getChainName(x.chainID);
         let [__, idDest] = this.convertChainID(x.chainIDDest)
-
+        x.chainDestName = this.getChainName(x.chainIDDest);
+        if (id == false){
+            //temporary id
+            id = `${paraTool.getRelayChainByChainID(x.chainIDDest)}-parachain-${x.paraIDDest}`
+        }
+        if (idDest == false){
+            //temporary idDest
+            idDest = `${paraTool.getRelayChainByChainID(x.chainID)}-parachain-${x.paraID}`
+        }
         x.id = id
         x.idDest = idDest
-        x.chainDestName = this.getChainName(x.chainIDDest);
         return x;
     }
 
