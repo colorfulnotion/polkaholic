@@ -142,7 +142,7 @@ let f = xcm;
           let ac = assetChains[i]
           let acID = `msgAc${i}`
           %>
-          <%- include("decode", {"obj": ac, "id": `asset${i}`, "verify": null}) %>
+          <%- include("decode", {"obj": ac, "id": `asset${i}`, "verify": null, "size": []}) %>
         <% } %>
       </td>
     </tr>
@@ -150,9 +150,27 @@ let f = xcm;
     <tr>
       <td>Instructions</td>
       <td>
-        <%- include("decode", {"obj": f.msg, "id": "instructions", "verify": null}) %>
+         <%
+         let msg = f.msg
+         if ( f.decodeMsg ) msg = f.decodeMsg
+        %>
+        <%- include("decode", {"obj": msg, "id": "instructions", "verify": null, "size": [1500,1000]}) %>
       </td>
     </tr>
+<%
+if ( msg != undefined && msg.transactList != undefined &&   msg.transactList.length > 0) { %>
+    <tr>
+      <td>Transact Instruction(s)</td>
+      <td>
+          <% for (var i = 0; i < msg.transactList.length; i++) {
+            let transact = msg.transactList[i]
+            let transactID = `transact${i}`
+            %>
+            <%- include("decode", {"obj": transact, "id": `${transactID}`, "verify": null, "size": [1500, 800] }) %>
+          <% } %>
+      </td>
+    </tr>
+<% } %>
 <% if ( false ) { %>
     <tr>
       <td>Verify</td>

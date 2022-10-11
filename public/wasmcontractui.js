@@ -31,7 +31,7 @@ async function decodeWASMContractsCall(chainID, args, metadata, divID) {
 	compactAddLength
     } = polkadotUtil;
     const contract = new ContractPromise(api, metadata, address);
-    
+
     let decodedMessage = contract.abi.decodeMessage(compactAddLength(hexToU8a(args.data)));
     let decodedArgs = decodedMessage.args;
     let argsDefs = decodedMessage.message.args;
@@ -50,7 +50,3 @@ async function decodeWASMContractsCall(chainID, args, metadata, divID) {
     out += "</table>";
     document.getElementById(divID).innerHTML = out;
 }
-
-
-
-

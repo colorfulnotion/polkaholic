@@ -59,7 +59,7 @@ let f = contract;
     <tr>
        <td>WASM Contract Metadata</td>
        <td>
-       <%- include("decode", {id: "metadata", obj: JSON.parse(contract.metadata), verify: null }); %>
+       <%- include("decode", {id: "metadata", obj: JSON.parse(contract.metadata), verify: null, size: [] }); %>
        </td>
     </tr>
 

@@ -150,7 +150,7 @@ module.exports = class ChainParser {
 
     async getSystemProperties(indexer, chain) {
         let chainID = chain.chainID;
-        if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta) {
+        if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta || chainID == paraID.chainIDMoonbaseRelay){
             //suppress DEV
             return
         }
@@ -158,7 +158,7 @@ module.exports = class ChainParser {
         let props = JSON.parse(propsNative.toString());
         // {"ss58Format":10,"tokenDecimals":[12,12,10,10],"tokenSymbol":["ACA","AUSD","DOT","LDOT"]}
         // NOT MAINTAINED let ss58Format = props.ss58Format;
-        //console.log(propsNative)
+        console.log(propsNative)
         if (props.tokenSymbol) {
             for (let i = 0; i < props.tokenSymbol.length; i++) {
                 let symbol = props.tokenSymbol[i];
@@ -4956,5 +4956,183 @@ module.exports = class ChainParser {
             // don't worry ...
         }
     }
+
+    decode_s_internal_raw(call_s, apiAt) {
+        //fetch method, section when human is not set
+        let callIndex = call_s.callIndex
+        let [method, section] = this.getMethodSection(callIndex, apiAt)
+        let f = {
+            callIndex: callIndex,
+            section: section,
+            method: method,
+            args: call_s.args
+        }
+        return f
+    }
+
+    getMethodSection(callIndex, apiAt) {
+        try {
+            var {
+                method,
+                section
+            } = apiAt.registry.findMetaCall(paraTool.hexAsU8(callIndex))
+            return [method, section]
+        } catch (e) {
+            console.log(`getMethodSection unable to decode ${callIndex}`)
+        }
+        return [null, null]
+    }
+
+    recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = {}) {
+        if (call_s && call_s.args.calls != undefined) {
+            for (let i = 0; i < call_s.args.calls.length; i++) {
+                let callIndex = call_s.args.calls[i].callIndex
+                let [method, section] = this.getMethodSection(callIndex, apiAt)
+                let ff = {
+                    callIndex: callIndex,
+                    section: section,
+                    method: method,
+                    args: call_s.args.calls[i].args
+                }
+                let pallet_method = `${ff.section}:${ff.method}`
+                if (pallet_method == 'system:remarkWithEvent' || pallet_method == 'system:remark') {
+                    if (ff.args.remark != undefined) {
+                        remarks[ff.args.remark] = 1
+                    }
+                }
+                let o = `call ${lvl}-${i}`
+                // console.log(`\t${o} - ${pallet_method}`)
+                if (ff.args.call != undefined) {
+                    //recursively decode opaque call
+                    let s = " ".repeat()
+                    //console.log(`\t${" ".repeat(o.length+2)} - additional 'call' argument found`)
+                    this.decode_opaque_call(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks)
+                }
+                this.recursive_batch_all(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks)
+                call_s.args.calls[i] = ff
+            }
+            //console.log("recursive_batch_all done")
+        } else {
+            //sudo:sudoAs case
+            if (call_s && call_s.args.call != undefined) {
+                //console.log(`${extrinsicHash}`, 'call only', innerexs)
+                this.decode_opaque_call(call_s, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks)
+            } else {
+                //console.log("recursive_batch_all no more loop")
+            }
+        }
+    }
+
+    decodeDestination_call(apiAt, opaqueCall='0x010008240533ee7b029e9570efca80a60d167584b74771741a064d07134be65ace2c10ca4192b91f5f31130000e8890423c78a01010800241333ee7b029e9570efca80a60d167584b747e41a900b94e647d7106899ca303b2f07cdd53f95130000e8890423c78a', lvl = '', remarks = []){
+        let res = {}
+        let extrinsicHash = ''
+        let extrinsicID = ''
+        let extrinsicCall = false;
+        try {
+            // cater for an extrinsic input...
+            extrinsicCall = apiAt.registry.createType('Call', opaqueCall);
+            console.log("d decoded opaqueCall", extrinsicCall.toString())
+            let innerexs = JSON.parse(extrinsicCall.toString());
+            let innerOutput = {}
+            try {
+                // only utility batch will have struct like this
+                if (innerexs && innerexs.args.calls != undefined) {
+                    this.recursive_batch_all(innerexs, apiAt, extrinsicHash, extrinsicID, lvl, remarks)
+                }
+                if (innerexs && innerexs.args.call != undefined) {
+                    //console.log(`${extrinsicHash}`, 'call only', innerexs)
+                    this.decode_opaque_call(innerexs, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks)
+                }
+                innerOutput = this.decode_s_internal_raw(innerexs, apiAt)
+                //console.log(`${extrinsicHash}`, 'innerexs', innerexs)
+                let innerOutputPV = `${innerOutput.section}:${innerOutput.method}`
+                //console.log(`${extrinsicHash}`, 'innerOutput', innerOutput)
+                if (innerOutputPV == 'system:remarkWithEvent' || innerOutputPV == 'system:remark') {
+                    if (innerOutput.args.remark != undefined) {
+                        remarks[innerOutput.args.remark] = 1
+                    }
+                }
+            } catch (err1) {
+                console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, err1)
+            }
+
+            //console.log("innerexs", JSON.stringify(innerexs))
+
+            res = innerOutput //this line update the f
+            //console.log("innerOutput", JSON.stringify(innerOutput))
+
+        } catch (e) {
+            console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, e)
+        }
+        return res
+    }
+
+    //this is right the level above args
+    decode_opaque_call(f, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = []) {
+        //console.log(`${extrinsicHash}`, 'decode_opaque_call', f)
+        if (f.args.call != undefined) {
+            let opaqueCall = f.args.call
+            let extrinsicCall = false;
+            let isHexEncoded = (typeof opaqueCall === 'object') ? false : true
+            //console.log(`d opaqueCall(hexEncoded=${isHexEncoded})`, opaqueCall)
+            if (isHexEncoded) {
+                try {
+                    // cater for an extrinsic input...
+                    extrinsicCall = apiAt.registry.createType('Call', opaqueCall);
+                    //console.log("d decoded opaqueCall", extrinsicCall.toString())
+
+                    let innerexs = JSON.parse(extrinsicCall.toString());
+                    let innerOutput = {}
+                    try {
+                        // only utility batch will have struct like this
+                        if (innerexs && innerexs.args.calls != undefined) {
+                            this.recursive_batch_all(innerexs, apiAt, extrinsicHash, extrinsicID, lvl, remarks)
+                        }
+                        if (innerexs && innerexs.args.call != undefined) {
+                            //console.log(`${extrinsicHash}`, 'call only', innerexs)
+                            this.decode_opaque_call(innerexs, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks)
+                        }
+                        innerOutput = this.decode_s_internal_raw(innerexs, apiAt)
+                        //console.log(`${extrinsicHash}`, 'innerexs', innerexs)
+                        let innerOutputPV = `${innerOutput.section}:${innerOutput.method}`
+                        //console.log(`${extrinsicHash}`, 'innerOutput', innerOutput)
+                        if (innerOutputPV == 'system:remarkWithEvent' || innerOutputPV == 'system:remark') {
+                            if (innerOutput.args.remark != undefined) {
+                                remarks[innerOutput.args.remark] = 1
+                            }
+                        }
+                    } catch (err1) {
+                        console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, err1)
+                    }
+
+                    //console.log("innerexs", JSON.stringify(innerexs))
+
+                    f.args.call = innerOutput //this line update the f
+                    //console.log("innerOutput", JSON.stringify(innerOutput))
+
+                } catch (e) {
+                    console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, e, f)
+                }
+            } else {
+                //This is the proxy:proxy case - where api has automatically decoded the "call"
+                if (f.args.call.callIndex != undefined) {
+                    let call_ss = f.args.call
+                    let call_s = this.decode_s_internal_raw(call_ss, apiAt)
+                    let call_sPV = `${call_s.section}:${call_s.method}`
+                    //console.log(`call_sPV`, call_sPV)
+                    if (call_sPV == 'system:remarkWithEvent' || call_sPV == 'system:remark') {
+                        if (call_s.args.remark != undefined) {
+                            remarks[call_s.args.remark] = 1
+                        }
+                    }
+                    this.recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl, remarks)
+                    f.args.call = call_s
+                }
+                //console.log(`* [${extrinsicID}] ${extrinsicHash} already decoded opaqueCall`, extrinsicCall.toString())
+            }
+        }
+    }
+
+
 
 }
