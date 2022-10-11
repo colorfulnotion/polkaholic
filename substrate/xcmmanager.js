@@ -121,6 +121,59 @@ module.exports = class XCMManager extends Query {
         }
     }
 
+    async patchXcmAsset(){
+        let alphaAssets = await this.poolREADONLY.query(`select assetType, asset.assetName, asset.numHolders, asset.totalSupply, asset.asset, asset.symbol, asset.xcmInteriorKey, xcmasset.symbol as xcmasset_symbol, xcmasset.relayChain as xcmasset_relayChain, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.id, chain.chainName, asset.isUSD, asset.priceUSD, asset.priceUSDPercentChange,  asset.nativeAssetChain, currencyID, xcContractAddress, from_unixtime(createDT) as createTS from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where asset.chainID = chain.chainID and assetType in ('Token') and asset.chainID = ${paraTool.chainIDMoonbaseAlpha}`);
+        let alphaMap = {}
+        for (const a of alphaAssets){
+            console.log(a)
+            let alphaSymbol = a.symbol.replace('xc','')
+            let relayChain = paraTool.getRelayChainByChainID(a.chainID)
+            let alphaSymbolRelayChain = paraTool.makeAssetChain(alphaSymbol, relayChain)
+            alphaMap[alphaSymbolRelayChain] = a
+        }
+        console.log(`alphaMap`, alphaMap)
+        let relayChain = paraTool.getRelayChainByChainID(paraTool.chainIDMoonbaseAlpha)
+        let xcmAssets = await this.poolREADONLY.query(`select * from xcmasset where relayChain = '${relayChain}'`);
+        let xcmAssetsOut = []
+        let assetsOut = []
+        for (const x of xcmAssets){
+            console.log(x)
+            let symbol = x.symbol
+            let relayChain = x.relayChain
+            let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain)
+            let alphaAsset = alphaMap[symbolRelayChain]
+            if (alphaAsset != undefined){
+                console.log(`${symbolRelayChain} found, decimals`, alphaAsset.decimals)
+                let t = "(" + [`'${x.xcmInteriorKey}'`, `'${symbol}'`, `'${relayChain}'`, `'${x.parent}'`, `'${x.nativeAssetChain}'`, `'${alphaAsset.decimals}'`,`Now()`].join(",") + ")";
+                xcmAssetsOut.push(t)
+                let xcContractAddress = paraTool.xcAssetIDToContractAddr(alphaAsset.currencyID).toLowerCase()
+                let t1 = "(" + [`'${alphaAsset.asset}'`, `'${alphaAsset.chainID}'`, `'${x.xcmInteriorKey}'`,`'${xcContractAddress}'`].join(",") + ")";
+                assetsOut.push(t1)
+            }else{
+                console.log(`${symbolRelayChain} not found`)
+            }
+        }
+        //symbol, relayChain, xcmInteriorKey, xcmChainID, parent, nativeAssetChain, decimals
+        let sqlDebug = true
+        let xcmAssetsVals = ["parent", "nativeAssetChain", "decimals", "addDT"]
+        await this.upsertSQL({
+            "table": `xcmasset`,
+            "keys": ["xcmInteriorKey","symbol", "relayChain"],
+            "vals": xcmAssetsVals,
+            "data": xcmAssetsOut,
+            "replace": xcmAssetsVals
+        }, sqlDebug);
+
+        let assetsVals = ["xcmInteriorKey", "xcContractAddress"]
+        await this.upsertSQL({
+            "table": `asset`,
+            "keys": ["asset", "chainID"],
+            "vals": ["xcmInteriorKey", "xcContractAddress"],
+            "data": assetsOut,
+            "replace": assetsVals
+        }, sqlDebug);
+    }
+
     async updateHRMPChannelEvents() {
         let msgs = await this.poolREADONLY.query("select msgHash, sentAt, sourceTS, from_unixtime(sourceTS) as messageDT, chainID, chainIDDest, msgStr from xcmmessages where ((incoming = 0 and matched = 0) or ( incoming = 1 and matched = 1 )) and msgStr like '%hrmp%' limit 200000;");
         let openRequests = [];
