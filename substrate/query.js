@@ -1348,7 +1348,7 @@ module.exports = class Query extends AssetManager {
                 }
                 if (c.transactionHash) {
                     // this is an EVM tx
-                    let assetChain = paraTool.makeAssetChain(c.to.toLowerCase(), c.chainID);
+                    let assetChain = c.to ? paraTool.makeAssetChain(c.to.toLowerCase(), c.chainID) : null;
                     if (this.assetInfo[assetChain]) {
                         c.assetInfo = this.assetInfo[assetChain];
                     }

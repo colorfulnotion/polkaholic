@@ -1,0 +1,222 @@
+[
+	{
+		"inputs": [
+			{
+				"internalType": "address[]",
+				"name": "asset_id",
+				"type": "address[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "asset_amount",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "address",
+				"name": "recipient_account_id",
+				"type": "address"
+			},
+			{
+				"internalType": "bool",
+				"name": "is_relay",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "parachain_id",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fee_index",
+				"type": "uint256"
+			}
+		],
+		"name": "assets_reserve_transfer",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address[]",
+				"name": "asset_id",
+				"type": "address[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "asset_amount",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "recipient_account_id",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bool",
+				"name": "is_relay",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "parachain_id",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fee_index",
+				"type": "uint256"
+			}
+		],
+		"name": "assets_reserve_transfer",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address[]",
+				"name": "asset_id",
+				"type": "address[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "asset_amount",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "recipient_account_id",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bool",
+				"name": "is_relay",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "parachain_id",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fee_index",
+				"type": "uint256"
+			}
+		],
+		"name": "assets_withdraw",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address[]",
+				"name": "asset_id",
+				"type": "address[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "asset_amount",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "address",
+				"name": "recipient_account_id",
+				"type": "address"
+			},
+			{
+				"internalType": "bool",
+				"name": "is_relay",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "parachain_id",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fee_index",
+				"type": "uint256"
+			}
+		],
+		"name": "assets_withdraw",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "parachain_id",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "is_relay",
+				"type": "bool"
+			},
+			{
+				"internalType": "address",
+				"name": "payment_asset_id",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "payment_amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "call",
+				"type": "bytes"
+			},
+			{
+				"internalType": "uint64",
+				"name": "transact_weight",
+				"type": "uint64"
+			}
+		],
+		"name": "remote_transact",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+]

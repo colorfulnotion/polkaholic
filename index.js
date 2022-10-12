@@ -1628,7 +1628,7 @@ async function txUIRedirect(req, res) {
         let tx = await query.getTransaction(txHash, decorate, decorateExtra);
         if (tx) {
             let txview = 'tx';
-            if (tx.to) {
+            if (tx.transactionHash) {
                 txview = 'evmtx';
             }
             let chain = await query.getChain(tx.chainID);
