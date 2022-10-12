@@ -6127,7 +6127,8 @@ module.exports = class Query extends AssetManager {
         if (xcmMsg != undefined) {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
             let dMsg = await this.decorateXCMMsg(x.chainID, x.chainIDDest, xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
-            x.decodeMsg = dMsg
+            //x.decodeMsg = dMsg //let's not return both version.. less is more
+            x.msg = dMsg
             if (dMsg.destAddress != undefined) {
                 x.destAddress = dMsg.destAddress
                 x.destSS58Address = this.getSS58ByChainID(x.destAddress, x.chainIDDest)
@@ -6298,6 +6299,8 @@ module.exports = class Query extends AssetManager {
                 instructionV.decodedCall = ext
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
+                if (dXcmMsg.transactList == undefined) dXcmMsg.transactList = []
+                dXcmMsg.transactList.push(instructionV)
                 break
             case "refundSurplus":
                 dInstructionV[instructionK] = instructionV
@@ -6400,6 +6403,8 @@ module.exports = class Query extends AssetManager {
                 instructionV.decodedCall = ext
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version] = dInstructionV
+                if (dXcmMsg.transactList == undefined) dXcmMsg.transactList = []
+                dXcmMsg.transactList.push(instructionV)
                 break
             case "refundSurplus":
                 dInstructionV[instructionK] = instructionV
@@ -6494,6 +6499,8 @@ module.exports = class Query extends AssetManager {
                 instructionV.decodedCall = ext
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version].push(dInstructionV)
+                if (dXcmMsg.transactList == undefined) dXcmMsg.transactList = []
+                dXcmMsg.transactList.push(instructionV)
                 break
             case "refundSurplus":
                 dInstructionV[instructionK] = instructionV
@@ -6598,6 +6605,7 @@ module.exports = class Query extends AssetManager {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
             dMsg = await this.decorateXCMMsg(rawXcmRec.chainID, rawXcmRec.chainIDDest, xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
         }
+        let transactList = (dMsg.transactList != undefined)? dMsg.transactList : []
         let destAddress = (dMsg.destAddress != undefined) ? dMsg.destAddress : null
         let destSS58Address = this.getSS58ByChainID(destAddress, rawXcmRec.chainIDDest)
 
@@ -6639,7 +6647,8 @@ module.exports = class Query extends AssetManager {
             childBlocknumber,
             childSentAt,
             assetsReceived,
-            assetChains: dAssetChains
+            assetChains: dAssetChains,
+            transactList: transactList,
         }
 
         if (decorate) this.decorateAddress(dXcm, "destAddress", decorateAddr, decorateRelated);
