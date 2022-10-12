@@ -150,7 +150,7 @@ module.exports = class ChainParser {
 
     async getSystemProperties(indexer, chain) {
         let chainID = chain.chainID;
-        if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta || chainID == paraID.chainIDMoonbaseRelay){
+        if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta || chainID == paraTool.chainIDMoonbaseRelay){
             //suppress DEV
             return
         }

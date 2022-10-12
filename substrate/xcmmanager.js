@@ -1,5 +1,23 @@
 // Copyright 2022 Colorful Notion, Inc.
-// This file is part of Polkaholic
+// This file is part of Polkaholic.
+
+// Polkaholic is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// Polkaholic is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
+const { ApiPromise, WsProvider } = require('@polkadot/api');
+const { u8aToHex, hexToU8a } = require('@polkadot/util');
+const { decodeAddress } = require('@polkadot/util-crypto');
+const { MultiLocation } = require('@polkadot/types/interfaces');
+
 const Query = require('./query');
 const AssetManager = require("./assetManager");
 const mysql = require("mysql2");
@@ -27,6 +45,7 @@ module.exports = class XCMManager extends Query {
         this.relayChain = chain.relayChain;
         return (chain);
     }
+
 
     // generates xcmmessagelog, xcmassetlog, and tallies activity in last 24h/7d/30 in channel, xcmasset
     async update_xcmlogs(lookbackDays = 1) {
@@ -2199,4 +2218,79 @@ order by chainID, extrinsicHash`
         }
     }
 
+    async fetch_indexToAccount(chainID = 61000, relayChain = 'moonbase-relay', index = null)
+    {
+	// TODO: when "index" is supplied (if this map gets too big, or to cover on demand situation)
+	let derivedAccounts = (index) ? [] : await this.api.query.xcmTransactor.indexToAccount.entries()
+	
+	// take result of xcmTransactor.indexToAccount (all of them if index is null, or a specific one) and store in Mysql 
+	let out = [];
+	let vals = ["relayChain", "address", "addDT"];
+	for ( const t of derivedAccounts ) {
+	    let k = t[0].toHuman();
+	    let address = t[1].toJSON();
+	    let index = paraTool.toNumWithoutComma(k[0]);
+	    console.log(index, k[0], address);
+	    out.push(`( '${chainID}', '${index}', '${relayChain}', '${address}', Now() )`);
+	    // TODO: store in BigTable addressrealtime new column family "derivedAccounts" ?
+	}
+	await this.upsertSQL({
+            "table": `xcmtransactor_indexToAccount`,
+            "keys": ["chainID", "indexToAccount"],
+            "vals": vals,
+            "data": out,
+            "replace": ["address", "relayChain"]
+        }, true);
+
+    }
+
+    // Sovereign account — an account each chain in the ecosystem has, one for the relay chain and the other for other parachains.
+    // The account is owned by root and can only be used through SUDO (if available) or democracy (technical committee or referenda).
+    // The sovereign account typically signs XCM messages in other chains in the ecosystem
+    // It is calculated as the blake2 hash of a specific word (para or sibl) and parachain ID, truncating the hash to the correct length.
+    compute_sovereign_account(paraID) {
+	// (1) blake2(para+ParachainID) for the sovereign account in the relay chain, and
+	// (2) blake2(sibl+ParachainID) for the sovereign account in other parachains
+    }
+
+    // { "parents": 1, "interior": { "X1": [{ "Parachain": 1000 }]}}
+    make_multilocation(paraID = null, address = null, namedNetwork = 'Any')
+    {
+	const ethAddress = address.length === 42;
+	const named =  (namedNetwork != 'Any') ? { Named: namedNetwork } : namedNetwork;
+	const account = ethAddress ? { AccountKey20: { network: named, key: address } } : { AccountId32: { network: named, id: u8aToHex(decodeAddress(address)) } };
+	// make a multilocation object
+	let interior = { here: null }
+	if ( paraID && account ) {
+	    interior = { X2: [{ Parachain: paraID }, account] }
+	} else if ( paraID ) {
+	    interior = { X1: { Parachain: paraID } }
+	} else if ( account ) {
+	    interior = { X1: account }
+	}
+	return { parents: 1, interior: interior }
+    }
+    
+    // Converts a given MultiLocation into a 20/32 byte accountID by hashing with blake2_256 and taking the first 20/32 bytes
+    //  https://github.com/albertov19/xcmTools/blob/main/calculateMultilocationDerivative.ts
+    //  https://github.com/PureStake/moonbeam/blob/master/primitives/xcm/src/location_conversion.rs#L31-L37
+    // Test case: Alice (origin parachain) 0x44236223aB4291b93EEd10E4B511B37a398DEE55 => is 0x5c27c4bb7047083420eddff9cddac4a0a120b45c on paraID 1000
+
+    calculateMultilocationDerivative(paraID = null, address = null, namedNetwork = 'Any') {
+	let multilocationStruct = this.make_multilocation(paraID, address, namedNetwork)
+	const multilocation = this.api.createType('XcmV1MultiLocation', multilocationStruct)
+	const toHash = new Uint8Array([
+	    ...new Uint8Array([32]),
+	    ...new TextEncoder().encode('multiloc'),
+	    ...multilocation.toU8a(),
+	]);
+
+	const DescendOriginAddress20 = u8aToHex(this.api.registry.hash(toHash).slice(0, 20));
+	const DescendOriginAddress32 = u8aToHex(this.api.registry.hash(toHash).slice(0, 32));
+	console.log("calculateMultilocationDerivative", multilocation.toString(), DescendOriginAddress20, DescendOriginAddress32);
+	// multilocation {"parents":1,"interior":{"x2":[{"parachain":1000},{"accountKey20":{"network":{"any":null},"key":"0x44236223ab4291b93eed10e4b511b37a398dee55"}}]}}
+	// 20 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45c
+	// 32 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45cdfa7831175e442b8f14391aa
+	return [DescendOriginAddress20, DescendOriginAddress32]
+    }
 }

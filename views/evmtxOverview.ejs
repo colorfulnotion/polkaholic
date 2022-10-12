@@ -16,7 +16,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
         <code><%= f.transactionHash; %></code>
       </td>
     </tr>
-    <% if ( tx.substrate !== undefined ) { %>
+    <% if ( tx.substrate  ) { %>
     <tr>
       <td>Substrate Tx / Extrinsic ID</td>
       <td><%- uiTool.presentFullTx(tx.substrate.extrinsicHash); %> <a href='/tx/<%= tx.substrate.extrinsicHash; %>'><%= f.chainName; %> <%= tx.substrate.extrinsicID; %></a></td>
@@ -53,13 +53,15 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 	<%- uiTool.presentAddress(f.from) %>
       </td>
     </tr>
+<% if ( tx.to) { %>
     <tr>
       <td>Interacted With (To)</td>
       <td>
-    <%- uiTool.presentBlockiesOrIdenticon(f.to, 20) %>
+       <%- uiTool.presentBlockiesOrIdenticon(f.to, 20) %>
 	<%- uiTool.presentAddress(f.to) %>
       </td>
     </tr>
+<% } %>
 <% if ( tx.transfers && tx.transfers.length > 0 ) { %>
     <tr>
       <td>Tokens Transferred</td>
