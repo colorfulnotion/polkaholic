@@ -142,7 +142,7 @@ let f = xcm;
           let ac = assetChains[i]
           let acID = `msgAc${i}`
           %>
-          <%- include("decode", {"obj": ac, "id": `asset${i}`, "verify": null}) %>
+          <%- include("decode", {"obj": ac, "id": `asset${i}`, "verify": null, "size": []}) %>
         <% } %>
       </td>
     </tr>
@@ -154,7 +154,7 @@ let f = xcm;
          let msg = f.msg
          if ( f.decodeMsg ) msg = f.decodeMsg
         %>
-        <%- include("decode", {"obj": msg, "id": "instructions", "mWidth": 1200, "mHeight": 1000 , "verify": null}) %>
+        <%- include("decode", {"obj": msg, "id": "instructions", "verify": null, "size": [1500,1000]}) %>
       </td>
     </tr>
 <%
@@ -166,7 +166,7 @@ if ( msg != undefined && msg.transactList != undefined &&   msg.transactList.len
             let transact = msg.transactList[i]
             let transactID = `transact${i}`
             %>
-            <%- include("decode", {"obj": transact, "id": `${transactID}`, "verify": null}) %>
+            <%- include("decode", {"obj": transact, "id": `${transactID}`, "verify": null, "size": [1500, 800] }) %>
           <% } %>
       </td>
     </tr>

@@ -7,14 +7,7 @@
       </button>
     </h2>
     <div id="flush<%= id; %>" class="accordion-collapse collapse" aria-labelledby="heading<%= id; %>">
-      <div class="accordion-body"><%- include("decode", {id: id, obj: params, verify: null}) %></div>
+      <div class="accordion-body"><%- include("decode", {id: id, obj: params, verify: null,  size: [] }) %></div>
     </div>
   </div>
 </div>
-
-
-
-
-
-
-

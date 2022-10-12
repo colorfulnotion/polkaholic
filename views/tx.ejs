@@ -50,7 +50,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
           <td><%- include("xcminfo", {xcm: f.xcmInfo}); %></td>
         </tr>
     <% } %>
-    
+
     <tr>
       <td>Finalized</td>
       <td><span id="status"><%- include("finalized", {finalized: (f.status=="finalized" || f.status == "finalizeddest")}); %></span></td>
@@ -126,7 +126,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
     </tr>
     <tr>
       <td>Params</td>
-      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID } }); %></td>
+      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID },  size: []  }); %></td>
     </tr>
 <% let decodeWASM = false;
     if ( f.section == "contracts" && f.method == "call"  && f.metadata ) {  decodeWASM = true; %>
@@ -140,7 +140,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
     <tr>
        <td>WASM Contract Metadata</td>
        <td>
-       <%- include("decode", {id: "metadata", obj: JSON.parse(f.metadata), verify: null }); %>
+       <%- include("decode", {id: "metadata", obj: JSON.parse(f.metadata), verify: null, size: [] }); %>
        </td>
     </tr>
 <% } %>

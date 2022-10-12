@@ -9,8 +9,8 @@ let copyA = "ca" + id;
 let copyB = "cb" + id;
 let verifyA = "va" + id;
 let verifyB = "vb" + id;
-let maxWidth = (mWidth!= undefined)? mWidth: 800;
-let maxHeight = (mHeight != undefined)? mHeight :600;
+let maxWidth = (size.length == 2)? size[0]: 800;
+let maxHeight = (size.length == 2)? size[1] :600;
 %>
 <div id="<%= rjouter; %>" style="display:none; overflow: hidden">
   <div id="<%= rj; %>" class="renderjson" style="overflow-y: scroll; max-width: <%= maxWidth; %>px; max-height: <%= maxHeight; %>px"></div>
