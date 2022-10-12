@@ -3969,11 +3969,16 @@ module.exports = class Indexer extends AssetManager {
                 chainID: this.chainID,
                 ts: blockTS
             })
+            if (p){
+                feedReward["amountUSD"] = p.valUSD
+                feedReward["priceUSD"] = p.priceUSD
+            }else{
+                feedReward["amountUSD"] = 0
+                feedReward["priceUSD"] = 0
+            }
             feedReward["asset"] = asset
             feedReward["symbol"] = symbol
             feedReward["decimals"] = decimals
-            feedReward["amountUSD"] = p.valUSD
-            feedReward["priceUSD"] = p.priceUSD
         } else if (feedReward["amount"] != undefined) {
             feedReward["rawAmount"] = feedReward["amount"]
             feedReward["amount"] = null

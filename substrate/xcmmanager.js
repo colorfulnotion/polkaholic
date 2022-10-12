@@ -40,7 +40,7 @@ module.exports = class XCMManager extends Query {
     }
 
     async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
-        let chain = await this.getChain(chainID, withSpecVersions);
+        let chain = await this.getChainWithVersion(chainID, withSpecVersions);
         await this.setupAPI(chain, backfill);
         this.relayChain = chain.relayChain;
         return (chain);
@@ -2222,8 +2222,8 @@ order by chainID, extrinsicHash`
     {
 	// TODO: when "index" is supplied (if this map gets too big, or to cover on demand situation)
 	let derivedAccounts = (index) ? [] : await this.api.query.xcmTransactor.indexToAccount.entries()
-	
-	// take result of xcmTransactor.indexToAccount (all of them if index is null, or a specific one) and store in Mysql 
+
+	// take result of xcmTransactor.indexToAccount (all of them if index is null, or a specific one) and store in Mysql
 	let out = [];
 	let vals = ["relayChain", "address", "addDT"];
 	for ( const t of derivedAccounts ) {
@@ -2270,7 +2270,7 @@ order by chainID, extrinsicHash`
 	}
 	return { parents: 1, interior: interior }
     }
-    
+
     // Converts a given MultiLocation into a 20/32 byte accountID by hashing with blake2_256 and taking the first 20/32 bytes
     //  https://github.com/albertov19/xcmTools/blob/main/calculateMultilocationDerivative.ts
     //  https://github.com/PureStake/moonbeam/blob/master/primitives/xcm/src/location_conversion.rs#L31-L37
