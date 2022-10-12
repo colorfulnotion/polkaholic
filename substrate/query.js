@@ -4276,6 +4276,26 @@ module.exports = class Query extends AssetManager {
                     } else if (args.transaction.legacy != undefined) {
                         evmTx = args.transaction.legacy
                     }
+                    if (args.transaction.v1 != undefined){
+                        evmTx = args.transaction.v1
+                    }
+                    if (args.transaction.v2 != undefined){
+                        evmTx = args.transaction.v2
+                    }
+                    if (decorate && evmTx) {
+                        let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
+                        if (output != undefined) {
+                            args.decodedEvmInput = output
+                        }
+                    }
+                }
+            }
+            if (section == 'ethereumXcm' && method == 'transactThroughProxy') {
+                //console.log(`${section}:${method} args`, args)
+                if (args.xcm_transaction != undefined) {
+                    let evmTx = false;
+                    if (args.xcm_transaction.v1 != undefined) evmTx = args.xcm_transaction.v1
+                    if (args.xcm_transaction.v2 != undefined) evmTx = args.xcm_transaction.v2
                     if (decorate && evmTx) {
                         let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
                         if (output != undefined) {
@@ -6107,7 +6127,8 @@ module.exports = class Query extends AssetManager {
         if (xcmMsg != undefined) {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
             let dMsg = await this.decorateXCMMsg(x.chainID, x.chainIDDest, xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
-            x.decodeMsg = dMsg
+            //x.decodeMsg = dMsg //let's not return both version.. less is more
+            x.msg = dMsg
             if (dMsg.destAddress != undefined) {
                 x.destAddress = dMsg.destAddress
                 x.destSS58Address = this.getSS58ByChainID(x.destAddress, x.chainIDDest)
@@ -6269,11 +6290,22 @@ module.exports = class Query extends AssetManager {
                 }
                 console.log(`decorateInternalXCMInstruction transact!!!`, instructionV)
                 let opaqueCall = instructionV.call.encoded
-                let res = this.chainParser.decodeDestination_call(this.api, opaqueCall)
-                instructionV.decodedCall = res
+                let ext = this.chainParser.decodeDestination_call(this.api, opaqueCall)
+                if (ext.args != undefined && decorate) {
+                    let section = (ext.section != undefined)? ext.section : ''
+                    let method = (ext.method != undefined)? ext.method : ''
+                    await this.decorateParams(section, method, ext.args, chainIDDest, 0, 0, decorate, ["data", "address"])
+                }
+                instructionV.decodedCall = ext
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
+                if (dXcmMsg.transactList == undefined) dXcmMsg.transactList = []
+                dXcmMsg.transactList.push(instructionV)
                 break
+            case "refundSurplus":
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
             default:
                 dInstructionV[instructionK] = instructionV
                 internalXCM = dInstructionV
@@ -6362,11 +6394,22 @@ module.exports = class Query extends AssetManager {
                 }
                 console.log(`decorateXCMInstructionV1 transact!!!`, instructionV)
                 let opaqueCall = instructionV.call.encoded
-                let res = this.chainParser.decodeDestination_call(this.api, opaqueCall)
-                instructionV.decodedCall = res
+                let ext = this.chainParser.decodeDestination_call(this.api, opaqueCall)
+                if (ext.args != undefined && decorate) {
+                    let section = (ext.section != undefined)? ext.section : ''
+                    let method = (ext.method != undefined)? ext.method : ''
+                    await this.decorateParams(section, method, ext.args, chainIDDest, 0, 0, decorate, ["data", "address"])
+                }
+                instructionV.decodedCall = ext
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version] = dInstructionV
+                if (dXcmMsg.transactList == undefined) dXcmMsg.transactList = []
+                dXcmMsg.transactList.push(instructionV)
                 break
+            case "refundSurplus":
+                dInstructionV[instructionK] = instructionV
+                internalXCM = dInstructionV
+                break;
             default:
                 console.log(`unhandled case ${instructionK}`)
                 dInstructionV[instructionK] = instructionV
@@ -6446,12 +6489,23 @@ module.exports = class Query extends AssetManager {
                 }
                 console.log(`decorateXCMInstruction transact!!!`, instructionV)
                 let opaqueCall = instructionV.call.encoded
-                let res = this.chainParser.decodeDestination_call(this.api, opaqueCall)
-                console.log(`transact!!`, res)
-                instructionV.decodedCall = res
+                let ext = this.chainParser.decodeDestination_call(this.api, opaqueCall)
+                console.log(`transact!!`, ext)
+                if (ext.args != undefined && decorate) {
+                    let section = (ext.section != undefined)? ext.section : ''
+                    let method = (ext.method != undefined)? ext.method : ''
+                    await this.decorateParams(section, method, ext.args, chainIDDest, 0, 0, decorate, ["data", "address"])
+                }
+                instructionV.decodedCall = ext
                 dInstructionV[instructionK] = instructionV
                 dXcmMsg[version].push(dInstructionV)
+                if (dXcmMsg.transactList == undefined) dXcmMsg.transactList = []
+                dXcmMsg.transactList.push(instructionV)
                 break
+            case "refundSurplus":
+                dInstructionV[instructionK] = instructionV
+                dXcmMsg[version].push(dInstructionV)
+                break;
             default:
                 console.log(`unhandled case ${instructionK}`)
                 dInstructionV[instructionK] = instructionV
@@ -6551,6 +6605,7 @@ module.exports = class Query extends AssetManager {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
             dMsg = await this.decorateXCMMsg(rawXcmRec.chainID, rawXcmRec.chainIDDest, xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
         }
+        let transactList = (dMsg.transactList != undefined)? dMsg.transactList : []
         let destAddress = (dMsg.destAddress != undefined) ? dMsg.destAddress : null
         let destSS58Address = this.getSS58ByChainID(destAddress, rawXcmRec.chainIDDest)
 
@@ -6592,7 +6647,8 @@ module.exports = class Query extends AssetManager {
             childBlocknumber,
             childSentAt,
             assetsReceived,
-            assetChains: dAssetChains
+            assetChains: dAssetChains,
+            transactList: transactList,
         }
 
         if (decorate) this.decorateAddress(dXcm, "destAddress", decorateAddr, decorateRelated);

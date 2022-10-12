@@ -17,7 +17,7 @@
     <tr>
       <td>Event <%= e.eventID %></td>
       <td><a href='/events/<%= chainID %>/<%= pallet; %>/<%- method %>' class="btn btn-outline-primary" style="text-transform: unset !important;" data-mdb-toggle="tooltip" title="<%= docs; %>"><%= pallet_method; %></a></td>
-      <td><%- include("decode", {id: e.eventID, obj: decodedDataArr, verify: { verification: "event", blockNumber: blockNumber, eventID: e.eventID } }); %></td>
+      <td><%- include("decode", {id: e.eventID, obj: decodedDataArr, verify: { verification: "event", blockNumber: blockNumber, eventID: e.eventID }, size: [] }); %></td>
     </tr>
   <% } %>
 </table>
