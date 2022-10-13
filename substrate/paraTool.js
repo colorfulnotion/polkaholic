@@ -23,6 +23,7 @@ const {
 const {
     bnToBn,
     bnToHex,
+    bnToU8a,
     hexToBn,
     hexToU8a,
     isHex,
@@ -748,6 +749,41 @@ function is_public_endpoint(wss){
     return true
 }
 
+// Sovereign account — an account each chain in the ecosystem has, one for the relay chain and the other for other parachains.
+// The account is owned by root and can only be used through SUDO (if available) or democracy (technical committee or referenda).
+// The sovereign account typically signs XCM messages in other chains in the ecosystem
+// It is calculated as the blake2 hash of a specific word (para or sibl) and parachain ID, truncating the hash to the correct length.
+function compute_sovereign_account(parachainID) {
+    let paraID;
+    try  {
+        paraID = dechexToInt(parachainID)
+        if (isNaN(paraID)){
+            return false
+        }
+    } catch (e){
+        return false
+    }
+
+    // (1) blake2(para+ParachainID) for the sovereign account in the relay chain, and
+    let paraIDRawHex = '0x' + bnToHex(paraID).slice(2).padStart(8, '0');
+    let paraIDU8a = hexToU8a(paraIDRawHex).reverse()
+    let sovAddressRelay = u8aToHex(
+        new Uint8Array([...new TextEncoder().encode('para'), ...paraIDU8a])
+    ).padEnd(66, '0');
+
+    // (2) blake2(sibl+ParachainID) for the sovereign account in other parachains
+    let sovPara = u8aToHex(new Uint8Array([...new TextEncoder().encode('sibl'), ...paraIDU8a]))
+    let sovAddressParaAccount32 = sovPara.padEnd(66, '0');
+    let sovAddressParaAccount20 = sovPara.padEnd(42, '0');
+    let r = {
+        paraID: paraID,
+        sovereignRelay: sovAddressRelay,
+        sovereignAccount20: sovAddressParaAccount20,
+        sovereignAccount32: sovAddressParaAccount32,
+    }
+    return r
+}
+
 class NotFoundError extends Error {
     constructor(message) {
         // Needs to pass both `message` and `options` to install the "cause" property.
@@ -1449,5 +1485,7 @@ module.exports = {
     getTempID: function(chainID) {
         return get_temp_id(chainID)
     },
-
+    computeSovereignAccount: function(paraID) {
+        return compute_sovereign_account(paraID)
+    },
 };

@@ -2244,15 +2244,9 @@ order by chainID, extrinsicHash`
 
     }
 
-    // Sovereign account — an account each chain in the ecosystem has, one for the relay chain and the other for other parachains.
-    // The account is owned by root and can only be used through SUDO (if available) or democracy (technical committee or referenda).
-    // The sovereign account typically signs XCM messages in other chains in the ecosystem
-    // It is calculated as the blake2 hash of a specific word (para or sibl) and parachain ID, truncating the hash to the correct length.
-    compute_sovereign_account(paraID) {
-	// (1) blake2(para+ParachainID) for the sovereign account in the relay chain, and
-	// (2) blake2(sibl+ParachainID) for the sovereign account in other parachains
+    computeSovereignAccount(paraID){
+        return paraTool.compute_sovereign_account(paraID)
     }
-
     // { "parents": 1, "interior": { "X1": [{ "Parachain": 1000 }]}}
     make_multilocation(paraID = null, address = null, namedNetwork = 'Any')
     {
