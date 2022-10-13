@@ -731,6 +731,8 @@ function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
             //contract creation
             decodedTxnInput.decodeStatus = 'contractCreation'
             decodedTxnInput.contractAddress = contractcreationAddress
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.signature = `contractCreation`
         } else {
             //native transfer
             decodedTxnInput.decodeStatus = 'success'
@@ -790,6 +792,8 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
         if (contractcreationAddress) {
             //contract creation
             decodedTxnInput.decodeStatus = 'contractCreation'
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.signature = `contractCreation`
             decodedTxnInput.contractAddress = contractcreationAddress
         } else {
             //native transfer

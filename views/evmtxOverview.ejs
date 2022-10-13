@@ -62,6 +62,15 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       </td>
     </tr>
 <% } %>
+<% if ( tx.creates) { %>
+    <tr>
+      <td>To</td>
+      <td>
+       <%- uiTool.presentBlockiesOrIdenticon(tx.creates, 20) %>
+       [Contract <%- uiTool.presentAddress(tx.creates) %> Created]
+      </td>
+    </tr>
+<% } %>
 <% if ( tx.transfers && tx.transfers.length > 0 ) { %>
     <tr>
       <td>Tokens Transferred</td>
@@ -89,12 +98,21 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 <% } %>
     <tr>
       <td>Value</td>
-      <td><%- tx.value; %> <%- tx.symbol %> (<%- uiTool.currencyFormat(tx.valueUSD, tx.priceUSD, tx.priceUSDCurrent);%> ) <% %> </td>
+
+      <td><%- tx.value; %> <%- tx.symbol %>
+      <% if ( tx.valueUSD) { %>
+      (<%- uiTool.currencyFormat(tx.valueUSD, tx.priceUSD, tx.priceUSDCurrent);%> )
+       <% } %>
+      <% %> </td>
     </tr>
 
     <tr>
       <td>Transaction Fee</td>
-      <td><%- tx.fee; %> <%- tx.symbol; %> (<%- uiTool.currencyFormat(tx.feeUSD, tx.priceUSD, tx.priceUSDCurrent); %> ) <% %> </td>
+      <td><%- tx.fee; %> <%- tx.symbol; %>
+      <% if ( tx.feeUSD) { %>
+      (<%- uiTool.currencyFormat(tx.feeUSD, tx.priceUSD, tx.priceUSDCurrent); %> )
+      <% } %>
+      <% %> </td>
     </tr>
 
 <% if ( tx.gasLimit ) { %>

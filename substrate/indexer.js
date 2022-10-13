@@ -5580,7 +5580,24 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     value: tx.value,
                     fee: tx.fee
                 }
+                console.log(`[${tx.blockNumber}][${evmTxHash}] sent to ${tx.to}`, feedto)
                 this.updateAddressExtrinsicStorage(tx.to, syntheticExtrinsicID, evmTxHash, "feedto", feedto, tx.timestamp, true);
+            }
+            if (tx.creates){
+                // this is contracts creates
+                let feedCreates = {
+                    chainID: chainID,
+                    blockNumber: tx.blockNumber,
+                    transactionHash: evmTxHash,
+                    decodedInput: tx.decodedInput,
+                    from: tx.from.toLowerCase(),
+                    to: tx.creates.toLowerCase(),
+                    ts: tx.timestamp,
+                    value: tx.value,
+                    fee: tx.fee
+                }
+                console.log(`[${tx.blockNumber}][${evmTxHash}] created at ${ethTool.toChecksumAddress(tx.creates)}`, feedCreates)
+                this.updateAddressExtrinsicStorage(tx.creates, syntheticExtrinsicID, evmTxHash, "feedto", feedCreates, tx.timestamp, true);
             }
         }
     }
