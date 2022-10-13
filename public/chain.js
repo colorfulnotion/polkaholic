@@ -73,7 +73,7 @@ function show_recentblocks(chainID) {
                         if (row.numTransactionsEVM != undefined) {
                             return `<a href='/txs/${chainID}/${row.blockNumber}'>` + presentNumber(row.numTransactionsEVM) + "</a>";
                         } else {
-                            return presentNumber(data);
+                            return `<a href='/block/${chainID}/${row.blockNumber}#extrinsics'>` + presentNumber(data) + "</a>";
                         }
                     } else {
                         if (row.numTransactionsEVM != undefined) {
@@ -131,7 +131,7 @@ function show_recentblocks(chainID) {
                 data: 'numEvents',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        return presentNumber(data);
+                        return `<a href='/block/${chainID}/${row.blockNumber}#events'>` + presentNumber(data) + "</a>";
                     }
                     return data;
                 }
