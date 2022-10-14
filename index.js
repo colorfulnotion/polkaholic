@@ -1759,7 +1759,7 @@ app.post('/uploadcontract/:address', async (req, res) => {
 app.get('/ws', async (req, res) => {
     var chains = await query.getChains();
     res.render('ws', {
-	chains
+        chains
     });
 })
 

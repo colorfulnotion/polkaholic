@@ -150,7 +150,7 @@ module.exports = class ChainParser {
 
     async getSystemProperties(indexer, chain) {
         let chainID = chain.chainID;
-        if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta || chainID == paraTool.chainIDMoonbaseRelay){
+        if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta || chainID == paraTool.chainIDMoonbaseRelay) {
             //suppress DEV
             return
         }
@@ -5023,7 +5023,7 @@ module.exports = class ChainParser {
         }
     }
 
-    decodeDestination_call(apiAt, opaqueCall='0x010008240533ee7b029e9570efca80a60d167584b74771741a064d07134be65ace2c10ca4192b91f5f31130000e8890423c78a01010800241333ee7b029e9570efca80a60d167584b747e41a900b94e647d7106899ca303b2f07cdd53f95130000e8890423c78a', lvl = '', remarks = []){
+    decodeDestination_call(apiAt, opaqueCall = '0x010008240533ee7b029e9570efca80a60d167584b74771741a064d07134be65ace2c10ca4192b91f5f31130000e8890423c78a01010800241333ee7b029e9570efca80a60d167584b747e41a900b94e647d7106899ca303b2f07cdd53f95130000e8890423c78a', lvl = '', remarks = []) {
         let res = {}
         let extrinsicHash = ''
         let extrinsicID = ''

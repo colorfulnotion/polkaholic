@@ -13,10 +13,20 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
-const { ApiPromise, WsProvider } = require('@polkadot/api');
-const { u8aToHex, hexToU8a } = require('@polkadot/util');
-const { decodeAddress } = require('@polkadot/util-crypto');
-const { MultiLocation } = require('@polkadot/types/interfaces');
+const {
+    ApiPromise,
+    WsProvider
+} = require('@polkadot/api');
+const {
+    u8aToHex,
+    hexToU8a
+} = require('@polkadot/util');
+const {
+    decodeAddress
+} = require('@polkadot/util-crypto');
+const {
+    MultiLocation
+} = require('@polkadot/types/interfaces');
 
 const Query = require('./query');
 const AssetManager = require("./assetManager");
@@ -2218,23 +2228,22 @@ order by chainID, extrinsicHash`
         }
     }
 
-    async fetch_indexToAccount(chainID = 61000, relayChain = 'moonbase-relay', index = null)
-    {
-	// TODO: when "index" is supplied (if this map gets too big, or to cover on demand situation)
-	let derivedAccounts = (index) ? [] : await this.api.query.xcmTransactor.indexToAccount.entries()
+    async fetch_indexToAccount(chainID = 61000, relayChain = 'moonbase-relay', index = null) {
+        // TODO: when "index" is supplied (if this map gets too big, or to cover on demand situation)
+        let derivedAccounts = (index) ? [] : await this.api.query.xcmTransactor.indexToAccount.entries()
 
-	// take result of xcmTransactor.indexToAccount (all of them if index is null, or a specific one) and store in Mysql
-	let out = [];
-	let vals = ["relayChain", "address", "addDT"];
-	for ( const t of derivedAccounts ) {
-	    let k = t[0].toHuman();
-	    let address = t[1].toJSON();
-	    let index = paraTool.toNumWithoutComma(k[0]);
-	    console.log(index, k[0], address);
-	    out.push(`( '${chainID}', '${index}', '${relayChain}', '${address}', Now() )`);
-	    // TODO: store in BigTable addressrealtime new column family "derivedAccounts" ?
-	}
-	await this.upsertSQL({
+        // take result of xcmTransactor.indexToAccount (all of them if index is null, or a specific one) and store in Mysql
+        let out = [];
+        let vals = ["relayChain", "address", "addDT"];
+        for (const t of derivedAccounts) {
+            let k = t[0].toHuman();
+            let address = t[1].toJSON();
+            let index = paraTool.toNumWithoutComma(k[0]);
+            console.log(index, k[0], address);
+            out.push(`( '${chainID}', '${index}', '${relayChain}', '${address}', Now() )`);
+            // TODO: store in BigTable addressrealtime new column family "derivedAccounts" ?
+        }
+        await this.upsertSQL({
             "table": `xcmtransactor_indexToAccount`,
             "keys": ["chainID", "indexToAccount"],
             "vals": vals,
@@ -2244,25 +2253,51 @@ order by chainID, extrinsicHash`
 
     }
 
-    computeSovereignAccount(paraID){
+    computeSovereignAccount(paraID) {
         return paraTool.compute_sovereign_account(paraID)
     }
     // { "parents": 1, "interior": { "X1": [{ "Parachain": 1000 }]}}
-    make_multilocation(paraID = null, address = null, namedNetwork = 'Any')
-    {
-	const ethAddress = address.length === 42;
-	const named =  (namedNetwork != 'Any') ? { Named: namedNetwork } : namedNetwork;
-	const account = ethAddress ? { AccountKey20: { network: named, key: address } } : { AccountId32: { network: named, id: u8aToHex(decodeAddress(address)) } };
-	// make a multilocation object
-	let interior = { here: null }
-	if ( paraID && account ) {
-	    interior = { X2: [{ Parachain: paraID }, account] }
-	} else if ( paraID ) {
-	    interior = { X1: { Parachain: paraID } }
-	} else if ( account ) {
-	    interior = { X1: account }
-	}
-	return { parents: 1, interior: interior }
+    make_multilocation(paraID = null, address = null, namedNetwork = 'Any') {
+        const ethAddress = address.length === 42;
+        const named = (namedNetwork != 'Any') ? {
+            Named: namedNetwork
+        } : namedNetwork;
+        const account = ethAddress ? {
+            AccountKey20: {
+                network: named,
+                key: address
+            }
+        } : {
+            AccountId32: {
+                network: named,
+                id: u8aToHex(decodeAddress(address))
+            }
+        };
+        // make a multilocation object
+        let interior = {
+            here: null
+        }
+        if (paraID && account) {
+            interior = {
+                X2: [{
+                    Parachain: paraID
+                }, account]
+            }
+        } else if (paraID) {
+            interior = {
+                X1: {
+                    Parachain: paraID
+                }
+            }
+        } else if (account) {
+            interior = {
+                X1: account
+            }
+        }
+        return {
+            parents: 1,
+            interior: interior
+        }
     }
 
     // Converts a given MultiLocation into a 20/32 byte accountID by hashing with blake2_256 and taking the first 20/32 bytes
@@ -2271,20 +2306,20 @@ order by chainID, extrinsicHash`
     // Test case: Alice (origin parachain) 0x44236223aB4291b93EEd10E4B511B37a398DEE55 => is 0x5c27c4bb7047083420eddff9cddac4a0a120b45c on paraID 1000
 
     calculateMultilocationDerivative(paraID = null, address = null, namedNetwork = 'Any') {
-	let multilocationStruct = this.make_multilocation(paraID, address, namedNetwork)
-	const multilocation = this.api.createType('XcmV1MultiLocation', multilocationStruct)
-	const toHash = new Uint8Array([
-	    ...new Uint8Array([32]),
-	    ...new TextEncoder().encode('multiloc'),
-	    ...multilocation.toU8a(),
-	]);
+        let multilocationStruct = this.make_multilocation(paraID, address, namedNetwork)
+        const multilocation = this.api.createType('XcmV1MultiLocation', multilocationStruct)
+        const toHash = new Uint8Array([
+            ...new Uint8Array([32]),
+            ...new TextEncoder().encode('multiloc'),
+            ...multilocation.toU8a(),
+        ]);
 
-	const DescendOriginAddress20 = u8aToHex(this.api.registry.hash(toHash).slice(0, 20));
-	const DescendOriginAddress32 = u8aToHex(this.api.registry.hash(toHash).slice(0, 32));
-	console.log("calculateMultilocationDerivative", multilocation.toString(), DescendOriginAddress20, DescendOriginAddress32);
-	// multilocation {"parents":1,"interior":{"x2":[{"parachain":1000},{"accountKey20":{"network":{"any":null},"key":"0x44236223ab4291b93eed10e4b511b37a398dee55"}}]}}
-	// 20 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45c
-	// 32 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45cdfa7831175e442b8f14391aa
-	return [DescendOriginAddress20, DescendOriginAddress32]
+        const DescendOriginAddress20 = u8aToHex(this.api.registry.hash(toHash).slice(0, 20));
+        const DescendOriginAddress32 = u8aToHex(this.api.registry.hash(toHash).slice(0, 32));
+        console.log("calculateMultilocationDerivative", multilocation.toString(), DescendOriginAddress20, DescendOriginAddress32);
+        // multilocation {"parents":1,"interior":{"x2":[{"parachain":1000},{"accountKey20":{"network":{"any":null},"key":"0x44236223ab4291b93eed10e4b511b37a398dee55"}}]}}
+        // 20 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45c
+        // 32 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45cdfa7831175e442b8f14391aa
+        return [DescendOriginAddress20, DescendOriginAddress32]
     }
 }

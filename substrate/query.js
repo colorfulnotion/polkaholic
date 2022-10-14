@@ -1044,14 +1044,14 @@ module.exports = class Query extends AssetManager {
                     }
                 }
                 if (isExternal) {
-                    if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint))  chainInfo.WSEndpoint = null
+                    if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint)) chainInfo.WSEndpoint = null
                     if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint2)) chainInfo.WSEndpoint2 = null
                     if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint3)) chainInfo.WSEndpoint3 = null
                     // hardcoded for publicEndpoint = true for now
                     chainInfo.chainID = parseInt(chainInfo.chainID)
-                    if ( ( chainInfo.chainID == 2006 || chainInfo.chainID == 22007 ) || ( chainInfo.chainID == 2004 || chainInfo.chainID == 22023  || chainInfo.chainID == 61000 ) ) {
-                      chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
-                      chainInfo.WSEndpoint = `wss://${chainInfo.id}.api.onfinality.io/public-ws`
+                    if ((chainInfo.chainID == 2006 || chainInfo.chainID == 22007) || (chainInfo.chainID == 2004 || chainInfo.chainID == 22023 || chainInfo.chainID == 61000)) {
+                        chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
+                        chainInfo.WSEndpoint = `wss://${chainInfo.id}.api.onfinality.io/public-ws`
                     }
                 }
                 return chainInfo
@@ -3766,11 +3766,11 @@ module.exports = class Query extends AssetManager {
 
             }
             let rowData = row.data;
-	    let w = chainID ?  `and asset.chainID = '${chainID}'` : ''
+            let w = chainID ? `and asset.chainID = '${chainID}'` : ''
             contract = null;
-	    [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
+            [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
             let sql = `select asset.creator, asset.assetType, asset.createdAtTx, unix_timestamp(asset.createDT) as createTS, asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' ${w}`
-	    console.log(sql);
+            console.log(sql);
             let extraRecs = await this.poolREADONLY.query(sql)
             if (extraRecs.length > 0) {
                 let e = extraRecs[0];
@@ -3778,16 +3778,16 @@ module.exports = class Query extends AssetManager {
                     asset: e.asset,
                     chainID: e.chainID
                 });
-		if ( ! contract ) {
-		    contract = {}
-		}
-		contract.chainID = e.chainID;
-		contract.creator = e.creator;
-                contract.createdAtTx   = e.createdAtTx;
-                contract.createTS   = e.createTS;
-                contract.assetType   = e.assetType;
-		contract.address = e.asset
-		contract.asset = e.asset
+                if (!contract) {
+                    contract = {}
+                }
+                contract.chainID = e.chainID;
+                contract.creator = e.creator;
+                contract.createdAtTx = e.createdAtTx;
+                contract.createTS = e.createTS;
+                contract.assetType = e.assetType;
+                contract.address = e.asset
+                contract.asset = e.asset
                 contract.assetName = e.assetName;
                 contract.symbol = e.symbol;
                 contract.localSymbol = e.localSymbol;
@@ -3795,7 +3795,7 @@ module.exports = class Query extends AssetManager {
                 contract.totalSupply = e.totalSupply;
                 contract.numHolders = e.numHolders;
                 contract.decimals = e.decimals;
-	    }
+            }
             return [realtime, contract];
         }
     }
@@ -4287,10 +4287,10 @@ module.exports = class Query extends AssetManager {
                     } else if (args.transaction.legacy != undefined) {
                         evmTx = args.transaction.legacy
                     }
-                    if (args.transaction.v1 != undefined){
+                    if (args.transaction.v1 != undefined) {
                         evmTx = args.transaction.v1
                     }
-                    if (args.transaction.v2 != undefined){
+                    if (args.transaction.v2 != undefined) {
                         evmTx = args.transaction.v2
                     }
                     if (decorate && evmTx) {
@@ -5326,7 +5326,7 @@ module.exports = class Query extends AssetManager {
                     }
                 }
             }
-            r.relayChain = paraTool.getParaIDfromChainID(r.chainIDDest)
+            r.relayChain = paraTool.getRelayChainByChainID(r.chainIDDest)
             if (r.matched == 0 && (this.getCurrentTS() - r.blockTS < 60)) {
                 // if this record hasn't been matched, mark as pending / in transit if its very new (60s)
                 r.pending = 1;
@@ -6152,11 +6152,11 @@ module.exports = class Query extends AssetManager {
         x.chainName = this.getChainName(x.chainID);
         let [__, idDest] = this.convertChainID(x.chainIDDest)
         x.chainDestName = this.getChainName(x.chainIDDest);
-        if (id == false){
+        if (id == false) {
             //temporary id
             id = paraTool.getTempID(x.chainID)
         }
-        if (idDest == false){
+        if (idDest == false) {
             //temporary idDest
             idDest = paraTool.getTempID(x.chainIDDest)
         }
@@ -6214,26 +6214,26 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-/*
-{
-    "transact": {
-        "originType": "SovereignAccount",
-        "requireWeightAtMost": 10000000000,
-        "call": {
-            "encoded": "0x010008240533ee7b029e9570efca80a60d167584b74771741a064d07134be65ace2c10ca4192b91f5f31130000e8890423c78a01010800241333ee7b029e9570efca80a60d167584b747e41a900b94e647d7106899ca303b2f07cdd53f95130000e8890423c78a"
+    /*
+    {
+        "transact": {
+            "originType": "SovereignAccount",
+            "requireWeightAtMost": 10000000000,
+            "call": {
+                "encoded": "0x010008240533ee7b029e9570efca80a60d167584b74771741a064d07134be65ace2c10ca4192b91f5f31130000e8890423c78a01010800241333ee7b029e9570efca80a60d167584b747e41a900b94e647d7106899ca303b2f07cdd53f95130000e8890423c78a"
+            }
         }
-    }
-},
-{
-    "transact": {
-        "originType": "SovereignAccount",
-        "requireWeightAtMost": 10000000000,
-        "call": {
-            "encoded": "0x260171741a064d07134be65ace2c10ca4192b91f5f3101e09304000000000000000000000000000000000000000000000000000000000000ddd3761511ae568ee614e232d553553faf729a820000000000000000000000000000000000000000000000000000000000000000910305e2ca1700000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000001df9bd10de107d2ce81a510eb158421000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000540000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000000000000000000014ef6b3b0a89d9c966bd9291130869140cde2b768800000000000000000000000000"
+    },
+    {
+        "transact": {
+            "originType": "SovereignAccount",
+            "requireWeightAtMost": 10000000000,
+            "call": {
+                "encoded": "0x260171741a064d07134be65ace2c10ca4192b91f5f3101e09304000000000000000000000000000000000000000000000000000000000000ddd3761511ae568ee614e232d553553faf729a820000000000000000000000000000000000000000000000000000000000000000910305e2ca1700000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000001df9bd10de107d2ce81a510eb158421000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000540000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000000000000000000014ef6b3b0a89d9c966bd9291130869140cde2b768800000000000000000000000000"
+            }
         }
-    }
-},
-*/
+    },
+    */
     async decorateInternalXCMInstruction(chainID, chainIDDest, dXcmMsg, internalXCM, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let dInstructionV = {}
@@ -6295,7 +6295,7 @@ module.exports = class Query extends AssetManager {
                 internalXCM = dInstructionV
                 break;
             case "transact":
-                if (chainIDDest != undefined){
+                if (chainIDDest != undefined) {
                     //init with chainDest
                     await this.setupQuerChainAndAPI(chainIDDest);
                 }
@@ -6303,8 +6303,8 @@ module.exports = class Query extends AssetManager {
                 let opaqueCall = instructionV.call.encoded
                 let ext = this.chainParser.decodeDestination_call(this.api, opaqueCall)
                 if (ext.args != undefined && decorate) {
-                    let section = (ext.section != undefined)? ext.section : ''
-                    let method = (ext.method != undefined)? ext.method : ''
+                    let section = (ext.section != undefined) ? ext.section : ''
+                    let method = (ext.method != undefined) ? ext.method : ''
                     await this.decorateParams(section, method, ext.args, chainIDDest, 0, 0, decorate, ["data", "address"])
                 }
                 instructionV.decodedCall = ext
@@ -6399,7 +6399,7 @@ module.exports = class Query extends AssetManager {
                 dXcmMsg[version] = dInstructionV
                 break;
             case "transact":
-                if (chainIDDest != undefined){
+                if (chainIDDest != undefined) {
                     //init with chainDest
                     await this.setupQuerChainAndAPI(chainIDDest);
                 }
@@ -6407,8 +6407,8 @@ module.exports = class Query extends AssetManager {
                 let opaqueCall = instructionV.call.encoded
                 let ext = this.chainParser.decodeDestination_call(this.api, opaqueCall)
                 if (ext.args != undefined && decorate) {
-                    let section = (ext.section != undefined)? ext.section : ''
-                    let method = (ext.method != undefined)? ext.method : ''
+                    let section = (ext.section != undefined) ? ext.section : ''
+                    let method = (ext.method != undefined) ? ext.method : ''
                     await this.decorateParams(section, method, ext.args, chainIDDest, 0, 0, decorate, ["data", "address"])
                 }
                 instructionV.decodedCall = ext
@@ -6431,10 +6431,10 @@ module.exports = class Query extends AssetManager {
     }
 
     async decorateXCMInstruction(chainID, chainIDDest, dXcmMsg, instructionK, instructionV, blockTS = 0, dAssetChains = [], decorate = true, decorateExtra = true) {
-        if (chainIDDest != undefined){
+        if (chainIDDest != undefined) {
             //init with chainDest
             this.chainParserInit(chainIDDest, this.debugLevel);
-        }else{
+        } else {
             this.chainParserInit(paraTool.chainIDPolkadot, this.debugLevel);
         }
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -6494,7 +6494,7 @@ module.exports = class Query extends AssetManager {
                 dXcmMsg[version].push(dInstructionV)
                 break;
             case "transact":
-                if (chainIDDest != undefined){
+                if (chainIDDest != undefined) {
                     //init with chainDest
                     await this.setupQuerChainAndAPI(chainIDDest);
                 }
@@ -6503,8 +6503,8 @@ module.exports = class Query extends AssetManager {
                 let ext = this.chainParser.decodeDestination_call(this.api, opaqueCall)
                 console.log(`transact!!`, ext)
                 if (ext.args != undefined && decorate) {
-                    let section = (ext.section != undefined)? ext.section : ''
-                    let method = (ext.method != undefined)? ext.method : ''
+                    let section = (ext.section != undefined) ? ext.section : ''
+                    let method = (ext.method != undefined) ? ext.method : ''
                     await this.decorateParams(section, method, ext.args, chainIDDest, 0, 0, decorate, ["data", "address"])
                 }
                 instructionV.decodedCall = ext
@@ -6616,7 +6616,7 @@ module.exports = class Query extends AssetManager {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
             dMsg = await this.decorateXCMMsg(rawXcmRec.chainID, rawXcmRec.chainIDDest, xcmMsg0, blockTS, dAssetChains, decorate, decorateExtra)
         }
-        let transactList = (dMsg.transactList != undefined)? dMsg.transactList : []
+        let transactList = (dMsg.transactList != undefined) ? dMsg.transactList : []
         let destAddress = (dMsg.destAddress != undefined) ? dMsg.destAddress : null
         let destSS58Address = this.getSS58ByChainID(destAddress, rawXcmRec.chainIDDest)
 

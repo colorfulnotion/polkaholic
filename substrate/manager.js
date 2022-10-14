@@ -624,7 +624,7 @@ module.exports = class Manager extends AssetManager {
     async updateChainlogNumAddresses(chainID = null, lookback = 7) {
         await this.assetManagerInit();
         await this.update_chainlog_numAddresses(chainID, "2022-10-11");
-	/*
+        /*
         let whereChain = (chainID >= 0) ? ` and chainID = ${chainID}` : "";
         let sql = `select UNIX_TIMESTAMP(logDT) as logTS, chainID from blocklog where logDT >= date_sub(Now(), interval ${lookback} DAY) and logDT < date_sub(Now(), interval 1 day) and  numAddressesLastUpdateDT is null ${whereChain} order by rand() limit 20`;
         let chainlog = await this.poolREADONLY.query(sql)
@@ -678,7 +678,7 @@ module.exports = class Manager extends AssetManager {
                 break
             }
             for (const user of query) {
-		console.log(user[0].toHuman(), user[1].toString());
+                console.log(user[0].toHuman(), user[1].toString());
                 numAddresses++;
                 last_key = user[0];
             }

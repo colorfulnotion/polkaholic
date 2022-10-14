@@ -1961,7 +1961,11 @@ create table talismanEndpoint (
             let finalizedHash = header.hash.toString();
             let parentHash = header.parentHash.toString();
 
-	    this.sendWSMessage({"msgType": "subscribeFinalizedHeads", "bn": bn, "chainID": chainID});
+            this.sendWSMessage({
+                "msgType": "subscribeFinalizedHeads",
+                "bn": bn,
+                "chainID": chainID
+            });
             await this.processFinalizedHead(chain, chainID, bn, finalizedHash, parentHash, true);
             this.finalizedHashes[bn] = finalizedHash;
             // because we do not always get the finalized hash signal, we brute force use the parentHash => grandparentHash => greatgrandparentHash => greatgreatgrandparentHash  (3 up)
@@ -2009,7 +2013,7 @@ create table talismanEndpoint (
             unsubscribeStorage = await this.api.rpc.state.subscribeStorage(async (results) => {
                 try {
                     this.lastEventReceivedTS = this.getCurrentTS(); // if not received in 5mins, reset
-		    
+
                     // build block similar to sidecar
                     let blockHash = results.block.toHex();
                     let [signedBlock, events] = await this.crawlBlock(this.api, results.block.toHex());
@@ -2029,8 +2033,12 @@ create table talismanEndpoint (
                     block.blockTS = blockTS;
 
                     let blockNumber = block.number;
-                    this.sendWSMessage({"msgType": "subscribeStorage", "bn": blockNumber, "chainID": chainID});
-		    // get trace from block
+                    this.sendWSMessage({
+                        "msgType": "subscribeStorage",
+                        "bn": blockNumber,
+                        "chainID": chainID
+                    });
+                    // get trace from block
                     let trace = await this.dedupChanges(results.changes);
                     if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
                     let evmBlock = false
