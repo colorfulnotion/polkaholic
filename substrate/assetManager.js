@@ -465,7 +465,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     assetType: "Token"
                 }
                 if (symbol) {
-                    let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain);
+                    let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain); // REVIEW: why upper case here??
                     xcmSymbolInfo[symbolRelayChain] = a
                 }
                 xcmAssetInfo[xcmInteriorKey] = a; //the key has no chainID
@@ -530,7 +530,10 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     getXcmAssetInfoBySymbolKey(symbolRelayChain) {
-        let xcmAssetInfo = this.xcmSymbolInfo[symbolRelayChain]
+        let pieces = symbolRelayChain.split('~')
+        pieces[0] = pieces[0].toUpperCase()
+        symbolRelayChain = pieces.join('~')
+        let xcmAssetInfo =  this.xcmSymbolInfo[symbolRelayChain]
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo
         }
@@ -648,7 +651,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             assetInfo[assetChain] = a;
             if (alternativeAssetChain){
-                console.log(`adding assetInfo[${alternativeAssetChain}]`, a)
+                console.log(`adding alternative assetInfo[${alternativeAssetChain}]`, a)
                 assetInfo[alternativeAssetChain] = a;
             }
             if (v.currencyID != null && v.currencyID.length > 0) {
