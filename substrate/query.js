@@ -1536,7 +1536,8 @@ module.exports = class Query extends AssetManager {
         let tbl = "assetpricelog";
         if (q.symbol && q.relayChain) {
             let symbolRelayChain = paraTool.makeAssetChain(q.symbol, q.relayChain);
-            if (this.xcmSymbolInfo[symbolRelayChain] == undefined) {
+            let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+            if (xcmAssetInfo == undefined) {
                 throw new paraTool.InvalidError(`Invalid symbol relay chain: ${q.symbol}/${q.relayChain}`)
             }
             tbl = "xcmassetpricelog";

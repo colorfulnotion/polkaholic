@@ -116,7 +116,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     // reads all the decimals from the chain table and then the asset mysql table
     async init_chainInfos() {
         //TODO: adjust getSystemProperties to handle case where chain that does not have a "asset" specified (or use left join here) will get one
-        let chainSQL = `select id, chain.chainID, chain.chainName, chain.relayChain, paraID, ss58Format, isEVM, chain.iconUrl, 
+        let chainSQL = `select id, chain.chainID, chain.chainName, chain.relayChain, paraID, ss58Format, isEVM, chain.iconUrl,
  xcmasset.symbol, xcmasset.decimals, xcmasset.priceUSD, xcmasset.priceUSDPercentChange,
  githubURL, subscanURL, parachainsURL, dappURL, WSEndpoint
  from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( (crawling = 1 or paraID > 0 or chain.relayChain = '${paraTool.getRelayChainByChainID(60000)}') and id is not null);`
@@ -651,7 +651,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             assetInfo[assetChain] = a;
             if (alternativeAssetChain){
-                console.log(`adding alternative assetInfo[${alternativeAssetChain}]`, a)
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`adding alternative assetInfo[${alternativeAssetChain}]`, a)
                 assetInfo[alternativeAssetChain] = a;
             }
             if (v.currencyID != null && v.currencyID.length > 0) {
