@@ -2210,6 +2210,7 @@ module.exports = class ChainParser {
         return outgoingXTokens;
     }
 
+    //TODO: go one level deep 
     extract_xcm_incomplete(events, extrinsicID = false) {
         let incomplete = 0;
         for (let i = 0; i < events.length; i++) {
@@ -2816,8 +2817,8 @@ module.exports = class ChainParser {
                         let amountSent = assetAndAmountSent.amountSent
                         let transferIndex = assetAndAmountSent.transferIndex
                         let isFeeItem = assetAndAmountSent.isFeeItem
+                        let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                         if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent) && chainIDDest) {
-                            let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcms.length
                             let r = {
@@ -2847,6 +2848,37 @@ module.exports = class ChainParser {
                             outgoingXcmPallet.push(r)
                             extrinsic.xcms.push(r)
                             //outgoingXcmList.push(r)
+                        } else if (incomplete){
+                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer incomplete `, `module:${section_method}`, a);
+                            // TODO: tally error
+                            if (extrinsic.xcms == undefined) extrinsic.xcms = []
+                            let xcmIndex = extrinsic.xcms.length
+                            let r = {
+                                sectionMethod: section_method,
+                                extrinsicHash: feed.extrinsicHash,
+                                extrinsicID: feed.extrinsicID,
+                                transferIndex: transferIndex,
+                                xcmIndex: xcmIndex,
+                                relayChain: indexer.relayChain,
+                                chainID: indexer.chainID,
+                                chainIDDest: chainIDDest,
+                                paraID: paraID,
+                                paraIDDest: paraIDDest,
+                                blockNumber: this.parserBlockNumber,
+                                fromAddress: fromAddress,
+                                destAddress: destAddress,
+                                sourceTS: feed.ts,
+                                amountSent: amountSent,
+                                incomplete: incomplete,
+                                isFeeItem: isFeeItem,
+                                msgHash: '0x',
+                                sentAt: this.parserWatermark,
+                                xcmSymbol: targetedSymbol,
+                                xcmInteriorKey: targetedXcmInteriorKey,
+                            }
+                            console.log("processOutgoingPolkadotXcm xcmPallet incomplete", r);
+                            //outgoingXcmPallet.push(r)
+                            //extrinsic.xcms.push(r)
                         } else {
                             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer unknown `, `module:${section_method}`, a);
                             // TODO: tally error
