@@ -2059,8 +2059,7 @@ create table talismanEndpoint (
                             let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, "subscribeStorage", this.api);
                             let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces); // autotrace, finalized, write_bq_log are all false
 
-                            await this.immediateFlushBlockAndAddressExtrinsics()
-
+                            await this.immediateFlushBlockAndAddressExtrinsics(isTip) //this is tip
                             if (blockNumber > this.blocksCovered) {
                                 // only update blocksCovered in the DB if its HIGHER than what we have seen before
                                 var sql = `update chain set blocksCovered = '${blockNumber}', lastCrawlDT = Now() where chainID = '${chainID}' and blocksCovered < ${blockNumber}`
