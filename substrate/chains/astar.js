@@ -282,8 +282,8 @@ module.exports = class AstarParser extends ChainParser {
     }
 
     // default parser //998807-7 (astar)
-    processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized = false) {
-        return super.processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized)
+    processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
+        return super.processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip, finalized)
     }
 
     processOutgoingXCM(indexer, extrinsic, feed, fromAddress, section = false, method = false, args = false) {
