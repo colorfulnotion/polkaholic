@@ -1335,8 +1335,10 @@ module.exports = class Indexer extends AssetManager {
     }
 
     sendWSMessage(m, msgType = null) {
+	return;
+	const endpoint = null;
         try {
-            const ws = new WebSocket('ws://kusama-internal.polkaholic.io:9977');
+            const ws = new WebSocket(endpoint);
             ws.on('error', function error() {
 
             })
