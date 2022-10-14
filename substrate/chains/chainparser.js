@@ -3799,14 +3799,14 @@ module.exports = class ChainParser {
 
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                let updateXcmConcept = true
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
-                    return
+                    updateXcmConcept = false
+                    //already cached
                 }
-
                 //console.log(`${chainID} '${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
-
                 let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
                 let xcmAssetInfo = {
                     chainID: chainID,
@@ -3821,7 +3821,7 @@ module.exports = class ChainParser {
                     source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
-                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetRegistryLocations');
+                if (updateXcmConcept)  await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetRegistryLocations');
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
@@ -3859,7 +3859,6 @@ module.exports = class ChainParser {
             }
             let paraID = 0
             let chainID = -1
-
             var asset = JSON.stringify(parsedAsset);
             let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
             let cachedAssetInfo = indexer.assetInfo[assetChain]
@@ -3883,9 +3882,11 @@ module.exports = class ChainParser {
                 }
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                let updateXcmConcept = true
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
-                    return
+                    updateXcmConcept = false
+                    //already cached
                 }
 
                 if ((typeof interiorK == "string") && (interiorK.toLowerCase() == 'here')) {
@@ -3920,35 +3921,6 @@ module.exports = class ChainParser {
                 }
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
 
-                /*
-
-                //Moonbeam Registry
-                2000	'[{"parachain":2000},{"generalKey":"0x0001"}]'	      {"Token":"AUSD"}[2000] |	[aUSD]	[x2]
-                2012	'[{"parachain":2012},{"generalKey":"0x50415241"}]'	  {"Token":"PARA"}[2012] |	[PARA]	[x2]
-                0	    'here'	                                              {"Token":"DOT"}	[0]    |	[DOT]	[here]
-                2000	'[{"parachain":2000},{"generalKey":"0x0000"}]'	      {"Token":"ACA"}[2000]  |	[ACA]	[x2]
-
-                //Moonriver Registry
-                22012	'{"parachain":2012}'	                                {"Token":"CSM"}	[2012] |	[CSM]	[x1]
-                22007	'{"parachain":2007}'	                                {"Token":"SDN"}	[2007] |	[SDN]	[x1]
-                22085	'[{"parachain":2085},{"generalKey":"0x484b4f"}]'	    {"Token":"HKO"}	[2085] |	[HKO]	[x2]
-                22092	'[{"parachain":2092},{"generalKey":"0x000b"}]'	      {"Token":"KBTC"}[2092] |	[KBTC]	[x2]
-                22084	'{"parachain":2084}'	                                {"Token":"KMA"} [2084] |	[KMA]	[x1]
-                22105	'[{"parachain":2105},{"palletInstance":5}]'	          {"Token":"CRAB"}[2105] |	[CRAB]	[x2]
-                22004	'{"parachain":2004}'	                                {"Token":"PHA"} [2004] |	[PHA]	[x1]
-                22000	'[{"parachain":2000},{"generalKey":"0x0081"}]'	      {"Token":"KUSD"}[2000] |	[AUSD]	[x2]
-                22092	'[{"parachain":2092},{"generalKey":"0x000c"}]'    	  {"Token":"KINT"}[2092] |	[KINT]	[x2]
-                22015	'[{"parachain":2015},{"generalKey":"0x54454552"}]'	  {"Token":"TEER"}[2015] |	[TEER]	[x2]
-                2	    'here'	                                              {"Token":"KSM"}    [0] |	[KSM]	[here]
-                22000	'[{"parachain":2000},{"generalKey":"0x0080"}]'	      {"Token":"KAR"} [2000] |	[KAR]	[x2]
-                22001	'[{"parachain":2001},{"generalKey":"0x0001"}]'	      {"Token":"BNC"} [2001] |	[BNC]	[x2]
-                21000	'[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'	  {"Token":"1984"}[1000] |	[USDT]	[x3]
-                21000	'[{"parachain":1000},{"palletInstance":50},{"generalIndex":8}]'	         {"Token":"8"}[1000] |	[RMRK]	[x3]
-
-                //Heiko Registry
-                21000 '[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'    {"Token":"1984"} [1000] | [USDT] [x3]
-                */
-
                 //console.log(`${chainID} '${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
 
@@ -3966,7 +3938,7 @@ module.exports = class ChainParser {
                     source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
-                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdType');
+                if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdType');
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
@@ -4084,7 +4056,6 @@ module.exports = class ChainParser {
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     updateXcmConcept = false
                     if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
-                    //return
                 }
 
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
