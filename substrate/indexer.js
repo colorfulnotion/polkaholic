@@ -1340,6 +1340,8 @@ module.exports = class Indexer extends AssetManager {
     }
 
     sendWSMessage(m, msgType = null, caller = null) {
+        if (msgType) m.msgType = msgType;
+        m.source = this.hostname;
         console.log(`sendWSMessage [${msgType}] [${caller}]`, m)
         return;
         const endpoint = null;
@@ -1349,7 +1351,7 @@ module.exports = class Indexer extends AssetManager {
 
             })
             ws.on('open', function open() {
-                if (msgType) m.msgType = msgType;
+
                 ws.send(JSON.stringify(m));
             });
         } catch (err) {
