@@ -1335,6 +1335,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     sendWSMessage(m, msgType = null) {
+        console.log(`sending [${msgType}]`, m)
         return;
         const endpoint = null;
         try {
@@ -1353,6 +1354,8 @@ module.exports = class Indexer extends AssetManager {
 
     //this is the xcmmessages table
     updateXCMMsg(xcmMsg, overwrite = false) {
+        //send incoming msg immediately...
+        //for out going msg wait till we have all available info
         this.sendWSMessage(xcmMsg, "xcmmessage")
 
         let direction = (xcmMsg.isIncoming) ? 'i' : 'o'
@@ -1603,7 +1606,8 @@ module.exports = class Indexer extends AssetManager {
                 errs.push(`No symbol (${xcmtransfer.xcmSymbol})/relaychain (${xcmtransfer.relayChain})`);
             } else {
                 let symbolRelayChain = paraTool.makeAssetChain(xcmtransfer.xcmSymbol, xcmtransfer.relayChain);
-                if (this.xcmSymbolInfo[symbolRelayChain] == undefined) {
+                let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+                if (xcmAssetInfo == undefined) {
                     errs.push(`Invalid symbol relaychain (${symbolRelayChain}) not found in assetManager.xcmSymbolInfo`);
                 } else {}
             }
