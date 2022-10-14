@@ -583,7 +583,7 @@ function get_temp_id(chainID) {
     let relayChain = getRelayChainByChainID(chainID)
     let paraID = getParaIDfromChainID(chainID)
     let tempID = `${relayChain}`
-    if (paraID != 0){
+    if (paraID != 0) {
         relayChain = relayChain.replace('-relay', '')
         tempID = `${relayChain}-parachain-${paraID}`
     }
@@ -741,9 +741,9 @@ function contractAddrToXcAssetID(xcAssetAddress) {
     return xcAssetID
 }
 
-function is_public_endpoint(wss){
+function is_public_endpoint(wss) {
     if (wss == undefined) return true
-    if (wss.includes("polkaholic.io") || wss.includes("g.moonbase")){
+    if (wss.includes("polkaholic.io") || wss.includes("g.moonbase")) {
         return false
     }
     return true
@@ -755,12 +755,12 @@ function is_public_endpoint(wss){
 // It is calculated as the blake2 hash of a specific word (para or sibl) and parachain ID, truncating the hash to the correct length.
 function compute_sovereign_account(parachainID) {
     let paraID;
-    try  {
+    try {
         paraID = dechexToInt(parachainID)
-        if (isNaN(paraID)){
+        if (isNaN(paraID)) {
             return false
         }
-    } catch (e){
+    } catch (e) {
         return false
     }
 

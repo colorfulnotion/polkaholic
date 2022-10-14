@@ -668,7 +668,7 @@ from chain where chainID = '${chainID}' limit 1`);
         }
         return chain;
     }
-    async getChainWithVersion(chainID, withSpecVersions = false){
+    async getChainWithVersion(chainID, withSpecVersions = false) {
         var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmChainID, evmRPC, evmRPCInternal, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus,
 numExtrinsics, numExtrinsics7d, numExtrinsics30d,
 numSignedExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d,

@@ -676,6 +676,7 @@ module.exports = class Manager extends AssetManager {
                 break
             }
             for (const user of query) {
+                console.log(user[0].toHuman(), user[1].toString());
                 numAddresses++;
                 last_key = user[0];
             }

@@ -1961,6 +1961,11 @@ create table talismanEndpoint (
             let finalizedHash = header.hash.toString();
             let parentHash = header.parentHash.toString();
 
+            this.sendWSMessage({
+                "msgType": "subscribeFinalizedHeads",
+                "bn": bn,
+                "chainID": chainID
+            });
             await this.processFinalizedHead(chain, chainID, bn, finalizedHash, parentHash, true);
             this.finalizedHashes[bn] = finalizedHash;
             // because we do not always get the finalized hash signal, we brute force use the parentHash => grandparentHash => greatgrandparentHash => greatgreatgrandparentHash  (3 up)
@@ -2028,6 +2033,11 @@ create table talismanEndpoint (
                     block.blockTS = blockTS;
 
                     let blockNumber = block.number;
+                    this.sendWSMessage({
+                        "msgType": "subscribeStorage",
+                        "bn": blockNumber,
+                        "chainID": chainID
+                    });
                     // get trace from block
                     let trace = await this.dedupChanges(results.changes);
                     if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;

@@ -7,6 +7,9 @@ const paraTool = require("./paraTool");
 const Endpoints = require("./summary/endpoints");
 const mysql = require("mysql2");
 const {
+    WebSocket
+} = require('ws');
+const {
     hexToU8a,
     compactStripLength,
     hexToBn
@@ -694,6 +697,7 @@ module.exports = class Indexer extends AssetManager {
             this.flush_addressExtrinsicMap(),
             this.flushProxy(),
             this.flushWasmContracts(),
+            //this.flush_evmcontractMap(),
             await this.flushXCM()
         ])
         await statusesPromise
@@ -1330,8 +1334,27 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
+    sendWSMessage(m, msgType = null) {
+        return;
+        const endpoint = null;
+        try {
+            const ws = new WebSocket(endpoint);
+            ws.on('error', function error() {
+
+            })
+            ws.on('open', function open() {
+                if (msgType) m.msgType = msgType;
+                ws.send(JSON.stringify(m));
+            });
+        } catch (err) {
+
+        }
+    }
+
     //this is the xcmmessages table
     updateXCMMsg(xcmMsg, overwrite = false) {
+        this.sendWSMessage(xcmMsg, "xcmmessage")
+
         let direction = (xcmMsg.isIncoming) ? 'i' : 'o'
         if (direction == 'o' && xcmMsg.msgType != 'dmp' && !overwrite) {
             //sentAt is theoretically unknown for ump/hrmp..
@@ -1541,6 +1564,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     updateXCMTransferStorage(xcmtransfer) {
+        this.sendWSMessage(xcmtransfer, "xcmtransfer");
         //console.log(`adding xcmtransfer`, xcmtransfer)
         try {
             let errs = []
@@ -1606,6 +1630,7 @@ module.exports = class Indexer extends AssetManager {
 
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
     updateXCMTransferDestCandidate(candidate, caller = false) {
+        this.sendWSMessage(candidate, "xcmtransferdestcandidate");
         //potentially add sentAt here, but it's 2-4
         let eventID = candidate.eventID
         let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
@@ -1977,6 +2002,7 @@ module.exports = class Indexer extends AssetManager {
         let rows = [];
         for (const k of Object.keys(this.evmcontractMap)) {
             let c = this.evmcontractMap[k];
+            console.log(`!! flush_evmcontractMap ${k}`, c)
             this.add_index_metadata(c);
             this.push_rows_related_keys("evmcontract", c.chainID.toString(), rows, c.asset, c)
         }
@@ -3969,10 +3995,10 @@ module.exports = class Indexer extends AssetManager {
                 chainID: this.chainID,
                 ts: blockTS
             })
-            if (p){
+            if (p) {
                 feedReward["amountUSD"] = p.valUSD
                 feedReward["priceUSD"] = p.priceUSD
-            }else{
+            } else {
                 feedReward["amountUSD"] = 0
                 feedReward["priceUSD"] = 0
             }
@@ -4917,7 +4943,7 @@ module.exports = class Indexer extends AssetManager {
             */
             let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(erc20TokenInfo.tokenAddress, chainID) // REVIEW
             this.initERCAsset(assetChain, erc20TokenInfo, tx, ercType);
-            return (true)
+            return `${paraTool.assetTypeERC20}`
         }
         // trying erc721 next
         // ethTool rpccall (6)
@@ -4925,7 +4951,7 @@ module.exports = class Indexer extends AssetManager {
         if (erc721ContractInfo) {
             let assetChain = this.getErc721TokenAssetChain(erc721ContractInfo.tokenAddress, chainID)
             this.initERCAsset(assetChain, erc721ContractInfo, tx, paraTool.assetTypeERC721);
-            return true
+            return `${paraTool.assetTypeERC721}`
         }
 
         //trying erc1155 (stub)
@@ -4934,7 +4960,7 @@ module.exports = class Indexer extends AssetManager {
         if (erc1155ContractInfo) {
             let assetChain = this.getErc1155TokenAssetChain(erc1155ContractInfo.tokenAddress, chainID)
             this.initERCAsset(assetChain, erc1155ContractInfo, tx, paraTool.assetTypeERC1155);
-            return true
+            return `${paraTool.assetTypeERC1155}`
         }
 
         {
@@ -4943,8 +4969,8 @@ module.exports = class Indexer extends AssetManager {
             };
             let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(contractAddress, chainID); // REVIEW
             this.initERCAsset(assetChain, contractInfo, tx, paraTool.assetTypeContract);
+            return `${paraTool.assetTypeContract}`
         }
-
         return (false);
     }
 
@@ -5507,9 +5533,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     //  - /asset/0x1d3.. --> get the totalSupply, top 1000 asset holders
     async process_evm_transaction(tx, chainID, finalized = false) {
         if (tx == undefined) return;
+        let contractType = false
         if (ethTool.isTxContractCreate(tx)) {
             // Contract Creates
-            await this.process_evm_contract_create(tx, chainID, finalized);
+            contractType = await this.process_evm_contract_create(tx, chainID, finalized);
         }
 
         if (ethTool.isTxNativeTransfer(tx)) {
@@ -5580,10 +5607,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     value: tx.value,
                     fee: tx.fee
                 }
-                console.log(`[${tx.blockNumber}][${evmTxHash}] sent to ${tx.to}`, feedto)
+                //console.log(`[${tx.blockNumber}][${evmTxHash}] sent to ${tx.to}`, feedto)
                 this.updateAddressExtrinsicStorage(tx.to, syntheticExtrinsicID, evmTxHash, "feedto", feedto, tx.timestamp, true);
             }
-            if (tx.creates){
+            if (tx.creates) {
                 // this is contracts creates
                 let feedCreates = {
                     chainID: chainID,
@@ -5598,6 +5625,18 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 }
                 console.log(`[${tx.blockNumber}][${evmTxHash}] created at ${ethTool.toChecksumAddress(tx.creates)}`, feedCreates)
                 this.updateAddressExtrinsicStorage(tx.creates, syntheticExtrinsicID, evmTxHash, "feedto", feedCreates, tx.timestamp, true);
+                if (contractType) {
+                    let contractAddress = tx.creates.toLowerCase()
+                    let contractMeta = {
+                        asset: contractAddress,
+                        chainID: chainID,
+                        assetType: contractType,
+                        creator: tx.from.toLowerCase(),
+                        createdAtTx: evmTxHash,
+                    };
+                    console.log(`[${evmTxHash}] [${contractAddress}]`, contractMeta)
+                    this.evmcontractMap[contractAddress] = contractMeta;
+                }
             }
         }
     }

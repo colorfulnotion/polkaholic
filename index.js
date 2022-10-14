@@ -1756,6 +1756,14 @@ app.post('/uploadcontract/:address', async (req, res) => {
 
 })
 
+app.get('/ws', async (req, res) => {
+    var chains = await query.getChains();
+    res.render('ws', {
+        chains
+    });
+})
+
+
 app.post('/uploadcode/:codeHash', async (req, res) => {
     if (!req.files || Object.keys(req.files).length === 0) {
         return res.status(400).send('No contract file was uploaded.');
@@ -1771,7 +1779,6 @@ app.post('/uploadcode/:codeHash', async (req, res) => {
         }
         res.send('Code File uploaded!');
     });
-
 })
 
 app.get('/about', async (req, res) => {
