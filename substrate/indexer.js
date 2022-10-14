@@ -694,6 +694,7 @@ module.exports = class Indexer extends AssetManager {
             this.flush_addressExtrinsicMap(),
             this.flushProxy(),
             this.flushWasmContracts(),
+            //this.flush_evmcontractMap(),
             await this.flushXCM()
         ])
         await statusesPromise
@@ -1977,6 +1978,7 @@ module.exports = class Indexer extends AssetManager {
         let rows = [];
         for (const k of Object.keys(this.evmcontractMap)) {
             let c = this.evmcontractMap[k];
+            console.log(`!! flush_evmcontractMap ${k}`, c)
             this.add_index_metadata(c);
             this.push_rows_related_keys("evmcontract", c.chainID.toString(), rows, c.asset, c)
         }
@@ -4917,7 +4919,7 @@ module.exports = class Indexer extends AssetManager {
             */
             let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(erc20TokenInfo.tokenAddress, chainID) // REVIEW
             this.initERCAsset(assetChain, erc20TokenInfo, tx, ercType);
-            return (true)
+            return `${paraTool.assetTypeERC20}`
         }
         // trying erc721 next
         // ethTool rpccall (6)
@@ -4925,7 +4927,7 @@ module.exports = class Indexer extends AssetManager {
         if (erc721ContractInfo) {
             let assetChain = this.getErc721TokenAssetChain(erc721ContractInfo.tokenAddress, chainID)
             this.initERCAsset(assetChain, erc721ContractInfo, tx, paraTool.assetTypeERC721);
-            return true
+            return `${paraTool.assetTypeERC721}`
         }
 
         //trying erc1155 (stub)
@@ -4934,7 +4936,7 @@ module.exports = class Indexer extends AssetManager {
         if (erc1155ContractInfo) {
             let assetChain = this.getErc1155TokenAssetChain(erc1155ContractInfo.tokenAddress, chainID)
             this.initERCAsset(assetChain, erc1155ContractInfo, tx, paraTool.assetTypeERC1155);
-            return true
+            return `${paraTool.assetTypeERC1155}`
         }
 
         {
@@ -4943,8 +4945,8 @@ module.exports = class Indexer extends AssetManager {
             };
             let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(contractAddress, chainID); // REVIEW
             this.initERCAsset(assetChain, contractInfo, tx, paraTool.assetTypeContract);
+            return `${paraTool.assetTypeContract}`
         }
-
         return (false);
     }
 
@@ -5507,9 +5509,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     //  - /asset/0x1d3.. --> get the totalSupply, top 1000 asset holders
     async process_evm_transaction(tx, chainID, finalized = false) {
         if (tx == undefined) return;
+        let contractType = false
         if (ethTool.isTxContractCreate(tx)) {
             // Contract Creates
-            await this.process_evm_contract_create(tx, chainID, finalized);
+            contractType = await this.process_evm_contract_create(tx, chainID, finalized);
         }
 
         if (ethTool.isTxNativeTransfer(tx)) {
@@ -5580,7 +5583,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     value: tx.value,
                     fee: tx.fee
                 }
-                console.log(`[${tx.blockNumber}][${evmTxHash}] sent to ${tx.to}`, feedto)
+                //console.log(`[${tx.blockNumber}][${evmTxHash}] sent to ${tx.to}`, feedto)
                 this.updateAddressExtrinsicStorage(tx.to, syntheticExtrinsicID, evmTxHash, "feedto", feedto, tx.timestamp, true);
             }
             if (tx.creates){
@@ -5598,6 +5601,18 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 }
                 console.log(`[${tx.blockNumber}][${evmTxHash}] created at ${ethTool.toChecksumAddress(tx.creates)}`, feedCreates)
                 this.updateAddressExtrinsicStorage(tx.creates, syntheticExtrinsicID, evmTxHash, "feedto", feedCreates, tx.timestamp, true);
+                if (contractType){
+                    let contractAddress = tx.creates.toLowerCase()
+                    let contractMeta = {
+                        asset: contractAddress,
+                        chainID: chainID,
+                        assetType: contractType,
+                        creator: tx.from.toLowerCase(),
+                        createdAtTx: evmTxHash,
+                    };
+                    console.log(`[${evmTxHash}] [${contractAddress}]`, contractMeta)
+                    this.evmcontractMap[contractAddress] = contractMeta;
+                }
             }
         }
     }
