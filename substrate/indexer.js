@@ -689,7 +689,8 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async immediateFlushBlockAndAddressExtrinsics() {
+    // also send xcmtransfer ws msg
+    async immediateFlushBlockAndAddressExtrinsics(isTip = false) {
         //flush table that are not dependent on each other and can be promised immediately ()
         var statusesPromise = Promise.allSettled([
             this.flushHashesRows(),
@@ -698,7 +699,7 @@ module.exports = class Indexer extends AssetManager {
             this.flushProxy(),
             this.flushWasmContracts(),
             this.flush_evmcontractMap(),
-            await this.flushXCM()
+            await this.flushXCM(isTip)
         ])
         await statusesPromise
         this.resetHashRowStat()
@@ -711,7 +712,7 @@ module.exports = class Indexer extends AssetManager {
         this.showCurrentMemoryUsage()
 
         let immediateFlushStartTS = new Date().getTime();
-        await this.immediateFlushBlockAndAddressExtrinsics()
+        await this.immediateFlushBlockAndAddressExtrinsics(isTip)
         let immediateFlushTS = (new Date().getTime() - immediateFlushStartTS) / 1000
         if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(f): immediate Flush Block&AddressExtrinsics", immediateFlushTS);
         this.timeStat.flush_f_TS += immediateFlushTS
@@ -1197,7 +1198,7 @@ module.exports = class Indexer extends AssetManager {
     PRIMARY KEY (`extrinsicHash`)
     );
     */
-    async flushXCM() {
+    async flushXCM(isTip = false) {
         // flush xcmtransfer
         let xcmtransferKeys = Object.keys(this.xcmtransfer)
         if (xcmtransferKeys.length > 0) {
@@ -1205,6 +1206,12 @@ module.exports = class Indexer extends AssetManager {
             let numXCMTransfersOut = {}
             for (let i = 0; i < xcmtransferKeys.length; i++) {
                 let r = this.xcmtransfer[xcmtransferKeys[i]];
+                //MK: send xcmtransfer here
+                if (isTip || true){
+                    console.log(`send xcmtransfer ${r.extrinsicHash} (msgHash:${r.msgHash}), isTip=${isTip}`)
+                    this.sendWSMessage(r, "xcmtransfer", "flushXCM");
+                }
+
                 //let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
                 let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
                 //["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"]
@@ -1258,6 +1265,11 @@ module.exports = class Indexer extends AssetManager {
             let xcmtransferdestcandidates = [];
             for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
                 let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
+                //MK: send xcmtransfer here
+                if (isTip || true){
+                    console.log(`send xcmtransferdestcandidate [${r.eventID}] (msgHash:${r.msgHash}), isTip=${isTip}`)
+                    this.sendWSMessage(r, "xcmtransferdestcandidate", "flushXCM");
+                }
                 // ["chainIDDest", "eventID"] + ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT", "nativeAssetChain", "xcmInteriorKey"
                 //let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
                 let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
@@ -1293,9 +1305,13 @@ module.exports = class Indexer extends AssetManager {
             let xcmViolationRecs = [];
             for (let i = 0; i < xcmViolationKeys.length; i++) {
                 let v = this.xcmViolation[xcmViolationKeys[i]];
-
                 let chainIDDest = (v.chainIDDest != undefined) ? `'${v.chainIDDest}'` : `NULL`
                 let errorcase = (v.errorcase != undefined && v.errorcase != "") ? `'${v.errorcase}'` : `NULL`
+                //MK: send violation here
+                if (isTip || true){
+                    console.log(`send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${r.instructionHash}), isTip=${isTip}`)
+                    this.sendWSMessage(r, "xcmViolation", "flushXCM");
+                }
                 //["chainID", "instructionHash", "sourceBlocknumber"]
                 //["chainIDDest", "violationType", "parser", "caller", "errorcase", "instruction", "sourceTS", "indexDT"]
                 let t = "(" + [`'${v.chainID}'`, `'${v.instructionHash}'`, `'${v.sourceBlocknumber}'`,
@@ -1334,8 +1350,8 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
-    sendWSMessage(m, msgType = null) {
-        console.log(`sending [${msgType}]`, m)
+    sendWSMessage(m, msgType = null, caller = null) {
+        console.log(`sendWSMessage [${msgType}] [${caller}]`, m)
         return;
         const endpoint = null;
         try {
@@ -1354,9 +1370,7 @@ module.exports = class Indexer extends AssetManager {
 
     //this is the xcmmessages table
     updateXCMMsg(xcmMsg, overwrite = false) {
-        //send incoming msg immediately...
         //for out going msg wait till we have all available info
-        this.sendWSMessage(xcmMsg, "xcmmessage")
 
         let direction = (xcmMsg.isIncoming) ? 'i' : 'o'
         if (direction == 'o' && xcmMsg.msgType != 'dmp' && !overwrite) {
@@ -1567,8 +1581,8 @@ module.exports = class Indexer extends AssetManager {
     }
 
     updateXCMTransferStorage(xcmtransfer) {
-        this.sendWSMessage(xcmtransfer, "xcmtransfer");
         //console.log(`adding xcmtransfer`, xcmtransfer)
+        //!only isXcmTipSafe can get here
         try {
             let errs = []
             /*
@@ -1634,7 +1648,6 @@ module.exports = class Indexer extends AssetManager {
 
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
     updateXCMTransferDestCandidate(candidate, caller = false) {
-        this.sendWSMessage(candidate, "xcmtransferdestcandidate");
         //potentially add sentAt here, but it's 2-4
         let eventID = candidate.eventID
         let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
@@ -6304,6 +6317,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let mp = this.xcmmsgMap[xcmKey]
                 let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
                 if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
+                //MK: send xcmmsg here
+                if (mp != undefined && (isTip || true)){
+                    console.log(`send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
+                    this.sendWSMessage(mp, "xcmmessage", "processBlockEvents")
+                }
                 let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
                 let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
                 let beneficiaries = (mp.beneficiaries != undefined) ? `'${mp.beneficiaries}'` : 'NULL'
@@ -7758,7 +7776,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (true) {
                 //flush hashesRows
                 startTS = new Date().getTime();
-                await this.immediateFlushBlockAndAddressExtrinsics()
+                await this.immediateFlushBlockAndAddressExtrinsics(false)
                 let immediateFlushTS = (new Date().getTime() - startTS) / 1000
                 this.timeStat.immediateFlushTS += immediateFlushTS
                 this.timeStat.immediateFlush++
