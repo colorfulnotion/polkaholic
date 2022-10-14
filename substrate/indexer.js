@@ -697,7 +697,7 @@ module.exports = class Indexer extends AssetManager {
             this.flush_addressExtrinsicMap(),
             this.flushProxy(),
             this.flushWasmContracts(),
-            //this.flush_evmcontractMap(),
+            this.flush_evmcontractMap(),
             await this.flushXCM()
         ])
         await statusesPromise
