@@ -1206,12 +1206,6 @@ module.exports = class Indexer extends AssetManager {
             let numXCMTransfersOut = {}
             for (let i = 0; i < xcmtransferKeys.length; i++) {
                 let r = this.xcmtransfer[xcmtransferKeys[i]];
-                //MK: send xcmtransfer here
-                if (isTip || true){
-                    console.log(`send xcmtransfer ${r.extrinsicHash} (msgHash:${r.msgHash}), isTip=${isTip}`)
-                    this.sendWSMessage(r, "xcmtransfer", "flushXCM");
-                }
-
                 //let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
                 let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
                 //["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"]
@@ -1265,11 +1259,6 @@ module.exports = class Indexer extends AssetManager {
             let xcmtransferdestcandidates = [];
             for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
                 let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
-                //MK: send xcmtransfer here
-                if (isTip || true){
-                    console.log(`send xcmtransferdestcandidate [${r.eventID}] (msgHash:${r.msgHash}), isTip=${isTip}`)
-                    this.sendWSMessage(r, "xcmtransferdestcandidate", "flushXCM");
-                }
                 // ["chainIDDest", "eventID"] + ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT", "nativeAssetChain", "xcmInteriorKey"
                 //let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
                 let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
@@ -1309,8 +1298,8 @@ module.exports = class Indexer extends AssetManager {
                 let errorcase = (v.errorcase != undefined && v.errorcase != "") ? `'${v.errorcase}'` : `NULL`
                 //MK: send violation here
                 if (isTip || true){
-                    console.log(`send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${r.instructionHash}), isTip=${isTip}`)
-                    this.sendWSMessage(r, "xcmViolation", "flushXCM");
+                    console.log(`[Delay=${this.chainParser.parserBlockNumber-v.sourceBlocknumber}]  send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${r.instructionHash}), isTip=${isTip}`)
+                    //this.sendWSMessage(r, "xcmViolation", "flushXCM");
                 }
                 //["chainID", "instructionHash", "sourceBlocknumber"]
                 //["chainIDDest", "violationType", "parser", "caller", "errorcase", "instruction", "sourceTS", "indexDT"]
@@ -1580,22 +1569,11 @@ module.exports = class Indexer extends AssetManager {
         return (asset);
     }
 
-    updateXCMTransferStorage(xcmtransfer) {
+    updateXCMTransferStorage(xcmtransfer, isTip) {
         //console.log(`adding xcmtransfer`, xcmtransfer)
         //!only isXcmTipSafe can get here
         try {
             let errs = []
-            /*
-            // check that xcmtransfer.rawAsset exists
-            if (xcmtransfer.rawAsset == undefined) {
-                errs.push("No rawAsset");
-            } else {
-                let assetChain = paraTool.makeAssetChain(xcmtransfer.rawAsset, xcmtransfer.chainID);
-                if (this.assetInfo[assetChain] == undefined) {
-                    errs.push(`Invalid asset-chain combination (${assetChain}) not found in assetManager.assetInfo`);
-                }
-            }
-            */
             // check that xcmInteriorKey exists and matches
             if (xcmtransfer.xcmInteriorKey == undefined) {
                 errs.push("No xcmInteriorKey");
@@ -1644,10 +1622,15 @@ module.exports = class Indexer extends AssetManager {
             })
         }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
+        //MK: send xcmtransfer here
+        if (isTip || true){
+            console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
+            this.sendWSMessage(xcmtransfer, "xcmtransfer", "updateXCMTransferStorage");
+        }
     }
 
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
-    updateXCMTransferDestCandidate(candidate, caller = false) {
+    updateXCMTransferDestCandidate(candidate, caller = false, isTip = false) {
         //potentially add sentAt here, but it's 2-4
         let eventID = candidate.eventID
         let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
@@ -1658,6 +1641,11 @@ module.exports = class Indexer extends AssetManager {
             }
         } else {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
+        }
+        //MK: send xcmtransfer here
+        if (isTip || true){
+            console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
+            this.sendWSMessage(candidate, "xcmtransferdestcandidate", caller);
         }
     }
 
@@ -4558,7 +4546,7 @@ module.exports = class Indexer extends AssetManager {
         }
 
         if (!isSigned) {
-            this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, finalized);
+            this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, isTip, finalized);
         }
         //console.log('hash!!', extrinsicHash, `isSigned=${isSigned}`, `${JSON.stringify(extrinsic.signature)}`, extrinsic.signature.signer)
 
@@ -4679,7 +4667,7 @@ module.exports = class Indexer extends AssetManager {
                             }
                             this.stat.addressRows.xcmsend++;
                             this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized);
-                            this.updateXCMTransferStorage(xcmtransfer); // store, flushed in flushXCM
+                            this.updateXCMTransferStorage(xcmtransfer, isTip); // store, flushed in flushXCM
                         }
                     } else {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length} - skip`)
@@ -6104,7 +6092,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
                 //MK: send xcmmsg here
                 if (mp != undefined && (isTip || true)){
-                    console.log(`send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
+                    console.log(`[Delay=${this.chainParser.parserBlockNumber-mp.blockNumber}] send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
                     this.sendWSMessage(mp, "xcmmessage", "processBlockEvents")
                 }
                 let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'

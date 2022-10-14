@@ -883,7 +883,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized = false) {
+    processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
         //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
         this.mpReceived = false;
         this.mpReceivedHashes = {};
@@ -937,7 +937,7 @@ module.exports = class ChainParser {
                         let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
                         if (candidate) {
                             candiateCnt++
-                            indexer.updateXCMTransferDestCandidate(candidate, caller)
+                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
                         }
                     }
                     console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
@@ -948,7 +948,7 @@ module.exports = class ChainParser {
                             console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
                             if (candidate) {
                                 candiateCnt++
-                                indexer.updateXCMTransferDestCandidate(candidate, caller)
+                                indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
                             }
                         }
                     }
@@ -2210,7 +2210,7 @@ module.exports = class ChainParser {
         return outgoingXTokens;
     }
 
-    //TODO: go one level deep 
+    //TODO: go one level deep
     extract_xcm_incomplete(events, extrinsicID = false) {
         let incomplete = 0;
         for (let i = 0; i < events.length; i++) {

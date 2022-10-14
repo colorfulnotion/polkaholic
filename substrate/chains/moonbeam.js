@@ -5,7 +5,7 @@ const ChainParser = require("./chainparser");
 
 module.exports = class MoonbeamParser extends ChainParser {
 
-    processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized = false) {
+    processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
         //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
         this.mpReceived = false;
         this.mpReceivedHashes = {};
@@ -56,7 +56,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                         let e = eventRange[i]
                         let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
                         if (candidate) {
-                            indexer.updateXCMTransferDestCandidate(candidate, caller)
+                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
                         }
                     }
                 } else {
