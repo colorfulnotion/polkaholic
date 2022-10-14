@@ -1049,7 +1049,7 @@ module.exports = class Query extends AssetManager {
                     if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint3)) chainInfo.WSEndpoint3 = null
                     // hardcoded for publicEndpoint = true for now
                     chainInfo.chainID = parseInt(chainInfo.chainID)
-                    if ( ( chainInfo.chainID == 2006 || chainInfo.chainID == 22007 ) || ( chainInfo.chainID == 2004 || chainInfo.chainID == 22023 ) ) {
+                    if ( ( chainInfo.chainID == 2006 || chainInfo.chainID == 22007 ) || ( chainInfo.chainID == 2004 || chainInfo.chainID == 22023  || chainInfo.chainID == 61000 ) ) {
                       chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
                       chainInfo.WSEndpoint = `wss://${chainInfo.id}.api.onfinality.io/public-ws`
                     }
@@ -3766,25 +3766,36 @@ module.exports = class Query extends AssetManager {
 
             }
             let rowData = row.data;
-            [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
-            if (contract) {
-                let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' and asset.chainID = '${chainID}'`
-                let extraRecs = await this.poolREADONLY.query(sql)
-                if (extraRecs.length > 0) {
-                    let e = extraRecs[0];
-                    var p = await this.computePriceUSD({
-                        asset: e.asset,
-                        chainID: e.chainID
-                    });
-                    contract.assetName = e.assetName;
-                    contract.symbol = e.symbol;
-                    contract.localSymbol = e.localSymbol;
-                    if (p) contract.priceUSD = p.priceUSDCurrent;
-                    contract.totalSupply = e.totalSupply;
-                    contract.numHolders = e.numHolders;
-                    contract.decimals = e.decimals;
-                }
-            }
+	    let w = chainID ?  `and asset.chainID = '${chainID}'` : ''
+            contract = null;
+	    [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
+            let sql = `select asset.creator, asset.assetType, asset.createdAtTx, unix_timestamp(asset.createDT) as createTS, asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' ${w}`
+	    console.log(sql);
+            let extraRecs = await this.poolREADONLY.query(sql)
+            if (extraRecs.length > 0) {
+                let e = extraRecs[0];
+                var p = await this.computePriceUSD({
+                    asset: e.asset,
+                    chainID: e.chainID
+                });
+		if ( ! contract ) {
+		    contract = {}
+		}
+		contract.chainID = e.chainID;
+		contract.creator = e.creator;
+                contract.createdAtTx   = e.createdAtTx;
+                contract.createTS   = e.createTS;
+                contract.assetType   = e.assetType;
+		contract.address = e.asset
+		contract.asset = e.asset
+                contract.assetName = e.assetName;
+                contract.symbol = e.symbol;
+                contract.localSymbol = e.localSymbol;
+                if (p) contract.priceUSD = p.priceUSDCurrent;
+                contract.totalSupply = e.totalSupply;
+                contract.numHolders = e.numHolders;
+                contract.decimals = e.decimals;
+	    }
             return [realtime, contract];
         }
     }

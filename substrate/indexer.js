@@ -6,6 +6,7 @@ const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 const Endpoints = require("./summary/endpoints");
 const mysql = require("mysql2");
+const { WebSocket } = require('ws');
 const {
     hexToU8a,
     compactStripLength,
@@ -1331,8 +1332,25 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
+    sendWSMessage(m, msgType = null) {
+	try {
+	    const ws = new WebSocket('ws://kusama-internal.polkaholic.io:9977');
+	    ws.on('error', function error() {
+		
+	    })
+	    ws.on('open', function open() {
+		if ( msgType ) m.msgType = msgType;
+		ws.send(JSON.stringify(m));
+	    });
+	} catch (err) {
+	    
+	}
+    }
+
     //this is the xcmmessages table
     updateXCMMsg(xcmMsg, overwrite = false) {
+	this.sendWSMessage(xcmMsg, "xcmmessage")
+
         let direction = (xcmMsg.isIncoming) ? 'i' : 'o'
         if (direction == 'o' && xcmMsg.msgType != 'dmp' && !overwrite) {
             //sentAt is theoretically unknown for ump/hrmp..
@@ -1542,6 +1560,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     updateXCMTransferStorage(xcmtransfer) {
+	this.sendWSMessage(xcmtransfer, "xcmtransfer");
         //console.log(`adding xcmtransfer`, xcmtransfer)
         try {
             let errs = []
@@ -1607,6 +1626,7 @@ module.exports = class Indexer extends AssetManager {
 
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
     updateXCMTransferDestCandidate(candidate, caller = false) {
+	this.sendWSMessage(candidate, "xcmtransferdestcandidate");
         //potentially add sentAt here, but it's 2-4
         let eventID = candidate.eventID
         let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
