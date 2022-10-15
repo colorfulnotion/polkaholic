@@ -1297,7 +1297,7 @@ module.exports = class Indexer extends AssetManager {
                 let chainIDDest = (v.chainIDDest != undefined) ? `'${v.chainIDDest}'` : `NULL`
                 let errorcase = (v.errorcase != undefined && v.errorcase != "") ? `'${v.errorcase}'` : `NULL`
                 //MK: send violation here
-                if (isTip || true){
+                if (isTip){
                     console.log(`[Delay=${this.chainParser.parserBlockNumber-v.sourceBlocknumber}]  send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${r.instructionHash}), isTip=${isTip}`)
                     //this.sendWSMessage(r, "xcmViolation", "flushXCM");
                 }
@@ -1340,19 +1340,22 @@ module.exports = class Indexer extends AssetManager {
     }
 
     sendWSMessage(m, msgType = null, caller = null) {
-        if (msgType) m.msgType = msgType;
-        m.source = this.hostname;
-        console.log(`sendWSMessage [${msgType}] [${caller}]`, m)
+        if (msgType == undefined) msgType = 'Unknown'
+        //m.source = this.hostname;
+        let wrapper = {
+            type: msgType,
+            msg: m,
+            source: this.hostname,
+        }
+        console.log(`sendWSMessage [${msgType}] [${caller}]`, wrapper)
         return;
         const endpoint = null;
         try {
             const ws = new WebSocket(endpoint);
             ws.on('error', function error() {
-
             })
             ws.on('open', function open() {
-
-                ws.send(JSON.stringify(m));
+                ws.send(JSON.stringify(wrapper));
             });
         } catch (err) {
 
@@ -1625,7 +1628,7 @@ module.exports = class Indexer extends AssetManager {
         }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
         //MK: send xcmtransfer here
-        if (isTip || true){
+        if (isTip){
             console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(xcmtransfer, "xcmtransfer", "updateXCMTransferStorage");
         }
@@ -1645,7 +1648,7 @@ module.exports = class Indexer extends AssetManager {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
         }
         //MK: send xcmtransfer here
-        if (isTip || true){
+        if (isTip){
             console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(candidate, "xcmtransferdestcandidate", caller);
         }
@@ -6093,7 +6096,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
                 if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
                 //MK: send xcmmsg here
-                if (mp != undefined && (isTip || true)){
+                if (mp != undefined && (isTip)){
                     console.log(`[Delay=${this.chainParser.parserBlockNumber-mp.blockNumber}] send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
                     this.sendWSMessage(mp, "xcmmessage", "processBlockEvents")
                 }

@@ -1960,12 +1960,12 @@ create table talismanEndpoint (
             let bn = parseInt(header.number.toString(), 10);
             let finalizedHash = header.hash.toString();
             let parentHash = header.parentHash.toString();
-
-            this.sendWSMessage({
+            let subscribeFinalizedHeadsMsg = {
                 "msgType": "subscribeFinalizedHeads",
                 "bn": bn,
                 "chainID": chainID
-            });
+            }
+            this.sendWSMessage(subscribeFinalizedHeadsMsg, "subscribeFinalizedHeads", "crawlBlocks");
             await this.processFinalizedHead(chain, chainID, bn, finalizedHash, parentHash, true);
             this.finalizedHashes[bn] = finalizedHash;
             // because we do not always get the finalized hash signal, we brute force use the parentHash => grandparentHash => greatgrandparentHash => greatgreatgrandparentHash  (3 up)
@@ -2033,11 +2033,12 @@ create table talismanEndpoint (
                     block.blockTS = blockTS;
 
                     let blockNumber = block.number;
-                    this.sendWSMessage({
+                    let subscribeStorageMsg = {
                         "msgType": "subscribeStorage",
                         "bn": blockNumber,
                         "chainID": chainID
-                    });
+                    }
+                    this.sendWSMessage(subscribeStorageMsg, "subscribeStorage", "crawlBlocks");
                     // get trace from block
                     let trace = await this.dedupChanges(results.changes);
                     if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
@@ -2059,7 +2060,7 @@ create table talismanEndpoint (
                             let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, "subscribeStorage", this.api);
                             let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces); // autotrace, finalized, write_bq_log are all false
 
-                            await this.immediateFlushBlockAndAddressExtrinsics(isTip) //this is tip
+                            await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
                             if (blockNumber > this.blocksCovered) {
                                 // only update blocksCovered in the DB if its HIGHER than what we have seen before
                                 var sql = `update chain set blocksCovered = '${blockNumber}', lastCrawlDT = Now() where chainID = '${chainID}' and blocksCovered < ${blockNumber}`
