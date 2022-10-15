@@ -52,6 +52,7 @@ module.exports = class Indexer extends AssetManager {
     currentSessionValidators = [];
     currentSessionIndex = -1;
 
+    trailingBlockHashs = {};
     multisigMap = {};
     proxyMap = {};
     crowdloan = {};
@@ -6050,6 +6051,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let blockNumber = block.header.number;
         let blockHash = block.hash;
         let blockTS = block.blockTS;
+        let paraID = paraTool.getParaIDfromChainID(chainID)
+        if (paraID == 0){
+            this.trailingBlockHashs[blockHash] = blockNumber;
+        }
         let recentExtrinsics = [];
         let recentTransfers = [];
         let recentXcmMsgs = []; //new xcm here
