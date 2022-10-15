@@ -1050,6 +1050,7 @@ module.exports = class ChainParser {
         // claim: parainclusion(CandidateBacked) -> parainclusion(CandidateIncluded)
         // a block must be "backed" before it can be included
         // destSentAt correspond to parainclusion(CandidateIncluded) at sent
+        // backedCandidate.relayParent is same as source 'sentAt'!
         try {
             console.log(`im here processParainherentEnter`)
             let parainclusionCandidateBackedList = events.filter((ev) => {
@@ -1068,7 +1069,7 @@ module.exports = class ChainParser {
             }
             for (const parainclusionCandidateIncluded of parainclusionCandidateIncludedList){
                  let includedCandidate = parainclusionCandidateIncluded.data[0].descriptor
-                 let relayParent = backedCandidate.relayParent
+                 let relayParent = includedCandidate.relayParent
                  if (indexer.trailingBlockHashs[relayParent] != undefined){
                      includedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
                  }
