@@ -1061,16 +1061,16 @@ module.exports = class ChainParser {
             for (const parainclusionCandidateBacked of parainclusionCandidateBackedList){
                  let backedCandidate = parainclusionCandidateBacked.data[0].descriptor
                  let relayParent = backedCandidate.relayParent
-                 if (this.trailingBlockHashs[relayParent] != undefined){
-                     backedCandidate.sentAt2 = this.trailingBlockHashs[relayParent]
+                 if (indexer.trailingBlockHashs[relayParent] != undefined){
+                     backedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
                  }
                  console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] backedCandidate`, backedCandidate)
             }
             for (const parainclusionCandidateIncluded of parainclusionCandidateIncludedList){
                  let includedCandidate = parainclusionCandidateIncluded.data[0].descriptor
                  let relayParent = backedCandidate.relayParent
-                 if (this.trailingBlockHashs[relayParent] != undefined){
-                     includedCandidate.sentAt2 = this.trailingBlockHashs[relayParent]
+                 if (indexer.trailingBlockHashs[relayParent] != undefined){
+                     includedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
                  }
                  console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] includedCandidate`, includedCandidate)
             }
