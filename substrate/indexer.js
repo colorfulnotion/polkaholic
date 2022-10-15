@@ -1340,19 +1340,22 @@ module.exports = class Indexer extends AssetManager {
     }
 
     sendWSMessage(m, msgType = null, caller = null) {
-        if (msgType) m.msgType = msgType;
-        m.source = this.hostname;
-        console.log(`sendWSMessage [${msgType}] [${caller}]`, m)
+        if (msgType == undefined) msgType = 'Unknown'
+        //m.source = this.hostname;
+        let wrapper = {
+            type: msgType,
+            msg: m,
+            source: this.hostname,
+        }
+        console.log(`sendWSMessage [${msgType}] [${caller}]`, wrapper)
         return;
         const endpoint = null;
         try {
             const ws = new WebSocket(endpoint);
             ws.on('error', function error() {
-
             })
             ws.on('open', function open() {
-
-                ws.send(JSON.stringify(m));
+                ws.send(JSON.stringify(wrapper));
             });
         } catch (err) {
 
