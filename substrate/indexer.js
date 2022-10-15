@@ -6053,7 +6053,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let blockTS = block.blockTS;
         let paraID = paraTool.getParaIDfromChainID(chainID)
         if (paraID == 0){
-            this.trailingBlockHashs[blockHash] = blockNumber;
+            //this.trailingBlockHashs[blockHash] = blockNumber;
         }
         let recentExtrinsics = [];
         let recentTransfers = [];

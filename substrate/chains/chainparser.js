@@ -1052,6 +1052,7 @@ module.exports = class ChainParser {
         // destSentAt correspond to parainclusion(CandidateIncluded) at sent
         // backedCandidate.relayParent is same as source 'sentAt'!
         try {
+            /*
             console.log(`im here processParainherentEnter`)
             let parainclusionCandidateBackedList = events.filter((ev) => {
                 return this.paraInclusionCandidateBackedFilter(`${ev.section}(${ev.method})`);
@@ -1075,6 +1076,7 @@ module.exports = class ChainParser {
                  }
                  console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] includedCandidate`, includedCandidate)
             }
+            */
         }catch (err) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processParainherentEnter event error`, err)
         }
