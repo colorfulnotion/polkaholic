@@ -8,6 +8,7 @@ module.exports = class ChainParser {
     parserBlockHash = false;
     parserWatermark = 0;
     relayParentStorageRoot = false;
+    paraStates = {}
     numParserErrors = 0;
     mpReceived = false;
     mpReceivedHashes = {};
@@ -997,7 +998,76 @@ module.exports = class ChainParser {
             },
             ...
           ]
+          {
+            "eventID": "0-12484234-1-1",
+            "section": "paraInclusion",
+            "method": "CandidateIncluded",
+            "data": [
+              {
+                "descriptor": {
+                  "paraId": 1000,
+                  "relayParent": "0x40be74436db126b9e81d5a1f0fe385335d9174d98cfe86e8f5ea2ab22c1c204c",
+                  "collator": "0xc43af01cb2265b0fb18681bd6e223a9c920cff12a453f614b40df42597bf4e05",
+                  "persistedValidationDataHash": "0xb5c4bbe34b9c2798ea35de0a285d42d7cdb64265db316579edd4aebaa73ab940",
+                  "povHash": "0xbddda78d1f3c04e01da57c35f24bcae330f16f7d4fe444d6cba5bfdd9223f73e",
+                  "erasureRoot": "0xe005c22f322ecf96863a50c16870163eb14ce5704d798cb17ec6d99df677c68f",
+                  "signature": "0x0e1fb3171c4906033ca627d1cd08ea61d587c7033d4ad38d61ce2eb42080d60b9d4911733433097576c02a68b74d4bcff7c503e3d25ff3aa38fd87a8aced9f8c",
+                  "paraHead": "0xd309360cb8921d83aad00ad7ca66e5d8eccc65a33e4b01ef5110a03c4d1f1a20",
+                  "validationCodeHash": "0x4c2a8f587d02cb03f8e1c7cead6a8afd64da21700010a3863cac9750bf2614cb"
+                },
+                "commitmentsHash": "0x216ef3d97d8ddb1dcb613ec78e7ca2fd79060cf22911f991eada61b5b6c547c0"
+              },
+              "0xdc5844a8700d0588f2a71784fd1f11ed7fdf3e33e069fb7dae79388017be2e0346dd8e00ba3e09edf026ff6b1038c133c44c7b1f170ad27fc19cd0959c6822c11b630095a509fca749fff50e5f20919a34f225bd404599cc72dced9c59797aa35cfcae0c08066175726120792b46080000000005617572610101a89dadec63ef5d9ec03f76edc121e43d4c7425b341e3f64834bfc69a83f1fac39fe92fe285b78209193e9bc7c1c003877056b469f2007db4478ecc2aae89310c",
+              0,
+              19
+            ]
+          }
+          {
+            "eventID": "0-12484233-1-10",
+            "section": "paraInclusion",
+            "method": "CandidateBacked",
+            "data": [
+              {
+                "descriptor": {
+                  "paraId": 1000,
+                  "relayParent": "0x40be74436db126b9e81d5a1f0fe385335d9174d98cfe86e8f5ea2ab22c1c204c",
+                  "collator": "0xc43af01cb2265b0fb18681bd6e223a9c920cff12a453f614b40df42597bf4e05",
+                  "persistedValidationDataHash": "0xb5c4bbe34b9c2798ea35de0a285d42d7cdb64265db316579edd4aebaa73ab940",
+                  "povHash": "0xbddda78d1f3c04e01da57c35f24bcae330f16f7d4fe444d6cba5bfdd9223f73e",
+                  "erasureRoot": "0xe005c22f322ecf96863a50c16870163eb14ce5704d798cb17ec6d99df677c68f",
+                  "signature": "0x0e1fb3171c4906033ca627d1cd08ea61d587c7033d4ad38d61ce2eb42080d60b9d4911733433097576c02a68b74d4bcff7c503e3d25ff3aa38fd87a8aced9f8c",
+                  "paraHead": "0xd309360cb8921d83aad00ad7ca66e5d8eccc65a33e4b01ef5110a03c4d1f1a20",
+                  "validationCodeHash": "0x4c2a8f587d02cb03f8e1c7cead6a8afd64da21700010a3863cac9750bf2614cb"
+                },
+                "commitmentsHash": "0x216ef3d97d8ddb1dcb613ec78e7ca2fd79060cf22911f991eada61b5b6c547c0"
+              },
+              "0xdc5844a8700d0588f2a71784fd1f11ed7fdf3e33e069fb7dae79388017be2e0346dd8e00ba3e09edf026ff6b1038c133c44c7b1f170ad27fc19cd0959c6822c11b630095a509fca749fff50e5f20919a34f225bd404599cc72dced9c59797aa35cfcae0c08066175726120792b46080000000005617572610101a89dadec63ef5d9ec03f76edc121e43d4c7425b341e3f64834bfc69a83f1fac39fe92fe285b78209193e9bc7c1c003877056b469f2007db4478ecc2aae89310c",
+              0,
+              19
+            ]
+          }
         */
+        // claim: parainclusion(CandidateBacked) -> parainclusion(CandidateIncluded)
+        // a block must be "backed" before it can be included
+        // destSentAt correspond to parainclusion(CandidateIncluded) at sent
+        try {
+            let parainclusionCandidateBackedList = extrinsic.events.filter((ev) => {
+                return this.parainclusionCandidateBackedFilter(`${ev.section}(${ev.method})`);
+            })
+            let parainclusionCandidateIncludedList = extrinsic.events.filter((ev) => {
+                return this.parainclusionCandidateIncludedFilter(`${ev.section}(${ev.method})`);
+            })
+            for (const parainclusionCandidateBacked of parainclusionCandidateBackedList){
+                 let backedCandidate = parainclusionCandidateBacked.data[0].descriptor
+                 console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] backedCandidate`, backedCandidate)
+            }
+            for (const parainclusionCandidateIncluded of parainclusionCandidateIncludedList){
+                 let includedCandidate = parainclusionCandidateIncluded.data[0].descriptor
+                 console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] includedCandidate`, includedCandidate)
+            }
+        }catch (err) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processParainherentEnter event error`, err)
+        }
         try {
             if (extrinsic.params != undefined && extrinsic.params.data != undefined) {
                 let data = extrinsic.params.data
@@ -3149,6 +3219,25 @@ module.exports = class ChainParser {
     xTokensFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
         if (palletMethod == "xTokens(TransferredMultiAssets)") {
+            return true
+        } else {
+            return false;
+        }
+    }
+
+
+    parainclusionCandidateIncludedFilter(palletMethod) {
+        //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
+        if (palletMethod == "parainclusion(CandidateIncluded)") {
+            return true
+        } else {
+            return false;
+        }
+    }
+
+    parainclusionCandidateBackedFilter(palletMethod) {
+        //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
+        if (palletMethod == "parainclusion(CandidateBacked)") {
             return true
         } else {
             return false;
