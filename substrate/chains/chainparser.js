@@ -1053,10 +1053,10 @@ module.exports = class ChainParser {
         try {
             console.log(`im here processParainherentEnter`)
             let parainclusionCandidateBackedList = events.filter((ev) => {
-                return this.parainclusionCandidateBackedFilter(`${ev.section}(${ev.method})`);
+                return this.paraInclusionCandidateBackedFilter(`${ev.section}(${ev.method})`);
             })
             let parainclusionCandidateIncludedList = events.filter((ev) => {
-                return this.parainclusionCandidateIncludedFilter(`${ev.section}(${ev.method})`);
+                return this.paraInclusionCandidateIncludedFilter(`${ev.section}(${ev.method})`);
             })
             for (const parainclusionCandidateBacked of parainclusionCandidateBackedList){
                  let backedCandidate = parainclusionCandidateBacked.data[0].descriptor
@@ -3227,18 +3227,18 @@ module.exports = class ChainParser {
     }
 
 
-    parainclusionCandidateIncludedFilter(palletMethod) {
+    paraInclusionCandidateIncludedFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
-        if (palletMethod == "parainclusion(CandidateIncluded)") {
+        if (palletMethod == "paraInclusion(CandidateIncluded)") {
             return true
         } else {
             return false;
         }
     }
 
-    parainclusionCandidateBackedFilter(palletMethod) {
+    paraInclusionCandidateBackedFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
-        if (palletMethod == "parainclusion(CandidateBacked)") {
+        if (palletMethod == "paraInclusion(CandidateBacked)") {
             return true
         } else {
             return false;
