@@ -1051,10 +1051,11 @@ module.exports = class ChainParser {
         // a block must be "backed" before it can be included
         // destSentAt correspond to parainclusion(CandidateIncluded) at sent
         try {
-            let parainclusionCandidateBackedList = extrinsic.events.filter((ev) => {
+            console.log(`im here processParainherentEnter`)
+            let parainclusionCandidateBackedList = events.filter((ev) => {
                 return this.parainclusionCandidateBackedFilter(`${ev.section}(${ev.method})`);
             })
-            let parainclusionCandidateIncludedList = extrinsic.events.filter((ev) => {
+            let parainclusionCandidateIncludedList = events.filter((ev) => {
                 return this.parainclusionCandidateIncludedFilter(`${ev.section}(${ev.method})`);
             })
             for (const parainclusionCandidateBacked of parainclusionCandidateBackedList){
