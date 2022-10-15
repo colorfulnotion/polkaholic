@@ -1965,7 +1965,7 @@ create table talismanEndpoint (
                 "bn": bn,
                 "chainID": chainID
             }
-            this.sendWSMessage("subscribeFinalizedHeads", subscribeFinalizedHeadsMsg, "crawlBlocks");
+            this.sendWSMessage(subscribeFinalizedHeadsMsg, "subscribeFinalizedHeads", "crawlBlocks");
             await this.processFinalizedHead(chain, chainID, bn, finalizedHash, parentHash, true);
             this.finalizedHashes[bn] = finalizedHash;
             // because we do not always get the finalized hash signal, we brute force use the parentHash => grandparentHash => greatgrandparentHash => greatgreatgrandparentHash  (3 up)
