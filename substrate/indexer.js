@@ -2025,7 +2025,7 @@ module.exports = class Indexer extends AssetManager {
 
         // for all this.assetList, write to asset; mysql address table
         if (isTip) {
-            console.log(`flush_assets [${blockNumber}], ts=${ts}, isFullPeriod=${isFullPeriod}, isTip=${isTip}`)
+            //console.log(`flush_assets [${blockNumber}], ts=${ts}, isFullPeriod=${isFullPeriod}, isTip=${isTip}`)
         }
         let chainID = this.chainID;
         let web3Api = this.web3Api;
@@ -4326,7 +4326,7 @@ module.exports = class Indexer extends AssetManager {
             blockHash: this.chainParser.parserBlockHash,
             reaped: reaped
         };
-        console.log("flagAddressBalanceRequest", address, this.chainParser.parserBlockNumber, this.chainParser.parserTS, this.chainParser.parserBlockHash, reaped);
+        // console.log("flagAddressBalanceRequest", address, this.chainParser.parserBlockNumber, this.chainParser.parserTS, this.chainParser.parserBlockHash, reaped);
     }
 
     async dump_addressBalanceRequest() {
@@ -4363,7 +4363,7 @@ module.exports = class Indexer extends AssetManager {
 
             let str = `('${address}', '${free_balance}', '${reserved_balance}', '${miscFrozen_balance}', '${feeFrozen_balance}', '${r.blockHash}', Now(), '${r.blockNumber}', '${r.blockTS}',   2)`
             out.push(str)
-            console.log("dump_addressBalanceRequest", str);
+            //console.log("dump_addressBalanceRequest", str);
 
             let asset = this.getChainAsset(this.chainID);
             let assetChain = paraTool.makeAssetChain(asset, this.chainID);
@@ -4384,7 +4384,8 @@ module.exports = class Indexer extends AssetManager {
                 value: JSON.stringify(newState),
                 timestamp: r.blockTS * 1000000
             }
-            this.logger.info({
+
+/*          this.logger.info({
                 "op": "dump_addressBalanceRequest upd",
                 "chainID": this.chainID,
                 "address": address,
@@ -4393,7 +4394,7 @@ module.exports = class Indexer extends AssetManager {
                 "encodedAssetChain": encodedAssetChain,
                 "newState": newState,
                 "upd": str
-            })
+            }) */
             let rowKey = address.toLowerCase()
             rows.push({
                 key: rowKey,
@@ -5845,6 +5846,97 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return [null, null];
     }
 
+    async store_rcxcm(msgType, paraID, paraIDDest, sentAt, msgHex, blockTS, relayChain, ctx = "unk") {
+	try {
+	    let xcmObj = this.api.registry.createType("XcmVersionedXcm", msgHex);
+	    let msg = xcmObj.toJSON();
+	    console.log("store_rcxcm COMPUTE", msgType, msgHex);
+	    let msgHash = '0x' + paraTool.blake2_256_from_hex(msgHex)
+	    paraID = parseInt(paraID, 10);
+	    paraIDDest = parseInt(paraIDDest, 10);
+	    let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+	    let chainIDDest = paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain);
+	    // generate beneficiaries, version, path
+	    let r = {
+		beneficiaries: "",
+		version: "",
+		path: ""
+	    }
+	    try {
+		if ( this.chainParser ) {   
+		    r.beneficiaries = this.chainParser.getBeneficiary(msg);
+		    let p = this.chainParser.getInstructionPath(msg)
+		    if (p) {
+			r.version = p.version;
+			r.path = p.path
+		    }
+		}
+	    } catch (err) {
+		console.log(err)
+	    }
+	    let out = [];
+	    out.push(`('${msgHash}', '${sentAt}', '${msgType}', '${chainID}', '${chainIDDest}', '${blockTS}', ${mysql.escape(JSON.stringify(msg))}, '${msgHex}', ${mysql.escape(r.path)}, '${r.version}', ${mysql.escape(r.beneficiaries)}, Now())`)
+	    console.log("!!!!! store_rcxcm", ctx, msgType, msgHash, "sentAt", sentAt, "chains", chainID, chainIDDest, "ts", blockTS, "instructions", JSON.stringify(msg))
+	    let vals = ["msgType", "chainID", "chainIDDest", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT"]
+            await this.upsertSQL({
+		"table": "xcm",
+		"keys": ["msgHash", "sentAt"],
+		"vals": vals,
+		"data": out,
+		"replace": vals
+            });
+	} catch (err) {
+	    console.log("store_rcxcm", err);
+	}
+    }
+
+    async indexRelayChainTrace(traces, bn, chainID, blockTS, relayChain = 'polkadot') {
+	for ( const t of traces ) {
+	    if ( t.p == "ParaInclusion" && ( t.s == "PendingAvailabilityCommitments" ) ) {
+		try {
+		    let commitments = t.pv ? JSON.parse(t.pv) : null; // pv: '{"upwardMessages":[],"horizontalMessages":[],"newValidationCode":null,"headData":"0x8b479dbeef314a22bc8589a38b2b25a6396d5d0fa0a3caa906faee3aaf8188f7b2e47b001e8988caae6861bdfe076f0390770be196c146a30b5e86b03b397a628d79c985e34268e121c9cc333487d904bc10a0f7d1b58e978d0ae3a41e6c27bd03e5203d08066175726120e64446080000000005617572610101ccb39d04d868d3585bb68c0fcbfa1146dc3009422d36933841d2c086d24e5475824fe6428de54c00a9284665b016ec92039db793374b19fe78404e433d5c4780","processedDownwardMessages":0,"hrmpWatermark":12497248}'
+		    if ( commitments && commitments.upwardMessages.length > 0 ) {
+			let k = JSON.parse(t.pkExtra)
+			let paraID = paraTool.toNumWithoutComma(k[0])
+			for ( const m of commitments.upwardMessages ) {
+			    let sentAt = bn // QUESTION: UMP sentAt could be when it ENTERs PendingAvailabilityCommitments or when it EXITS
+			    await this.store_rcxcm("ump", paraID, chainID, sentAt, m, blockTS, relayChain, t.s);
+			}
+		    }
+		} catch (e) {
+		    console.log(e);
+		}
+	    } else if ( ( t.p == "Dmp" ) && ( t.s == "DownwardMessageQueues" ) ) {
+                let queues = JSON.parse(t.pv);
+		if (queues.length > 0) {
+		    let k = JSON.parse(t.pkExtra)
+		    let paraID = paraTool.toNumWithoutComma(k[0])
+		    for (const q of queues ) {
+			let sentAt = q.sentAt; // NO QUESTION on dmp
+			let msg = q.msg;
+			await this.store_rcxcm("dmp", chainID, paraID, sentAt, msg, blockTS, relayChain,  t.s)
+		    }
+		} 
+	    } else if ( ( t.p == "Hrmp" ) && ( t.s == "HrmpChannelContents" ) ) { 
+		let k = JSON.parse(t.pkExtra) 
+		let pv = JSON.parse(t.pv); // : '12497281'
+		try {
+		    let sender = paraTool.toNumWithoutComma(k[0].sender);
+		    let recipient = paraTool.toNumWithoutComma(k[0].recipient);
+		    let contents = JSON.parse(t.pv); // [{"sentAt":12497388,"data":"0x000210010400010200411f06080000000b70f9ce692a0d0a1300010200411f06080000000b70f9ce692a0d0102286bee0d010004000103001db984abe93072469e0ac0d1bba374a4140ffff4"}]
+		    for (const d of contents) {
+			let sentAt = d.sentAt // NO QUESTION on HRMP
+			let data = '0x' + d.data.substring(4).toString();
+			console.log("HRMP", sender, recipient);
+                        await this.store_rcxcm("hrmp", sender, recipient, sentAt, data, blockTS, relayChain, t.s);
+		    }
+		} catch (err) {
+		    console.log(err);
+		}
+	    }
+	}
+    }
+    
     async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, evmTrace = false, autoTraces = false, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
         if (!block) return;
@@ -6025,7 +6117,15 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 timestamp: blockTS * 1000000
             };
         }
-
+	if ( isTip && ( chainID == 0 || chainID == 2 || chainID == 61000 ) ) {
+	    let relayChain = paraTool.getRelayChainByChainID(chainID);
+	    if ( autoTraces ) {
+		console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
+		await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain);
+	    } else {
+		console.log("this.indexRelayChainTrace FAIL", blockNumber, chainID, relayChain);
+	    }
+	}
         // (3) fuse block+receipt for evmchain, if both evmBlock and evmReceipts are available
         let web3Api = this.web3Api
         let contractABIs = this.contractABIs

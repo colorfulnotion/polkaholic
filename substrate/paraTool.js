@@ -672,6 +672,7 @@ function getRelayChainID(relaychain = 'polkadot') {
 
 function getChainIDFromParaIDAndRelayChain(paraID, relayChain = 'polkadot') {
     let paraIDExtra = getParaIDExtra(relayChain)
+    if ( (paraID == 0) || (paraID == 2) || (paraID==60000) ) return(paraID)
     return paraIDExtra + paraID
 }
 
