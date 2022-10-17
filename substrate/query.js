@@ -6764,7 +6764,7 @@ module.exports = class Query extends AssetManager {
         for (const p of parents) {
             out.push(`( msgHash = '${p.msgHash}' and blockNumber = '${p.blockNumber}' )`);
         }
-        for (const p of children) {
+        for (const c of children) {
             out.push(`( msgHash = '${c.msgHash}' and blockNumber = '${c.blockNumber}' )`);
         }
         let str = out.join(" or");
