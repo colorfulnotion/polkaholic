@@ -1961,7 +1961,6 @@ create table talismanEndpoint (
             let finalizedHash = header.hash.toString();
             let parentHash = header.parentHash.toString();
             let subscribeFinalizedHeadsMsg = {
-                "msgType": "subscribeFinalizedHeads",
                 "bn": bn,
                 "chainID": chainID
             }
@@ -2034,7 +2033,6 @@ create table talismanEndpoint (
 
                     let blockNumber = block.number;
                     let subscribeStorageMsg = {
-                        "msgType": "subscribeStorage",
                         "bn": blockNumber,
                         "chainID": chainID
                     }

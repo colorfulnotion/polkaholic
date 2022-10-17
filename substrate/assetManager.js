@@ -562,7 +562,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     async init_asset_info() {
-        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.totalSupply, asset.asset, asset.symbol, asset.alternativeAsset, asset.xcmInteriorKey, xcmasset.symbol as xcmasset_symbol, xcmasset.relayChain as xcmasset_relayChain, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.id, chain.chainName, asset.isUSD, asset.priceUSD, asset.priceUSDPercentChange,  asset.nativeAssetChain, currencyID, xcContractAddress, from_unixtime(createDT) as createTS from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow')");
+        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.totalSupply, asset.asset, asset.symbol, asset.xcmInteriorKey, xcmasset.symbol as xcmasset_symbol, xcmasset.relayChain as xcmasset_relayChain, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.id, chain.chainName, asset.isUSD, asset.priceUSD, asset.priceUSDPercentChange,  asset.nativeAssetChain, currencyID, xcContractAddress, from_unixtime(createDT) as createTS from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow')");
 
         let nassets = 0;
         let assetInfo = {};
@@ -580,7 +580,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 v.assetType = 'LiquidityPair';
             }
 
-            let alternativeAssetChain = (v.alternativeAsset != undefined)? paraTool.makeAssetChain(v.alternativeAsset,v.chainID) : false
+            //let alternativeAssetChain = (v.alternativeAsset != undefined)? paraTool.makeAssetChain(v.alternativeAsset,v.chainID) : false
 
             if (v.assetType == 'LiquidityPair' || v.assetType == 'ERC20LP') { //'ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special'
                 a = {
@@ -650,6 +650,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
             }
             assetInfo[assetChain] = a;
+            let alternativeAssetChain = (v.asset != undefined && v.asset == '{"LiquidCrowdloan":"13"}')? '{"Token":"lcDOT"}' : false
             if (alternativeAssetChain){
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`adding alternative assetInfo[${alternativeAssetChain}]`, a)
                 assetInfo[alternativeAssetChain] = a;
