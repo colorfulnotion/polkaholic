@@ -5846,7 +5846,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return [null, null];
     }
 
-    async store_rcxcm(msgType, paraID, paraIDDest, sentAt, msgHex, blockTS, relayChain, ctx = "unk") {
+    async store_rcxcm(msgType, paraID, paraIDDest, sentAt, relayedAt, includedAt, msgHex, blockTS, relayChain, ctx = "unk") {
         try {
             let xcmObj = this.api.registry.createType("XcmVersionedXcm", msgHex);
             let msg = xcmObj.toJSON();
@@ -5875,12 +5875,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 console.log(err)
             }
             let out = [];
-            out.push(`('${msgHash}', '${sentAt}', '${msgType}', '${chainID}', '${chainIDDest}', '${blockTS}', ${mysql.escape(JSON.stringify(msg))}, '${msgHex}', ${mysql.escape(r.path)}, '${r.version}', ${mysql.escape(r.beneficiaries)}, Now())`)
+            out.push(`('${msgHash}', '${sentAt}','${chainID}', '${chainIDDest}', '${relayedAt}', '${includedAt}', '${msgType}', '${blockTS}', ${mysql.escape(JSON.stringify(msg))}, '${msgHex}', ${mysql.escape(r.path)}, '${r.version}', ${mysql.escape(r.beneficiaries)}, Now())`)
             console.log("!!!!! store_rcxcm", ctx, msgType, msgHash, "sentAt", sentAt, "chains", chainID, chainIDDest, "ts", blockTS, "instructions", JSON.stringify(msg))
-            let vals = ["msgType", "chainID", "chainIDDest", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT"]
+            let vals = ["relayedAt", "includedAt", "msgType", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT"]
             await this.upsertSQL({
                 "table": "xcm",
-                "keys": ["msgHash", "sentAt"],
+                "keys": ["msgHash", "sentAt", "chainID", "chainIDDest"],
                 "vals": vals,
                 "data": out,
                 "replace": vals
@@ -5890,34 +5890,76 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
+    ParaInclusionPendingAvailabilityFilter(traces) {
+        let backedMap = {}
+        for (const t of traces) {
+            if (t.p == "ParaInclusion" && (t.s == "PendingAvailability")) {
+                try {
+                    if (t.v == '0x') continue
+                    let pendingAvailability = t.pv ? JSON.parse(t.pv) : null; // pv:
+                    if (pendingAvailability){
+                        let k = JSON.parse(t.pkExtra)
+                        let paraID = paraTool.toNumWithoutComma(k[0])
+                        backedMap[paraID] = pendingAvailability
+                    }
+                }catch(e){
+                    console.log(`ParaInclusionPendingAvailabilityFilter error`, err)
+                }
+            }
+        }
+        return backedMap
+    }
+
     async indexRelayChainTrace(traces, bn, chainID, blockTS, relayChain = 'polkadot') {
+        console.log(`indexRelayChainTrace [${relayChain}-${bn}]`)
+        let backedMap = this.ParaInclusionPendingAvailabilityFilter(traces)
+        let mp = {}
         for (const t of traces) {
             if (t.p == "ParaInclusion" && (t.s == "PendingAvailabilityCommitments")) {
                 try {
                     let commitments = t.pv ? JSON.parse(t.pv) : null; // pv: '{"upwardMessages":[],"horizontalMessages":[],"newValidationCode":null,"headData":"0x8b479dbeef314a22bc8589a38b2b25a6396d5d0fa0a3caa906faee3aaf8188f7b2e47b001e8988caae6861bdfe076f0390770be196c146a30b5e86b03b397a628d79c985e34268e121c9cc333487d904bc10a0f7d1b58e978d0ae3a41e6c27bd03e5203d08066175726120e64446080000000005617572610101ccb39d04d868d3585bb68c0fcbfa1146dc3009422d36933841d2c086d24e5475824fe6428de54c00a9284665b016ec92039db793374b19fe78404e433d5c4780","processedDownwardMessages":0,"hrmpWatermark":12497248}'
-                    if (commitments && commitments.upwardMessages.length > 0) {
+                    if (commitments && (commitments.upwardMessages.length > 0 || commitments.horizontalMessages.length > 0) ) {
                         let k = JSON.parse(t.pkExtra)
                         let paraID = paraTool.toNumWithoutComma(k[0])
+                        let backed = backedMap[paraID]
+                        let sourceSentAt = backed.relayParentNumber // this is the true "sentAt" at sourceChain, same as commitments.hrmpWatermark
+                        let relayedAt = bn                          // "relayedAt" -- aka backed at this relay bn
+                        let includedAt = bn+1                       // "includedAt" -- aka when it's being delivered to destChain
                         for (const m of commitments.upwardMessages) {
-                            let sentAt = bn // QUESTION: UMP sentAt could be when it ENTERs PendingAvailabilityCommitments or when it EXITS
-                            await this.store_rcxcm("ump", paraID, chainID, sentAt, m, blockTS, relayChain, t.s);
+                            //let sentAt = bn // QUESTION: UMP sentAt could be when it ENTERs PendingAvailabilityCommitments or when it EXITS
+                            await this.store_rcxcm("ump", paraID, chainID, sourceSentAt, relayedAt, includedAt, m, blockTS, relayChain, t.s);
+                        }
+                        for (const h of commitments.horizontalMessages) {
+                            /*
+                            {
+                                "recipient": 2004,
+                                "data":"0x000210010400010200411f06080001000b3cbef64bc1240a1300010200411f06080001000b3cbef64bc124010700f2052a010d0100040001030024a304386099637e578c02ffeaf2cf3dcfbab751"
+                            }
+                            */
+                            let paraIDDest = paraTool.toNumWithoutComma(h.recipient)
+                            let m = '0x' + h.data.substring(4).toString();
+                            await this.store_rcxcm("hrmp", paraID, chainID, sourceSentAt, relayedAt, includedAt, m, blockTS, relayChain, t.s);
                         }
                     }
                 } catch (e) {
                     console.log(e);
                 }
             } else if ((t.p == "Dmp") && (t.s == "DownwardMessageQueues")) {
+                console.log(`!!!Dmp:DownwardMessageQueues here`, t)
                 let queues = JSON.parse(t.pv);
                 if (queues.length > 0) {
                     let k = JSON.parse(t.pkExtra)
                     let paraID = paraTool.toNumWithoutComma(k[0])
                     for (const q of queues) {
-                        let sentAt = q.sentAt; // NO QUESTION on dmp
+                        let sentAt = q.sentAt; // NO QUESTION on dmp (this is usually always the same block where xcmtransfer is initiated), sentAt = includedAt = relayedAt
                         let msg = q.msg;
-                        await this.store_rcxcm("dmp", chainID, paraID, sentAt, msg, blockTS, relayChain, t.s)
+                        console.log(`!!!Dmp:DownwardMessageQueues`, q)
+                        await this.store_rcxcm("dmp", chainID, paraID, sentAt, sentAt, sentAt, msg, blockTS, relayChain, t.s);
                     }
                 }
             } else if ((t.p == "Hrmp") && (t.s == "HrmpChannelContents")) {
+                //use PendingAvailabilityCommitments instead
+                /*
                 let k = JSON.parse(t.pkExtra)
                 let pv = JSON.parse(t.pv); // : '12497281'
                 try {
@@ -5928,11 +5970,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         let sentAt = d.sentAt // NO QUESTION on HRMP
                         let data = '0x' + d.data.substring(4).toString();
                         console.log("HRMP", sender, recipient);
-                        await this.store_rcxcm("hrmp", sender, recipient, sentAt, data, blockTS, relayChain, t.s);
+                        //await this.store_rcxcm("hrmp", sender, recipient, sentAt, data, blockTS, relayChain, t.s);
                     }
                 } catch (err) {
                     console.log(err);
                 }
+                */
             }
         }
     }
@@ -6117,7 +6160,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 timestamp: blockTS * 1000000
             };
         }
-        if (isTip && (chainID == 0 || chainID == 2 || chainID == 61000)) {
+        let forceTry = true
+        if ((isTip || forceTry) && (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama || chainID == paraTool.chainIDMoonbaseRelay)) {
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             if (autoTraces) {
                 console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
