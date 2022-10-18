@@ -5846,35 +5846,53 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return [null, null];
     }
 
+    patch_xcm(xcmMsg){
+        try {
+            let xcmObj = this.api.registry.createType("XcmVersionedXcm", xcmMsg.msgHex);
+            let msg = xcmObj.toJSON();
+            console.log("patch_xcm COMPUTE", xcmMsg.msgType, xcmMsg.msgHex);
+            // generate beneficiaries, version, path
+            let r = {
+                beneficiaries: "",
+                version: "",
+                path: ""
+            }
+            if (this.chainParser) {
+                r.beneficiaries = this.chainParser.getBeneficiary(msg);
+                let p = this.chainParser.getInstructionPath(msg)
+                if (p) {
+                    r.version = p.version;
+                    r.path = p.path
+                }
+            }
+            xcmMsg.msg = msg
+            xcmMsg.beneficiaries = r.beneficiaries
+            xcmMsg.version = r.version
+            xcmMsg.path = r.path
+        } catch (err) {
+            this.logger.error({
+                "op": "patch_xcm",
+                "obj": JSON.stringify(xcmMsg),
+                "err": err
+            })
+            console.log("patch_xcm", err);
+        }
+        return;
+    }
+
     async process_rcxcm(xcmList) {
         let out = [];
         for (const x of xcmList){
             try {
-                let xcmObj = this.api.registry.createType("XcmVersionedXcm", x.msgHex);
-                let msg = xcmObj.toJSON();
-                console.log("store_rcxcm COMPUTE", x.msgType, x.msgHex);
-                // generate beneficiaries, version, path
-                let r = {
-                    beneficiaries: "",
-                    version: "",
-                    path: ""
-                }
-                if (this.chainParser) {
-                    r.beneficiaries = this.chainParser.getBeneficiary(msg);
-                    let p = this.chainParser.getInstructionPath(msg)
-                    if (p) {
-                        r.version = p.version;
-                        r.path = p.path
-                    }
-                }
+                //if (x.isTip) this.sendWSMessage(x, "relayxcmmessage", "process_rcxcm")
                 let isFinalized = (x.finalized) ? 1 : 0
-                out.push(`('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(msg))}, '${x.msgHex}', ${mysql.escape(r.path)}, '${r.version}', ${mysql.escape(r.beneficiaries)}, Now(), ${isFinalized})`)
+                out.push(`('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayChain}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(x.msg))}, '${x.msgHex}', ${mysql.escape(x.path)}, '${x.version}', ${mysql.escape(x.beneficiaries)}, Now(), ${isFinalized})`)
             } catch (err) {
                 console.log("process_rcxcm", err);
             }
         }
-        let vals = ["relayedBlockHash", "relayedAt", "includedAt", "msgType", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT", "finalized"]
-        let sqlDebug = true
+        let vals = ["relayChain", "relayedBlockHash", "relayedAt", "includedAt", "msgType", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT", "finalized"]
+        let sqlDebug = false
         await this.upsertSQL({
             "table": "xcm",
             "keys": ["msgHash", "chainID", "chainIDDest", "sentAt"],
@@ -5943,8 +5961,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                 finalized: finalized,
                                 ctx: t.s,
                             }
+                            this.patch_xcm(umpMsg)
                             xcmList.push(umpMsg)
-                            //await this.store_rcxcm("ump", paraID, chainID, sourceSentAt, relayedAt, includedAt, msgHex, blockTS, relayChain, t.s);
                         }
                         for (const h of commitments.horizontalMessages) {
                             /*
@@ -5973,8 +5991,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                 finalized: finalized,
                                 ctx: t.s,
                             }
+                            this.patch_xcm(hrmpMsg)
                             xcmList.push(hrmpMsg)
-                            //await this.store_rcxcm("hrmp", paraID, chainID, sourceSentAt, relayedAt, includedAt, msgHex, blockTS, relayChain, t.s);
                         }
                     }
                 } catch (err) {
@@ -6013,8 +6031,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                 finalized: finalized,
                                 ctx: t.s,
                             }
+                            this.patch_xcm(dmpMsg)
                             xcmList.push(dmpMsg)
-                            //await this.store_rcxcm("dmp", chainID, paraIDDest, sentAt, sentAt, sentAt, msgHex, blockTS, relayChain, t.s);
                         }
                     }
                 } catch (err){
