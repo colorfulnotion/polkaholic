@@ -1118,7 +1118,7 @@ module.exports = class Query extends AssetManager {
                     x.symbol = assetInfo.symbol;
                     //if (assetInfo.localSymbol) x.localSymbol = assetInfo.localSymbol;
                 } else {
-                    console.log("MISSING", x.asset, x.chainID);
+                    console.log(`[${x.extrinsicHash}] [${x.extrinsicID}] MISSING x.asset`, x.asset, x.chainID);
                 }
                 let section = null,
                     method = null;

@@ -170,7 +170,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             specVersionsMap[chainID].push(specVersion);
         }
-
+        // console.log(`this.chainInfos`, chainInfoMap)
         this.chainInfos = chainInfoMap
         this.chainNames = chainNameMap
         this.specVersions = specVersionsMap
@@ -507,7 +507,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         this.xcmAssetInfo = xcmAssetInfo; // key: xcmInteriorKey => a (1, ignore asset/chain)
         this.xcmInteriorInfo = xcmInteriorInfo; // key: asset~chainID  => a (N)
         this.xcmSymbolInfo = xcmSymbolInfo; // key: symbol~relayChain => a (1, ignore asset/chain)
-        console.log(`this.xcmSymbolInfo`, this.xcmSymbolInfo)
+        // console.log(`this.xcmSymbolInfo`, this.xcmSymbolInfo)
     }
 
     getXcmAssetInfoDecimals(xcmInteriorKey) {

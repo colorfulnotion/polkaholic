@@ -304,16 +304,17 @@ module.exports = class PolkaholicDB {
 
     getChainAsset(chainID) {
         chainID = chainID.toString()
+        let assetChain = null
         if (this.chainInfos[chainID] != undefined && this.chainInfos[chainID].symbol != undefined) {
             let asset = JSON.stringify({
                 "Token": this.chainInfos[chainID].symbol
             })
-            let assetChain = paraTool.makeAssetChain(asset, chainID);
+            assetChain = paraTool.makeAssetChain(asset, chainID);
             if (this.assetInfo[assetChain] != undefined) {
                 return (asset);
             }
         }
-        console.log("getChainAsset FATAL ERROR: must call init", chainID)
+        console.log(`[${chainID}] getChainAsset FATAL ERROR: must call init for ${assetChain}`, this.chainInfos[chainID])
         return null
     }
 

@@ -1283,14 +1283,24 @@ order by msgHash, diffSentAt, diffTS`
                   parents: 0 -> referring to itself
                   parents: 1 -> referring to parents (relaychain)
                 */
-                let targetAssetChain = (parents == 0) ? this.getNativeChainAsset(chainIDDest) : this.getNativeChainAsset(relayChainID)
-                let [targetAsset, targetChainID] = paraTool.parseAssetChain(targetAssetChain)
-                let targetSymbol = this.getAssetSymbol(targetAsset, targetChainID)
-                let symbolRelayChain = paraTool.makeAssetChain(targetSymbol, relayChain);
-                let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
-                let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined) ? false : xcmAssetInfo.xcmInteriorKey
-                //console.log(`[paranets=${parents}] ${chainID} ${chainIDDest} ${JSON.stringify(interior)} -> ${targetAssetChain}, symbolRelayChain=${symbolRelayChain}, xcmInteriorKey=${xcmInteriorKey}, xcmAssetInfo`, xcmAssetInfo)
-                return [targetAssetChain, xcmInteriorKey]
+                try {
+                    let targetAssetChain = (parents == 0) ? this.getNativeChainAsset(chainIDDest) : this.getNativeChainAsset(relayChainID)
+                    if (targetAssetChain == undefined) {
+                        console.log(`get_concrete_assetChain missing!!! parents=${parents}, chainID=${chainID}, chainIDDest=${chainIDDest}, relayChain=${relayChain}, relayChainID=${relayChainID}, targetAssetChain=${targetAssetChain}`)
+                        return [false, false]
+                    }
+                    let [targetAsset, targetChainID] = paraTool.parseAssetChain(targetAssetChain)
+                    let targetSymbol = this.getAssetSymbol(targetAsset, targetChainID)
+                    let symbolRelayChain = paraTool.makeAssetChain(targetSymbol, relayChain);
+                    let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+                    let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined) ? false : xcmAssetInfo.xcmInteriorKey
+                    //console.log(`[paranets=${parents}] ${chainID} ${chainIDDest} ${JSON.stringify(interior)} -> ${targetAssetChain}, symbolRelayChain=${symbolRelayChain}, xcmInteriorKey=${xcmInteriorKey}, xcmAssetInfo`, xcmAssetInfo)
+                    return [targetAssetChain, xcmInteriorKey]
+                }catch (err){
+                    console.log(`get_concrete_assetChain parents=${parents}, chainID=${chainID}, chainIDDest=${chainIDDest}, relayChain=${relayChain}, relayChainID=${relayChainID}, error`, err)
+                    return [false, false]
+                }
+
             } else {
                 let interiorVal = interior[interiorType]
                 if (parents == 1 || (chainIDDest == relayChainID)) {
