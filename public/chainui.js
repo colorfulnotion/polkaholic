@@ -324,7 +324,7 @@ async function showxcmtransfers(filter = {}) {
                     if (type == 'display') {
                         try {
                             let symbol = row.symbol;
-			    let amountSent = row.amountSent;
+                            let amountSent = row.amountSent;
                             if (symbol && amountSent) {
                                 return presentTokenCount(data) + " " + symbol
                             }
@@ -334,7 +334,7 @@ async function showxcmtransfers(filter = {}) {
                     } else {
                         try {
                             let symbol = row.symbol
-			    let amountSent = row.amountSent;
+                            let amountSent = row.amountSent;
                             if (symbol && amountSent) {
                                 return data + " " + symbol
                             }

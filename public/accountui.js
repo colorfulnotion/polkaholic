@@ -653,11 +653,11 @@ function showxcmtransfers(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     try {
-			let symbol = row.symbol;
-			let amountSent = row.amountSent;
+                        let symbol = row.symbol;
+                        let amountSent = row.amountSent;
                         if (symbol && amountSent) {
                             return presentTokenCount(amountSent) + " " + presentAsset(row);
-                        } else if ( row.asset ) {
+                        } else if (row.asset) {
                             return row.asset;
                         }
                     } catch (err) {
@@ -665,12 +665,12 @@ function showxcmtransfers(address, chainListStr = 'all') {
                     }
                 } else {
                     try {
-			return "";
+                        return "";
                         let symbol = row.symbol;
-			let amountSent = row.amountSent;
-                        if ( symbol && amountSent ) {
-                            return amountSent+ " " + symbol;
-			}
+                        let amountSent = row.amountSent;
+                        if (symbol && amountSent) {
+                            return amountSent + " " + symbol;
+                        }
                     } catch (err) {
                         return "unk";
                     }

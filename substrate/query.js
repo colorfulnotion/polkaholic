@@ -1084,17 +1084,17 @@ module.exports = class Query extends AssetManager {
         let out = [];
         try {
             let w = [];
-	    if ( address ) {
-		w.push(`(fromAddress='${address}' or destAddress='${address}')`);
-	    }
+            if (address) {
+                w.push(`(fromAddress='${address}' or destAddress='${address}')`);
+            }
             if (blockNumber) {
                 w.push(`(blockNumber='${parseInt(blockNumber, 10)}')`)
             }
             let chainListFilter = "";
             if (chainList.length > 0) {
                 w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`)
-	    }
-	    let wstr = ( w.length > 0 ) ? " where " + w.join(" and ") : "";
+            }
+            let wstr = (w.length > 0) ? " where " + w.join(" and ") : "";
             let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
             //console.log(filters, sql);
@@ -6587,10 +6587,10 @@ module.exports = class Query extends AssetManager {
                     chainID,
                     ts: blockTS
                 });
-                if ( p ) {
-		    dXCMAsset.priceUSD = p.priceUSD
+                if (p) {
+                    dXCMAsset.priceUSD = p.priceUSD
                     dXCMAsset.priceUSDCurrent = p.priceUSDCurrent
-		}
+                }
             }
             return dXCMAsset
         } else {
