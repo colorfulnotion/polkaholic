@@ -5,10 +5,10 @@ const Query = require("../query");
 async function main() {
     var query = new Query();
     let filters = {
-        "chainID": 2012
+        "chainList": [61000]
     };
     await query.assetManagerInit();
-    let rows = await query.searchXCMTransfers(filters);
+    let rows = await query.getXCMTransfers(filters);
     console.log(rows);
 }
 

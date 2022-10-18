@@ -653,26 +653,29 @@ function showxcmtransfers(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     try {
-                        let symbol = row.symbol;
-                        if (symbol !== undefined) {
-                            row.symbol = symbol;
-                            return presentTokenCount(data) + " " + presentAsset(row);
-                        } else {
+			let symbol = row.symbol;
+			let amountSent = row.amountSent;
+                        if (symbol && amountSent) {
+                            return presentTokenCount(amountSent) + " " + presentAsset(row);
+                        } else if ( row.asset ) {
                             return row.asset;
                         }
                     } catch (err) {
                         return "unk";
-                        console.log(row);
                     }
                 } else {
                     try {
+			return "";
                         let symbol = row.symbol;
-                        return data + " " + symbol;
+			let amountSent = row.amountSent;
+                        if ( symbol && amountSent ) {
+                            return amountSent+ " " + symbol;
+			}
                     } catch (err) {
                         return "unk";
                     }
-                    return data;
                 }
+                return "";
             }
         }, {
             data: 'amountSentUSD',
@@ -713,7 +716,6 @@ function showxcmtransfers(address, chainListStr = 'all') {
                         let beneficiary = (row.beneficiary) ? row.beneficiary : row.destAddress
                         if (row.destAddress.toLowerCase() == address.toLowerCase()) {
                             return presentRawIDwithIdenticon(beneficiary);
-                            //return getShortHash(beneficiary, false);
                         } else {
                             return presentIDwithIdenticon(beneficiary);
                         }

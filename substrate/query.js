@@ -1083,17 +1083,21 @@ module.exports = class Query extends AssetManager {
         let address = filters.address ? filters.address : null;
         let out = [];
         try {
-            let w = address ? `and ( fromAddress = '${address}' or destAddress = '${address}' )` : "";
+            let w = [];
+	    if ( address ) {
+		w.push(`(fromAddress='${address}' or destAddress='${address}')`);
+	    }
             if (blockNumber) {
-                w += ` and blockNumber = '${parseInt(blockNumber, 10)}'`
+                w.push(`(blockNumber='${parseInt(blockNumber, 10)}')`)
             }
             let chainListFilter = "";
             if (chainList.length > 0) {
-                chainListFilter = ` and ( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`
-            }
-            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain, xcmInfo from xcmtransfer where length(symbol) > 0 ${w} ${chainListFilter} order by sourceTS desc limit ${limit}`
+                w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`)
+	    }
+	    let wstr = ( w.length > 0 ) ? " where " + w.join(" and ") : "";
+            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
-            console.log(filters, xcmtransfers, sql);
+            //console.log(filters, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
                 let x = xcmtransfers[i];
                 x.chainName = this.getChainName(x.chainID);
@@ -6583,8 +6587,10 @@ module.exports = class Query extends AssetManager {
                     chainID,
                     ts: blockTS
                 });
-                dXCMAsset.priceUSD = p.priceUSD
-                dXCMAsset.priceUSDCurrent = p.priceUSDCurrent
+                if ( p ) {
+		    dXCMAsset.priceUSD = p.priceUSD
+                    dXCMAsset.priceUSDCurrent = p.priceUSDCurrent
+		}
             }
             return dXCMAsset
         } else {
