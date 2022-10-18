@@ -590,9 +590,10 @@ function presentRawIDwithIdenticon(id, imageSize = '25rpx') {
             // that look like eyes, mouths and noses.
         });
         return (`<img class="circularImage" src="${canvas.toDataURL()}" ${cl} /> ${getShortHash(id, false)}`)
-    } else {
+    } else if (id.length > 2) {
         return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/> ${getShortHash(id, false)}`;
     }
+    return "";
 }
 
 function presentIDwithIdenticon(id, imageSize = '25rpx') {
@@ -609,9 +610,10 @@ function presentIDwithIdenticon(id, imageSize = '25rpx') {
             // that look like eyes, mouths and noses.
         });
         return (`<img class="circularImage" src="${canvas.toDataURL()}" ${cl} /><a href="/account/${id}">${getShortHash(id)} </a>`)
-    } else {
+    } else if (id.length > 2) {
         return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
     }
+    return "";
 }
 
 

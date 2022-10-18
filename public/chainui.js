@@ -324,7 +324,8 @@ async function showxcmtransfers(filter = {}) {
                     if (type == 'display') {
                         try {
                             let symbol = row.symbol;
-                            if (symbol !== undefined) {
+                            let amountSent = row.amountSent;
+                            if (symbol && amountSent) {
                                 return presentTokenCount(data) + " " + symbol
                             }
                         } catch (err) {
@@ -333,20 +334,21 @@ async function showxcmtransfers(filter = {}) {
                     } else {
                         try {
                             let symbol = row.symbol
-                            if (symbol !== undefined) {
+                            let amountSent = row.amountSent;
+                            if (symbol && amountSent) {
                                 return data + " " + symbol
                             }
                         } catch (err) {
                             return ""
                         }
                     }
-                    return data;
+                    return "";
                 }
             }, {
                 data: 'amountSentUSD',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        if (row.amountSentUSD !== undefined) {
+                        if (row.amountSentUSD !== undefined && row.amountSentUSD > 0) {
                             //
                             return currencyFormat(row.amountSentUSD, row.priceUSD, row.priceUSDCurrent);
                         } else {
@@ -354,7 +356,7 @@ async function showxcmtransfers(filter = {}) {
                             return "--";
                         }
                     } else {
-                        if (row.amountSentUSD !== undefined) {
+                        if (row.amountSentUSD !== undefined && row.amountSentUSD > 0) {
                             return data
                         } else {
                             return 0;
