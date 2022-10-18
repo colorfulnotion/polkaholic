@@ -5897,12 +5897,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             try {
                 if (x.isTip) this.sendWSMessage(x, "relayxcmmessage", "process_rcxcm")
                 let isFinalized = (x.finalized) ? 1 : 0
-                out.push(`('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(x.msg))}, '${x.msgHex}', ${mysql.escape(x.path)}, '${x.version}', ${mysql.escape(x.beneficiaries)}, Now(), ${isFinalized})`)
+                out.push(`('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayChain}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(x.msg))}, '${x.msgHex}', ${mysql.escape(x.path)}, '${x.version}', ${mysql.escape(x.beneficiaries)}, Now(), ${isFinalized})`)
             } catch (err) {
                 console.log("process_rcxcm", err);
             }
         }
-        let vals = ["relayedBlockHash", "relayedAt", "includedAt", "msgType", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT", "finalized"]
+        let vals = ["relayChain", "relayedBlockHash", "relayedAt", "includedAt", "msgType", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT", "finalized"]
         let sqlDebug = false
         await this.upsertSQL({
             "table": "xcm",
