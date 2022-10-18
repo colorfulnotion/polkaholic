@@ -31,6 +31,7 @@ const MAX_PRICEUSD = 100000.00;
 module.exports = class AssetManager extends PolkaholicDB {
 
     assetInfo = {};
+    alternativeAssetInfo = {};
     xcmAssetInfo = {}; // xcmInteriorKey   ->
     xcmInteriorInfo = {}; // nativeAssetChain ->
     // TODO:fuse these together
@@ -445,11 +446,22 @@ module.exports = class AssetManager extends PolkaholicDB {
             let a = {}
             // add assetChain (string)
             let nativeAssetChain = paraTool.makeAssetChain(v.asset, v.chainID)
-            if (this.assetInfo[nativeAssetChain] && this.assetInfo[nativeAssetChain].decimals != undefined && this.assetInfo[nativeAssetChain].symbol != undefined) {
+            let decimals = null;
+            let symbol = null;
+            let isUSD = false;
+            let assetInfo = this.assetInfo[nativeAssetChain]
+            let alternativeAssetInfo = this.alternativeAssetInfo[nativeAssetChain]
+            if (assetInfo && assetInfo.decimals != undefined && assetInfo.symbol != undefined) {
+                decimals = assetInfo.decimals
+                symbol = assetInfo.symbol
+                isUSD = assetInfo.isUSD
+            }else if (alternativeAssetInfo && alternativeAssetInfo.decimals != undefined && alternativeAssetInfo.symbol != undefined){
+                decimals = alternativeAssetInfo.decimals
+                symbol = alternativeAssetInfo.symbol
+                isUSD = alternativeAssetInfo.isUSD
+            }
+            if (decimals != undefined && symbol != undefined) {
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(v.xcmConcept, v.relayChain);
-                let decimals = this.assetInfo[nativeAssetChain].decimals;
-                let symbol = this.assetInfo[nativeAssetChain].symbol;
-                let isUSD = this.assetInfo[nativeAssetChain].isUSD;
                 a = {
                     chainID: v.chainID,
                     isUSD: isUSD,
@@ -495,6 +507,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         this.xcmAssetInfo = xcmAssetInfo; // key: xcmInteriorKey => a (1, ignore asset/chain)
         this.xcmInteriorInfo = xcmInteriorInfo; // key: asset~chainID  => a (N)
         this.xcmSymbolInfo = xcmSymbolInfo; // key: symbol~relayChain => a (1, ignore asset/chain)
+        console.log(`this.xcmSymbolInfo`, this.xcmSymbolInfo)
     }
 
     getXcmAssetInfoDecimals(xcmInteriorKey) {
@@ -566,6 +579,7 @@ module.exports = class AssetManager extends PolkaholicDB {
 
         let nassets = 0;
         let assetInfo = {};
+        let alternativeAssetInfo = {};
         let currencyIDInfo = {};
         let xcContractAddress = {};
         let symbolRelayChainAsset = {};
@@ -652,7 +666,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             assetInfo[assetChain] = a;
             if (alternativeAssetChain){
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`adding alternative assetInfo[${alternativeAssetChain}]`, a)
-                assetInfo[alternativeAssetChain] = a;
+                alternativeAssetInfo[alternativeAssetChain] = a;
             }
             if (v.currencyID != null && v.currencyID.length > 0) {
                 let currencyChain = paraTool.makeAssetChain(v.currencyID, v.chainID)
@@ -667,6 +681,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         }
         //console.log(assetInfo)
         this.assetInfo = assetInfo;
+        this.alternativeAssetInfo = alternativeAssetInfo;
         this.symbolRelayChainAsset = symbolRelayChainAsset;
         this.xcContractAddress = xcContractAddress;
         this.currencyIDInfo = currencyIDInfo;
