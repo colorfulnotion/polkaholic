@@ -13,7 +13,6 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
-
 const bs58 = require("bs58");
 const {
     Keyring,
@@ -672,6 +671,7 @@ function getRelayChainID(relaychain = 'polkadot') {
 
 function getChainIDFromParaIDAndRelayChain(paraID, relayChain = 'polkadot') {
     let paraIDExtra = getParaIDExtra(relayChain)
+    //if ((paraID == 0) || (paraID == 2) || (paraID == 60000)) return (paraID)
     return paraIDExtra + paraID
 }
 
@@ -782,6 +782,25 @@ function compute_sovereign_account(parachainID) {
         sovereignAccount32: sovAddressParaAccount32,
     }
     return r
+}
+
+
+function git_hash(isRelativePath = true) {
+    let path = (isRelativePath)? '..' : '/root/go/src/github.com/colorfulnotion/polkaholic'
+    try {
+        const rev = fs.readFileSync(`${path}/.git/HEAD`).toString().trim().split(/.*[: ]/).slice(-1)[0];
+        if (rev.indexOf('/') === -1) {
+            return `${rev}`;
+        } else {
+            return `${fs.readFileSync(`${path}/.git/` + rev).toString().trim()}`;
+        }
+    } catch (e) {
+        if (isRelativePath){
+            return git_hash(false)
+        }
+        console.log(`git_hash err ${e.toString()}`)
+        return `NA`
+    }
 }
 
 class NotFoundError extends Error {
@@ -1488,4 +1507,7 @@ module.exports = {
     computeSovereignAccount: function(paraID) {
         return compute_sovereign_account(paraID)
     },
+    commitHash: function() {
+        return git_hash()
+    }
 };

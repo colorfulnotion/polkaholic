@@ -1122,7 +1122,7 @@ module.exports = class Query extends AssetManager {
                     x.symbol = assetInfo.symbol;
                     //if (assetInfo.localSymbol) x.localSymbol = assetInfo.localSymbol;
                 } else {
-                    console.log("MISSING", x.asset, x.chainID);
+                    console.log(`[${x.extrinsicHash}] [${x.extrinsicID}] MISSING x.asset`, x.asset, x.chainID);
                 }
                 let section = null,
                     method = null;
@@ -1540,7 +1540,8 @@ module.exports = class Query extends AssetManager {
         let tbl = "assetpricelog";
         if (q.symbol && q.relayChain) {
             let symbolRelayChain = paraTool.makeAssetChain(q.symbol, q.relayChain);
-            if (this.xcmSymbolInfo[symbolRelayChain] == undefined) {
+            let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+            if (xcmAssetInfo == undefined) {
                 throw new paraTool.InvalidError(`Invalid symbol relay chain: ${q.symbol}/${q.relayChain}`)
             }
             tbl = "xcmassetpricelog";
@@ -6770,7 +6771,7 @@ module.exports = class Query extends AssetManager {
         for (const p of parents) {
             out.push(`( msgHash = '${p.msgHash}' and blockNumber = '${p.blockNumber}' )`);
         }
-        for (const p of children) {
+        for (const c of children) {
             out.push(`( msgHash = '${c.msgHash}' and blockNumber = '${c.blockNumber}' )`);
         }
         let str = out.join(" or");

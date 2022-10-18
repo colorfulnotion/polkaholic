@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+const fs = require('fs');
+function git_hash(){
+    try {
+        const rev = fs.readFileSync('../.git/HEAD').toString().trim().split(/.*[: ]/).slice(-1)[0];
+        if (rev.indexOf('/') === -1) {
+            return `commit:${rev}`;
+        } else {
+            return `commit:${fs.readFileSync('../.git/' + rev).toString().trim()}`;
+        }
+    }catch (e){
+        console.log(`git_hash err`, e)
+        return `commit:NA`
+    }
+}
+console.log(`${git_hash()}`)
+

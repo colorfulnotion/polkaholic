@@ -230,6 +230,8 @@ app.get('/login', async (req, res) => {
     try {
         var chains = await query.getChains();
         res.render('login', {
+	    commit: query.commitHash,
+            version: query.indexerInfo,
             chains: chains,
             chainInfo: query.getChainInfo(),
             skipSearch: true,

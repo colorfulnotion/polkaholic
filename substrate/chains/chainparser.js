@@ -7,6 +7,8 @@ module.exports = class ChainParser {
     parserBlockNumber = false;
     parserBlockHash = false;
     parserWatermark = 0;
+    relayParentStorageRoot = false;
+    paraStates = {}
     numParserErrors = 0;
     mpReceived = false;
     mpReceivedHashes = {};
@@ -883,7 +885,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processIncomingXCM(indexer, extrinsic, extrinsicID, events, finalized = false) {
+    processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
         //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
         this.mpReceived = false;
         this.mpReceivedHashes = {};
@@ -937,7 +939,7 @@ module.exports = class ChainParser {
                         let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
                         if (candidate) {
                             candiateCnt++
-                            indexer.updateXCMTransferDestCandidate(candidate, caller)
+                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
                         }
                     }
                     console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
@@ -948,7 +950,7 @@ module.exports = class ChainParser {
                             console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
                             if (candidate) {
                                 candiateCnt++
-                                indexer.updateXCMTransferDestCandidate(candidate, caller)
+                                indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
                             }
                         }
                     }
@@ -996,7 +998,88 @@ module.exports = class ChainParser {
             },
             ...
           ]
+          {
+            "eventID": "0-12484234-1-1",
+            "section": "paraInclusion",
+            "method": "CandidateIncluded",
+            "data": [
+              {
+                "descriptor": {
+                  "paraId": 1000,
+                  "relayParent": "0x40be74436db126b9e81d5a1f0fe385335d9174d98cfe86e8f5ea2ab22c1c204c",
+                  "collator": "0xc43af01cb2265b0fb18681bd6e223a9c920cff12a453f614b40df42597bf4e05",
+                  "persistedValidationDataHash": "0xb5c4bbe34b9c2798ea35de0a285d42d7cdb64265db316579edd4aebaa73ab940",
+                  "povHash": "0xbddda78d1f3c04e01da57c35f24bcae330f16f7d4fe444d6cba5bfdd9223f73e",
+                  "erasureRoot": "0xe005c22f322ecf96863a50c16870163eb14ce5704d798cb17ec6d99df677c68f",
+                  "signature": "0x0e1fb3171c4906033ca627d1cd08ea61d587c7033d4ad38d61ce2eb42080d60b9d4911733433097576c02a68b74d4bcff7c503e3d25ff3aa38fd87a8aced9f8c",
+                  "paraHead": "0xd309360cb8921d83aad00ad7ca66e5d8eccc65a33e4b01ef5110a03c4d1f1a20",
+                  "validationCodeHash": "0x4c2a8f587d02cb03f8e1c7cead6a8afd64da21700010a3863cac9750bf2614cb"
+                },
+                "commitmentsHash": "0x216ef3d97d8ddb1dcb613ec78e7ca2fd79060cf22911f991eada61b5b6c547c0"
+              },
+              "0xdc5844a8700d0588f2a71784fd1f11ed7fdf3e33e069fb7dae79388017be2e0346dd8e00ba3e09edf026ff6b1038c133c44c7b1f170ad27fc19cd0959c6822c11b630095a509fca749fff50e5f20919a34f225bd404599cc72dced9c59797aa35cfcae0c08066175726120792b46080000000005617572610101a89dadec63ef5d9ec03f76edc121e43d4c7425b341e3f64834bfc69a83f1fac39fe92fe285b78209193e9bc7c1c003877056b469f2007db4478ecc2aae89310c",
+              0,
+              19
+            ]
+          }
+          {
+            "eventID": "0-12484233-1-10",
+            "section": "paraInclusion",
+            "method": "CandidateBacked",
+            "data": [
+              {
+                "descriptor": {
+                  "paraId": 1000,
+                  "relayParent": "0x40be74436db126b9e81d5a1f0fe385335d9174d98cfe86e8f5ea2ab22c1c204c",
+                  "collator": "0xc43af01cb2265b0fb18681bd6e223a9c920cff12a453f614b40df42597bf4e05",
+                  "persistedValidationDataHash": "0xb5c4bbe34b9c2798ea35de0a285d42d7cdb64265db316579edd4aebaa73ab940",
+                  "povHash": "0xbddda78d1f3c04e01da57c35f24bcae330f16f7d4fe444d6cba5bfdd9223f73e",
+                  "erasureRoot": "0xe005c22f322ecf96863a50c16870163eb14ce5704d798cb17ec6d99df677c68f",
+                  "signature": "0x0e1fb3171c4906033ca627d1cd08ea61d587c7033d4ad38d61ce2eb42080d60b9d4911733433097576c02a68b74d4bcff7c503e3d25ff3aa38fd87a8aced9f8c",
+                  "paraHead": "0xd309360cb8921d83aad00ad7ca66e5d8eccc65a33e4b01ef5110a03c4d1f1a20",
+                  "validationCodeHash": "0x4c2a8f587d02cb03f8e1c7cead6a8afd64da21700010a3863cac9750bf2614cb"
+                },
+                "commitmentsHash": "0x216ef3d97d8ddb1dcb613ec78e7ca2fd79060cf22911f991eada61b5b6c547c0"
+              },
+              "0xdc5844a8700d0588f2a71784fd1f11ed7fdf3e33e069fb7dae79388017be2e0346dd8e00ba3e09edf026ff6b1038c133c44c7b1f170ad27fc19cd0959c6822c11b630095a509fca749fff50e5f20919a34f225bd404599cc72dced9c59797aa35cfcae0c08066175726120792b46080000000005617572610101a89dadec63ef5d9ec03f76edc121e43d4c7425b341e3f64834bfc69a83f1fac39fe92fe285b78209193e9bc7c1c003877056b469f2007db4478ecc2aae89310c",
+              0,
+              19
+            ]
+          }
         */
+        // claim: parainclusion(CandidateBacked) -> parainclusion(CandidateIncluded)
+        // a block must be "backed" before it can be included
+        // destSentAt correspond to parainclusion(CandidateIncluded) at sent
+        // backedCandidate.relayParent is same as source 'sentAt'!
+        try {
+            /*
+            console.log(`im here processParainherentEnter`)
+            let parainclusionCandidateBackedList = events.filter((ev) => {
+                return this.paraInclusionCandidateBackedFilter(`${ev.section}(${ev.method})`);
+            })
+            let parainclusionCandidateIncludedList = events.filter((ev) => {
+                return this.paraInclusionCandidateIncludedFilter(`${ev.section}(${ev.method})`);
+            })
+            for (const parainclusionCandidateBacked of parainclusionCandidateBackedList){
+                 let backedCandidate = parainclusionCandidateBacked.data[0].descriptor
+                 let relayParent = backedCandidate.relayParent
+                 if (indexer.trailingBlockHashs[relayParent] != undefined){
+                     backedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
+                 }
+                 console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] backedCandidate`, backedCandidate)
+            }
+            for (const parainclusionCandidateIncluded of parainclusionCandidateIncludedList){
+                 let includedCandidate = parainclusionCandidateIncluded.data[0].descriptor
+                 let relayParent = includedCandidate.relayParent
+                 if (indexer.trailingBlockHashs[relayParent] != undefined){
+                     includedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
+                 }
+                 console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] includedCandidate`, includedCandidate)
+            }
+            */
+        } catch (err) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processParainherentEnter event error`, err)
+        }
         try {
             if (extrinsic.params != undefined && extrinsic.params.data != undefined) {
                 let data = extrinsic.params.data
@@ -1076,8 +1159,10 @@ module.exports = class ChainParser {
                 let data = extrinsic.params.data
                 try {
                     let hrmpWatermark = data.validationData.relayParentNumber
+                    let relayParentStorageRoot = data.validationData.relayParentStorageRoot
                     this.parserWatermark = hrmpWatermark
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark}`)
+                    this.relayParentStorageRoot = relayParentStorageRoot
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark} (${relayParentStorageRoot})`)
                     //update all outgoing trace msg with this hrmp
                     indexer.fixOutgoingUnknownSentAt(hrmpWatermark);
                 } catch (err1) {
@@ -2210,6 +2295,7 @@ module.exports = class ChainParser {
         return outgoingXTokens;
     }
 
+    //TODO: go one level deep
     extract_xcm_incomplete(events, extrinsicID = false) {
         let incomplete = 0;
         for (let i = 0; i < events.length; i++) {
@@ -2816,8 +2902,8 @@ module.exports = class ChainParser {
                         let amountSent = assetAndAmountSent.amountSent
                         let transferIndex = assetAndAmountSent.transferIndex
                         let isFeeItem = assetAndAmountSent.isFeeItem
+                        let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                         if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent) && chainIDDest) {
-                            let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcms.length
                             let r = {
@@ -2847,6 +2933,37 @@ module.exports = class ChainParser {
                             outgoingXcmPallet.push(r)
                             extrinsic.xcms.push(r)
                             //outgoingXcmList.push(r)
+                        } else if (incomplete) {
+                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer incomplete `, `module:${section_method}`, a);
+                            // TODO: tally error
+                            if (extrinsic.xcms == undefined) extrinsic.xcms = []
+                            let xcmIndex = extrinsic.xcms.length
+                            let r = {
+                                sectionMethod: section_method,
+                                extrinsicHash: feed.extrinsicHash,
+                                extrinsicID: feed.extrinsicID,
+                                transferIndex: transferIndex,
+                                xcmIndex: xcmIndex,
+                                relayChain: indexer.relayChain,
+                                chainID: indexer.chainID,
+                                chainIDDest: chainIDDest,
+                                paraID: paraID,
+                                paraIDDest: paraIDDest,
+                                blockNumber: this.parserBlockNumber,
+                                fromAddress: fromAddress,
+                                destAddress: destAddress,
+                                sourceTS: feed.ts,
+                                amountSent: amountSent,
+                                incomplete: incomplete,
+                                isFeeItem: isFeeItem,
+                                msgHash: '0x',
+                                sentAt: this.parserWatermark,
+                                xcmSymbol: targetedSymbol,
+                                xcmInteriorKey: targetedXcmInteriorKey,
+                            }
+                            console.log("processOutgoingPolkadotXcm xcmPallet incomplete", r);
+                            //outgoingXcmPallet.push(r)
+                            //extrinsic.xcms.push(r)
                         } else {
                             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer unknown `, `module:${section_method}`, a);
                             // TODO: tally error
@@ -3114,6 +3231,25 @@ module.exports = class ChainParser {
     xTokensFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
         if (palletMethod == "xTokens(TransferredMultiAssets)") {
+            return true
+        } else {
+            return false;
+        }
+    }
+
+
+    paraInclusionCandidateIncludedFilter(palletMethod) {
+        //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
+        if (palletMethod == "paraInclusion(CandidateIncluded)") {
+            return true
+        } else {
+            return false;
+        }
+    }
+
+    paraInclusionCandidateBackedFilter(palletMethod) {
+        //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
+        if (palletMethod == "paraInclusion(CandidateBacked)") {
             return true
         } else {
             return false;
@@ -3799,14 +3935,14 @@ module.exports = class ChainParser {
 
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                let updateXcmConcept = true
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
-                    return
+                    updateXcmConcept = false
+                    //already cached
                 }
-
                 //console.log(`${chainID} '${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
-
                 let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
                 let xcmAssetInfo = {
                     chainID: chainID,
@@ -3821,7 +3957,7 @@ module.exports = class ChainParser {
                     source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
-                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetRegistryLocations');
+                if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetRegistryLocations');
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
@@ -3859,7 +3995,6 @@ module.exports = class ChainParser {
             }
             let paraID = 0
             let chainID = -1
-
             var asset = JSON.stringify(parsedAsset);
             let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
             let cachedAssetInfo = indexer.assetInfo[assetChain]
@@ -3883,9 +4018,11 @@ module.exports = class ChainParser {
                 }
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                let updateXcmConcept = true
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
-                    return
+                    updateXcmConcept = false
+                    //already cached
                 }
 
                 if ((typeof interiorK == "string") && (interiorK.toLowerCase() == 'here')) {
@@ -3920,35 +4057,6 @@ module.exports = class ChainParser {
                 }
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
 
-                /*
-
-                //Moonbeam Registry
-                2000	'[{"parachain":2000},{"generalKey":"0x0001"}]'	      {"Token":"AUSD"}[2000] |	[aUSD]	[x2]
-                2012	'[{"parachain":2012},{"generalKey":"0x50415241"}]'	  {"Token":"PARA"}[2012] |	[PARA]	[x2]
-                0	    'here'	                                              {"Token":"DOT"}	[0]    |	[DOT]	[here]
-                2000	'[{"parachain":2000},{"generalKey":"0x0000"}]'	      {"Token":"ACA"}[2000]  |	[ACA]	[x2]
-
-                //Moonriver Registry
-                22012	'{"parachain":2012}'	                                {"Token":"CSM"}	[2012] |	[CSM]	[x1]
-                22007	'{"parachain":2007}'	                                {"Token":"SDN"}	[2007] |	[SDN]	[x1]
-                22085	'[{"parachain":2085},{"generalKey":"0x484b4f"}]'	    {"Token":"HKO"}	[2085] |	[HKO]	[x2]
-                22092	'[{"parachain":2092},{"generalKey":"0x000b"}]'	      {"Token":"KBTC"}[2092] |	[KBTC]	[x2]
-                22084	'{"parachain":2084}'	                                {"Token":"KMA"} [2084] |	[KMA]	[x1]
-                22105	'[{"parachain":2105},{"palletInstance":5}]'	          {"Token":"CRAB"}[2105] |	[CRAB]	[x2]
-                22004	'{"parachain":2004}'	                                {"Token":"PHA"} [2004] |	[PHA]	[x1]
-                22000	'[{"parachain":2000},{"generalKey":"0x0081"}]'	      {"Token":"KUSD"}[2000] |	[AUSD]	[x2]
-                22092	'[{"parachain":2092},{"generalKey":"0x000c"}]'    	  {"Token":"KINT"}[2092] |	[KINT]	[x2]
-                22015	'[{"parachain":2015},{"generalKey":"0x54454552"}]'	  {"Token":"TEER"}[2015] |	[TEER]	[x2]
-                2	    'here'	                                              {"Token":"KSM"}    [0] |	[KSM]	[here]
-                22000	'[{"parachain":2000},{"generalKey":"0x0080"}]'	      {"Token":"KAR"} [2000] |	[KAR]	[x2]
-                22001	'[{"parachain":2001},{"generalKey":"0x0001"}]'	      {"Token":"BNC"} [2001] |	[BNC]	[x2]
-                21000	'[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'	  {"Token":"1984"}[1000] |	[USDT]	[x3]
-                21000	'[{"parachain":1000},{"palletInstance":50},{"generalIndex":8}]'	         {"Token":"8"}[1000] |	[RMRK]	[x3]
-
-                //Heiko Registry
-                21000 '[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'    {"Token":"1984"} [1000] | [USDT] [x3]
-                */
-
                 //console.log(`${chainID} '${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
 
@@ -3966,7 +4074,7 @@ module.exports = class ChainParser {
                     source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
-                await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdType');
+                if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdType');
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
@@ -4084,7 +4192,6 @@ module.exports = class ChainParser {
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     updateXcmConcept = false
                     if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
-                    //return
                 }
 
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)

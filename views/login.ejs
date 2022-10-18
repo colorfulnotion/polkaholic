@@ -34,6 +34,11 @@
   <div>
   Don't have an account yet? <a href='/register'>Sign up for free.</a> | <a href='/forgot'>Forgot password?</a>
   </div>
+<% if ( commit && version ) { %>
+  <div>
+  Version: <a href='https://github.com/colorfulnotion/polkaholic/commit/<%= commit; %>'><b>v<%= version; %> </b></a>
+  </div>
+<% } %>
 </form>
 
 <script>

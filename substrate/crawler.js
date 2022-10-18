@@ -1890,7 +1890,7 @@ create table talismanEndpoint (
                     await this.getSpecVersionMetadata(chain, specVersion, finalizedHash, bn);
                 }
 
-                console.log("subscribeFinalizedHeads", chain.chainName, bn, `CHECK: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(bn), "|  ", sql2);
+                //console.log("subscribeFinalizedHeads", chain.chainName, bn, `CHECK: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(bn), "|  ", sql2);
                 await this.update_batchedSQL();
 
                 if (this.readyToCrawlParachains && (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama)) {
@@ -1960,12 +1960,11 @@ create table talismanEndpoint (
             let bn = parseInt(header.number.toString(), 10);
             let finalizedHash = header.hash.toString();
             let parentHash = header.parentHash.toString();
-
-            this.sendWSMessage({
-                "msgType": "subscribeFinalizedHeads",
+            let subscribeFinalizedHeadsMsg = {
                 "bn": bn,
                 "chainID": chainID
-            });
+            }
+            this.sendWSMessage(subscribeFinalizedHeadsMsg, "subscribeFinalizedHeads", "crawlBlocks");
             await this.processFinalizedHead(chain, chainID, bn, finalizedHash, parentHash, true);
             this.finalizedHashes[bn] = finalizedHash;
             // because we do not always get the finalized hash signal, we brute force use the parentHash => grandparentHash => greatgrandparentHash => greatgreatgrandparentHash  (3 up)
@@ -1977,7 +1976,7 @@ create table talismanEndpoint (
             while (this.finalizedHashes[b] == undefined && (b > bMin)) {
                 let bHeader = await this.api.rpc.chain.getHeader(bHash);
                 let bparentHash = bHeader.parentHash.toString();
-                console.log("processFinalizedHead", b, bHash, bparentHash)
+                //console.log("processFinalizedHead", b, bHash, bparentHash)
                 this.finalizedHashes[b] = bHash;
                 queue.push({
                     b,
@@ -2033,11 +2032,11 @@ create table talismanEndpoint (
                     block.blockTS = blockTS;
 
                     let blockNumber = block.number;
-                    this.sendWSMessage({
-                        "msgType": "subscribeStorage",
+                    let subscribeStorageMsg = {
                         "bn": blockNumber,
                         "chainID": chainID
-                    });
+                    }
+                    this.sendWSMessage(subscribeStorageMsg, "subscribeStorage", "crawlBlocks");
                     // get trace from block
                     let trace = await this.dedupChanges(results.changes);
                     if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
@@ -2059,8 +2058,7 @@ create table talismanEndpoint (
                             let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, "subscribeStorage", this.api);
                             let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces); // autotrace, finalized, write_bq_log are all false
 
-                            await this.immediateFlushBlockAndAddressExtrinsics()
-
+                            await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
                             if (blockNumber > this.blocksCovered) {
                                 // only update blocksCovered in the DB if its HIGHER than what we have seen before
                                 var sql = `update chain set blocksCovered = '${blockNumber}', lastCrawlDT = Now() where chainID = '${chainID}' and blocksCovered < ${blockNumber}`
@@ -2094,7 +2092,7 @@ create table talismanEndpoint (
                                 "vals": vals,
                                 "data": [out],
                                 "replace": vals
-                            }, true);
+                            });
                             /*
                             {"name":"polkaholic","hostname":"kusama","pid":684112,"level":50,"op":"update_batchedSQL","sql":"insert into blockunfinalized (chainID,blockNumber,numExtrinsics,numSignedExtrinsics,numTransfers,numEvents,valueTransfersUSD,fees,lastTraceDT,blockHashEVM,parentHashEVM,numTransactionsEVM,numTransactionsInternalEVM,numReceiptsEVM,gasUsed,gasLimit) VALUES ('2004', '1868555', '0x1cf7a3838a8dcf9087251521e070023b9cd633c9d6a1dc777a4a5866822e1bc4', '15', '0', '2', '138', '26.831085319352944', from_unixtime(1663191949) , '', '', '0', '0', '0', '0', '0' ) on duplicate key update numExtrinsics=VALUES(numExtrinsics),numSignedExtrinsics=VALUES(numSignedExtrinsics),numTransfers=VALUES(numTransfers),numEvents=VALUES(numEvents),valueTransfersUSD=VALUES(valueTransfersUSD),fees=VALUES(fees),lastTraceDT=VALUES(lastTraceDT),blockHashEVM=VALUES(blockHashEVM),parentHashEVM=VALUES(parentHashEVM),numTransactionsEVM=VALUES(numTransactionsEVM),numTransactionsInternalEVM=VALUES(numTransactionsInternalEVM),numReceiptsEVM=VALUES(numReceiptsEVM),gasUsed=VALUES(gasUsed),gasLimit=VALUES(gasLimit)","len":981,"try":1,"err":{"code":"ER_WARN_DATA_TRUNCATED","errno":1265,"sqlState":"01000","sqlMessage":"Data truncated for column 'numExtrinsics' at row 1"
                             */
@@ -2110,7 +2108,7 @@ create table talismanEndpoint (
                                 "replace": vals
                             })
 
-                            console.log(`****** subscribeStorage ${chain.chainName} bn=${blockNumber} ${blockHash}: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(parseInt(blockNumber, 10)));
+                            //console.log(`****** subscribeStorage ${chain.chainName} bn=${blockNumber} ${blockHash}: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(parseInt(blockNumber, 10)));
                             await this.update_batchedSQL();
                         }
                     } else {

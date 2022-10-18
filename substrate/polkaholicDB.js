@@ -41,7 +41,7 @@ module.exports = class PolkaholicDB {
     hostname = false;
     batchedSQL = [];
     initChainInfos = false;
-
+    commitHash = 'NA';
     specVersions = {};
     chainInfos = {};
     chainNames = {};
@@ -83,6 +83,10 @@ module.exports = class PolkaholicDB {
         });
 
         this.hostname = os.hostname();
+        this.commitHash = paraTool.commitHash()
+        this.version = `1.0.0` // we will update this manually
+        this.indexerInfo = `${this.version}-${this.commitHash.slice(0,7)}`
+        console.log(`****  Initiating Polkaholic ${this.indexerInfo} ****`)
 
         // 1. ready db config for WRITABLE mysql pool [always in US presently] using env variable POLKAHOLIC_DB
         let dbconfigFilename = (process.env.POLKAHOLIC_DB != undefined) ? process.env.POLKAHOLIC_DB : '/root/.mysql/.db00.cnf';
@@ -304,16 +308,17 @@ module.exports = class PolkaholicDB {
 
     getChainAsset(chainID) {
         chainID = chainID.toString()
+        let assetChain = null
         if (this.chainInfos[chainID] != undefined && this.chainInfos[chainID].symbol != undefined) {
             let asset = JSON.stringify({
                 "Token": this.chainInfos[chainID].symbol
             })
-            let assetChain = paraTool.makeAssetChain(asset, chainID);
+            assetChain = paraTool.makeAssetChain(asset, chainID);
             if (this.assetInfo[assetChain] != undefined) {
                 return (asset);
             }
         }
-        console.log("getChainAsset FATAL ERROR: must call init", chainID)
+        console.log(`[${chainID}] getChainAsset FATAL ERROR: must call init for ${assetChain}`, this.chainInfos[chainID])
         return null
     }
 
@@ -1223,6 +1228,7 @@ from chain where chainID = '${chainID}' limit 1`);
     add_index_metadata(c) {
         c.source = this.hostname;
         c.genTS = this.getCurrentTS();
+        c.commit = this.indexerInfo;
     }
 
     capitalizeFirstLetter(string) {
