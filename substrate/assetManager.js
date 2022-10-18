@@ -465,7 +465,8 @@ module.exports = class AssetManager extends PolkaholicDB {
                     assetType: "Token"
                 }
                 if (symbol) {
-                    let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain); // REVIEW: why upper case here??
+                    // upper case to standardized LCDOT, AUSD
+                    let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain);
                     xcmSymbolInfo[symbolRelayChain] = a
                 }
                 xcmAssetInfo[xcmInteriorKey] = a; //the key has no chainID
@@ -533,7 +534,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         let pieces = symbolRelayChain.split('~')
         pieces[0] = pieces[0].toUpperCase()
         symbolRelayChain = pieces.join('~')
-        let xcmAssetInfo =  this.xcmSymbolInfo[symbolRelayChain]
+        let xcmAssetInfo = this.xcmSymbolInfo[symbolRelayChain]
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo
         }
@@ -579,8 +580,6 @@ module.exports = class AssetManager extends PolkaholicDB {
             if (v.asset == '{"StableAssetPoolToken":"0"}') {
                 v.assetType = 'LiquidityPair';
             }
-
-            //let alternativeAssetChain = (v.alternativeAsset != undefined)? paraTool.makeAssetChain(v.alternativeAsset,v.chainID) : false
 
             if (v.assetType == 'LiquidityPair' || v.assetType == 'ERC20LP') { //'ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special'
                 a = {
@@ -643,15 +642,14 @@ module.exports = class AssetManager extends PolkaholicDB {
                     if (symbolRelayChainAsset[symbolRelayChain] == undefined) {
                         symbolRelayChainAsset[symbolRelayChain] = {};
                     }
-
                     symbolRelayChainAsset[symbolRelayChain][v.chainID] = a
                 } else {
                     a.relayChain = paraTool.getRelayChainByChainID(a.chainID)
                 }
             }
             assetInfo[assetChain] = a;
-            let alternativeAssetChain = (v.asset != undefined && v.asset == '{"LiquidCrowdloan":"13"}')? '{"Token":"lcDOT"}' : false
-            if (alternativeAssetChain){
+            let alternativeAssetChain = (v.asset != undefined && v.asset == '{"LiquidCrowdloan":"13"}') ? '{"Token":"lcDOT"}' : false
+            if (alternativeAssetChain) {
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`adding alternative assetInfo[${alternativeAssetChain}]`, a)
                 assetInfo[alternativeAssetChain] = a;
             }

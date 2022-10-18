@@ -1298,7 +1298,7 @@ module.exports = class Indexer extends AssetManager {
                 let chainIDDest = (v.chainIDDest != undefined) ? `'${v.chainIDDest}'` : `NULL`
                 let errorcase = (v.errorcase != undefined && v.errorcase != "") ? `'${v.errorcase}'` : `NULL`
                 //MK: send violation here
-                if (isTip){
+                if (isTip) {
                     console.log(`[Delay=${this.chainParser.parserBlockNumber-v.sourceBlocknumber}]  send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${r.instructionHash}), isTip=${isTip}`)
                     //this.sendWSMessage(r, "xcmViolation", "flushXCM");
                 }
@@ -1353,8 +1353,7 @@ module.exports = class Indexer extends AssetManager {
         const endpoint = null;
         try {
             const ws = new WebSocket(endpoint);
-            ws.on('error', function error() {
-            })
+            ws.on('error', function error() {})
             ws.on('open', function open() {
                 ws.send(JSON.stringify(wrapper));
             });
@@ -1629,7 +1628,7 @@ module.exports = class Indexer extends AssetManager {
         }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
         //MK: send xcmtransfer here
-        if (isTip){
+        if (isTip) {
             console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(xcmtransfer, "xcmtransfer", "updateXCMTransferStorage");
         }
@@ -1649,7 +1648,7 @@ module.exports = class Indexer extends AssetManager {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
         }
         //MK: send xcmtransfer here
-        if (isTip){
+        if (isTip) {
             console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(candidate, "xcmtransferdestcandidate", caller);
         }
@@ -4396,16 +4395,6 @@ module.exports = class Indexer extends AssetManager {
                 timestamp: r.blockTS * 1000000
             }
 
-            /*          this.logger.info({
-                            "op": "dump_addressBalanceRequest upd",
-                            "chainID": this.chainID,
-                            "address": address,
-                            "asset": asset,
-                            "assetChain": assetChain,
-                            "encodedAssetChain": encodedAssetChain,
-                            "newState": newState,
-                            "upd": str
-                        }) */
             let rowKey = address.toLowerCase()
             rows.push({
                 key: rowKey,
@@ -5857,7 +5846,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return [null, null];
     }
 
-    patch_xcm(xcmMsg){
+    patch_xcm(xcmMsg) {
         try {
             let xcmObj = this.api.registry.createType("XcmVersionedXcm", xcmMsg.msgHex);
             let msg = xcmObj.toJSON();
@@ -5893,7 +5882,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
     async process_rcxcm(xcmList) {
         let out = [];
-        for (const x of xcmList){
+        for (const x of xcmList) {
             try {
                 if (x.isTip) this.sendWSMessage(x, "relayxcmmessage", "process_rcxcm")
                 let isFinalized = (x.finalized) ? 1 : 0
@@ -5920,12 +5909,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 try {
                     if (t.v == '0x') continue
                     let pendingAvailability = t.pv ? JSON.parse(t.pv) : null; // pv:
-                    if (pendingAvailability){
+                    if (pendingAvailability) {
                         let k = JSON.parse(t.pkExtra)
                         let paraID = paraTool.toNumWithoutComma(k[0])
                         backedMap[paraID] = pendingAvailability
                     }
-                }catch(err){
+                } catch (err) {
                     this.logger.error({
                         "op": "ParaInclusionPendingAvailabilityFilter",
                         "traceID": t.traceID,
@@ -5946,13 +5935,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (t.p == "ParaInclusion" && (t.s == "PendingAvailabilityCommitments")) {
                 try {
                     let commitments = t.pv ? JSON.parse(t.pv) : null; // pv: '{"upwardMessages":[],"horizontalMessages":[],"newValidationCode":null,"headData":"0x8b479dbeef314a22bc8589a38b2b25a6396d5d0fa0a3caa906faee3aaf8188f7b2e47b001e8988caae6861bdfe076f0390770be196c146a30b5e86b03b397a628d79c985e34268e121c9cc333487d904bc10a0f7d1b58e978d0ae3a41e6c27bd03e5203d08066175726120e64446080000000005617572610101ccb39d04d868d3585bb68c0fcbfa1146dc3009422d36933841d2c086d24e5475824fe6428de54c00a9284665b016ec92039db793374b19fe78404e433d5c4780","processedDownwardMessages":0,"hrmpWatermark":12497248}'
-                    if (commitments && (commitments.upwardMessages.length > 0 || commitments.horizontalMessages.length > 0) ) {
+                    if (commitments && (commitments.upwardMessages.length > 0 || commitments.horizontalMessages.length > 0)) {
                         let k = JSON.parse(t.pkExtra)
                         let paraID = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
                         let backed = backedMap[paraID]
                         let sourceSentAt = backed.relayParentNumber // this is the true "sentAt" at sourceChain, same as commitments.hrmpWatermark
-                        let relayedAt = bn                          // "relayedAt" -- aka backed at this relay bn
-                        let includedAt = bn+1                       // "includedAt" -- aka when it's being delivered to destChain
+                        let relayedAt = bn // "relayedAt" -- aka backed at this relay bn
+                        let includedAt = bn + 1 // "includedAt" -- aka when it's being delivered to destChain
                         for (const msgHex of commitments.upwardMessages) {
                             let umpMsg = {
                                 msgType: "ump",
@@ -5963,7 +5952,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                 sentAt: sourceSentAt,
                                 relayedAt: relayedAt,
                                 includedAt: includedAt,
-                                msgHex:  msgHex,
+                                msgHex: msgHex,
                                 msgHash: '0x' + paraTool.blake2_256_from_hex(msgHex),
                                 relayedBlockHash: this.chainParser.parserBlockHash,
                                 blockTS: blockTS,
@@ -5993,7 +5982,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                 sentAt: sourceSentAt,
                                 relayedAt: relayedAt,
                                 includedAt: includedAt,
-                                msgHex:  msgHex,
+                                msgHex: msgHex,
                                 msgHash: '0x' + paraTool.blake2_256_from_hex(msgHex),
                                 relayedBlockHash: this.chainParser.parserBlockHash,
                                 blockTS: blockTS,
@@ -6033,7 +6022,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                 sentAt: sentAt,
                                 relayedAt: sentAt,
                                 includedAt: sentAt,
-                                msgHex:  msgHex,
+                                msgHex: msgHex,
                                 msgHash: '0x' + paraTool.blake2_256_from_hex(msgHex),
                                 relayedBlockHash: this.chainParser.parserBlockHash,
                                 blockTS: blockTS,
@@ -6046,7 +6035,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             xcmList.push(dmpMsg)
                         }
                     }
-                } catch (err){
+                } catch (err) {
                     this.logger.error({
                         "op": "indexRelayChainTrace - Dmp:DownwardMessageQueues",
                         "traceID": t.traceID,
@@ -6056,7 +6045,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 }
             }
         }
-        if (xcmList.length > 0){
+        if (xcmList.length > 0) {
             console.log(`!!! indexRelayChainTrace [${relayChain}-${bn}] len=${xcmList.length} (finalized=${finalized}, isTip=${isTip})`, xcmList)
             await this.process_rcxcm(xcmList)
         }
@@ -6070,7 +6059,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let blockHash = block.hash;
         let blockTS = block.blockTS;
         let paraID = paraTool.getParaIDfromChainID(chainID)
-        if (paraID == 0){
+        if (paraID == 0) {
             //this.trailingBlockHashs[blockHash] = blockNumber;
         }
         let recentExtrinsics = [];
@@ -6316,7 +6305,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
                 if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
                 //MK: send xcmmsg here
-                if (mp != undefined && (isTip)){
+                if (mp != undefined && (isTip)) {
                     console.log(`[Delay=${this.chainParser.parserBlockNumber-mp.blockNumber}] send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
                     this.sendWSMessage(mp, "xcmmessage", "processBlockEvents")
                 }
