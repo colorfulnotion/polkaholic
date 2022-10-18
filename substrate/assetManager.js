@@ -455,7 +455,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 decimals = assetInfo.decimals
                 symbol = assetInfo.symbol
                 isUSD = assetInfo.isUSD
-            }else if (alternativeAssetInfo && alternativeAssetInfo.decimals != undefined && alternativeAssetInfo.symbol != undefined){
+            } else if (alternativeAssetInfo && alternativeAssetInfo.decimals != undefined && alternativeAssetInfo.symbol != undefined) {
                 decimals = alternativeAssetInfo.decimals
                 symbol = alternativeAssetInfo.symbol
                 isUSD = alternativeAssetInfo.isUSD
@@ -546,7 +546,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         let pieces = symbolRelayChain.split('~')
         pieces[0] = pieces[0].toUpperCase()
         symbolRelayChain = pieces.join('~')
-        let xcmAssetInfo =  this.xcmSymbolInfo[symbolRelayChain]
+        let xcmAssetInfo = this.xcmSymbolInfo[symbolRelayChain]
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo
         }
@@ -594,7 +594,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 v.assetType = 'LiquidityPair';
             }
 
-            let alternativeAssetChain = (v.alternativeAsset != undefined)? paraTool.makeAssetChain(v.alternativeAsset,v.chainID) : false
+            let alternativeAssetChain = (v.alternativeAsset != undefined) ? paraTool.makeAssetChain(v.alternativeAsset, v.chainID) : false
 
             if (v.assetType == 'LiquidityPair' || v.assetType == 'ERC20LP') { //'ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special'
                 a = {
@@ -664,7 +664,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
             }
             assetInfo[assetChain] = a;
-            if (alternativeAssetChain){
+            if (alternativeAssetChain) {
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`adding alternative assetInfo[${alternativeAssetChain}]`, a)
                 alternativeAssetInfo[alternativeAssetChain] = a;
             }

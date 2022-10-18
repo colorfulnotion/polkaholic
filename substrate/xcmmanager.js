@@ -1296,7 +1296,7 @@ order by msgHash, diffSentAt, diffTS`
                     let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined) ? false : xcmAssetInfo.xcmInteriorKey
                     //console.log(`[paranets=${parents}] ${chainID} ${chainIDDest} ${JSON.stringify(interior)} -> ${targetAssetChain}, symbolRelayChain=${symbolRelayChain}, xcmInteriorKey=${xcmInteriorKey}, xcmAssetInfo`, xcmAssetInfo)
                     return [targetAssetChain, xcmInteriorKey]
-                }catch (err){
+                } catch (err) {
                     console.log(`get_concrete_assetChain parents=${parents}, chainID=${chainID}, chainIDDest=${chainIDDest}, relayChain=${relayChain}, relayChainID=${relayChainID}, error`, err)
                     return [false, false]
                 }

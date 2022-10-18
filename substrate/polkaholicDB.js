@@ -1228,6 +1228,7 @@ from chain where chainID = '${chainID}' limit 1`);
     add_index_metadata(c) {
         c.source = this.hostname;
         c.genTS = this.getCurrentTS();
+        c.commit = this.indexerInfo;
     }
 
     capitalizeFirstLetter(string) {

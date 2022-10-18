@@ -1077,7 +1077,7 @@ module.exports = class ChainParser {
                  console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] includedCandidate`, includedCandidate)
             }
             */
-        }catch (err) {
+        } catch (err) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processParainherentEnter event error`, err)
         }
         try {
@@ -2933,7 +2933,7 @@ module.exports = class ChainParser {
                             outgoingXcmPallet.push(r)
                             extrinsic.xcms.push(r)
                             //outgoingXcmList.push(r)
-                        } else if (incomplete){
+                        } else if (incomplete) {
                             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer incomplete `, `module:${section_method}`, a);
                             // TODO: tally error
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
@@ -3957,7 +3957,7 @@ module.exports = class ChainParser {
                     source: indexer.chainID,
                 }
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
-                if (updateXcmConcept)  await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetRegistryLocations');
+                if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetRegistryLocations');
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }

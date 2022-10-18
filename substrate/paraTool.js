@@ -784,7 +784,7 @@ function compute_sovereign_account(parachainID) {
     return r
 }
 
-function git_hash(){
+function git_hash() {
     try {
         const rev = fs.readFileSync('../.git/HEAD').toString().trim().split(/.*[: ]/).slice(-1)[0];
         if (rev.indexOf('/') === -1) {
@@ -792,7 +792,7 @@ function git_hash(){
         } else {
             return `${fs.readFileSync('../.git/' + rev).toString().trim()}`;
         }
-    }catch (e){
+    } catch (e) {
         console.log(`git_hash err`, e)
         return `NA`
     }
@@ -1502,7 +1502,7 @@ module.exports = {
     computeSovereignAccount: function(paraID) {
         return compute_sovereign_account(paraID)
     },
-    commitHash: function(){
+    commitHash: function() {
         return git_hash()
     }
 };
