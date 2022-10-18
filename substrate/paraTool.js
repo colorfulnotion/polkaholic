@@ -13,7 +13,6 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
-
 const bs58 = require("bs58");
 const {
     Keyring,
@@ -785,6 +784,20 @@ function compute_sovereign_account(parachainID) {
     return r
 }
 
+function git_hash(){
+    try {
+        const rev = fs.readFileSync('../.git/HEAD').toString().trim().split(/.*[: ]/).slice(-1)[0];
+        if (rev.indexOf('/') === -1) {
+            return `${rev}`;
+        } else {
+            return `${fs.readFileSync('../.git/' + rev).toString().trim()}`;
+        }
+    }catch (e){
+        console.log(`git_hash err`, e)
+        return `NA`
+    }
+}
+
 class NotFoundError extends Error {
     constructor(message) {
         // Needs to pass both `message` and `options` to install the "cause" property.
@@ -1489,4 +1502,7 @@ module.exports = {
     computeSovereignAccount: function(paraID) {
         return compute_sovereign_account(paraID)
     },
+    commitHash: function(){
+        return git_hash()
+    }
 };

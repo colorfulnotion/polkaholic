@@ -41,7 +41,7 @@ module.exports = class PolkaholicDB {
     hostname = false;
     batchedSQL = [];
     initChainInfos = false;
-
+    commitHash = 'NA';
     specVersions = {};
     chainInfos = {};
     chainNames = {};
@@ -83,6 +83,10 @@ module.exports = class PolkaholicDB {
         });
 
         this.hostname = os.hostname();
+        this.commitHash = paraTool.commitHash()
+        this.version = `1.0.0` // we will update this manually
+        this.indexerInfo = `${this.version}-${this.commitHash.slice(0,7)}`
+        console.log(`****  Initiating Polkaholic ${this.indexerInfo} ****`)
 
         // 1. ready db config for WRITABLE mysql pool [always in US presently] using env variable POLKAHOLIC_DB
         let dbconfigFilename = (process.env.POLKAHOLIC_DB != undefined) ? process.env.POLKAHOLIC_DB : '/root/.mysql/.db00.cnf';

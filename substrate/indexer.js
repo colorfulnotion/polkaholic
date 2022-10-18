@@ -1347,6 +1347,7 @@ module.exports = class Indexer extends AssetManager {
             type: msgType,
             msg: m,
             source: this.hostname,
+            commit: this.indexerInfo,
         }
         console.log(`sendWSMessage [${msgType}] [${caller}]`, wrapper)
         return;

@@ -928,7 +928,7 @@ module.exports = class XCMManager extends Query {
             }
         } catch (err) {
             console.log("WRITE_FEEDXCMDEST", err)
-            process.exit(0);
+            //process.exit(0);
         }
         let logDT = new Date(startTS * 1000)
         console.log(`match_xcm ${startTS} covered ${logDT}`)
@@ -1162,7 +1162,7 @@ module.exports = class XCMManager extends Query {
             }
         } catch (err) {
             console.log("WRITE_FEEDXCMDEST", err)
-            process.exit(0);
+            //process.exit(0);
         }
         let logDT = new Date(startTS * 1000)
         console.log(`match_xcm_failure ${startTS} covered ${logDT}`)
