@@ -41,9 +41,11 @@
       <B>Module</B>: <%- include("module", {chainID: xcm.origination.id, section: xcm.origination.section, method: xcm.origination.method}); %><br/>
       <b>Sent At Block</B>: <a href='/block/<%= xcm.origination.id %>/<%= xcm.origination.blockNumber; %>'><code><%= xcm.origination.blockNumber; %></code></a><br/>
       <b>XCM Message Hash</b>: <a href='/xcmmessage/<%= xcm.origination.msgHash %>/<%= xcm.origination.sentAt %>'><%- uiTool.getShortHash(xcm.origination.msgHash) %></a><br/>
+      <% if ( xcm.origination.txFee != undefined) { %>
       <B>TX Fees:</B>
          <%- uiTool.presentFloat(xcm.origination.txFee) %> <%= xcm.origination.txFeeSymbol %>
          (<%- uiTool.currencyFormat(xcm.origination.txFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)<br/>
+      <% } %>
       </p>
     </li>
 
