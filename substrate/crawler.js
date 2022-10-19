@@ -60,7 +60,7 @@ const {
     StorageKey
 } = require('@polkadot/types');
 
-const axios = require("axios");
+
 const mysql = require("mysql2");
 const Indexer = require("./indexer");
 const paraTool = require("./paraTool");
@@ -106,12 +106,6 @@ module.exports = class Crawler extends Indexer {
                 "method": "state_traceBlock",
                 "params": [blockHash, "state", "", "Put"]
             }
-            /*
-            let traceData = await axios.post(chain.RPCBackfill, data, {
-                headers: headers,
-                timeout: timeoutMS
-            })
-	    */
             let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' ${chain.RPCBackfill}`
             const {
                 stdout,

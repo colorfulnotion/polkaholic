@@ -1,24 +1,22 @@
 var initcontract = false;
 var contract = null;
 
-function presentSourceCode(contract) {
+function presentSourceCode(sources) {
     let out = [];
-    out.push(`<b>Contract Name:</b> <b>${contract.ContractName}</b>`);
-    out.push(`<b>Compiler Version:</b> ${contract.CompilerVersion}`);
-    out.push(`<b>Constructor Arguments:</b><br/><textarea rows=12 cols=80>${contract.ConstructorArguments}</textarea>`);
-    out.push(`<b>EVM Version:</b> ${contract.EVMVersion}`);
-    let sourceCode = contract.SourceCode;
-    if (sourceCode.length > 4 && sourceCode.substring(0, 2) == "{{") {
-        sourceCode = JSON.parse(sourceCode.substring(1, sourceCode.length - 1));
-        let sources = sourceCode.sources;
-        for (const source of Object.keys(sources)) {
-            let content = sources[source].content;
-            out.push(`<code>${source}:</code><br/><textarea rows=12 style='width:100%; font-family: Courier; font-size: 8pt'>${content}</textarea>`);
-        }
-    } else {
-        out.push(`<textarea rows=12 style='width:100%; font-family: Courier; font-size: 8pt'>${sourceCode}</textarea>`);
+    // TODO: metadata
+    //out.push(`<b>Contract Name:</b> <b>${contract.ContractName}</b>`);
+    //out.push(`<b>Compiler Version:</b> ${contract.CompilerVersion}`);
+    //out.push(`<b>Constructor Arguments:</b><br/><textarea rows=12 cols=80>${contract.ConstructorArguments}</textarea>`);
+    //out.push(`<b>EVM Version:</b> ${contract.EVMVersion}`);
+    for ( const source of Object.keys(sources) ) {
+	let content = sources[source];
+	if ( source.includes("http") ) {
+            out.push(`<div style='font-size:9pt'><a href='${source}'>Download ${source}</a></div>`);
+	} else {
+            out.push(`<div style='font-size:9pt'>${source}</div>`);
+	}
+	out.push(`<textarea rows=12 style='width:100%; font-family: Courier; font-size: 8pt'>${content}</textarea>`);
     }
-
     return out.join("<br/>");
 }
 
@@ -213,7 +211,6 @@ async function showcontract(address, chain) {
             "Content-Type": "application/json"
         })
     });
-    console.log("showcontract", endpoint);
 
     const provider = new ethers.providers.StaticJsonRpcProvider(chain.RPCBackfill, {
         chainId: chain.evmChainID,
@@ -231,13 +228,13 @@ async function showcontract(address, chain) {
                     document.getElementById("v-tabs-read").innerHTML = readContract;
                     document.getElementById("v-tabs-write").innerHTML = writeContract;
                     try {
-                        document.getElementById("v-tabs-code").innerHTML = presentSourceCode(contract);
+                        document.getElementById("v-tabs-code").innerHTML = presentSourceCode(contract.code);
                     } catch (err) {
                         console.log(err);
                     }
                     return (todos);
                 } else {
-                    let note = `<div class="alert" role="alert" data-mdb-color="warning">Unable to read contract info!</div>`
+                    let note = `<div><a class='btn btn-primary' href='https://sourcify.dev/#/verifier'>Upload contract info</a></div>`
                     document.getElementById("v-tabs-read").innerHTML = note;
                     document.getElementById("v-tabs-write").innerHTML = note;
                     document.getElementById("v-tabs-code").innerHTML = note;
