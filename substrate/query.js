@@ -6961,13 +6961,93 @@ module.exports = class Query extends AssetManager {
         }
     }
 
+    async get_sourcify_evmcontract(asset)
+    {
+	const axios = require("axios");
+	// check https://sourcify.dev/server/check-by-addresses?addresses=0x3a7798ca28cfe64c974f8196450e1464f43a0d1e&chainIds=1284,1285,1287
+	try {
+	    let url = `https://sourcify.dev/server/check-by-addresses?addresses=${asset}&chainIds=1284,1285,1287`
+            let response = await axios.get(url)
+	    response = response.data; 
+	    for ( let i = 0 ; i < response.length; i++) {
+		let r = response[i];
+		// if status is false, give up
+		if ( ! r.status || ( r.status === "false" ) || r.status === false ) {
+		    // TODO: store miss in abiRaw and only call sourcify again if addDT is more than 1-5 mins ago
+		    return null;
+		}
+		// for any chainIDs in the response, get the files {"address": "0x3A7798CA28CFE64C974f8196450e1464f43A0d1e","status": "perfect","chainIds": ["1287"]}
+		let abiraw = [];
+		let contractCode = [];
+		let contract = { code: {} };
+		for ( const evmchainID of r.chainIds) {
+		    let chainID = ethTool.evmChainIDToChainID(evmchainID) // e.g moonbeam 1284 => 2004
+		    if ( chainID ) {
+			let files = 0;
+			let codeResult = {}
+			let filesUrl = `https://sourcify.dev/server/files/tree/${evmchainID}/${asset}`
+			let filesResponse = await axios.get(filesUrl)
+			for ( const fileurl of filesResponse.data) {
+			    let f = await axios.get(fileurl)
+			    console.log(fileurl, f.data);
+			    if ( f.data && f.data.output != undefined && f.data.output.abi != undefined ) {
+				let flds = ["compiler", "language", "settings", "sources"]
+				for ( const fld of flds ) {
+				    if ( f.data[fld] != undefined ) {
+					contract[fld] = f.data[fld];
+				    }
+				}
+				contract.ABI = f.data.output.abi
+				abiraw.push(`('${asset}', '${chainID}', ${mysql.escape(JSON.stringify(contract.ABI))})`)
+			    } else {
+				codeResult[fileurl] = f.data;
+				files++;
+			    }
+			}
+			if ( files > 0 ) {
+			    let y = {result: [codeResult]}
+			    contractCode.push(`('${asset}', '${chainID}', ${mysql.escape(JSON.stringify(y))}, Now())`)
+			}
+			contract.chainID = chainID;
+		    } else {
+
+			// TODO: store miss in abiRaw and only call sourcify again if addDT is more than 1-5 mins ago
+		    }
+		}
+		let vals = ["abiraw"];
+		await this.upsertSQL({
+                    "table": "asset",
+                    "keys": ["asset", "chainID"],
+                    "vals": vals,
+                    "data": abiraw,
+                    "replace": vals
+		});
+		let vals2 = ["code", "addDT"];
+		await this.upsertSQL({
+                    "table": "contractCode",
+                    "keys": ["asset", "chainID"],
+                    "vals": vals2,
+                    "data": contractCode,
+                    "replace": vals2
+		});
+		return contract;
+	    }
+	} catch (err) {
+	    console.log(err);
+	    return null
+	}
+    }
+    
     async getEVMContract(asset, chainID = null) {
         try {
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
             let sql = `select asset.asset, asset.chainID, convert(asset.abiRaw using utf8) as ABI, convert(contractCode.code using utf8) code, addDT from asset left join contractCode on contractCode.asset = asset.asset and contractCode.chainID = asset.chainID where asset.asset = '${asset}' ${w} order by addDT desc limit 1`
+	    console.log(sql);
             let evmContracts = await this.poolREADONLY.query(sql);
             if (evmContracts.length == 0) {
                 // return not found error
+		let evmContract = await this.get_sourcify_evmcontract(asset, chainID);
+		
                 throw new paraTool.NotFoundError(`EVM Contract not found: ${asset}`)
                 return (false);
             }
@@ -6980,26 +7060,26 @@ module.exports = class Query extends AssetManager {
                 let code = JSON.parse(evmContract.code);
                 if (Array.isArray(code.result) && code.result.length > 0) {
                     let result = code.result[0];
+                    evmContract.code = {};
                     for (const key of Object.keys(result)) {
-                        evmContract[key] = result[key];
+                        evmContract.code[key] = result[key];
                     }
-                    evmContract.code = '';
-                    evmContract.ABI = JSON.parse(evmContract.ABI);
-                } else {
-                    let abiRaw = JSON.parse(evmContract.ABI);
-                    evmContract.ABI = abiRaw;
-                }
+                    //evmContract.ABI = JSON.parse(evmContract.ABI);
+                } 
+                let abiRaw = JSON.parse(evmContract.ABI);
+		if ( abiRaw.result != undefined ) {
+                    abiRaw = JSON.parse(abiRaw.result)
+		}
+                evmContract.ABI = abiRaw;
             } catch (err) {
                 delete evmContract.ABI
             }
-            delete evmContract.code;
-            delete evmContract.addDT;
             return evmContract;
         } catch (err) {
             console.log(err)
         }
     }
-
+    
     async getWASMCode(codeHash, chainID = null) {
         try {
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";

@@ -373,6 +373,7 @@ module.exports = class XCMManager extends Query {
         if (d.evm != undefined && d.evm.transactionHash != undefined) {
             evmTransactionHash = d.evm.transactionHash
             let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
+            if (!evmtx) return [false, false]
             sourceTxFee = evmtx.fee
             sourceTxFeeUSD = evmtx.feeUSD
             sourceChainSymbol = evmtx.symbol
@@ -522,6 +523,9 @@ module.exports = class XCMManager extends Query {
         if (d.evm != undefined && d.evm.transactionHash != undefined) {
             evmTransactionHash = d.evm.transactionHash
             let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
+            if (!evmtx){
+                return [false, false]
+            }
             sourceTxFee = evmtx.fee
             sourceTxFeeUSD = evmtx.feeUSD
             sourceChainSymbol = evmtx.symbol
@@ -847,7 +851,12 @@ module.exports = class XCMManager extends Query {
                     }
                     let xcmInfo, xcmOld;
                     if (substratetx != undefined) {
-                        [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
+                        try {
+                            [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
+                        }catch (e){
+                            console.log(`!!!!buildSuccessXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
+                            continue
+                        }
                     }
                     console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
 
@@ -1082,7 +1091,12 @@ module.exports = class XCMManager extends Query {
                     let substratetx = await this.getTransaction(substrateTxHash);
                     let xcmInfo, xcmOld;
                     if (substratetx != undefined) {
-                        [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord)
+                        try {
+                            [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord)
+                        } catch (e){
+                            console.log(`!!!!buildFailedXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
+                            continue
+                        }
                     }
                     console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
 

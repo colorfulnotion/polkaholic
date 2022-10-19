@@ -1942,6 +1942,20 @@ module.exports = {
         let res = []
         process_evm_trace(evmTrace, res, 0, [0], evmTxs);
         return res
+    },
+    evmChainIDToChainID: function(evmChainID) {
+	evmChainID = parseInt(evmChainID, 10)
+	switch ( evmChainID ) {
+	case 1284:
+	    return 2004;
+	case 1285:
+	    return 22023;
+	case 1287:
+	    return 61000;
+	case 1288:
+	    return 60888;
+	}
+	return null;
     }
 
 };
