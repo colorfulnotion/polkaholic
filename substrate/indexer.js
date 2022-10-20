@@ -6294,6 +6294,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
                 let decorateTxnStartTS = new Date().getTime()
                 evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmBlock, dTxns, dReceipts, evmTrace, chainID)
+                if (evmFullBlock.transactionsConnected.length > 0 ) console.log(`[${blockNumber}] connectTransaction`, evmFullBlock.transactionsConnected)
                 let decorateTxnTS = (new Date().getTime() - decorateTxnStartTS) / 1000
                 this.timeStat.decorateTxnTS += decorateTxnTS
 
