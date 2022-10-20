@@ -77,6 +77,8 @@ module.exports = class MoonbeamParser extends ChainParser {
         return [candidate, caller]
     }
 
+
+    // we are actually getting inner call from the event
     getMsgHashAndInnerCall(indexer, extrinsic, feed) {
         let msgHash = '0x'
         let innerCall = '0x'
@@ -86,6 +88,24 @@ module.exports = class MoonbeamParser extends ChainParser {
             let eventMethodSection = `${e.section}(${e.method})`
             if (eventMethodSection == 'xcmTransactor(TransactedSigned)') {
                 /*
+                {
+                    "parents": 1,
+                    "interior": {
+                        "x2": [
+                            {
+                                "parachain": 1000
+                            },
+                            {
+                                "accountKey20": {
+                                    "network": {
+                                        "any": null
+                                    },
+                                    "key": "0x44236223ab4291b93eed10e4b511b37a398dee55"
+                                }
+                            }
+                        ]
+                    }
+                }
                 [
                     "0xD720165D294224A7d16F22ffc6320eb31f3006e1", //fee payer?
                     {
@@ -279,17 +299,21 @@ module.exports = class MoonbeamParser extends ChainParser {
             innerCall: innerCall,
         }
         try {
+            /*
+            MK:
+            {transactThroughSigned, transactThroughDerivative} express fee paying via {asCurrencyId, asMultiLocation}
+
+            */
             /* Known cases:
-            xcmTransactor:transactThroughSignedMultilocation 0x9861c936ab2a0fbe8ff3ce50075a87a6e89b3db3bf9e8b593fd365743c8a954b [OK]
-            xcmTransactor:transactThroughSigned 0xdc6d066d87f77c36566862599110ae38b493ede9004ffbad5e80377742e02ab8 [OK]
-            xcmTransactor:transactThroughDerivative  0x5f2231642a9b07b8835e1bdf26548e0ec4e31ca6b823a9255235dda65d8e1b9f [OK]
-            xcmTransactor:transactThroughDerivativeMultilocation 0xe3c265369654f67b232939ac4b041cae6fed144b3336a12becb2d937b241b1f3 [untested]
-            xcmTransactor:transactThroughSovereign 0xfab404024caceb70685d10b8ab8fc2c27783e4a8ed4bc0598f330f5c4b877d80 [untested]
+
+            xcmTransactor:transactThroughSigned         0x1c3d1f60c155d68da57c184a7e77507515140f5d6b3cc93d4d634822115fb893/0xf4673308b8bb3013a6772e3fb6e7bece136abeee098343cc325e9e710bae6478/0xc068c7f643abfd75701974eba03cfdf671a89b2ebe797671ce8e4ae7ef367185
+            xcmTransactor:transactThroughDerivative     0x9f6a5ac8575ad65910972a496ab328a048a34b7ebc654cce6cfeb2295d1d4392
+            xcmTransactor:transactThroughSovereign      0xfab404024caceb70685d10b8ab8fc2c27783e4a8ed4bc0598f330f5c4b877d80 [untested]
 
             */
 
             console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=${section_method} args`, a)
-            console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=${section_method} default`, r)
+            //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=${section_method} default`, r)
             if (section_method == "xcmTransactor:transactThroughDerivative") {
                 /*
                 // dest currently has fixed input "Relay"
@@ -305,23 +329,26 @@ module.exports = class MoonbeamParser extends ChainParser {
                 }
                 */
 
+                // reject legacy fee_currency_id
+                if (a.currency_id != undefined){
+                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivative skip old version`)
+                    return outgoingXcmPallet
+                }
+
                 // dest processing
                 chainIDDest = paraTool.getRelayChainID(relayChain)
                 paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
 
-                // index: skipped for now
-
-                // currency_id processing
-                //asset = this.processGenericCurrencyID(indexer, a.currency_id) //inferred approach
-                //rawAsset = this.processRawGenericCurrencyID(indexer, a.currency_id)
-
-                let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
-                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughDerivative", a.currency_id)
+                // fee processing
+                let targetedSymbol = false
+                if (a.fee != undefined && a.fee.currency != undefined && a.fee.feeAmount !== undefined){
+                    let [extractedSymbol, _] = this.processFeeStruct(indexer, a.fee, relayChain)
+                    targetedSymbol= extractedSymbol
+                }
+                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.fee)
 
                 //inner_call processing
                 innerCall = (a.inner_call != undefined) ? a.inner_call : 'notfound'
-                //r.asset = asset
-                //r.rawAsset = rawAsset
                 r.xcmInteriorKey = targetedXcmInteriorKey
                 r.xcmSymbol = targetedSymbol
                 r.chainIDDest = chainIDDest
@@ -331,171 +358,76 @@ module.exports = class MoonbeamParser extends ChainParser {
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivative`, r)
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
-            } else if (section_method == "xcmTransactor:transactThroughDerivativeMultilocation") {
 
-                //dest currently has fixed input "Relay"
-                chainIDDest = paraTool.getRelayChainID(relayChain)
-                paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
-
-                // index: skipped for now
-
-                // fee_location processing
-                let targetedSymbol = false
-                let targetedXcmInteriorKey = false
-                if (a !== undefined && a.fee_location !== undefined) {
-                    let feelocation = a.fee_location
-                    let [feeSymbol, feeRelayChain] = this.processFeeLocation(indexer, feelocation, relayChain)
-                    if (feeSymbol) {
-                        targetedSymbol = feeSymbol
-                        let [feeXcmInteriorKey] = indexer.check_refintegrity_xcm_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processFeeLocation", "moonbeam xcmTransactor:transactThroughDerivativeMultilocation", feelocation)
-                        if (feeXcmInteriorKey) targetedXcmInteriorKey = feeXcmInteriorKey
-                    }
-                }
-
-                // inner_call processing
-                innerCall = (a.inner_call != undefined) ? a.inner_call : 'notfound'
-                //r.asset = asset
-                //r.rawAsset = rawAsset
-                r.xcmInteriorKey = targetedXcmInteriorKey
-                r.xcmSymbol = targetedSymbol
-                r.chainIDDest = chainIDDest
-                r.paraIDDest = paraIDDest
-                r.innerCall = innerCall
-                console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivativeMultilocation`, r)
-                extrinsic.xcms.push(r)
-                outgoingXcmPallet.push(r)
-
-            } else if (section_method == "xcmTransactor:transactThroughSignedMultilocation") {
-                /*
-                msgHash: 0x0002100b010300d720165d294224a7d16f22ffc6320eb31f3006e100040000010403000f00005d4d5e0830130000010403000f00005d4d5e083001070068e36b0206010700e40b54020103260000e093040000000000000000000000000000000000000000000000000000000000010011246ff6b1900bd864d1b603e6d8f093b87828e3000000000000000000000000000000000000000000000000000000000000000091015d3a1f9d0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000e476f726b6120426574612058434d00000000000000000000000000000000000000
-                {
-                    "dest": {
-                        "v1": {
-                            "parents": 1,
-                            "interior": {
-                                "x1": {
-                                    "parachain": 888
-                                }
-                            }
-                        }
-                    },
-                    "fee_location": {
-                        "v1": {
-                            "parents": 1,
-                            "interior": {
-                                "x2": [
-                                    {
-                                        "parachain": 888
-                                    },
-                                    {
-                                        "palletInstance": 3
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "dest_weight": 10000000000,
-                    "call": {
-                        "callIndex": "0x2600",
-                        "section": "ethereumXcm",
-                        "method": "transact",
-                        "args": {
-                            "xcm_transaction": {
-                                "v1": {
-                                    "gasLimit": 300000,
-                                    "feePayment": {
-                                        "auto": null
-                                    },
-                                    "action": {
-                                        "call": "0x11246ff6b1900bd864d1b603e6d8f093b87828e3"
-                                    },
-                                    "value": 0,
-                                    "input": "0x5d3a1f9d0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000e476f726b6120426574612058434d000000000000000000000000000000000000",
-                                    "accessList": null
-                                }
-                            }
-                        }
-                    }
-                }
-                //xcmtransactor (TransactedSigned)
-                TODO: how do we encode call back to its raw form? 260000e093040000000000000000000000000000000000000000000000000000000000010011246ff6b1900bd864d1b603e6d8f093b87828e3000000000000000000000000000000000000000000000000000000000000000091015d3a1f9d0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000e476f726b6120426574612058434d00000000000000000000000000000000000000
-                */
-
-                // dest processing
-                if (a.dest != undefined) {
-                    let dest = a.dest
-                    let [paraIDDest1, chainIDDest1] = this.processTransactorDest(dest, relayChain)
-                    if (paraIDDest1 !== false) paraIDDest = paraIDDest1
-                    if (chainIDDest1 !== false) chainIDDest = chainIDDest1
-                }
-
-                // fee_location processing
-                let targetedSymbol = false
-                let targetedXcmInteriorKey = false
-                if (a !== undefined && a.fee_location !== undefined) {
-                    let feelocation = a.fee_location
-                    let [feeSymbol, feeRelayChain] = this.processFeeLocation(indexer, feelocation, relayChain)
-                    if (feeSymbol) {
-                        targetedSymbol = feeSymbol
-                        let [feeXcmInteriorKey] = indexer.check_refintegrity_xcm_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processFeeLocation", "moonbeam xcmTransactor:transactThroughSignedMultilocation", feelocation)
-                        if (feeXcmInteriorKey) targetedXcmInteriorKey = feeXcmInteriorKey
-                    }
-                }
-
-                // get msgHash, innerCall from event
-                let [msgHash, innerCall] = this.getMsgHashAndInnerCall(indexer, extrinsic, feed)
-                console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSignedMultilocation msgHash=${msgHash}, innerCall=${innerCall}`)
-                //r.asset = asset
-                //r.rawAsset = rawAsset
-                r.xcmInteriorKey = targetedXcmInteriorKey
-                r.xcmSymbol = targetedSymbol
-                r.chainIDDest = chainIDDest
-                r.paraIDDest = paraIDDest
-                r.innerCall = innerCall
-                r.msgHash = msgHash
-                console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSignedMultilocation`, r)
-                extrinsic.xcms.push(r)
-                outgoingXcmPallet.push(r)
             } else if (section_method == "xcmTransactor:transactThroughSigned") {
                 /*
+                // New version components: dest, fee, call, weight_info
                 {
-                    "dest": {
-                        "v1": {
-                            "parents": 1,
-                            "interior": {
-                                "x1": {
-                                    "parachain": 888
+                        "dest": {
+                            "v1": {
+                                "parents": 1,
+                                "interior": {
+                                    "x1": {
+                                        "parachain": 1000
+                                    }
                                 }
                             }
-                        }
-                    },
-                    "fee_currency_id": {
-                        "foreignAsset": "0x1ab2b146c526d4154905ff12e6e57675"
-                    },
-                    "dest_weight": 5000000000,
-                    "call": {
-                        "callIndex": "0x2600",
-                        "section": "ethereumXcm",
-                        "method": "transact",
-                        "args": {
-                            "xcm_transaction": {
-                                "v1": {
-                                    "gasLimit": 3000000000,
-                                    "feePayment": {
-                                        "auto": null
-                                    },
-                                    "action": {
-                                        "call": "0x11246ff6b1900bd864d1b603e6d8f093b87828e3"
-                                    },
-                                    "value": 0,
-                                    "input": "0x5d3a1f9d000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000074265746158434d00000000000000000000000000000000000000000000000000",
-                                    "accessList": null
+                        },
+                        "fee": {
+                            "currency": {
+                                "asMultiLocation": {
+                                    "v1": {
+                                        "parents": 1,
+                                        "interior": {
+                                            "x2": [
+                                                {
+                                                    "parachain": 1000
+                                                },
+                                                {
+                                                    "palletInstance": 3
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            "feeAmount": "0x0000000000000000006a94d74f430001"
+                        },
+                        "call": {
+                            "callIndex": "0x2600",
+                            "section": "ethereumXcm",
+                            "method": "transact",
+                            "args": {
+                                "xcm_transaction": {
+                                    "v1": {
+                                        "gasLimit": 300123,
+                                        "feePayment": {
+                                            "auto": null
+                                        },
+                                        "action": {
+                                            "call": "0xffffffff1fcacbd218edc0eba20fc2308c778080"
+                                        },
+                                        "value": 0,
+                                        "input": "0x095ea7b30000000000000000000000008a1932d6e26433f3037bd6c3a40c816222a6ccd4ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                                        "accessList": null
+                                    }
                                 }
                             }
+                        },
+                        "weight_info": {
+                            "transactRequiredWeightAtMost": 8000000000,
+                            "overallWeight": null
                         }
                     }
-                }
+
                 */
+
+                // reject legacy fee_currency_id
+                if (a.fee_currency_id != undefined){
+                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned skip old version`)
+                    return outgoingXcmPallet
+                }
+
                 // dest processing
                 if (a.dest != undefined) {
                     let dest = a.dest
@@ -504,16 +436,41 @@ module.exports = class MoonbeamParser extends ChainParser {
                     if (chainIDDest1 !== false) chainIDDest = chainIDDest1
                 }
 
-                // fee_current_id processing
-                //asset = this.processGenericCurrencyID(indexer, a.fee_currency_id) //inferred approach
-                //rawAsset = this.processRawGenericCurrencyID(indexer, a.fee_currency_id)
-                let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
-                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.currency_id)
+                // fee processing
+                let targetedSymbol = false
+                /*
+                {
+                    "currency": {
+                        "asCurrencyId": {
+                            "foreignAsset": "0x1ab2b146c526d4154905ff12e6e57675"
+                        }
+                    },
+                    "feeAmount": "0x0000000000000000006a94d74f430000"
+                }
 
+                */
+                if (a.fee != undefined && a.fee.currency != undefined && a.fee.feeAmount !== undefined){
+                    let [extractedSymbol, _] = this.processFeeStruct(indexer, a.fee, relayChain)
+                    targetedSymbol= extractedSymbol
+                }
+                //let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
+                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.fee)
 
                 // get msgHash, innerCall from event
                 let [msgHash, innerCall] = this.getMsgHashAndInnerCall(indexer, extrinsic, feed)
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned msgHash=${msgHash}, innerCall=${innerCall}`)
+
+                //processing weight_info
+                if (a.weight_info != undefined){
+                    //TODO
+                }
+                try {
+                    let isEVM  = indexer.getChainEVMStatus(chainIDDest)
+                    let [derivedAccount20, derivedAccount32] = this.calculateMultilocationDerivative(indexer.api, paraID, fromAddress)
+                    r.destAddress = (isEVM)? derivedAccount20 : derivedAccount32
+                }catch (e){
+                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned calculateMultilocationDerivative failed`, e)
+                }
                 r.xcmInteriorKey = targetedXcmInteriorKey
                 r.xcmSymbol = targetedSymbol
                 r.chainIDDest = chainIDDest
@@ -524,6 +481,14 @@ module.exports = class MoonbeamParser extends ChainParser {
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
             } else if (section_method == "xcmTransactor:transactThroughSovereign") {
+                // guessing here..
+
+                // reject legacy fee_location
+                if (a.fee_location != undefined){
+                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSovereign skip old version`)
+                    return outgoingXcmPallet
+                }
+
                 // dest processing
                 if (a.dest != undefined) {
                     let dest = a.dest
@@ -531,29 +496,40 @@ module.exports = class MoonbeamParser extends ChainParser {
                     if (paraIDDest1 !== false) paraIDDest = paraIDDest1
                     if (chainIDDest1 !== false) chainIDDest = chainIDDest1
                 }
-                // fee_payer processing -- skip
+                // fee_payer processing
+                let feePayer = '0x' // account20
+                if (a.fee_payer != undefined){
+                    feePayer = a.fee_payer
+                }
 
                 // fee_location processing
                 let targetedSymbol = false
-                let targetedXcmInteriorKey = false
-                if (a !== undefined && a.fee_location !== undefined) {
-                    let feelocation = a.fee_location
-                    let [feeSymbol, feeRelayChain] = this.processFeeLocation(indexer, feelocation, relayChain)
-                    if (feeSymbol) {
-                        targetedSymbol = feeSymbol
-                        let [feeXcmInteriorKey] = indexer.check_refintegrity_xcm_symbol(targetedSymbol, feeRelayChain, chainID, chainIDDest, "processFeeLocation", "moonbeam xcmTransactor:transactThroughSovereign", feelocation)
-                        if (feeXcmInteriorKey) targetedXcmInteriorKey = feeXcmInteriorKey
-                    }
+                if (a.fee != undefined && a.fee.currency != undefined && a.fee.feeAmount !== undefined){
+                    let [extractedSymbol, _] = this.processFeeStruct(indexer, a.fee, relayChain)
+                    targetedSymbol= extractedSymbol
                 }
+                //let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
+                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.fee)
 
                 // inner_call processing
-                innerCall = (a.inner_call != undefined) ? a.inner_call : 'notfound'
+                innerCall = (a.call != undefined) ? a.call : 'notfound'
+
+                // originKind processing
+                let originKind = 'NA'
+                if (a.origin_kind != undefined){
+                    originKind = Object.keys(a.origin_kind)[0]
+                }
+                //processing weight_info
+                if (a.weight_info != undefined){
+                    //TODO
+                }
                 r.xcmInteriorKey = targetedXcmInteriorKey,
-                    r.xcmSymbol = targetedSymbol,
-                    r.chainIDDest = chainIDDest
+                r.xcmSymbol = targetedSymbol,
+                r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
                 r.msgHash = msgHash
+                r.originKind = originKind
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSovereign`, r)
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
@@ -564,7 +540,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 outgoingXcmPallet.push(r)
             }
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXCMTransactor error`, e)
+            if (indexer.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXCMTransactor error`, e)
             return outgoingXcmPallet
         }
         return outgoingXcmPallet
@@ -625,7 +601,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 [paraIDDest, chainIDDest] = this.processDestV0X2(dest_v0.x2, relayChain)
 
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
+                if (indexer.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
                 chainIDDest = false
             }
         } else if ((dest.v1 !== undefined) && (dest.v1.interior !== undefined)) {
@@ -636,31 +612,87 @@ module.exports = class MoonbeamParser extends ChainParser {
                 //[paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
                 [paraIDDest, chainIDDest] = this.processDestV0X1(destV1Interior.x1, relayChain)
             } else if (destV1Interior.x2 !== undefined) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
+                if (indexer.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
                 // dest for parachain, add 20000 for kusama-relay
                 [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
+                if (indexer.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
                 chainIDDest = false
             }
         }
         return [paraIDDest, chainIDDest]
     }
 
-    processFeeLocation(indexer, feelocation, relayChain) {
+    /*
+    {
+        "currency": {
+            "asCurrencyId": {
+                "foreignAsset": "0x1ab2b146c526d4154905ff12e6e57675"
+            }
+        },
+        "feeAmount": "0x0000000000000000006a94d74f430000"
+    }
+    {
+        "currency": {
+            "asMultiLocation": {
+                "v1": {
+                    "parents": 1,
+                    "interior": {
+                        "x2": [
+                            {
+                                "parachain": 1000
+                            },
+                            {
+                                "palletInstance": 3
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "feeAmount": "0x0000000000000000006a94d74f430001"
+    }
+    */
+    processFeeStruct(indexer, feeStruct, relayChain){
+        //TODO: feeAmount is not accurate and potentially null
+        let feeCurrency = feeStruct.currency
+        let feeType = Object.keys(feeCurrency)[0]
+        let feeTypeStruct = feeCurrency[feeType]
+        let targetedSymbol = false
+        switch (feeType) {
+            case "asCurrencyId":
+                //let subType = Object.keys(feeTypeStruct)[0] //selfReserve/foreignAsset/LocalAssetReserve
+                //let currencyID = feeTypeStruct[subType]
+                let targetedSymbol0 = this.processXcmGenericCurrencyID(indexer, feeTypeStruct) //inferred approach
+                console.log(`processFeeStruct ${feeType} ${targetedSymbol0}`, JSON.stringify(feeTypeStruct, null, 4))
+                return [targetedSymbol0, relayChain]
+            case "asMultiLocation":
+                let [targetSymbol1, _] = this.processFeeMultiLocation(indexer, feeTypeStruct, relayChain)
+                console.log(`processFeeStruct ${feeType} ${targetSymbol1}`, JSON.stringify(feeTypeStruct, null, 4))
+                return [targetSymbol1, relayChain]
+            default:
+                console.log(`processFeeStruct new feeType ${feeType}`, feeStruct)
+                break;
+        }
+        return [false, relayChain]
+    }
+
+    processFeeMultiLocation(indexer, feelocation, relayChain) {
         /*
-        "fee_location": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x2": [
-                        {
-                            "parachain": 888
-                        },
-                        {
-                            "palletInstance": 3
-                        }
-                    ]
+        {
+            "asMultiLocation": {
+                "v1": {
+                    "parents": 1,
+                    "interior": {
+                        "x2": [
+                            {
+                                "parachain": 1000
+                            },
+                            {
+                                "palletInstance": 3
+                            }
+                        ]
+                    }
                 }
             }
         }
@@ -679,13 +711,14 @@ module.exports = class MoonbeamParser extends ChainParser {
                     targetSymbol = indexer.getNativeSymbol()
                     //targetedAsset = indexer.getNativeSymbol()
                     //rawTargetedAsset = indexer.getNativeSymbol()
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processFeeLocation targetedAsset parents:0, here`, targetedSymbol)
+                    console.log(`processFeeMultiLocation targetedAsset parents:0, here`, targetedSymbol)
                 } else if (feelocation_v1_parents != undefined && feelocation_v1_parents == 1) {
                     //ump
                     targetSymbol = indexer.getRelayChainSymbol()
                     //targetedAsset = indexer.getRelayChainAsset()
                     //rawTargetedAsset = indexer.getRelayChainAsset()
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processFeeLocation targetedAsset parents:1, here`, targetedSymbol)
+                    console.log(`processFeeMultiLocation targetedAsset parents:1, here`, targetedSymbol)
+                }else{
                 }
                 //} else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
             } else {
@@ -710,11 +743,11 @@ module.exports = class MoonbeamParser extends ChainParser {
                         //x2/x3...
                         for (const v of feelocation_v1_interiorVal) {
                             new_feelocation_v1_interiorVal.push(v)
-                            if (this.debugLevel >= paraTool.debugInfo) console.log(`${indexer.chainID}, [parents=${feelocation_v1_interiorVal}] expandedkey ${JSON.stringify(feelocation_v1_interiorVal)} ->  ${JSON.stringify(new_feelocation_v1_interiorVal)}`)
+                            console.log(`${indexer.chainID}, [parents=${feelocation_v1_interiorVal}] expandedkey ${JSON.stringify(feelocation_v1_interiorVal)} ->  ${JSON.stringify(new_feelocation_v1_interiorVal)}`)
                         }
                         //new_v1_id_concrete_interiorVal.concat(v1_id_concrete_interiorVal)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible error. expecting array`, JSON.stringify(feelocation_v1_interiorVal))
+                        console.log(`processV1ConcreteFungible error. expecting array`, JSON.stringify(feelocation_v1_interiorVal))
                     }
                     feelocation_v1_interiorVal = new_feelocation_v1_interiorVal
                 }
@@ -726,7 +759,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                     targetSymbol = cachedXcmAssetInfo.symbol
                     targetedAsset = cachedXcmAssetInfo.asset
                     //rawTargetedAsset = cachedXcmAssetInfo.asset
-                    if (cachedXcmAssetInfo.paraID == 1000) {
+                    if (cachedXcmAssetInfo.paraID == 1000 && relayChain != 'moonbase-relay') {
                         //statemine/statemint
                         let nativeChainID = paraIDExtra + 1000
                         let t = JSON.parse(targetedAsset)
@@ -735,14 +768,14 @@ module.exports = class MoonbeamParser extends ChainParser {
                         targetSymbol = symbol
                     }
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${feelocation_v1_interiorVal}] [${xType}]`, xcmInteriorKey)
+                    console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${feelocation_v1_interiorVal}] [${xType}]`, xcmInteriorKey)
                     //targetedAsset = interiorVStr
                     //rawTargetedAsset = interiorVStr
                 }
             }
 
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processFeeLocation unknown unknown!`, JSON.stringify(feelocation, null, 2))
+            console.log(`processFeeMultiLocation unknown unknown!`, JSON.stringify(feelocation, null, 2))
         }
         return [targetSymbol, relayChain]
     }
