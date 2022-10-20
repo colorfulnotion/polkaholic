@@ -1207,15 +1207,16 @@ module.exports = class Indexer extends AssetManager {
             let numXCMTransfersOut = {}
             for (let i = 0; i < xcmtransferKeys.length; i++) {
                 let r = this.xcmtransfer[xcmtransferKeys[i]];
-                if (r.xcmSymbol && !this.validXcmSymbol(r.xcmSymbol, r.chainID, "xcmtransfer", r)) {
+                if (r.innerCall == undefined && (r.xcmSymbol && !this.validXcmSymbol(r.xcmSymbol, r.chainID, "xcmtransfer", r))) {
                     console.log(`invalid asset`, r.xcmSymbol, r.chainID, "xcmtransfer", r)
                 } else {
+                    let innerCall = (r.innerCall) ? `'${r.innerCall}'` : `NULL`
                     let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `${mysql.escape(r.xcmInteriorKey)}` : `NULL`
                     let xcmSymbol = (r.xcmSymbol) ? `${mysql.escape(r.xcmSymbol)}` : `NULL`
                     //["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"]
                     //["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"]
                     let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
-                        `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey
+                        `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey, innerCall
                     ].join(",") + ")";
                     xcmtransfers.push(t);
                     if (numXCMTransfersOut[r.blockNumber] == undefined) {
@@ -1230,9 +1231,9 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"]
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall"]
             }, sqlDebug);
 
 
@@ -3181,7 +3182,7 @@ module.exports = class Indexer extends AssetManager {
         return false
     }
 
-    // find the msgHash given {BN, recipient}
+    // find the msgHash given {BN, recipient} or {BN, innercall}
     getMsgHashCandidate(targetBN, destAddress = false, extrinsicID = false, extrinsicHash = false, isInnercall = false) {
         if (!destAddress) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}], dest MISSING`)
@@ -3522,7 +3523,7 @@ module.exports = class Indexer extends AssetManager {
         return [null, null]
     }
 
-    recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = {}) {
+    recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = {}, opaqueCalls = {}) {
         if (call_s && call_s.args.calls != undefined) {
             for (let i = 0; i < call_s.args.calls.length; i++) {
                 let callIndex = call_s.args.calls[i].callIndex
@@ -3545,9 +3546,9 @@ module.exports = class Indexer extends AssetManager {
                     //recursively decode opaque call
                     let s = " ".repeat()
                     //console.log(`\t${" ".repeat(o.length+2)} - additional 'call' argument found`)
-                    this.decode_opaque_call(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks)
+                    this.decode_opaque_call(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks, opaqueCalls)
                 }
-                this.recursive_batch_all(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks)
+                this.recursive_batch_all(ff, apiAt, extrinsicHash, extrinsicID, `${lvl}-${i}`, remarks, opaqueCalls)
                 call_s.args.calls[i] = ff
             }
             //console.log("recursive_batch_all done")
@@ -3555,7 +3556,7 @@ module.exports = class Indexer extends AssetManager {
             //sudo:sudoAs case
             if (call_s && call_s.args.call != undefined) {
                 //console.log(`${extrinsicHash}`, 'call only', innerexs)
-                this.decode_opaque_call(call_s, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks)
+                this.decode_opaque_call(call_s, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks, opaqueCalls)
             } else {
                 //console.log("recursive_batch_all no more loop")
             }
@@ -3563,7 +3564,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     //this is right the level above args
-    decode_opaque_call(f, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = []) {
+    decode_opaque_call(f, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = {}, opaqueCalls = {}) {
         //console.log(`${extrinsicHash}`, 'decode_opaque_call', f)
         if (f.args.call != undefined) {
             let opaqueCall = f.args.call
@@ -3571,6 +3572,7 @@ module.exports = class Indexer extends AssetManager {
             let isHexEncoded = (typeof opaqueCall === 'object') ? false : true
             //console.log(`d opaqueCall(hexEncoded=${isHexEncoded})`, opaqueCall)
             if (isHexEncoded) {
+                opaqueCalls[opaqueCall] = 1 // using opaqueCalls for fingerprint
                 try {
                     // cater for an extrinsic input...
                     extrinsicCall = apiAt.registry.createType('Call', opaqueCall);
@@ -3581,11 +3583,11 @@ module.exports = class Indexer extends AssetManager {
                     try {
                         // only utility batch will have struct like this
                         if (innerexs && innerexs.args.calls != undefined) {
-                            this.recursive_batch_all(innerexs, apiAt, extrinsicHash, extrinsicID, lvl, remarks)
+                            this.recursive_batch_all(innerexs, apiAt, extrinsicHash, extrinsicID, lvl, remarks, opaqueCalls)
                         }
                         if (innerexs && innerexs.args.call != undefined) {
                             //console.log(`${extrinsicHash}`, 'call only', innerexs)
-                            this.decode_opaque_call(innerexs, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks)
+                            this.decode_opaque_call(innerexs, apiAt, extrinsicHash, extrinsicID, `${lvl}`, remarks, opaqueCalls)
                         }
                         innerOutput = this.decode_s_internal_raw(innerexs, apiAt)
                         //console.log(`${extrinsicHash}`, 'innerexs', innerexs)
@@ -3620,7 +3622,7 @@ module.exports = class Indexer extends AssetManager {
                             remarks[call_s.args.remark] = 1
                         }
                     }
-                    this.recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl, remarks)
+                    this.recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl, remarks, opaqueCalls)
                     f.args.call = call_s
                 }
                 //console.log(`* [${extrinsicID}] ${extrinsicHash} already decoded opaqueCall`, extrinsicCall.toString())
@@ -3636,6 +3638,7 @@ module.exports = class Indexer extends AssetManager {
         let callIndex = exos.method.callIndex
         let [method, section] = this.getMethodSection(callIndex, apiAt)
         let remarks = {} // add all remarks here
+        let opaqueCalls = {}
         let pv = `${section}:${method}`
         if (pv == 'system:remarkWithEvent' || pv == 'system:remark') {
             if (exos.method.args.remark != undefined) {
@@ -3650,7 +3653,7 @@ module.exports = class Indexer extends AssetManager {
         try {
             // this is picking up utility batch with "calls" array
             if (exos && exos.method.args.calls != undefined && Array.isArray(exos.method.args.calls)) {
-                this.recursive_batch_all(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks)
+                this.recursive_batch_all(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks, opaqueCalls)
                 let exosArgsCall = exos.method.args.calls
                 for (let i = 0; i < exosArgsCall.length; i++) {
                     let f = exosArgsCall[i]
@@ -3664,7 +3667,7 @@ module.exports = class Indexer extends AssetManager {
         }
 
         if (exos.method.args.call != undefined) {
-            this.decode_opaque_call(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks)
+            this.decode_opaque_call(exos.method, apiAt, extrinsicHash, extrinsicID, `0`, remarks, opaqueCalls)
         }
 
         let sig = exos.signature
@@ -3699,7 +3702,10 @@ module.exports = class Indexer extends AssetManager {
         for (const remark of Object.keys(remarks)) {
             remarkStrs.push(remark)
         }
-
+        let encodedCalls = []
+        for (const opaqueCall of Object.keys(opaqueCalls)) {
+            encodedCalls.push(opaqueCall)
+        }
         let out = {
             method: {
                 //todo: figure out method section
@@ -3709,6 +3715,7 @@ module.exports = class Indexer extends AssetManager {
             },
             args: exos.method.args,
             remarks: remarkStrs,
+            encodedCalls: encodedCalls,
             signature: sig,
             lifetime: lifetime
         }
@@ -4559,6 +4566,8 @@ module.exports = class Indexer extends AssetManager {
             // feed is used for {feed, feedTransfer, feedRewards}
             var feed = {};
             feed = rExtrinsic
+            //!!! MK: write encodedCalls here!!
+            feed.encodedCalls = extrinsic.encodedCalls
             feed["genTS"] = this.currentTS();
             feed["source"] = this.hostname // add index source for debugging
 
@@ -4629,7 +4638,7 @@ module.exports = class Indexer extends AssetManager {
                                     fallbackRequired = true
                                 }
                             } else if (xcm.innerCall != undefined) {
-                                // lookup msgHash using innerCall
+                                // lookup msgHash using innerCall -- it shouldn't be empty?
                                 let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcm.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, true)
                                 if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                                 //accept the fact that this xcm doesn not have destAddress

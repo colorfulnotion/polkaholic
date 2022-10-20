@@ -1,5 +1,11 @@
 const paraTool = require("../paraTool");
 const ethTool = require("../ethTool");
+const {
+    decodeAddress,
+} = require("@polkadot/keyring");
+const {
+    u8aToHex,
+} = require("@polkadot/util");
 
 module.exports = class ChainParser {
     debugLevel = paraTool.debugNoLog;
@@ -2466,7 +2472,7 @@ module.exports = class ChainParser {
                         targetSymbol = cachedXcmAssetInfo.symbol
                         targetedAsset = cachedXcmAssetInfo.asset
                         //rawTargetedAsset = cachedXcmAssetInfo.asset
-                        if (cachedXcmAssetInfo.paraID == 1000) {
+                        if (cachedXcmAssetInfo.paraID == 1000 && relayChain != 'moonbase-relay') {
                             //statemine/statemint
                             let nativeChainID = paraIDExtra + 1000
                             let t = JSON.parse(targetedAsset)
@@ -2599,7 +2605,7 @@ module.exports = class ChainParser {
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     targetedAsset = cachedXcmAssetInfo.asset
                     //rawTargetedAsset = cachedXcmAssetInfo.asset
-                    if (cachedXcmAssetInfo.paraID == 1000) {
+                    if (cachedXcmAssetInfo.paraID == 1000 && relayChain != 'moonbase-relay') {
                         //statemine/statemint
                         let nativeChainID = paraIDExtra + 1000
                         let t = JSON.parse(targetedAsset)
@@ -2819,6 +2825,9 @@ module.exports = class ChainParser {
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
                         // dest for parachain, add 20000 for kusama-relay
                         [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
+                    } else if (dest.v1.parents !== undefined && dest.v1.parents == 1 && destV1Interior != undefined && destV1Interior.here !== undefined){
+                        paraIDDest = 0
+                        chainIDDest = paraTool.getChainIDFromParaIDAndRelayChain(0, relayChain)
                     } else {
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
                         chainIDDest = false
@@ -4456,6 +4465,8 @@ module.exports = class ChainParser {
             if (this.isObject(currency_id)) {
                 if (currency_id.foreignAsset != undefined) {
                     rawAssetID = currency_id.foreignAsset
+                } else if (currency_id.localAssetReserve != undefined) {
+                    rawAssetID = currency_id.localAssetReserve
                 } else if (currency_id.selfReserve === null) {
                     // return native asset
                     let nativeAssetString = indexer.getNativeAsset()
@@ -4495,6 +4506,8 @@ module.exports = class ChainParser {
             if (this.isObject(currency_id)) {
                 if (currency_id.foreignAsset != undefined) {
                     rawAssetID = currency_id.foreignAsset
+                } else if (currency_id.localAssetReserve != undefined) {
+                    rawAssetID = currency_id.localAssetReserve
                 } else if (currency_id.selfReserve === null) {
                     // return native asset
                     let nativeAssetString = indexer.getNativeAsset()
@@ -4562,6 +4575,8 @@ module.exports = class ChainParser {
             if (this.isObject(currency_id)) {
                 if (currency_id.foreignAsset != undefined) {
                     rawAssetID = currency_id.foreignAsset
+                } else if (currency_id.localAssetReserve != undefined) {
+                    rawAssetID = currency_id.localAssetReserve
                 } else if (currency_id.selfReserve === null) {
                     // return native asset
                     let nativeSymbol = indexer.getNativeSymbol()
@@ -4644,6 +4659,8 @@ module.exports = class ChainParser {
             if (this.isObject(currency_id)) {
                 if (currency_id.foreignAsset != undefined) {
                     rawAssetID = currency_id.foreignAsset
+                } else if (currency_id.localAssetReserve != undefined) {
+                    rawAssetID = currency_id.localAssetReserve
                 } else if (currency_id.selfReserve === null) {
                     // return native asset
                     let nativeAssetString = indexer.getNativeAsset()
@@ -5240,6 +5257,73 @@ module.exports = class ChainParser {
         }
     }
 
+    make_multilocation(paraID = null, address = null, namedNetwork = 'Any') {
+        const ethAddress = address.length === 42;
+        const named = (namedNetwork != 'Any') ? {
+            Named: namedNetwork
+        } : namedNetwork;
+        const account = ethAddress ? {
+            AccountKey20: {
+                network: named,
+                key: address
+            }
+        } : {
+            AccountId32: {
+                network: named,
+                //id: paraTool.getPubKey(address)
+                id: u8aToHex(decodeAddress(address))
+            }
+        };
+        // make a multilocation object
+        let interior = {
+            here: null
+        }
+        if (paraID && account) {
+            interior = {
+                X2: [{
+                    Parachain: paraID
+                }, account]
+            }
+        } else if (paraID) {
+            interior = {
+                X1: {
+                    Parachain: paraID
+                }
+            }
+        } else if (account) {
+            interior = {
+                X1: account
+            }
+        }
+        return {
+            parents: 1,
+            interior: interior
+        }
+    }
 
+    // Converts a given MultiLocation into a 20/32 byte accountID by hashing with blake2_256 and taking the first 20/32 bytes
+    //  https://github.com/albertov19/xcmTools/blob/main/calculateMultilocationDerivative.ts
+    //  https://github.com/PureStake/moonbeam/blob/master/primitives/xcm/src/location_conversion.rs#L31-L37
+    // Test case: Alice (origin parachain) 0x44236223aB4291b93EEd10E4B511B37a398DEE55 => is 0x5c27c4bb7047083420eddff9cddac4a0a120b45c on paraID 1000
+
+    calculateMultilocationDerivative(apiAt, paraID = null, address = null, namedNetwork = 'Any') {
+        let multilocationStruct = this.make_multilocation(paraID, address, namedNetwork)
+        const multilocation = apiAt.createType('XcmV1MultiLocation', multilocationStruct)
+        const toHash = new Uint8Array([
+            ...new Uint8Array([32]),
+            ...new TextEncoder().encode('multiloc'),
+            ...multilocation.toU8a(),
+        ]);
+        // TODO: remove api dependency for hash
+        const DescendOriginAddress20 = u8aToHex(apiAt.registry.hash(toHash).slice(0, 20));
+        const DescendOriginAddress32 = u8aToHex(apiAt.registry.hash(toHash).slice(0, 32));
+        //const DescendOriginAddress32 = paraTool.blake2_256_from_hex(paraTool.u8aAsHex(toHash))
+        //const DescendOriginAddress20 = DescendOriginAddress32.slice(0, 42)
+        console.log("calculateMultilocationDerivative", multilocation.toString(), DescendOriginAddress20, DescendOriginAddress32);
+        // multilocation {"parents":1,"interior":{"x2":[{"parachain":1000},{"accountKey20":{"network":{"any":null},"key":"0x44236223ab4291b93eed10e4b511b37a398dee55"}}]}}
+        // 20 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45c
+        // 32 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45cdfa7831175e442b8f14391aa
+        return [DescendOriginAddress20, DescendOriginAddress32]
+    }
 
 }

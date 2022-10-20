@@ -1509,5 +1509,8 @@ module.exports = {
     },
     commitHash: function() {
         return git_hash()
+    },
+    u8aAsHex: function(){
+        return u8aToHex()
     }
 };
