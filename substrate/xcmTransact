@@ -16,7 +16,6 @@ async function main() {
     // only on moonbase right now
     let chainIDRelay = 60000;
 
-
     // case (1) is the default
     let address = "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d";
     let paraID = 1000;
@@ -56,7 +55,7 @@ async function main() {
     let [sectionMethod, func, args, isEVMTx] = await xcmtransact.xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, currencyID, contract, input, chainIDRelay);
     let argsStr = JSON.stringify(args, null, 4)
     console.log(`${sectionMethod} args`, argsStr);
-    let execute = false;
+    let execute = true;
     if (isEVMTx){
         var txStruct = args
         var web3Api = func

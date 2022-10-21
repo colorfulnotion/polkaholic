@@ -49,7 +49,7 @@ module.exports = class XCMTransact {
 
     async getAPI(chainID) {
 	let wsEndpoints = {
-	    60000: "ws://moonbase-internal.polkaholic.io:9944",
+	    60000: "ws://moonbase-internal.polkaholic.io:9945",
 	    60888: "ws://moonbase-beta-internal.polkaholic.io:9944",
 	    61000: "ws://moonbase-internal.polkaholic.io:9944"
 	}
@@ -76,7 +76,6 @@ module.exports = class XCMTransact {
         this.pair = keyring.addFromUri(privateSeed, {
             name: name
         })
-	console.log("PAIR", this.pair);
     }
 
     // evm keys (Substrate style), for extrinsics
@@ -101,7 +100,6 @@ module.exports = class XCMTransact {
 
     // setup backedup from Relay chain trace 
     ParaInclusionPendingAvailabilityBackedMap(traces) {
-	return; // TEMP
         let backedMap = {}
         for (const t of traces) {
             if (t.p == "ParaInclusion" && (t.s == "PendingAvailability")) {
@@ -121,7 +119,7 @@ module.exports = class XCMTransact {
         return backedMap
     }
 
-    async indexRelayChainTrace(traces, blockHash, blockNumber, finalized, chainID, relayChain) {
+    async indexRelayChainTrace(traces, blockHash, blockNumber, blockTS, finalized, chainID, relayChain) {
         let backedMap = this.ParaInclusionPendingAvailabilityBackedMap(traces)
         let mp = {}
         for (const t of traces) {
@@ -129,16 +127,15 @@ module.exports = class XCMTransact {
             if (t.p == "ParaInclusion" && (t.s == "PendingAvailabilityCommitments")) {
                 try {
                     let commitments = t.pv ? JSON.parse(t.pv) : null; 
-		    console.log(t);
                     if (commitments && (commitments.upwardMessages.length > 0 || commitments.horizontalMessages.length > 0)) {
 			let k = JSON.parse(t.pk)
                         let paraID = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
                         let backed = backedMap[paraID]
                         let sourceSentAt = backed.relayParentNumber // this is the true "sentAt" at sourceChain, same as commitments.hrmpWatermark
-                        let relayedAt = bn // "relayedAt" -- aka backed at this relay bn
-                        let includedAt = bn + 1 // "includedAt" -- aka when it's being delivered to destChain
-			let msgHash = '0x' + paraTool.blake2_256_from_hex(msgHex);
-                        for (const msgHex of commitments.upwardMessages) {
+                        let relayedAt = blockNumber // "relayedAt" -- aka backed at this relay blockNumber
+                        let includedAt = blockNumber + 1 // "includedAt" -- aka when it's being delivered to destChain
+			for (const msgHex of commitments.upwardMessages) {
+                            let msgHash = '0x' + paraTool.blake2_256_from_hex(msgHex);
                             let umpMsg = {
                                 msgType: "ump",
                                 chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
@@ -153,7 +150,6 @@ module.exports = class XCMTransact {
                                 relayedBlockHash: blockHash,
                                 blockTS: blockTS,
                                 relayChain: relayChain,
-                                isTip: isTip,
                                 finalized: finalized,
                                 ctx: t.s,
                             }
@@ -183,7 +179,6 @@ module.exports = class XCMTransact {
                                 relayedBlockHash: blockHash,
                                 blockTS: blockTS,
                                 relayChain: relayChain,
-                                isTip: isTip,
                                 finalized: finalized,
                                 ctx: t.s,
                             }
@@ -197,7 +192,6 @@ module.exports = class XCMTransact {
                 try {
                     let queues = t.pv ? JSON.parse(t.pv) : null; 
                     if (queues && queues.length > 0) {
-			console.log("iRCT", t.p, t.s, t.pv);
                         let k = JSON.parse(t.pk)
                         let paraIDDest = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
                         for (const q of queues) {
@@ -281,7 +275,6 @@ module.exports = class XCMTransact {
         receipt.to = rawTransactionStatus.to;
         receipt.transactionHash = rawTransactionStatus.transactionHash;
         receipt.transactionIndex = rawTransactionStatus.transactionIndex
-        //console.log("combine", idx, dtx, "receipt", rawReceipt);
         return [tx, receipt];
     }
 
@@ -341,7 +334,6 @@ module.exports = class XCMTransact {
                     let bnCand = parseInt(paraTool.toNumWithoutComma(pkExtraArr[0]), 10);
                     if (bnCand == blockNumber) {
 			// TODO: fix this -- evmBlockHash is not coming in
-			//console.log("DEST CHECKBN bnCand", bnCand, "blockNumber", blockNumber, "bh", t.pv)
                         current.evmBlockHash = true; 
                     }
                 }
@@ -350,7 +342,6 @@ module.exports = class XCMTransact {
 	
         let [newEVMBlock, newReceipts] = this.convertUnfinalizedRawTraceData(current);
         if (newEVMBlock && newReceipts) {
-            //console.log("NEW RECEIPTS", JSON.stringify(newReceipts, null, 4));
             let evmBlock = newEVMBlock;
             let evmReceipts = newReceipts;
 	    if ( this.evmBlocks[blockNumber] == undefined ) {
@@ -358,9 +349,9 @@ module.exports = class XCMTransact {
 	    } else if ( finalized ) {
 		this.evmBlocks[blockNumber] = {}; // clean out everything else 
 	    }
-	    console.log("STORE EVM BLOCK", blockNumber, blockHash, newEVMBlock);
+	    //console.log("STORE EVM BLOCK", blockNumber, blockHash, newEVMBlock);
+            //console.log("NEW RECEIPTS", JSON.stringify(newReceipts, null, 4));
             this.evmBlocks[blockNumber][blockHash] = newEVMBlock;
-	    //console.log(blockNumber, blockHash, this.evmBlocks[blockNumber][blockHash]);
         }
     }
     
@@ -399,18 +390,18 @@ module.exports = class XCMTransact {
         }
     }
 
-    parse_trace(t, api) {
-	let t0 = t.toJSON();
-	let e = {k: t0[0], v:t0[1]}
+    parse_trace(e, api, blockNumber, chainID, role) {
         let decodeFailed = false
         let key = e.k.slice()
         var query = api.query;
-        if (key.substr(0, 2) == "0x") key = key.substr(2)
+	if (key.substr(0, 2) == "0x") key = key.substr(2)
+		 
         let val = "0x"; // this is essential to cover "0" balance situations where e.v is null ... we cannot return otherwise we never zero out balances
         if (e.v) {
             val = e.v.slice()
             if (val.substr(0, 2) == "0x") val = val.substr(2)
         }
+	
         let k = key.slice();
         if (k.length > 64) k = k.substr(0, 64);
         let sk = this.storageKeys[k];
@@ -476,70 +467,33 @@ module.exports = class XCMTransact {
             o.pk = null;
             pk = "err"
         }
+        o.k = e.k
+        o.v = e.v
 
-        // parse value
+	// let flagged =  ( ( o.p == "ParaInclusion" && o.s == "PendingAvailabilityCommitments" || ( (o.p == "Dmp") && (o.s == "DownwardMessageQueues") ) ) && ( o.pk == '["888"]'  || o.pk == '["1,000"]'  ) && chainID == 60000 )
+
+        let valueType = (queryMeta.type.isMap) ? queryMeta.type.asMap.value.toJSON() : queryMeta.type.asPlain.toJSON();
         try {
-            let valueType = (queryMeta.type.isMap) ? queryMeta.type.asMap.value.toJSON() : queryMeta.type.asPlain.toJSON();
             let valueTypeDef = api.registry.metadata.lookup.getTypeDef(valueType).type;
-            let v = (val.length >= 2) ? val.substr(2).slice() : "";
             if (valueTypeDef == "u128" || valueTypeDef == "u64" || valueTypeDef == "u32" || valueTypeDef == "u64" || valueTypeDef == "Balance") {
+		let v = (val.length >= 2) ? val.substr(2).slice() : "";
                 parsev = hexToBn(v, {
                     isLe: true
                 }).toString();
             } else {
-                let b0 = parseInt(val.substr(0, 2), 16);
-                switch (b0 & 3) {
-                case 0: // single-byte mode: upper six bits are the LE encoding of the value
-                    let el0 = (b0 >> 2) & 63;
-                    if (el0 == (val.substr(2).length) / 2) {
-                        if (api.createType != undefined) {
-                            parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
-                        } else if (api.registry != undefined && api.registry.createType != undefined) {
-                            parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
-                        }
-                    } else {
-                        // MYSTERY: why should this work?
-                        // console.log("0 BYTE FAIL - el0", el0, "!=", (val.substr(2).length) / 2);
-                        if (api.createType != undefined) {
-                            parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
-                        } else if (api.registry != undefined && api.registry.createType != undefined) {
-                            parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
-                        }
-                    }
-                    break;
-	        case 1: // two-byte mode: upper six bits and the following byte is the LE encoding of the value
-                    var b1 = parseInt(val.substr(2, 2), 16);
-                    var el1 = ((b0 >> 2) & 63) + (b1 << 6);
-                    if (el1 == (val.substr(2).length - 2) / 2) {
-                        if (api.createType != undefined) {
-                            parsev = api.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
-                        } else if (api.registry != undefined && api.registry.createType != undefined) {
-                            parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
-                        }
-                    } else {
-                        // MYSTERY: why should this work?
-                        // console.log("2 BYTE FAIL el1=", el1, "!=", (val.substr(2).length - 2) / 2, "b0", b0, "b1", b1, "len", (val.substr(2).length - 2) / 2, "val", val);
-                        if (api.createType != undefined) {
-                            parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
-                        } else if (api.registry != undefined && api.registry.createType != undefined) {
-                            parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
-                        }
-                    }
-                    break;
-		}
+                parsev = api.createType(valueTypeDef, "0x" + val).toString(); 
 	    }
 	    o.pv = parsev;
-	} catch (e) {
+	} catch (err) {
+	    //console.log("parse_trace ERROR", valueType, blockNumber, role, chainID, o.k, err)
+	    //process.stdout.write("val=" + val);
 	    o.pv = null; 
 	}
-        o.k = e.k
-        o.v = e.v
 	return [o, true]
     }
 
     parseEvent(evt, api = false) {
-        if (!api) { 	console.log("e0")
-			return (false);}
+        if (!api) { 	return (false);}
         if (!api.events) {
 	    return (false);
 	}
@@ -764,16 +718,16 @@ module.exports = class XCMTransact {
 		    origination: {
 			// if this extrinsic initiates a EVMTx or extrinsic, an observed extrinsic event will set these in index_origination_extrinsic
 			remoteEVMTx: null,      // holds *requested* remote evmtx, filled in when first seen 
-			remoteExtrinsic: null,  // holds *requested* remote extrinsic, filled in when first seen 
+			//remoteExtrinsic: null,  // holds *requested* remote extrinsic, filled in when first seen 
 			unfinalized: {}, // holds unfinalized blockHash => extrinsic until finalization
 			extrinsicID: null, // filled in on origination finalization 
 		    },
 		    relayed: {
-			// TODO: holds relay info
+			unfinalized: {}
 		    },
 		    destination: {
 			remoteEVMTx: null, // holds finalized EVMTx (from EVM Block), filled in on destination finalization
-			remoteExtrinsic: null, // holds finalized execution (from Substrate Block), filled in on destination finalization
+			//remoteExtrinsic: null, // holds finalized execution (from Substrate Block), filled in on destination finalization
 			unfinalized: {}, // holds unfinalized blockHash => { remoteEVMTx, remoteExtrinsic } until finalization
 		    },
 		},
@@ -785,6 +739,15 @@ module.exports = class XCMTransact {
 	}
     }
 
+    timeStr() {
+	return new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')
+    }
+    
+    finalizedStr(finalized, bn) {
+	return finalized ? ` FINALIZED ${bn}`: ` UNFINALIZED ${bn}`;
+    }
+    
+    
     // as messages come in (either observed from the relay chain or from the origination blocks), they fill in this 
     init_msgHash(msgHash, msg = null, blockNumber, blockHash, finalized = false) {
 	if ( this.msgHash[msgHash] == undefined ) {
@@ -795,8 +758,25 @@ module.exports = class XCMTransact {
 	}
 	if ( msg ) {
 	    this.msgHash[msgHash].msg = msg
+	    let extrinsicHashes = this.msgHash[msgHash].extrinsicHash
+	    for ( const extrinsicHash of Object.keys(extrinsicHashes) ) {
+		if ( this.extrinsics[extrinsicHash] != undefined ) {
+		    let e = this.extrinsics[extrinsicHash];
+		    if ( e.xcmInfo.relayed == undefined ) {
+			console.log("ERROR: MISSING xcmInfo.relayed");
+		    } else if ( e.xcmInfo.relayed.finalized == undefined ) {
+			if ( finalized ) {
+			    e.xcmInfo.relayed.finalized = msg;
+			} else {
+			    e.xcmInfo.relayed.unfinalized[blockHash] = msg;
+			}
+			console.log(this.timeStr(), "XCMINFO: RELAY CHAIN MESSAGE", this.finalizedStr(finalized, blockNumber), "extrinsicHash", extrinsicHash, "msgHash", msgHash, "xcmInfo", JSON.stringify(e.xcmInfo, null, 4));
+		    }
+		} else {
+		    console.log("ERROR: MISSING extrinsicHash", extrinsicHash);
+		}
+	    }
 	}
-	console.log("!!!!! INIT Message Hash", this.msgHash[msgHash]);
 	// TODO: treat blockNumber, blockHash, finalized for the situation where msgHashes are sent at different relay chain blockHashes
     }
 
@@ -811,16 +791,17 @@ module.exports = class XCMTransact {
 	    this.extrinsics[orig_extrinsicHash].xcmInfo.origination.extrinsicID = orig_extrinsicID;
 	    // clean out old extrinsicIDs
 	    //delete this.extrinsics[orig_extrinsicHash].xcmInfo.origination.unfinalized;
+
 	} else {
 	    // a given extrinsicHash may be submitted at different blockHashes, thus with different extrinsicIDs and even different events
 	    if ( this.extrinsics[orig_extrinsicHash] == undefined ) {
-		console.log("f1");
+
 	    } else if ( this.extrinsics[orig_extrinsicHash].xcmInfo == undefined ) {
-		console.log("f2");
+
 	    } else if ( this.extrinsics[orig_extrinsicHash].xcmInfo.origination == undefined ) {
-		console.log("f3");
+
 	    } else if ( this.extrinsics[orig_extrinsicHash].xcmInfo.origination.unfinalized == undefined ) {
-		console.log("f4");
+
 	    } else {
 		this.extrinsics[orig_extrinsicHash].xcmInfo.origination.unfinalized[orig_blockHash] = extrinsic
 	    }
@@ -831,11 +812,13 @@ module.exports = class XCMTransact {
 		let event = events[i];
 		if ( event.section == "xcmpQueue" ) {
 		    if ( event.method == "XcmpMessageSent" ) {
-			console.log("MESSAGE SENT", event, orig_extrinsicHash)
 			let data = event.data;
 			let msgHash = data.messageHash
 			// store the extrinsic => msgHash relation
-			this.extrinsics[orig_extrinsicHash].msgHashes.push(msgHash);
+			if ( ! this.extrinsics[orig_extrinsicHash].msgHashes.includes(msgHash) ) {
+			    this.extrinsics[orig_extrinsicHash].msgHashes.push(msgHash);
+			}
+			console.log(this.timeStr(), "XCMINFO: ORIGINATION MSGHASH", this.finalizedStr(finalized, orig_blockNumber), "extrinsicHash=", orig_extrinsicHash, "msgHash=", msgHash);
 			if ( this.msgHash[msgHash] == undefined ) {
 			    this.init_msgHash(msgHash);
 			}
@@ -843,35 +826,23 @@ module.exports = class XCMTransact {
 			    this.msgHash[msgHash].extrinsicHash[orig_extrinsicHash] = {}
 			}
 			this.msgHash[msgHash].extrinsicHash[orig_extrinsicHash][orig_blockHash] = finalized;
-			console.log("******** extrinisc MSG", orig_extrinsicHash, msgHash);
-		    } else {
-			console.log("SOME XCMP EVENT", event, orig_extrinsicHash)
 		    }
 		} else if ( event.section == "xcmTransactor" && event.method == "TransactedSigned" ) {
 		    let data = event.data;
-		    /*
-		      {
-		        feePayer: '0xDcB4651B5BbD105CDa8d3bA5740b6C4f02b9256D',
-		        dest: { parents: '1', interior: { X1: [Object] } },
-		        call: '0x260000e093040000000000000000000000000000000000000000000000000000000000010049ba58e2ef3047b1f90375c79b93578d90d24e24000000000000000000000000000000000000000000000000000000000000000010cde4efa900'
-		      }
-		    */
 		    // map the call (which is an ethereumXcm:transact typically, right now)
 		    let internalCall = this.apis["origination"].api.registry.createType('Call', data.call);
 		    // internalCallHuman {"args":{"xcm_transaction":{"V1":{"gasLimit":"300,000","feePayment":"Auto","action":{"Call":"0x49ba58e2ef3047b1f90375c79b93578d90d24e24"},"value":"0","input":"0xcde4efa9","accessList":null}}},"method":"transact","section":"ethereumXcm"}
 		    let internalCallHuman = internalCall.toHuman()
 		    // this could be in proxy, multisig, utility batch, so this is by no means perfect...
-		    console.log("******** extrinsic TRANSACTED!", orig_extrinsicHash, internalCallHuman, data);
 		    if ( internalCallHuman.section == "ethereumXcm" && internalCallHuman.method == "transact" ) {
 			// we store the origination call here to match on it later
 			let paraID = this.apis["origination"].paraID;
 			let [from, _] = this.calculateMultilocationDerivative(this.apis["origination"].api, paraID, data.feePayer);
 			this.extrinsics[orig_extrinsicHash].xcmInfo.origination.remoteEVMTx = {
 			    from:  from,
-			    transactionHash: null, // TODO: add calculated transactionHash here
 			    transact: internalCallHuman
 			}
-			console.log("******** extrinsic TRANSACTED evmtx", orig_extrinsicHash, internalCallHuman, JSON.stringify(this.extrinsics[orig_extrinsicHash]));
+			console.log(this.timeStr(), "XCMINFO: ORIGINATION EXTRINSIC", this.finalizedStr(finalized, orig_blockNumber), "extrinsicHash=", orig_extrinsicHash, "xcmInfo", JSON.stringify(this.extrinsics[orig_extrinsicHash].xcmInfo, null, 4))
 		    }
 		}
 		// TODO: other extrinsics with events may generate remoteExtrinsic
@@ -879,10 +850,10 @@ module.exports = class XCMTransact {
 	}
     }
     
-    async indexOriginationChainBlock(api, blockHash, blockNumber, paraID, finalized = false) {
-	console.log("indexOriginationChainBlock - getBlockEvents",  blockHash);
+    async indexOriginationChainBlock(api, blockHash, blockNumber, blockTS, paraID, finalized = false) {
 	let [block, extrinsics, events] = await this.getBlockEvents(api, blockHash)
-	console.log("origination", block.number.toString(), block.blockTS, blockHash, extrinsics.length);
+	//console.log("indexOriginationChainBlock - getBlockEvents",  blockHash);
+	//console.log("origination", block.number.toString(), block.blockTS, blockHash, extrinsics.length);
 
 	for (let i=0; i < extrinsics.length; i++) {
 	    await this.index_origination_extrinsic(extrinsics[i], blockHash, blockNumber, finalized)
@@ -890,40 +861,36 @@ module.exports = class XCMTransact {
     }
 
     get_extrinsics_by_msgHash_destblockHash(msgHash, dest_blockNumber, dest_blockHash) {
-	console.log("get_extrinsics_by_msgHash", msgHash, this.msgHash)
 	if ( this.msgHash[msgHash] == undefined ) return(null);
 	let m = this.msgHash[msgHash];
-	console.log("get_extrinsics_by_msgHash ====> ", m);
-	
+	//console.log("get_extrinsics_by_msgHash", msgHash, this.msgHash, m)
 	// TODO: given the specific dest_blockNumber / dest_blockHash, filter to get the precise extrinsics sent
 	return m.extrinsicHash
     }
 
     get_transaction_by_remoteEVMTx(remoteExecution, dest_blockNumber, dest_blockHash) {
-	console.log("get_transaction_by_remoteEVMTx", dest_blockNumber, dest_blockHash, "remoteExecution", remoteExecution)
+	//console.log("get_transaction_by_remoteEVMTx", dest_blockNumber, dest_blockHash, "remoteExecution", remoteExecution)
 	
 	if ( this.evmBlocks[dest_blockNumber] == undefined ) {
-	    console.log("get_transaction_by_remoteEVMTx NO EVM BLOCK", dest_blockNumber, "bns", Object.keys(this.evmBlocks));
+	    console.log("WARNING: get_transaction_by_remoteEVMTx NO EVM BLOCK", dest_blockNumber, "bns", Object.keys(this.evmBlocks));
 	    return(null);
 	}
 	if ( this.evmBlocks[dest_blockNumber][dest_blockHash] == undefined ) {
-	    console.log("get_transaction_by_remoteEVMTx NO EVM BLOCK", dest_blockNumber, "need:", dest_blockHash, Object.keys(this.evmBlocks[dest_blockNumber]));
+	    console.log("WARNING: get_transaction_by_remoteEVMTx NO EVM BLOCK", dest_blockNumber, "need:", dest_blockHash, Object.keys(this.evmBlocks[dest_blockNumber]));
 	    return(null);
 	}
 	let evmBlock = this.evmBlocks[dest_blockNumber][dest_blockHash];
-	console.log("****** get_transaction_by_remoteEVMTx", evmBlock);
 	let txs = evmBlock.transactions;
 	let remoteExecution_from = remoteExecution.from;
 	let remoteExecution_xcm_transaction = remoteExecution.xcm_transaction;
 	for (const tx of txs) {
-	    // TODO: use connectedTx abstraction here, changing "from" to txHash
 	    if ( tx.from == remoteExecution_from ) {
 		return(tx);
 	    }
 	}
     }    
     
-    async indexDestinationChainBlock(api, dest_blockHash, dest_blockNumber, finalized = false) {
+    async indexDestinationChainBlock(api, dest_blockHash, dest_blockNumber, blockTS, finalized = false) {
 	let [block, extrinsics, events] = await this.getBlockEvents(api, dest_blockHash)
 	// for any extrinsics/events in the origination chain that are executing calls on a destination chains, lets record that they are interesting and should be watched
 	
@@ -940,9 +907,7 @@ module.exports = class XCMTransact {
 			let msgHash = data.messageHash;
 			let error = null
 			if ( event.method == "Success" ) {
-			    console.log("DCBDATA SUCC", data);
 			} else if ( event.method == "Fail" ) {
-			    console.log("DCBDATA ERROR", data);
 			    error = data.error;
 			}
 
@@ -957,9 +922,7 @@ module.exports = class XCMTransact {
 					let remoteEVMTx = orig_extrinsic.xcmInfo.origination.remoteEVMTx;
 					//  if it does, find transactionHash from the EVM block [obtained from the trace]  
 					let evmtx = this.get_transaction_by_remoteEVMTx(remoteEVMTx, dest_blockNumber, dest_blockHash)
-					console.log(" -----> get_transaction_by_remoteEVMTx!", evmtx, remoteEVMTx);
 					if ( evmtx ) {
-					    console.log(" -- CONCLUSION", finalized, evmtx)
 					    // link evmtx to destination blockHash
 					    if ( finalized ) {
 						orig_extrinsic.xcmInfo.destination.remoteEVMTx = evmtx;
@@ -968,15 +931,11 @@ module.exports = class XCMTransact {
 						    remoteEVMTx: evmtx
 						}
 					    }
+					    console.log(this.timeStr(), "XCMINFO: DEST RemoteEVMTX", this.finalizedStr(finalized, dest_blockNumber), JSON.stringify(orig_extrinsic.xcmInfo, null, 4))
 					}
 				    } else {
-					console.log(".............. lookup failed... MISSING remoteEVMTx", orig_extrinsic)
+					console.log("FAILURE: remoteEVMTx not found in origination", orig_extrinsic)
 				    }
-				} else if ( orig_extrinsic.remoteExtrinsic ) {
-				    //let extrinsic = this.get_extrinsic_by_remoteExtrinsic(orig_extrinsic.remoteExtrinsic, dest_blockNumber, dest_blockHash)
-				    //if ( extrinsic ) {
-				    //    orig_extrinsic.xcmInfo.destination[dest_blockHash].remoteExtrinsic = extrinsic;
-				    //}
 				}			
 			    }
 			} 
@@ -1042,7 +1001,7 @@ module.exports = class XCMTransact {
 
         const DescendOriginAddress20 = u8aToHex(api.registry.hash(toHash).slice(0, 20));
         const DescendOriginAddress32 = u8aToHex(api.registry.hash(toHash).slice(0, 32));
-        console.log("calculateMultilocationDerivative", multilocation.toString(), DescendOriginAddress20, DescendOriginAddress32);
+        //console.log("calculateMultilocationDerivative", multilocation.toString(), DescendOriginAddress20, DescendOriginAddress32);
         // multilocation {"parents":1,"interior":{"x2":[{"parachain":1000},{"accountKey20":{"network":{"any":null},"key":"0x44236223ab4291b93eed10e4b511b37a398dee55"}}]}}
         // 20 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45c
         // 32 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45cdfa7831175e442b8f14391aa
@@ -1057,27 +1016,32 @@ module.exports = class XCMTransact {
 
 	// parse the traces
 	if ( finalized == false ) {
+
 	    let results = resultsOrHeader;
 	    blockHash = results.block.toHex();
-            const signedBlock = await api.rpc.chain.getBlock(blockHash);
+	    let traceBlock = await api.rpc.state.traceBlock(blockHash, "state", "", "Put");
+	    let rawTraces = traceBlock.toJSON().blockTrace.events.map( (e) => {
+		let sv = e.data.stringValues
+		let v = ( sv.value ==  'None' ) ? sv.value_encoded :  sv.value.replaceAll("Some(", "").replaceAll(")", "");
+		return ({
+                    k: sv.key,
+                    v: v
+                })
+	    });
+
+	    const signedBlock = await api.rpc.chain.getBlock(blockHash);
 	    blockNumber = parseInt(signedBlock.block.header.number.toString(), 10);
-	    for ( const r of results.changes ) {
-		let [x, succ] = this.parse_trace(r, api)
-		console.log(x);
-		if ( ( x.p == "ParaInclusion" && x.s == "PendingAvailabilityCommitments" && ( x.pk == '["888"]'  || x.pk == '["1,000"]' || true ) ) ||
-		     ( (x.p == "Dmp") && (x.s == "DownwardMessageQueues") ) ) {
-		    //console.log("FLAGGED", x);
-		}
+	
+            for ( const r of rawTraces ) {
+		let [x, succ] = this.parse_trace(r, api, blockNumber, chainID, role)
 		if ( succ ) {
 		    traces.push(x);
 		    if ( x.method == "Now" ) {
-			console.log(x);
 			blockTS = parseInt(t.pv, 10)
 		    }
 		}
 	    }
-
-	    console.log("subscribestorage ***** ", role, blockNumber, blockHash, "numTraces", traces.length)
+	    //console.log("subscribestorage ***** ", role, blockNumber, blockHash, "numTraces", traces.length) 
 	    if ( this.parsedTraces[blockNumber] == undefined ) {
 		this.parsedTraces[blockNumber] = {}
 	    }
@@ -1086,7 +1050,7 @@ module.exports = class XCMTransact {
 	    let header = resultsOrHeader;
 	    blockNumber = parseInt(header.number.toString(), 10);
 	    blockHash = header.hash.toString();
-	    console.log("finalized", blockNumber, blockHash);
+	    //console.log("finalized", blockNumber, blockHash);
 	    // get traces from cache, if we can
 	    if ( this.parsedTraces[blockNumber] != undefined ) {
 		if ( this.parsedTraces[blockNumber][blockHash] != undefined ) {
@@ -1100,18 +1064,18 @@ module.exports = class XCMTransact {
 	if ( role == "relay" ) {
 	    if ( traces && traces.length > 0) { 
 		console.log("relay TRACE", blockHash, blockNumber, finalized);
-		await this.indexRelayChainTrace(traces, blockHash, blockNumber, finalized, chainID, relayChain);
+		await this.indexRelayChainTrace(traces, blockHash, blockNumber, blockTS, finalized, chainID, relayChain);
 	    }
 	} else if ( role == "origination" ) { 
 	    console.log("origination BLOCK", blockHash, blockNumber, finalized);
-	    await this.indexOriginationChainBlock(api, blockHash, blockNumber, paraID, finalized);
+	    await this.indexOriginationChainBlock(api, blockHash, blockNumber, blockTS, paraID, finalized);
 	} else if ( role == "destination" ) {
 	    if ( traces && traces.length > 0 ) {
 		console.log("destination TRACE", blockHash, blockNumber, finalized);
 		await this.indexDestinationChainTrace(traces,  blockHash, blockNumber, blockTS, finalized)
 	    }
 	    console.log("destination BLOCK", blockHash, blockNumber, finalized);
-	    await this.indexDestinationChainBlock(api, blockHash, blockNumber, paraIDDest, finalized);
+	    await this.indexDestinationChainBlock(api, blockHash, blockNumber, blockTS,  paraIDDest, finalized);
 	}
     }
 
@@ -1182,7 +1146,7 @@ module.exports = class XCMTransact {
 
 	let encodedCall = internaltx.toHex();
 	encodedCall = encodedCall.replace("0x810104", "0x");
-	console.log("ethereumXcm.transact", encodedCall);
+	console.log("GENERATED ethereumXcm.transact", encodedCall);
 
 	// ***** TODO: compute this more precisely using paraID / paraIDDest fee model from on chain data + check balances on derivedaccount are sufficient
 	// 30000000000000000 => 0x0000000000000000006a94d74f430000
