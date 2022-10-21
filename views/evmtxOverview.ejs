@@ -173,16 +173,23 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td><%- uiTool.getEvmTxnType(tx.txType); %> </td>
     </tr>
 <% } %>
+<% if ( tx.priceUSD) { %>
     <tr>
       <td><%- tx.symbol; %> Price</td>
       <td><%- uiTool.currencyFormat(tx.priceUSD); %> </td>
     </tr>
-
+<% } %>
     <tr>
       <td>Nonce</td>
       <td><%= f.nonce; %></td>
     </tr>
 
+<% if ( tx.transactionIndex != undefined) { %>
+    <tr>
+        <td>Position</td>
+        <td><%= tx.transactionIndex; %></td>
+    </tr>
+<% } %>
 <% if ( tx.decodedInput ) { %>
     <tr>
       <td>Input Data</td>
