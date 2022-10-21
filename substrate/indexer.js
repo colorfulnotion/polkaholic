@@ -3219,32 +3219,33 @@ module.exports = class Indexer extends AssetManager {
         let evmTxHash = matcher.transactionHash
         let txInput = matcher.input.substr(2)
         let txTo = (matcher.to != undefined)? matcher.to.toLowerCase().substr(2) : ''
-        //let txCreates = (matcher.creates != undefined)? matcher.creates.substr(2) : ''
-        //let txGasLimit = paraTool.intToHex(matcher.gasLimit).substr(2)
+        let txGasLimit = paraTool.intToHex(matcher.gasLimit).substr(2).reverse() // little endian
+        let txValue = paraTool.intToHex(matcher.value).substr(2).reverse()       // little endian
+        let txCreates = (matcher.creates != undefined)? matcher.creates.toLowerCase().substr(2) : ''
         if (!matcher) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getEvmMsgHashCandidate [${targetBN}], matcher MISSING`)
             return false
         }
         let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}] trailingKeys`, trailingKeys)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingKeys`, trailingKeys)
         for (const tk of trailingKeys) {
             let trailingXcm = this.xcmTrailingKeyMap[tk]
-            console.log(`getEvmMsgHashCandidate tk=${tk}`, trailingXcm)
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}] trailingXcm`, trailingXcm)
+            //console.log(`getEvmMsgHashCandidate tk=${tk}`, trailingXcm)
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingXcm`, trailingXcm)
             let firstSeenBN = trailingXcm.blockNumber
             let msgHex = trailingXcm.msgHex
             let msgHash = trailingXcm.msgHash
-            if (firstSeenBN == targetBN && msgHex.includes(txInput) && msgHex.includes(txTo)) {
+            if (firstSeenBN == targetBN && msgHex.includes(txInput) && msgHex.includes(txTo) && msgHex.includes(txGasLimit)) {
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=${txInput}, ${txTo}] FOUND candidate=${msgHash}`)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=${txInput}, ${txTo}, ${txGasLimit}] FOUND candidate=${msgHash}`)
                 if (this.xcmmsgMap[tk] != undefined) {
-                    this.xcmmsgMap[tk].connectTransactionHash = evmTxHash
+                    this.xcmmsgMap[tk].connectedTxHash = evmTxHash
                 }
                 return msgHash
             }
         }
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}], ${matcherType}] MISS`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}], ${matcherType}] MISS`)
         return false
     }
 
@@ -3297,7 +3298,7 @@ module.exports = class Indexer extends AssetManager {
             let rows = this.recentXcmMsgs
             if (this.debugLevel >= paraTool.debugTracing) console.log(`dump_xcm_messages rowsLen=${rows.length}`, rows)
 
-            let vals = ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries"];
+            let vals = ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries", "connectedTxHash"];
             await this.upsertSQL({
                 "table": "xcmmessages",
                 "keys": ["msgHash", "blockNumber", "incoming"],
@@ -6375,9 +6376,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
                 let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
                 let beneficiaries = (mp.beneficiaries != undefined) ? `'${mp.beneficiaries}'` : 'NULL'
+                let connectedTxHash = (mp.connectedTxHash != undefined) ? `'${mp.connectedTxHash}'` : 'NULL'
                 //console.log(`mp beneficiaries`, beneficiaries)
                 //["msgHash", "blockNumber", "incoming"] + ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries"]
-                let s = `('${mp.msgHash}', '${mp.blockNumber}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.relayChain}', '${mp.version}', '${mp.path}', ${extrinsicID}, ${extrinsicHash}, Now(), ${beneficiaries})`
+                let s = `('${mp.msgHash}', '${mp.blockNumber}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.relayChain}', '${mp.version}', '${mp.path}', ${extrinsicID}, ${extrinsicHash}, Now(), ${beneficiaries}, ${connectedTxHash})`
                 if (mp.isIncoming == 1) {
                     if (this.numXCMMessagesIn[mp.blockNumber] == undefined) {
                         this.numXCMMessagesIn[mp.blockNumber] = 1;
