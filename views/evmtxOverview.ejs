@@ -22,6 +22,12 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td><%- uiTool.presentFullTx(tx.substrate.extrinsicHash); %> <a href='/tx/<%= tx.substrate.extrinsicHash; %>'><%= f.chainName; %> <%= tx.substrate.extrinsicID; %></a></td>
     </tr>
     <% } %>
+    <% if ( tx.isConnectedCall && tx.msgHash) { %>
+    <tr>
+      <td>Connected Contract Call</td>
+      <td><a href='/xcmmessage/<%= `${tx.msgHash}/${tx.blockNumber}`; %>'><%= tx.msgHash; %></a></td>
+    </tr>
+    <% } %>
 <% if ( f.xcmInfo != undefined ) { %>
     <tr>
       <td>XCM Timeline</td>

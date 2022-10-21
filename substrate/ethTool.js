@@ -613,6 +613,9 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         decodedInput: dTxn.decodedInput,
         decodedLogs: dReceipt.decodedLogs,
     }
+    if (dTxn.isConnectedCall != undefined){
+        fTxn.isConnectedCall = dTxn.isConnectedCall
+    }
     if (txType == txLegacyType) {
         delete fTxn.maxFeePerGas
         delete fTxn.maxPriorityFeePerGas
@@ -805,8 +808,115 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
     }
     output.chainID = chainID
     output.decodedInput = decodedTxnInput
+    try {
+        let derivedTx = decodeRLPTx(txn.raw)
+        if (derivedTx.errorDesc != undefined || txn.hash != derivedTx.txHash) console.log(`!!!! Mismatch txHash: ${txn.hash}, derived=${derivedTxhash}, raw=${txn.raw}`)
+        if (derivedTx.tx != undefined && derivedTx.tx.r.length != 66 && derivedTx.tx.s.length != 66){
+            output.isConnectedCall = 1
+        }
+    } catch (e){
+        console.log(`decodeTransaction err`, e)
+    }
     return output
 }
+
+function keccak256(hex){
+    return web3.utils.keccak256(hex)
+}
+
+function computeConnectedTxHash(tx){
+    /*
+    {
+      chainID: '0x',
+      nonce: '0x04',
+      maxFeePerGas: '0x',
+      maxPriorityFeePerGas: '0x',
+      gas: '0x0493e0',
+      to: '0x49ba58e2ef3047b1f90375c79b93578d90d24e24',
+      value: '0x',
+      data: '0xcde4efa9',
+      accessList: [],
+      v: '0x01',
+      r: '0x01',
+      s: '0x01'
+    }
+    */
+    let encodedList = []
+    for (const k of Object.keys(tx)){
+        encodedList.push(tx[k])
+    }
+    let encoded = '0x02' +rlp.encode(encodedList).toString('hex')
+    return keccak256(encoded)
+}
+
+function createTxFromEncoded(encodedList){
+    let tx = {}
+    let legacyFormat = ['nonce','gas','gasPrice','value','data','to','v','r','s']
+    let tx1559Format = ['chainID','nonce','maxFeePerGas','maxPriorityFeePerGas','gas', 'to','value','data','accessList','v','r','s']
+    //let accessListFormat = ['chainID', 'nonce', 'gas','gasPrice','value','data','to','accessList','v','r','s'] // this is probably type1 with 11 fields
+    let txType = legacyFormat //'legacy'
+    if (encodedList.length == 11) return tx
+    if (encodedList.length == 12){
+        txType = tx1559Format //'1559'
+    }
+    for (let i = 0; i < encodedList.length; i++) {
+        tx[txType[i]] = encodedList[i]
+    }
+    return tx
+}
+
+function buffertoHex(bufferArr){
+    let hexArr = []
+    for (const b of bufferArr){
+        if (Array.isArray(b)){
+            let r = buffertoHex(b)
+            hexArr.push(r)
+        }else{
+            hexArr.push('0x'+b.toString('hex'))
+        }
+    }
+    return hexArr
+}
+//https://github.com/ethereum/go-ethereum/blob/v1.10.25/core/types/transaction_marshalling.go#L54
+//0xa902e780048080830493e09449ba58e2ef3047b1f90375c79b93578d90d24e248084cde4efa9c0010101 (connected contract call)
+//0xf8d084010c5053843b9aca0082c35094588538d1eb40db215c41ee02c298ec54b8da0bb2843b9aca00b8645d3a1f9d0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000368657900000000000000000000000000000000000000000000000000000000001ba024081dad89b4404fef555f2f750e958b3cb1741f2dde2cb4eb1d1109e3c2127ca0384110ec022985cdf673e8ea71852efdce94273a831a2393c60cd88612c0259f (legacy)
+//0xb9027c02f902788205078301642985012a05f20085012a05f200831a3c8194e4f8526e5ddb840aa118a21b8ac46f0c80773d0480b902044916065810335695908e164ea756596a2d6eff14607917dba3ab2fc4004999f0b45be05b000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000646616e746f6d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002a3078384436303635353363383043313638313837324237463135383636413533384561663833633345430000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c097b94760a80063518c2c0000d978859318ef8092532ce80df1a179e7eaace3cf000000000000000000000000000000000000000000000000000000000000000000000000000000000000000088a8ab07c3020ae6f59096942e58d97fef1d2d39000000000000000000000000d978859318ef8092532ce80df1a179e7eaace3cf0000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000003635c9adc5dea00000c001a0fbe673a8a73b5cdb557dea3dc2aa3f37b5ccc5fc23a622362e25e88bb0c944c2a06ed35fb4200251e9d6d1169887c317959a35e88dd9172cb5e6e87539f3aca265 (1559)
+function decodeRLPTx(raw=''){
+    let r = {
+        txType: 0,
+        txHash: null,
+        encoded: [],
+        tx: null,
+        errorDesc: null,
+    }
+    try {
+        let rlptxn = rlp.decode(raw) //EIP2718: (TransactionType || TransactionPayload)
+        if (Array.isArray(rlptxn)) {
+            if (rlptxn.length != 9) r.errorDesc = `invalid rlp arrayLen:${rlptxn.length} (Expecting 9)`
+            r.txHash = keccak256(raw)
+            r.encoded = buffertoHex(rlptxn)
+        }else{
+            rlptxn = rlptxn.toString('hex')
+            let transactionType = rlptxn.slice(0,2)
+            let transactionPayload = '0x' + rlptxn.slice(2)
+            let tx = rlp.decode(transactionPayload)
+            if (Array.isArray(tx)) {
+                if (tx.length != 12) r.errorDesc = `invalid rlp arrayLen:${tx.length} (Expecting 12)`
+                r.txType = transactionType
+                r.txHash = keccak256('0x' + rlptxn)
+                r.encoded = buffertoHex(tx)
+            }else{
+                r.errorDesc = 'Decode Failed?'
+            }
+        }
+    }catch(e){
+        console.log(`decodeRLPTx [${raw}] err`, e)
+        r.errorDesc = e.toString()
+    }
+    if (r.errorDesc == undefined) r.tx = createTxFromEncoded(r.encoded)
+    return r
+}
+
 
 //'0x38ed1739'
 //decodeMethod
@@ -1003,6 +1113,7 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
     let blockTS = fBlk.timestamp
     let fTxns = []
     let fTxnsInternal = [];
+    let fTxnsConnected = [];
     if (dTxns.length != dReceipts.length) {
         console.log(`[${fBlk.blockNumber}][${fBlk.blockHash}] txns/receipts len mismatch: txnLen=${dTxns.length}, receiptLen=${dReceipts.length}`)
     }
@@ -1027,6 +1138,9 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
         let dReceipt = dReceipts[i]
         let dInternal = feedtraceMap[dTxn.hash] ? feedtraceMap[dTxn.hash] : []
         let fTxn = decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID)
+        if (fTxn.isConnectedCall){
+            fTxnsConnected.push(fTxn)
+        }
         fTxns.push(fTxn)
         if (fTxn.transactionsInternal && fTxn.transactionsInternal.length > 0) {
             for (let j = 0; j < fTxn.transactionsInternal.length; j++) {
@@ -1036,6 +1150,7 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
     }
     fBlk.transactions = fTxns
     fBlk.transactionsInternal = fTxnsInternal
+    fBlk.transactionsConnected = fTxnsConnected
     return fBlk
 }
 
@@ -1943,19 +2058,27 @@ module.exports = {
         process_evm_trace(evmTrace, res, 0, [0], evmTxs);
         return res
     },
+    keccak256: function(hex) {
+        return keccak256(hex);
+    },
+    decodeRLPTxRaw: function(hex) {
+        return decodeRLPTx(hex);
+    },
+    computeConnectedTxHash: function(tx) {
+        return computeConnectedTxHash(tx);
+    },
     evmChainIDToChainID: function(evmChainID) {
-	evmChainID = parseInt(evmChainID, 10)
-	switch ( evmChainID ) {
-	case 1284:
-	    return 2004;
-	case 1285:
-	    return 22023;
-	case 1287:
-	    return 61000;
-	case 1288:
-	    return 60888;
-	}
-	return null;
+	    evmChainID = parseInt(evmChainID, 10)
+	    switch ( evmChainID ) {
+            case 1284:
+                return 2004;
+	        case 1285:
+                return 22023;
+            case 1287:
+                return 61000;
+            case 1288:
+                return 60888;
+            }
+	        return null;
     }
-
 };
