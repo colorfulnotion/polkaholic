@@ -559,6 +559,7 @@ module.exports = class AstarParser extends ChainParser {
                         sentAt: this.parserWatermark,
                         xcmSymbol: targetedSymbol,
                         xcmInteriorKey: targetedXcmInteriorKey,
+                        xcmType: "xcmtransfer",
                     }
                     //if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
                     console.log(`processOutgoingEthereum`, r)

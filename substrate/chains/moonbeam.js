@@ -297,6 +297,7 @@ module.exports = class MoonbeamParser extends ChainParser {
             xcmSymbol: null,
             xcmInteriorKey: null,
             innerCall: innerCall,
+            xcmType: "xcmtransact",
         }
         try {
             /*
