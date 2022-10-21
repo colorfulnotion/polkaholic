@@ -56,7 +56,7 @@ async function main() {
     let [sectionMethod, func, args, isEVMTx] = await xcmtransact.xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, currencyID, contract, input, chainIDRelay);
     let argsStr = JSON.stringify(args, null, 4)
     console.log(`${sectionMethod} args`, argsStr);
-    let execute = true;
+    let execute = false;
     if (isEVMTx){
         var txStruct = args
         var web3Api = func

@@ -195,8 +195,8 @@ module.exports = class XCMTransact {
                 }
             } else if ((t.p == "Dmp") && (t.s == "DownwardMessageQueues")) {
                 try {
-                    let queues = JSON.parse(t.pv);
-                    if (queues.length > 0) {
+                    let queues = t.pv ? JSON.parse(t.pv) : null; 
+                    if (queues && queues.length > 0) {
 			console.log("iRCT", t.p, t.s, t.pv);
                         let k = JSON.parse(t.pk)
                         let paraIDDest = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
@@ -464,7 +464,6 @@ module.exports = class XCMTransact {
         }
 
         let queryMeta = query[p][s].meta;
-        let handParseKey = false;
         // parse key
         try {
             kk = key;
@@ -533,6 +532,8 @@ module.exports = class XCMTransact {
 	} catch (e) {
 	    o.pv = null; 
 	}
+        o.k = e.k
+        o.v = e.v
 	return [o, true]
     }
 
@@ -1062,6 +1063,11 @@ module.exports = class XCMTransact {
 	    blockNumber = parseInt(signedBlock.block.header.number.toString(), 10);
 	    for ( const r of results.changes ) {
 		let [x, succ] = this.parse_trace(r, api)
+		console.log(x);
+		if ( ( x.p == "ParaInclusion" && x.s == "PendingAvailabilityCommitments" && ( x.pk == '["888"]'  || x.pk == '["1,000"]' || true ) ) ||
+		     ( (x.p == "Dmp") && (x.s == "DownwardMessageQueues") ) ) {
+		    //console.log("FLAGGED", x);
+		}
 		if ( succ ) {
 		    traces.push(x);
 		    if ( x.method == "Now" ) {
