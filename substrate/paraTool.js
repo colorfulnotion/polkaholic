@@ -1512,5 +1512,8 @@ module.exports = {
     },
     u8aAsHex: function(){
         return u8aToHex()
-    }
+    },
+    intToHex: function(int){
+        return bnToHex(int)
+    },
 };
