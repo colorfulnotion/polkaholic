@@ -4972,7 +4972,7 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async process_evm_contract_create(tx, chainID, finalized = false) {
+    async process_evm_contract_create(tx, chainID, finalized = false, isTip = false) {
         // waterfall model: use `getERC20TokenInfo` to categorize ERC20 contract first. if doesn't work, we will try erc720 next, and then erc1155..
         let web3Api = this.web3Api
         let bn = tx.blockNumber
@@ -5584,12 +5584,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     //    Design: easy to value native assets with coin prices, but very challenging to value ALL assets,
     //      so how do we provide historical balances for ERC20 assets as assets suddenly acquire USD values?
     //  - /asset/0x1d3.. --> get the totalSupply, top 1000 asset holders
-    async process_evm_transaction(tx, chainID, finalized = false) {
+    async process_evm_transaction(tx, chainID, finalized = false, isTip = false) {
         if (tx == undefined) return;
         let contractType = false
         if (ethTool.isTxContractCreate(tx)) {
             // Contract Creates
-            contractType = await this.process_evm_contract_create(tx, chainID, finalized);
+            contractType = await this.process_evm_contract_create(tx, chainID, finalized, isTip);
         }
 
         if (ethTool.isTxNativeTransfer(tx)) {
@@ -5671,6 +5671,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     transactionHash: evmTxHash,
                     decodedInput: tx.decodedInput,
                     from: tx.from.toLowerCase(),
+                    nonce: tx.nonce,
                     to: tx.creates.toLowerCase(),
                     ts: tx.timestamp,
                     value: tx.value,
@@ -5695,13 +5696,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
 
-    async processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, finalized) {
+    async processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, finalized, isTip = false) {
         if (!evmFullBlock) return (false)
         // could this be done with Promise.all?
         let evmTxnCnt = 0
         for (const tx of evmFullBlock.transactions) {
             evmTxnCnt++
-            await this.process_evm_transaction(tx, chainID, finalized);
+            await this.process_evm_transaction(tx, chainID, finalized, isTip);
         }
         this.stat.hashesRows.evmTxPerBlk.push(evmTxnCnt)
     }
@@ -6351,7 +6352,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 this.timeStat.processBlockAndReceipt++
 
                 let processEVMFullBlockStartTS = new Date().getTime()
-                await this.processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, block.finalized)
+                await this.processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, block.finalized, isTip)
                 let processEVMFullBlockTS = (new Date().getTime() - processEVMFullBlockStartTS) / 1000
                 this.timeStat.processEVMFullBlockTS += processEVMFullBlockTS
                 this.timeStat.processEVMFullBlock++
