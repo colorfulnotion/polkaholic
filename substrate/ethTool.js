@@ -824,6 +824,31 @@ function keccak256(hex){
     return web3.utils.keccak256(hex)
 }
 
+function computeConnectedTxHash(tx){
+    /*
+    {
+      chainID: '0x',
+      nonce: '0x04',
+      maxFeePerGas: '0x',
+      maxPriorityFeePerGas: '0x',
+      gas: '0x0493e0',
+      to: '0x49ba58e2ef3047b1f90375c79b93578d90d24e24',
+      value: '0x',
+      data: '0xcde4efa9',
+      accessList: [],
+      v: '0x01',
+      r: '0x01',
+      s: '0x01'
+    }
+    */
+    let encodedList = []
+    for (const k of Object.keys(tx)){
+        encodedList.push(tx[k])
+    }
+    let encoded = '0x02' +rlp.encode(encodedList).toString('hex')
+    return keccak256(encoded)
+}
+
 function createTxFromEncoded(encodedList){
     let tx = {}
     let legacyFormat = ['nonce','gas','gasPrice','value','data','to','v','r','s']
@@ -2033,19 +2058,27 @@ module.exports = {
         process_evm_trace(evmTrace, res, 0, [0], evmTxs);
         return res
     },
+    keccak256: function(hex) {
+        return keccak256(hex);
+    },
+    decodeRLPTxRaw: function(hex) {
+        return decodeRLPTx(hex);
+    },
+    computeConnectedTxHash: function(tx) {
+        return computeConnectedTxHash(tx);
+    },
     evmChainIDToChainID: function(evmChainID) {
-	evmChainID = parseInt(evmChainID, 10)
-	switch ( evmChainID ) {
-	case 1284:
-	    return 2004;
-	case 1285:
-	    return 22023;
-	case 1287:
-	    return 61000;
-	case 1288:
-	    return 60888;
-	}
-	return null;
+	    evmChainID = parseInt(evmChainID, 10)
+	    switch ( evmChainID ) {
+            case 1284:
+                return 2004;
+	        case 1285:
+                return 22023;
+            case 1287:
+                return 61000;
+            case 1288:
+                return 60888;
+            }
+	        return null;
     }
-
 };
