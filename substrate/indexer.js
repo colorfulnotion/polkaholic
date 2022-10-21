@@ -3219,8 +3219,8 @@ module.exports = class Indexer extends AssetManager {
         let evmTxHash = matcher.transactionHash
         let txInput = matcher.input.substr(2)
         let txTo = (matcher.to != undefined)? matcher.to.toLowerCase().substr(2) : ''
-        let txGasLimit = paraTool.intToHex(matcher.gasLimit).substr(2).reverse() // little endian
-        let txValue = paraTool.intToHex(matcher.value).substr(2).reverse()       // little endian
+        let txGasLimit = paraTool.reverseEndian(paraTool.intToHex(matcher.gasLimit).substr(2))           // little endian
+        let txValue = paraTool.reverseEndian(paraTool.intToHex(matcher.value).substr(2))       // little endian
         let txCreates = (matcher.creates != undefined)? matcher.creates.toLowerCase().substr(2) : ''
         if (!matcher) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getEvmMsgHashCandidate [${targetBN}], matcher MISSING`)
