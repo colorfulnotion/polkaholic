@@ -1,39 +1,32 @@
 const {
+    ApiPromise,
+    WsProvider,
     Keyring
 } = require("@polkadot/api");
 const {
-    cryptoWaitReady
+    u8aToHex,
+    hexToBn,
+    hexToU8a,
+} = require('@polkadot/util');
+const {
+    StorageKey
+} = require('@polkadot/types');
+const {
+    cryptoWaitReady,
+    decodeAddress,
+    mnemonicToLegacySeed,
+    hdEthereum
 } = require('@polkadot/util-crypto');
+const {
+    MultiLocation
+} = require('@polkadot/types/interfaces');
 const fs = require('fs');
-const AssetManager = require('./assetManager');
+//const AssetManager = require('./assetManager');
 const paraTool = require('./paraTool');
 const ethTool = require('./ethTool');
 const mysql = require("mysql2");
 
-module.exports = class XCMTransfer extends AssetManager {
-    pair = null;
-    evmpair = null
-
-    async init() {
-        await cryptoWaitReady()
-    }
-
-    setupPair(FN = "/root/.wallet", name = "polkadot") {
-        const privateSeed = fs.readFileSync(FN, 'utf8');
-        var keyring = new Keyring({
-            type: 'sr25519'
-        });
-        this.pair = keyring.addFromUri(privateSeed, {
-            name: name
-        })
-    }
-
-    setupEvmPair(FN = "/root/.walletevm2", name = "evm") {
-        var pk = fs.readFileSync(FN, 'utf8');
-        pk = pk.replace(/\r|\n/g, '');
-        this.evmpair = ethTool.loadWallet(pk)
-    }
-
+module.exports = class XCMTransfer extends XCMTransact {
     parse_xcmInteriorKey(xcmInteriorKeyRelayChain, symbol) {
         let [xcmInteriorKey, relayChain] = paraTool.parseAssetChain(xcmInteriorKeyRelayChain);
         let xcm = {
@@ -89,7 +82,7 @@ module.exports = class XCMTransfer extends AssetManager {
         let r = recs[0];
         r.paraID = paraTool.getParaIDfromChainID(chainID);
         return r;
-    }
+    } 
 
     async lookup_sectionMethod(chainID, chainIDDest, xcmInteriorKey, evmPreferred = true) {
         let sectionMethodBlacklist = `'utility:batchAll', 'utility:batch', 'timestamp:set'`
@@ -519,169 +512,6 @@ module.exports = class XCMTransfer extends AssetManager {
         return [this.api.tx.xcmPallet.limitedReserveTransferAssets, [dest, beneficiary, assets, fee_asset_item, weight_limit]];
     }
 
-    async getTestcasesAutomated(limit = 30) {
-        let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM as isBeneficiaryEVM, 0 as isSenderEVM, count(*) cnt from xcmtransfer join xcmasset on
-        xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where
-        sourceTS > unix_timestamp(date_sub(Now(), interval 30 day)) and
-        chain.chainID = xcmtransfer.chainIDDest and xcmtransfer.chainID >= 0 and
-        xcmtransfer.chainIDDest >= 0 and incomplete = 0 and length(xcmtransfer.xcmInteriorKey) > 4 and
-        xcmtransfer.sectionMethod not in ( 'xTokens:TransferredMultiAssets', 'xTransfer:transfer' )
-        group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM
-        having count(*) > 10 order by count(*) desc limit ${limit}`
-        console.log(paraTool.removeNewLine(sql))
-        let testcases = await this.poolREADONLY.query(sql);
-        let autoTestcases = []
-        for (const testcase of testcases) {
-            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam || testcase.chainID == paraTool.chainIDMoonbaseAlpha || testcase.chainID == paraTool.chainIDMoonbaseBeta ||
-                testcase.chainID == paraTool.chainIDAstar || testcase.chainID == paraTool.chainIDShiden || testcase.chainID == paraTool.chainIDShibuya
-            ) {
-                autoTestcases.push(testcase)
-                let testcase2 = JSON.parse(JSON.stringify(testcase))
-                testcase2.isSenderEVM = 1
-                autoTestcases.push(testcase2)
-            } else {
-                autoTestcases.push(testcase)
-            }
-        }
-        console.log("TESTCASES", autoTestcases.length);
-        return autoTestcases;
-    }
-
-    async getTestcasesAutomatedEVM(limit = 30) {
-        let sql = `select xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM as isBeneficiaryEVM, 0 as isSenderEVM, count(*) cnt from xcmtransfer join xcmasset on
-        xcmtransfer.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where
-        xcmtransfer.chainID in (${paraTool.chainIDMoonriver}, ${paraTool.chainIDMoonbeam}) and
-        sourceTS > unix_timestamp(date_sub(Now(), interval 30 day)) and
-        chain.chainID = xcmtransfer.chainIDDest and xcmtransfer.chainID >= 0 and
-        xcmtransfer.chainIDDest >= 0 and incomplete = 0 and length(xcmtransfer.xcmInteriorKey) > 4 and
-        xcmtransfer.sectionMethod not in ('xTransfer:transfer' )
-        group by xcmtransfer.chainID, xcmtransfer.chainIDDest, xcmasset.symbol, chain.isEVM
-        having count(*) > 10 order by count(*) desc limit ${limit}`
-        console.log(paraTool.removeNewLine(sql))
-        let testcases = await this.poolREADONLY.query(sql);
-        let autoTestcases = []
-        for (const testcase of testcases) {
-            if (testcase.chainID == paraTool.chainIDMoonriver || testcase.chainID == paraTool.chainIDMoonbeam) {
-                testcase.isSenderEVM = 1
-            }
-            autoTestcases.push(testcase)
-        }
-        console.log("TESTCASES", autoTestcases.length);
-        return autoTestcases;
-    }
-
-    async getTestcasesManualEVM() {
-        return [{
-                chainID: 22023,
-                chainIDDest: 2,
-                symbol: 'KSM',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 1,
-                cnt: 100
-            },
-            {
-                chainID: 22023, //0xb9f813ff
-                chainIDDest: 22007,
-                symbol: 'MOVR',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 1,
-                cnt: 64
-            },
-            {
-                chainID: 2004,
-                chainIDDest: 2000,
-                symbol: 'ACA',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 1,
-                cnt: 64
-            },
-            {
-                chainID: 2006,
-                chainIDDest: 2004,
-                symbol: 'GLMR',
-                isBeneficiaryEVM: 1,
-                isSenderEVM: 1,
-                cnt: 64
-            },
-            {
-                chainID: 2006,
-                chainIDDest: 0,
-                symbol: 'DOT',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 1,
-                cnt: 64
-            },
-        ]
-    }
-
-    async getTestcasesManual() {
-        return [{
-                chainID: 2,
-                chainIDDest: 21000,
-                symbol: 'KSM',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 0,
-                cnt: 100
-            },
-            {
-                chainID: 2006,
-                chainIDDest: 2000,
-                symbol: 'ACA',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 0,
-                cnt: 64
-            },
-            {
-                chainID: 2006,
-                chainIDDest: 2000,
-                symbol: 'AUSD',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 0,
-                cnt: 47
-            },
-            {
-                chainID: 2000,
-                chainIDDest: 2006,
-                symbol: 'AUSD',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 0,
-                cnt: 45
-            },
-            {
-                chainID: 2,
-                chainIDDest: 22024,
-                symbol: 'KSM',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 0,
-                cnt: 20
-            },
-            {
-                chainID: 0,
-                chainIDDest: 1000,
-                symbol: 'DOT',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 0,
-                cnt: 16
-            },
-            {
-                chainID: 21000,
-                chainIDDest: 22000,
-                symbol: 'USDT',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 0,
-                cnt: 12
-            },
-            {
-                chainID: 21000,
-                chainIDDest: 22001,
-                symbol: 'RMRK',
-                isBeneficiaryEVM: 0,
-                isSenderEVM: 0,
-                cnt: 12
-            }
-        ]
-    }
-
     validateBeneficiaryAddress(chainIDDest, beneficiary) {
         let isValid = true
         let desc = "ok"
@@ -718,6 +548,7 @@ module.exports = class XCMTransfer extends AssetManager {
         return [isValid, desc]
     }
 
+    
     async xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary, evmPreferred = true) {
         let [isValidBeneficiary, desc] = this.validateBeneficiaryAddress(chainIDDest, beneficiary)
         if (!isValidBeneficiary) {
@@ -818,4 +649,5 @@ module.exports = class XCMTransfer extends AssetManager {
             return [null, null, null, null];
         }
     }
+
 }

@@ -1,0 +1,101 @@
+#!/usr/bin/env node
+// Usage:
+// (1) we are submitting on 1000 but executing on 888 with BetaDev [which is a "ForeignAsset" from 1000 submitter]
+// ./xcmTransact 0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d 1000 888 35487752324713722007834302681851459189 0x49ba58e2ef3047b1f90375c79b93578d90d24e24 0xcde4efa9
+
+// (2) we are submitting on 888 but executing on 1000 with AlphaDev [which is a "ForeignAsset" from 888 submitter]
+// ./xcmTransact 0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d 888 1000 222902676330054289648817870329963141953 0x3a7798ca28cfe64c974f8196450e1464f43a0d1e 0xcde4efa9
+
+const XCMTransact = require("./xcmtransact");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
+
+async function main() {
+    let xcmtransact = new XCMTransact();
+
+    // only on moonbase right now
+    let chainIDRelay = 60000;
+
+
+    // case (1) is the default
+    let address = "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d";
+    let paraID = 1000;
+    let paraIDDest = 888;
+    let currencyID = "35487752324713722007834302681851459189";
+    let contract = "0x49ba58e2ef3047b1f90375c79b93578d90d24e24";
+    let input = "0xcde4efa9"
+
+    // could use flags instead, too many inputs but pretty much all are needed, so...
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            address = parseInt(val, 10);
+        }
+        if (index == 3 && val.length > 0) {
+            paraID = parseInt(val, 10);
+        }
+        if (index == 4 && val.length > 0) {
+            paraIDDest = parseInt(val, 10);
+        }
+        if (index == 5 && val.length > 0) {
+            currencyID = val;
+        }
+        if (index == 6 && val.length > 0) {
+            contract = val;
+        }
+        if (index == 7 && val.length > 0) {
+            input = val;
+        }
+        if (index == 8 && val.length > 0) {
+            chainIDRelay = val;
+        }
+    });
+
+    await xcmtransact.init();
+    await xcmtransact.setupAPIs(paraID, paraIDDest, chainIDRelay);
+    xcmtransact.setupEvmPairFromMnemonic()
+    let [sectionMethod, func, args, isEVMTx] = await xcmtransact.xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, currencyID, contract, input, chainIDRelay);
+    let argsStr = JSON.stringify(args, null, 4)
+    console.log(`${sectionMethod} args`, argsStr);
+    let execute = true;
+    if (isEVMTx){
+        var txStruct = args
+        var web3Api = func
+        var signedTx = await ethTool.signEvmTx(web3Api, args, xcmtransact.evmpair)
+        var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
+        console.log(`signedTx`, signedTx, `decodedTx`, decodedTx)
+        if (execute) {
+            console.log(`broadcasting signed evmTx`)
+            //if execute true, brocast the tx
+            let txHash = signedTx.transactionHash
+            console.log("EVM Transfer sent with hash", hash.toHex());
+            console.log(`View Transaction: https://polkaholic.io/tx/${txHash}`);
+            var result = await ethTool.sendSignedTx(web3Api, signedTx)
+            console.log(`signedTX result=`, result)
+        }
+    } else {
+        let xcmTxn = func.apply(null, args)
+	console.log("transactThroughSigned", xcmTxn.toHex());
+        const { partialFee, weight } = await xcmTxn.paymentInfo(xcmtransact.pair);
+        console.log(`Est. extrinsics weight=${weight}, weight fees=${partialFee.toHuman()}`);
+
+	if (execute) {
+            console.log(`broadcasting signed extrinsic`)
+            let hash = await xcmTxn.signAndSend(xcmtransact.pair);
+            let extrinsicHash = hash.toHex()
+	    xcmtransact.init_extrinsic(extrinsicHash, xcmTxn);
+            console.log("Transfer sent with hash", hash.toHex());
+            console.log(`View extrinsic: https://polkaholic.io/tx/${extrinsicHash}`);
+        }
+    }
+}
+
+main()
+    .then(() => {
+        //process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
+
+

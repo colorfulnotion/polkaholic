@@ -213,131 +213,60 @@ async function main() {
     xcmtransfer.setupPair();
     xcmtransfer.setupEvmPair();
 
-    let test = 'auto' // ['autoSubstrate', 'manualSubstrate', 'autoEVM', 'manualEVM', 'auto', 'manuals']
-    console.log(`testing ${test}`)
-    if (chainID == -1) {
-        let testcases = []
-        switch (test) {
-            case 'auto':
-                testcases = await xcmtransfer.getTestcasesAutomated();
-                break;
-            case 'manuals':
-                testcases = xcmtransfer.getTestcasesManual();
-                break;
-            case 'autoSubstrate':
-                testcases = await xcmtransfer.getTestcasesAutomated();
-                break;
-            case 'manualSubstrate':
-                testcases = xcmtransfer.getTestcasesManual();
-                break;
-            case 'autoEVM':
-                testcases = await xcmtransfer.getTestcasesAutomatedEVM();
-                break;
-            case 'manualEVM':
-                //TODO
-                testcases = await xcmtransfer.getTestcasesManualEVM();
-                break;
-            default:
+    if (chainIDDest == paraTool.chainIDMoonbeam || chainIDDest == paraTool.chainIDMoonriver || chainIDDest == paraTool.chainIDAstar || chainIDDest == paraTool.chainIDShiden) {
+        if (!isNonDefaultBeneficiary){
+            beneficiary = beneficiaryEVM;
         }
-        console.log(testcases)
-        for (let i = 0; i < testcases.length; i++) {
-            try {
-                let t = testcases[i];
-                chainID = t.chainID;
-                chainIDDest = t.chainIDDest;
-                symbol = t.symbol;
-                amount = 1.0;
-                let beneficiary = beneficiarySubstrate
-                console.log(`******* CASE ${i}`);
-                console.log(t);
-                /*
-                if (t.isEVM != undefined) {
-                    beneficiary = beneficiaryEVM;
-                }
-                if (test == 'manualEVM'){
-                    beneficiary = (t.isBeneficiaryEVM)? beneficiaryEVM : beneficiarySubstrate
-                }
-                */
-                beneficiary = (t.isBeneficiaryEVM)? beneficiaryEVM : beneficiarySubstrate
-                let executionInput = {
-                    execute: false,
-                    origination: chainID,
-                    destination: chainIDDest,
-                    symbol: symbol,
-                    amount: amount,
-                    beneficiary: beneficiary,
-                }
-                let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary, t.isSenderEVM);
-                let argsStr = JSON.stringify(args, null, 4)
-                console.log(`xcmtransfer cli executionInput`, executionInput)
-                console.log(`xcmtransfer cli transcribed ${sectionMethod} args`, argsStr);
-                if (isEVMTx){
-                    var txStruct = args
-                    var web3Api = func
-                    var signedTx = await ethTool.signEvmTx(web3Api, txStruct, xcmtransfer.evmpair)
-                    var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
-                    console.log(`signedTx`, signedTx)
-                    console.log(`decodedTx`, decodedTx)
-                }
-            } catch (e) {
-                console.log(`xcmtransfer cli error`, e.toString());
-            }
+    }
+    //validate cli inputs
+    let [isValidBeneficiary, desc] = xcmtransfer.validateBeneficiaryAddress(chainIDDest, beneficiary)
+    if (!isValidBeneficiary){
+        console.error('ERROR', desc);
+        process.exit(1);
+    }
+    let execute = 0;
+    let executionInput = {
+        execute: (execute == 1)? true : false,
+        origination: chainID,
+        destination: chainIDDest,
+        symbol: symbol,
+        amount: amount,
+        beneficiary: beneficiary,
+    }
+    let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
+    console.log(`xcmtransfer cli executionInput`, executionInput)
+    let argsStr = JSON.stringify(args, null, 4)
+    console.log(`xcmtransfer cli transcribed ${sectionMethod} args`, argsStr);
+    if (isEVMTx){
+        var txStruct = args
+        var web3Api = func
+        var signedTx = await ethTool.signEvmTx(web3Api, args, xcmtransfer.evmpair)
+        var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
+        console.log(`signedTx`, signedTx)
+        console.log(`decodedTx`, decodedTx)
+        if (execute) {
+            console.log(`broadcasting signed evmTx`)
+            //if execute true, brocast the tx
+            let txHash = signedTx.transactionHash
+            console.log("EVM Transfer sent with hash", hash.toHex());
+            console.log(`View Transaction: https://polkaholic.io/tx/${txHash}`);
+            var result = await ethTool.sendSignedTx(web3Api, signedTx)
+            console.log(`signedTX result=`, result)
         }
-    } else {
-        if (chainIDDest == paraTool.chainIDMoonbeam || chainIDDest == paraTool.chainIDMoonriver || chainIDDest == paraTool.chainIDAstar || chainIDDest == paraTool.chainIDShiden) {
-            if (!isNonDefaultBeneficiary){
-                beneficiary = beneficiaryEVM;
-            }
-        }
-        //validate cli inputs
-        let [isValidBeneficiary, desc] = xcmtransfer.validateBeneficiaryAddress(chainIDDest, beneficiary)
-        if (!isValidBeneficiary){
-            console.error('ERROR', desc);
-            process.exit(1);
-        }
-        let execute = 0;
-        let executionInput = {
-            execute: (execute == 1)? true : false,
-            origination: chainID,
-            destination: chainIDDest,
-            symbol: symbol,
-            amount: amount,
-            beneficiary: beneficiary,
-        }
-        let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
-        console.log(`xcmtransfer cli executionInput`, executionInput)
-        let argsStr = JSON.stringify(args, null, 4)
-        console.log(`xcmtransfer cli transcribed ${sectionMethod} args`, argsStr);
-        if (isEVMTx){
-            var txStruct = args
-            var web3Api = func
-            var signedTx = await ethTool.signEvmTx(web3Api, args, xcmtransfer.evmpair)
-            var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
-            console.log(`signedTx`, signedTx)
-            console.log(`decodedTx`, decodedTx)
-            if (execute) {
-                console.log(`broadcasting signed evmTx`)
-                //if execute true, brocast the tx
-                let txHash = signedTx.transactionHash
-                console.log("EVM Transfer sent with hash", hash.toHex());
-                console.log(`View Transaction: https://polkaholic.io/tx/${txHash}`);
-                var result = await ethTool.sendSignedTx(web3Api, signedTx)
-                console.log(`signedTX result=`, result)
-            }
-        }else{
-            if (execute) {
-                let xcmTxn = func.apply(null, args)
-                const { partialFee, weight } = await xcmTxn.paymentInfo(xcmtransfer.pair);
-                console.log(`Est. extrinsics weight=${weight}, weight fees=${partialFee.toHuman()}`);
-                console.log(`broadcasting signed extrinsics`)
-                let hash = await xcmTxn.signAndSend(xcmtransfer.pair);
-                let extrinsicHash = hash.toHex()
-                console.log("Transfer sent with hash", hash.toHex());
-                console.log(`View extrinsics: https://polkaholic.io/tx/${extrinsicHash}`);
-            }
+    }else{
+        if (execute) {
+            let xcmTxn = func.apply(null, args)
+            const { partialFee, weight } = await xcmTxn.paymentInfo(xcmtransfer.pair);
+            console.log(`Est. extrinsics weight=${weight}, weight fees=${partialFee.toHuman()}`);
+            console.log(`broadcasting signed extrinsics`)
+            let hash = await xcmTxn.signAndSend(xcmtransfer.pair);
+            let extrinsicHash = hash.toHex()
+            console.log("Transfer sent with hash", hash.toHex());
+            console.log(`View extrinsics: https://polkaholic.io/tx/${extrinsicHash}`);
         }
     }
 }
+
 main()
     .then(() => {
         process.exit(0);

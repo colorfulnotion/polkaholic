@@ -2882,8 +2882,6 @@ module.exports = class Indexer extends AssetManager {
             o.v = e.v
             return [o, false]
         }
-
-
         //if (!query[p]) return ([false, false]);
         //if (!query[p][s]) return ([false, false]);
         //if (!query[p][s].meta) return ([false, false]);
@@ -3784,7 +3782,7 @@ module.exports = class Indexer extends AssetManager {
             if (evt.section != undefined && evt.method != undefined) {
                 pallet_method = `${evt.section}:${evt.method}`
             }
-            //if (extrinsicHash == '0xd50a05196fcc5794b44b19502dcb4aaa573fea0a510120fb1966fdd5ad76f119') console.log('events', data, dataType, decodedData)
+
             if (dataType != undefined && Array.isArray(dataType)) {
                 if (pallet_method == 'tokens:Withdrawn') {
                     //this is normal case for txfees
@@ -6122,7 +6120,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 //console.log("NEW RECEIPTS", JSON.stringify(newReceipts, null, 4));
                 evmBlock = newEVMBlock;
                 evmReceipts = newReceipts;
-
             }
         }
         // setParserContext
