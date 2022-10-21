@@ -1213,10 +1213,11 @@ module.exports = class Indexer extends AssetManager {
                     let innerCall = (r.innerCall) ? `'${r.innerCall}'` : `NULL`
                     let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `${mysql.escape(r.xcmInteriorKey)}` : `NULL`
                     let xcmSymbol = (r.xcmSymbol) ? `${mysql.escape(r.xcmSymbol)}` : `NULL`
+                    let xcmType = (r.xcmType != undefined) ? `'${r.xcmType}'` : 'xcmtransfer'
                     //["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"]
                     //["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"]
                     let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
-                        `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey, innerCall
+                        `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey, innerCall, xcmType
                     ].join(",") + ")";
                     xcmtransfers.push(t);
                     if (numXCMTransfersOut[r.blockNumber] == undefined) {
@@ -1231,9 +1232,9 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall"]
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"]
             }, sqlDebug);
 
 
@@ -3181,37 +3182,72 @@ module.exports = class Indexer extends AssetManager {
     }
 
     // find the msgHash given {BN, recipient} or {BN, innercall}
-    getMsgHashCandidate(targetBN, destAddress = false, extrinsicID = false, extrinsicHash = false, isInnercall = false) {
-        if (!destAddress) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}], dest MISSING`)
+    getMsgHashCandidate(targetBN, matcher = false, extrinsicID = false, extrinsicHash = false, matcherType = 'address') {
+        if (!matcher) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}], matcher MISSING`)
             return false
         }
-        let rawDestAddr = destAddress.substr(2) // without the prefix 0x
-        if (rawDestAddr.length != 64 && rawDestAddr.length != 40 && !isInnercall) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] Invalid destAddress`)
+        let rawMatcher = matcher.substr(2) // without the prefix 0x
+        if (rawMatcher.length != 64 && rawMatcher.length != 40 && matcherType == 'address') {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] Invalid destAddress`)
             return false
         }
         let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingKeys`, trailingKeys)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] trailingKeys`, trailingKeys)
         for (const tk of trailingKeys) {
             let trailingXcm = this.xcmTrailingKeyMap[tk]
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] trailingXcm`, trailingXcm)
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] trailingXcm`, trailingXcm)
             let firstSeenBN = trailingXcm.blockNumber
             let msgHex = trailingXcm.msgHex
             let msgHash = trailingXcm.msgHash
-            if (firstSeenBN == targetBN && msgHex.includes(rawDestAddr)) {
+            if (firstSeenBN == targetBN && msgHex.includes(rawMatcher)) {
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] FOUND candidate=${msgHash}`)
-                if (this.xcmmsgMap[tk] != undefined) {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
+                if (this.xcmmsgMap[tk] != undefined && extrinsicID && extrinsicHash) {
                     this.xcmmsgMap[tk].extrinsicID = extrinsicID
                     this.xcmmsgMap[tk].extrinsicHash = extrinsicHash
                 }
                 return msgHash
             }
         }
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, dest=${destAddress}] MISS`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}, ${matcherType}] MISS`)
     }
+
+    getEvmMsgHashCandidate(targetBN, matcher = false, matcherType = 'evm') {
+        let evmTxHash = matcher.transactionHash
+        let txInput = matcher.input.substr(2)
+        let txTo = (matcher.to != undefined)? matcher.to.toLowerCase().substr(2) : ''
+        let txGasLimit = paraTool.reverseEndian(paraTool.intToHex(matcher.gasLimit).substr(2))           // little endian
+        let txValue = paraTool.reverseEndian(paraTool.intToHex(matcher.value).substr(2))       // little endian
+        let txCreates = (matcher.creates != undefined)? matcher.creates.toLowerCase().substr(2) : ''
+        if (!matcher) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getEvmMsgHashCandidate [${targetBN}], matcher MISSING`)
+            return false
+        }
+        let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingKeys`, trailingKeys)
+        for (const tk of trailingKeys) {
+            let trailingXcm = this.xcmTrailingKeyMap[tk]
+            //console.log(`getEvmMsgHashCandidate tk=${tk}`, trailingXcm)
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingXcm`, trailingXcm)
+            let firstSeenBN = trailingXcm.blockNumber
+            let msgHex = trailingXcm.msgHex
+            let msgHash = trailingXcm.msgHash
+            if (firstSeenBN == targetBN && msgHex.includes(txInput) && msgHex.includes(txTo) && msgHex.includes(txGasLimit)) {
+                //criteria: firstSeen at the block when xcmtransfer is found + recipient match
+                //this should give 99% coverage? let's return on first hit for now
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=${txInput}, ${txTo}, ${txGasLimit}] FOUND candidate=${msgHash}`)
+                if (this.xcmmsgMap[tk] != undefined) {
+                    this.xcmmsgMap[tk].connectedTxHash = evmTxHash
+                }
+                return msgHash
+            }
+        }
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}], ${matcherType}] MISS`)
+        return false
+    }
+
 
     // clean traling xcm
     cleanTrailingXcmMap(blockNumber) {
@@ -3261,7 +3297,7 @@ module.exports = class Indexer extends AssetManager {
             let rows = this.recentXcmMsgs
             if (this.debugLevel >= paraTool.debugTracing) console.log(`dump_xcm_messages rowsLen=${rows.length}`, rows)
 
-            let vals = ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries"];
+            let vals = ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries", "connectedTxHash"];
             await this.upsertSQL({
                 "table": "xcmmessages",
                 "keys": ["msgHash", "blockNumber", "incoming"],
@@ -4637,7 +4673,7 @@ module.exports = class Indexer extends AssetManager {
                                 }
                             } else if (xcm.innerCall != undefined) {
                                 // lookup msgHash using innerCall -- it shouldn't be empty?
-                                let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcm.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, true)
+                                let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcm.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
                                 if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                                 //accept the fact that this xcm doesn not have destAddress
                             } else {
@@ -4669,9 +4705,9 @@ module.exports = class Indexer extends AssetManager {
                             if (xcmtransfer.msgHash == undefined || xcmtransfer.msgHash.length != 66) {
                                 let msgHashCandidate;
                                 if (xcmtransfer.innerCall != undefined) {
-                                    msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, true)
+                                    msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
                                 } else {
-                                    msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, false)
+                                    msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'address')
                                 }
                                 if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                             }
@@ -4934,7 +4970,7 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async process_evm_contract_create(tx, chainID, finalized = false) {
+    async process_evm_contract_create(tx, chainID, finalized = false, isTip = false) {
         // waterfall model: use `getERC20TokenInfo` to categorize ERC20 contract first. if doesn't work, we will try erc720 next, and then erc1155..
         let web3Api = this.web3Api
         let bn = tx.blockNumber
@@ -5546,12 +5582,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     //    Design: easy to value native assets with coin prices, but very challenging to value ALL assets,
     //      so how do we provide historical balances for ERC20 assets as assets suddenly acquire USD values?
     //  - /asset/0x1d3.. --> get the totalSupply, top 1000 asset holders
-    async process_evm_transaction(tx, chainID, finalized = false) {
+    async process_evm_transaction(tx, chainID, finalized = false, isTip = false) {
         if (tx == undefined) return;
         let contractType = false
         if (ethTool.isTxContractCreate(tx)) {
             // Contract Creates
-            contractType = await this.process_evm_contract_create(tx, chainID, finalized);
+            contractType = await this.process_evm_contract_create(tx, chainID, finalized, isTip);
         }
 
         if (ethTool.isTxNativeTransfer(tx)) {
@@ -5633,6 +5669,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     transactionHash: evmTxHash,
                     decodedInput: tx.decodedInput,
                     from: tx.from.toLowerCase(),
+                    nonce: tx.nonce,
                     to: tx.creates.toLowerCase(),
                     ts: tx.timestamp,
                     value: tx.value,
@@ -5657,13 +5694,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
 
-    async processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, finalized) {
+    async processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, finalized, isTip = false) {
         if (!evmFullBlock) return (false)
         // could this be done with Promise.all?
         let evmTxnCnt = 0
         for (const tx of evmFullBlock.transactions) {
             evmTxnCnt++
-            await this.process_evm_transaction(tx, chainID, finalized);
+            await this.process_evm_transaction(tx, chainID, finalized, isTip);
         }
         this.stat.hashesRows.evmTxPerBlk.push(evmTxnCnt)
     }
@@ -6291,6 +6328,19 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
                 let decorateTxnStartTS = new Date().getTime()
                 evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmBlock, dTxns, dReceipts, evmTrace, chainID)
+                if (evmFullBlock.transactionsConnected.length > 0 ) {
+                    let connectedTxns = []
+                    for (const connectedTxn of evmFullBlock.transactionsConnected){
+                        let msgHash = this.getEvmMsgHashCandidate(blockNumber, connectedTxn, 'evm')
+                        if (msgHash){
+                            connectedTxn.msgHash = msgHash
+                        }
+                        connectedTxns.push(connectedTxn)
+                        evmFullBlock.transactions[connectedTxn.transactionIndex] = connectedTxn
+                        evmFullBlock.transactionsConnected = connectedTxns
+                    }
+                    console.log(`[${blockNumber}] connectTransaction`, evmFullBlock.transactionsConnected)
+                }
                 let decorateTxnTS = (new Date().getTime() - decorateTxnStartTS) / 1000
                 this.timeStat.decorateTxnTS += decorateTxnTS
 
@@ -6299,7 +6349,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 this.timeStat.processBlockAndReceipt++
 
                 let processEVMFullBlockStartTS = new Date().getTime()
-                await this.processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, block.finalized)
+                await this.processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, block.finalized, isTip)
                 let processEVMFullBlockTS = (new Date().getTime() - processEVMFullBlockStartTS) / 1000
                 this.timeStat.processEVMFullBlockTS += processEVMFullBlockTS
                 this.timeStat.processEVMFullBlock++
@@ -6325,9 +6375,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
                 let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
                 let beneficiaries = (mp.beneficiaries != undefined) ? `'${mp.beneficiaries}'` : 'NULL'
+                let connectedTxHash = (mp.connectedTxHash != undefined) ? `'${mp.connectedTxHash}'` : 'NULL'
                 //console.log(`mp beneficiaries`, beneficiaries)
                 //["msgHash", "blockNumber", "incoming"] + ["sentAt", "chainIDDest", "chainID", "msgType", "msgHex", "msgStr", "blockTS", "relayChain", "version", "path", "extrinsicID", "extrinsicHash", "indexDT", "beneficiaries"]
-                let s = `('${mp.msgHash}', '${mp.blockNumber}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.relayChain}', '${mp.version}', '${mp.path}', ${extrinsicID}, ${extrinsicHash}, Now(), ${beneficiaries})`
+                let s = `('${mp.msgHash}', '${mp.blockNumber}', '${mp.isIncoming}', '${mp.sentAt}', '${mp.chainIDDest}', '${mp.chainID}', '${mp.msgType}', '${mp.msgHex}', ${mysql.escape(mp.msgStr)}, '${mp.blockTS}', '${mp.relayChain}', '${mp.version}', '${mp.path}', ${extrinsicID}, ${extrinsicHash}, Now(), ${beneficiaries}, ${connectedTxHash})`
                 if (mp.isIncoming == 1) {
                     if (this.numXCMMessagesIn[mp.blockNumber] == undefined) {
                         this.numXCMMessagesIn[mp.blockNumber] = 1;

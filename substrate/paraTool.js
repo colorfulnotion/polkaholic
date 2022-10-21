@@ -85,6 +85,10 @@ function isFloat(n) {
     return Number(n) === n && n % 1 !== 0;
 }
 
+function reverse_endian(hex){
+    return hex.match(/.{1,2}/g).reverse().join('')
+}
+
 // does not handle 1.0e+23 but does handle 123.45678987654321
 function float_to_BigInt_decimals(f, decimals) {
     let fstr = f.toString();
@@ -1512,5 +1516,11 @@ module.exports = {
     },
     u8aAsHex: function(){
         return u8aToHex()
-    }
+    },
+    intToHex: function(int){
+        return bnToHex(int)
+    },
+    reverseEndian: function(hex){
+        return reverse_endian(hex)
+    },
 };

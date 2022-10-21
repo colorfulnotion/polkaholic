@@ -1893,6 +1893,7 @@ module.exports = class ChainParser {
                     sentAt: this.parserWatermark,
                     xcmSymbol: targetedSymbol,
                     xcmInteriorKey: targetedXcmInteriorKey,
+                    xcmType: "xcmtransfer",
                 }
                 if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
                 console.log(`processOutgoingXTokensEvent`, r)
@@ -2086,6 +2087,7 @@ module.exports = class ChainParser {
                             sentAt: this.parserWatermark,
                             xcmSymbol: targetedSymbol,
                             xcmInteriorKey: targetedXcmInteriorKey,
+                            xcmType: "xcmtransfer",
                         }
                         let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
                         if (isXCMAssetFound) {
@@ -2281,6 +2283,7 @@ module.exports = class ChainParser {
                             sentAt: this.parserWatermark,
                             xcmSymbol: targetedSymbol,
                             xcmInteriorKey: targetedXcmInteriorKey,
+                            xcmType: "xcmtransfer",
                         }
                         //console.log("processOutgoingXTokens xTokens", r);
                         outgoingXTokens.push(r)
@@ -2937,6 +2940,7 @@ module.exports = class ChainParser {
                                 sentAt: this.parserWatermark,
                                 xcmSymbol: targetedSymbol,
                                 xcmInteriorKey: targetedXcmInteriorKey,
+                                xcmType: "xcmtransfer",
                             }
                             if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingPolkadotXcm xcmPallet", r);
                             outgoingXcmPallet.push(r)
@@ -2969,6 +2973,7 @@ module.exports = class ChainParser {
                                 sentAt: this.parserWatermark,
                                 xcmSymbol: targetedSymbol,
                                 xcmInteriorKey: targetedXcmInteriorKey,
+                                xcmType: "xcmtransfer",
                             }
                             console.log("processOutgoingPolkadotXcm xcmPallet incomplete", r);
                             //outgoingXcmPallet.push(r)
@@ -3201,6 +3206,7 @@ module.exports = class ChainParser {
                                 sentAt: this.parserWatermark,
                                 xcmSymbol: targetedSymbol,
                                 xcmInteriorKey: targetedXcmInteriorKey,
+                                xcmType: "xcmtransfer",
                             }
                             //if (this.debugLevel >= paraTool.debugVerbose) console.log("processOutgoingXcmPallet xcmPallet", r);
                             extrinsic.xcms.push(r)
