@@ -1766,6 +1766,14 @@ app.get('/ws', async (req, res) => {
 })
 
 
+app.get('/xcmtransact', async (req, res) => {
+    res.render('xcmtransact', {
+        chainInfo: query.getChainInfo(),
+        apiUrl: req.path,
+    });
+})
+
+
 app.post('/uploadcode/:codeHash', async (req, res) => {
     if (!req.files || Object.keys(req.files).length === 0) {
         return res.status(400).send('No contract file was uploaded.');

@@ -16,7 +16,6 @@ async function main() {
     // only on moonbase right now
     let chainIDRelay = 60000;
 
-
     // case (1) is the default
     let address = "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d";
     let paraID = 1000;

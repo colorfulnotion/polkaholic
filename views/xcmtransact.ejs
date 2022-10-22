@@ -1,0 +1,34 @@
+<%- include('header', {chainInfo: chainInfo, title: "XCM Timeline"}); %>
+<div style='padding-left: 30px; margin-left: 30px; border: 1px solid block;'>
+  <ul class="timeline-with-icons">
+    <!-- Section: Origination -->
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-paper-plane text-primary fa-sm fa-fw"></i>
+      </span>
+      <div id="origination"></div>
+    </li>
+    <!-- Section: RelayChain -->
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-spinner text-primary fa-sm fa-fw"></i>
+      </span>
+      <div id="relayed"></div>
+    </li>
+    <!-- Section: Destination Chain -->
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-hand-holding-usd text-primary fa-sm fa-fw"></i>
+      </span>
+      <div id="destination"></div>
+    </li>
+  </ul>
+</div>
+<script src="/xcmtransact-1000-888.js"></script>
+<script src="/xcminfo.js"></script>
+<script>
+$(document).ready(function() {
+  showxcminfo(xcmInfo[xcmInfo.length-1]);
+});
+</script>
+<%- include('footer', {apiUrl: apiUrl}); %>
