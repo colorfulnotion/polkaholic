@@ -163,12 +163,12 @@ function JSONToHTMLTable(data) {
     let mid = Object.keys(data).map((k) => {
         let p = ''
         if (!Array.isArray(data)) {
-            p += `<td width="20%"><b>${k}</b></td>`
+            p += `<td width="10%"><b>${k}</b></td>`
         }
         if (data[k] && typeof data[k] === 'object') {
-            p += `<td width="80%">` + JSONToHTMLTable(data[k]) + '</td>';
+            p += `<td width="90%">` + JSONToHTMLTable(data[k]) + '</td>';
         } else {
-            p += `<td width="80%">${data[k]}</td>`;
+            p += `<td width="90%">${data[k]}</td>`;
         }
         return `<tr>${p}</tr>`;
     });

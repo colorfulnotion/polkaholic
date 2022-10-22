@@ -179,13 +179,13 @@ const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 
 async function main() {
-    let chainID = -1;
-    let chainIDDest = -1;
-    let amount = 1.0;
-    let symbol = "KSM";
-    let beneficiary = "0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c"
+    let chainID = 61000;
+    let chainIDDest = 60888;
+    let amount = .02;
+    let symbol = "AlphaDev";
+    let beneficiary = "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d"
     let beneficiarySubstrate = "0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c"
-    let beneficiaryEVM = "0xeaf3223589ed19bcd171875ac1d0f99d31a5969c";
+    let beneficiaryEVM = "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d"; //0xeaf3223589ed19bcd171875ac1d0f99d31a5969c";
     let isNonDefaultBeneficiary = false
     //xcmTransfer chainID chainIDDest amount symbol beneficiary
 
@@ -212,6 +212,7 @@ async function main() {
     await xcmtransfer.init() //wait for cryptoReady here
     xcmtransfer.setupPair();
     xcmtransfer.setupEvmPair();
+    xcmtransfer.setupEvmPairFromMnemonic()
 
     if (chainIDDest == paraTool.chainIDMoonbeam || chainIDDest == paraTool.chainIDMoonriver || chainIDDest == paraTool.chainIDAstar || chainIDDest == paraTool.chainIDShiden) {
         if (!isNonDefaultBeneficiary){
@@ -224,9 +225,9 @@ async function main() {
         console.error('ERROR', desc);
         process.exit(1);
     }
-    let execute = 0;
+    let execute = true;
     let executionInput = {
-        execute: (execute == 1)? true : false,
+        execute: execute,
         origination: chainID,
         destination: chainIDDest,
         symbol: symbol,
@@ -237,27 +238,37 @@ async function main() {
     console.log(`xcmtransfer cli executionInput`, executionInput)
     let argsStr = JSON.stringify(args, null, 4)
     console.log(`xcmtransfer cli transcribed ${sectionMethod} args`, argsStr);
-    if (isEVMTx){
+
+    // temp
+    let chainIDRelay = 60000;
+    let paraID = ( chainID - chainIDRelay ) ;
+    let paraIDDest = ( chainIDDest - chainIDRelay );
+    await xcmtransfer.setupAPIs(paraID, paraIDDest, chainIDRelay);
+
+    if ( isEVMTx ) {
         var txStruct = args
         var web3Api = func
         var signedTx = await ethTool.signEvmTx(web3Api, args, xcmtransfer.evmpair)
         var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
         console.log(`signedTx`, signedTx)
         console.log(`decodedTx`, decodedTx)
-        if (execute) {
-            console.log(`broadcasting signed evmTx`)
+        if ( execute ) {
+            console.log(`***** broadcasting signed evmTx`)
             //if execute true, brocast the tx
             let txHash = signedTx.transactionHash
-            console.log("EVM Transfer sent with hash", hash.toHex());
+            console.log("EVM Transfer sent with hash", txHash);
             console.log(`View Transaction: https://polkaholic.io/tx/${txHash}`);
             var result = await ethTool.sendSignedTx(web3Api, signedTx)
             console.log(`signedTX result=`, result)
         }
-    }else{
+    } else {
+        console.log(args);
+
+	let xcmTxn = func.apply(null, args)
+        const { partialFee, weight } = await xcmTxn.paymentInfo(xcmtransfer.pair);
+        console.log(`Est. extrinsics weight=${weight}, weight fees=${partialFee.toHuman()}`);
+	console.log("encoded", xcmTxn.toHex());
         if (execute) {
-            let xcmTxn = func.apply(null, args)
-            const { partialFee, weight } = await xcmTxn.paymentInfo(xcmtransfer.pair);
-            console.log(`Est. extrinsics weight=${weight}, weight fees=${partialFee.toHuman()}`);
             console.log(`broadcasting signed extrinsics`)
             let hash = await xcmTxn.signAndSend(xcmtransfer.pair);
             let extrinsicHash = hash.toHex()
@@ -269,7 +280,7 @@ async function main() {
 
 main()
     .then(() => {
-        process.exit(0);
+        //process.exit(0);
     })
     .catch((e) => {
         console.error('ERROR', e);

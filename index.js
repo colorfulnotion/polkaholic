@@ -1765,14 +1765,16 @@ app.get('/ws', async (req, res) => {
     });
 })
 
-
-app.get('/xcmtransact', async (req, res) => {
-    res.render('xcmtransact', {
+app.get('/xcmexecutor/:src?/:idx?', async (req, res) => {
+    let src = req.params["src"] ? req.params["src"] : "moonbase-xtokens_transfer-1000-888";
+    let idx = req.params["idx"] ? parseInt(req.params["idx"]) : 0;
+    res.render('xcmexecutor', {
         chainInfo: query.getChainInfo(),
+	src: src,
+	idx: idx,
         apiUrl: req.path,
     });
 })
-
 
 app.post('/uploadcode/:codeHash', async (req, res) => {
     if (!req.files || Object.keys(req.files).length === 0) {
