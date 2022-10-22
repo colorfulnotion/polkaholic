@@ -3216,35 +3216,36 @@ module.exports = class Indexer extends AssetManager {
 
     getEvmMsgHashCandidate(targetBN, matcher = false, matcherType = 'evm') {
         let evmTxHash = matcher.transactionHash
+        if (evmTxHash == undefined) return
         let txInput = matcher.input.substr(2)
         let txTo = (matcher.to != undefined)? matcher.to.toLowerCase().substr(2) : ''
-        let txGasLimit = paraTool.reverseEndian(paraTool.intToHex(matcher.gasLimit).substr(2))           // little endian
-        let txValue = paraTool.reverseEndian(paraTool.intToHex(matcher.value).substr(2))       // little endian
+        let txGasLimit = (matcher.gasLimit != undefined)? paraTool.reverseEndian(paraTool.intToHex(matcher.gasLimit).substr(2)) : ''           // little endian
+        //let txValue = (matcher.value != undefined)? paraTool.reverseEndian(paraTool.intToHex(matcher.value).substr(2)) : ''                  // cant match on value because we already modified by decimals...
         let txCreates = (matcher.creates != undefined)? matcher.creates.toLowerCase().substr(2) : ''
         if (!matcher) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getEvmMsgHashCandidate [${targetBN}], matcher MISSING`)
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getEvmMsgHashCandidate [${evmTxHash}][${targetBN}], matcher MISSING`)
             return false
         }
         let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingKeys`, trailingKeys)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${evmTxHash}] [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingKeys`, trailingKeys)
         for (const tk of trailingKeys) {
             let trailingXcm = this.xcmTrailingKeyMap[tk]
             //console.log(`getEvmMsgHashCandidate tk=${tk}`, trailingXcm)
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingXcm`, trailingXcm)
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${evmTxHash}] [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingXcm`, trailingXcm)
             let firstSeenBN = trailingXcm.blockNumber
             let msgHex = trailingXcm.msgHex
             let msgHash = trailingXcm.msgHash
             if (firstSeenBN == targetBN && msgHex.includes(txInput) && msgHex.includes(txTo) && msgHex.includes(txGasLimit)) {
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=${txInput}, ${txTo}, ${txGasLimit}] FOUND candidate=${msgHash}`)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${evmTxHash}] [${targetBN}, matcher=${txInput}, ${txTo}, ${txGasLimit}] FOUND candidate=${msgHash}`)
                 if (this.xcmmsgMap[tk] != undefined) {
                     this.xcmmsgMap[tk].connectedTxHash = evmTxHash
                 }
                 return msgHash
             }
         }
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}], ${matcherType}] MISS`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${evmTxHash}] [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}], ${matcherType}] MISS`)
         return false
     }
 
@@ -6331,9 +6332,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 if (evmFullBlock.transactionsConnected.length > 0 ) {
                     let connectedTxns = []
                     for (const connectedTxn of evmFullBlock.transactionsConnected){
-                        let msgHash = this.getEvmMsgHashCandidate(blockNumber, connectedTxn, 'evm')
-                        if (msgHash){
-                            connectedTxn.msgHash = msgHash
+                        try {
+                            let msgHash = this.getEvmMsgHashCandidate(blockNumber, connectedTxn, 'evm')
+                            if (msgHash) connectedTxn.msgHash = msgHash
+                        } catch (e){
+                            console.log(`[${blockNumber}] [${connectedTxn.transactionHash}] connectTransaction `, e, connectedTxn)
                         }
                         connectedTxns.push(connectedTxn)
                         evmFullBlock.transactions[connectedTxn.transactionIndex] = connectedTxn
