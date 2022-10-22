@@ -1121,7 +1121,7 @@ module.exports = class XCMManager extends Query {
  where  xcmtransfer.xcmType = 'xcmtransact' and
         d.chainIDDest = xcmtransfer.chainIDDest and
         d.msgHash = xcmtransfer.msgHash and length(d.msgHash) = 66 and
-        d.sentAt - xcmtransfer.sentAt >=0 and d.sentAt - xcmtransfer.sentAt <= 5 and
+        d.sentAt - xcmtransfer.sentAt >=0 and d.sentAt - xcmtransfer.sentAt <= 6 and
         d.relayChain = xcmtransfer.relayChain and
         xcmtransfer.sourceTS >= ${startTS} and
         d.destTS >= ${startTS} ${endWhere} and ${rematchClause} ${targetChainClause}
