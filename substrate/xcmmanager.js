@@ -361,6 +361,148 @@ module.exports = class XCMManager extends Query {
         }, sqlDebug); */
     }
 
+    async buildSuccessXcmTransactInfo(substrateTx, remoteEvmTx, matchRec) {
+        let decorate = true
+        let decorateExtra = ["usd", "address", "related", "data"]
+        let d = substrateTx
+        let devm = remoteEvmTx
+        let xcm = matchRec
+        let sourceTxFee = d.fee
+        let sourceTxFeeUSD = d.feeUSD
+        let sourceChainSymbol = d.chainSymbol
+        let evmTransactionHash = null
+        let remoteEVMTxResult = 'Unknown'
+        if (remoteEvmTx){
+            remoteEVMTxResult = remoteEvmTx.result
+        }
+        if (d.evm != undefined && d.evm.transactionHash != undefined) {
+            evmTransactionHash = d.evm.transactionHash
+            let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
+            if (!evmtx) return [false, false]
+            sourceTxFee = evmtx.fee
+            sourceTxFeeUSD = evmtx.feeUSD
+            sourceChainSymbol = evmtx.symbol
+        }
+        if (sourceTxFeeUSD == undefined) sourceTxFeeUSD = 0
+        console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
+        console.log(`rawXCM`, xcm)
+        xcm.chainName = this.getChainName(xcm.chainID);
+        xcm.chainDestName = this.getChainName(xcm.chainIDDest);
+        xcm.id = this.getIDByChainID(xcm.chainID)
+        xcm.idDest = this.getIDByChainID(xcm.chainIDDest)
+        xcm.paraID = paraTool.getParaIDfromChainID(xcm.chainID)
+        xcm.paraIDDest = paraTool.getParaIDfromChainID(xcm.chainIDDest)
+        let chainIDDestInfo = this.chainInfos[xcm.chainIDDest]
+        if (xcm.chainIDDest != undefined && chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
+            if (xcm.destAddress != undefined) {
+                if (xcm.destAddress.length == 42) xcm.destAddress = xcm.destAddress
+                if (xcm.destAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.destAddress, chainIDDestInfo.ss58Format)
+            } else if (xcm.fromAddress != undefined) {
+                if (xcm.fromAddress.length == 42) xcm.destAddress = xcm.fromAddress
+                if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
+            }
+        }
+        if (d.signer != undefined) {
+            xcm.fromAddress = d.signer
+        }
+
+        let decimals = false
+        let isNewFormat = true
+        if (xcm.asset != undefined) {
+            isNewFormat = false
+        }
+
+        let symbolRelayChain = paraTool.makeAssetChain(xcm.symbol, xcm.relayChain);
+        let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+        if (xcmAssetInfo != undefined && xcmAssetInfo.decimals) {
+            decimals = xcmAssetInfo.decimals
+        }
+
+        //fee -> initiation + teleport fee
+        // those number doesn't make sense...
+        if (decimals !== false) {
+            xcm.fee = xcm.amountSent - xcm.amountReceived
+            xcm.feeUSD = xcm.fee * (xcm.amountSentUSD / xcm.amountReceived) // temp hack
+            xcm.sourceTxFee = sourceTxFee
+            xcm.sourceTxFeeUSD = sourceTxFeeUSD
+            xcm.sourceChainSymbol = sourceChainSymbol
+
+            let p = await this.computePriceUSD({
+                val: xcm.amountSent,
+                asset: xcm.asset,
+                chainID: xcm.chainID,
+                ts: xcm.destTS
+            });
+            if (p) {
+                console.log(`p found`, p)
+                xcm.amountSentUSD = p.valUSD;
+                xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
+                xcm.feeUSD = p.priceUSD * xcm.fee
+                xcm.priceUSD = p.priceUSD;
+                xcm.priceUSDCurrent = p.priceUSDCurrent;
+            }
+        }
+        let xcmInfo = {
+            symbol: xcm.symbol,
+            priceUSD: xcm.priceUSD,
+            relayChain: null,
+            origination: null,
+            destination: null,
+            version: 'V3'
+        }
+        xcmInfo.relayChain = {
+            relayChain: xcm.relayChain,
+            relayAt: xcm.sentAt, //?
+        }
+
+        xcmInfo.origination = {
+            chainName: xcm.chainName,
+            id: xcm.id,
+            chainID: xcm.chainID,
+            paraID: xcm.paraID,
+            sender: xcm.fromAddress,
+            amountSent: xcm.amountSent,
+            amountSentUSD: xcm.amountSentUSD,
+            txFee: xcm.sourceTxFee,
+            txFeeUSD: xcm.sourceTxFeeUSD,
+            txFeeSymbol: xcm.sourceChainSymbol,
+            blockNumber: xcm.blockNumber,
+            section: xcm.xcmSection,
+            method: xcm.xcmMethod,
+            extrinsicID: xcm.extrinsicID,
+            extrinsicHash: xcm.extrinsicHash,
+            //transactionHash: evmTransactionHash,
+            msgHash: xcm.msgHash,
+            sentAt: xcm.sentAt,
+            ts: xcm.sourceTS,
+            complete: true,
+        }
+        //if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
+        xcmInfo.destination = {
+            chainName: xcm.chainDestName,
+            id: xcm.idDest,
+            chainID: xcm.chainIDDest,
+            paraID: xcm.paraIDDest,
+            beneficiary: xcm.destAddress,
+            remoteEVMTxHash: xcm.remoteEVMTxHash,
+            remoteEVMResult: remoteEVMTxResult,
+            /*
+            amountReceived: xcm.amountReceived,
+            amountReceivedUSD: xcm.amountReceivedUSD,
+            teleportFee: xcm.fee,
+            teleportFeeUSD: xcm.feeUSD,
+            teleportFeeChainSymbol: xcm.symbol,
+            */
+            blockNumber: xcm.blockNumberDest,
+            extrinsicID: xcm.destExtrinsicID,
+            eventID: xcm.destEventID,
+            ts: xcm.destTS,
+            status: true,
+        }
+        return [xcmInfo, xcm] //TODO: drop xcm format
+    }
+
+
     async buildSuccessXcmInfo(substrateTx, matchRec) {
         let decorate = true
         let decorateExtra = ["usd", "address", "related", "data"]
@@ -970,7 +1112,7 @@ module.exports = class XCMManager extends Query {
           xcmtransfer.blockNumber,
           xcmtransfer.sectionMethod,
           xcmtransfer.xcmType,
-          xcmtransfer.connectedTxHash,
+          xcmtransfer.connectedTxHash as remoteEVMTxHash,
           d.eventID,
           d.extrinsicID as destExtrinsicID,
           d.sentAt as destSentAt,
@@ -995,7 +1137,6 @@ module.exports = class XCMManager extends Query {
         console.log(`match_xcmtransact [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, chain=${targetChainID}`)
         console.log(`match_xcmtransact (A)`)
         console.log(paraTool.removeNewLine(sqlA))
-        process.exit(0);
         try {
             let xcmmatches = await this.poolREADONLY.query(sqlA);
             let addressextrinsic = []
@@ -1082,6 +1223,7 @@ module.exports = class XCMManager extends Query {
                         sentAt: (d.sentAt != undefined) ? d.sentAt : null,
                         xcmSection: xcmSection,
                         xcmMethod: xcmMethod,
+                        remoteEVMTxHash: d.remoteEVMTxHash,
                         extrinsicHash: d.extrinsicHash,
                         extrinsicID: d.extrinsicID,
                         destExtrinsicID: d.destExtrinsicID,
@@ -1090,18 +1232,25 @@ module.exports = class XCMManager extends Query {
                         destTS: d.destTS
                     }
                     let substrateTxHash = d.extrinsicHash
+                    let remoteEVMTxHash = d.remoteEVMTxHash
                     let substratetx;
+                    let remoteEvmTx;
                     try {
                         substratetx = await this.getTransaction(substrateTxHash);
                     } catch (err) {
                         console.log("looking for", substrateTxHash, err);
                     }
+                    try {
+                        remoteEvmTx = await this.getTransaction(remoteEVMTxHash);
+                    } catch (err) {
+                        console.log("looking for", remoteEVMTxHash, err);
+                    }
                     let xcmInfo, xcmOld;
                     if (substratetx != undefined) {
                         try {
-                            [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
+                            [xcmInfo, xcmOld] = await this.buildSuccessXcmTransactInfo(substratetx, remoteEvmTx, match)
                         }catch (e){
-                            console.log(`!!!!buildSuccessXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
+                            console.log(`!!!!buildSuccessXcmTransactInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
                             continue
                         }
                     }
@@ -1173,6 +1322,7 @@ module.exports = class XCMManager extends Query {
                     //console.log("SKIP", matched[d.extrinsicHash], matched[d.eventID]);
                 }
             }
+            //process.exit(0);
             if (addressextrinsic.length > 0) {
                 await this.insertBTRows(this.btAddressExtrinsic, addressextrinsic, "addressextrinsic")
             }
