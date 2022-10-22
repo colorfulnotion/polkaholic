@@ -339,14 +339,19 @@ function show_account_info(c, fld) {
 
 module.exports = {
     currencyFormat: function(c, _maximumFractionDigits = 2) {
-        if (c < .01) _maximumFractionDigits = 3;
-        if (c < .001) _maximumFractionDigits = 43;
-        var formatter = new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            maximumFractionDigits: _maximumFractionDigits
-        });
-        return formatter.format(c);
+        try {
+            if (c < .01) _maximumFractionDigits = 3;
+            if (c < .001) _maximumFractionDigits = 43;
+            var formatter = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                maximumFractionDigits: _maximumFractionDigits
+            });
+            return formatter.format(c);
+        } catch(e){
+            return '-'
+        }
+
     },
     presentPercentChange: function(p) {
         return p + "%"; // TODO: improve this

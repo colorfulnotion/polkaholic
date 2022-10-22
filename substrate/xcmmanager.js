@@ -486,13 +486,11 @@ module.exports = class XCMManager extends Query {
             beneficiary: xcm.destAddress,
             remoteEVMTxHash: xcm.remoteEVMTxHash,
             remoteEVMResult: remoteEVMTxResult,
-            /*
-            amountReceived: xcm.amountReceived,
-            amountReceivedUSD: xcm.amountReceivedUSD,
+            amountReceived: 0,
+            amountReceivedUSD: 0,
             teleportFee: xcm.fee,
             teleportFeeUSD: xcm.feeUSD,
             teleportFeeChainSymbol: xcm.symbol,
-            */
             blockNumber: xcm.blockNumberDest,
             extrinsicID: xcm.destExtrinsicID,
             eventID: xcm.destEventID,
@@ -2531,6 +2529,7 @@ order by msgHash`
 
             console.log(`NORMAL CASES ${t0} ${t1} (chain:${targetChainID})`);
             await this.xcmtransfer_match(t0, t1, rat, transferLookbackwindow, forceRematch, targetChainID);
+            await this.xcmtransact_match(t0, t1, transferLookbackwindow, forceRematch, targetChainID);
 
             numRecs = await this.xcmmessages_match(t0, t1, msgLookbackwindow, targetChainID, forceRematch);
 
