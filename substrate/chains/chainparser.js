@@ -4270,8 +4270,8 @@ module.exports = class ChainParser {
                 a = await indexer.api.query.currencies.listenAssetsInfo.entries()
                 break;
             case paraTool.chainIDMangataX:
-                console.log(`fetch assetsInfo:assetsInfo`)
-                a = await indexer.api.query.assetsInfo.assetsInfo.entries()
+            //console.log(`fetch assetsInfo:assetsInfo`, indexer.api.query)
+             //   a = await indexer.api.query.assetsInfo.assetsInfo.entries()
                 break;
             case paraTool.chainIDBasilisk:
             case paraTool.chainIDHydraDX:

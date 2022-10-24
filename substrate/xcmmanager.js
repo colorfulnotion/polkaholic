@@ -1279,7 +1279,6 @@ module.exports = class XCMManager extends Query {
                         key: rowKey,
                         data: {
                             feedxcminfo: {}
-                            //feedxcmdest: {},
                         }
                     };
                     let extrinsicHashEventID = `${d.extrinsicHash}#${d.chainID}-${d.extrinsicID}-${d.transferIndex}`
@@ -1287,12 +1286,7 @@ module.exports = class XCMManager extends Query {
                         value: JSON.stringify(xcmInfo),
                         timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
                     };
-                    /*
-                    cres['data']['feedxcmdest'][extrinsicHashEventID] = {
-                        value: JSON.stringify(match),
-                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
-                    };
-                    */
+
                     addressextrinsic.push(cres);
 
                     // 2. write "hashes" feedxcmdest with row key extrinsicHash and column extrinsicHash#chainID-extrinsicID (same as 1)
@@ -1300,7 +1294,6 @@ module.exports = class XCMManager extends Query {
                         key: d.extrinsicHash,
                         data: {
                             feedxcminfo: {}
-                            //feedxcmdest: {}
                         }
                     }
                     hres['data']['feedxcminfo'][extrinsicHashEventID] = {
@@ -1308,14 +1301,26 @@ module.exports = class XCMManager extends Query {
                         value: JSON.stringify(xcmInfo),
                         timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
                     };
-                    /*
-                    hres['data']['feedxcmdest'][extrinsicHashEventID] = {
-                        value: JSON.stringify(match),
-                        timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
-                    };
-                    */
+
                     console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
                     hashes.push(hres)
+                    if (d.remoteEVMTxHash){
+                        let remoteRec = {
+                            key: d.remoteEVMTxHash,
+                            data: {
+                                feedxcminfo: {}
+                            }
+                        }
+                        // note: we are using origination extrinsicHashEventID here
+                        remoteRec['data']['feedxcminfo'][extrinsicHashEventID] = {
+                            //value: JSON.stringify(match),
+                            value: JSON.stringify(xcmInfo),
+                            timestamp: d.sourceTS * 1000000
+                        };
+                        hashes.push(remoteRec)
+                        console.log("REMOTE MATCH#", matches, "hashes rowkey", d.remoteEVMTxHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
+                    }
+
                 } else {
                     //console.log("SKIP", matched[d.extrinsicHash], matched[d.eventID]);
                 }
