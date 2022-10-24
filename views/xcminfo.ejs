@@ -102,6 +102,17 @@
        <% } %>
        <br/>
 
+       <% if ( xcm.destination.remoteEVMTxHash ) {
+           let remoteEVMTxHash = xcm.destination.remoteEVMTxHash;
+           let remoteEVMResult = xcm.destination.remoteEVMResult;
+       %>
+       <B>Remote EVM Tx:</B>
+       <%- uiTool.presentFullTx(remoteEVMTxHash); %>
+       <%- include("txResult", {success: remoteEVMResult, errorMsg: false}); %>
+       <br/>
+       <% } %>
+
+
       <B>Execution Status:</B>
        <% if ( xcm.destination.status ) { %>
 	    <button type="button" class="btn btn-success text-capitalize">Success</button>

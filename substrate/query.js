@@ -1340,10 +1340,6 @@ module.exports = class Query extends AssetManager {
                 feedXCMInfoData = rowData["feedxcminfo"]
                 status = "finalizeddest"
             }
-            if (rowData["feedxcminfo"]) {
-                feedXCMInfoData = rowData["feedxcminfo"]
-                status = "finalizeddest"
-            }
             if (feedTX) {
                 const cell = feedTX[0];
                 let c = JSON.parse(cell.value);
@@ -1428,15 +1424,26 @@ module.exports = class Query extends AssetManager {
                             }
                         }
                     }
-                    if (this.is_evm_xcmtransfer_input(c.input) && c.substrate != undefined && isRecursive) {
-                        //  fetch substrate extrinsicHash
-                        try {
-                            let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
-                            if (substratetx.xcmInfo != undefined) {
-                                c.xcmInfo = substratetx.xcmInfo;
+                    let rowDataKeys = Object.keys(rowData)
+                    //console.log(`[${rowDataKeys}] feedXCMInfoData`, feedXCMInfoData, `isRecursive=${isRecursive}, is_evm_xcmtransfer_input=${this.is_evm_xcmtransfer_input(c.input)}, c.substrate(undefined)=${c.substrate != undefined}`)
+                    if (c.substrate != undefined && isRecursive) {
+                        if (feedXCMInfoData) {
+                            for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
+                                const cell = feedXCMInfoData[extrinsicHashEventID][0];
+                                let xcmInfo = JSON.parse(cell.value);
+                                c.xcmInfo = xcmInfo;
+                                break;
                             }
-                        } catch (errS) {
-                            console.log("FETCH XCMTRANSFER ERR", errS);
+                        }else if(this.is_evm_xcmtransfer_input(c.input) ){
+                            //  fetch xcmInfo from substrate extrinsicHash
+                            try {
+                                let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
+                                if (substratetx.xcmInfo != undefined) {
+                                    c.xcmInfo = substratetx.xcmInfo;
+                                }
+                            } catch (errS) {
+                                console.log("FETCH XCMTRANSFER ERR", errS);
+                            }
                         }
                     }
                     return c;
@@ -6968,7 +6975,7 @@ module.exports = class Query extends AssetManager {
 	try {
 	    let url = `https://sourcify.dev/server/check-by-addresses?addresses=${asset}&chainIds=1284,1285,1287`
             let response = await axios.get(url)
-	    response = response.data; 
+	    response = response.data;
 	    for ( let i = 0 ; i < response.length; i++) {
 		let r = response[i];
 		// if status is false, give up
@@ -7037,7 +7044,7 @@ module.exports = class Query extends AssetManager {
 	    return null
 	}
     }
-    
+
     async getEVMContract(asset, chainID = null) {
         try {
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
@@ -7047,7 +7054,7 @@ module.exports = class Query extends AssetManager {
             if (evmContracts.length == 0) {
                 // return not found error
 		let evmContract = await this.get_sourcify_evmcontract(asset, chainID);
-		
+
                 throw new paraTool.NotFoundError(`EVM Contract not found: ${asset}`)
                 return (false);
             }
@@ -7065,7 +7072,7 @@ module.exports = class Query extends AssetManager {
                         evmContract.code[key] = result[key];
                     }
                     //evmContract.ABI = JSON.parse(evmContract.ABI);
-                } 
+                }
                 let abiRaw = JSON.parse(evmContract.ABI);
 		if ( abiRaw.result != undefined ) {
                     abiRaw = JSON.parse(abiRaw.result)
@@ -7079,7 +7086,7 @@ module.exports = class Query extends AssetManager {
             console.log(err)
         }
     }
-    
+
     async getWASMCode(codeHash, chainID = null) {
         try {
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
