@@ -653,7 +653,7 @@ async function signEvmTx(web3Api, txStruct, wallet) {
     try {
         signedTX = await web3Api.eth.accounts.signTransaction(txStruct, wallet.privateKey)
         console.log(`signEvmTx [acct=${wallet.address}], txHash=${signedTX.transactionHash}, txStruct=`, txStruct)
-    } catch (e) {
+    } catch (error) {
         console.log(`signEvmTx [acct=${wallet.address}], txStruct=${txStruct} error=${error.toString()}`)
     }
     return signedTX

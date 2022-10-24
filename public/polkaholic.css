@@ -93,7 +93,16 @@
   justify-content: center;
 }
 
-
+.finalized {
+    background: white;
+    padding: 10px;
+    border: 1px solid black;
+}
+.unfinalized {
+    background: #EFEFDD;
+    padding: 10px;
+    border: 1px dashed grey;
+}
 
 .cookie-consent {
     position: fixed;

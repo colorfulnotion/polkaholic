@@ -304,7 +304,7 @@ module.exports = class XCMManager extends Query {
     }
 
     async updateXcAssetContractAddr() {
-        let xcAssetRecs = await this.poolREADONLY.query(`select chainID, asset, assetname, symbol, decimals, xcmInteriorKey from asset where assetType = "Token" and chainID in (${paraTool.chainIDMoonbeam},${paraTool.chainIDMoonriver},${paraTool.chainIDMoonbase},${paraTool.chainIDAstar},${paraTool.chainIDShiden},${paraTool.chainIDShibuya}) order by chainID`);
+        let xcAssetRecs = await this.poolREADONLY.query(`select chainID, asset, assetname, symbol, decimals, xcmInteriorKey from asset where assetType = "Token" and chainID in (${paraTool.chainIDMoonbeam},${paraTool.chainIDMoonriver},${paraTool.chainIDAstar},${paraTool.chainIDShiden},${paraTool.chainIDShibuya},${paraTool.chainIDMoonbaseAlpha},${paraTool.chainIDMoonbaseBeta}) order by chainID`);
         let xcAssetList = [];
         let xcContractAddrUpdates = []
         let xcInteriorKeyUpdates = []
