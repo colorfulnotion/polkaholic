@@ -1299,7 +1299,7 @@ module.exports = class Indexer extends AssetManager {
                 let errorcase = (v.errorcase != undefined && v.errorcase != "") ? `'${v.errorcase}'` : `NULL`
                 //MK: send violation here
                 if (isTip) {
-                    console.log(`[Delay=${this.chainParser.parserBlockNumber-v.sourceBlocknumber}]  send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${r.instructionHash}), isTip=${isTip}`)
+                    console.log(`[Delay=${this.chainParser.parserBlockNumber-v.sourceBlocknumber}]  send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${v.instructionHash}), isTip=${isTip}`)
                     //this.sendWSMessage(r, "xcmViolation", "flushXCM");
                 }
                 //["chainID", "instructionHash", "sourceBlocknumber"]
