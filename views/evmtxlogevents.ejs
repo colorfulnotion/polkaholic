@@ -4,5 +4,5 @@
 </button>
 <% } %>
 <% if ( log.events != undefined ) { %>
-<%- include("evmtxparams", {params: log.events}); %>
+<%- include("evmtxparams", {params: log.events, decoded: null}); %>
 <% } %>

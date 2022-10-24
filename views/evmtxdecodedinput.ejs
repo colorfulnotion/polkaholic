@@ -9,5 +9,5 @@
 <br />
 <% } %>
 <% if ( showParams && tx.params != undefined && tx.params.length > 0) { %>
-<%- include("evmtxparams", {params: tx.params}); %>
+<%- include("evmtxparams", {params: tx.params, decoded: tx}); %>
 <% } %>
