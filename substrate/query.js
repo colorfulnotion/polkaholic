@@ -3756,7 +3756,7 @@ module.exports = class Query extends AssetManager {
         let w = (chainID) ? `and asset.chainID = '${chainID}'` : ""
         let contract = null;
         if (this.xcContractAddress[rawAddress] != undefined) {
-            let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.xcContractAddress = '${rawAddress}' and asset.assetType = 'Token' ${w}`
+            let sql = `select asset.asset, asset.assetType, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.xcContractAddress = '${rawAddress}' and asset.assetType = 'Token' ${w}`
             let extraRecs = await this.poolREADONLY.query(sql)
             if (extraRecs.length == 1) {
                 console.log("getAddressContract XCCONTRACT UNAMBIGUOUS", extraRecs.length, sql);
@@ -3772,6 +3772,7 @@ module.exports = class Query extends AssetManager {
                 let chainName = this.getChainName(e.chainID);
                 contract.chainID = e.chainID;
                 contract.id = id;
+                contract.assetType = e.assetType;
                 contract.chainName = chainName;
                 contract.localSymbol = e.localSymbol;
                 if (p) contract.priceUSD = p.priceUSDCurrent;
@@ -3830,7 +3831,11 @@ module.exports = class Query extends AssetManager {
                 contract.chainName = chainName;
                 contract.address = e.asset
                 contract.asset = e.asset
-                contract.localSymbol = e.localSymbol;
+                if (!contract.symbol) {
+                    contract.symbol = e.localSymbol
+                } else {
+                    contract.localSymbol = e.localSymbol;
+                }
                 if (p) contract.priceUSD = p.priceUSDCurrent;
             } else if (extraRecs.length > 1) {
                 console.log("getAddressContract AMBIGUOUS MULTI CHAIN", sql);
@@ -7091,9 +7096,9 @@ module.exports = class Query extends AssetManager {
 
     async getEVMContract(asset, chainID = null) {
         try {
+            let where_asset = (this.xcContractAddress[asset] != undefined) ? `asset.xcContractAddress = '${asset}'` : `asset.asset = '${asset}'`
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
-            let sql = `select asset.asset, asset.assetType, asset.chainID, convert(asset.abiRaw using utf8) as ABI, convert(contractCode.code using utf8) code, addDT from asset left join contractCode on contractCode.asset = asset.asset and contractCode.chainID = asset.chainID where asset.asset = '${asset}' ${w} order by addDT desc limit 1`
-            //console.log("getEVMContract", sql);
+            let sql = `select asset.asset, asset.assetType, asset.chainID, convert(asset.abiRaw using utf8) as ABI, convert(contractCode.code using utf8) code, asset.xcContractAddress, addDT from asset left join contractCode on contractCode.asset = asset.asset and contractCode.chainID = asset.chainID where ( ${where_asset} ) ${w} order by addDT desc limit 1`
             let evmContracts = await this.poolREADONLY.query(sql);
             if (evmContracts.length == 0) {
                 // return not found error
@@ -7102,7 +7107,11 @@ module.exports = class Query extends AssetManager {
                 throw new paraTool.NotFoundError(`EVM Contract not found: ${asset}`)
                 return (false);
             }
+
             let evmContract = evmContracts[0];
+            if (this.xcContractAddress[asset] != undefined) {
+                evmContract.asset = evmContract.xcContractAddress;
+            }
             let [_, id] = this.convertChainID(evmContract.chainID)
             let chainName = this.getChainName(evmContract.chainID);
             evmContract.id = id;
@@ -7125,9 +7134,17 @@ module.exports = class Query extends AssetManager {
                 if (evmContract.ABI && evmContract.ABI.length > 0) {
                     let abiRaw = JSON.parse(evmContract.ABI);
                     if (abiRaw.result != undefined) {
-                        abiRaw = JSON.parse(abiRaw.result)
+                        abiRaw = abiRaw.result;
                     }
-                    evmContract.ABI = abiRaw;
+                    if (typeof abiRaw == "string") {
+                        abiRaw = JSON.parse(abiRaw);
+                    }
+                    if (abiRaw.length > 0) {
+                        evmContract.ABI = abiRaw;
+                    }
+                }
+                if (Array.isArray(evmContract.ABI) && (evmContract.ABI.length > 0)) {
+
                 } else {
                     evmContract.ABI = ethTool.getABIByAssetType(evmContract.assetType)
                 }

@@ -116,7 +116,7 @@ function presentContract(contract, provider, contractInstance) {
         } else if (x.type == "constructor") {
             constructors.push(x);
         } else {
-            console.log(x);
+            //console.log(x);
         }
     }
 
@@ -180,7 +180,9 @@ function presentContract(contract, provider, contractInstance) {
     </div>`)
     }
     let readstr = `<div class="accordion" id="reads">${rout.join("\n")}</div>`
-
+    if (rout.length == 0) {
+        readstr = "No <i>Read</i> methods in ABI.";
+    }
     let wout = [];
     for (let n = 0; n < writes.length; n++) {
         let r = writes[n];
@@ -212,6 +214,9 @@ function presentContract(contract, provider, contractInstance) {
 
     }
     let writestr = `<div class="accordion" id="writes">${wout.join("\n")}</div>`
+    if (wout.length == 0) {
+        writestr = "No <i>Write</i> methods";
+    }
 
     return [readstr, writestr, todos];
 }
@@ -238,7 +243,6 @@ async function showcontract(address, chain) {
             try {
                 contract = data;
                 if (contract.ABI) {
-                    console.log(endpoint, contract.ABI);
                     let contractInstance = new ethers.Contract(contract.asset, contract.ABI, provider);
                     let [readContract, writeContract, todos] = presentContract(contract, provider, contractInstance);
                     document.getElementById("v-tabs-read").innerHTML = readContract;
