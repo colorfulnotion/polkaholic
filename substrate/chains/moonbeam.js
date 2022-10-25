@@ -5,6 +5,8 @@ const ChainParser = require("./chainparser");
 
 module.exports = class MoonbeamParser extends ChainParser {
 
+    xcmTransactorMethodList = ["0xfe430475", "0x185de2ae", "0xd7ab340c", "0xb648f3fe"];
+
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
         //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
         this.mpReceived = false;
@@ -181,11 +183,195 @@ module.exports = class MoonbeamParser extends ChainParser {
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoing XCMTransactor`, outgoingXcmList4)
                 //return outgoingXcmList
                 break;
+            case 'ethereum':
+                if (module_method == 'transact') {
+                    let isEthereumXCM = this.etherumXCMFilter(indexer, args, feed.events)
+                    if (isEthereumXCM) {
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
+                        let outgoingXcmList5 = this.processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingXCM ethereum`, outgoingXcmList5)
+                        //return outgoingXcmList
+                    }
+                }
+                break;
             default:
                 //console.log(`unknown`)
                 //return outgoingXcmList
                 break;
         }
+    }
+
+    etherumXCMFilter(indexer, args, events) {
+        if (args.transaction != undefined) {
+            let evmTx = false;
+            if (args.transaction.eip1559 != undefined) {
+                evmTx = args.transaction.eip1559
+            } else if (args.transaction.legacy != undefined) {
+                evmTx = args.transaction.legacy
+            }
+            //console.log(`evmTx`, evmTx)
+            /*
+            transactThroughDerivativeMultilocation: 0xfe430475
+            transactThroughDerivative: 0x185de2ae
+            transactThroughSignedMultilocation: 0xd7ab340c
+            transactThroughSigned: 0xb648f3fe
+            */
+            if (evmTx && evmTx.input != undefined) {
+                let txInput = evmTx.input
+                let txMethodID = txInput.substr(0, 10)
+                if (this.xcmTransactorMethodList.includes(txMethodID)) {
+                    let output = ethTool.decodeTransactionInput(evmTx, indexer.contractABIs, indexer.contractABISignatures)
+                    for (const ev of events) {
+                        let eventMethodSection = `${ev.section}(${ev.method})`
+                        if (eventMethodSection == 'balances(Withdraw)') {
+                            //this is the fromAddress (ss58)
+                            output.fromAddress = paraTool.getPubKey(ev.data[0])
+                            break;
+                        }
+                    }
+                    let xcmInput = {}
+                    for (let i = 0; i < output.params.length; i++) {
+                        let input = output.params[i]
+                        xcmInput[input.name] = input.value
+                    }
+                    output.params = xcmInput
+                    console.log(`output >>`, JSON.stringify(output, null, 2))
+                    if (output != undefined) {
+                        args.decodedEvmInput = output
+                    }
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /*
+    "dest": [
+      "1",
+      [
+        "0x0000000378"
+      ]
+    ],
+    "dest": {
+        "v1": {
+            "parents": 1,
+            "interior": {
+                "x1": {
+                    "parachain": 1000
+                }
+            }
+        }
+    }
+    */
+    convertMultilocationFromHex(hex='0x0000000378', isUppercase = false){
+        let selector = hex.substr(0,4)
+        let data = '0x'+hex.substr(4)
+        let selectorType = 'NA'
+        let decodedType = {}
+        switch (selector) {
+            case "0x00": //Parachain, bytes4
+                selectorType = (isUppercase)? "Parachain" : "parachain"
+                // "0x00+000007E7" -> 2023
+                let paraID = paraTool.dechexToInt(data)
+                decodedType[selectorType] = paraID
+                break;
+            case "0x01": //AccountId32, bytes32
+                selectorType = (isUppercase)? "AccountId32" : "accountId32"
+                let networkType = data.substr(66)
+                let networkName = 'Any'
+                if (networkType.substr(0,2) == '01') networkName = { Named: networkType.substr(2)} // not sure?
+                if (networkType.substr(0,2) == '02') networkName = 'Polkadot'
+                if (networkType.substr(0,2) == '03') networkName = 'Kusama'
+                let account32 = data.substr(0,66)
+                decodedType[selectorType] = {
+                    network: networkName,
+                    key: account32
+                }
+                break;
+            case "0x02": //AccountIndex64, byte8 via u64
+                selectorType = (isUppercase)? "AccountIndex64" : "accountIndex64"
+                let networkTypeA = data.substr(16)
+                let networkNameA = 'Any'
+                if (networkTypeA.substr(0,2) == '01') networkNameA = { Named: networkTypeA.substr(2)} // not sure?
+                if (networkTypeA.substr(0,2) == '02') networkNameA = 'Polkadot'
+                if (networkTypeA.substr(0,2) == '03') networkNameA = 'Kusama'
+                let accountIndex64 = paraTool.dechexToInt(data.substr(0,34))
+                decodedType[selectorType] = {
+                    network: networkNameA,
+                    index: accountIndex64
+                }
+                break;
+            case "0x03": //AccountKey20, bytes20
+                selectorType = (isUppercase)? "AccountKey20" : "accountKey20"
+                let networkTypeB = data.substr(42)
+                let networkNameB = 'Any'
+                if (networkTypeB.substr(0,2) == '01') networkNameB = { Named: networkTypeB.substr(2)} // not sure?
+                if (networkTypeB.substr(0,2) == '02') networkNameB = 'Polkadot'
+                if (networkTypeB.substr(0,2) == '03') networkNameB = 'Kusama'
+                let account20 = data.substr(0,42)
+                decodedType[selectorType] = {
+                    network: networkName,
+                    key: account20
+                }
+                break;
+            case "0x04": //PalletInstance, byte
+                selectorType = (isUppercase)? "PalletInstance" : "palletInstance"
+                let palletInstanceID = paraTool.dechexToInt(data)
+                decodedType[selectorType] = palletInstanceID
+                break;
+            case "0x05": //GeneralIndex, byte16 via u128
+                selectorType = (isUppercase)? "GeneralIndex" : "generalIndex"
+                let generalIndexID = paraTool.dechexToInt(data)
+                decodedType[selectorType] = generalIndexID
+                break;
+            case "0x06": //GeneralKey, bytes[]
+                selectorType = (isUppercase)? "GeneralKey" : "generalKey"
+                decodedType[selectorType] = data
+                break;
+            case "0x07": //OnlyChild, ???
+                selectorType = (isUppercase)? "OnlyChild" : "onlyChild"
+                break;
+            case "0x08": //plurality, ???
+                selectorType = (isUppercase)? "Plurality" : "plurality"
+                break;
+            default:
+                break;
+        }
+        return decodedType
+    }
+
+    //see https://docs.moonbeam.network/builders/xcm/xcm-transactor/
+    convertMultilocationByteToMultilocation(dest, isUppercase = false){
+        let v1 = {
+            parents: 0,
+            interior: {},
+        }
+        let cDest = { v1: v1}
+        if (dest.length != 2) {
+            console.log('Invalid dest')
+            return false
+        }
+        v1.parents = paraTool.dechexToInt(dest[0])
+        let interior = dest[1]
+        let interiorN = interior.length
+        let interiorType = (isUppercase)? `X${interiorN}` : `x${interiorN}`
+        if (interiorN == 0){
+            v1.interior = {here: null}
+        } else if (interiorN == 1){
+            let decodedType = this.convertMultilocationFromHex(interior[0])
+            v1.interior[interiorType] = decodedType
+        } else {
+            let interiorValArr = []
+            for (const inter of interior){
+                let decodedType = this.convertMultilocationFromHex(inter)
+                interiorValArr.push(decodedType)
+            }
+            v1.interior[interiorType] = interiorValArr
+        }
+        cDest.v1 = v1
+        console.log(`dest ${JSON.stringify(dest, null, 4)} -> cDest ${JSON.stringify(cDest, null, 4)}`)
+        return cDest
     }
 
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
@@ -253,6 +439,173 @@ module.exports = class MoonbeamParser extends ChainParser {
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXcmPallet DONE`, outgoingXcmList)
         extrinsic.xcms = outgoingXcmList
         return outgoingXcmList
+    }
+
+    processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args) {
+        // need additional processing for currency_id part
+        let outgoingEtherumXCM = []
+        if (extrinsic.xcms == undefined) extrinsic.xcms = []
+        try {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingEthereum start`)
+            let a = args
+            let params = a.params
+            let methodID = a.methodID
+            if (a.fromAddress != undefined) fromAddress = a.fromAddress
+            //console.log(`a`, a)
+            //console.log(`params`, params)
+            if (extrinsic.xcms == undefined) extrinsic.xcms = []
+            let xcmIndex = extrinsic.xcms.length
+            let destAddress = '0x' //unknown
+            let isFeeItem = 1 // irrelevant?
+            let transferIndex = 0
+            let relayChain = indexer.relayChain
+            let chainID = indexer.chainID
+            let paraID = paraTool.getParaIDfromChainID(chainID)
+            let chainIDDest = null;
+            let paraIDDest = null;
+            let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
+            let innerCall = null
+            let r = {
+                sectionMethod: section_method,
+                extrinsicHash: feed.extrinsicHash,
+                extrinsicID: feed.extrinsicID,
+                transferIndex: 0,
+                xcmIndex: xcmIndex,
+                relayChain: relayChain,
+                chainID: chainID,
+                chainIDDest: chainIDDest, // unknown
+                paraID: paraID,
+                paraIDDest: paraIDDest, // unknown
+                blockNumber: this.parserBlockNumber,
+                fromAddress: fromAddress,
+                destAddress: destAddress, //unknown
+                asset: false, //unknown
+                rawAsset: false, //unknown
+                sourceTS: feed.ts,
+                amountSent: 0, // unknown
+                incomplete: incomplete,
+                isFeeItem: isFeeItem,
+                msgHash: '0x',
+                sentAt: this.parserWatermark,
+                xcmSymbol: null, // unknown
+                xcmInteriorKey: null, // unknown
+                innerCall: innerCall,
+                xcmType: "xcmtransact",
+            }
+            /*
+            0xfe430475: transactThroughDerivativeMultilocation
+            0x185de2ae: transactThroughDerivative
+            0xd7ab340c: transactThroughSignedMultilocation
+            0xb648f3fe: transactThroughSigned
+            */
+            if (methodID == '0xb648f3fe' || methodID == '0xd7ab340c'){
+                let ethereumMethod = (methodID == '0xb648f3fe')? 'transactThroughSigned' : 'transactThroughSignedMultilocation'
+                /*
+                {
+                    "decodeStatus": "success",
+                    "methodID": "0xb648f3fe",
+                    "signature": "transactThroughSigned((uint8 parents, bytes[] interior), address feeLocationAddress, uint64 transactRequiredWeightAtMost, bytes call, uint256 feeAmount, uint64 overallWeight)",
+                    "params": {
+                        "dest": [
+                            "1",
+                            [
+                                "0x0000000378"
+                            ]
+                        ],
+                        "feeLocationAddress": "0xffffffff1ab2b146c526d4154905ff12e6e57675",
+                        "transactRequiredWeightAtMost": "8000000000",
+                        "call": "0x260000e093040000000000000000000000000000000000000000000000000000000000010049ba58e2ef3047b1f90375c79b93578d90d24e24000000000000000000000000000000000000000000000000000000000000000010cde4efa900",
+                        "feeAmount": "30000000000000000",
+                        "overallWeight": "15000000000"
+                    },
+                    "fromAddress": "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d"
+                }
+                */
+
+                try {
+                    // process Dest
+                    let syntheticDest = this.convertMultilocationByteToMultilocation(params.dest)
+
+                    let [paraIDDest1, chainIDDest1] = this.processTransactorDest(syntheticDest, relayChain)
+                    if (paraIDDest1 !== false) paraIDDest = paraIDDest1
+                    if (chainIDDest1 !== false) chainIDDest = chainIDDest1
+
+                    //process fee
+                    let syntheticFee = {}
+                    let feeRaw = null
+                    if (ethereumMethod == 'transactThroughSigned'){
+                        feeRaw = params.feeLocationAddress
+                        let xcAssetID = paraTool.contractAddrToXcAssetID(feeRaw)
+                        let xcAssetIDHex = paraTool.bnToHex(xcAssetID)
+                        syntheticFee = {
+                          currency: {
+                            asCurrencyId: { foreignAsset: xcAssetIDHex }
+                          },
+                          feeAmount: paraTool.bnToHex(params.feeAmount)
+                        }
+                    }else if (ethereumMethod == 'transactThroughSignedMultilocation'){
+                        feeRaw = params.feeLocation
+                        try {
+                            let syntheticFeeLocation = this.convertMultilocationByteToMultilocation(feeRaw)
+                            syntheticFee = {
+                              currency: {
+                                asMultiLocation: { v1: syntheticFeeLocation}
+                              },
+                              feeAmount: paraTool.bnToHex(params.feeAmount)
+                            }
+                        } catch (e2){
+                            console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] process syntheticFeeLocation err`, e2)
+                        }
+                    }
+                    let targetedSymbol = false
+                    try {
+                        let [extractedSymbol, _] = this.processFeeStruct(indexer, syntheticFee, relayChain)
+                        targetedSymbol= extractedSymbol
+                    } catch (e){
+                        console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] process syntheticFee err`, e)
+                    }
+                    let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processFeeStruct", `moonbeam ethereum:${ethereumMethod}`, feeRaw)
+
+                    // get msgHash, innerCall from event
+                    let [msgHash, innerCall] = this.getMsgHashAndInnerCall(indexer, extrinsic, feed)
+
+                    // weight_info
+                    let weight_info = {
+                        transactRequiredWeightAtMost: paraTool.dechexToInt(params.transactRequiredWeightAtMost),
+                        overallWeight: null
+                    }
+
+                    // compute derivedAccount at destChain
+                    try {
+                        let isEVM  = indexer.getChainEVMStatus(chainIDDest)
+                        let [derivedAccount20, derivedAccount32] = this.calculateMultilocationDerivative(indexer.api, paraID, fromAddress)
+                        r.destAddress = (isEVM)? derivedAccount20 : derivedAccount32
+                    }catch (e){
+                        console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod} calculateMultilocationDerivative failed`, e)
+                    }
+
+                    r.xcmInteriorKey = targetedXcmInteriorKey
+                    r.xcmSymbol = targetedSymbol
+                    r.chainIDDest = chainIDDest
+                    r.paraIDDest = paraIDDest
+                    r.innerCall = innerCall
+                    r.msgHash = msgHash
+                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod}`, r)
+                    extrinsic.xcms.push(r)
+                    outgoingEtherumXCM.push(r)
+                } catch (e1){
+                    console.log(`processOutgoingEthereum:${ethereumMethod} err`, e1)
+                }
+            }else if (methodID == '0x185de2ae' || methodID == '0xfe430475'){
+                //transactThroughDerivative
+                let ethereumMethod = (methodID == '0x185de2ae')? 'transactThroughDerivative' : 'transactThroughDerivativeMultilocation'
+                console.log(`TODO [${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method:${ethereumMethod}`, r)
+            }
+            return outgoingEtherumXCM
+        } catch (e) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] ${e.toString()}`)
+            return
+        }
     }
 
     processOutgoingXCMTransactor(indexer, extrinsic, feed, fromAddress, section_method, args) {
@@ -602,7 +955,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 [paraIDDest, chainIDDest] = this.processDestV0X2(dest_v0.x2, relayChain)
 
             } else {
-                if (indexer.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
                 chainIDDest = false
             }
         } else if ((dest.v1 !== undefined) && (dest.v1.interior !== undefined)) {
@@ -613,11 +966,11 @@ module.exports = class MoonbeamParser extends ChainParser {
                 //[paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
                 [paraIDDest, chainIDDest] = this.processDestV0X1(destV1Interior.x1, relayChain)
             } else if (destV1Interior.x2 !== undefined) {
-                if (indexer.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
                 // dest for parachain, add 20000 for kusama-relay
                 [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
             } else {
-                if (indexer.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
                 chainIDDest = false
             }
         }

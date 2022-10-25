@@ -190,13 +190,25 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
         <td><%= tx.transactionIndex; %></td>
     </tr>
 <% } %>
-<% if ( tx.decodedInput ) { %>
+<% if ( tx.decodedInput ) {
+    let txInput = tx.input
+    let funcDesc = (tx.decodedInput.signature)? `Function: ${tx.decodedInput.signature}\n\n` : ''
+    let methodIDDesc = (tx.decodedInput.signature)?  `MethodID: ${tx.decodedInput.methodID}\n` : ''
+    if (tx.decodedInput.methodID != undefined) {
+        if (tx.decodedInput.methodID == '0x') {
+            methodIDDesc = ''
+            funcDesc = ''
+        }
+    }
+    //let txInputStr = `${funcDesc}${methodIDDesc}${txInput}`
+    let txInputStr = `${txInput}`
+    %>
     <tr>
       <td>Input Data</td>
       <td>
         <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
 	<div>
-  	  <textarea style="width: 800px; height: 300px"><%= tx.input; %></textarea>
+  	  <textarea style="width: 800px; height:125px"><%= txInputStr; %></textarea>
 	</div>
       </td>
     </tr>
