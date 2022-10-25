@@ -1293,7 +1293,7 @@ module.exports = class Query extends AssetManager {
 
     is_evm_xcmtransfer_input(inp) {
         try {
-            let xcmMethodList = ["0xb38c60fa", "0xb9f813ff", "0xfe430475", "0x185de2ae", "0xd7ab340c", "0xb648f3fe"]
+            let xcmMethodList = ["0xb38c60fa", "0xb9f813ff", "0xfe430475", "0x185de2ae", "0xd7ab340c", "0xb648f3fe", "0xecf766ff", "0x019054d0"]
             let txMethodID = inp.substr(0,10)
             if (xcmMethodList.includes(txMethodID)){
                 return true
@@ -1434,7 +1434,7 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                     let rowDataKeys = Object.keys(rowData)
-                    console.log(`[${rowDataKeys}] feedXCMInfoData`, feedXCMInfoData, `isRecursive=${isRecursive}, is_evm_xcmtransfer_input=${this.is_evm_xcmtransfer_input(c.input)}, c.substrate(undefined)=${c.substrate != undefined}`)
+                    //console.log(`[${rowDataKeys}] feedXCMInfoData`, feedXCMInfoData, `isRecursive=${isRecursive}, is_evm_xcmtransfer_input=${this.is_evm_xcmtransfer_input(c.input)}, c.substrate(undefined)=${c.substrate != undefined}`)
                     if (c.substrate != undefined && isRecursive) {
                         if (feedXCMInfoData) {
                             for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
@@ -1445,7 +1445,7 @@ module.exports = class Query extends AssetManager {
                             }
                         }else if(this.is_evm_xcmtransfer_input(c.input) ){
                             //  fetch xcmInfo from substrate extrinsicHash
-                            console.log(`im here evmTxhash=${txHash}, extrinsicsHash=${c.substrate.extrinsicHash}`)
+                            //console.log(`evmTxhash=${txHash}, extrinsicsHash=${c.substrate.extrinsicHash}`)
                             try {
                                 let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
                                 if (substratetx.xcmInfo != undefined) {
