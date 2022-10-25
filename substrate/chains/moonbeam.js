@@ -443,6 +443,8 @@ module.exports = class MoonbeamParser extends ChainParser {
 
     processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // need additional processing for currency_id part
+        let outgoingEtherumXCM = []
+        if (extrinsic.xcms == undefined) extrinsic.xcms = []
         try {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingEthereum start`)
             let a = args
@@ -491,13 +493,13 @@ module.exports = class MoonbeamParser extends ChainParser {
                 xcmType: "xcmtransact",
             }
             /*
-            transactThroughDerivativeMultilocation: 0xfe430475
-            transactThroughDerivative: 0x185de2ae
-            transactThroughSignedMultilocation: 0xd7ab340c
-            transactThroughSigned: 0xb648f3fe
+            0xfe430475: transactThroughDerivativeMultilocation
+            0x185de2ae: transactThroughDerivative
+            0xd7ab340c: transactThroughSignedMultilocation
+            0xb648f3fe: transactThroughSigned
             */
-            if (methodID == '0xb648f3fe'){
-                //transactThroughSigned
+            if (methodID == '0xb648f3fe' || methodID == '0xd7ab340c'){
+                let ethereumMethod = (methodID == '0xb648f3fe')? 'transactThroughSigned' : 'transactThroughSignedMultilocation'
                 /*
                 {
                     "decodeStatus": "success",
@@ -529,13 +531,31 @@ module.exports = class MoonbeamParser extends ChainParser {
                     if (chainIDDest1 !== false) chainIDDest = chainIDDest1
 
                     //process fee
-                    let xcAssetID = paraTool.contractAddrToXcAssetID(params.feeLocationAddress)
-                    let xcAssetIDHex = paraTool.bnToHex(xcAssetID)
-                    let syntheticFee = {
-                      currency: {
-                        asCurrencyId: { foreignAsset: xcAssetIDHex }
-                      },
-                      feeAmount: paraTool.bnToHex(params.feeAmount)
+                    let syntheticFee = {}
+                    let feeRaw = null
+                    if (ethereumMethod == 'transactThroughSigned'){
+                        feeRaw = params.feeLocationAddress
+                        let xcAssetID = paraTool.contractAddrToXcAssetID(feeRaw)
+                        let xcAssetIDHex = paraTool.bnToHex(xcAssetID)
+                        syntheticFee = {
+                          currency: {
+                            asCurrencyId: { foreignAsset: xcAssetIDHex }
+                          },
+                          feeAmount: paraTool.bnToHex(params.feeAmount)
+                        }
+                    }else if (ethereumMethod == 'transactThroughSignedMultilocation'){
+                        feeRaw = params.feeLocation
+                        try {
+                            let syntheticFeeLocation = this.convertMultilocationByteToMultilocation(feeRaw)
+                            syntheticFee = {
+                              currency: {
+                                asMultiLocation: { v1: syntheticFeeLocation}
+                              },
+                              feeAmount: paraTool.bnToHex(params.feeAmount)
+                            }
+                        } catch (e2){
+                            console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] process syntheticFeeLocation err`, e2)
+                        }
                     }
                     let targetedSymbol = false
                     try {
@@ -544,7 +564,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                     } catch (e){
                         console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] process syntheticFee err`, e)
                     }
-                    let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processFeeStruct", "moonbeam ethereum:transactThroughSigned", params.feeLocationAddress)
+                    let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processFeeStruct", `moonbeam ethereum:${ethereumMethod}`, feeRaw)
 
                     // get msgHash, innerCall from event
                     let [msgHash, innerCall] = this.getMsgHashAndInnerCall(indexer, extrinsic, feed)
@@ -561,7 +581,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                         let [derivedAccount20, derivedAccount32] = this.calculateMultilocationDerivative(indexer.api, paraID, fromAddress)
                         r.destAddress = (isEVM)? derivedAccount20 : derivedAccount32
                     }catch (e){
-                        console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:transactThroughSigned calculateMultilocationDerivative failed`, e)
+                        console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod} calculateMultilocationDerivative failed`, e)
                     }
 
                     r.xcmInteriorKey = targetedXcmInteriorKey
@@ -570,25 +590,18 @@ module.exports = class MoonbeamParser extends ChainParser {
                     r.paraIDDest = paraIDDest
                     r.innerCall = innerCall
                     r.msgHash = msgHash
-                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:transactThroughSigned`, r)
-
-                    //extrinsic.xcms.push(r)
-                    //outgoingXcmPallet.push(r)
+                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod}`, r)
+                    extrinsic.xcms.push(r)
+                    outgoingEtherumXCM.push(r)
                 } catch (e1){
-                    console.log(`processOutgoingEthereum:transactThroughSigned err`, e1)
+                    console.log(`processOutgoingEthereum:${ethereumMethod} err`, e1)
                 }
-
-                //process dest
-            }else if (methodID == '0xd7ab340c'){
-                //transactThroughSignedMultilocation
-            }else if (methodID == '0x185de2ae'){
+            }else if (methodID == '0x185de2ae' || methodID == '0xfe430475'){
                 //transactThroughDerivative
-            }else if (methodID == '0xfe430475'){
-                //transactThroughDerivativeMultilocation
+                let ethereumMethod = (methodID == '0x185de2ae')? 'transactThroughDerivative' : 'transactThroughDerivativeMultilocation'
+                console.log(`TODO [${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method:${ethereumMethod}`, r)
             }
-            //extrinsic.xcms.push(r)
-            //outgoingXcmPallet.push(r)
-            //return outgoingEtherumXCM
+            return outgoingEtherumXCM
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] ${e.toString()}`)
             return

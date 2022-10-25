@@ -24,7 +24,7 @@
       <% if ( xcm.origination.transactionHash ) { %>
        <B> Transaction Hash: </b><%- uiTool.presentTx(xcm.origination.transactionHash) %>
       <% } else { %>
-       <B> Extrinsic ID: </B> <%- uiTool.presentExtrinsicID(xcm.origination.extrinsicID, xcm.origination.extrinsicHash); %>
+       <B> Extrinsic ID: </B> <%- uiTool.presentExtrinsicID(xcm.origination.extrinsicHash, xcm.origination.extrinsicID); %>
       <% } %>
       <br/>
 
