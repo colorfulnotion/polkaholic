@@ -62,10 +62,10 @@
 	   <td><%- uiTool.presentERCID(contract.creator) %> at txn <%- uiTool.presentTx(contract.createdAtTx) %></td>
 	</tr>
 	<% } %>
-	<% if ( contract && ( contract.assetType == "ERC20" ) ) { %>
+	<%if ( contract && ( contract.assetType == "ERC20" || contract.assetType == "Token" ) ) { %>
 	<tr>
-<td>Token Symbol:</td>
-		<td><%- contract.symbol; %></td>
+           <td>Token Symbol:</td>
+	   <td><%- contract.symbol; %></td>
 	</tr>
 	<% } %>
 	<tr>

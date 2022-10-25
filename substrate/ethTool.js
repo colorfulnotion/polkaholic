@@ -116,6 +116,7 @@ const erc1155ABI = JSON.parse('[{"anonymous":false,"inputs":[{"indexed":true,"in
 
 function getABIByAssetType(assetType) {
     switch (assetType) {
+        case "Token":
         case "ERC20":
             return erc20ABI;
         case "ERC20LP":
