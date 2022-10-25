@@ -25,7 +25,6 @@
     <td>Transactions</td>
     <td>
 <%
-console.log(block);
 if ( block && block.transactions ) { %>
 <a class="btn-sm btn-primary" href='javascript:jumpTab()'><%= block.transactions.length %> transactions</a>
     <% if ( block.transactionsInternal && ( block.transactionsInternal.length > 0 ) ) { %>

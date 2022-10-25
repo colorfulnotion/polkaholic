@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Usage:  node testQuerySourcify.js [address]
+ // Usage:  node testQuerySourcify.js [address]
 const Query = require("../query");
 
 async function main() {

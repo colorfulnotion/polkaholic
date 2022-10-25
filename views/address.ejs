@@ -28,24 +28,33 @@
         <% } %>
 
         <table class="table table-hover table-bordered">
+	<% if ( contract ) { %>
+	<% if ( contract.assetName ) { %>
 	<tr>
-		<td>Balance:</td>
-		<td><%- include("addressBalance", { account }) %></td>
+		<td>Name:</td>
+		<td><%- contract.assetName %></td>
 	</tr>
+	<% } %>
+	<tr>
+		<td>Chain:</td>
+		<td><%- uiTool.presentChain(contract.chainID, contract.chainName); %></td>
+	</tr>
+	<% } %>
 	<% if ( contract && contract.assetType == "ERC20LP" ) { %>
 	<tr>
 	   <td>Token Pair:</td>
 	   <td><a href='/address/<%- contract.token0 %>'><%- uiTool.getShortHash(contract.token0) %></a> / <a href='/address/<%- contract.token1 %>'><%- uiTool.getShortHash(contract.token1) %></a></td>
 	</tr>
-	<tr>
-	   <td>
 	   <%
 	   let t0 = query.assetInfo[paraTool.makeAssetChain(contract.token0, contract.chainID)];
 	   let t1 = query.assetInfo[paraTool.makeAssetChain(contract.token1, contract.chainID)];
 	   %>
-           Token Symbol:</td>
+	  <% if ( t0 && t1 ) { %>
+	<tr>
+	   <td>Token Symbol:</td>
 	   <td><%- include("symbollink", {assetInfo: t0}) %> / <%- include("symbollink", {assetInfo: t1}) %> </td>
 	</tr>
+  	   <% } %>
 	<% } %>
 	<% if ( contract && contract.creator && contract.createdAtTx ) {%>
 	<tr>
@@ -53,9 +62,8 @@
 	   <td><%- uiTool.presentERCID(contract.creator) %> at txn <%- uiTool.presentTx(contract.createdAtTx) %></td>
 	</tr>
 	<% } %>
-	<% if ( contract && ( contract.assetType == "ERC20" || contract.assetType == "ERC20LP" ) ) { console.log(contract);  %>
+	<% if ( contract && ( contract.assetType == "ERC20" ) ) { %>
 	<tr>
-<% console.log(contract); %>
 <td>Token Symbol:</td>
 		<td><%- contract.symbol; %></td>
 	</tr>
@@ -208,7 +216,7 @@ for (let i=0; i<tabs.length; i++) {
 
 <script>
 let address = '<%= address; %>';
-let chainID = null;
+let chainID = '<%= chainID; %>';
 let chain = <%- JSON.stringify(chain); %>;
 let requestedChainAddress = '<%= address; %>';
 let tabs = <%- JSON.stringify(tabs); %>;

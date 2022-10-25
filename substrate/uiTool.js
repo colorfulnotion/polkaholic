@@ -348,7 +348,7 @@ module.exports = {
                 maximumFractionDigits: _maximumFractionDigits
             });
             return formatter.format(c);
-        } catch(e){
+        } catch (e) {
             return '-'
         }
 

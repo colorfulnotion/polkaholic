@@ -9,7 +9,6 @@
 <script>
   QRCode.toCanvas(document.getElementById('<%= canvasid; %>'), '<%= address; %>', function (error) {
     if (error) console.error(error)
-    console.log('success!');
   })
 </script>
 

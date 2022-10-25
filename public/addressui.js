@@ -1,21 +1,30 @@
 var initcontract = false;
 var contract = null;
 
-function presentSourceCode(sources) {
+
+
+function presentSourceCode(sources, abi) {
     let out = [];
+    if (abi) {
+        out.push(`<b>Contract ABI:</b> <textarea rows=12 style='width:100%; font-family: Courier; font-size: 8pt'>${JSON.stringify(abi)}</textarea>`);
+    }
     // TODO: metadata
-    //out.push(`<b>Contract Name:</b> <b>${contract.ContractName}</b>`);
     //out.push(`<b>Compiler Version:</b> ${contract.CompilerVersion}`);
     //out.push(`<b>Constructor Arguments:</b><br/><textarea rows=12 cols=80>${contract.ConstructorArguments}</textarea>`);
     //out.push(`<b>EVM Version:</b> ${contract.EVMVersion}`);
-    for ( const source of Object.keys(sources) ) {
-	let content = sources[source];
-	if ( source.includes("http") ) {
-            out.push(`<div style='font-size:9pt'><a href='${source}'>Download ${source}</a></div>`);
-	} else {
-            out.push(`<div style='font-size:9pt'>${source}</div>`);
-	}
-	out.push(`<textarea rows=12 style='width:100%; font-family: Courier; font-size: 8pt'>${content}</textarea>`);
+    if (sources) {
+        for (const source of Object.keys(sources)) {
+            let content = sources[source];
+            if (source.includes("http")) {
+                out.push(`<div style='font-size:9pt'><a href='${source}'>Download ${source}</a></div>`);
+            } else {
+                out.push(`<div style='font-size:9pt'>${source}</div>`);
+            }
+            out.push(`<textarea rows=12 style='width:100%; font-family: Courier; font-size: 8pt'>${content}</textarea>`);
+        }
+    } else {
+
+        out.push(`<b>Contract Code Not Available</b>: <a href='https://sourcify.dev/#/verifier'>Upload to Sourcify</a>`)
     }
     return out.join("<br/>");
 }
@@ -37,10 +46,14 @@ function executeRead(n, nm) {
         try {
             let res = _contractInstance[nm].apply(null, inputs)
             res.then((x) => {
-                    let xstr = x.map((o) => {
-                        return o.toString();
-                    }).join(",")
-                    console.log(n, xstr)
+                    let xstr = null;
+                    if (Array.isArray(x)) {
+                        xstr = x.map((o) => {
+                            return o.toString();
+                        }).join(",")
+                    } else {
+                        xstr = x.toString();
+                    }
                     document.getElementById(`ro${n}`).innerHTML = xstr;
                 })
                 .catch(err => {
@@ -88,6 +101,7 @@ function presentContract(contract, provider, contractInstance) {
     let reads = [];
     let events = [];
     let writes = [];
+
     for (const x of ABI) {
         if (x.type == 'function') {
             if (x.stateMutability == "view") {
@@ -105,6 +119,7 @@ function presentContract(contract, provider, contractInstance) {
             console.log(x);
         }
     }
+
 
     let rout = [];
     let todos = [];
@@ -217,18 +232,19 @@ async function showcontract(address, chain) {
         name: chain.chainName
     });
 
-    let bozo = await fetch(req)
+    let fetchRes = await fetch(req)
         .then((response) => response.json())
         .then(async (data) => {
             try {
                 contract = data;
                 if (contract.ABI) {
+                    console.log(endpoint, contract.ABI);
                     let contractInstance = new ethers.Contract(contract.asset, contract.ABI, provider);
                     let [readContract, writeContract, todos] = presentContract(contract, provider, contractInstance);
                     document.getElementById("v-tabs-read").innerHTML = readContract;
                     document.getElementById("v-tabs-write").innerHTML = writeContract;
                     try {
-                        document.getElementById("v-tabs-code").innerHTML = presentSourceCode(contract.code);
+                        document.getElementById("v-tabs-code").innerHTML = presentSourceCode(contract.code, contract.ABI);
                     } catch (err) {
                         console.log(err);
                     }
@@ -244,8 +260,8 @@ async function showcontract(address, chain) {
                 console.log(err);
             }
         })
-    let xxx = await Promise.all(bozo);
-    console.log("DONE", xxx);
+    let xxx = await Promise.all(fetchRes);
+
 }
 
 
@@ -259,6 +275,7 @@ function showerc20(address) {
 
     let pathParams = `account/evmtransfers/${address}`
     let tableName = '#tableerc20'
+    $.fn.dataTable.ext.errMode = 'none';
     tableERC20 = $(tableName).DataTable({
         lengthMenu: getLengthMenu(),
         columnDefs: [{

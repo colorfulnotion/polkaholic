@@ -66,7 +66,7 @@ for ( const p of priceUSD_routerAsset ) {
 function showRouterAssetChainPrices(routerAssetChain, routerName) {
   var series_name = `USD Value`
 
-<% if ( asset ) { console.log(asset); %>
+<% if ( asset ) { %>
   let url = `${baseURL}/asset/pricelog/${encodeURIComponent(asset)}/${encodeURIComponent(chainID)}/${encodeURIComponent(routerAssetChain)}`
   var title_text = `USD Value (Source: ${routerName})`;
 <% } else { %>

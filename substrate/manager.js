@@ -1592,13 +1592,13 @@ module.exports = class Manager extends AssetManager {
 
     // writeBTHashesRealtime: writes all hashes/strings from { asset, xcmAsset, contract, chain } (other than extrinsicHashes, blockHashes)
     // to the { btHashes, btRealtime } BigTables
-    async writeBTHashesRealtime(lookbackDays = 1, limit = 100) {
+    async writeBTHashesRealtime(lookbackDays = 30, limit = 100) {
         /*        await this.write_btHashes_xcmmessage(lookbackDays);
                 await this.write_btHashes_symbol(limit);
                 await this.write_btHashes_chain(limit);
-                await this.write_btHashes_currencyID(limit);
-                await this.write_btHashes_wasmcode(lookbackDays);
-                await this.write_btRealtime_wasmcontract(lookbackDays); */
+                await this.write_btHashes_currencyID(limit); */
+        await this.write_btHashes_wasmcode(lookbackDays);
+        await this.write_btRealtime_wasmcontract(lookbackDays);
         await this.write_btRealtime_evmcontract(lookbackDays);
     }
 
@@ -1698,8 +1698,104 @@ module.exports = class Manager extends AssetManager {
             console.log("writeCrowdloanRelated rows=", rows.length);
             rows = [];
         }
-
     }
 
+    async updateEVMPrecompiles(network) {
+        let network_precompiles = {
+            // https://docs.moonbeam.network/builders/pallets-precompiles/precompiles/
+            moonbeam: {
+                chainIDs: {
+                    2004: '{"Token":"GLMR"}',
+                    22023: '{"Token":"MOVR"}',
+                    61000: '{"Token":"AlphaDev"}',
+                    60888: '{"Token":"BetaDev"}'
+                },
+                precompiles: {
+                    "0x0000000000000000000000000000000000000809": "Randomness",
+                    "0x0000000000000000000000000000000000000800": "StakingInterface",
+                    "0x000000000000000000000000000000000000080d": "XCMTransactorV2",
+                    "0x0000000000000000000000000000000000000804": "XTokens",
+                    "0x0000000000000000000000000000000000000808": "Batch",
+                    "0x000000000000000000000000000000000000080a": "CallPermit",
+                    "0x000000000000000000000000000000000000080e": ["Collective", "Council"],
+                    "0x000000000000000000000000000000000000080f": ["Collective", "Technical commitee"],
+                    "0x000000000000000000000000000000000000080f": ["Collective", "Treasury council"],
+                    "0x0000000000000000000000000000000000000803": "Democracy",
+                    "0x0000000000000000000000000000000000000802": "ERC20",
+                    "0x000000000000000000000000000000000000080b": "Proxy"
+                },
+
+            },
+            // https://docs.astar.network/docs/EVM/precompiles/
+            astar: {
+                chainIDs: {
+                    2006: '{"Token":"ASTR"}',
+                    22007: '{"Token":"SDN"}'
+                },
+                precompiles: {
+                    "0x0000000000000000000000000000000000005001": "DappsStaking",
+                    "0x0000000000000000000000000000000000005002": "SR25519",
+                    //"" => "ERC20",  // https://github.com/AstarNetwork/astar-frame/blob/polkadot-v0.9.29/precompiles/assets-erc20/ERC20.sol
+                    //"" => "SubstrateECDSA", // https://github.com/AstarNetwork/astar-frame/blob/polkadot-v0.9.29/precompiles/substrate-ecdsa/SubstrateEcdsa.sol
+                    "0x0000000000000000000000000000000000005004": "XCM", // assets_withdraw https://github.com/AstarNetwork/astar-frame/blob/polkadot-v0.9.29/precompiles/xcm/XCM.sol
+
+                }
+            },
+            // common to above networks, probably all
+            generic: {
+                networks: ["moonbeam", "astar"],
+                precompiles: {
+                    "0x0000000000000000000000000000000000000001": "ECRecover",
+                    "0x0000000000000000000000000000000000000002": "Sha256",
+                    "0x0000000000000000000000000000000000000003": "Ripemd160",
+                    "0x0000000000000000000000000000000000000004": "Identity",
+                    "0x0000000000000000000000000000000000000005": "Modexp",
+                    "0x0000000000000000000000000000000000000006": "Bn128Add",
+                    "0x0000000000000000000000000000000000000007": "Bn128Mul",
+                    "0x0000000000000000000000000000000000000008": "Bn128Pairing"
+                }
+            }
+        }
+
+        let chainIDs = network_precompiles[network].chainIDs;
+        let precompiles = network_precompiles[network].precompiles;
+        // TODO: add generic precompiles
+        let out = [];
+        for (const [chainID, nativeAsset] of Object.entries(chainIDs)) {
+            for (const [asset, name] of Object.entries(precompiles)) {
+                let fn = null;
+                let assetName = null;
+                if (typeof name == "string") {
+                    assetName = `${name} System Contract`;
+                    fn = name;
+                } else if (Array.isArray(name)) {
+                    fn = name[0];
+                    assetName = `${name[1]} System Contract`;
+                }
+                if (fn && assetName) {
+                    let fullfn = path.join("precompiles", network, `${fn}.json`)
+                    if (fs.existsSync(fullfn)) {
+                        let abi = await fs.readFileSync(fullfn, "utf8");
+                        if (name == "ERC20") {
+                            let nsql = `update asset set abiRaw = ${mysql.escape(abi)} where asset = '${nativeAsset}' and chainID = '${chainID}'`
+                            this.batchedSQL.push(nsql);
+                        }
+                        out.push(`('${asset}', '${chainID}', 'Contract', ${mysql.escape(assetName)}, ${mysql.escape(abi)})`)
+                    } else {
+                        console.log("not found", fullfn)
+                    }
+                }
+            }
+        }
+        await this.update_batchedSQL();
+        let vals = ["assetType", "assetName", "abiRaw"];
+        await this.upsertSQL({
+            "table": `asset`,
+            "keys": ["asset", "chainID"],
+            "vals": vals,
+            "data": out,
+            "replace": vals,
+        });
+    }
 
 }

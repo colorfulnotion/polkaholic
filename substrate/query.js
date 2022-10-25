@@ -625,10 +625,21 @@ module.exports = class Query extends AssetManager {
                         let c = JSON.parse(cell.value);
                         if (c && c.asset) {
                             // TODO: adjust text/description based on ERC20, ERC721, ERC1155 assetType data
+                            console.log("SEARCH RES", c);
+                            let [__, id] = this.convertChainID(c.chainID)
+                            let chainName = this.getChainName(c.chainID);
+                            let description = `Chain ID: ${c.chainID} ${chainName}`
+                            let paraID = paraTool.getParaIDfromChainID(chainID)
+                            if (paraID > 0) {
+                                description += ` ParaID: ${paraID}`;
+                            }
+                            if (c.symbol) {
+                                description += ` ${c.symbol}`
+                            }
                             res.push({
                                 link: `/address/${c.asset}/${c.chainID}`,
                                 text: "EVM Contract: " + c.asset,
-                                description: `Chain ID: ${c.chainID}`,
+                                description: description,
                                 numHolders: c.numHolders
                             })
                         }
@@ -1049,9 +1060,11 @@ module.exports = class Query extends AssetManager {
                     if (!paraTool.isPublicEndpoint(chainInfo.WSEndpoint3)) chainInfo.WSEndpoint3 = null
                     // hardcoded for publicEndpoint = true for now
                     chainInfo.chainID = parseInt(chainInfo.chainID)
-                    if ((chainInfo.chainID == 2006 || chainInfo.chainID == 22007) || (chainInfo.chainID == 2004 || chainInfo.chainID == 22023 || chainInfo.chainID == 61000)) {
-                        chainInfo.RPCBackfill = `https://${chainInfo.id}.api.onfinality.io/public`
-                        chainInfo.WSEndpoint = `wss://${chainInfo.id}.api.onfinality.io/public-ws`
+                    if ((chainInfo.chainID == 2006 || chainInfo.chainID == 22007) || (chainInfo.chainID == 2004 || chainInfo.chainID == 22023 || chainInfo.chainID == 61000 || chainInfo.chainID == 60888)) {
+                        let id = chainInfo.id;
+                        if (id == "moonbase-alpha") id = "moonbase";
+                        chainInfo.RPCBackfill = `https://${id}-internal.polkaholic.io:8443`
+                        chainInfo.WSEndpoint = `wss://${id}-internal.polkaholic.io`
                     }
                 }
                 return chainInfo
@@ -1434,7 +1447,7 @@ module.exports = class Query extends AssetManager {
                                 c.xcmInfo = xcmInfo;
                                 break;
                             }
-                        }else if(this.is_evm_xcmtransfer_input(c.input) ){
+                        } else if (this.is_evm_xcmtransfer_input(c.input)) {
                             //  fetch xcmInfo from substrate extrinsicHash
                             try {
                                 let substratetx = await this.getTransaction(c.substrate.extrinsicHash);
@@ -3740,29 +3753,49 @@ module.exports = class Query extends AssetManager {
             throw new paraTool.InvalidError(`Invalid address ${address}`)
         }
         let realtime = {};
+        let w = (chainID) ? `and asset.chainID = '${chainID}'` : ""
         let contract = null;
         if (this.xcContractAddress[rawAddress] != undefined) {
-            contract = {};
-            let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.xcContractAddress = '${rawAddress}' and asset.chainID = '${chainID}'`
+            let sql = `select asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.xcContractAddress = '${rawAddress}' and asset.assetType = 'Token' ${w}`
             let extraRecs = await this.poolREADONLY.query(sql)
-            if (extraRecs.length > 0) {
+            if (extraRecs.length == 1) {
+                console.log("getAddressContract XCCONTRACT UNAMBIGUOUS", extraRecs.length, sql);
                 let e = extraRecs[0];
                 var p = await this.computePriceUSD({
                     asset: e.asset,
                     chainID: e.chainID
                 });
+                contract = {};
                 contract.assetName = e.assetName;
                 contract.symbol = e.symbol;
+                let [__, id] = this.convertChainID(e.chainID)
+                let chainName = this.getChainName(e.chainID);
+                contract.chainID = e.chainID;
+                contract.id = id;
+                contract.chainName = chainName;
                 contract.localSymbol = e.localSymbol;
                 if (p) contract.priceUSD = p.priceUSDCurrent;
                 contract.totalSupply = e.totalSupply;
                 contract.numHolders = e.numHolders;
                 contract.decimals = e.decimals;
+            } else {
+                console.log("getAddressContract XCCONTRACT AMBIGUOUS", extraRecs.length, sql);
+                contract = [];
+                for (const e of extraRecs) {
+                    let [__, id] = this.convertChainID(e.chainID)
+                    let chainName = this.getChainName(e.chainID);
+                    contract.push({
+                        link: `/address/${rawAddress}/${e.chainID}`,
+                        text: `${rawAddress} on ${chainName}`,
+                        description: `${e.localSymbol} System Contract`
+                    })
+                }
             }
             return [realtime, contract];
         } else {
             let families = ["realtime", "evmcontract", "wasmcontract"];
             let row = false;
+            contract = null;
             try {
                 let [tblName, tblRealtime] = this.get_btTableRealtime()
                 const filter = [{
@@ -3774,39 +3807,47 @@ module.exports = class Query extends AssetManager {
                 [row] = await tblRealtime.row(address).get({
                     filter
                 });
+                let rowData = row.data;
+                [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
             } catch (err) {
 
             }
-            let rowData = row.data;
             let w = chainID ? `and asset.chainID = '${chainID}'` : ''
-            contract = null;
-            [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
-            let sql = `select asset.creator, asset.assetType, asset.createdAtTx, unix_timestamp(asset.createDT) as createTS, asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' ${w}`
-            console.log(sql);
+            let sql = `select asset.creator, asset.assetType, asset.createdAtTx, unix_timestamp(asset.createDT) as createTS, asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' ${w}`
             let extraRecs = await this.poolREADONLY.query(sql)
-            if (extraRecs.length > 0) {
+            if (extraRecs.length == 1) {
+                console.log("getAddressContract UNAMBIGUOUS SINGLE CHAIN", sql);
                 let e = extraRecs[0];
+                contract = e
                 var p = await this.computePriceUSD({
                     asset: e.asset,
                     chainID: e.chainID
                 });
-                if (!contract) {
-                    contract = {}
-                }
                 contract.chainID = e.chainID;
-                contract.creator = e.creator;
-                contract.createdAtTx = e.createdAtTx;
-                contract.createTS = e.createTS;
-                contract.assetType = e.assetType;
+                let [__, id] = this.convertChainID(e.chainID)
+                let chainName = this.getChainName(e.chainID);
+                contract.id = id;
+                contract.chainName = chainName;
                 contract.address = e.asset
                 contract.asset = e.asset
-                contract.assetName = e.assetName;
-                contract.symbol = e.symbol;
                 contract.localSymbol = e.localSymbol;
                 if (p) contract.priceUSD = p.priceUSDCurrent;
-                contract.totalSupply = e.totalSupply;
-                contract.numHolders = e.numHolders;
-                contract.decimals = e.decimals;
+            } else if (extraRecs.length > 1) {
+                console.log("getAddressContract AMBIGUOUS MULTI CHAIN", sql);
+                contract = [];
+                for (const e of extraRecs) {
+                    let [__, id] = this.convertChainID(e.chainID)
+                    let chainName = this.getChainName(e.chainID);
+                    let description = e.assetName
+                    if (e.localSymbol) {
+                        description += ": ${e.localSymbol}"
+                    }
+                    contract.push({
+                        link: `/address/${e.asset}/${e.chainID}`,
+                        text: `${e.asset} on ${chainName}`,
+                        description: `${description}`
+                    })
+                }
             }
             return [realtime, contract];
         }
@@ -3913,7 +3954,7 @@ module.exports = class Query extends AssetManager {
         if (accountGroup == "balances") {
             maxRows = 1000;
         }
-        console.log(accountGroup, tableName);
+        //console.log(accountGroup, tableName);
         let startRow = address;
         if (TSpagination && (TSStart != null)) {
             startRow = address + "#" + paraTool.inverted_ts_key(TSStart)
@@ -6968,92 +7009,95 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async get_sourcify_evmcontract(asset)
-    {
-	const axios = require("axios");
-	// check https://sourcify.dev/server/check-by-addresses?addresses=0x3a7798ca28cfe64c974f8196450e1464f43a0d1e&chainIds=1284,1285,1287
-	try {
-	    let url = `https://sourcify.dev/server/check-by-addresses?addresses=${asset}&chainIds=1284,1285,1287`
+    async get_sourcify_evmcontract(asset) {
+        const axios = require("axios");
+        // check https://sourcify.dev/server/check-by-addresses?addresses=0x3a7798ca28cfe64c974f8196450e1464f43a0d1e&chainIds=1284,1285,1287
+        try {
+            let url = `https://sourcify.dev/server/check-by-addresses?addresses=${asset}&chainIds=1284,1285,1287`
             let response = await axios.get(url)
-	    response = response.data;
-	    for ( let i = 0 ; i < response.length; i++) {
-		let r = response[i];
-		// if status is false, give up
-		if ( ! r.status || ( r.status === "false" ) || r.status === false ) {
-		    // TODO: store miss in abiRaw and only call sourcify again if addDT is more than 1-5 mins ago
-		    return null;
-		}
-		// for any chainIDs in the response, get the files {"address": "0x3A7798CA28CFE64C974f8196450e1464f43A0d1e","status": "perfect","chainIds": ["1287"]}
-		let abiraw = [];
-		let contractCode = [];
-		let contract = { code: {} };
-		for ( const evmchainID of r.chainIds) {
-		    let chainID = ethTool.evmChainIDToChainID(evmchainID) // e.g moonbeam 1284 => 2004
-		    if ( chainID ) {
-			let files = 0;
-			let codeResult = {}
-			let filesUrl = `https://sourcify.dev/server/files/tree/${evmchainID}/${asset}`
-			let filesResponse = await axios.get(filesUrl)
-			for ( const fileurl of filesResponse.data) {
-			    let f = await axios.get(fileurl)
-			    console.log(fileurl, f.data);
-			    if ( f.data && f.data.output != undefined && f.data.output.abi != undefined ) {
-				let flds = ["compiler", "language", "settings", "sources"]
-				for ( const fld of flds ) {
-				    if ( f.data[fld] != undefined ) {
-					contract[fld] = f.data[fld];
-				    }
-				}
-				contract.ABI = f.data.output.abi
-				abiraw.push(`('${asset}', '${chainID}', ${mysql.escape(JSON.stringify(contract.ABI))})`)
-			    } else {
-				codeResult[fileurl] = f.data;
-				files++;
-			    }
-			}
-			if ( files > 0 ) {
-			    let y = {result: [codeResult]}
-			    contractCode.push(`('${asset}', '${chainID}', ${mysql.escape(JSON.stringify(y))}, Now())`)
-			}
-			contract.chainID = chainID;
-		    } else {
+            response = response.data;
+            for (let i = 0; i < response.length; i++) {
+                let r = response[i];
+                // if status is false, give up
+                if (!r.status || (r.status === "false") || r.status === false) {
+                    // TODO: store miss in abiRaw and only call sourcify again if addDT is more than 1-5 mins ago
+                    return null;
+                }
+                // for any chainIDs in the response, get the files {"address": "0x3A7798CA28CFE64C974f8196450e1464f43A0d1e","status": "perfect","chainIds": ["1287"]}
+                let abiraw = [];
+                let contractCode = [];
+                let contract = {
+                    code: {}
+                };
+                for (const evmchainID of r.chainIds) {
+                    let chainID = ethTool.evmChainIDToChainID(evmchainID) // e.g moonbeam 1284 => 2004
+                    if (chainID) {
+                        let files = 0;
+                        let codeResult = {}
+                        let filesUrl = `https://sourcify.dev/server/files/tree/${evmchainID}/${asset}`
+                        let filesResponse = await axios.get(filesUrl)
+                        for (const fileurl of filesResponse.data) {
+                            let f = await axios.get(fileurl)
+                            console.log(fileurl, f.data);
+                            if (f.data && f.data.output != undefined && f.data.output.abi != undefined) {
+                                let flds = ["compiler", "language", "settings", "sources"]
+                                for (const fld of flds) {
+                                    if (f.data[fld] != undefined) {
+                                        contract[fld] = f.data[fld];
+                                    }
+                                }
+                                contract.ABI = f.data.output.abi
+                                abiraw.push(`('${asset}', '${chainID}', ${mysql.escape(JSON.stringify(contract.ABI))})`)
+                            } else {
+                                codeResult[fileurl] = f.data;
+                                files++;
+                            }
+                        }
+                        if (files > 0) {
+                            let y = {
+                                result: [codeResult]
+                            }
+                            contractCode.push(`('${asset}', '${chainID}', ${mysql.escape(JSON.stringify(y))}, Now())`)
+                        }
+                        contract.chainID = chainID;
+                    } else {
 
-			// TODO: store miss in abiRaw and only call sourcify again if addDT is more than 1-5 mins ago
-		    }
-		}
-		let vals = ["abiraw"];
-		await this.upsertSQL({
+                        // TODO: store miss in abiRaw and only call sourcify again if addDT is more than 1-5 mins ago
+                    }
+                }
+                let vals = ["abiraw"];
+                await this.upsertSQL({
                     "table": "asset",
                     "keys": ["asset", "chainID"],
                     "vals": vals,
                     "data": abiraw,
                     "replace": vals
-		});
-		let vals2 = ["code", "addDT"];
-		await this.upsertSQL({
+                });
+                let vals2 = ["code", "addDT"];
+                await this.upsertSQL({
                     "table": "contractCode",
                     "keys": ["asset", "chainID"],
                     "vals": vals2,
                     "data": contractCode,
                     "replace": vals2
-		});
-		return contract;
-	    }
-	} catch (err) {
-	    console.log(err);
-	    return null
-	}
+                });
+                return contract;
+            }
+        } catch (err) {
+            console.log(err);
+            return null
+        }
     }
 
     async getEVMContract(asset, chainID = null) {
         try {
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
-            let sql = `select asset.asset, asset.chainID, convert(asset.abiRaw using utf8) as ABI, convert(contractCode.code using utf8) code, addDT from asset left join contractCode on contractCode.asset = asset.asset and contractCode.chainID = asset.chainID where asset.asset = '${asset}' ${w} order by addDT desc limit 1`
-	    console.log(sql);
+            let sql = `select asset.asset, asset.assetType, asset.chainID, convert(asset.abiRaw using utf8) as ABI, convert(contractCode.code using utf8) code, addDT from asset left join contractCode on contractCode.asset = asset.asset and contractCode.chainID = asset.chainID where asset.asset = '${asset}' ${w} order by addDT desc limit 1`
+            //console.log("getEVMContract", sql);
             let evmContracts = await this.poolREADONLY.query(sql);
             if (evmContracts.length == 0) {
                 // return not found error
-		let evmContract = await this.get_sourcify_evmcontract(asset, chainID);
+                let evmContract = await this.get_sourcify_evmcontract(asset, chainID);
 
                 throw new paraTool.NotFoundError(`EVM Contract not found: ${asset}`)
                 return (false);
@@ -7065,7 +7109,7 @@ module.exports = class Query extends AssetManager {
             evmContract.chainName = chainName;
             try {
                 let code = JSON.parse(evmContract.code);
-                if (Array.isArray(code.result) && code.result.length > 0) {
+                if (code && code.result && Array.isArray(code.result) && code.result.length > 0) {
                     let result = code.result[0];
                     evmContract.code = {};
                     for (const key of Object.keys(result)) {
@@ -7073,12 +7117,22 @@ module.exports = class Query extends AssetManager {
                     }
                     //evmContract.ABI = JSON.parse(evmContract.ABI);
                 }
-                let abiRaw = JSON.parse(evmContract.ABI);
-		if ( abiRaw.result != undefined ) {
-                    abiRaw = JSON.parse(abiRaw.result)
-		}
-                evmContract.ABI = abiRaw;
             } catch (err) {
+                console.log(err);
+                delete evmContract.ABI
+            }
+            try {
+                if (evmContract.ABI && evmContract.ABI.length > 0) {
+                    let abiRaw = JSON.parse(evmContract.ABI);
+                    if (abiRaw.result != undefined) {
+                        abiRaw = JSON.parse(abiRaw.result)
+                    }
+                    evmContract.ABI = abiRaw;
+                } else {
+                    evmContract.ABI = ethTool.getABIByAssetType(evmContract.assetType)
+                }
+            } catch (err) {
+                console.log(err);
                 delete evmContract.ABI
             }
             return evmContract;

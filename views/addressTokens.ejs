@@ -67,13 +67,11 @@ $("#tokens").on("change", function(e) {
   var value = e.value;
   if ( value.includes("0x") ) {
     let url = `/address/${value}?a=${address}`
-    console.log(url);
     window.location.href = url;
   } else {
     let sa = value.split("~~");
     let [chainID, asset] = sa;
     let url = `/asset/${chainID}/${encodeURIComponent(asset)}`
-    console.log(url);
       window.location.href = url;
   }
 })

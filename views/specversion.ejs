@@ -3,7 +3,6 @@
 <script>
 function toggleHideExtrinsicsEvents() {
   let x = document.getElementById("toggleHideEE");
-  console.log("toggleHideExtrinsicEvents", x.checked)
   const stylesheet = document.styleSheets[0];
   for (let i = 0; i < stylesheet.cssRules.length; i++) {
     if(stylesheet.cssRules[i].selectorText === '.rowhidden') {
