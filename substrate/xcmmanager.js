@@ -372,7 +372,7 @@ module.exports = class XCMManager extends Query {
         let sourceChainSymbol = d.chainSymbol
         let evmTransactionHash = null
         let remoteEVMTxResult = 'Unknown'
-        if (remoteEvmTx){
+        if (remoteEvmTx) {
             remoteEVMTxResult = remoteEvmTx.result
         }
         if (d.evm != undefined && d.evm.transactionHash != undefined) {
@@ -663,7 +663,7 @@ module.exports = class XCMManager extends Query {
         if (d.evm != undefined && d.evm.transactionHash != undefined) {
             evmTransactionHash = d.evm.transactionHash
             let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
-            if (!evmtx){
+            if (!evmtx) {
                 return [false, false]
             }
             sourceTxFee = evmtx.fee
@@ -995,7 +995,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
-                        }catch (e){
+                        } catch (e) {
                             console.log(`!!!!buildSuccessXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
                             continue
                         }
@@ -1247,7 +1247,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildSuccessXcmTransactInfo(substratetx, remoteEvmTx, match)
-                        }catch (e){
+                        } catch (e) {
                             console.log(`!!!!buildSuccessXcmTransactInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
                             continue
                         }
@@ -1304,7 +1304,7 @@ module.exports = class XCMManager extends Query {
 
                     console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
                     hashes.push(hres)
-                    if (d.remoteEVMTxHash){
+                    if (d.remoteEVMTxHash) {
                         let remoteRec = {
                             key: d.remoteEVMTxHash,
                             data: {
@@ -1493,7 +1493,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord)
-                        } catch (e){
+                        } catch (e) {
                             console.log(`!!!!buildFailedXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
                             continue
                         }

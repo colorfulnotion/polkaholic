@@ -74,15 +74,12 @@ let chainModel = {};
 	  break;
       case "xcmtransfer":
 	  c.xcmtransfers.push(bn);
-	  console.log("xcmtr", c);
 	  break;
       case "xcmtransferdestcandidate":
 	  c.xcmtransferdestcandidates.push(bn);
-	  console.log("xcmdc", c);
 	  break;
       case  "xcmmessages":
 	  c.xcmmessages.push(bn);
-	  console.log("xcmm", c);
 	  break;
       }
       let out = [];
@@ -148,12 +145,10 @@ const chains = <%- JSON.stringify(chains); %>;
 	      
 	  case "xcmtransfer": {
 	      show_message(msg)
-	      console.log("received xcmtransfer", msg);
 	  }
 	      break;
 	  case "xcmmessage":
 	      show_message(msg)
-	      console.log("received xcmmessage", msg);
 	      break;
 	  case "xcmtransferdestcandidate": 
 	      show_message(msg)
@@ -162,7 +157,7 @@ const chains = <%- JSON.stringify(chains); %>;
 	      console.log("UNK", msg);
 	  }
       } catch (err){
-	  console.log(err)
+
       }
 }
 </script>

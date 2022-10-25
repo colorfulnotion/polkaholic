@@ -6,10 +6,8 @@ function parseErrorMsg(errorMsg){
   let idx = errorMsg.indexOf(')')
   let e = errorMsg.substring(0, idx+1)    //Failed(RequiredContractPreApproval)
   let desc = errorMsg.substring(idx+2) //To register a contract, pre-approval is needed for this address'
-  console.log(e, desc)
   return [e, desc]
   } catch(err) {
-     console.log(errorMsg)
   return ["unk", "unk"];
   }
 }

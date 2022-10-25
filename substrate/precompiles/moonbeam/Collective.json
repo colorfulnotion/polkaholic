@@ -1,0 +1,255 @@
+[
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "proposalHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "Closed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "proposalHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "Executed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "who",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint32",
+				"name": "proposalIndex",
+				"type": "uint32"
+			},
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "proposalHash",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint32",
+				"name": "threshold",
+				"type": "uint32"
+			}
+		],
+		"name": "Proposed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "who",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "proposalHash",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "voted",
+				"type": "bool"
+			}
+		],
+		"name": "Voted",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "proposalHash",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint32",
+				"name": "proposalIndex",
+				"type": "uint32"
+			},
+			{
+				"internalType": "uint64",
+				"name": "proposalWeightBound",
+				"type": "uint64"
+			},
+			{
+				"internalType": "uint32",
+				"name": "lengthBound",
+				"type": "uint32"
+			}
+		],
+		"name": "close",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "executed",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes",
+				"name": "proposal",
+				"type": "bytes"
+			}
+		],
+		"name": "execute",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "isMember",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "members",
+		"outputs": [
+			{
+				"internalType": "address[]",
+				"name": "members",
+				"type": "address[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "prime",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "prime",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes",
+				"name": "proposal",
+				"type": "bytes"
+			}
+		],
+		"name": "proposalHash",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "proposalHash",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "proposals",
+		"outputs": [
+			{
+				"internalType": "bytes32[]",
+				"name": "proposalsHash",
+				"type": "bytes32[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint32",
+				"name": "threshold",
+				"type": "uint32"
+			},
+			{
+				"internalType": "bytes",
+				"name": "proposal",
+				"type": "bytes"
+			}
+		],
+		"name": "propose",
+		"outputs": [
+			{
+				"internalType": "uint32",
+				"name": "index",
+				"type": "uint32"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "proposalHash",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint32",
+				"name": "proposalIndex",
+				"type": "uint32"
+			},
+			{
+				"internalType": "bool",
+				"name": "approve",
+				"type": "bool"
+			}
+		],
+		"name": "vote",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+]

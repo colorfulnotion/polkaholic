@@ -35,7 +35,8 @@ function setuptabs(tabs, address) {
         let tabEl = document.querySelector(id);
         tabEl.addEventListener('shown.mdb.tab', function(event) {
             const hash = $(this).attr("href");
-            let newUrl = `/address/` + address + `#${t.target}`
+            let chainIDopturl = chainID ? `/${chainID}` : "";
+            let newUrl = `/address/` + address + chainIDopturl + `#${t.target}`
             setTimeout(() => {
                 showaddresstab(hash, address, chainID);
             }, 250);

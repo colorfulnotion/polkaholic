@@ -85,7 +85,7 @@ function isFloat(n) {
     return Number(n) === n && n % 1 !== 0;
 }
 
-function reverse_endian(hex){
+function reverse_endian(hex) {
     return hex.match(/.{1,2}/g).reverse().join('')
 }
 
@@ -790,7 +790,7 @@ function compute_sovereign_account(parachainID) {
 
 
 function git_hash(isRelativePath = true) {
-    let path = (isRelativePath)? '..' : '/root/go/src/github.com/colorfulnotion/polkaholic'
+    let path = (isRelativePath) ? '..' : '/root/go/src/github.com/colorfulnotion/polkaholic'
     try {
         const rev = fs.readFileSync(`${path}/.git/HEAD`).toString().trim().split(/.*[: ]/).slice(-1)[0];
         if (rev.indexOf('/') === -1) {
@@ -799,7 +799,7 @@ function git_hash(isRelativePath = true) {
             return `${fs.readFileSync(`${path}/.git/` + rev).toString().trim()}`;
         }
     } catch (e) {
-        if (isRelativePath){
+        if (isRelativePath) {
             return git_hash(false)
         }
         console.log(`git_hash err ${e.toString()}`)
@@ -1514,13 +1514,13 @@ module.exports = {
     commitHash: function() {
         return git_hash()
     },
-    u8aAsHex: function(){
+    u8aAsHex: function() {
         return u8aToHex()
     },
-    intToHex: function(int){
+    intToHex: function(int) {
         return bnToHex(int)
     },
-    reverseEndian: function(hex){
+    reverseEndian: function(hex) {
         return reverse_endian(hex)
     },
 };

@@ -82,7 +82,7 @@ module.exports = class XCMTransfer extends XCMTransact {
         let r = recs[0];
         r.paraID = paraTool.getParaIDfromChainID(chainID);
         return r;
-    } 
+    }
 
     async lookup_sectionMethod(chainID, chainIDDest, xcmInteriorKey, evmPreferred = true) {
         let sectionMethodBlacklist = `'utility:batchAll', 'utility:batch', 'timestamp:set'`
@@ -120,11 +120,11 @@ module.exports = class XCMTransfer extends XCMTransact {
 
     async evm_xTokens_transfer(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest) {
         let args = ethTool.xTokenBuilder(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
-	console.log("evm_xTokens_transfer", args);
-	
+        console.log("evm_xTokens_transfer", args);
+
         return [web3Api, args];
     }
-    
+
 
     async evm_assets_withdraw(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest) {
         let args = ethTool.xc20AssetWithdrawBuilder(web3Api, currencyAddress, amount, decimals, beneficiary, chainIDDest)
@@ -525,7 +525,7 @@ module.exports = class XCMTransfer extends XCMTransact {
             case paraTool.chainIDMoonbeam:
             case paraTool.chainIDMoonriver:
             case paraTool.chainIDMoonbase:
-        case 60888:
+            case 60888:
                 //accountKey20 only
                 if (beneficiary.length != accountKey20Len) {
                     isValid = false
@@ -552,163 +552,160 @@ module.exports = class XCMTransfer extends XCMTransact {
         return [isValid, desc]
     }
 
-    get_encoded_xcmTransaction(contract, input, gasLimit = 300000)
-    {
-	let api = this.apis["origination"].api;
-	// ***** TODO: get ethereum call from ethers contract ABI, estimate gasLimit
-	const xcmTransaction = {
-	    V1: {
-		gasLimit,
-		feePayment: "Auto",
-		action: {
-		    Call: contract
-		},
-		value: 0,
-		input,
-		accessList: null
-	    }
-	}
+    get_encoded_xcmTransaction(contract, input, gasLimit = 300000) {
+        let api = this.apis["origination"].api;
+        // ***** TODO: get ethereum call from ethers contract ABI, estimate gasLimit
+        const xcmTransaction = {
+            V1: {
+                gasLimit,
+                feePayment: "Auto",
+                action: {
+                    Call: contract
+                },
+                value: 0,
+                input,
+                accessList: null
+            }
+        }
 
-	// map internaltx to encodedCall
-	const internaltx = api.tx.ethereumXcm.transact(xcmTransaction)
-	let encodedCall = internaltx.toHex();
-	encodedCall = encodedCall.replace("0x810104", "0x"); // why?
-	console.log("GENERATED ethereumXcm.transact", encodedCall);
-	return encodedCall;
+        // map internaltx to encodedCall
+        const internaltx = api.tx.ethereumXcm.transact(xcmTransaction)
+        let encodedCall = internaltx.toHex();
+        encodedCall = encodedCall.replace("0x810104", "0x"); // why?
+        console.log("GENERATED ethereumXcm.transact", encodedCall);
+        return encodedCall;
     }
     // https://docs.moonbeam.network/builders/xcm/xcm-transactor/#xcmtransactor-precompile
     evm_xcmTransactor_transactThroughSigned(account, paraID, paraIDDest, feeLocationAddress, contract, input, chainIDRelay = 60000) {
-	// transactThroughSigned(Multilocation memory dest, address feeLocationAddress, uint64 transactRequiredWeightAtMost, bytes memory call, uint256 feeAmount, uint64 overallWeight) 
-	var xcmTransactorContractAbi = [{
-		"inputs": [
-			{
-				"components": [
-					{
-						"internalType": "uint8",
-						"name": "parents",
-						"type": "uint8"
-					},
-					{
-						"internalType": "bytes[]",
-						"name": "interior",
-						"type": "bytes[]"
-					}
-				],
-				"internalType": "struct XcmTransactorV2.Multilocation",
-				"name": "dest",
-				"type": "tuple"
-			},
-			{
-				"internalType": "address",
-				"name": "feeLocationAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "uint64",
-				"name": "transactRequiredWeightAtMost",
-				"type": "uint64"
-			},
-			{
-				"internalType": "bytes",
-				"name": "call",
-				"type": "bytes"
-			},
-			{
-				"internalType": "uint256",
-				"name": "feeAmount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint64",
-				"name": "overallWeight",
-				"type": "uint64"
-			}
-		],
-		"name": "transactThroughSigned",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	}]
-	var xcmTransactorContractAddress = '0x000000000000000000000000000000000000080d' //this is the precompiled interface
-	var xcmTransactorContract = new this.web3Api.eth.Contract(xcmTransactorContractAbi, xcmTransactorContractAddress);
-	let weight = 6000000000
-	let relayChain = paraTool.getRelayChainByChainID(chainIDRelay)
-	let dest = []
-	dest.push(1) // parents: 1 
-	if (paraIDDest != 0) {
+        // transactThroughSigned(Multilocation memory dest, address feeLocationAddress, uint64 transactRequiredWeightAtMost, bytes memory call, uint256 feeAmount, uint64 overallWeight) 
+        var xcmTransactorContractAbi = [{
+            "inputs": [{
+                    "components": [{
+                            "internalType": "uint8",
+                            "name": "parents",
+                            "type": "uint8"
+                        },
+                        {
+                            "internalType": "bytes[]",
+                            "name": "interior",
+                            "type": "bytes[]"
+                        }
+                    ],
+                    "internalType": "struct XcmTransactorV2.Multilocation",
+                    "name": "dest",
+                    "type": "tuple"
+                },
+                {
+                    "internalType": "address",
+                    "name": "feeLocationAddress",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint64",
+                    "name": "transactRequiredWeightAtMost",
+                    "type": "uint64"
+                },
+                {
+                    "internalType": "bytes",
+                    "name": "call",
+                    "type": "bytes"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "feeAmount",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint64",
+                    "name": "overallWeight",
+                    "type": "uint64"
+                }
+            ],
+            "name": "transactThroughSigned",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        }]
+        var xcmTransactorContractAddress = '0x000000000000000000000000000000000000080d' //this is the precompiled interface
+        var xcmTransactorContract = new this.web3Api.eth.Contract(xcmTransactorContractAbi, xcmTransactorContractAddress);
+        let weight = 6000000000
+        let relayChain = paraTool.getRelayChainByChainID(chainIDRelay)
+        let dest = []
+        dest.push(1) // parents: 1 
+        if (paraIDDest != 0) {
             let parachainHex = paraTool.bnToHex(paraIDDest).substr(2)
             parachainHex = ['0x' + parachainHex.padStart(10, '0')]
             dest.push(parachainHex)
-	}
+        }
 
-	let encodedCall = this.get_encoded_xcmTransaction(contract, input)
-	let transactRequiredWeightAtMost = "8000000000"; // uint64
-	let feeAmount = "30000000000000000"; // uint256
-	let overallWeight = "15000000000"; // uint64
+        let encodedCall = this.get_encoded_xcmTransaction(contract, input)
+        let transactRequiredWeightAtMost = "8000000000"; // uint64
+        let feeAmount = "30000000000000000"; // uint256
+        let overallWeight = "15000000000"; // uint64
 
-	var data = xcmTransactorContract.methods.transactThroughSigned(dest, feeLocationAddress, transactRequiredWeightAtMost, encodedCall, feeAmount, overallWeight).encodeABI()
-	let txStruct = {
+        var data = xcmTransactorContract.methods.transactThroughSigned(dest, feeLocationAddress, transactRequiredWeightAtMost, encodedCall, feeAmount, overallWeight).encodeABI()
+        let txStruct = {
             to: xcmTransactorContractAddress,
             value: '0',
             gas: 2000000,
             data: data
-	}
-	console.log(`evm_xcmTransactor_transactThroughSigned txStruct=`, txStruct)
-	
-	//let sectionMethod = "xcmTransactor:transactThroughSigned";
-	//let func = api.tx.xcmTransactor.transactThroughSigned;
-	//return [sectionMethod, func, args, isEVMTx];	
-	let isEVMTx = true;
-	return [this.web3Api, txStruct]
+        }
+        console.log(`evm_xcmTransactor_transactThroughSigned txStruct=`, txStruct)
+
+        //let sectionMethod = "xcmTransactor:transactThroughSigned";
+        //let func = api.tx.xcmTransactor.transactThroughSigned;
+        //return [sectionMethod, func, args, isEVMTx];	
+        let isEVMTx = true;
+        return [this.web3Api, txStruct]
     }
 
 
-    
+
     // execute xcmTransactor.transactThroughSigned and observe blocks
     // assumes setupAPIs has been set up
     async xcmTransactor_transactThroughSigned(account, paraID, paraIDDest, currencyID, contract, input, chainIDRelay = 60000) {
-	let encodedCall = this.get_encoded_xcmTransaction(contract, input)
-	// ***** TODO: compute this more precisely using paraID / paraIDDest fee model from on chain data + check balances on derivedaccount are sufficient
-	// 30000000000000000 => 0x0000000000000000006a94d74f430000
-	const feeAmount = "30000000000000000"  // check if really optional wrt AssetsTrapped
-	const transactRequiredWeightAtMost = "8000000000" // required
-	const overallWeight = null   // check if really optional wrt AssetsTrapped
+        let encodedCall = this.get_encoded_xcmTransaction(contract, input)
+        // ***** TODO: compute this more precisely using paraID / paraIDDest fee model from on chain data + check balances on derivedaccount are sufficient
+        // 30000000000000000 => 0x0000000000000000006a94d74f430000
+        const feeAmount = "30000000000000000" // check if really optional wrt AssetsTrapped
+        const transactRequiredWeightAtMost = "8000000000" // required
+        const overallWeight = null // check if really optional wrt AssetsTrapped
 
-	//console.log(api.tx.ethereumXcm.transact.toJSON());
-	//console.log(api.tx.xcmTransactor.transactThroughSigned.toJSON());
-	// VersionedMultiLocation
-	let dest = {
-	    V1: {
-		parents: 1,
-		interior: {
-		    X1: {
-			Parachain: paraIDDest
-		    }
-		}
-	    }
-	};
-	// CurrencyPayment<CurrencyIdOf<T>>
-	let fee = {
-	    currency: {
-		AsCurrencyId: {
-		    ForeignAsset: currencyID, 
-		}
-	    },
-	    feeAmount
-	}
-	// TransactWeights
-	let weightInfo = {
-	    transactRequiredWeightAtMost,
-	    overallWeight
-	}
-	
-	let sectionMethod = "xcmTransactor:transactThroughSigned";
-	let func = api.tx.xcmTransactor.transactThroughSigned;
-	let args = [dest, fee, encodedCall, weightInfo];
-	let isEVMTx = false;
-	return [sectionMethod, func, args, isEVMTx];	
+        //console.log(api.tx.ethereumXcm.transact.toJSON());
+        //console.log(api.tx.xcmTransactor.transactThroughSigned.toJSON());
+        // VersionedMultiLocation
+        let dest = {
+            V1: {
+                parents: 1,
+                interior: {
+                    X1: {
+                        Parachain: paraIDDest
+                    }
+                }
+            }
+        };
+        // CurrencyPayment<CurrencyIdOf<T>>
+        let fee = {
+            currency: {
+                AsCurrencyId: {
+                    ForeignAsset: currencyID,
+                }
+            },
+            feeAmount
+        }
+        // TransactWeights
+        let weightInfo = {
+            transactRequiredWeightAtMost,
+            overallWeight
+        }
+
+        let sectionMethod = "xcmTransactor:transactThroughSigned";
+        let func = api.tx.xcmTransactor.transactThroughSigned;
+        let args = [dest, fee, encodedCall, weightInfo];
+        let isEVMTx = false;
+        return [sectionMethod, func, args, isEVMTx];
     }
-    
+
     async xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary, evmPreferred = true) {
         let [isValidBeneficiary, desc] = this.validateBeneficiaryAddress(chainIDDest, beneficiary)
         if (!isValidBeneficiary) {
@@ -749,11 +746,11 @@ module.exports = class XCMTransfer extends XCMTransact {
                 case "evm_xTokens_transfer":
                     if (asset.xcContractAddress) {
                         [func, args] = await this.evm_xTokens_transfer(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest);
-			isEVMTx = 1;
+                        isEVMTx = 1;
                     } else {
-			isEVMTx = 0;
-			[func, args] = await this.xTokens_transfer(version, asset, assetDest, xcm, amount, beneficiary);
-		    }
+                        isEVMTx = 0;
+                        [func, args] = await this.xTokens_transfer(version, asset, assetDest, xcm, amount, beneficiary);
+                    }
                     break;
                 case "polkadotXcm:limitedReserveTransferAssets":
                     [func, args] = await this.polkadotXcm_limitedReserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);

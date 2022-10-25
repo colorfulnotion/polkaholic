@@ -2828,7 +2828,7 @@ module.exports = class ChainParser {
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
                         // dest for parachain, add 20000 for kusama-relay
                         [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
-                    } else if (dest.v1.parents !== undefined && dest.v1.parents == 1 && destV1Interior != undefined && destV1Interior.here !== undefined){
+                    } else if (dest.v1.parents !== undefined && dest.v1.parents == 1 && destV1Interior != undefined && destV1Interior.here !== undefined) {
                         paraIDDest = 0
                         chainIDDest = paraTool.getChainIDFromParaIDAndRelayChain(0, relayChain)
                     } else {
@@ -4270,8 +4270,8 @@ module.exports = class ChainParser {
                 a = await indexer.api.query.currencies.listenAssetsInfo.entries()
                 break;
             case paraTool.chainIDMangataX:
-            //console.log(`fetch assetsInfo:assetsInfo`, indexer.api.query)
-             //   a = await indexer.api.query.assetsInfo.assetsInfo.entries()
+                //console.log(`fetch assetsInfo:assetsInfo`, indexer.api.query)
+                //   a = await indexer.api.query.assetsInfo.assetsInfo.entries()
                 break;
             case paraTool.chainIDBasilisk:
             case paraTool.chainIDHydraDX:

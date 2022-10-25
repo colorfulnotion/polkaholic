@@ -204,7 +204,7 @@
                     beneficiary = (t.isBeneficiaryEVM)? beneficiaryEVM : beneficiarySubstrate
                 }
                 */
-                beneficiary = (t.isBeneficiaryEVM)? beneficiaryEVM : beneficiarySubstrate
+                beneficiary = (t.isBeneficiaryEVM) ? beneficiaryEVM : beneficiarySubstrate
                 let executionInput = {
                     execute: false,
                     origination: chainID,
@@ -217,7 +217,7 @@
                 let argsStr = JSON.stringify(args, null, 4)
                 console.log(`xcmtransfer cli executionInput`, executionInput)
                 console.log(`xcmtransfer cli transcribed ${sectionMethod} args`, argsStr);
-                if (isEVMTx){
+                if (isEVMTx) {
                     var txStruct = args
                     var web3Api = func
                     var signedTx = await ethTool.signEvmTx(web3Api, txStruct, xcmtransfer.evmpair)
@@ -232,5 +232,3 @@
     }
 
     let test = 'auto' // ['autoSubstrate', 'manualSubstrate', 'autoEVM', 'manualEVM', 'auto', 'manuals']
-
-

@@ -51,7 +51,7 @@ if (process.env.NODE_ENV == "development") {
     }))
 } else {
     app.use(express.static('public', {
-        maxAge: '5m'
+        maxAge: '120m'
     }))
 }
 app.use(fileUpload());
@@ -87,6 +87,7 @@ try {
 } catch (err) {
     console.log(err);
 }
+
 
 
 app.use(function(req, res, next) {
@@ -230,7 +231,7 @@ app.get('/login', async (req, res) => {
     try {
         var chains = await query.getChains();
         res.render('login', {
-	    commit: query.commitHash,
+            commit: query.commitHash,
             version: query.indexerInfo,
             chains: chains,
             chainInfo: query.getChainInfo(),
@@ -1338,6 +1339,14 @@ app.get('/address/:address/:chainID?', async (req, res) => {
         }
         let chainList = [];
         let [account, contract] = await query.getAddressContract(address, chainID);
+        if (contract && Array.isArray(contract)) {
+            res.render('searchresults', {
+                search: address,
+                searchresults: contract,
+                chainInfo: query.getChainInfo()
+            })
+            return;
+        }
 
         let chain = contract && contract.chainID ? await query.getChain(contract.chainID, true) : null;
         res.render('address', {
@@ -1345,6 +1354,7 @@ app.get('/address/:address/:chainID?', async (req, res) => {
             contract: contract,
             chainInfo: query.getChainInfo(),
             address: address,
+            chainID: chainID,
             chain: chain,
             claimed: false,
             apiUrl: req.path,
@@ -1770,8 +1780,8 @@ app.get('/xcmexecutor/:src?/:idx?', async (req, res) => {
     let idx = req.params["idx"] ? parseInt(req.params["idx"]) : 0;
     res.render('xcmexecutor', {
         chainInfo: query.getChainInfo(),
-	src: src,
-	idx: idx,
+        src: src,
+        idx: idx,
         apiUrl: req.path,
     });
 })

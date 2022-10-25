@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+// Updates EVM precompiles for networks (Moonbeam, Astar) 
+// Usage:  ./updateEVMPrecompiles
+const Manager = require("./manager");
+
+async function main() {
+    var manager = new Manager();
+    await manager.updateEVMPrecompiles("moonbeam");
+    await manager.updateEVMPrecompiles("astar");
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
+
+

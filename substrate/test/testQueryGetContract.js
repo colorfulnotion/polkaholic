@@ -5,6 +5,7 @@ const Query = require("../query");
 async function main() {
     var query = new Query();
     let address = '0xf3a5454496e26ac57da879bf3285fa85debf0388';
+    address = '0x0000000000000000000000000000000000000804';
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             address = val;

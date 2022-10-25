@@ -331,7 +331,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 */
 
                 // reject legacy fee_currency_id
-                if (a.currency_id != undefined){
+                if (a.currency_id != undefined) {
                     console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivative skip old version`)
                     return outgoingXcmPallet
                 }
@@ -342,9 +342,9 @@ module.exports = class MoonbeamParser extends ChainParser {
 
                 // fee processing
                 let targetedSymbol = false
-                if (a.fee != undefined && a.fee.currency != undefined && a.fee.feeAmount !== undefined){
+                if (a.fee != undefined && a.fee.currency != undefined && a.fee.feeAmount !== undefined) {
                     let [extractedSymbol, _] = this.processFeeStruct(indexer, a.fee, relayChain)
-                    targetedSymbol= extractedSymbol
+                    targetedSymbol = extractedSymbol
                 }
                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.fee)
 
@@ -424,7 +424,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 */
 
                 // reject legacy fee_currency_id
-                if (a.fee_currency_id != undefined){
+                if (a.fee_currency_id != undefined) {
                     console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned skip old version`)
                     return outgoingXcmPallet
                 }
@@ -450,9 +450,9 @@ module.exports = class MoonbeamParser extends ChainParser {
                 }
 
                 */
-                if (a.fee != undefined && a.fee.currency != undefined && a.fee.feeAmount !== undefined){
+                if (a.fee != undefined && a.fee.currency != undefined && a.fee.feeAmount !== undefined) {
                     let [extractedSymbol, _] = this.processFeeStruct(indexer, a.fee, relayChain)
-                    targetedSymbol= extractedSymbol
+                    targetedSymbol = extractedSymbol
                 }
                 //let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.fee)
@@ -462,14 +462,14 @@ module.exports = class MoonbeamParser extends ChainParser {
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned msgHash=${msgHash}, innerCall=${innerCall}`)
 
                 //processing weight_info
-                if (a.weight_info != undefined){
+                if (a.weight_info != undefined) {
                     //TODO
                 }
                 try {
-                    let isEVM  = indexer.getChainEVMStatus(chainIDDest)
+                    let isEVM = indexer.getChainEVMStatus(chainIDDest)
                     let [derivedAccount20, derivedAccount32] = this.calculateMultilocationDerivative(indexer.api, paraID, fromAddress)
-                    r.destAddress = (isEVM)? derivedAccount20 : derivedAccount32
-                }catch (e){
+                    r.destAddress = (isEVM) ? derivedAccount20 : derivedAccount32
+                } catch (e) {
                     console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned calculateMultilocationDerivative failed`, e)
                 }
                 r.xcmInteriorKey = targetedXcmInteriorKey
@@ -485,7 +485,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 // guessing here..
 
                 // reject legacy fee_location
-                if (a.fee_location != undefined){
+                if (a.fee_location != undefined) {
                     console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSovereign skip old version`)
                     return outgoingXcmPallet
                 }
@@ -499,15 +499,15 @@ module.exports = class MoonbeamParser extends ChainParser {
                 }
                 // fee_payer processing
                 let feePayer = '0x' // account20
-                if (a.fee_payer != undefined){
+                if (a.fee_payer != undefined) {
                     feePayer = a.fee_payer
                 }
 
                 // fee_location processing
                 let targetedSymbol = false
-                if (a.fee != undefined && a.fee.currency != undefined && a.fee.feeAmount !== undefined){
+                if (a.fee != undefined && a.fee.currency != undefined && a.fee.feeAmount !== undefined) {
                     let [extractedSymbol, _] = this.processFeeStruct(indexer, a.fee, relayChain)
-                    targetedSymbol= extractedSymbol
+                    targetedSymbol = extractedSymbol
                 }
                 //let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.fee)
@@ -517,15 +517,15 @@ module.exports = class MoonbeamParser extends ChainParser {
 
                 // originKind processing
                 let originKind = 'NA'
-                if (a.origin_kind != undefined){
+                if (a.origin_kind != undefined) {
                     originKind = Object.keys(a.origin_kind)[0]
                 }
                 //processing weight_info
-                if (a.weight_info != undefined){
+                if (a.weight_info != undefined) {
                     //TODO
                 }
-                r.xcmInteriorKey = targetedXcmInteriorKey,
-                r.xcmSymbol = targetedSymbol,
+                r.xcmInteriorKey = targetedXcmInteriorKey
+                r.xcmSymbol = targetedSymbol
                 r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
@@ -654,7 +654,7 @@ module.exports = class MoonbeamParser extends ChainParser {
         "feeAmount": "0x0000000000000000006a94d74f430001"
     }
     */
-    processFeeStruct(indexer, feeStruct, relayChain){
+    processFeeStruct(indexer, feeStruct, relayChain) {
         //TODO: feeAmount is not accurate and potentially null
         let feeCurrency = feeStruct.currency
         let feeType = Object.keys(feeCurrency)[0]
@@ -719,8 +719,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                     //targetedAsset = indexer.getRelayChainAsset()
                     //rawTargetedAsset = indexer.getRelayChainAsset()
                     console.log(`processFeeMultiLocation targetedAsset parents:1, here`, targetedSymbol)
-                }else{
-                }
+                } else {}
                 //} else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
             } else {
                 //v1_id_concrete_interior case [x1/x2/x3]

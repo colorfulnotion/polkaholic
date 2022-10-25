@@ -1341,7 +1341,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     sendWSMessage(m, msgType = null, caller = null) {
-	return;
+        return;
         if (msgType == undefined) msgType = 'Unknown'
         //m.source = this.hostname;
         let wrapper = {
@@ -3219,10 +3219,10 @@ module.exports = class Indexer extends AssetManager {
         let evmTxHash = matcher.transactionHash
         if (evmTxHash == undefined) return
         let txInput = matcher.input.substr(2)
-        let txTo = (matcher.to != undefined)? matcher.to.toLowerCase().substr(2) : ''
-        let txGasLimit = (matcher.gasLimit != undefined)? paraTool.reverseEndian(paraTool.intToHex(matcher.gasLimit).substr(2)) : ''           // little endian
+        let txTo = (matcher.to != undefined) ? matcher.to.toLowerCase().substr(2) : ''
+        let txGasLimit = (matcher.gasLimit != undefined) ? paraTool.reverseEndian(paraTool.intToHex(matcher.gasLimit).substr(2)) : '' // little endian
         //let txValue = (matcher.value != undefined)? paraTool.reverseEndian(paraTool.intToHex(matcher.value).substr(2)) : ''                  // cant match on value because we already modified by decimals...
-        let txCreates = (matcher.creates != undefined)? matcher.creates.toLowerCase().substr(2) : ''
+        let txCreates = (matcher.creates != undefined) ? matcher.creates.toLowerCase().substr(2) : ''
         if (!matcher) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getEvmMsgHashCandidate [${evmTxHash}][${targetBN}], matcher MISSING`)
             return false
@@ -6330,13 +6330,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
                 let decorateTxnStartTS = new Date().getTime()
                 evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmBlock, dTxns, dReceipts, evmTrace, chainID)
-                if (evmFullBlock.transactionsConnected.length > 0 ) {
+                if (evmFullBlock.transactionsConnected.length > 0) {
                     let connectedTxns = []
-                    for (const connectedTxn of evmFullBlock.transactionsConnected){
+                    for (const connectedTxn of evmFullBlock.transactionsConnected) {
                         try {
                             let msgHash = this.getEvmMsgHashCandidate(blockNumber, connectedTxn, 'evm')
                             if (msgHash) connectedTxn.msgHash = msgHash
-                        } catch (e){
+                        } catch (e) {
                             console.log(`[${blockNumber}] [${connectedTxn.transactionHash}] connectTransaction `, e, connectedTxn)
                         }
                         connectedTxns.push(connectedTxn)
