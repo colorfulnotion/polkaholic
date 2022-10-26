@@ -576,8 +576,7 @@ module.exports = class XCMTransfer extends XCMTransact {
         return encodedCall;
     }
     // https://docs.moonbeam.network/builders/xcm/xcm-transactor/#xcmtransactor-precompile
-    evm_xcmTransactor_transactThroughSigned(account, paraID, paraIDDest, feeLocationAddress, contract, input, chainIDRelay = 60000) {
-        // transactThroughSigned(Multilocation memory dest, address feeLocationAddress, uint64 transactRequiredWeightAtMost, bytes memory call, uint256 feeAmount, uint64 overallWeight) 
+    evm_xcmTransactor_transactThroughSigned(account, paraID, paraIDDest, feeLocationAddress, contract, input, chainIDRelay = 60000, useMultilocation = false) {
         var xcmTransactorContractAbi = [{
             "inputs": [{
                     "components": [{
@@ -625,7 +624,70 @@ module.exports = class XCMTransfer extends XCMTransact {
             "outputs": [],
             "stateMutability": "nonpayable",
             "type": "function"
-        }]
+        },
+	{
+		"inputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint8",
+						"name": "parents",
+						"type": "uint8"
+					},
+					{
+						"internalType": "bytes[]",
+						"name": "interior",
+						"type": "bytes[]"
+					}
+				],
+				"internalType": "struct XcmTransactorV2.Multilocation",
+				"name": "dest",
+				"type": "tuple"
+			},
+			{
+				"components": [
+					{
+						"internalType": "uint8",
+						"name": "parents",
+						"type": "uint8"
+					},
+					{
+						"internalType": "bytes[]",
+						"name": "interior",
+						"type": "bytes[]"
+					}
+				],
+				"internalType": "struct XcmTransactorV2.Multilocation",
+				"name": "feeLocation",
+				"type": "tuple"
+			},
+			{
+				"internalType": "uint64",
+				"name": "transactRequiredWeightAtMost",
+				"type": "uint64"
+			},
+			{
+				"internalType": "bytes",
+				"name": "call",
+				"type": "bytes"
+			},
+			{
+				"internalType": "uint256",
+				"name": "feeAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint64",
+				"name": "overallWeight",
+				"type": "uint64"
+			}
+		],
+		"name": "transactThroughSignedMultilocation",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+				       ]
         var xcmTransactorContractAddress = '0x000000000000000000000000000000000000080d' //this is the precompiled interface
         var xcmTransactorContract = new this.web3Api.eth.Contract(xcmTransactorContractAbi, xcmTransactorContractAddress);
         let weight = 6000000000
@@ -644,6 +706,12 @@ module.exports = class XCMTransfer extends XCMTransact {
         let overallWeight = "15000000000"; // uint64
 
         var data = xcmTransactorContract.methods.transactThroughSigned(dest, feeLocationAddress, transactRequiredWeightAtMost, encodedCall, feeAmount, overallWeight).encodeABI()
+        if ( useMultiLocation ) {
+	    // TODO: compute feeLocation
+	    let feeLocation = [] 
+            // transactThroughSignedMultilocation(Multilocation memory dest, tuple feeLocation, uint64 transactRequiredWeightAtMost, bytes memory call, uint256 feeAmount, uint64 overallWeight)
+            var data = xcmTransactorContract.methods.transactThroughSignedMultilocation(dest, feeLocation, transactRequiredWeightAtMost, encodedCall, feeAmount, overallWeight).encodeABI()
+	}
         let txStruct = {
             to: xcmTransactorContractAddress,
             value: '0',
@@ -652,10 +720,6 @@ module.exports = class XCMTransfer extends XCMTransact {
         }
         console.log(`evm_xcmTransactor_transactThroughSigned txStruct=`, txStruct)
 
-        //let sectionMethod = "xcmTransactor:transactThroughSigned";
-        //let func = api.tx.xcmTransactor.transactThroughSigned;
-        //return [sectionMethod, func, args, isEVMTx];	
-        let isEVMTx = true;
         return [this.web3Api, txStruct]
     }
 
@@ -663,7 +727,7 @@ module.exports = class XCMTransfer extends XCMTransact {
 
     // execute xcmTransactor.transactThroughSigned and observe blocks
     // assumes setupAPIs has been set up
-    async xcmTransactor_transactThroughSigned(account, paraID, paraIDDest, currencyID, contract, input, chainIDRelay = 60000) {
+    async xcmTransactor_transactThroughSigned(account, paraID, paraIDDest, currencyID, contract, input, chainIDRelay = 60000, useMultilocation = false) {
         let encodedCall = this.get_encoded_xcmTransaction(contract, input)
         // ***** TODO: compute this more precisely using paraID / paraIDDest fee model from on chain data + check balances on derivedaccount are sufficient
         // 30000000000000000 => 0x0000000000000000006a94d74f430000
@@ -693,6 +757,19 @@ module.exports = class XCMTransfer extends XCMTransact {
             },
             feeAmount
         }
+	if ( useMultiLocation ) {
+            fee = {
+		currency: {
+                    AsMultiLocation: {
+			X2: {
+			    Parachain: paraIDDest,
+			    PalletInstance: 3
+			}
+                    }
+		},
+		feeAmount
+            }
+	}
         // TransactWeights
         let weightInfo = {
             transactRequiredWeightAtMost,
@@ -706,6 +783,8 @@ module.exports = class XCMTransfer extends XCMTransact {
         return [sectionMethod, func, args, isEVMTx];
     }
 
+
+    
     async xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary, evmPreferred = true) {
         let [isValidBeneficiary, desc] = this.validateBeneficiaryAddress(chainIDDest, beneficiary)
         if (!isValidBeneficiary) {

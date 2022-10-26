@@ -56,9 +56,11 @@ async function main() {
     xcmtransact.setupEvmPair();
     xcmtransact.setupEvmPairFromMnemonic()
     let execute = true;
-    let isEVMTx = true;
+    let isEVMTx = false;
+    let useMultilocation = false;
     if (isEVMTx){
-	let [web3Api, txStruct] = await xcmtransact.evm_xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, feePaymentAddress, contract, input, chainIDRelay);
+	//let [web3Api, txStruct] = await xcmtransact.evm_xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, feePaymentAddress, contract, input, chainIDRelay);
+        let [web3Api, txStruct] = await xcmtransact.evm_xcmTransactor_transactThroughSignedMultilocation(address, paraID, paraIDDest, feePaymentAddress, contract, input, chainIDRelay, useMultilocation);
         var signedTx = await ethTool.signEvmTx(web3Api, txStruct, xcmtransact.evmpair)
         var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
         console.log(`signedTx`, signedTx, `decodedTx`, decodedTx)
@@ -99,5 +101,3 @@ main()
         console.error('ERROR', e);
         process.exit(1);
     });
-
-
