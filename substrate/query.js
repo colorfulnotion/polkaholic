@@ -7315,7 +7315,7 @@ module.exports = class Query extends AssetManager {
         await this.update_batchedSQL();
     }
 
-    async getMultilocation(chainID_or_chainName){
+    async getMultilocation(chainID_or_chainName) {
         return {}
     }
 

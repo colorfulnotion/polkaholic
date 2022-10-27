@@ -756,12 +756,12 @@ module.exports = class XCMTransfer extends XCMTransact {
         }
         if (useMultiLocation) {
             fee = {
-                currency: {
-                    AsMultiLocation: {
-                        V1: {
-                            parents: 1,
-                            interior: {
-                                X2: [
+                    currency: {
+                        AsMultiLocation: {
+                            V1: {
+                                parents: 1,
+                                interior: {
+                                    X2: [
                                         Parachain: paraIDDest,
                                         PalletInstance: 3
                                     ]
@@ -771,111 +771,111 @@ module.exports = class XCMTransfer extends XCMTransact {
                     }
                 },
                 feeAmount
-            }
         }
-        // TransactWeights
-        let weightInfo = {
-            transactRequiredWeightAtMost,
-            overallWeight
-        }
-
-        let sectionMethod = "xcmTransactor:transactThroughSigned";
-        let func = api.tx.xcmTransactor.transactThroughSigned;
-        let args = [dest, fee, encodedCall, weightInfo];
-        let isEVMTx = false;
-        return [sectionMethod, func, args, isEVMTx];
+    }
+    // TransactWeights
+    let weightInfo = {
+        transactRequiredWeightAtMost,
+        overallWeight
     }
 
+    let sectionMethod = "xcmTransactor:transactThroughSigned";
+    let func = api.tx.xcmTransactor.transactThroughSigned;
+    let args = [dest, fee, encodedCall, weightInfo];
+    let isEVMTx = false;
+    return [sectionMethod, func, args, isEVMTx];
+}
 
 
-    async xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary, evmPreferred = true) {
-        let [isValidBeneficiary, desc] = this.validateBeneficiaryAddress(chainIDDest, beneficiary)
-        if (!isValidBeneficiary) {
-            console.log(`xcmtransfer warning: ${desc}`);
-            return [null, null, null, null];
+
+async xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary, evmPreferred = true) {
+    let [isValidBeneficiary, desc] = this.validateBeneficiaryAddress(chainIDDest, beneficiary)
+    if (!isValidBeneficiary) {
+        console.log(`xcmtransfer warning: ${desc}`);
+        return [null, null, null, null];
+    }
+
+    let chain = await this.getChain(chainID)
+    await this.setupAPI(chain)
+    let relayChain = paraTool.getRelayChainByChainID(chainID)
+    let isEVMTx = 0
+    try {
+        let xcmInteriorKey = await this.lookupSymbolXCMInteriorKey(symbol, relayChain);
+        let asset = await this.lookupChainAsset(chainID, xcmInteriorKey);
+        let assetDest = await this.lookupChainAsset(chainIDDest, xcmInteriorKey);
+        let [sectionMethod, version] = await this.lookup_sectionMethod(chainID, chainIDDest, xcmInteriorKey, evmPreferred);
+        let xcm = this.parse_xcmInteriorKey(xcmInteriorKey, symbol);
+        let func = null,
+            args = null;
+        if (assetDest == undefined || assetDest.decimals == undefined) {
+            console.log("no decimals for assetDest", assetDest, "xcmInteriorKey", xcmInteriorKey, "chainIDDest", chainIDDest);
+            return ([null, null, null]);
         }
 
-        let chain = await this.getChain(chainID)
-        await this.setupAPI(chain)
-        let relayChain = paraTool.getRelayChainByChainID(chainID)
-        let isEVMTx = 0
-        try {
-            let xcmInteriorKey = await this.lookupSymbolXCMInteriorKey(symbol, relayChain);
-            let asset = await this.lookupChainAsset(chainID, xcmInteriorKey);
-            let assetDest = await this.lookupChainAsset(chainIDDest, xcmInteriorKey);
-            let [sectionMethod, version] = await this.lookup_sectionMethod(chainID, chainIDDest, xcmInteriorKey, evmPreferred);
-            let xcm = this.parse_xcmInteriorKey(xcmInteriorKey, symbol);
-            let func = null,
-                args = null;
-            if (assetDest == undefined || assetDest.decimals == undefined) {
-                console.log("no decimals for assetDest", assetDest, "xcmInteriorKey", xcmInteriorKey, "chainIDDest", chainIDDest);
-                return ([null, null, null]);
-            }
+        if ((chainID == 2 || chainID == 21000) && chainIDDest == 22000) version = "v0";
+        if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta) {
+            sectionMethod = 'evm_xTokens_transfer'
+        }
 
-            if ((chainID == 2 || chainID == 21000) && chainIDDest == 22000) version = "v0";
-            if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta) {
-                sectionMethod = 'evm_xTokens_transfer'
-            }
-
-            switch (sectionMethod) {
-                case "assets_withdraw:0xecf766ff":
-                case "assets_withdraw:0x019054d0":
-                    if (asset.xcContractAddress) {
-                        [func, args] = await this.evm_assets_withdraw(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest);
-                        isEVMTx = 1
-                    }
-                    break;
-                case "evm_xTokens_transfer":
-                    if (asset.xcContractAddress) {
-                        [func, args] = await this.evm_xTokens_transfer(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest);
-                        isEVMTx = 1;
-                    } else {
-                        isEVMTx = 0;
-                        [func, args] = await this.xTokens_transfer(version, asset, assetDest, xcm, amount, beneficiary);
-                    }
-                    break;
-                case "polkadotXcm:limitedReserveTransferAssets":
-                    [func, args] = await this.polkadotXcm_limitedReserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "polkadotXcm:limitedTeleportAssets":
-                    [func, args] = await this.polkadotXcm_limitedTeleportAssets(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "polkadotXcm:reserveTransferAssets":
-                    [func, args] = await this.polkadotXcm_reserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "polkadotXcm:reserveWithdrawAssets":
-                    [func, args] = await this.polkadotXcm_reserveWithdrawAssets(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "polkadotXcm:teleportAssets":
-                    [func, args] = await this.polkadotXcm_teleportAssets(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "xcmPallet:limitedReserveTransferAssets":
-                    [func, args] = await this.xcmPallet_limitedReserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "xcmPallet:limitedTeleportAssets":
-                    [func, args] = await this.xcmPallet_limitedTeleportAssets(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "xcmPallet:reserveTransferAssets":
-                    [func, args] = await this.xcmPallet_reserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "xcmPallet:teleportAssets":
-                    [func, args] = await this.xcmPallet_teleportAssets(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "xTokens:transfer":
+        switch (sectionMethod) {
+            case "assets_withdraw:0xecf766ff":
+            case "assets_withdraw:0x019054d0":
+                if (asset.xcContractAddress) {
+                    [func, args] = await this.evm_assets_withdraw(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest);
+                    isEVMTx = 1
+                }
+                break;
+            case "evm_xTokens_transfer":
+                if (asset.xcContractAddress) {
+                    [func, args] = await this.evm_xTokens_transfer(this.web3Api, asset.xcContractAddress, amount, asset.decimals, beneficiary, chainIDDest);
+                    isEVMTx = 1;
+                } else {
+                    isEVMTx = 0;
                     [func, args] = await this.xTokens_transfer(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "xTokens:transferMulticurrencies":
-                    [func, args] = await this.xTokens_transferMulticurrencies(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-                case "xTransfer:transfer":
-                    [func, args] = await this.xTransfer_transfer(version, asset, assetDest, xcm, amount, beneficiary);
-                    break;
-            }
-            return [sectionMethod, func, args, isEVMTx];
-        } catch (err) {
-            console.log(err);
-            return [null, null, null, null];
+                }
+                break;
+            case "polkadotXcm:limitedReserveTransferAssets":
+                [func, args] = await this.polkadotXcm_limitedReserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "polkadotXcm:limitedTeleportAssets":
+                [func, args] = await this.polkadotXcm_limitedTeleportAssets(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "polkadotXcm:reserveTransferAssets":
+                [func, args] = await this.polkadotXcm_reserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "polkadotXcm:reserveWithdrawAssets":
+                [func, args] = await this.polkadotXcm_reserveWithdrawAssets(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "polkadotXcm:teleportAssets":
+                [func, args] = await this.polkadotXcm_teleportAssets(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "xcmPallet:limitedReserveTransferAssets":
+                [func, args] = await this.xcmPallet_limitedReserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "xcmPallet:limitedTeleportAssets":
+                [func, args] = await this.xcmPallet_limitedTeleportAssets(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "xcmPallet:reserveTransferAssets":
+                [func, args] = await this.xcmPallet_reserveTransferAssets(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "xcmPallet:teleportAssets":
+                [func, args] = await this.xcmPallet_teleportAssets(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "xTokens:transfer":
+                [func, args] = await this.xTokens_transfer(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "xTokens:transferMulticurrencies":
+                [func, args] = await this.xTokens_transferMulticurrencies(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
+            case "xTransfer:transfer":
+                [func, args] = await this.xTransfer_transfer(version, asset, assetDest, xcm, amount, beneficiary);
+                break;
         }
+        return [sectionMethod, func, args, isEVMTx];
+    } catch (err) {
+        console.log(err);
+        return [null, null, null, null];
     }
+}
 
 }
