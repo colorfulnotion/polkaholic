@@ -83,6 +83,17 @@ function initPolkadorJSAPI() {
   return
 }
 
+async function initPolkadotAPI(){
+    if (apiParser != undefined){
+        console.log(`polkadotjs already initiated`)
+        return
+    }
+    var api = await ApiPromise.create()
+    await api.isReady;
+    apiParser = api
+    console.log(`initiated polkadotjs api`)
+}
+
 function q(inp) {
     return ("'" + inp + "'");
 }
@@ -824,6 +835,9 @@ function toByteArray(hexString) {
   return result;
 }
 
+function convert_xcmInteriorKey_to_moonbeam_xcmV1MultiLocationByte(){
+    
+}
 function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = '[{"parachain":1000},{"palletInstance":3}]~moonbase-relay', isUppercase = false) {
     try {
         let pieces = xcmInteriorKey.split(assetChainSeparator);
@@ -864,6 +878,25 @@ function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = '[{"parac
         return false
     }
 }
+
+function convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation){
+    if (apiParser == undefined) {
+        console.log(`need to init polkdotjs api`)
+        initPolkadorJSAPI()
+    }
+    let multilocationStruct = {}
+    if (xcmV1MultiLocation.v1 != undefined) multilocationStruct = xcmV1MultiLocation.v1
+    if (xcmV1MultiLocation.V1 != undefined) multilocationStruct = xcmV1MultiLocation.V1
+    let multiLocationHex = false
+    try {
+        let multilocation = apiParser.createType('XcmV1MultiLocation', multilocationStruct)
+        multiLocationHex = u8aToHex(multilocation.toU8a())
+    }catch(e){
+        console.log(`xcmV1MultiLocation_to_byte error`, e)
+    }
+    return multiLocationHex
+}
+
 
 class NotFoundError extends Error {
     constructor(message) {
@@ -1584,7 +1617,13 @@ module.exports = {
     convertXCMInteriorKeyToXcmV1MultiLocation: function(xcmInteriorKey, isUppercase) {
         return convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey, isUppercase)
     },
+    convertXCMV1MultiLocationToByte: function(xcmV1MultiLocation){
+        return convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation)
+    },
     initPolkadorJSAPI: function() {
         return initPolkadorJSAPI()
     },
+    async initPolkadotAPI(){
+        return initPolkadotAPI()
+    }
 };
