@@ -690,7 +690,7 @@ module.exports = class XCMTransfer extends XCMTransact {
         let weight = 6000000000
         let relayChain = paraTool.getRelayChainByChainID(chainIDRelay)
         let dest = []
-        dest.push(1) // parents: 1 
+        dest.push(1) // parents: 1
         if (paraIDDest != 0) {
             let parachainHex = paraTool.bnToHex(paraIDDest).substr(2)
             parachainHex = ['0x' + parachainHex.padStart(10, '0')]
@@ -758,9 +758,15 @@ module.exports = class XCMTransfer extends XCMTransact {
             fee = {
                 currency: {
                     AsMultiLocation: {
-                        X2: {
-                            Parachain: paraIDDest,
-                            PalletInstance: 3
+                        V1: {
+                            parents: 1,
+                            interior: {
+                                X2: [
+                                        Parachain: paraIDDest,
+                                        PalletInstance: 3
+                                    ]
+                                }
+                            }
                         }
                     }
                 },

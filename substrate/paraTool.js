@@ -64,7 +64,24 @@ const {
     extractAuthor
 } = require('@polkadot/api-derive/type/util')
 
+const {
+    ApiPromise,
+} = require('@polkadot/api');
+
 const assetChainSeparator = "~"
+
+let apiParser = null
+function initPolkadorJSAPI() {
+  if (apiParser) {
+      console.log(`polkadot.js API already set`)
+      return
+  }
+  ApiPromise.create().then((api) => {
+     console.log(`setting polkadot.js once`)
+     apiParser = api
+  })
+  return
+}
 
 function q(inp) {
     return ("'" + inp + "'");
@@ -342,19 +359,6 @@ function parseSectionMethod(e) {
     }
 }
 
-/*
-{
-  "method": {
-    "pallet": "balances",
-    "method": "Transfer"
-  },
-  "data": [
-    "1qnJN7FViy3HZaxZK9tGAA71zxHSBeUweirKqCaox4t8GT7",
-    "1b8tb8N1Nu3CQzF6fctE3p2es7KoMoiWSABe7e4jw22hngm",
-    504494000000
-  ]
-}
-*/
 function is_transfer_event(pallet, method, data) {
     let pallet_method = `${pallet}:${method}`
     if (pallet_method == "balances:Transfer") return (true);
@@ -440,7 +444,6 @@ function get_lifetime(current, r) {
     return [birth, death]
 }
 
-//TODO: the computation is off by one?
 function lifetime(currentBN, periodBN, phaseBN) {
     let current = bnToBn(currentBN).toNumber()
     let period = bnToBn(periodBN).toNumber()
@@ -804,6 +807,61 @@ function git_hash(isRelativePath = true) {
         }
         console.log(`git_hash err ${e.toString()}`)
         return `NA`
+    }
+}
+
+function toHexString(byteArray) {
+  return Array.prototype.map.call(byteArray, function(byte) {
+    return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+  }).join('');
+}
+
+function toByteArray(hexString) {
+  var result = [];
+  for (var i = 0; i < hexString.length; i += 2) {
+    result.push(parseInt(hexString.substr(i, 2), 16));
+  }
+  return result;
+}
+
+function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = '[{"parachain":1000},{"palletInstance":3}]~moonbase-relay', isUppercase = false) {
+    try {
+        let pieces = xcmInteriorKey.split(assetChainSeparator);
+        let assetUnparsed = pieces[0];
+        let relayChain = (pieces.length > 1) ? pieces[1] : undefined;
+        // always use parent as reference
+        let xcmVersionedMultiLocation = {}
+        let xcmV1MultiLocation = {
+            parents: 1,
+            interior: {}
+        }
+        if (assetUnparsed == 'here'){
+            xcmV1MultiLocation.interior = {
+                here: null
+            }
+        }else {
+            let interior = JSON.parse(assetUnparsed)
+            let interiorN = interior.length
+            let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
+            if (interiorN == 0) {
+                xcmV1MultiLocation.interior = {
+                    here: null
+                }
+            } else if (interiorN == 1) {
+                xcmV1MultiLocation.interior[interiorType] = interior[0]
+            } else {
+                let interiorValArr = []
+                for (const inter of interior) {
+                    interiorValArr.push(inter)
+                }
+                xcmV1MultiLocation.interior[interiorType] = interiorValArr
+            }
+        }
+        let versionType = (isUppercase) ? `V1` : `v1`
+        xcmVersionedMultiLocation[versionType] = xcmV1MultiLocation
+        return xcmVersionedMultiLocation
+    } catch (e){
+        return false
     }
 }
 
@@ -1522,5 +1580,11 @@ module.exports = {
     },
     reverseEndian: function(hex) {
         return reverse_endian(hex)
+    },
+    convertXCMInteriorKeyToXcmV1MultiLocation: function(xcmInteriorKey, isUppercase) {
+        return convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey, isUppercase)
+    },
+    initPolkadorJSAPI: function() {
+        return initPolkadorJSAPI()
     },
 };
