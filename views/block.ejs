@@ -97,6 +97,15 @@ let defHash = "#overview";
     </td>
   </tr>
     <% } %>
+    <% if ( b.transactionsConnected ) { %>
+  <tr>
+    <td># XCM Remote Executions</td>
+    <td>
+    <a class="btn-sm btn-primary" href='/xcmtransfers?chainfilters=<%= id; %>&blockNumber=<%= blockNumber %>'><%= b.transactionsConnected.length; %> Remote Executions</a>
+    </td>
+  </tr>
+    <% } %>
+    
   <% if ( b.numXCMMessagesIn > 0 || b.numXCMMessagesOut > 0 ) { %>
   <tr>
     <td>XCM Messages</td>

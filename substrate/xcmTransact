@@ -72,9 +72,9 @@ async function main() {
             console.log(`signedTX result=`, result)
         }
     } else {
+	let [sectionMethod, func, args, isEVMTx] = await xcmtransact.xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, currencyID, contract, input, chainIDRelay);
 	let argsStr = JSON.stringify(args, null, 4)
 	console.log(`${sectionMethod} args`, argsStr);
-	let [sectionMethod, func, args, isEVMTx] = await xcmtransact.xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, currencyID, contract, input, chainIDRelay);
         let xcmTxn = func.apply(null, args)
 	console.log("transactThroughSigned", xcmTxn.toHex());
         const { partialFee, weight } = await xcmTxn.paymentInfo(xcmtransact.pair);

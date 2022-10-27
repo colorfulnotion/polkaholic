@@ -91,9 +91,9 @@ let tabs = [
 ];
 
 if ( contract ) {
-  tabs.splice(1, 0, { title: "Internal Txns", target: "transfers" });
-  tabs.splice(2, 0, { title: "ERC20 Token Txns", target: "erc20" });
-  tabs.splice(3, 0, { title: "Contract", target: "contract" });
+  //tabs.splice(1, 0, { title: "Internal Txns", target: "internal" });
+  tabs.splice(1, 0, { title: "ERC20 Token Txns", target: "erc20" });
+  tabs.splice(2, 0, { title: "Contract", target: "contract" });
 }
 
 for (let i=0; i<tabs.length; i++) {
@@ -220,6 +220,10 @@ let chainID = '<%= chainID; %>';
 let chain = <%- JSON.stringify(chain); %>;
 let requestedChainAddress = '<%= address; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
+<%
+let isContract = ( contract && chainID ) ? true : false;
+%>
+let isContract = <%= isContract; %>;
 let chainListStr = '<%= chainListStr; %>';
 let isEVM = 1;
 </script>

@@ -7285,13 +7285,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         this.batchedSQL.push(sql0);
         await this.update_batchedSQL(10.0);
     }
-    
+
     async update_chain_assets(chain, daysago = 2) {
         try {
             let chainID = chain.chainID;
-	    if ( chainID == 0 ) {
-		await this.update_xcm_count(daysago);
-	    }
+            if (chainID == 0) {
+                await this.update_xcm_count(daysago);
+            }
             let eflds = ", numTransactionsEVM, numReceiptsEVM, gasUsed, gasLimit, numEVMBlocks";
             let evals = ", 0, 0, 0, 0, 0";
             let eupds = ", numTransactionsEVM = values(numTransactionsEVM), numReceiptsEVM = values(numReceiptsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit), numEVMBlocks = values(numEVMBlocks)";

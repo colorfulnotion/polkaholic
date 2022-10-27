@@ -11,49 +11,49 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 <table class="table table-hover table-bordered">
   <tbody>
     <tr>
-      <td>Transaction Hash</td>
+      <td><%- include("tooltip", {k: "transactionhash"}) %>Transaction Hash</td>
       <td>
         <code><%= f.transactionHash; %></code>
       </td>
     </tr>
     <% if ( tx.substrate  ) { %>
     <tr>
-      <td>Substrate Tx / Extrinsic ID</td>
+      <td><%- include("tooltip", {k: "txextrinsichash"}) %>Substrate Extrinsic ID</td>
       <td><%- uiTool.presentFullTx(tx.substrate.extrinsicHash); %> <a href='/tx/<%= tx.substrate.extrinsicHash; %>'><%= f.chainName; %> <%= tx.substrate.extrinsicID; %></a></td>
     </tr>
     <% } %>
     <% if ( tx.isConnectedCall && tx.msgHash) { %>
     <tr>
-      <td>Connected Contract Call</td>
+      <td><%- include("tooltip", {k: "connectedcontractcall"}) %>Connected Contract Call</td>
       <td><a href='/xcmmessage/<%= `${tx.msgHash}/${tx.blockNumber}`; %>'><%= tx.msgHash; %></a></td>
     </tr>
     <% } %>
 <% if ( f.xcmInfo != undefined ) { %>
     <tr>
-      <td>XCM Timeline</td>
+      <td><%- include("tooltip", {k: "xcmtimeline"}) %>XCM Timeline</td>
       <td><%- include("xcminfo", {xcm: f.xcmInfo}); %></td>
     </tr>
 <% } %>
     <tr>
-      <td>Status</td>
+      <td><%- include("tooltip", {k: "txresult"}) %>Status</td>
       <td><%- include("txResult", {success: txResult, errorMsg: errStr}); %></td>
     </tr>
     <tr>
-      <td>Finalized</td>
+      <td><%- include("tooltip", {k: "finalized"}) %>Finalized</td>
       <td><span id="status"><%- include("finalized", {finalized: (f.status=="finalized")}); %></span></td>
     </tr>
     <tr>
-      <td>Block</td>
+      <td><%- include("tooltip", {k: "block"}) %>Block</td>
       <td>
         <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.blockNumber}); %>
       </td>
     </tr>
     <tr>
-      <td>Timestamp</td>
+      <td><%- include("tooltip", {k: "txtimestamp"}) %>Timestamp</td>
       <td class='date'><%= uiTool.presentSecondsAgoTS(f.timestamp) %> (<%= dateString; %>) </td>
     </tr>
     <tr>
-      <td>From</td>
+      <td><%- include("tooltip", {k: "evmfrom"}) %>From</td>
       <td>
     <%- uiTool.presentBlockiesOrIdenticon(f.from, 20) %>
 	<%- uiTool.presentAddress(f.from) %>
@@ -61,7 +61,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
     </tr>
 <% if ( tx.to) { %>
     <tr>
-      <td>Interacted With (To)</td>
+      <td><%- include("tooltip", {k: "evmto"}) %>Interacted With (To)</td>
       <td>
        <%- uiTool.presentBlockiesOrIdenticon(f.to, 20) %>
 	<%- uiTool.presentAddress(f.to) %>
@@ -70,7 +70,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 <% } %>
 <% if ( tx.creates) { %>
     <tr>
-      <td>To</td>
+      <td><%- include("tooltip", {k: "evmcreates"}) %>To</td>
       <td>
        <%- uiTool.presentBlockiesOrIdenticon(tx.creates, 20) %>
        [Contract <%- uiTool.presentAddress(tx.creates) %> Created]
@@ -79,7 +79,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 <% } %>
 <% if ( tx.transfers && tx.transfers.length > 0 ) { %>
     <tr>
-      <td>Tokens Transferred</td>
+      <td><%- include("tooltip", {k: "tokenstransferred"}) %>Tokens Transferred</td>
       <td>
         <table>
 	  <tr>
@@ -103,7 +103,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
     </tr>
 <% } %>
     <tr>
-      <td>Value</td>
+      <td><%- include("tooltip", {k: "evmvalue"}) %>Value</td>
 
       <td><%- tx.value; %> <%- tx.symbol %>
       <% if ( tx.valueUSD) { %>
@@ -113,7 +113,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
     </tr>
 
     <tr>
-      <td>Transaction Fee</td>
+      <td><%- include("tooltip", {k: "evmtxfee"}) %>Transaction Fee</td>
       <td><%- tx.fee; %> <%- tx.symbol; %>
       <% if ( tx.feeUSD) { %>
       (<%- uiTool.currencyFormat(tx.feeUSD, tx.priceUSD, tx.priceUSDCurrent); %> )
@@ -123,75 +123,88 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 
 <% if ( tx.gasLimit ) { %>
     <tr>
-      <td>Gas Limit</td>
+      <td><%- include("tooltip", {k: "txgaslimit"}) %>Gas Limit</td>
       <td><%- tx.gasLimit; %></td>
     </tr>
 <% } %>
     <tr>
-      <td>Gas Used by Transaction</td>
+      <td><%- include("tooltip", {k: "txgasused"}) %>Gas Used by Transaction</td>
       <td><%- tx.gasUsed; %><% if ( tx.gasLimit ) { %><%- ` (${uiTool.presentPercentage(tx.gasUsed/tx.gasLimit)})` %><% } %></td>
     </tr>
 <% if ( tx.baseFeePerGas ) { %>
     <tr>
-      <td>Base Fee Per Gas</td>
+      <td><%- include("tooltip", {k: "basefeepergas"}) %>Base Fee Per Gas</td>
       <td><%- uiTool.presentGasPrice(tx.baseFeePerGas, tx.symbol); %></td>
     </tr>
 <% } %>
 <% if ( tx.maxFeePerGas != undefined) { %>
     <tr>
-      <td>Max Fee Per Gas</td>
+      <td><%- include("tooltip", {k: "maxfeepergas"}) %>Max Fee Per Gas</td>
       <td><%- uiTool.presentGasPrice(tx.maxFeePerGas, tx.symbol); %></td>
     </tr>
 <% } %>
 <% if ( tx.maxPriorityFeePerGas != undefined) { %>
     <tr>
-      <td>Max Priority Fee Per Gas</td>
+      <td><%- include("tooltip", {k: "maxpriorityfeepergas"}) %>Max Priority Fee Per Gas</td>
       <td><%- uiTool.presentGasPrice(tx.maxPriorityFeePerGas, tx.symbol); %></td>
     </tr>
 <% } %>
 <% if ( tx.burnedFee != undefined) { %>
     <tr>
-      <td>Burned Fees</td>
+      <td><%- include("tooltip", {k: "burnedfees"}) %>Burned Fees</td>
       <td><%- tx.burnedFee; %> <%- tx.symbol; %> </td>
     </tr>
 <% } %>
 <% if ( tx.txnSaving != undefined) { %>
     <tr>
-      <td>Txn Savings</td>
+      <td><%- include("tooltip", {k: "txnsavings"}) %>Txn Savings</td>
       <td><%- tx.txnSaving; %> <%- tx.symbol; %> </td>
     </tr>
 <% } %>
 <% if ( tx.gasPrice ) { %>
     <tr>
-      <td>Gas Price</td>
+      <td><%- include("tooltip", {k: "gasprice"}) %>Gas Price</td>
       <td><%- uiTool.presentGasPrice(tx.gasPrice, tx.symbol); %></td>
     </tr>
 <% } %>
 <% if ( tx.txType != undefined ) { %>
     <tr>
-      <td>Txn Type</td>
+      <td><%- include("tooltip", {k: "txntype"}) %>Txn Type</td>
       <td><%- uiTool.getEvmTxnType(tx.txType); %> </td>
     </tr>
 <% } %>
 <% if ( tx.priceUSD) { %>
     <tr>
-      <td><%- tx.symbol; %> Price</td>
+      <td><%- include("tooltip", {k: "evmprice"}) %><%- tx.symbol; %> Price</td>
       <td><%- uiTool.currencyFormat(tx.priceUSD); %> </td>
     </tr>
 <% } %>
     <tr>
-      <td>Nonce</td>
+      <td><%- include("tooltip", {k: "evmnonce"}) %>Nonce</td>
       <td><%= f.nonce; %></td>
     </tr>
 
 <% if ( tx.transactionIndex != undefined) { %>
     <tr>
-        <td>Position</td>
+        <td><%- include("tooltip", {k: "evmposition"}) %>Position</td>
         <td><%= tx.transactionIndex; %></td>
     </tr>
 <% } %>
-<% if ( tx.decodedInput ) {
-    let txInput = tx.input
+<%
+function hex2a(hexx) {
+    var hex = hexx.toString();//force conversion
+    var str = '';
+    for (var i = 0; i < hex.length; i += 2) 
+        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+    return str;
+}
+
+let txInput = tx.input
+let txInputStr = `${txInput}`
+let utf8Str = hex2a(txInputStr.substring(2));
+console.log("HEX0", txInputStr.substring(2));
+console.log("HEX1", utf8Str.toString());
+if ( tx.decodedInput ) {
     let funcDesc = (tx.decodedInput.signature)? `Function: ${tx.decodedInput.signature}\n\n` : ''
     let methodIDDesc = (tx.decodedInput.signature)?  `MethodID: ${tx.decodedInput.methodID}\n` : ''
     if (tx.decodedInput.methodID != undefined) {
@@ -200,14 +213,26 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
             funcDesc = ''
         }
     }
-    //let txInputStr = `${funcDesc}${methodIDDesc}${txInput}`
-    let txInputStr = `${txInput}`
     %>
     <tr>
-      <td>Input Data</td>
+      <td><%- include("tooltip", {k: "evminputdata"}) %>Input Data</td>
       <td>
+<div class="dropdown">
+  <button class="btn btn-tertiary dropdown-toggle" type="button" id="decodeInput" data-mdb-toggle="dropdown" aria-expanded="false">View Input As</button>
+  <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton2">
+    <li><a class="dropdown-item active" href="javascript:showtxinputdata('txinputdata_default')">Default View</a></li>
+    <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_utf8')">UTF-8</a></li>
+    <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_original')">Original</a></li>
+  </ul>
+</div>
+        <div id="txinputdata_default">
         <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
-	<div>
+	</div>
+	</div>
+        <div id="txinputdata_utf8" style="display:none" >
+  	  <textarea style="width: 800px; height:125px"><%= utf8Str; %></textarea>
+	</div>
+	<div id="txinputdata_original" style="display:none" >
   	  <textarea style="width: 800px; height:125px"><%= txInputStr; %></textarea>
 	</div>
       </td>

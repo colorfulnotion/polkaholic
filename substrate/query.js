@@ -1307,11 +1307,11 @@ module.exports = class Query extends AssetManager {
     is_evm_xcmtransfer_input(inp) {
         try {
             let xcmMethodList = ["0xb38c60fa", "0xb9f813ff", "0xfe430475", "0x185de2ae", "0xd7ab340c", "0xb648f3fe", "0xecf766ff", "0x019054d0"]
-            let txMethodID = inp.substr(0,10)
-            if (xcmMethodList.includes(txMethodID)){
+            let txMethodID = inp.substr(0, 10)
+            if (xcmMethodList.includes(txMethodID)) {
                 return true
             }
-        } catch (e){
+        } catch (e) {
             console.log(`is_evm_xcmtransfer_input inp=${inp}`, e)
         }
         return false
@@ -3765,7 +3765,8 @@ module.exports = class Query extends AssetManager {
         let realtime = {};
         let w = (chainID) ? `and asset.chainID = '${chainID}'` : ""
         let contract = null;
-        if (this.xcContractAddress[rawAddress] != undefined) {
+        let assetChain = chainID ? paraTool.makeAssetChain(address, chainID) : "";
+        if (this.xcContractAddress[address] != undefined) {
             let sql = `select asset.asset, asset.assetType, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.xcContractAddress = '${rawAddress}' and asset.assetType = 'Token' ${w}`
             let extraRecs = await this.poolREADONLY.query(sql)
             if (extraRecs.length == 1) {
@@ -4495,6 +4496,11 @@ module.exports = class Query extends AssetManager {
                 for (const evt of ext.events) {
                     let dEvent = this.decorateEventModule(evt, decorate, decorateData)
                     decoratedExt.events.push(dEvent)
+                    if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
+                        if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
+                            decoratedExt.weight = dEvent.data[0].weight.refTime;
+                        }
+                    }
                 }
             }
             //console.log(`decoratedExt after decorateEventModule [decorate=${decorate}, decorateUSD=${decorateUSD}]`, decoratedExt)
@@ -7106,8 +7112,9 @@ module.exports = class Query extends AssetManager {
 
     async getEVMContract(asset, chainID = null) {
         try {
+            let assetChain = (chainID) ? paraTool.makeAssetChain(asset, chainID) : "";
             let where_asset = (this.xcContractAddress[asset] != undefined) ? `asset.xcContractAddress = '${asset}'` : `asset.asset = '${asset}'`
-            let w = (chainID) ? ` and chainID = '${chainID}'` : "";
+            let w = (chainID) ? ` and asset.chainID = '${chainID}'` : "";
             let sql = `select asset.asset, asset.assetType, asset.chainID, convert(asset.abiRaw using utf8) as ABI, convert(contractCode.code using utf8) code, asset.xcContractAddress, addDT from asset left join contractCode on contractCode.asset = asset.asset and contractCode.chainID = asset.chainID where ( ${where_asset} ) ${w} order by addDT desc limit 1`
             let evmContracts = await this.poolREADONLY.query(sql);
             if (evmContracts.length == 0) {
@@ -7117,7 +7124,6 @@ module.exports = class Query extends AssetManager {
                 throw new paraTool.NotFoundError(`EVM Contract not found: ${asset}`)
                 return (false);
             }
-
             let evmContract = evmContracts[0];
             if (this.xcContractAddress[asset] != undefined) {
                 evmContract.asset = evmContract.xcContractAddress;

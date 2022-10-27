@@ -674,7 +674,6 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             if (v.xcContractAddress) {
                 let xcassetChain = paraTool.makeAssetChain(v.xcContractAddress, v.chainID);
-                assetInfo[xcassetChain] = a;
                 xcContractAddress[v.xcContractAddress] = a;
             }
             nassets++;

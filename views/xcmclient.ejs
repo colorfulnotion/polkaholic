@@ -1,0 +1,83 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <title>XCM Scan</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="description" content="xcm scan" />
+    <meta name="robots" content="index, follow" />
+    <link rel="stylesheet" type="text/css" href="/polkaholic.css" />
+    <link rel="stylesheet" href="/css/mdb.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+    <script src="/blockies.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+    <script src="/bundle-polkadot-util.js"></script>
+    <script src="/bundle-polkadot-util-crypto.js"></script>
+    <script src="/bundle-polkadot-types.js"></script>
+    <script src="/bundle-polkadot-api.js"></script>
+    <script src="/bundle-polkadot-keyring.js"></script>
+    <script src="/bundle-polkadot-api-contract.js"></script>
+    <script src="/extension.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"></script>
+    <script src="/uihelper.js"></script>
+    <script src="/xcmclient.js"></script>
+    <script src="/xcmexecutor.js"></script>
+</head>
+
+<body>
+<h5>XCM Executor</h5>
+
+
+
+<div class="btn-group" role="group" aria-label="Traces">
+<div style='padding-left: 30px; margin-left: 30px; border: 1px solid block;'>
+  <ul class="timeline-with-icons">
+    <!-- Section: Origination -->
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-paper-plane text-primary fa-sm fa-fw"></i>
+      </span>
+      <div id="origination"></div>
+    </li>
+    <!-- Section: RelayChain -->
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-spinner text-primary fa-sm fa-fw"></i>
+      </span>
+      <div id="relayed"></div>
+    </li>
+    <!-- Section: Destination Chain -->
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-hand-holding-usd text-primary fa-sm fa-fw"></i>
+      </span>
+      <div id="destination"></div>
+    </li>
+  </ul>
+</div>
+
+<a class="btn" href='javascript:xcmclient_clear()'>Clear</a>
+<script>
+  let xcmInfo = {
+      "origination":{
+	  "id":"moonbase-alpha",
+	  "paraID":1000,
+	  "unfinalized":{}
+      },
+      "relayed":{
+	  "unfinalized":{}
+      },
+      "destination":{
+	  "unfinalized":{}
+      },
+      "msgHashes":[]
+  };
+  $(document).ready(function() {
+    showxcmexecutor(xcmInfo);
+      init_xcmClient();
+});
+</script>
+
+</body>
+</html>
