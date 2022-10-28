@@ -79,7 +79,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 <% } %>
 <% if ( tx.transfers && tx.transfers.length > 0 ) { %>
     <tr>
-      <td><%- include("tooltip", {k: "tokenstransferred"}) %>Tokens Transferred</td>
+      <td><%- include("tooltip", {k: "tokenstransferred"}) %>Tokens Transferred <%-`(${tx.transfers.length })`%></td>
       <td>
         <table>
 	  <tr>
