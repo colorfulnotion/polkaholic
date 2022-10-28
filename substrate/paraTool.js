@@ -1067,7 +1067,7 @@ function convert_moonbeam_evm_multiLocation_to_xcmV1MultiLocation(dest, isUpperc
         v1.interior[interiorType] = interiorValArr
     }
     cDest.v1 = v1
-    console.log(`dest ${JSON.stringify(dest, null, 4)} -> cDest ${JSON.stringify(cDest, null, 4)}`)
+    //console.log(`dest ${JSON.stringify(dest, null, 4)} -> cDest ${JSON.stringify(cDest, null, 4)}`)
     return cDest
 }
 
@@ -1138,12 +1138,13 @@ function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = '[{"parac
         } else {
             let interior = JSON.parse(assetUnparsed)
             let interiorN = interior.length
+            if (interiorN == undefined) {
+                interiorN = 1
+                interior = [interior]
+            }
+            console.log(`assetUnparsed ${assetUnparsed} interiorN=${interiorN},interior`, interior)
             let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
-            if (interiorN == 0) {
-                xcmV1MultiLocation.interior = {
-                    here: null
-                }
-            } else if (interiorN == 1) {
+            if (interiorN == 1) {
                 xcmV1MultiLocation.interior[interiorType] = interior[0]
             } else {
                 let interiorValArr = []
@@ -1157,6 +1158,7 @@ function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = '[{"parac
         xcmVersionedMultiLocation[versionType] = xcmV1MultiLocation
         return xcmVersionedMultiLocation
     } catch (e) {
+        console.log(`convert_xcmInteriorKey_to_xcmV1MultiLocation err`, e)
         return false
     }
 }
