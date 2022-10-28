@@ -30,6 +30,7 @@ let tooltips = {
  "assettransferred": "List of assets transfered in the extrinsic, and their fiat values, if available",
  "txtimestamp": "Time of the transaction",
  "blocktimestamp": "Time of the block",
+ "blocktimestampago": "Age of the block",
  "txresult": "result",
  "gasprice": "Cost per unit of gas for the transaction; The higher the gas price, the higher the probability that the transaction will be included in the block",
  "basefeepergas": "Base fee per gas specified in the block",
@@ -44,6 +45,7 @@ let tooltips = {
  "evmparenthash": "The hash of the block from which this block was generated, also known as the parent block",
  "evmstateroot": "EVM Block State root hash",
  "blockhash": "Substrate block hash of the current block",
+ "blockauthor": "The author/validator of the the block",
  "trace": "Substrate Block Trace, which lists out storage key value pairs that have been updated in this block during execution",
  "parenthash": "Substrate block hash of the previous block, for which this current block is built off of",
  "stateroot": "Substrate state root, which rolls up the entire state of the chain as of this block",
@@ -55,6 +57,7 @@ let tooltips = {
  "sentatblock": "The block number on the origination chain which initiated an XCM Message.  This block typically includes an extrinsic that sends an XCM",
  "txfees": "Fees charged by the origination chain.",
  "transactions": "Tally of the number of transactions included in the block",
+ "xcmtransferstally": "Tally of the number of xcm transfers included in this blocks",
  "remoteexecutions": "Tally of the number of remotely executed transactions included in this blocks",
  "remoteexecutionmessage": "Link to XCM Message sent by Origination chain, initiating Remote Execution",
  "xcmmessages": "Tally of the number of XCM Messages included in the block",
@@ -73,7 +76,8 @@ let tooltips = {
  "executionstatus": "Whether the XCM Message has been successfully processed, or an error",
  "receivedatblock": "The block number of the destination chain which received the XCM Message",
  "teleportfees": "Fees charged by the destination chain for processing the XCM Message",
- "evmtransaction": "Every EVM Transaction has a associated substrate extrinsic, which have two different hashes: there is a substrate extrinsic hash (which may not be unique, because of the possibility of reaped accounts) and a unique transaction hash."
+ "evmtransaction": "Every EVM Transaction has a associated substrate extrinsic, which have two different hashes: there is a substrate extrinsic hash (which may not be unique, because of the possibility of reaped accounts) and a unique transaction hash.",
+ "todo": "" // add missing desc
 };
 if ( k && tooltips[k] != undefined ) {
   t=tooltips[k];
