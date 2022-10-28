@@ -7334,6 +7334,7 @@ module.exports = class Query extends AssetManager {
                 symbol: v.symbol,
                 //parents: v.parents,
                 xcmInteriorKey: v.xcmInteriorKey,
+                xcmV1MultiLocationHex: v.xcmV1MultiLocationHex,
                 xcmV1MultiLocation: JSON.parse(v.xcmV1MultiLocation),
                 evmMultiLocation: JSON.parse(v.evmMultiLocation),
             }

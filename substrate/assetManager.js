@@ -464,6 +464,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             if (decimals != undefined && symbol != undefined) {
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(v.xcmConcept, v.relayChain);
                 let xcmV1MultiLocation = paraTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
+                let xcmV1MultiLocationHex = paraTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation) //this call requires api
                 let evmMultiLocation = paraTool.convertXcmV1MultiLocationToMoonbeamEvmMultiLocation(xcmV1MultiLocation)
                 a = {
                     chainID: v.chainID,
@@ -476,6 +477,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     relayChain: v.relayChain,
                     parents: v.parents,
                     xcmInteriorKey: xcmInteriorKey,
+                    xcmV1MultiLocationHex: xcmV1MultiLocationHex,
                     xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
                     evmMultiLocation: JSON.stringify(evmMultiLocation),
                     nativeAssetChain: nativeAssetChain,
