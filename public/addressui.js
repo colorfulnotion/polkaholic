@@ -224,7 +224,7 @@ function presentContract(contract, provider, contractInstance) {
 async function showcontract(address, chain) {
     if (initcontract) return;
     else initcontract = true;
-    let endpoint = `${baseURL}/contract/${address}`
+    let endpoint = `${baseURL}/contract/${address}/${chainID}`
     var req = new Request(endpoint, {
         method: 'GET',
         headers: new Headers({
@@ -272,12 +272,18 @@ async function showcontract(address, chain) {
 var initerc20 = false;
 var tableERC20 = null
 
+// in case we have a tab on contract with a known chainID, restrict the view to a specific chainID
+function append_chain_filter(chainID, qstr = "", isContract) {
+    if (isContract != undefined && chainID) {
+        return `${qstr}chainfilters=${chainID}`
+    }
+}
 
 function showerc20(address) {
     if (initerc20) return;
     else initerc20 = true;
 
-    let pathParams = `account/evmtransfers/${address}`
+    let pathParams = `account/evmtransfers/${address}` + append_chain_filter(chainID, "?", isContract)
     let tableName = '#tableerc20'
     $.fn.dataTable.ext.errMode = 'none';
     tableERC20 = $(tableName).DataTable({
@@ -392,6 +398,9 @@ function showinternal(address) {
     else initinternal = true;
 
     let pathParams = `evmtx/${address}?group=internal`
+    if (isContract && chainID) {
+        pathParams += `&chainfilters=${chainID}`
+    }
     let tableName = '#tableinternal'
     tableInteranl = $(tableName).DataTable({
         lengthMenu: getLengthMenu(),

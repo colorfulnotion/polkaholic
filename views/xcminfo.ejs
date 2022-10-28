@@ -39,10 +39,10 @@
       <br/>
 
       <B>Module</B>: <%- include("module", {chainID: xcm.origination.id, section: xcm.origination.section, method: xcm.origination.method}); %><br/>
-      <b>Sent At Block</B>: <a href='/block/<%= xcm.origination.id %>/<%= xcm.origination.blockNumber; %>'><code><%= xcm.origination.blockNumber; %></code></a><br/>
-      <b>XCM Message Hash</b>: <a href='/xcmmessage/<%= xcm.origination.msgHash %>/<%= xcm.origination.sentAt %>'><%- uiTool.getShortHash(xcm.origination.msgHash) %></a><br/>
+       <%- include("tooltip", {k: "sentatblock"}) %><b>Sent At Block</B>: <a href='/block/<%= xcm.origination.id %>/<%= xcm.origination.blockNumber; %>'><code><%= xcm.origination.blockNumber; %></code></a><br/>
+      <%- include("tooltip", {k: "xcmmessagehash"}) %><b>XCM Message Hash</b>: <a href='/xcmmessage/<%= xcm.origination.msgHash %>/<%= xcm.origination.sentAt %>'><%- uiTool.getShortHash(xcm.origination.msgHash) %></a><br/>
       <% if ( xcm.origination.txFee != undefined) { %>
-      <B>TX Fees:</B>
+      <%- include("tooltip", {k: "txfees"}) %><B>TX Fees:</B>
          <%- uiTool.presentFloat(xcm.origination.txFee) %> <%= xcm.origination.txFeeSymbol %>
          (<%- uiTool.currencyFormat(xcm.origination.txFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)<br/>
       <% } %>
@@ -61,7 +61,7 @@
 
       <p class="text-muted">
       <% if ( xcm.relayChain.relayAt ) { %>
-      <B>Relayed At Block:</B>
+      <%- include("tooltip", {k: "relayedatblock"}) %><B>Relayed At Block:</B>
       <a href='/block/<%= xcm.relayChain.relayChain %>/<%= xcm.relayChain.relayAt; %>'>
         <code><%= xcm.relayChain.relayAt; %></code>
       </a>
@@ -88,12 +88,12 @@
       </p>
       <p class="text-muted">
        <% if ( xcm.destination.blockNumber ) { %>
-       <B> Received At Block:</B> <a href='/block/<%= xcm.destination.id %>/<%= xcm.destination.blockNumber %>'>
+       <%- include("tooltip", {k: "receivedatblock"}) %><B> Received At Block:</B> <a href='/block/<%= xcm.destination.id %>/<%= xcm.destination.blockNumber %>'>
          <code><%= xcm.destination.blockNumber %></a></code>
        <br/>
        <% } %>
 
-       <B>Beneficiary:</B>
+       <%- include("tooltip", {k: "beneficiary"}) %><B>Beneficiary:</B>
        <% if ( xcm.destination.beneficiary ) {
            let beneficiary = xcm.destination.beneficiary;
        %>
@@ -106,14 +106,14 @@
            let remoteEVMTxHash = xcm.destination.remoteEVMTxHash;
            let remoteEVMResult = xcm.destination.remoteEVMResult;
        %>
-       <B>Remote EVM Tx:</B>
+       <%- include("tooltip", {k: "removeevmtx"}) %><B>Remote EVM Tx:</B>
        <%- uiTool.presentFullTx(remoteEVMTxHash); %>
        <%- include("txResult", {success: remoteEVMResult, errorMsg: false}); %>
        <br/>
        <% } %>
 
 
-      <B>Execution Status:</B>
+      <%- include("tooltip", {k: "executionstatus"}) %><B>Execution Status:</B>
        <% if ( xcm.destination.status ) { %>
 	    <button type="button" class="btn btn-success text-capitalize">Success</button>
        <% } else { %>
@@ -124,13 +124,13 @@
        <% } %>
 	 <br/>
 	 <% if ( xcm.destination.eventID ) { %>
-         <B> Event ID:</B> <%= xcm.destination.eventID %><br/>
+         <%- include("tooltip", {k: "executedeventid"}) %><B> Event ID:</B> <%= xcm.destination.eventID %><br/>
 	 <%- include("eventaccordion", {eventID: xcm.destination.eventID}); %>
 	 <% } %>
 	 <br/>
        <% if ( xcm.destination.teleportFee ) { %>
       <p class="text-muted">
-      <B>Teleport Fees:</B>
+      <%- include("tooltip", {k: "teleportfees"}) %><B>Teleport Fees:</B>
       <%- uiTool.presentFloat(xcm.destination.teleportFee) %> <%= xcm.destination.teleportFeeChainSymbol %> (<%- uiTool.currencyFormat(xcm.destination.teleportFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)
       </p>
        <% } %>

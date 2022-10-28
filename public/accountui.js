@@ -191,7 +191,10 @@ function get_method(decodedInput) {
 function showevmtxs(address, chainListStr = 'all') {
     if (initevmtxs) return;
     else initevmtxs = true;
-    let pathParams = `account/${address}?group=evmtxs&chainfilters=${chainListStr}`
+    let pathParams = `account/${address}?group=evmtxs`
+    if (isContract) {
+        pathParams += `&chainfilters=${chainID}`
+    }
 
     let tableName = '#tableevmtxs'
     tableEVMTxs = $(tableName).DataTable({
@@ -612,7 +615,12 @@ var initxcmtransfers = false;
 function showxcmtransfers(address, chainListStr = 'all') {
     if (initxcmtransfers) return;
     else initxcmtransfers = true;
-    let pathParams = `account/${address}?group=xcmtransfers&chainfilters=${chainListStr}`
+    let pathParams = `account/${address}?group=xcmtransfers`
+    if (chainID && isContract) {
+        pathParams += `&chainfilters=${chainID}`
+    } else {
+        pathParams += `&chainfilters=${chainListStr}`
+    }
     let tableName = '#tablexcmtransfers'
     tableXCMTransfers = $(tableName).DataTable({
         dom: 'lfrtipB',
