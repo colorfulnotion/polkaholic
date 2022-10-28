@@ -296,7 +296,7 @@ app.get('/addresstopn/:topN', async (req, res) => {
     }
 })
 
-// Usage: https://api.polkaholic.io/contract/:asset/:chainID 
+// Usage: https://api.polkaholic.io/contract/:asset/:chainID
 app.get('/contract/:asset/:chainID_or_chainName?', async (req, res) => {
     try {
         let asset = req.params["asset"]
@@ -354,7 +354,6 @@ app.get('/wasmcontracts/:chainID_or_chainName', async (req, res) => {
         });
     }
 })
-
 
 // Usage: https://api.polkaholic.io/specversions/polkadot
 app.get('/specversions/:chainID_or_chainName', async (req, res) => {
@@ -716,6 +715,24 @@ app.post('/search/:table', async (req, res) => {
         }
     } catch (err) {
         console.log(`error:`, err.toString())
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/xcm/multilocation/:chainID_or_chainName', async (req, res) => {
+    try {
+        let chainID_or_chainName = req.params["chainID_or_chainName"]
+        let mRes = await query.getMultilocation(chainID_or_chainName);
+        if (mRes) {
+            res.write(JSON.stringify(mRes));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
         return res.status(400).json({
             error: err.toString()
         });

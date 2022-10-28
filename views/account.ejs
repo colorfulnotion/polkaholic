@@ -268,13 +268,13 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="extrinsics" role="tabpanel" aria-labelledby="extrinsics-tab">
     <table id="tableextrinsics" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Extrinsic ID</th>
-          <th>Section/Method</th>
-          <th>Params</th>
-          <th>Result</th>
-          <th>Date</th>
-          <th>Chain</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "extrinsichash"}) %>Extrinsic ID</th>
+          <th><%- include("tooltip", {k: "module"}) %>Section/Method</th>
+          <th><%- include("tooltip", {k: "params"}) %>Params</th>
+          <th><%- include("tooltip", {k: "txresult"}) %>Result</th>
+          <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
+          <th><%- include("tooltip", {k: "chain"}) %>Chain</th>
         </tr>
       </thead>
     </table>
@@ -282,15 +282,15 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="transfers" role="tabpanel" aria-labelledby="transfers-tab">
     <table id="tabletransfers" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Event ID</th>
-          <th>From</th>
-          <th>To</th>
-          <th>Type</th>
-          <th>Amount</th>
-          <th>Amount (USD)</th>
-          <th>Date</th>
-          <th>Chain</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "eventid"}) %>Event ID</th>
+          <th><%- include("tooltip", {k: "transferfrom"}) %>From</th>
+          <th><%- include("tooltip", {k: "transferto"}) %>To</th>
+          <th><%- include("tooltip", {k: "transfertype"}) %>Type</th>
+          <th><%- include("tooltip", {k: "value"}) %>Amount</th>
+          <th><%- include("tooltip", {k: "valueusd"}) %>Amount (USD)</th>
+          <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
+          <th><%- include("tooltip", {k: "chain"}) %>Chain</th>
         </tr>
       </thead>
     </table>
@@ -298,7 +298,7 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="history" role="tabpanel" aria-labelledby="history-tab">
     <table id="tablehistory" class="display" style='width: 100%'>
       <thead>
-        <tr>
+        <tr class="tableheader">
           <th>Chain</th>
           <th>Assets</th>
           <th>History</th>
@@ -310,7 +310,7 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="nfts" role="tabpanel" aria-labelledby="nfts-tab">
     <table id="tablenfts" class="display" style='width: 100%'>
       <thead>
-        <tr>
+        <tr class="tableheader">
           <th>TxHash</th>
           <th>NFT</th>
         </tr>
@@ -320,16 +320,16 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
     <table id="tablexcmtransfers" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Extrinsic</th>
-          <th>Amount Sent</th>
-          <th>Value (USD)</th>
-          <th>Sender</th>
-          <th>Beneficiary</th>
-          <th>From Chain</th>
-          <th>To Chain</th>
-          <th>Date</th>
-          <th>Chain</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "extrinsichash"}) %>Extrinsic</th>
+          <th><%- include("tooltip", {k: "amountsent"}) %>Amount Sent</th>
+          <th><%- include("tooltip", {k: "valueusd"}) %>Value (USD)</th>
+          <th><%- include("tooltip", {k: "sender"}) %>Sender</th>
+          <th><%- include("tooltip", {k: "beneficiary"}) %>Beneficiary</th>
+          <th><%- include("tooltip", {k: "origination"}) %>From Chain</th>
+          <th><%- include("tooltip", {k: "destination"}) %>To Chain</th>
+          <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
+          <th><%- include("tooltip", {k: "relaychain"}) %>Chain</th>
         </tr>
       </thead>
     </table>
@@ -337,15 +337,15 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="rewards" role="tabpanel" aria-labelledby="rewards-tab">
     <table id="tablerewards" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Asset</th>
-          <th>Amount</th>
-          <th>Amount (USD)</th>
-          <th>Extrinsic Hash</th>
-          <th>Action</th>
-          <th>Date</th>
-          <th>Era</th>
-          <th>Chain</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "assets"}) %>Asset</th>
+          <th><%- include("tooltip", {k: "rewards"}) %>Amount</th>
+          <th><%- include("tooltip", {k: "valueusd"}) %>Amount (USD)</th>
+          <th><%- include("tooltip", {k: "extrinsichash"}) %>Extrinsic Hash</th>
+          <th><%- include("tooltip", {k: "rewardsaction"}) %>Action</th>
+          <th><%- include("tooltip", {k: "rewardstimestamp"}) %>Date</th>
+          <th><%- include("tooltip", {k: "era"}) %>Era</th>
+          <th><%- include("tooltip", {k: "chain"}) %>Chain</th>
         </tr>
       </thead>
     </table>
@@ -354,13 +354,13 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="crowdloans" role="tabpanel" aria-labelledby="crowdloans-tab">
    <table id="tablecrowdloans" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Parachain</th>
-          <th>Contributed</th>
-          <th>Amount</th>
-          <th>Amount (USD)</th>
-          <th>Extrinsic Hash</th>
-          <th>Date</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "parachain"}) %>Parachain</th>
+          <th><%- include("tooltip", {k: "crowdloanscontributed"}) %>Contributed</th>
+          <th><%- include("tooltip", {k: "value"}) %>Amount</th>
+          <th><%- include("tooltip", {k: "valueusd"}) %>Amount (USD)</th>
+          <th><%- include("tooltip", {k: "extrinsichash"}) %>Extrinsic Hash</th>
+          <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
         </tr>
       </thead>
     </table>
@@ -375,7 +375,7 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="feed" role="tabpanel" aria-labelledby="feed-tab">
     <table id="tablefeed" class="display" style='width: 100%'>
       <thead>
-        <tr>
+        <tr class="tableheader">
           <th>Account</th>
           <th>Block Number</th>
           <th>Date</th>

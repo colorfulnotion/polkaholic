@@ -5,13 +5,13 @@
     <table id="tablexcmmessages" class="display" style="width: 100%">
       <thead>
         <tr>
-	  <th>MsgHash</th>
-	  <th>Extrinsic</th>
-	  <th>Msg Type</th>
-	  <th>Sent</th>
-	  <th>Received</th>
-          <th>Assets Received/Instructions</th>
-          <th>Beneficiary</th>
+	  <th><%- include("tooltip", {k: "xcmmessagehash"}) %>MsgHash</th>
+	  <th><%- include("tooltip", {k: "extrinsichash"}) %>Extrinsic</th>
+	  <th><%- include("tooltip", {k: "xcmmessagetype"}) %>Msg Type</th>
+	  <th><%- include("tooltip", {k: "origination"}) %>Sent</th>
+	  <th><%- include("tooltip", {k: "destination"}) %>Received</th>
+          <th><%- include("tooltip", {k: "assets"}) %>Assets Received/Instructions</th>
+          <th><%- include("tooltip", {k: "xcmmessagehash"}) %>Beneficiary</th>
 	  <th>Matched/Time</th>
         </tr>
       </thead>
@@ -21,14 +21,14 @@
     <table id="tablexcmtransfers" class="display" style='width: 100%'>
       <thead>
         <tr>
-          <th>Section:Method</th>
-          <th>Amount Sent</th>
-          <th>Value (USD)</th>
-          <th>Sender</th>
-          <th>Beneficiary</th>
-          <th>From Chain/Extrinsic ID</th>
-          <th>To Chain</th>
-          <th>Date</th>
+          <th><%- include("tooltip", {k: "module"}) %>Section:Method</th>
+          <th><%- include("tooltip", {k: "value"}) %>Value</th>
+          <th><%- include("tooltip", {k: "valueusd"}) %>Value (USD)</th>
+          <th><%- include("tooltip", {k: "sender"}) %>Sender</th>
+          <th><%- include("tooltip", {k: "beneficiary"}) %>Beneficiary</th>
+          <th><%- include("tooltip", {k: "origination"}) %>From Chain/Extrinsic ID</th>
+          <th><%- include("tooltip", {k: "destination"}) %>To Chain</th>
+          <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
         </tr>
       </thead>
     </table>

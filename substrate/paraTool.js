@@ -64,6 +64,10 @@ const {
     extractAuthor
 } = require('@polkadot/api-derive/type/util')
 
+const {
+    ApiPromise,
+} = require('@polkadot/api');
+
 const assetChainSeparator = "~"
 
 function q(inp) {
@@ -342,19 +346,6 @@ function parseSectionMethod(e) {
     }
 }
 
-/*
-{
-  "method": {
-    "pallet": "balances",
-    "method": "Transfer"
-  },
-  "data": [
-    "1qnJN7FViy3HZaxZK9tGAA71zxHSBeUweirKqCaox4t8GT7",
-    "1b8tb8N1Nu3CQzF6fctE3p2es7KoMoiWSABe7e4jw22hngm",
-    504494000000
-  ]
-}
-*/
 function is_transfer_event(pallet, method, data) {
     let pallet_method = `${pallet}:${method}`
     if (pallet_method == "balances:Transfer") return (true);
@@ -440,7 +431,6 @@ function get_lifetime(current, r) {
     return [birth, death]
 }
 
-//TODO: the computation is off by one?
 function lifetime(currentBN, periodBN, phaseBN) {
     let current = bnToBn(currentBN).toNumber()
     let period = bnToBn(periodBN).toNumber()
@@ -806,6 +796,363 @@ function git_hash(isRelativePath = true) {
         return `NA`
     }
 }
+
+function toHexString(byteArray) {
+    return Array.prototype.map.call(byteArray, function(byte) {
+        return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+    }).join('');
+}
+
+function toByteArray(hexString) {
+    var result = [];
+    for (var i = 0; i < hexString.length; i += 2) {
+        result.push(parseInt(hexString.substr(i, 2), 16));
+    }
+    return result;
+}
+
+
+/*
+{
+  "v1": {
+    "parents": 1,
+    "interior": {
+      "x3": [
+        {
+          "parachain": 1000
+        },
+        {
+          "palletInstance": 36
+        },
+        {
+          "generalIndex": "0xfd9d0bf45a2947a519a741c4b9e99eb6"
+        }
+      ]
+    }
+  }
+}
+*/
+
+function padHexToFixedLength(hex, length = 8) {
+    hex = hex.replace('0x', '')
+    return '0x' + hex.padStart(length, '0')
+}
+
+function parseNetwork(networkStruct) {
+    let networkTypes = Object.keys(networkStruct)
+    let networkType = networkTypes[0]
+    let networkVal = '00'
+    if (networkType.toLowerCase() == 'any') {
+        networkVal = '00'
+    } else if (networkType.toLowerCase() == 'named') {
+        networkVal = '01' + networkStruct[networkType].replace('0x', '')
+    } else if (networkType.toLowerCase() == 'polkadot') {
+        networkVal = '02'
+    } else if (networkType.toLowerCase() == 'kusama') {
+        networkVal = '03'
+    }
+    return networkVal
+}
+
+function lowercaseFirstLetter(string) {
+  return string.charAt(0).toLowerCase() + string.slice(1);
+}
+
+function convert_multilocation_to_hex(piece) {
+    let selectorEnum = 'NA'
+    let selector = Object.keys(piece)[0]
+    let selectorData = piece[selector]
+    let encodedData = ''
+    switch (lowercaseFirstLetter(selector)) {
+        case "parachain": // 0x00 Parachain, bytes4
+            let paraID = dechexToInt(selectorData)
+            let paraIDHex = padHexToFixedLength(bnToHex(paraID), 8).replace('0x','')
+            encodedData = '0x00' + paraIDHex
+            break;
+        case "accountId32": // 0x01 AccountId32, bytes32
+            let account32Val = ''
+            let networkValA = ''
+            for (const k of Object.keys(selectorData)) {
+                if (k.toLowerCase() == 'id') account32Val = get_pubkey(selectorData[k])
+                if (k.toLowerCase() == 'network') networkValA = parseNetwork(selectorData[k])
+                encodedData = '0x01' + account32Val + networkValA
+                break;
+            }
+        case "accountIndex64": // 0x02 AccountIndex64, byte8 via u64
+            let accountIndex64Val = '0x'
+            let networkValC = ''
+            for (const k of Object.keys(selectorData)) {
+                if (k.toLowerCase() == 'index') {
+                    let acc64ID = dechexToInt(selectorData[k])
+                    accountIndex64Val = padHexToFixedLength(bnToHex(paraID), 16).replace('0x','')
+                }
+                if (k.toLowerCase() == 'network') networkValC = parseNetwork(selectorData[k])
+                encodedData = '0x02' + accountIndex64Val + networkValC
+                break;
+            }
+        case "accountKey20": // 0x03 AccountKey20, bytes20
+            let account20Val = ''
+            let networkValB = ''
+            for (const k of Object.keys(selectorData)) {
+                if (k.toLowerCase() == 'id') account20Val = get_pubkey(selectorData[k])
+                if (k.toLowerCase() == 'network') networkValB = parseNetwork(selectorData[k])
+                encodedData = '0x03' + account20Val + networkValB
+                break;
+            }
+            break;
+        case "palletInstance": // 0x04 PalletInstance, byte
+            let palletInstanceID = dechexToInt(selectorData)
+            let palletInstanceHex = padHexToFixedLength(bnToHex(palletInstanceID), 16).replace('0x','')
+            encodedData = '0x04' + palletInstanceHex
+            break;
+        case "generalIndex": // 0x05 GeneralIndex, byte16 via u128
+            let generalIndexVal = isNaN(selectorData) ? selectorData.replace('0x', '') : bnToHex(selectorData).replace('0x','')
+            encodedData = '0x05' + generalIndexVal
+            break;
+        case "generalKey": // 0x06 GeneralKey, bytes[]
+            let generalKeyVal = selectorData.replace('0x', '')
+            encodedData = '0x06' + generalKeyVal
+            break;
+        case "onlyChild": //0x07 OnlyChild, ???
+            selectorEnum = '0x07'
+            break;
+        case "plurality": //0x08 plurality, ???
+            selectorEnum = '0x08'
+            break;
+        default:
+            console.log(`unknown selector ${selector}!`)
+            break;
+    }
+    //console.log(`selector: ${selector} selectorData: ${selectorData} -> encodedData:${encodedData}`)
+    return encodedData
+}
+
+function convert_Multilocation_From_Hex(hex = '0x0000000378', isUppercase = false) {
+    let selector = hex.substr(0, 4)
+    let data = '0x' + hex.substr(4)
+    let selectorType = 'NA'
+    let decodedType = {}
+    switch (selector) {
+        case "0x00": //Parachain, bytes4
+            selectorType = (isUppercase) ? "Parachain" : "parachain"
+            let paraID = dechexToInt(data)
+            decodedType[selectorType] = paraID
+            break;
+        case "0x01": //AccountId32, bytes32
+            selectorType = (isUppercase) ? "AccountId32" : "accountId32"
+            let networkType = data.substr(66)
+            let networkName = 'Any'
+            if (networkType.substr(0, 2) == '01') networkName = {
+                Named: networkType.substr(2)
+            } // not sure?
+            if (networkType.substr(0, 2) == '02') networkName = 'Polkadot'
+            if (networkType.substr(0, 2) == '03') networkName = 'Kusama'
+            let account32 = data.substr(0, 66)
+            decodedType[selectorType] = {
+                network: networkName,
+                key: account32
+            }
+            break;
+        case "0x02": //AccountIndex64, byte8 via u64
+            selectorType = (isUppercase) ? "AccountIndex64" : "accountIndex64"
+            let networkTypeA = data.substr(16)
+            let networkNameA = 'Any'
+            if (networkTypeA.substr(0, 2) == '01') networkNameA = {
+                Named: networkTypeA.substr(2)
+            } // not sure?
+            if (networkTypeA.substr(0, 2) == '02') networkNameA = 'Polkadot'
+            if (networkTypeA.substr(0, 2) == '03') networkNameA = 'Kusama'
+            let accountIndex64 = dechexToInt(data.substr(0, 34))
+            decodedType[selectorType] = {
+                network: networkNameA,
+                index: accountIndex64
+            }
+            break;
+        case "0x03": //AccountKey20, bytes20
+            selectorType = (isUppercase) ? "AccountKey20" : "accountKey20"
+            let networkTypeB = data.substr(42)
+            let networkNameB = 'Any'
+            if (networkTypeB.substr(0, 2) == '01') networkNameB = {
+                Named: networkTypeB.substr(2)
+            } // not sure?
+            if (networkTypeB.substr(0, 2) == '02') networkNameB = 'Polkadot'
+            if (networkTypeB.substr(0, 2) == '03') networkNameB = 'Kusama'
+            let account20 = data.substr(0, 42)
+            decodedType[selectorType] = {
+                network: networkName,
+                key: account20
+            }
+            break;
+        case "0x04": //PalletInstance, byte
+            selectorType = (isUppercase) ? "PalletInstance" : "palletInstance"
+            let palletInstanceID = dechexToInt(data)
+            decodedType[selectorType] = palletInstanceID
+            break;
+        case "0x05": //GeneralIndex, byte16 via u128
+            selectorType = (isUppercase) ? "GeneralIndex" : "generalIndex"
+            let generalIndexID = dechexToInt(data)
+            decodedType[selectorType] = generalIndexID
+            break;
+        case "0x06": //GeneralKey, bytes[]
+            selectorType = (isUppercase) ? "GeneralKey" : "generalKey"
+            decodedType[selectorType] = data
+            break;
+        case "0x07": //OnlyChild, ???
+            selectorType = (isUppercase) ? "OnlyChild" : "onlyChild"
+            break;
+        case "0x08": //plurality, ???
+            selectorType = (isUppercase) ? "Plurality" : "plurality"
+            break;
+        default:
+            break;
+    }
+    return decodedType
+}
+
+//see https://docs.moonbeam.network/builders/xcm/xcm-transactor/
+function convert_moonbeam_evm_multiLocation_to_xcmV1MultiLocation(dest, isUppercase = false) {
+    let v1 = {
+        parents: 0,
+        interior: {},
+    }
+    let cDest = {
+        v1: v1
+    }
+    if (dest.length != 2) {
+        console.log('Invalid dest')
+        return false
+    }
+    v1.parents = dechexToInt(dest[0])
+    let interior = dest[1]
+    let interiorN = interior.length
+    let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
+    if (interiorN == 0) {
+        v1.interior = {
+            here: null
+        }
+    } else if (interiorN == 1) {
+        let decodedType = convert_Multilocation_From_Hex(interior[0])
+        v1.interior[interiorType] = decodedType
+    } else {
+        let interiorValArr = []
+        for (const inter of interior) {
+            let decodedType = convert_Multilocation_From_Hex(inter)
+            interiorValArr.push(decodedType)
+        }
+        v1.interior[interiorType] = interiorValArr
+    }
+    cDest.v1 = v1
+    //console.log(`dest ${JSON.stringify(dest, null, 4)} -> cDest ${JSON.stringify(cDest, null, 4)}`)
+    return cDest
+}
+
+function convert_xcmV1MultiLocation_to_moonbeam_evm_multilocation(multilocaitonStr = '{"v1":{"parents":1,"interior":{"x3":[{"parachain":1000},{"palletInstance":36},{"generalIndex":"0xfd9d0bf45a2947a519a741c4b9e99eb6"}]}}}') {
+    let multilocaiton = multilocaitonStr
+    try {
+        try {
+            multilocaiton = JSON.parse(multilocaitonStr)
+        } catch (e1) {
+            //console.log(`e1`, e1)
+        }
+        if (multilocaiton.v1 != undefined) multilocaiton = multilocaiton.v1
+        if (multilocaiton.V1 != undefined) multilocaiton = multilocaiton.V1
+        // always use parent as reference
+        let interiorArr = []
+        let multilocaitonByteArr = [0, []]
+        //console.log('multilocaiton', multilocaiton)
+        for (const k of Object.keys(multilocaiton)) {
+            if (k.toLowerCase() == 'parents') {
+                multilocaitonByteArr[0] = dechexToInt(multilocaiton[k])
+            }
+            if (k.toLowerCase() == 'interior') {
+                let multilocaitonInterior = multilocaiton[k]
+                //console.log(`multilocaitonInterior`, multilocaitonInterior)
+                let xType = Object.keys(multilocaitonInterior)[0]
+                if (xType.toLowerCase(0) == 'here') {
+                    // done
+                } else if (xType.toLowerCase(0) == 'x1') {
+                    let encodeHex = convert_multilocation_to_hex(multilocaitonInterior[xType])
+                    interiorArr.push(encodeHex)
+                } else {
+                    //x2....x7
+                    let interiorRawArr = multilocaitonInterior[xType]
+                    //console.log(`xType=${xType}, interiorRawArr`, interiorRawArr)
+                    if (Array.isArray(interiorRawArr)) {
+                        for (const inter of interiorRawArr) {
+                            let encodeHex = convert_multilocation_to_hex(inter)
+                            interiorArr.push(encodeHex)
+                        }
+                    }
+                }
+            }
+        }
+        //console.log(`interiorArr`, interiorArr)
+        multilocaitonByteArr[1] = interiorArr
+        return multilocaitonByteArr
+    } catch (e) {
+        console.log(`convert_xcmV1MultiLocation_to_moonbeam_xcmV1MultiLocationByte`, e)
+        return false
+    }
+}
+
+function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = '[{"parachain":1000},{"palletInstance":3}]~moonbase-relay', isUppercase = false) {
+    try {
+        let pieces = xcmInteriorKey.split(assetChainSeparator);
+        let assetUnparsed = pieces[0];
+        let relayChain = (pieces.length > 1) ? pieces[1] : undefined;
+        // always use parent as reference
+        let xcmVersionedMultiLocation = {}
+        let xcmV1MultiLocation = {
+            parents: 1,
+            interior: {}
+        }
+        if (assetUnparsed == 'here') {
+            xcmV1MultiLocation.interior = {
+                here: null
+            }
+        } else {
+            let interior = JSON.parse(assetUnparsed)
+            let interiorN = interior.length
+            if (interiorN == undefined) {
+                interiorN = 1
+                interior = [interior]
+            }
+            //console.log(`assetUnparsed ${assetUnparsed} interiorN=${interiorN},interior`, interior)
+            let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
+            if (interiorN == 1) {
+                xcmV1MultiLocation.interior[interiorType] = interior[0]
+            } else {
+                let interiorValArr = []
+                for (const inter of interior) {
+                    interiorValArr.push(inter)
+                }
+                xcmV1MultiLocation.interior[interiorType] = interiorValArr
+            }
+        }
+        let versionType = (isUppercase) ? `V1` : `v1`
+        xcmVersionedMultiLocation[versionType] = xcmV1MultiLocation
+        return xcmVersionedMultiLocation
+    } catch (e) {
+        console.log(`convert_xcmInteriorKey_to_xcmV1MultiLocation err`, e)
+        return false
+    }
+}
+
+function convert_xcmV1MultiLocation_to_byte( xcmV1MultiLocation, api = false) {
+    if ( ! api ) return null;
+    let multilocationStruct = {}
+    if (xcmV1MultiLocation.v1 != undefined) multilocationStruct = xcmV1MultiLocation.v1
+    if (xcmV1MultiLocation.V1 != undefined) multilocationStruct = xcmV1MultiLocation.V1
+    let multiLocationHex = false
+    try {
+        let multilocation = api.createType('XcmV1MultiLocation', multilocationStruct)
+        multiLocationHex = u8aToHex(multilocation.toU8a())
+    } catch (e) {
+        console.log(`xcmV1MultiLocation_to_byte error`, e)
+    }
+    return multiLocationHex
+}
+
 
 class NotFoundError extends Error {
     constructor(message) {
@@ -1522,5 +1869,17 @@ module.exports = {
     },
     reverseEndian: function(hex) {
         return reverse_endian(hex)
+    },
+    convertXcmInteriorKeyToXcmV1MultiLocation: function(xcmInteriorKey, isUppercase) {
+        return convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey, isUppercase)
+    },
+    convertXcmV1MultiLocationToByte: function(xcmV1MultiLocation, api = false) {
+        return convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation, api)
+    },
+    convertXcmV1MultiLocationToMoonbeamEvmMultiLocation: function(xcmV1MultiLocation) {
+        return convert_xcmV1MultiLocation_to_moonbeam_evm_multilocation(xcmV1MultiLocation)
+    },
+    convertMoonbeamEvmMultiLocationToXcmV1MultiLocation: function(xcmV1MultiLocation) {
+        return convert_moonbeam_evm_multiLocation_to_xcmV1MultiLocation(xcmV1MultiLocation)
     },
 };

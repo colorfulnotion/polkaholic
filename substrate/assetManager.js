@@ -49,6 +49,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     accounts = {};
     chainParser = null; // initiated by setup_chainParser (=> chainParserInit)
     chainParserChainID = null;
+    apiParser = null;
 
     lastEventReceivedTS = 0;
     constructor(debugLevel = false) {
@@ -422,21 +423,16 @@ module.exports = class AssetManager extends PolkaholicDB {
         return true
     }
 
-    //    |    2012 | [{"parachain":2012},{"generalKey":"0x50415241"}]                 | {"Token":"PARA"} |   2012 | polkadot   |      1 |
-    //    |   21000 | [{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}] | {"Token":"1984"} |   1000 | kusama     |      1 |
-    /*
-    xcmAssetInfo {
-      chainID: 22085,
-      xcmConcept: '[{"parachain":2085},{"generalKey":"0x484b4f"}]',
-      asset: '{"Token":"HKO"}',
-      paraID: 2085,
-      relayChain: 'kusama',
-      parents: 1,
-      interiorType: 'x2',
-      xcmInteriorKey: '[{"parachain":2085},{"generalKey":"0x484b4f"}]~kusama'
-    }
-    */
     async init_xcm_asset() {
+
+	if (this.apiParser != null ) {
+            //console.log(`polkadotjs already initiated`)
+	} else {
+	    //var api = await ApiPromise.create()
+	    //await api.isReady;
+	    //this.apiParser = api
+	    //console.log(`initiated polkadotjs api`)
+	}
         let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
         let xcmAssetInfo = {};
         let xcmInteriorInfo = {};
@@ -462,6 +458,9 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             if (decimals != undefined && symbol != undefined) {
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(v.xcmConcept, v.relayChain);
+                let xcmV1MultiLocation = paraTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
+                let xcmV1MultiLocationHex = null // paraTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, false) //this call requires apiparser
+                let evmMultiLocation = paraTool.convertXcmV1MultiLocationToMoonbeamEvmMultiLocation(xcmV1MultiLocation)
                 a = {
                     chainID: v.chainID,
                     isUSD: isUSD,
@@ -473,6 +472,9 @@ module.exports = class AssetManager extends PolkaholicDB {
                     relayChain: v.relayChain,
                     parents: v.parents,
                     xcmInteriorKey: xcmInteriorKey,
+                    xcmV1MultiLocationHex: xcmV1MultiLocationHex,
+                    xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
+                    evmMultiLocation: JSON.stringify(evmMultiLocation),
                     nativeAssetChain: nativeAssetChain,
                     assetType: "Token"
                 }

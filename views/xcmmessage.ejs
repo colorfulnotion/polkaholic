@@ -92,7 +92,7 @@ let f = xcm;
 
 <% if ( f.extrinsicHash ) { %>
     <tr>
-      <td>Extrinsic</td>
+      <td><%- include("tooltip", {k: "extrinsicid"}) %>Extrinsic</td>
       <td><a href='/tx/<%= f.extrinsicHash %>'><%= f.extrinsicID  %></a></td>
     </tr>
 <% } %>
@@ -112,7 +112,7 @@ let f = xcm;
 <% } %>
 
     <tr>
-      <td>Dest Address</td>
+      <td><%- include("tooltip", {k: "xcmdestaddress"}) %>Dest Address</td>
       <td>
         <% if (f.destAddress){
           let dest = (f.destSS58Address != undefined)? f.destSS58Address : f.destAddress

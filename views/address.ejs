@@ -116,15 +116,15 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="evmtxs" role="tabpanel" aria-labelledby="evmtxs-tab">
     <table id="tableevmtxs" class="display" style='width: 100%'>
       <thead>
-        <tr>
-      <th>Tx Hash</th>
-      <th>Method</th>
-      <th>Block</th>
-      <th>Age</th>
-      <th>From</th>
-      <th>To</th>
-      <th>Value</th>
-      <th>Fee</th>
+        <tr class="tableheader">
+      <th><%- include("tooltip", {k: "transactionhash"}) %>Txn Hash</th>
+      <th><%- include("tooltip", {k: "method"}) %>Method</th>
+      <th><%- include("tooltip", {k: "block"}) %>Block</th>
+      <th><%- include("tooltip", {k: "txtimestamp"}) %>Age</th>
+      <th><%- include("tooltip", {k: "evmfrom"}) %>From</th>
+      <th><%- include("tooltip", {k: "evmto"}) %>To</th>
+      <th><%- include("tooltip", {k: "evmvalue"}) %>Value</th>
+      <th><%- include("tooltip", {k: "evmtxfee"}) %>Fee</th>
         </tr>
       </thead>
     </table>
@@ -132,15 +132,15 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="transfers" role="tabpanel" aria-labelledby="transfers-tab">
     <table id="tabletransfers" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Event ID</th>
-          <th>From</th>
-          <th>To</th>
-          <th>Type</th>
-          <th>Amount</th>
-          <th>Amount (USD)</th>
-          <th>Date</th>
-          <th>Chain</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "eventid"}) %>Event ID</th>
+          <th><%- include("tooltip", {k: "evmfrom"}) %>From</th>
+          <th><%- include("tooltip", {k: "evmto"}) %>To</th>
+          <th><%- include("tooltip", {k: "txntype"}) %>Type</th>
+          <th><%- include("tooltip", {k: "value"}) %>Value</th>
+          <th><%- include("tooltip", {k: "valueusd"}) %>Value (USD)</th>
+          <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
+          <th><%- include("tooltip", {k: "chain"}) %>Chain</th>
         </tr>
       </thead>
     </table>
@@ -148,16 +148,16 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
     <table id="tablexcmtransfers" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Extrinsic</th>
-          <th>Amount Sent</th>
-          <th>Value (USD)</th>
-          <th>Sender</th>
-          <th>Beneficiary</th>
-          <th>From Chain</th>
-          <th>To Chain</th>
-          <th>Date</th>
-          <th>Chain</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "module"}) %>Method</th>
+          <th><%- include("tooltip", {k: "amountsent"}) %>Amount Sent</th>
+          <th><%- include("tooltip", {k: "valueusd"}) %>Value (USD)</th>
+          <th><%- include("tooltip", {k: "sender"}) %>Sender</th>
+          <th><%- include("tooltip", {k: "beneficiary"}) %>Beneficiary</th>
+          <th><%- include("tooltip", {k: "origination"}) %>From Chain</th>
+          <th><%- include("tooltip", {k: "destination"}) %>To Chain</th>
+          <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
+          <th><%- include("tooltip", {k: "chain"}) %>Chain</th>
         </tr>
       </thead>
     </table>
@@ -166,13 +166,13 @@ for (let i=0; i<tabs.length; i++) {
   <div class="tab-pane" id="internal" role="tabpanel" aria-labelledby="internal-tab">
     <table id="tableinternal" class="display" style='width: 100%'>
       <thead>
-        <tr>
-         <th>Parent Tx Hash</th>
-         <th>Block</th>
-         <th>Date</th>
-         <th>From</th>
-         <th>To</th>
-         <th>Value</th>
+        <tr class="tableheader">
+         <th><%- include("tooltip", {k: "parenttxhash"}) %>Parent Tx Hash</th>
+         <th><%- include("tooltip", {k: "block"}) %>Block</th>
+         <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
+         <th><%- include("tooltip", {k: "evmfrom"}) %>From</th>
+         <th><%- include("tooltip", {k: "evmto"}) %>To</th>
+         <th><%- include("tooltip", {k: "evmvalue"}) %>Value</th>
         </tr>
       </thead>
     </table>
@@ -181,13 +181,13 @@ for (let i=0; i<tabs.length; i++) {
     <table id="tableerc20" class="display" style='width: 100%'>
       <thead>
         <tr>
-         <th>Tx Hash</th>
-         <th>Date</th>
-         <th>From</th>
-         <th>Type</th>
-         <th>To</th>
-         <th>Value</th>
-         <th>Value USD</th>
+         <th><%- include("tooltip", {k: "transactionhash"}) %>Tx Hash</th>
+         <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
+         <th><%- include("tooltip", {k: "evmfrom"}) %>From</th>
+         <th><%- include("tooltip", {k: "txntype"}) %>Type</th>
+         <th><%- include("tooltip", {k: "evmto"}) %>To</th>
+         <th><%- include("tooltip", {k: "evmvalue"}) %>Value</th>
+         <th><%- include("tooltip", {k: "valueusd"}) %>Value USD</th>
         </tr>
       </thead>
     </table>
