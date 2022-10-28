@@ -70,6 +70,31 @@ const {
 
 const assetChainSeparator = "~"
 
+let apiParser = null
+
+function initPolkadorJSAPI() {
+    if (apiParser) {
+        console.log(`polkadot.js API already set`)
+        return
+    }
+    ApiPromise.create().then((api) => {
+        console.log(`setting polkadot.js once`)
+        apiParser = api
+    })
+    return
+}
+
+async function initPolkadotAPI() {
+    if (apiParser != undefined) {
+        console.log(`polkadotjs already initiated`)
+        return
+    }
+    var api = await ApiPromise.create()
+    await api.isReady;
+    apiParser = api
+    console.log(`initiated polkadotjs api`)
+}
+
 function q(inp) {
     return ("'" + inp + "'");
 }
