@@ -552,7 +552,7 @@ module.exports = class XCMTransfer extends XCMTransact {
         return [isValid, desc]
     }
 
-    get_encoded_xcmTransaction(contract, input, gasLimit = 80000) {
+    get_encoded_xcmTransaction(contract, input, gasLimit = 300000) {
         let api = this.apis["origination"].api;
         // ***** TODO: get ethereum call from ethers contract ABI, estimate gasLimit
         const xcmTransaction = {
@@ -577,7 +577,7 @@ module.exports = class XCMTransfer extends XCMTransact {
     }
     // https://docs.moonbeam.network/builders/xcm/xcm-transactor/#xcmtransactor-precompile
     evm_xcmTransactor_transactThroughSigned(account, paraID, paraIDDest, feeLocationAddress, contract, input, chainIDRelay = 60000) {
-        // transactThroughSigned(Multilocation memory dest, address feeLocationAddress, uint64 transactRequiredWeightAtMost, bytes memory call, uint256 feeAmount, uint64 overallWeight) 
+        // transactThroughSigned(Multilocation memory dest, address feeLocationAddress, uint64 transactRequiredWeightAtMost, bytes memory call, uint256 feeAmount, uint64 overallWeight)
         var xcmTransactorContractAbi = [{
             "inputs": [{
                     "components": [{
@@ -631,7 +631,7 @@ module.exports = class XCMTransfer extends XCMTransact {
         let weight = 6000000000
         let relayChain = paraTool.getRelayChainByChainID(chainIDRelay)
         let dest = []
-        dest.push(1) // parents: 1 
+        dest.push(1) // parents: 1
         if (paraIDDest != 0) {
             let parachainHex = paraTool.bnToHex(paraIDDest).substr(2)
             parachainHex = ['0x' + parachainHex.padStart(10, '0')]
@@ -654,7 +654,7 @@ module.exports = class XCMTransfer extends XCMTransact {
 
         //let sectionMethod = "xcmTransactor:transactThroughSigned";
         //let func = api.tx.xcmTransactor.transactThroughSigned;
-        //return [sectionMethod, func, args, isEVMTx];	
+        //return [sectionMethod, func, args, isEVMTx];
         let isEVMTx = true;
         return [this.web3Api, txStruct]
     }
@@ -796,4 +796,147 @@ module.exports = class XCMTransfer extends XCMTransact {
         }
     }
 
+}
+
+
+const XCMTransfer = require("./xcmtransfer");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
+
+async function main_xcmtransact() {
+    let xcmtransact = new XCMTransfer();
+
+    // only on moonbase right now
+    let chainIDRelay = 60000;
+
+    // case (1) is the default
+    let address = "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d";
+    let paraID = 1000; // moonbase-alpha
+    let paraIDDest = 888; // moonbase-beta
+    let currencyID = "35487752324713722007834302681851459189";  // BetaDev on 1000
+    let feePaymentAddress = "0xffffffff1ab2b146c526d4154905ff12e6e57675"; // BetaDev on 1000
+    let contract = "0x49ba58e2ef3047b1f90375c79b93578d90d24e24"; // flip contract
+    let input = "0xcde4efa9" // flip
+
+    await xcmtransact.init();
+    await xcmtransact.setupAPIs(paraID, paraIDDest, chainIDRelay);
+    xcmtransact.setupPair();
+    xcmtransact.setupEvmPair();
+    xcmtransact.setupEvmPairFromMnemonic()
+    let execute = true;
+    let isEVMTx = true;
+    if (isEVMTx){
+	let [web3Api, txStruct] = await xcmtransact.evm_xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, feePaymentAddress, contract, input, chainIDRelay);
+        var signedTx = await ethTool.signEvmTx(web3Api, txStruct, xcmtransact.evmpair)
+        var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
+        console.log(`signedTx`, signedTx, `decodedTx`, decodedTx)
+        if (execute) {
+            console.log(`broadcasting signed evmTx`)
+            //if execute true, brocast the tx
+            let txHash = signedTx.transactionHash
+            console.log("EVM Transfer sent with hash", txHash);
+            console.log(`View Transaction: https://polkaholic.io/tx/${txHash}`);
+            var result = await ethTool.sendSignedTx(web3Api, signedTx)
+            console.log(`signedTX result=`, result)
+        }
+    } else {
+	let argsStr = JSON.stringify(args, null, 4)
+	console.log(`${sectionMethod} args`, argsStr);
+	let [sectionMethod, func, args, isEVMTx] = await xcmtransact.xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, currencyID, contract, input, chainIDRelay);
+        let xcmTxn = func.apply(null, args)
+	console.log("transactThroughSigned", xcmTxn.toHex());
+        const { partialFee, weight } = await xcmTxn.paymentInfo(xcmtransact.pair);
+        console.log(`Est. extrinsics weight=${weight}, weight fees=${partialFee.toHuman()}`);
+
+	if (execute) {
+            console.log(`broadcasting signed extrinsic`)
+            let hash = await xcmTxn.signAndSend(xcmtransact.pair);
+            let extrinsicHash = hash.toHex()
+	    //xcmtransact.init_extrinsic(extrinsicHash, xcmTxn);
+            console.log("Transfer sent with hash", hash.toHex());
+            console.log(`View extrinsic: https://polkaholic.io/tx/${extrinsicHash}`);
+        }
+    }
+}
+
+
+async function main_xcmtransfer() {
+    let chainID = 61000;
+    let chainIDDest = 60888;
+    let amount = .02;
+    let symbol = "AlphaDev";
+    let beneficiary = "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d"
+    let beneficiarySubstrate = "0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c"
+    let beneficiaryEVM = "0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d"; //0xeaf3223589ed19bcd171875ac1d0f99d31a5969c";
+    let isNonDefaultBeneficiary = false
+    //xcmTransfer chainID chainIDDest amount symbol beneficiary
+
+    const xcmtransfer = new XCMTransfer();
+    await xcmtransfer.init() //wait for cryptoReady here
+    xcmtransfer.setupPair();
+    xcmtransfer.setupEvmPair();
+    xcmtransfer.setupEvmPairFromMnemonic()
+
+    if (chainIDDest == paraTool.chainIDMoonbeam || chainIDDest == paraTool.chainIDMoonriver || chainIDDest == paraTool.chainIDAstar || chainIDDest == paraTool.chainIDShiden) {
+        if (!isNonDefaultBeneficiary){
+            beneficiary = beneficiaryEVM;
+        }
+    }
+    //validate cli inputs
+    let [isValidBeneficiary, desc] = xcmtransfer.validateBeneficiaryAddress(chainIDDest, beneficiary)
+    if (!isValidBeneficiary){
+        console.error('ERROR', desc);
+        process.exit(1);
+    }
+    let execute = true;
+    let executionInput = {
+        execute: execute,
+        origination: chainID,
+        destination: chainIDDest,
+        symbol: symbol,
+        amount: amount,
+        beneficiary: beneficiary,
+    }
+    let [sectionMethod, func, args, isEVMTx] = await xcmtransfer.xcmtransfer(chainID, chainIDDest, symbol, amount, beneficiary);
+    console.log(`xcmtransfer cli executionInput`, executionInput)
+    let argsStr = JSON.stringify(args, null, 4)
+    console.log(`xcmtransfer cli transcribed ${sectionMethod} args`, argsStr);
+
+    // temp
+    let chainIDRelay = 60000;
+    let paraID = ( chainID - chainIDRelay ) ;
+    let paraIDDest = ( chainIDDest - chainIDRelay );
+    await xcmtransfer.setupAPIs(paraID, paraIDDest, chainIDRelay);
+
+    if ( isEVMTx ) {
+        var txStruct = args
+        var web3Api = func
+        var signedTx = await ethTool.signEvmTx(web3Api, args, xcmtransfer.evmpair)
+        var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
+        console.log(`signedTx`, signedTx)
+        console.log(`decodedTx`, decodedTx)
+        if ( execute ) {
+            console.log(`***** broadcasting signed evmTx`)
+            //if execute true, brocast the tx
+            let txHash = signedTx.transactionHash
+            console.log("EVM Transfer sent with hash", txHash);
+            console.log(`View Transaction: https://polkaholic.io/tx/${txHash}`);
+            var result = await ethTool.sendSignedTx(web3Api, signedTx)
+            console.log(`signedTX result=`, result)
+        }
+    } else {
+        console.log(args);
+
+	let xcmTxn = func.apply(null, args)
+        const { partialFee, weight } = await xcmTxn.paymentInfo(xcmtransfer.pair);
+        console.log(`Est. extrinsics weight=${weight}, weight fees=${partialFee.toHuman()}`);
+	console.log("encoded", xcmTxn.toHex());
+        if (execute) {
+            console.log(`broadcasting signed extrinsics`)
+            let hash = await xcmTxn.signAndSend(xcmtransfer.pair);
+            let extrinsicHash = hash.toHex()
+            console.log("Transfer sent with hash", hash.toHex());
+            console.log(`View extrinsics: https://polkaholic.io/tx/${extrinsicHash}`);
+        }
+    }
 }

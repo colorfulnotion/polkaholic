@@ -68,19 +68,12 @@ module.exports = class AssetManager extends PolkaholicDB {
         return s.replace('CDP_Supply', 'CDP');
     }
 
-    async autoRefresh(intervalSeconds = 900) {
-        while (1) {
-            await this.sleep(intervalSeconds * 1000);
-            console.log("autoRefresh assets...")
-            if (this.getCurrentTS() - this.lastEventReceivedTS > 300) {
-                console.log("No event received in 5mins, terminating")
-                process.exit(1);
-            }
-            await this.assetManagerInit();
-            if (this.web3Api) {
-                console.log("autoRefresh contractABI...")
-                this.contractABIs = await this.getContractABI();
-            }
+    
+    async autoRefreshAssetManager(crawler) {
+        await crawler.assetManagerInit();
+        if (crawler.web3Api) {
+            console.log("autoRefresh contractABI...")
+            crawler.contractABIs = await crawler.getContractABI();
         }
     }
 
@@ -674,7 +667,6 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             if (v.xcContractAddress) {
                 let xcassetChain = paraTool.makeAssetChain(v.xcContractAddress, v.chainID);
-                assetInfo[xcassetChain] = a;
                 xcContractAddress[v.xcContractAddress] = a;
             }
             nassets++;

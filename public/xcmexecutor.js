@@ -17,7 +17,6 @@ function show_remoteEVMTx_origination(tx) {
 function show_origination(o, finalized, blockHash, id) {
     let fin = finalized ? `<b>Finalized:</b> ${presentFinalized(finalized)}` : `<i>Unfinalized</i> <code>${getShortHash(blockHash)}</code> ${presentFinalized(finalized)}`
     let cls = finalized ? 'finalized' : 'unfinalized';
-    console.log("ORIG", o);
 	return `<div class='${cls}'>
 <i>${timeConverter(o.ts)}</i> ${fin}<br/>
 <b>Extrinsic ID:</b> ${presentExtrinsicIDHash(o.extrinsicID, o.extrinsicHash)}<br/> 

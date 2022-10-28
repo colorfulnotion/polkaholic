@@ -264,76 +264,82 @@ module.exports = class MoonbeamParser extends ChainParser {
         }
     }
     */
-    convertMultilocationFromHex(hex='0x0000000378', isUppercase = false){
-        let selector = hex.substr(0,4)
-        let data = '0x'+hex.substr(4)
+    convertMultilocationFromHex(hex = '0x0000000378', isUppercase = false) {
+        let selector = hex.substr(0, 4)
+        let data = '0x' + hex.substr(4)
         let selectorType = 'NA'
         let decodedType = {}
         switch (selector) {
             case "0x00": //Parachain, bytes4
-                selectorType = (isUppercase)? "Parachain" : "parachain"
+                selectorType = (isUppercase) ? "Parachain" : "parachain"
                 // "0x00+000007E7" -> 2023
                 let paraID = paraTool.dechexToInt(data)
                 decodedType[selectorType] = paraID
                 break;
             case "0x01": //AccountId32, bytes32
-                selectorType = (isUppercase)? "AccountId32" : "accountId32"
+                selectorType = (isUppercase) ? "AccountId32" : "accountId32"
                 let networkType = data.substr(66)
                 let networkName = 'Any'
-                if (networkType.substr(0,2) == '01') networkName = { Named: networkType.substr(2)} // not sure?
-                if (networkType.substr(0,2) == '02') networkName = 'Polkadot'
-                if (networkType.substr(0,2) == '03') networkName = 'Kusama'
-                let account32 = data.substr(0,66)
+                if (networkType.substr(0, 2) == '01') networkName = {
+                    Named: networkType.substr(2)
+                } // not sure?
+                if (networkType.substr(0, 2) == '02') networkName = 'Polkadot'
+                if (networkType.substr(0, 2) == '03') networkName = 'Kusama'
+                let account32 = data.substr(0, 66)
                 decodedType[selectorType] = {
                     network: networkName,
                     key: account32
                 }
                 break;
             case "0x02": //AccountIndex64, byte8 via u64
-                selectorType = (isUppercase)? "AccountIndex64" : "accountIndex64"
+                selectorType = (isUppercase) ? "AccountIndex64" : "accountIndex64"
                 let networkTypeA = data.substr(16)
                 let networkNameA = 'Any'
-                if (networkTypeA.substr(0,2) == '01') networkNameA = { Named: networkTypeA.substr(2)} // not sure?
-                if (networkTypeA.substr(0,2) == '02') networkNameA = 'Polkadot'
-                if (networkTypeA.substr(0,2) == '03') networkNameA = 'Kusama'
-                let accountIndex64 = paraTool.dechexToInt(data.substr(0,34))
+                if (networkTypeA.substr(0, 2) == '01') networkNameA = {
+                    Named: networkTypeA.substr(2)
+                } // not sure?
+                if (networkTypeA.substr(0, 2) == '02') networkNameA = 'Polkadot'
+                if (networkTypeA.substr(0, 2) == '03') networkNameA = 'Kusama'
+                let accountIndex64 = paraTool.dechexToInt(data.substr(0, 34))
                 decodedType[selectorType] = {
                     network: networkNameA,
                     index: accountIndex64
                 }
                 break;
             case "0x03": //AccountKey20, bytes20
-                selectorType = (isUppercase)? "AccountKey20" : "accountKey20"
+                selectorType = (isUppercase) ? "AccountKey20" : "accountKey20"
                 let networkTypeB = data.substr(42)
                 let networkNameB = 'Any'
-                if (networkTypeB.substr(0,2) == '01') networkNameB = { Named: networkTypeB.substr(2)} // not sure?
-                if (networkTypeB.substr(0,2) == '02') networkNameB = 'Polkadot'
-                if (networkTypeB.substr(0,2) == '03') networkNameB = 'Kusama'
-                let account20 = data.substr(0,42)
+                if (networkTypeB.substr(0, 2) == '01') networkNameB = {
+                    Named: networkTypeB.substr(2)
+                } // not sure?
+                if (networkTypeB.substr(0, 2) == '02') networkNameB = 'Polkadot'
+                if (networkTypeB.substr(0, 2) == '03') networkNameB = 'Kusama'
+                let account20 = data.substr(0, 42)
                 decodedType[selectorType] = {
                     network: networkName,
                     key: account20
                 }
                 break;
             case "0x04": //PalletInstance, byte
-                selectorType = (isUppercase)? "PalletInstance" : "palletInstance"
+                selectorType = (isUppercase) ? "PalletInstance" : "palletInstance"
                 let palletInstanceID = paraTool.dechexToInt(data)
                 decodedType[selectorType] = palletInstanceID
                 break;
             case "0x05": //GeneralIndex, byte16 via u128
-                selectorType = (isUppercase)? "GeneralIndex" : "generalIndex"
+                selectorType = (isUppercase) ? "GeneralIndex" : "generalIndex"
                 let generalIndexID = paraTool.dechexToInt(data)
                 decodedType[selectorType] = generalIndexID
                 break;
             case "0x06": //GeneralKey, bytes[]
-                selectorType = (isUppercase)? "GeneralKey" : "generalKey"
+                selectorType = (isUppercase) ? "GeneralKey" : "generalKey"
                 decodedType[selectorType] = data
                 break;
             case "0x07": //OnlyChild, ???
-                selectorType = (isUppercase)? "OnlyChild" : "onlyChild"
+                selectorType = (isUppercase) ? "OnlyChild" : "onlyChild"
                 break;
             case "0x08": //plurality, ???
-                selectorType = (isUppercase)? "Plurality" : "plurality"
+                selectorType = (isUppercase) ? "Plurality" : "plurality"
                 break;
             default:
                 break;
@@ -342,12 +348,14 @@ module.exports = class MoonbeamParser extends ChainParser {
     }
 
     //see https://docs.moonbeam.network/builders/xcm/xcm-transactor/
-    convertMultilocationByteToMultilocation(dest, isUppercase = false){
+    convertMultilocationByteToMultilocation(dest, isUppercase = false) {
         let v1 = {
             parents: 0,
             interior: {},
         }
-        let cDest = { v1: v1}
+        let cDest = {
+            v1: v1
+        }
         if (dest.length != 2) {
             console.log('Invalid dest')
             return false
@@ -355,15 +363,17 @@ module.exports = class MoonbeamParser extends ChainParser {
         v1.parents = paraTool.dechexToInt(dest[0])
         let interior = dest[1]
         let interiorN = interior.length
-        let interiorType = (isUppercase)? `X${interiorN}` : `x${interiorN}`
-        if (interiorN == 0){
-            v1.interior = {here: null}
-        } else if (interiorN == 1){
+        let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
+        if (interiorN == 0) {
+            v1.interior = {
+                here: null
+            }
+        } else if (interiorN == 1) {
             let decodedType = this.convertMultilocationFromHex(interior[0])
             v1.interior[interiorType] = decodedType
         } else {
             let interiorValArr = []
-            for (const inter of interior){
+            for (const inter of interior) {
                 let decodedType = this.convertMultilocationFromHex(inter)
                 interiorValArr.push(decodedType)
             }
@@ -498,8 +508,8 @@ module.exports = class MoonbeamParser extends ChainParser {
             0xd7ab340c: transactThroughSignedMultilocation
             0xb648f3fe: transactThroughSigned
             */
-            if (methodID == '0xb648f3fe' || methodID == '0xd7ab340c'){
-                let ethereumMethod = (methodID == '0xb648f3fe')? 'transactThroughSigned' : 'transactThroughSignedMultilocation'
+            if (methodID == '0xb648f3fe' || methodID == '0xd7ab340c') {
+                let ethereumMethod = (methodID == '0xb648f3fe') ? 'transactThroughSigned' : 'transactThroughSignedMultilocation'
                 /*
                 {
                     "decodeStatus": "success",
@@ -533,35 +543,39 @@ module.exports = class MoonbeamParser extends ChainParser {
                     //process fee
                     let syntheticFee = {}
                     let feeRaw = null
-                    if (ethereumMethod == 'transactThroughSigned'){
+                    if (ethereumMethod == 'transactThroughSigned') {
                         feeRaw = params.feeLocationAddress
                         let xcAssetID = paraTool.contractAddrToXcAssetID(feeRaw)
                         let xcAssetIDHex = paraTool.bnToHex(xcAssetID)
                         syntheticFee = {
-                          currency: {
-                            asCurrencyId: { foreignAsset: xcAssetIDHex }
-                          },
-                          feeAmount: paraTool.bnToHex(params.feeAmount)
+                            currency: {
+                                asCurrencyId: {
+                                    foreignAsset: xcAssetIDHex
+                                }
+                            },
+                            feeAmount: paraTool.bnToHex(params.feeAmount)
                         }
-                    }else if (ethereumMethod == 'transactThroughSignedMultilocation'){
+                    } else if (ethereumMethod == 'transactThroughSignedMultilocation') {
                         feeRaw = params.feeLocation
                         try {
                             let syntheticFeeLocation = this.convertMultilocationByteToMultilocation(feeRaw)
                             syntheticFee = {
-                              currency: {
-                                asMultiLocation: { v1: syntheticFeeLocation}
-                              },
-                              feeAmount: paraTool.bnToHex(params.feeAmount)
+                                currency: {
+                                    asMultiLocation: {
+                                        v1: syntheticFeeLocation
+                                    }
+                                },
+                                feeAmount: paraTool.bnToHex(params.feeAmount)
                             }
-                        } catch (e2){
+                        } catch (e2) {
                             console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] process syntheticFeeLocation err`, e2)
                         }
                     }
                     let targetedSymbol = false
                     try {
                         let [extractedSymbol, _] = this.processFeeStruct(indexer, syntheticFee, relayChain)
-                        targetedSymbol= extractedSymbol
-                    } catch (e){
+                        targetedSymbol = extractedSymbol
+                    } catch (e) {
                         console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] process syntheticFee err`, e)
                     }
                     let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processFeeStruct", `moonbeam ethereum:${ethereumMethod}`, feeRaw)
@@ -577,10 +591,10 @@ module.exports = class MoonbeamParser extends ChainParser {
 
                     // compute derivedAccount at destChain
                     try {
-                        let isEVM  = indexer.getChainEVMStatus(chainIDDest)
+                        let isEVM = indexer.getChainEVMStatus(chainIDDest)
                         let [derivedAccount20, derivedAccount32] = this.calculateMultilocationDerivative(indexer.api, paraID, fromAddress)
-                        r.destAddress = (isEVM)? derivedAccount20 : derivedAccount32
-                    }catch (e){
+                        r.destAddress = (isEVM) ? derivedAccount20 : derivedAccount32
+                    } catch (e) {
                         console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod} calculateMultilocationDerivative failed`, e)
                     }
 
@@ -593,12 +607,12 @@ module.exports = class MoonbeamParser extends ChainParser {
                     console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod}`, r)
                     extrinsic.xcms.push(r)
                     outgoingEtherumXCM.push(r)
-                } catch (e1){
+                } catch (e1) {
                     console.log(`processOutgoingEthereum:${ethereumMethod} err`, e1)
                 }
-            }else if (methodID == '0x185de2ae' || methodID == '0xfe430475'){
+            } else if (methodID == '0x185de2ae' || methodID == '0xfe430475') {
                 //transactThroughDerivative
-                let ethereumMethod = (methodID == '0x185de2ae')? 'transactThroughDerivative' : 'transactThroughDerivativeMultilocation'
+                let ethereumMethod = (methodID == '0x185de2ae') ? 'transactThroughDerivative' : 'transactThroughDerivativeMultilocation'
                 console.log(`TODO [${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method:${ethereumMethod}`, r)
             }
             return outgoingEtherumXCM

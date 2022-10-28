@@ -1,5 +1,18 @@
 var showtxstatusIntervalId = 0;
 
+function showtxinputdata(inp) {
+    let possibleinps = ["txinputdata_default", "txinputdata_utf8", "txinputdata_original"];
+    for (const el of possibleinps) {
+        let elem = document.getElementById(el);
+        if (el == inp) { // show one of txinputdata blocks
+            elem.style.display = "block";
+        } else { // hide the others
+            elem.style.display = "none";
+        }
+    }
+}
+
+
 function setuptabs(tabs, chain_id, txHash, hash = "#overview") {
     setupapidocs("tx", "", `${chain_id}/${txHash}`);
     for (let i = 0; i < tabs.length; i++) {

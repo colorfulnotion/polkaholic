@@ -826,16 +826,16 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
     output.decodedInput = decodedTxnInput
     try {
         if (txn.r && txn.s) {
-	    if ( txn.r.length == 66 && txn.s.length == 66) {
-		return output // let's not validate irrelevant tx
-	    } else {
-		let derivedTx = decodeRLPTx(txn.raw)
-		if (derivedTx.errorDesc != undefined || txn.hash != derivedTx.txHash) console.log(`!!!! Mismatch txHash: ${txn.hash}, derived=${derivedTxhash}, raw=${txn.raw}`)
-		if (derivedTx.tx != undefined && derivedTx.tx.r.length != 66 && derivedTx.tx.s.length != 66) {
-		    output.isConnectedCall = 1
-		}
-	    }
-	}
+            if (txn.r.length == 66 && txn.s.length == 66) {
+                return output // let's not validate irrelevant tx
+            } else {
+                let derivedTx = decodeRLPTx(txn.raw)
+                if (derivedTx.errorDesc != undefined || txn.hash != derivedTx.txHash) console.log(`!!!! Mismatch txHash: ${txn.hash}, derived=${derivedTxhash}, raw=${txn.raw}`)
+                if (derivedTx.tx != undefined && derivedTx.tx.r.length != 66 && derivedTx.tx.s.length != 66) {
+                    output.isConnectedCall = 1
+                }
+            }
+        }
     } catch (e) {
         console.log(`decodeTransaction err`, e)
     }
