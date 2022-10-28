@@ -883,7 +883,7 @@ function lowercaseFirstLetter(string) {
   return string.charAt(0).toLowerCase() + string.slice(1);
 }
 
-function convertMultilocationToHex(piece) {
+function convert_multilocation_to_hex(piece) {
     let selectorEnum = 'NA'
     let selector = Object.keys(piece)[0]
     let selectorData = piece[selector]
@@ -936,7 +936,7 @@ function convertMultilocationToHex(piece) {
             break;
         case "generalKey": // 0x06 GeneralKey, bytes[]
             let generalKeyVal = selectorData.replace('0x', '')
-            encodedData = selectorEnum + generalKeyVal
+            encodedData = '0x06' + generalKeyVal
             break;
         case "onlyChild": //0x07 OnlyChild, ???
             selectorEnum = '0x07'
@@ -952,13 +952,132 @@ function convertMultilocationToHex(piece) {
     return encodedData
 }
 
-function convert_xcmV1MultiLocation_to_moonbeam_multilocation(multilocaitonStr = '{"v1":{"parents":1,"interior":{"x3":[{"parachain":1000},{"palletInstance":36},{"generalIndex":"0xfd9d0bf45a2947a519a741c4b9e99eb6"}]}}}') {
+function convert_Multilocation_From_Hex(hex = '0x0000000378', isUppercase = false) {
+    let selector = hex.substr(0, 4)
+    let data = '0x' + hex.substr(4)
+    let selectorType = 'NA'
+    let decodedType = {}
+    switch (selector) {
+        case "0x00": //Parachain, bytes4
+            selectorType = (isUppercase) ? "Parachain" : "parachain"
+            let paraID = dechexToInt(data)
+            decodedType[selectorType] = paraID
+            break;
+        case "0x01": //AccountId32, bytes32
+            selectorType = (isUppercase) ? "AccountId32" : "accountId32"
+            let networkType = data.substr(66)
+            let networkName = 'Any'
+            if (networkType.substr(0, 2) == '01') networkName = {
+                Named: networkType.substr(2)
+            } // not sure?
+            if (networkType.substr(0, 2) == '02') networkName = 'Polkadot'
+            if (networkType.substr(0, 2) == '03') networkName = 'Kusama'
+            let account32 = data.substr(0, 66)
+            decodedType[selectorType] = {
+                network: networkName,
+                key: account32
+            }
+            break;
+        case "0x02": //AccountIndex64, byte8 via u64
+            selectorType = (isUppercase) ? "AccountIndex64" : "accountIndex64"
+            let networkTypeA = data.substr(16)
+            let networkNameA = 'Any'
+            if (networkTypeA.substr(0, 2) == '01') networkNameA = {
+                Named: networkTypeA.substr(2)
+            } // not sure?
+            if (networkTypeA.substr(0, 2) == '02') networkNameA = 'Polkadot'
+            if (networkTypeA.substr(0, 2) == '03') networkNameA = 'Kusama'
+            let accountIndex64 = dechexToInt(data.substr(0, 34))
+            decodedType[selectorType] = {
+                network: networkNameA,
+                index: accountIndex64
+            }
+            break;
+        case "0x03": //AccountKey20, bytes20
+            selectorType = (isUppercase) ? "AccountKey20" : "accountKey20"
+            let networkTypeB = data.substr(42)
+            let networkNameB = 'Any'
+            if (networkTypeB.substr(0, 2) == '01') networkNameB = {
+                Named: networkTypeB.substr(2)
+            } // not sure?
+            if (networkTypeB.substr(0, 2) == '02') networkNameB = 'Polkadot'
+            if (networkTypeB.substr(0, 2) == '03') networkNameB = 'Kusama'
+            let account20 = data.substr(0, 42)
+            decodedType[selectorType] = {
+                network: networkName,
+                key: account20
+            }
+            break;
+        case "0x04": //PalletInstance, byte
+            selectorType = (isUppercase) ? "PalletInstance" : "palletInstance"
+            let palletInstanceID = dechexToInt(data)
+            decodedType[selectorType] = palletInstanceID
+            break;
+        case "0x05": //GeneralIndex, byte16 via u128
+            selectorType = (isUppercase) ? "GeneralIndex" : "generalIndex"
+            let generalIndexID = dechexToInt(data)
+            decodedType[selectorType] = generalIndexID
+            break;
+        case "0x06": //GeneralKey, bytes[]
+            selectorType = (isUppercase) ? "GeneralKey" : "generalKey"
+            decodedType[selectorType] = data
+            break;
+        case "0x07": //OnlyChild, ???
+            selectorType = (isUppercase) ? "OnlyChild" : "onlyChild"
+            break;
+        case "0x08": //plurality, ???
+            selectorType = (isUppercase) ? "Plurality" : "plurality"
+            break;
+        default:
+            break;
+    }
+    return decodedType
+}
+
+//see https://docs.moonbeam.network/builders/xcm/xcm-transactor/
+function convert_moonbeam_evm_multiLocation_to_xcmV1MultiLocation(dest, isUppercase = false) {
+    let v1 = {
+        parents: 0,
+        interior: {},
+    }
+    let cDest = {
+        v1: v1
+    }
+    if (dest.length != 2) {
+        console.log('Invalid dest')
+        return false
+    }
+    v1.parents = dechexToInt(dest[0])
+    let interior = dest[1]
+    let interiorN = interior.length
+    let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
+    if (interiorN == 0) {
+        v1.interior = {
+            here: null
+        }
+    } else if (interiorN == 1) {
+        let decodedType = convert_Multilocation_From_Hex(interior[0])
+        v1.interior[interiorType] = decodedType
+    } else {
+        let interiorValArr = []
+        for (const inter of interior) {
+            let decodedType = convert_Multilocation_From_Hex(inter)
+            interiorValArr.push(decodedType)
+        }
+        v1.interior[interiorType] = interiorValArr
+    }
+    cDest.v1 = v1
+    console.log(`dest ${JSON.stringify(dest, null, 4)} -> cDest ${JSON.stringify(cDest, null, 4)}`)
+    return cDest
+}
+
+function convert_xcmV1MultiLocation_to_moonbeam_evm_multilocation(multilocaitonStr = '{"v1":{"parents":1,"interior":{"x3":[{"parachain":1000},{"palletInstance":36},{"generalIndex":"0xfd9d0bf45a2947a519a741c4b9e99eb6"}]}}}') {
     let multilocaiton = multilocaitonStr
     try {
         try {
             multilocaiton = JSON.parse(multilocaitonStr)
         } catch (e1) {
-            console.log(`e1`, e1)
+            //console.log(`e1`, e1)
         }
         if (multilocaiton.v1 != undefined) multilocaiton = multilocaiton.v1
         if (multilocaiton.V1 != undefined) multilocaiton = multilocaiton.V1
@@ -977,7 +1096,7 @@ function convert_xcmV1MultiLocation_to_moonbeam_multilocation(multilocaitonStr =
                 if (xType.toLowerCase(0) == 'here') {
                     // done
                 } else if (xType.toLowerCase(0) == 'x1') {
-                    let encodeHex = convertMultilocationToHex(multilocaitonInterior[xType])
+                    let encodeHex = convert_multilocation_to_hex(multilocaitonInterior[xType])
                     interiorArr.push(encodeHex)
                 } else {
                     //x2....x7
@@ -985,7 +1104,7 @@ function convert_xcmV1MultiLocation_to_moonbeam_multilocation(multilocaitonStr =
                     //console.log(`xType=${xType}, interiorRawArr`, interiorRawArr)
                     if (Array.isArray(interiorRawArr)) {
                         for (const inter of interiorRawArr) {
-                            let encodeHex = convertMultilocationToHex(inter)
+                            let encodeHex = convert_multilocation_to_hex(inter)
                             interiorArr.push(encodeHex)
                         }
                     }
@@ -1783,8 +1902,11 @@ module.exports = {
     convertXcmV1MultiLocationToByte: function(xcmV1MultiLocation) {
         return convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation)
     },
-    convertXcmV1MultiLocationToMoonbeamMultiLocation: function(xcmV1MultiLocation) {
-        return convert_xcmV1MultiLocation_to_moonbeam_multilocation(xcmV1MultiLocation)
+    convertXcmV1MultiLocationToMoonbeamEvmMultiLocation: function(xcmV1MultiLocation) {
+        return convert_xcmV1MultiLocation_to_moonbeam_evm_multilocation(xcmV1MultiLocation)
+    },
+    convertMoonbeamEvmMultiLocationToXcmV1MultiLocation: function(xcmV1MultiLocation) {
+        return convert_moonbeam_evm_multiLocation_to_xcmV1MultiLocation(xcmV1MultiLocation)
     },
     initPolkadorJSAPI: function() {
         return initPolkadorJSAPI()
