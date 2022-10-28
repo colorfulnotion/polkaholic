@@ -79,7 +79,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 <% } %>
 <% if ( tx.transfers && tx.transfers.length > 0 ) { %>
     <tr>
-      <td><%- include("tooltip", {k: "tokenstransferred"}) %>Tokens Transferred <%-`(${tx.transfers.length })`%></td>
+      <td><%- include("tooltip", {k: "tokenstransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
       <td>
         <table>
 	  <tr>
@@ -218,6 +218,30 @@ if ( tx.decodedInput ) {
     <tr>
       <td><%- include("tooltip", {k: "evminputdata"}) %>Input Data</td>
       <td>
+
+<% if ( decodeStatus == "success") { %>
+    <div id="txinputdata_default" style="display">
+    <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
+    </div>
+    </div>
+    <div id="txinputdata_utf8" style="display:none" >
+        <textarea style="width: 800px; height:125px"><%= utf8Str; %></textarea>
+    </div>
+    <div id="txinputdata_original" style="display:none" >
+        <textarea style="width: 800px; height:125px"><%= txInputStr; %></textarea>
+    </div>
+<% } else { %>
+    <div id="txinputdata_default" style="display:none">
+    <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
+    </div>
+    </div>
+    <div id="txinputdata_utf8" style="display:none" >
+        <textarea style="width: 800px; height:125px"><%= utf8Str; %></textarea>
+    </div>
+    <div id="txinputdata_original" style="display" >
+        <textarea style="width: 800px; height:125px"><%= txInputStr; %></textarea>
+    </div>
+<% } %>
 <div class="dropdown">
   <button class="btn btn-tertiary dropdown-toggle" type="button" id="decodeInput" data-mdb-toggle="dropdown" aria-expanded="false">View Input As</button>
   <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton2">
@@ -233,16 +257,6 @@ if ( tx.decodedInput ) {
 
   </ul>
 </div>
-        <div id="txinputdata_default">
-        <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
-	</div>
-	</div>
-        <div id="txinputdata_utf8" style="display:none" >
-  	  <textarea style="width: 800px; height:125px"><%= utf8Str; %></textarea>
-	</div>
-	<div id="txinputdata_original" style="display:none" >
-  	  <textarea style="width: 800px; height:125px"><%= txInputStr; %></textarea>
-	</div>
       </td>
     </tr>
 <% } %>

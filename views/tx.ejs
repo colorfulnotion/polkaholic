@@ -126,7 +126,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
     <tr>
         <% if ( tx.transfers && tx.transfers.length > 0 ) { %>
             <tr>
-              <td><%- include("tooltip", {k: "assettransferred"}) %>Tokens Transferred <%-`(${tx.transfers.length })`%></td>
+              <td><%- include("tooltip", {k: "assettransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
               <td>
                 <table>
         	  <tr>
@@ -180,7 +180,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
         %>
         <tr>
           <td><%- include("tooltip", {k: "substrateSignature"}) %>Signature</td>
-          <td><code><%= signature; %></code></td>
+          <td><%- signature; %></td>
         </tr>
     <% } %>
     <tr>
