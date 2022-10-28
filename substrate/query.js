@@ -7331,10 +7331,10 @@ module.exports = class Query extends AssetManager {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         if (chainID === false) return [];
         let relayChain = paraTool.getRelayChainByChainID(chainID)
-        let xcmSymbolInfoMap = this.xcmSymbolInfo
+        let xcmConceptInfoMap = this.xcmConceptInfo
         let multiLocations = []
-        for (const symbolRelayChain of Object.keys(xcmSymbolInfoMap)){
-            let v = xcmSymbolInfoMap[symbolRelayChain]
+        for (const xcmInteriorKey of Object.keys(xcmConceptInfoMap)){
+            let v = xcmConceptInfoMap[xcmInteriorKey]
             let m = {
                 chainID: v.chainID,
                 paraID: v.paraID,
