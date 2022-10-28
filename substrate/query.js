@@ -1365,6 +1365,7 @@ module.exports = class Query extends AssetManager {
             if (feedTX) {
                 const cell = feedTX[0];
                 let c = JSON.parse(cell.value);
+                //console.log(`getTransaction raw ${txHash}`, c)
                 if (!paraTool.auditHashesTx(c)) {
                     console.log(`Audit Failed`, txHash)
                 }
@@ -4475,6 +4476,13 @@ module.exports = class Query extends AssetManager {
             decoratedExt.nonce = ext.nonce
             decoratedExt.tip = ext.tip
             decoratedExt.fee = ext.fee
+            decoratedExt.weight = 0
+            //decoratedExt.weightToFeeCoefficient = 0
+            decoratedExt.transfers = []
+            //console.log(`decorateExtrinsic ext.transfers`, ext.transfers)
+            if (ext.transfers){
+                decoratedExt.transfers = ext.transfers
+            }
             //console.log(`decoratedExt before fee [decorate=${decorate}, decorateUSD=${decorateUSD}]`, decoratedExt)
             if (ext.fee > 0) {
                 await this.decorateFee(decoratedExt, decoratedExt.chainID, decorateUSD)
@@ -4498,7 +4506,11 @@ module.exports = class Query extends AssetManager {
                     decoratedExt.events.push(dEvent)
                     if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
                         if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
-                            decoratedExt.weight = dEvent.data[0].weight.refTime;
+                            if (dEvent.data[0].weight.refTime != undefined){
+                                decoratedExt.weight = dEvent.data[0].weight.refTime;
+                            }else if (!isNaN(dEvent.data[0].weight)){
+                                decoratedExt.weight = dEvent.data[0].weight;
+                            }
                         }
                     }
                 }
