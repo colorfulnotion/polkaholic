@@ -7316,6 +7316,9 @@ module.exports = class Query extends AssetManager {
     }
 
     async getMultilocation(chainID_or_chainName) {
+        let [chainID, id] = this.convertChainID(chainID_or_chainName)
+        if (chainID === false) return [];
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
         let xcmSymbolInfoMap = this.xcmSymbolInfo
         let multiLocations = []
         for (const symbolRelayChain of Object.keys(xcmSymbolInfoMap)){
@@ -7334,7 +7337,9 @@ module.exports = class Query extends AssetManager {
                 xcmV1MultiLocation: JSON.parse(v.xcmV1MultiLocation),
                 evmMultiLocation: JSON.parse(v.evmMultiLocation),
             }
-            multiLocations.push(m)
+            if (m.relayChain == relayChain){
+                multiLocations.push(m)
+            }
         }
         return multiLocations
     }
