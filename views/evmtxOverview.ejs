@@ -194,7 +194,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
 function hex2a(hexx) {
     var hex = hexx.toString();//force conversion
     var str = '';
-    for (var i = 0; i < hex.length; i += 2) 
+    for (var i = 0; i < hex.length; i += 2)
         str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
     return str;
 }
@@ -205,6 +205,7 @@ let utf8Str = hex2a(txInputStr.substring(2));
 console.log("HEX0", txInputStr.substring(2));
 console.log("HEX1", utf8Str.toString());
 if ( tx.decodedInput ) {
+    let decodeStatus = tx.decodedInput.decodeStatus
     let funcDesc = (tx.decodedInput.signature)? `Function: ${tx.decodedInput.signature}\n\n` : ''
     let methodIDDesc = (tx.decodedInput.signature)?  `MethodID: ${tx.decodedInput.methodID}\n` : ''
     if (tx.decodedInput.methodID != undefined) {
@@ -220,9 +221,16 @@ if ( tx.decodedInput ) {
 <div class="dropdown">
   <button class="btn btn-tertiary dropdown-toggle" type="button" id="decodeInput" data-mdb-toggle="dropdown" aria-expanded="false">View Input As</button>
   <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton2">
-    <li><a class="dropdown-item active" href="javascript:showtxinputdata('txinputdata_default')">Default View</a></li>
-    <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_utf8')">UTF-8</a></li>
-    <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_original')">Original</a></li>
+      <% if ( decodeStatus == "success") { %>
+          <li><a class="dropdown-item active" href="javascript:showtxinputdata('txinputdata_default')">Default View</a></li>
+          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_utf8')">UTF-8</a></li>
+          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_original')">Original</a></li>
+      <% } else { %>
+          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_default')">Default View</a></li>
+          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_utf8')">UTF-8</a></li>
+          <li><a class="dropdown-item active" href="javascript:showtxinputdata('txinputdata_original')">Original</a></li>
+      <% } %>
+
   </ul>
 </div>
         <div id="txinputdata_default">
