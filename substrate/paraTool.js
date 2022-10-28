@@ -1142,7 +1142,7 @@ function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = '[{"parac
                 interiorN = 1
                 interior = [interior]
             }
-            console.log(`assetUnparsed ${assetUnparsed} interiorN=${interiorN},interior`, interior)
+            //console.log(`assetUnparsed ${assetUnparsed} interiorN=${interiorN},interior`, interior)
             let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
             if (interiorN == 1) {
                 xcmV1MultiLocation.interior[interiorType] = interior[0]
@@ -1913,7 +1913,10 @@ module.exports = {
     initPolkadorJSAPI: function() {
         return initPolkadorJSAPI()
     },
+    isApiSet: function() {
+        return (apiParser != undefined)
+    },
     async initPolkadotAPI() {
         return initPolkadotAPI()
-    }
+    },
 };

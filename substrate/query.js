@@ -7316,7 +7316,27 @@ module.exports = class Query extends AssetManager {
     }
 
     async getMultilocation(chainID_or_chainName) {
-        return {}
+        let xcmSymbolInfoMap = this.xcmSymbolInfo
+        let multiLocations = []
+        for (const symbolRelayChain of Object.keys(xcmSymbolInfoMap)){
+            let v = xcmSymbolInfoMap[symbolRelayChain]
+            let m = {
+                chainID: v.chainID,
+                paraID: v.paraID,
+                relayChain: v.relayChain,
+                isUSD: v.isUSD,
+                //xcmConcept: v.xcmConcept,
+                //asset: v.asset,
+                decimals: v.decimals,
+                symbol: v.symbol,
+                //parents: v.parents,
+                xcmInteriorKey: v.xcmInteriorKey,
+                xcmV1MultiLocation: JSON.parse(v.xcmV1MultiLocation),
+                evmMultiLocation: JSON.parse(v.evmMultiLocation),
+            }
+            multiLocations.push(m)
+        }
+        return multiLocations
     }
 
     async getXCMInfo(hash) {

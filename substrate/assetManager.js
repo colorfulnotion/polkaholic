@@ -437,6 +437,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
     */
     async init_xcm_asset() {
+        await paraTool.initPolkadotAPI()
         let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
         let xcmAssetInfo = {};
         let xcmInteriorInfo = {};
@@ -462,6 +463,8 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             if (decimals != undefined && symbol != undefined) {
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(v.xcmConcept, v.relayChain);
+                let xcmV1MultiLocation = paraTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
+                let evmMultiLocation = paraTool.convertXcmV1MultiLocationToMoonbeamEvmMultiLocation(xcmV1MultiLocation)
                 a = {
                     chainID: v.chainID,
                     isUSD: isUSD,
@@ -473,6 +476,8 @@ module.exports = class AssetManager extends PolkaholicDB {
                     relayChain: v.relayChain,
                     parents: v.parents,
                     xcmInteriorKey: xcmInteriorKey,
+                    xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
+                    evmMultiLocation: JSON.stringify(evmMultiLocation),
                     nativeAssetChain: nativeAssetChain,
                     assetType: "Token"
                 }
