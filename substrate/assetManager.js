@@ -549,12 +549,12 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
             }
 
-            let assetRecs = await this.poolREADONLY.query("select currencyID, xcContractAddress, xcmInteriorKey from asset where xcmInteriorKey is not null and (xcContractAddress is not null or currencyID is not null)");
+            let assetRecs = await this.poolREADONLY.query("select chainID, currencyID, xcContractAddress, xcmInteriorKey from asset where xcmInteriorKey is not null and (xcContractAddress is not null or currencyID is not null)");
             for (const assetRec of assetRecs) {
                 let xcmInteriorKey = assetRec.xcmInteriorKey
                 if (xcmConceptInfo[xcmInteriorKey] != undefined){
-                    if (assetRec.xcContractAddress != null) xcmInteriorKey = xcmConceptInfo[xcmInteriorKey][assetRec.chainID] = assetRec.xcContractAddress
-                    if (assetRec.currencyID != null && !isNaN(assetRec.currencyID)) xcmInteriorKey = xcmConceptInfo[xcmInteriorKey][assetRec.chainID] = assetRec.currencyID
+                    if (assetRec.xcContractAddress != null) xcmConceptInfo[xcmInteriorKey]["xcContractAddress"][assetRec.chainID] = assetRec.xcContractAddress
+                    if (assetRec.currencyID != null && !isNaN(assetRec.currencyID)) xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"][assetRec.chainID] = assetRec.currencyID
                 }
             }
 
