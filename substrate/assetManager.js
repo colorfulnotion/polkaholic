@@ -436,6 +436,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         	    console.log(`initiated polkadotjs api`)
         	}
             */
+
             let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
             let xcmAssetInfo = {};
             let xcmConceptInfo = {}
@@ -479,6 +480,8 @@ module.exports = class AssetManager extends PolkaholicDB {
                     xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
                     evmMultiLocation: JSON.stringify(evmMultiLocation),
                     nativeAssetChain: nativeAssetChain,
+                    xcContractAddress: {},
+                    xcCurrencyID: {},
                     assetType: "Token"
                 }
                 if (decimals != undefined && symbol != undefined) {
@@ -531,6 +534,8 @@ module.exports = class AssetManager extends PolkaholicDB {
                         //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
                         xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
                         evmMultiLocation: JSON.stringify(evmMultiLocation),
+                        xcContractAddress: {},
+                        xcCurrencyID: {},
                         nativeAssetChain: nativeAssetChain, //probably unknown without indexing the native chain
                         assetType: "Token"
                     }
@@ -543,6 +548,16 @@ module.exports = class AssetManager extends PolkaholicDB {
                     xcmConceptInfo[u.xcmInteriorKey] = u
                 }
             }
+
+            let assetRecs = await this.poolREADONLY.query("select currencyID, xcContractAddress, xcmInteriorKey from asset where xcmInteriorKey is not null and (xcContractAddress is not null or currencyID is not null)");
+            for (const assetRec of assetRecs) {
+                let xcmInteriorKey = assetRec.xcmInteriorKey
+                if (xcmConceptInfo[xcmInteriorKey] != undefined){
+                    if (assetRec.xcContractAddress != null) xcmInteriorKey = xcmConceptInfo[xcmInteriorKey][assetRec.chainID] = assetRec.xcContractAddress
+                    if (assetRec.currencyID != null && !isNaN(assetRec.currencyID)) xcmInteriorKey = xcmConceptInfo[xcmInteriorKey][assetRec.chainID] = assetRec.currencyID
+                }
+            }
+
             let routerRecs = await this.poolREADONLY.query("select routerAssetChain, routerName from router");
             let routers = {};
             for (let i = 0; i < routerRecs.length; i++) {
@@ -558,7 +573,9 @@ module.exports = class AssetManager extends PolkaholicDB {
             this.xcmConceptInfo = xcmConceptInfo;
             // console.log(`this.xcmSymbolInfo`, this.xcmSymbolInfo)
             console.log(`this.xcmConceptInfo`, this.xcmConceptInfo)
+            for (let i = 0; i < xcmAssets.length; i++) {
 
+            }
         } catch(e){
             console.log(`init_xcm_asset err`, e)
         }

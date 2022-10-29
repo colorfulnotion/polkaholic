@@ -7349,6 +7349,8 @@ module.exports = class Query extends AssetManager {
                 xcmV1MultiLocationHex: v.xcmV1MultiLocationHex,
                 xcmV1MultiLocation: JSON.parse(v.xcmV1MultiLocation),
                 evmMultiLocation: JSON.parse(v.evmMultiLocation),
+                xcContractAddress: v.xcContractAddress,
+                xcCurrencyID: v.xcCurrencyID,
             }
             if (m.relayChain == relayChain){
                 multiLocations.push(m)
