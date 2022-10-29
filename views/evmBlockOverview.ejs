@@ -56,7 +56,7 @@ if ( block && block.transactions ) { %>
   <% } %>
 
     <% 
-    if ( block.transactionsConnected ) {
+    if ( block.transactionsConnected && block.transactionsConnected.length > 0 ) {
     
     %>
   <tr>

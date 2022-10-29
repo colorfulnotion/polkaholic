@@ -37,16 +37,16 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-pane" id="evmtxs" role="tabpanel" aria-labelledby="evmtxs-tab">
   <table id="tableevmtxs" class="display" style="width: 100%">
     <thead>
-    <tr>
-      <th>Tx Hash</th>
-      <th>Method</th>
-      <th>Block</th>
-      <th>Age</th>
-      <th>Result</th>
-      <th>From</th>
-      <th>To</th>
-      <th>Value</th>
-      <th>Fee</th>
+    <tr class="tableheader">
+      <th><%- include("tooltip", {k: "transactionhash"}) %>Tx Hash</th>
+      <th><%- include("tooltip", {k: "method"}) %>Method</th>
+      <th><%- include("tooltip", {k: "block"}) %>Block</th>
+      <th><%- include("tooltip", {k: "blocktimestampago"}) %></th>
+      <th><%- include("tooltip", {k: "txresult"}) %>Result</th>
+      <th><%- include("tooltip", {k: "evmfrom"}) %>From</th>
+      <th><%- include("tooltip", {k: "evmto"}) %>To</th>
+      <th><%- include("tooltip", {k: "evmvalue"}) %>Value</th>
+      <th><%- include("tooltip", {k: "txfees"}) %>Fee</th>
     </tr>
     </thead>
   </table>
@@ -55,14 +55,14 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-pane" id="internal" role="tabpanel" aria-labelledby="internal-tab">
   <table id="tableinternal" class="display" style="width: 100%">
     <thead>
-    <tr>
-       <th>Parent Txn Hash</th>
-       <th>Type Trace Address</th>
-       <th>From</th>
-       <th>To</th>
-       <th>Value</th>
-       <th>Gas Limit</th>
-       <th>Gas Used</th>
+    <tr class="tableheader">
+       <th><%- include("tooltip", {k: "parenttxhash"}) %>Parent Txn Hash</th>
+       <th><%- include("tooltip", {k: "typetraceaddress"}) %>Type Trace Address</th>
+       <th><%- include("tooltip", {k: "evmfrom"}) %>From</th>
+       <th><%- include("tooltip", {k: "evmto"}) %>To</th>
+       <th><%- include("tooltip", {k: "evmvalue"}) %>Value</th>
+       <th><%- include("tooltip", {k: "txgaslimit"}) %>Gas Limit</th>
+       <th><%- include("tooltip", {k: "txgasused"}) %>Gas Used</th>
     </tr>
     </thead>
   </table>
@@ -75,12 +75,12 @@ for (let i=0; i<tabs.length; i++) {
   </div>
   <table id="tableevmblockextrinsics" class="display" style='width: 100%'>
     <thead>
-      <tr>
-        <th>Extrinsic ID</th>
-        <th>Section/Method</th>
-        <th>Params</th>
-        <th>From</th>
-        <th>Result</th>
+      <tr class="tableheader">
+        <th><%- include("tooltip", {k: "extrinsicid"}) %>Extrinsic ID</th>
+        <th><%- include("tooltip", {k: "module"}) %>Section/Method</th>
+        <th><%- include("tooltip", {k: "params"}) %>Params</th>
+        <th><%- include("tooltip", {k: "sender"}) %>From</th>
+        <th><%- include("tooltip", {k: "txresult"}) %>Result</th>
       </tr>
     </thead>
   </table>
@@ -93,11 +93,11 @@ for (let i=0; i<tabs.length; i++) {
   </div>
   <table id="tableevmblockevents" class="display" style='width: 100%'>
     <thead>
-      <tr>
-        <th>Event ID</th>
-        <th>Extrinsic ID</th>
-        <th>Action</th>
-        <th>Params</th>
+      <tr class="tableheader">
+        <th><%- include("tooltip", {k: "eventid"}) %>Event ID</th>
+        <th><%- include("tooltip", {k: "extrinsicid"}) %>Extrinsic ID</th>
+        <th><%- include("tooltip", {k: "method"}) %>Action</th>
+        <th><%- include("tooltip", {k: "params"}) %>Params</th>
       </tr>
     </thead>
   </table>
