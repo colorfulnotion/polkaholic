@@ -3291,7 +3291,7 @@ module.exports = class Query extends AssetManager {
                     let a = kassets[j]
                     if (a != undefined && a.state != undefined){
                         let aState = a.state
-                        if (aState.free || aState.reserved || aState.miscFrozen || aState.feeFrozen || a.frozen || a.supplied || a.borrowed){
+                        if (aState.free || aState.reserved || aState.miscFrozen || aState.feeFrozen || aState.frozen || aState.supplied || aState.borrowed){
                             current.push(kassets[j]);
                         }
                     }
