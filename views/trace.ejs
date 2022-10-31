@@ -27,10 +27,10 @@ for (let i=0; i<tabs.length; i++) {
 <table id="tabletraces" class="display" style='width: 100%'>
   <thead>
     <tr>
-      <th>Trace ID</th>
-      <th>Section:Storage</th>
-      <th>Storage Key</th>
-      <th>Storage Value</th>
+      <th><%- include("tooltip", {k: "traceid"}) %>Trace ID</th>
+      <th><%- include("tooltip", {k: "sectionstorage"}) %>Section:Storage</th>
+      <th><%- include("tooltip", {k: "storagekey"}) %>Storage Key</th>
+      <th><%- include("tooltip", {k: "storagevalue"}) %>Storage Value</th>
     </tr>
   </thead>
 </table>
