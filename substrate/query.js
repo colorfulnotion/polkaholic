@@ -3125,7 +3125,7 @@ module.exports = class Query extends AssetManager {
                     let chainBalanceUSD = 0;
                     for (let j = 0; j < chain.assets.length; j++) {
                         let a = chain.assets[j];
-                        if (a.state.balanceUSD !== undefined) {
+                        if (a.state.balanceUSD !== undefined && !isNaN(a.state.balanceUSD)) {
                             chainBalanceUSD += a.state.balanceUSD;
                         }
                     }
