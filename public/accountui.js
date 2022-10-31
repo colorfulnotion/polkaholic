@@ -616,9 +616,11 @@ function showxcmtransfers(address, chainListStr = 'all') {
     if (initxcmtransfers) return;
     else initxcmtransfers = true;
     let pathParams = `account/${address}?group=xcmtransfers`
-    if (chainID && isContract) {
-        pathParams += `&chainfilters=${chainID}`
-    } else {
+    try {
+        if (isContract && chainID !== undefined) {
+            pathParams += `&chainfilters=${chainID}`
+        }
+    } catch (e) {
         pathParams += `&chainfilters=${chainListStr}`
     }
     let tableName = '#tablexcmtransfers'

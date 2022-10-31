@@ -402,7 +402,9 @@ module.exports = {
         return (a.toString());
     },
     presentFloat: function(a, decplaces = 5) {
-        return a.toLocaleString("en-US");
+        return a.toLocaleString("en-US", {
+            minimumFractionDigits: decplaces
+        });
     },
     presentPath: function(p) {
         if (Array.isArray(p)) {

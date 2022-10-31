@@ -7,6 +7,11 @@
   <% } %>
 </button>
 <br />
+<% } else if (tx.decodeStatus == "unknown") { %>
+<button type="button" class="btn btn-outline-primary text-capitalize" title="<%- tx.methodID; %>">
+<%- tx.methodID; %>
+</button>
+<br />
 <% } %>
 <% if ( showParams && tx.params != undefined && tx.params.length > 0) { %>
 <%- include("evmtxparams", {params: tx.params, decoded: tx}); %>

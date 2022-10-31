@@ -534,8 +534,8 @@ module.exports = class MoonbeamParser extends ChainParser {
 
                 try {
                     // process Dest
-                    let syntheticDest = this.convertMultilocationByteToMultilocation(params.dest)
-
+                    //let syntheticDest = this.convertMultilocationByteToMultilocation(params.dest)
+                    let syntheticDest = paraTool.convertMoonbeamEvmMultiLocationToXcmV1MultiLocation(params.dest)
                     let [paraIDDest1, chainIDDest1] = this.processTransactorDest(syntheticDest, relayChain)
                     if (paraIDDest1 !== false) paraIDDest = paraIDDest1
                     if (chainIDDest1 !== false) chainIDDest = chainIDDest1
@@ -558,7 +558,8 @@ module.exports = class MoonbeamParser extends ChainParser {
                     } else if (ethereumMethod == 'transactThroughSignedMultilocation') {
                         feeRaw = params.feeLocation
                         try {
-                            let syntheticFeeLocation = this.convertMultilocationByteToMultilocation(feeRaw)
+                            //let syntheticFeeLocation = this.convertMultilocationByteToMultilocation(feeRaw)
+                            let syntheticFeeLocation = paraTool.convertMoonbeamEvmMultiLocationToXcmV1MultiLocation(feeRaw)
                             syntheticFee = {
                                 currency: {
                                     asMultiLocation: {

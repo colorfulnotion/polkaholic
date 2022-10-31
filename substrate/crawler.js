@@ -1933,7 +1933,7 @@ create table talismanEndpoint (
             }
         }
     }
-    
+
 
     async crawlBlocks(chainID) {
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
@@ -1952,7 +1952,7 @@ create table talismanEndpoint (
         }
 
         // refresh assets + contractABI every 5-10m
-        setInterval(this.autoRefreshAssetManager, Math.round(300000 + Math.random()*300000), this);
+        setInterval(this.autoRefreshAssetManager, Math.round(300000 + Math.random() * 300000), this);
 
         if (chain.blocksFinalized) this.finalizedHashes[chain.blocksFinalized] = "known";
         const unsubscribeFinalizedHeads = await this.api.rpc.chain.subscribeFinalizedHeads(async (header) => {

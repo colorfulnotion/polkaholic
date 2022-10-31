@@ -54,6 +54,19 @@ if ( block && block.transactions ) { %>
     </td>
   </tr>
   <% } %>
+
+    <% 
+    if ( block.transactionsConnected && block.transactionsConnected.length > 0 ) {
+    
+    %>
+  <tr>
+    <td><%- include("tooltip", {k: "remoteexecutions"}) %># Remote Executions</td>
+    <td>
+    <a class="btn-sm btn-primary" href='javascript:jumpTab()'><%= block.transactionsConnected.length; %> Remote Executions</a>
+    </td>
+  </tr>
+    <% } %>
+
 <% if ( block ) { %>
 <% if ( block.miner ) { %>
   <tr>

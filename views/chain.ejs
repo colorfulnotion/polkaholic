@@ -54,21 +54,21 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-pane active" id="recentblocks" role="tabpanel" aria-labelledby="recentblocks-tab">
 <table id="tablerecentblocks" class="display" style='width: 100%'>
   <thead>
-    <tr>
-      <th scope="col">Block #</th>
-      <th scope="col">Block Hash</th>
-      <th scope="col">Time</th>
+    <tr class="tableheader">
+      <th scope="col"><%- include("tooltip", {k: "block"}) %>Block #</th>
+      <th scope="col"><%- include("tooltip", {k: "blockhash"}) %>Block Hash</th>
+      <th scope="col"><%- include("tooltip", {k: "blocktimestamp"}) %>Time</th>
 <% if ( chain.isEVM ) { %>
-      <th scope="col"># EVM Txs</th>
-      <th scope="col">Gas Used</th>
+      <th scope="col"><%- include("tooltip", {k: "evmtransactions"}) %># EVM Txs</th>
+      <th scope="col"><%- include("tooltip", {k: "blockgasused"}) %>Gas Used</th>
 <% } else { %>
-      <th scope="col"># Extrinsics</th>
-      <th scope="col"># Signed</th>
+      <th scope="col"><%- include("tooltip", {k: "extrinsics"}) %># Extrinsics</th>
+      <th scope="col"><%- include("tooltip", {k: "signedextrinsics"}) %># Signed</th>
 <% } %>
-      <th scope="col"># XCM Txs</th>
-      <th scole="col"># Events</th>
-      <th scope="col"># Transfers</th>
-      <th scole="col">Value of Transfers (USD)</th>
+      <th scope="col"><%- include("tooltip", {k: "xcmtransfers"}) %># XCM Txs</th>
+      <th scole="col"><%- include("tooltip", {k: "events"}) %># Events</th>
+      <th scope="col"><%- include("tooltip", {k: "transfers"}) %># Transfers</th>
+      <th scole="col"><%- include("tooltip", {k: "valuetransfers"}) %>Value of Transfers (USD)</th>
     </tr>
   </thead>
 </table>
@@ -78,13 +78,13 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-pane" id="wasmcontracts" role="tabpanel" aria-labelledby="wasmcontracts-tab">
     <table id="tablewasmcontracts" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Contract Address</th>
-          <th>Status</th>
-          <th>Deployer</th>
-          <th>Code Hash</th>
-          <th>Instantiated</th>
-          <th>Date</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "wasmcontractaddress"}) %>Contract Address</th>
+          <th><%- include("tooltip", {k: "wasmcontractstatus"}) %>Status</th>
+          <th><%- include("tooltip", {k: "wasmcontractdeployer"}) %>Deployer</th>
+          <th><%- include("tooltip", {k: "wasmcodehash"}) %>Code Hash</th>
+          <th><%- include("tooltip", {k: "wasmcontractinstantied"}) %>Instantiated</th>
+          <th><%- include("tooltip", {k: "wasmcontracttimestamp"}) %>Date</th>
         </tr>
       </thead>
     </table>
@@ -93,14 +93,14 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-pane" id="wasmcode" role="tabpanel" aria-labelledby="wasmcode-tab">
     <table id="tablewasmcode" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Code Hash</th>
-          <th>Status</th>
-          <th>Storer</th>
-          <th>Stored</th>
-          <th>Language</th>
-          <th>Compiler</th>
-          <th>Date</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "wasmcodehash"}) %>Code Hash</th>
+          <th><%- include("tooltip", {k: "wasmcodestatus"}) %>Status</th>
+          <th><%- include("tooltip", {k: "wasmcodestorer"}) %>Storer</th>
+          <th><%- include("tooltip", {k: "wasmcodestored"}) %>Stored</th>
+          <th><%- include("tooltip", {k: "wasmcodelanguage"}) %>Language</th>
+          <th><%- include("tooltip", {k: "wasmcodecompiler"}) %>Compiler</th>
+          <th><%- include("tooltip", {k: "wasmcodetimestamp"}) %>Date</th>
         </tr>
       </thead>
     </table>
@@ -110,16 +110,16 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
     <table id="tablexcmtransfers" class="display" style='width: 100%'>
       <thead>
-        <tr>
-          <th>Section:Method</th>
-          <th>Amount Sent</th>
-          <th>Value (USD)</th>
-          <th>Sender</th>
-          <th>Beneficiary</th>
-          <th>From Chain/Extrinsic ID</th>
-          <th>To Chain</th>
-          <th>Date</th>
-          <th>Relay</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "module"}) %>Section:Method</th>
+          <th><%- include("tooltip", {k: "amountsent"}) %>Amount Sent</th>
+          <th><%- include("tooltip", {k: "valueusd"}) %>Value (USD)</th>
+          <th><%- include("tooltip", {k: "sender"}) %>Sender</th>
+          <th><%- include("tooltip", {k: "beneficiary"}) %>Beneficiary</th>
+          <th><%- include("tooltip", {k: "origination"}) %>From Chain/Extrinsic ID</th>
+          <th><%- include("tooltip", {k: "destination"}) %>To Chain</th>
+          <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
+          <th><%- include("tooltip", {k: "relaychain"}) %>Relay</th>
         </tr>
       </thead>
     </table>
@@ -128,15 +128,15 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-pane" id="xcmmessages" role="tabpanel" aria-labelledby="xcmmessages-tab">
     <table id="tablexcmmessages" class="display" style="width: 100%">
       <thead>
-        <tr>
-	  <th>MsgHash</th>
-	  <th>Extrinsic</th>
-	  <th>Msg Type</th>
-	  <th>Sent</th>
-	  <th>Received</th>
-          <th>Assets Received/Instructions</th>
-          <th>Beneficiary</th>
-	  <th>Execution</th>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "xcmmessagehash"}) %>MsgHash</th>
+	  <th><%- include("tooltip", {k: "extrinsicid"}) %>Extrinsic</th>
+	  <th><%- include("tooltip", {k: "xcmmessagetype"}) %>Msg Type</th>
+	  <th><%- include("tooltip", {k: "origination"}) %>Sent</th>
+	  <th><%- include("tooltip", {k: "destination"}) %>Received</th>
+          <th><%- include("tooltip", {k: "assets"}) %>Assets Received/Instructions</th>
+          <th><%- include("tooltip", {k: "beneficiary"}) %>Beneficiary</th>
+	  <th><%- include("tooltip", {k: "executionstatus"}) %>Execution</th>
         </tr>
       </thead>
     </table>
@@ -145,17 +145,17 @@ for (let i=0; i<tabs.length; i++) {
 <div class="tab-pane" id="xcmassets" role="tabpanel" aria-labelledby="xcmassets-tab">
 <table id="tablexcmassets" class="display" style='width: 100%'>
   <thead>
-    <tr>
-      <th scope="col">Asset</th>
-      <th scope="col">Chain-Specific Holdings</th>
-      <th scope="col">CurrencyID</th>
-      <th scope="col"># Holders</th>
-      <th scope="col">Price</th>
-      <th scope="col">Total Free</th>
-      <th scope="col">TVL Free</th>
-      <th scope="col">Total Reserved</th>
-      <th scope="col">TVL Reserved</th>
-      <th scope="col">Relay Chain</th>
+    <tr class="tableheader">
+      <th scope="col"><%- include("tooltip", {k: "assets"}) %>Asset</th>
+      <th scope="col"><%- include("tooltip", {k: "holdings"}) %>Chain-Specific Holdings</th>
+      <th scope="col"><%- include("tooltip", {k: "currencyid"}) %>CurrencyID</th>
+      <th scope="col"><%- include("tooltip", {k: "numholders"}) %># Holders</th>
+      <th scope="col"><%- include("tooltip", {k: "price"}) %>Price</th>
+      <th scope="col"><%- include("tooltip", {k: "free"}) %>Total Free</th>
+      <th scope="col"><%- include("tooltip", {k: "tvlfree"}) %>TVL Free</th>
+      <th scope="col"><%- include("tooltip", {k: "reserved"}) %>Total Reserved</th>
+      <th scope="col"><%- include("tooltip", {k: "tvlreserved"}) %>TVL Reserved</th>
+      <th scope="col"><%- include("tooltip", {k: "relaychain"}) %>Relay Chain</th>
     </tr>
   </thead>
 </table>
@@ -210,10 +210,10 @@ for (let i=0; i<tabs.length; i++) {
   <table id="tablespecversions" class="display" style='width: 100%'>
     <thead>
         <tr>
-          <th>Spec Version</th>
-          <th>Block Number</th>
-          <th>Block Hash</th>
-          <th>First Seen</th>
+          <th><%- include("tooltip", {k: "specversion"}) %>Spec Version</th>
+          <th><%- include("tooltip", {k: "block"}) %>Block Number</th>
+          <th><%- include("tooltip", {k: "blockhash"}) %>Block Hash</th>
+          <th><%- include("tooltip", {k: "specversionfirstseen"}) %>First Seen</th>
         </tr>
     </thead>
   </table>
@@ -227,14 +227,14 @@ for (let i=0; i<tabs.length; i++) {
   <table id="tablechannels" class="display" style='width: 100%'>
     <thead>
         <tr>
-          <th>Sender</th>
-          <th>Recipient</th>
-          <th>Status</th>
-          <th>Request</th>
-          <th>Accepted</th>
-          <th>Symbols</th>
-          <th>Num Messages Sent 7d </th>
-          <th>Val Messages Sent 7d (USD)</th>
+          <th><%- include("tooltip", {k: "channelsender"}) %>Sender</th>
+          <th><%- include("tooltip", {k: "channelrecipient"}) %>Recipient</th>
+          <th><%- include("tooltip", {k: "channelstatus"}) %>Status</th>
+          <th><%- include("tooltip", {k: "channelrequest"}) %>Request</th>
+          <th><%- include("tooltip", {k: "channelaccepted"}) %>Accepted</th>
+          <th><%- include("tooltip", {k: "channelsymbols"}) %>Symbols</th>
+          <th><%- include("tooltip", {k: "channelmessagessent"}) %>Num Messages Sent 7d </th>
+          <th><%- include("tooltip", {k: "channelvalueused"}) %>Val Messages Sent 7d (USD)</th>
         </tr>
     </thead>
   </table>

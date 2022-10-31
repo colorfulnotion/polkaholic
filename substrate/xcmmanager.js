@@ -2746,7 +2746,8 @@ order by chainID, extrinsicHash`
 
         const DescendOriginAddress20 = u8aToHex(this.api.registry.hash(toHash).slice(0, 20));
         const DescendOriginAddress32 = u8aToHex(this.api.registry.hash(toHash).slice(0, 32));
-        console.log("calculateMultilocationDerivative", multilocation.toString(), DescendOriginAddress20, DescendOriginAddress32);
+        let multiLocationHex = u8aToHex(multilocation.toU8a())
+        console.log(`calculateMultilocationDerivative multiLocationHex=${multiLocationHex}`, multilocation.toString(), DescendOriginAddress20, DescendOriginAddress32);
         // multilocation {"parents":1,"interior":{"x2":[{"parachain":1000},{"accountKey20":{"network":{"any":null},"key":"0x44236223ab4291b93eed10e4b511b37a398dee55"}}]}}
         // 20 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45c
         // 32 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45cdfa7831175e442b8f14391aa

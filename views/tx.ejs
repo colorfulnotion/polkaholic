@@ -124,9 +124,65 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       </td>
     </tr>
     <tr>
+        <% if ( tx.transfers && tx.transfers.length > 0 ) { %>
+            <tr>
+              <td><%- include("tooltip", {k: "assettransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
+              <td>
+                <table>
+        	  <tr>
+        	    <th>From</td>
+        	    <th>To</td>
+              <th>Token</td>
+              <th>Value</td>
+        	  </tr>
+        	  <% for (let t = 0 ; t < tx.transfers.length; t++) {
+        	    let tok = tx.transfers[t];
+        	  %>
+        	    <tr>
+                    <td>
+                      <% if (tok.from){  %>
+                        <%- uiTool.presentBlockiesOrIdenticon(tok.from, 25) %>
+                        <a href='/account/<%= paraTool.getPubKey(tok.from) %>'>
+                          <%- uiTool.getShortHash(tok.from, true, false) %>
+                        </a>
+                      <% } else {%>
+                        <%- `-`; %>
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (tok.to){  %>
+                        <%- uiTool.presentBlockiesOrIdenticon(tok.to, 25) %>
+                        <a href='/account/<%= paraTool.getPubKey(tok.to) %>'>
+                            <%- uiTool.getShortHash(tok.to, true, false) %>
+                        </a>
+                      <% } else {%>
+                        <%- `-`; %>
+                      <% } %>
+                    </td>
+        	      <td><%- tok.symbol; %> <%- ; %></td>
+                  <td><%- tok.amount; %>
+                  <% if ( tok.amountUSD ) { %>
+                       (<%- uiTool.currencyFormat(tok.amountUSD, tok.priceUSD, tok.priceUSD); %> )
+                  <% } %>
+                  </td>
+        	    </tr>
+        	  <% } %>
+        	</table>
+              </td>
+            </tr>
+        <% } %>
       <td><%- include("tooltip", {k: "module"}) %>Module</td>
       <td><%- include("module", {chainID: f.id, section: f.section, method: f.method}); %></td>
     </tr>
+    <% if ( typeof tx.signature === 'object' && tx.signature !== null ) {
+        let signType = Object.keys(tx.signature)
+        let signature = tx.signature[signType]
+        %>
+        <tr>
+          <td><%- include("tooltip", {k: "substrateSignature"}) %>Signature</td>
+          <td><%- signature; %></td>
+        </tr>
+    <% } %>
     <tr>
       <td><%- include("tooltip", {k: "params"}) %>Params</td>
       <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID },  size: []  }); %></td>
