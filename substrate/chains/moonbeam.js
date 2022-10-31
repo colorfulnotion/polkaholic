@@ -246,6 +246,144 @@ module.exports = class MoonbeamParser extends ChainParser {
         return false
     }
 
+    /*
+    "dest": [
+      "1",
+      [
+        "0x0000000378"
+      ]
+    ],
+    "dest": {
+        "v1": {
+            "parents": 1,
+            "interior": {
+                "x1": {
+                    "parachain": 1000
+                }
+            }
+        }
+    }
+    */
+    convertMultilocationFromHex(hex = '0x0000000378', isUppercase = false) {
+        let selector = hex.substr(0, 4)
+        let data = '0x' + hex.substr(4)
+        let selectorType = 'NA'
+        let decodedType = {}
+        switch (selector) {
+            case "0x00": //Parachain, bytes4
+                selectorType = (isUppercase) ? "Parachain" : "parachain"
+                // "0x00+000007E7" -> 2023
+                let paraID = paraTool.dechexToInt(data)
+                decodedType[selectorType] = paraID
+                break;
+            case "0x01": //AccountId32, bytes32
+                selectorType = (isUppercase) ? "AccountId32" : "accountId32"
+                let networkType = data.substr(66)
+                let networkName = 'Any'
+                if (networkType.substr(0, 2) == '01') networkName = {
+                    Named: networkType.substr(2)
+                } // not sure?
+                if (networkType.substr(0, 2) == '02') networkName = 'Polkadot'
+                if (networkType.substr(0, 2) == '03') networkName = 'Kusama'
+                let account32 = data.substr(0, 66)
+                decodedType[selectorType] = {
+                    network: networkName,
+                    key: account32
+                }
+                break;
+            case "0x02": //AccountIndex64, byte8 via u64
+                selectorType = (isUppercase) ? "AccountIndex64" : "accountIndex64"
+                let networkTypeA = data.substr(16)
+                let networkNameA = 'Any'
+                if (networkTypeA.substr(0, 2) == '01') networkNameA = {
+                    Named: networkTypeA.substr(2)
+                } // not sure?
+                if (networkTypeA.substr(0, 2) == '02') networkNameA = 'Polkadot'
+                if (networkTypeA.substr(0, 2) == '03') networkNameA = 'Kusama'
+                let accountIndex64 = paraTool.dechexToInt(data.substr(0, 34))
+                decodedType[selectorType] = {
+                    network: networkNameA,
+                    index: accountIndex64
+                }
+                break;
+            case "0x03": //AccountKey20, bytes20
+                selectorType = (isUppercase) ? "AccountKey20" : "accountKey20"
+                let networkTypeB = data.substr(42)
+                let networkNameB = 'Any'
+                if (networkTypeB.substr(0, 2) == '01') networkNameB = {
+                    Named: networkTypeB.substr(2)
+                } // not sure?
+                if (networkTypeB.substr(0, 2) == '02') networkNameB = 'Polkadot'
+                if (networkTypeB.substr(0, 2) == '03') networkNameB = 'Kusama'
+                let account20 = data.substr(0, 42)
+                decodedType[selectorType] = {
+                    network: networkName,
+                    key: account20
+                }
+                break;
+            case "0x04": //PalletInstance, byte
+                selectorType = (isUppercase) ? "PalletInstance" : "palletInstance"
+                let palletInstanceID = paraTool.dechexToInt(data)
+                decodedType[selectorType] = palletInstanceID
+                break;
+            case "0x05": //GeneralIndex, byte16 via u128
+                selectorType = (isUppercase) ? "GeneralIndex" : "generalIndex"
+                let generalIndexID = paraTool.dechexToInt(data)
+                decodedType[selectorType] = generalIndexID
+                break;
+            case "0x06": //GeneralKey, bytes[]
+                selectorType = (isUppercase) ? "GeneralKey" : "generalKey"
+                decodedType[selectorType] = data
+                break;
+            case "0x07": //OnlyChild, ???
+                selectorType = (isUppercase) ? "OnlyChild" : "onlyChild"
+                break;
+            case "0x08": //plurality, ???
+                selectorType = (isUppercase) ? "Plurality" : "plurality"
+                break;
+            default:
+                break;
+        }
+        return decodedType
+    }
+
+    //see https://docs.moonbeam.network/builders/xcm/xcm-transactor/
+    convertMultilocationByteToMultilocation(dest, isUppercase = false) {
+        let v1 = {
+            parents: 0,
+            interior: {},
+        }
+        let cDest = {
+            v1: v1
+        }
+        if (dest.length != 2) {
+            console.log('Invalid dest')
+            return false
+        }
+        v1.parents = paraTool.dechexToInt(dest[0])
+        let interior = dest[1]
+        let interiorN = interior.length
+        let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
+        if (interiorN == 0) {
+            v1.interior = {
+                here: null
+            }
+        } else if (interiorN == 1) {
+            let decodedType = this.convertMultilocationFromHex(interior[0])
+            v1.interior[interiorType] = decodedType
+        } else {
+            let interiorValArr = []
+            for (const inter of interior) {
+                let decodedType = this.convertMultilocationFromHex(inter)
+                interiorValArr.push(decodedType)
+            }
+            v1.interior[interiorType] = interiorValArr
+        }
+        cDest.v1 = v1
+        console.log(`dest ${JSON.stringify(dest, null, 4)} -> cDest ${JSON.stringify(cDest, null, 4)}`)
+        return cDest
+    }
+
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // need additional processing for currency_id part
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXTokens start`)

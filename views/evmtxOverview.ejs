@@ -202,8 +202,6 @@ function hex2a(hexx) {
 let txInput = tx.input
 let txInputStr = `${txInput}`
 let utf8Str = hex2a(txInputStr.substring(2));
-console.log("HEX0", txInputStr.substring(2));
-console.log("HEX1", utf8Str.toString());
 if ( tx.decodedInput ) {
     let decodeStatus = tx.decodedInput.decodeStatus
     let funcDesc = (tx.decodedInput.signature)? `Function: ${tx.decodedInput.signature}\n\n` : ''

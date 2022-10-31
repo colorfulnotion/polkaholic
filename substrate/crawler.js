@@ -1421,6 +1421,11 @@ module.exports = class Crawler extends Indexer {
     }
 
     async crawlTxpoolContent(chain, crawler) {
+        if (crawler.getCurrentTS() - crawler.lastEventReceivedTS > 300) {
+            console.log("No event received in 5mins, terminating")
+            process.exit(1);
+        }
+
         if (crawler.latestBlockNumber > 0) {
             let cmd = `curl ${chain.RPCBackfill}  -X POST -H "Content-Type: application/json" --data '{"method":"txpool_content","params":[],"id":1,"jsonrpc":"2.0"}'`
             const {
@@ -1928,6 +1933,7 @@ create table talismanEndpoint (
             }
         }
     }
+    
 
     async crawlBlocks(chainID) {
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
@@ -1945,8 +1951,8 @@ create table talismanEndpoint (
             setInterval(this.crawlPendingExtrinsics, 1000, chain, this);
         }
 
-        //refresh asset contractABI every 720s
-        this.autoRefresh(720)
+        // refresh assets + contractABI every 5-10m
+        setInterval(this.autoRefreshAssetManager, Math.round(300000 + Math.random()*300000), this);
 
         if (chain.blocksFinalized) this.finalizedHashes[chain.blocksFinalized] = "known";
         const unsubscribeFinalizedHeads = await this.api.rpc.chain.subscribeFinalizedHeads(async (header) => {

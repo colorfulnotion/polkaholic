@@ -617,11 +617,11 @@ function showxcmtransfers(address, chainListStr = 'all') {
     else initxcmtransfers = true;
     let pathParams = `account/${address}?group=xcmtransfers`
     try {
-	if (isContract && chainID !== undefined) {
-            pathParams += `&chainfilters=${chainID}`
-	}
+      	if (isContract && chainID !== undefined) {
+                  pathParams += `&chainfilters=${chainID}`
+      	}
     } catch (e) {
-	pathParams += `&chainfilters=${chainListStr}`
+	     pathParams += `&chainfilters=${chainListStr}`
     }
     let tableName = '#tablexcmtransfers'
     tableXCMTransfers = $(tableName).DataTable({
