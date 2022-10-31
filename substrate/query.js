@@ -3279,6 +3279,8 @@ module.exports = class Query extends AssetManager {
         }
 
         let totalUSDVal = await this.compute_holdings_USD(realtime);
+	console.log("REALTIME", realtime);
+	
         let current = [];
         let covered = {};
         for (const k of Object.keys(realtime)) {
