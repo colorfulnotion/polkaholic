@@ -25,7 +25,7 @@ const MoonbeamParser = require("./chains/moonbeam");
 const InterlayParser = require("./chains/interlay");
 const KicoParser = require("./chains/kico");
 const ChainParser = require("./chains/chainparser");
-
+const { ApiPromise } = require('@polkadot/api');
 const MAX_PRICEUSD = 100000.00;
 
 module.exports = class AssetManager extends PolkaholicDB {
@@ -33,6 +33,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     assetInfo = {};
     alternativeAssetInfo = {};
     xcmAssetInfo = {}; // xcmInteriorKey   ->
+    xcmConceptInfo = {};
     xcmInteriorInfo = {}; // nativeAssetChain ->
     // TODO:fuse these together
     xcmSymbolInfo = {}; // symbolRelayChain ->
@@ -417,92 +418,161 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     async init_xcm_asset() {
+        try {
+            /*
+            if (this.apiParser != null ) {
+                    console.log(`polkadotjs already initiated`)
+        	} else {
+        	    var api = await ApiPromise.create()
+        	    await api.isReady;
+        	    this.apiParser = api
+        	    console.log(`initiated polkadotjs api`)
+        	}
+            */
 
-	if (this.apiParser != null ) {
-            //console.log(`polkadotjs already initiated`)
-	} else {
-	    //var api = await ApiPromise.create()
-	    //await api.isReady;
-	    //this.apiParser = api
-	    //console.log(`initiated polkadotjs api`)
-	}
-        let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
-        let xcmAssetInfo = {};
-        let xcmInteriorInfo = {};
-        let xcmSymbolInfo = {};
-        for (let i = 0; i < xcmAssetRecs.length; i++) {
-            let v = xcmAssetRecs[i];
-            let a = {}
-            // add assetChain (string)
-            let nativeAssetChain = paraTool.makeAssetChain(v.asset, v.chainID)
-            let decimals = null;
-            let symbol = null;
-            let isUSD = false;
-            let assetInfo = this.assetInfo[nativeAssetChain]
-            let alternativeAssetInfo = this.alternativeAssetInfo[nativeAssetChain]
-            if (assetInfo && assetInfo.decimals != undefined && assetInfo.symbol != undefined) {
-                decimals = assetInfo.decimals
-                symbol = assetInfo.symbol
-                isUSD = assetInfo.isUSD
-            } else if (alternativeAssetInfo && alternativeAssetInfo.decimals != undefined && alternativeAssetInfo.symbol != undefined) {
-                decimals = alternativeAssetInfo.decimals
-                symbol = alternativeAssetInfo.symbol
-                isUSD = alternativeAssetInfo.isUSD
-            }
-            if (decimals != undefined && symbol != undefined) {
+            let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
+            let xcmAssetInfo = {};
+            let xcmConceptInfo = {}
+            let xcmInteriorInfo = {};
+            let xcmSymbolInfo = {};
+            let unknownXcmConcepts = {};
+            for (let i = 0; i < xcmAssetRecs.length; i++) {
+                let v = xcmAssetRecs[i];
+                // add assetChain (string)
+                let nativeAssetChain = paraTool.makeAssetChain(v.asset, v.chainID)
+                let decimals = null;
+                let symbol = null;
+                let isUSD = false;
+                let assetInfo = this.assetInfo[nativeAssetChain]
+                let alternativeAssetInfo = this.alternativeAssetInfo[nativeAssetChain]
+                if (assetInfo && assetInfo.decimals != undefined && assetInfo.symbol != undefined) {
+                    decimals = assetInfo.decimals
+                    symbol = assetInfo.symbol
+                    isUSD = assetInfo.isUSD
+                } else if (alternativeAssetInfo && alternativeAssetInfo.decimals != undefined && alternativeAssetInfo.symbol != undefined) {
+                    decimals = alternativeAssetInfo.decimals
+                    symbol = alternativeAssetInfo.symbol
+                    isUSD = alternativeAssetInfo.isUSD
+                }
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(v.xcmConcept, v.relayChain);
                 let xcmV1MultiLocation = paraTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                let xcmV1MultiLocationHex = null // paraTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, false) //this call requires apiparser
+                //let xcmV1MultiLocationHex = paraTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, this.apiParser) //this call requires api
                 let evmMultiLocation = paraTool.convertXcmV1MultiLocationToMoonbeamEvmMultiLocation(xcmV1MultiLocation)
-                a = {
+                let a = {
                     chainID: v.chainID,
-                    isUSD: isUSD,
+                    isUSD: isUSD, // unknown
                     xcmConcept: v.xcmConcept,
                     asset: v.asset,
-                    decimals: decimals,
-                    symbol: symbol,
+                    decimals: decimals, // unknown
+                    symbol: symbol, // unknown
                     paraID: v.paraID,
                     relayChain: v.relayChain,
                     parents: v.parents,
                     xcmInteriorKey: xcmInteriorKey,
-                    xcmV1MultiLocationHex: xcmV1MultiLocationHex,
+                    //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
                     xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
                     evmMultiLocation: JSON.stringify(evmMultiLocation),
                     nativeAssetChain: nativeAssetChain,
+                    xcContractAddress: {},
+                    xcCurrencyID: {},
                     assetType: "Token"
                 }
-                if (symbol) {
-                    let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain); // REVIEW: why upper case here??
-                    xcmSymbolInfo[symbolRelayChain] = a
+                if (decimals != undefined && symbol != undefined) {
+                    a.isUSD = isUSD
+                    a.decimals = decimals
+                    a.symbol = symbol
+                    if (symbol) {
+                        let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain); // REVIEW: why upper case here??
+                        xcmSymbolInfo[symbolRelayChain] = a
+                    }
+                    xcmAssetInfo[xcmInteriorKey] = a; //the key has no chainID
+                    xcmInteriorInfo[nativeAssetChain] = a
+                    xcmConceptInfo[xcmInteriorKey] = a;
+                } else {
+                    //console.log(`nativeAssetChain=${nativeAssetChain} not found`)
+                    unknownXcmConcepts[xcmInteriorKey] = a
                 }
-                xcmAssetInfo[xcmInteriorKey] = a; //the key has no chainID
-                xcmInteriorInfo[nativeAssetChain] = a
-            } else {
-                //console.log(`nativeAssetChain=${nativeAssetChain} not found`)
+                //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
             }
-            //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
+
+            let xcmAssets = await this.poolREADONLY.query("select xcmchainID, xcmInteriorKey, symbol, relayChain, nativeAssetChain, isUSD, decimals, parent as parents from xcmasset where xcmInteriorKey is not null");
+            for (let i = 0; i < xcmAssets.length; i++) {
+                let v = xcmAssetRecs[i];
+                let xcmInteriorKey = v.xcmInteriorKey;
+                if (xcmAssetInfo[xcmInteriorKey] == undefined) {
+                    xcmAssetInfo[xcmInteriorKey] = v;
+                }
+                if (xcmConceptInfo[xcmInteriorKey] == undefined){
+                    let unknownXcmConceptCache = unknownXcmConcepts[xcmInteriorKey]
+                    let nativeAssetChain = null
+                    if (unknownXcmConceptCache != undefined && unknownXcmConceptCache.nativeAssetChain != undefined){
+                        nativeAssetChain = unknownXcmConceptCache.nativeAssetChain
+                        delete unknownXcmConcepts[xcmInteriorKey]
+                    }
+                    let xcmV1MultiLocation = paraTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
+                    //let xcmV1MultiLocationHex = paraTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, false) //this call requires apiparser
+                    let evmMultiLocation = paraTool.convertXcmV1MultiLocationToMoonbeamEvmMultiLocation(xcmV1MultiLocation)
+                    let [xcmConcept, relayChain] = paraTool.parseXcmInteriorKey(v.xcmInteriorKey)
+                    let a = {
+                        chainID: v.xcmchainID,
+                        isUSD: v.isUSD,
+                        xcmConcept: xcmConcept,
+                        asset: v.asset,
+                        decimals: v.decimals,
+                        symbol: v.symbol,
+                        paraID: v.paraID,
+                        relayChain: v.relayChain,
+                        parents: v.parents,
+                        xcmInteriorKey: xcmInteriorKey,
+                        //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
+                        xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
+                        evmMultiLocation: JSON.stringify(evmMultiLocation),
+                        xcContractAddress: {},
+                        xcCurrencyID: {},
+                        nativeAssetChain: nativeAssetChain, //probably unknown without indexing the native chain
+                        assetType: "Token"
+                    }
+                    xcmConceptInfo[v.xcmInteriorKey] = a;
+                }
+            }
+            for (const k of Object.keys(unknownXcmConcepts)){
+                let u = unknownXcmConcepts[k]
+                if (xcmConceptInfo[u.xcmInteriorKey] == undefined){
+                    xcmConceptInfo[u.xcmInteriorKey] = u
+                }
+            }
+
+            let assetRecs = await this.poolREADONLY.query("select chainID, currencyID, xcContractAddress, xcmInteriorKey from asset where xcmInteriorKey is not null and (xcContractAddress is not null or currencyID is not null)");
+            for (const assetRec of assetRecs) {
+                let xcmInteriorKey = assetRec.xcmInteriorKey
+                if (xcmConceptInfo[xcmInteriorKey] != undefined){
+                    if (assetRec.xcContractAddress != null) xcmConceptInfo[xcmInteriorKey]["xcContractAddress"][assetRec.chainID] = assetRec.xcContractAddress
+                    if (assetRec.currencyID != null && !isNaN(assetRec.currencyID)) xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"][assetRec.chainID] = assetRec.currencyID
+                }
+            }
+
+            let routerRecs = await this.poolREADONLY.query("select routerAssetChain, routerName from router");
+            let routers = {};
+            for (let i = 0; i < routerRecs.length; i++) {
+                let v = routerRecs[i];
+                if (routers[v.routerAssetChain] == undefined) {
+                    routers[v.routerAssetChain] = v;
+                }
+            }
+            this.routers = routers;
+            this.xcmAssetInfo = xcmAssetInfo; // key: xcmInteriorKey => a (1, ignore asset/chain)
+            this.xcmInteriorInfo = xcmInteriorInfo; // key: asset~chainID  => a (N)
+            this.xcmSymbolInfo = xcmSymbolInfo; // key: symbol~relayChain => a (1, ignore asset/chain)
+            this.xcmConceptInfo = xcmConceptInfo;
+            // console.log(`this.xcmSymbolInfo`, this.xcmSymbolInfo)
+            console.log(`this.xcmConceptInfo`, this.xcmConceptInfo)
+            for (let i = 0; i < xcmAssets.length; i++) {
+
+            }
+        } catch(e){
+            console.log(`init_xcm_asset err`, e)
         }
 
-        let xcmAssets = await this.poolREADONLY.query("select xcmInteriorKey, symbol, relayChain, nativeAssetChain, isUSD, decimals, parent as parents from xcmasset");
-        for (let i = 0; i < xcmAssets.length; i++) {
-            let v = xcmAssets[i];
-            if (xcmAssetInfo[v.xcmInteriorKey] == undefined) {
-                xcmAssetInfo[v.xcmInteriorKey] = v;
-            }
-        }
-        let routerRecs = await this.poolREADONLY.query("select routerAssetChain, routerName from router");
-        let routers = {};
-        for (let i = 0; i < routerRecs.length; i++) {
-            let v = routerRecs[i];
-            if (routers[v.routerAssetChain] == undefined) {
-                routers[v.routerAssetChain] = v;
-            }
-        }
-        this.routers = routers;
-        this.xcmAssetInfo = xcmAssetInfo; // key: xcmInteriorKey => a (1, ignore asset/chain)
-        this.xcmInteriorInfo = xcmInteriorInfo; // key: asset~chainID  => a (N)
-        this.xcmSymbolInfo = xcmSymbolInfo; // key: symbol~relayChain => a (1, ignore asset/chain)
-        // console.log(`this.xcmSymbolInfo`, this.xcmSymbolInfo)
     }
 
     getXcmAssetInfoDecimals(xcmInteriorKey) {
