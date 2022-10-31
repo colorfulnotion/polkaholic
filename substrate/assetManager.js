@@ -642,14 +642,22 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     async init_asset_info() {
-        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.totalSupply, asset.asset, asset.symbol, asset.alternativeAsset, asset.xcmInteriorKey, xcmasset.symbol as xcmasset_symbol, xcmasset.relayChain as xcmasset_relayChain, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.id, chain.chainName, asset.isUSD, asset.priceUSD, asset.priceUSDPercentChange,  asset.nativeAssetChain, currencyID, xcContractAddress, from_unixtime(createDT) as createTS, xcmasset.priceUSD as xcmpriceUSD from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow')");
-
         let nassets = 0;
         let assetInfo = {};
         let alternativeAssetInfo = {};
         let currencyIDInfo = {};
         let xcContractAddress = {};
+        let nonxcmAssetpriceUSDmap = {}
         let symbolRelayChainAsset = {};
+
+        let nonxcmAsset = await this.poolREADONLY.query(`select indexTS, chainID, asset, priceUSD, 0 as liquid from assetlog where chainID in (${paraTool.chainIDParallel}, ${paraTool.chainIDHeiko}) and source = 'oracle' order by indexTS desc limit 100`)
+        for (let i = 0; i < nonxcmAsset.length; i++) {
+            let nv = nonxcmAsset[i];
+            let nvKey = `${nv.asset}${nv.chainID}`
+            if (nonxcmAssetpriceUSDmap[nvKey] == undefined) nonxcmAssetpriceUSDmap[nvKey] = nv.priceUSD
+        }
+        let assetRecs = await this.poolREADONLY.query("select assetType, asset.assetName, asset.numHolders, asset.totalSupply, asset.asset, asset.symbol, asset.alternativeAsset, asset.xcmInteriorKey, xcmasset.symbol as xcmasset_symbol, xcmasset.relayChain as xcmasset_relayChain, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.id, chain.chainName, asset.isUSD, asset.priceUSD, asset.priceUSDPercentChange,  asset.nativeAssetChain, currencyID, xcContractAddress, from_unixtime(createDT) as createTS, xcmasset.priceUSD as xcmpriceUSD from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where asset.chainID = chain.chainID and assetType in ('ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special', 'CDP_Supply', 'CDP_Borrow')");
+
         for (let i = 0; i < assetRecs.length; i++) {
             let v = assetRecs[i];
             let a = {}
@@ -660,7 +668,11 @@ module.exports = class AssetManager extends PolkaholicDB {
             if (v.asset == '{"StableAssetPoolToken":"0"}') {
                 v.assetType = 'LiquidityPair';
             }
-
+            let priceUSD = v.priceUSD
+            if (!priceUSD){
+                let vKey = `${v.asset}${v.chainID}`
+                if (nonxcmAssetpriceUSDmap[vKey] != undefined) priceUSD = nonxcmAssetpriceUSDmap[vKey]
+            }
             let alternativeAssetChain = (v.alternativeAsset != undefined) ? paraTool.makeAssetChain(v.alternativeAsset, v.chainID) : false
 
             if (v.assetType == 'LiquidityPair' || v.assetType == 'ERC20LP') { //'ERC20','ERC20LP','ERC721','ERC1155','Token','LiquidityPair','NFT','Loan','Special'
@@ -684,7 +696,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     chainName: v.chainName,
                     assetChain: assetChain,
                     isUSD: v.isUSD,
-                    priceUSD: v.priceUSD,
+                    priceUSD: priceUSD,
                     priceUSDPercentChange: v.priceUSDPercentChange,
                     //priceUSDpaths: priceUSDpaths,
                     nativeAssetChain: v.nativeAssetChain // removable?
@@ -705,7 +717,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     chainName: v.chainName,
                     assetChain: assetChain,
                     isUSD: v.isUSD,
-                    priceUSD: v.priceUSD,
+                    priceUSD: priceUSD,
                     priceUSDPercentChange: v.priceUSDPercentChange,
                     priceUSDpaths: priceUSDpaths,
                     nativeAssetChain: v.nativeAssetChain, // removable
@@ -1591,7 +1603,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     chainID: chainID,
                     ts
                 });
-		        console.log("COMPUTEPRICEUSD",targetAsset, chainID, p);
+		        //console.log("COMPUTEPRICEUSD",targetAsset, chainID, p);
                 if (p) {
                     let rate = p.priceUSD;
                     state[fld + "USD"] = p.valUSD;
