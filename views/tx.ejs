@@ -2,6 +2,8 @@
 <h4>Transaction #<%=`${tx.extrinsicID}`%></h4>
 <%
 let f = tx;
+let xcmInfoFound = ( f.xcmInfo != undefined)? true : false
+let assetTransferFound = (  tx.transfers && tx.transfers.length > 0 )? true : false
 let txResult = (f.result != undefined)? f.result == 1: true //by default tx result is true (until we back fill it)
 let errStr = (f.result != undefined)? f.err: false //by default tx result is true (until we back fill it)
 if (txResult){
@@ -44,7 +46,13 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
         </tr>
     <% } %>
 
-    <% if ( f.xcmInfo ) {  %>
+    <% if ( xcmInfoFound) {  %>
+        <% if ( assetTransferFound) { %>
+        <tr>
+          <td><%- include("tooltip", {k: "assettransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
+          <td><%- include("assettransferred", {transfers: f.transfers}); %></td>
+        </tr>
+        <% } %>
         <tr>
           <td><%- include("tooltip", {k: "xcmtimeline"}) %>XCM Timeline</td>
           <td><%- include("xcminfo", {xcm: f.xcmInfo}); %></td>
@@ -124,53 +132,13 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       </td>
     </tr>
     <tr>
-        <% if ( tx.transfers && tx.transfers.length > 0 ) { %>
-            <tr>
-              <td><%- include("tooltip", {k: "assettransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
-              <td>
-                <table>
-        	  <tr>
-        	    <th>From</td>
-        	    <th>To</td>
-              <th>Token</td>
-              <th>Value</td>
-        	  </tr>
-        	  <% for (let t = 0 ; t < tx.transfers.length; t++) {
-        	    let tok = tx.transfers[t];
-        	  %>
-        	    <tr>
-                    <td>
-                      <% if (tok.from){  %>
-                        <%- uiTool.presentBlockiesOrIdenticon(tok.from, 25) %>
-                        <a href='/account/<%= paraTool.getPubKey(tok.from) %>'>
-                          <%- uiTool.getShortHash(tok.from, true, false) %>
-                        </a>
-                      <% } else {%>
-                        <%- `-`; %>
-                      <% } %>
-                    </td>
-                    <td>
-                      <% if (tok.to){  %>
-                        <%- uiTool.presentBlockiesOrIdenticon(tok.to, 25) %>
-                        <a href='/account/<%= paraTool.getPubKey(tok.to) %>'>
-                            <%- uiTool.getShortHash(tok.to, true, false) %>
-                        </a>
-                      <% } else {%>
-                        <%- `-`; %>
-                      <% } %>
-                    </td>
-        	      <td><%- tok.symbol; %> <%- ; %></td>
-                  <td><%- tok.amount; %>
-                  <% if ( tok.amountUSD ) { %>
-                       (<%- uiTool.currencyFormat(tok.amountUSD, tok.priceUSD, tok.priceUSD); %> )
-                  <% } %>
-                  </td>
-        	    </tr>
-        	  <% } %>
-        	</table>
-              </td>
-            </tr>
-        <% } %>
+
+    <% if ( !xcmInfoFound && assetTransferFound) { %>
+    <tr>
+        <td><%- include("tooltip", {k: "assettransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
+        <td><%- include("assettransferred", {transfers: f.transfers}); %></td>
+    </tr>
+    <% } %>
       <td><%- include("tooltip", {k: "module"}) %>Module</td>
       <td><%- include("module", {chainID: f.id, section: f.section, method: f.method}); %></td>
     </tr>
