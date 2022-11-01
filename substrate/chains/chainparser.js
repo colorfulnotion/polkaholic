@@ -1212,6 +1212,29 @@ module.exports = class ChainParser {
         }
     }
 
+    decodeXcmVersionedXcms(indexer, data, caller = false, useApiAt = true) {
+      let fragments = [];
+      let remainingMessage = data;
+      while (remainingMessage.length != 0) {
+          try {
+              let instructions = api.registry.createType('XcmVersionedXcm', remainingMessage);
+              if (this.debugLevel >= paraTool.debugInfo && !useApiAt) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] Fallback decode success!`)
+              //if (this.debugLevel >= paraTool.debugErrorOnly && !useApiAt) console.log(`decodeXcmVersionedXcm [${msgHash}](${data}) instructions`, instructions.toJSON())
+              fragments.push(instructions);
+              remainingMessage = remainingMessage.slice(fragment.toU8a().length)
+          } catch (err) {
+              if (useApiAt) {
+                  if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] apiAt decode failed. trying fallback`)
+                  return this.decodeXcmVersionedXcm(indexer, remainingMessage, caller, false)
+              } else {
+                  if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}](${remainingMessage}) decode failed. error`, err.toString())
+                  //return false
+              }
+          }
+      }
+      return fragments;
+    }
+
     decodeXcmVersionedXcm(indexer, data, caller = false, useApiAt = true) {
         let api = (useApiAt) ? indexer.apiAt : indexer.api
         let msgHash = '0x' + paraTool.blake2_256_from_hex(data)
@@ -1362,6 +1385,8 @@ module.exports = class ChainParser {
             let sentAt = (horizontalMsg.sentAt != undefined) ? paraTool.dechexToInt(horizontalMsg.sentAt) : paraTool.dechexToInt(horizontalMsg.pubSentAt)
             msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
             var instructions = this.decodeXcmVersionedXcm(indexer, data, `decodeHorizontalMsg-${channelMsgIndex}`)
+            var instructions2 = this.decodeXcmVersionedXcms(indexer, data, `decodeHorizontalMsg-${channelMsgIndex}`)
+            console.log(`instructions2`, instructions2)
             var hrmpMsg = instructions.toJSON()
             var msg0 = instructions.toJSON()
             let beneficiaries = this.getBeneficiary(msg0)
