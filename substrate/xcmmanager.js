@@ -56,6 +56,59 @@ module.exports = class XCMManager extends Query {
         return (chain);
     }
 
+    async auditMsgHash(limit = 1000){
+        let sql = `select msgHash, msgHex from xcmmessages where msgHashAudited = -1 order by blockTS desc limit ${limit}`;
+        let msgs = await this.poolREADONLY.query(sql)
+        let hashMap = {}
+        let validHashes = []
+        let invalidHashes = []
+        let unknownErrHashes = []
+        for (const m of msgs) {
+            try {
+                let rawMsgHash = `${m.msgHash}`
+                if (hashMap[rawMsgHash] != undefined) continue
+                hashMap[rawMsgHash] = 1
+                let rawHex = `${m.msgHex}`
+                let instructions = this.api.registry.createType('XcmVersionedXcm', rawHex);
+                let derivedInstructionHex = instructions.toHex()
+                if (derivedInstructionHex != rawHex){
+                    let remaining = '0x' + rawHex.replace(derivedInstructionHex,'')
+                    console.log(`mismatch!! [msgHash=${rawMsgHash}] rawHexLen=${rawHex.length-2}, derivedHexLen${derivedInstructionHex.length-2}), remainingLen=${remaining.length-2}`)
+                    invalidHashes.push(rawMsgHash)
+                }else{
+                    //console.log(`valid [msgHash=${rawMsgHash}] rawHex=${rawHex}, derivedHex=${derivedInstructionHex}`)
+                    validHashes.push(rawMsgHash)
+                }
+            } catch (e){
+                console.log(`auditMsgHash error`, e, m )
+                if (m.msgHash != undefined) unknownErrHashes.push(m.msgHash)
+            }
+        }
+        if (validHashes.length > 0){
+            let validHashList = "'" + validHashes.join("','") + "'"
+            let validSQL = `update xcmmessages set msgHashAudited = 1 where msgHash in (${validHashList})`
+            console.log(`mark valid sz=${validHashes.length}`)
+            this.batchedSQL.push(validSQL);
+        }
+        if (invalidHashes.length > 0){
+            let invalidHashList =  "'" + invalidHashes.join("','") + "'"
+            let invalidSQL = `update xcmmessages set msgHashAudited = 0 where msgHash in (${invalidHashList})`
+            console.log(`mark invalid sz=${invalidHashes.length}`, invalidSQL)
+            this.batchedSQL.push(invalidSQL);
+        }
+        if (unknownErrHashes.length > 0){
+            let unknownErrHashesList =  "'" + unknownErrHashes.join("','") + "'"
+            let unknownSQL = `update xcmmessages set msgHashAudited = -2 where msgHash in (${unknownErrHashesList})`
+            console.log(`mark unknown sz=${unknownErrHashes.length}`, unknownSQL)
+            this.batchedSQL.push(unknownSQL);
+        }
+        await this.update_batchedSQL();
+        if (msgs.length == 0){
+            //DONE
+            return false
+        }
+        return true
+    }
 
     // generates xcmmessagelog, xcmassetlog, and tallies activity in last 24h/7d/30 in channel, xcmasset
     async update_xcmlogs(lookbackDays = 1) {
