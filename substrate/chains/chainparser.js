@@ -356,33 +356,38 @@ module.exports = class ChainParser {
             for (const dmp of v) {
                 let data = dmp.msg
                 if (data != prevData) {
-                    let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
-                    var instructions = this.decodeXcmVersionedXcm(indexer, data, `DownwardMessageQueuesVal`)
-                    var dmpMsg = instructions.toJSON()
-                    var msg0 = instructions.toJSON()
-                    let beneficiaries = this.getBeneficiary(msg0)
-                    console.log(`[Trace] Outgoing DownwardMessageQueuesVal [${msgHash}] beneficiaries=${beneficiaries}`)
-                    let p = this.getInstructionPath(dmpMsg)
-                    let dmpDecoded = {
-                        msg: JSON.stringify(dmpMsg),
+                    var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `DownwardMessageQueuesVal`)
+                    if (xcmFragments) {
+                        for (const xcm of xcmFragments) {
+                            var msgHash = xcm.msgHash
+                            var dmpMsg = xcm.msg
+                            var msg0 = xcm.msg
+                            var msgHex = xcm.hex
+                            let beneficiaries = this.getBeneficiary(msg0)
+                            console.log(`[Trace] Outgoing DownwardMessageQueuesVal [${msgHash}] beneficiaries=${beneficiaries}`)
+                            let p = this.getInstructionPath(dmpMsg)
+                            let dmpDecoded = {
+                                msg: JSON.stringify(dmpMsg),
+                            }
+                            let dmpRaw = {
+                                mpType: mpType,
+                                msgHash: msgHash,
+                                msgHex: msgHex,
+                                msgStr: JSON.stringify(dmpMsg),
+                                sentAt: dmp.sentAt, //dmp is guranteed to be correct
+                                chainID: indexer.chainID,
+                                chainIDDest: chainIDDest,
+                                relayChain: relayChain,
+                                beneficiaries: beneficiaries,
+                            }
+                            if (p) {
+                                dmpRaw.version = p.version
+                                dmpRaw.path = p.path
+                            }
+                            dmps.push(dmpDecoded)
+                            dmpRaws.push(dmpRaw)
+                        }
                     }
-                    let dmpRaw = {
-                        mpType: mpType,
-                        msgHash: msgHash,
-                        msgHex: data,
-                        msgStr: JSON.stringify(dmpMsg),
-                        sentAt: dmp.sentAt, //dmp is guranteed to be correct
-                        chainID: indexer.chainID,
-                        chainIDDest: chainIDDest,
-                        relayChain: relayChain,
-                        beneficiaries: beneficiaries,
-                    }
-                    if (p) {
-                        dmpRaw.version = p.version
-                        dmpRaw.path = p.path
-                    }
-                    dmps.push(dmpDecoded)
-                    dmpRaws.push(dmpRaw)
                 }
                 prevData = data
             }
@@ -422,36 +427,41 @@ module.exports = class ChainParser {
                 let data = ump.replace(' ', '')
                 let relayChain = indexer.relayChain
                 if (data != prevData) {
-                    let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
-                    var instructions = this.decodeXcmVersionedXcm(indexer, data, `UpwardMessagesVal`)
-                    var umpMsg = instructions.toJSON()
-                    var msg0 = instructions.toJSON()
-                    let beneficiaries = this.getBeneficiary(msg0)
-                    console.log(`[Trace] Outgoing UpwardMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
-                    let p = this.getInstructionPath(umpMsg)
-                    let umpDecoded = {
-                        msg: JSON.stringify(umpMsg),
+                    var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `UpwardMessagesVal`)
+                    if (xcmFragments) {
+                        for (const xcm of xcmFragments) {
+                            var msgHash = xcm.msgHash
+                            var umpMsg = xcm.msg
+                            var msg0 = xcm.msg
+                            var msgHex = xcm.hex
+                            let beneficiaries = this.getBeneficiary(msg0)
+                            console.log(`[Trace] Outgoing UpwardMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
+                            let p = this.getInstructionPath(umpMsg)
+                            let umpDecoded = {
+                                msg: JSON.stringify(umpMsg),
+                            }
+                            let umpRaw = {
+                                mpType: mpType,
+                                msgHash: msgHash,
+                                msgHex: msgHex,
+                                msgStr: JSON.stringify(umpMsg),
+                                //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                                sentAt: 0,
+                                chainID: indexer.chainID,
+                                chainIDDest: paraTool.getRelayChainID(relayChain),
+                                relayChain: relayChain,
+                                beneficiaries: beneficiaries,
+                            }
+                            if (p) {
+                                umpRaw.version = p.version
+                                umpRaw.path = p.path
+                            }
+                            umps.push(umpDecoded)
+                            umpRaws.push(umpRaw)
+                        }
                     }
-                    let umpRaw = {
-                        mpType: mpType,
-                        msgHash: msgHash,
-                        msgHex: data,
-                        msgStr: JSON.stringify(umpMsg),
-                        //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
-                        sentAt: 0,
-                        chainID: indexer.chainID,
-                        chainIDDest: paraTool.getRelayChainID(relayChain),
-                        relayChain: relayChain,
-                        beneficiaries: beneficiaries,
-                    }
-                    if (p) {
-                        umpRaw.version = p.version
-                        umpRaw.path = p.path
-                    }
-                    umps.push(umpDecoded)
-                    umpRaws.push(umpRaw)
+                    prevData = data
                 }
-                prevData = data
             }
             extraField['mpIsSet'] = 1
             //res["pv"] = umps
@@ -486,34 +496,39 @@ module.exports = class ChainParser {
                     let relayChainID = paraTool.getRelayChainID(relayChain)
                     let paraIDExtra = paraTool.getParaIDExtra(relayChain)
                     let data = '0x' + hrmp.data.slice(4)
-                    let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
-                    var instructions = this.decodeXcmVersionedXcm(indexer, data, `HrmpOutboundMessagesVal`)
-                    var hrmpMsg = instructions.toJSON()
-                    var msg0 = instructions.toJSON()
-                    let beneficiaries = this.getBeneficiary(msg0)
-                    console.log(`[Trace] Outgoing HrmpOutboundMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
-                    let p = this.getInstructionPath(hrmpMsg)
-                    let hrmpDecoded = {
-                        msg: JSON.stringify(hrmpMsg),
+                    var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `HrmpOutboundMessagesVal`)
+                    if (xcmFragments) {
+                        for (const xcm of xcmFragments) {
+                            var msgHash = xcm.msgHash
+                            var hrmpMsg = xcm.msg
+                            var msg0 = xcm.msg
+                            var msgHex = xcm.hex
+                            let beneficiaries = this.getBeneficiary(msg0)
+                            console.log(`[Trace] Outgoing HrmpOutboundMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
+                            let p = this.getInstructionPath(hrmpMsg)
+                            let hrmpDecoded = {
+                                msg: JSON.stringify(hrmpMsg),
+                            }
+                            let hrmpRaw = {
+                                mpType: mpType,
+                                msgHash: msgHash,
+                                msgHex: msgHex,
+                                msgStr: JSON.stringify(hrmpMsg),
+                                //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                                sentAt: 0,
+                                chainID: indexer.chainID,
+                                chainIDDest: hrmp.recipient + paraIDExtra,
+                                relayChain: relayChain,
+                                beneficiaries: beneficiaries,
+                            }
+                            if (p) {
+                                hrmpRaw.version = p.version
+                                hrmpRaw.path = p.path
+                            }
+                            hrmps.push(hrmpDecoded)
+                            hrmpRaws.push(hrmpRaw)
+                        }
                     }
-                    let hrmpRaw = {
-                        mpType: mpType,
-                        msgHash: msgHash,
-                        msgHex: data,
-                        msgStr: JSON.stringify(hrmpMsg),
-                        //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
-                        sentAt: 0,
-                        chainID: indexer.chainID,
-                        chainIDDest: hrmp.recipient + paraIDExtra,
-                        relayChain: relayChain,
-                        beneficiaries: beneficiaries,
-                    }
-                    if (p) {
-                        hrmpRaw.version = p.version
-                        hrmpRaw.path = p.path
-                    }
-                    hrmps.push(hrmpDecoded)
-                    hrmpRaws.push(hrmpRaw)
                 }
             }
             //res["pv"] = hrmps
@@ -1111,10 +1126,12 @@ module.exports = class ChainParser {
                         let upwardMsg = candidateCommitments.upwardMessages[j]
                         let channelMsgIndex = `${extrinsic.extrinsicID}-ump-${indexer.chainID}-${paraChainID}-${j}`
                         if (this.debugLevel >= paraTool.debugTracing) console.log(`[${channelMsgIndex}] upwardMessages[${j}]`, upwardMsg)
-                        let uMsg = this.decodeUpwardMsg(indexer, upwardMsg, hrmpWatermark, channelMsgIndex)
-                        if (uMsg) {
-                            indexer.updateXCMChannelMsg(uMsg, this.parserBlockNumber, this.parserTS)
-                            indexer.updateXCMMsg(uMsg)
+                        let uMsgs = this.decodeUpwardMsg(indexer, upwardMsg, hrmpWatermark, channelMsgIndex)
+                        if (uMsgs) {
+                            for (const uMsg of uMsgs) {
+                                indexer.updateXCMChannelMsg(uMsg, this.parserBlockNumber, this.parserTS)
+                                indexer.updateXCMMsg(uMsg)
+                            }
                         }
                     }
                 }
@@ -1184,10 +1201,13 @@ module.exports = class ChainParser {
                     let channelMsgIndex = `${extrinsic.extrinsicID}-dmp-${indexer.chainID}-${relayChainID}-${j}`
                     //console.log(`[${channelMsgIndex}] downwardMessages[${j}]`, downwardMsg)
                     //console.log(`[${extrinsic.extrinsicID}] downwardMessages[${j}]`, downwardMsg)
-                    let dMsg = this.decodeDownwardMsg(indexer, downwardMsg, channelMsgIndex)
-                    if (dMsg) {
-                        indexer.updateXCMChannelMsg(dMsg, this.parserBlockNumber, this.parserTS)
-                        indexer.updateXCMMsg(dMsg)
+                    let dMsgs = this.decodeDownwardMsg(indexer, downwardMsg, channelMsgIndex)
+                    console.log(`decodeDownwardMsg downwardMessages[${j}]`, dMsgs)
+                    if (dMsgs) {
+                        for (const dMsg of dMsgs) {
+                            indexer.updateXCMChannelMsg(dMsg, this.parserBlockNumber, this.parserTS)
+                            indexer.updateXCMMsg(dMsg)
+                        }
                     }
                 }
                 let horizontalMessages = data.horizontalMessages // this is from para siblings
@@ -1199,10 +1219,12 @@ module.exports = class ChainParser {
                         let siblingChainID = paraTool.dechexToInt(paraSibling) + paraIDExtra
                         let channelMsgIndex = `${extrinsic.extrinsicID}-xcmp-${indexer.chainID}-${siblingChainID}-${k}`
                         //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${channelMsgIndex}] sibling[${paraSibling}] msg[${k}]`, horizontalMsg)
-                        let xcMsg = this.decodeHorizontalMsg(indexer, horizontalMsg, channelMsgIndex)
-                        if (xcMsg) {
-                            indexer.updateXCMChannelMsg(xcMsg, this.parserBlockNumber, this.parserTS)
-                            indexer.updateXCMMsg(xcMsg)
+                        let xcMsgs = this.decodeHorizontalMsg(indexer, horizontalMsg, channelMsgIndex)
+                        if (xcMsgs) {
+                            for (const xcMsg of xcMsgs) {
+                                indexer.updateXCMChannelMsg(xcMsg, this.parserBlockNumber, this.parserTS)
+                                indexer.updateXCMMsg(xcMsg)
+                            }
                         }
                     }
                 }
@@ -1213,43 +1235,89 @@ module.exports = class ChainParser {
     }
 
     decodeXcmVersionedXcms(indexer, data, caller = false, useApiAt = true) {
-      let fragments = [];
-      let remainingMessage = data;
-      while (remainingMessage.length != 0) {
-          try {
-              let instructions = api.registry.createType('XcmVersionedXcm', remainingMessage);
-              if (this.debugLevel >= paraTool.debugInfo && !useApiAt) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] Fallback decode success!`)
-              //if (this.debugLevel >= paraTool.debugErrorOnly && !useApiAt) console.log(`decodeXcmVersionedXcm [${msgHash}](${data}) instructions`, instructions.toJSON())
-              fragments.push(instructions);
-              remainingMessage = remainingMessage.slice(fragment.toU8a().length)
-          } catch (err) {
-              if (useApiAt) {
-                  if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] apiAt decode failed. trying fallback`)
-                  return this.decodeXcmVersionedXcm(indexer, remainingMessage, caller, false)
-              } else {
-                  if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}](${remainingMessage}) decode failed. error`, err.toString())
-                  //return false
-              }
-          }
-      }
-      return fragments;
+        let api = (useApiAt) ? indexer.apiAt : indexer.api
+        let msgHash = '0x' + paraTool.blake2_256_from_hex(data)
+        try {
+            let fragments = [];
+            let msgHashes = [];
+            let remainingMessage = data;
+            while (remainingMessage.length >= 0 && remainingMessage != '0x') {
+                //console.log(`remainingMessage(len=${remainingMessage.length})=${remainingMessage}`)
+                let instructions = api.registry.createType('XcmVersionedXcm', remainingMessage);
+                if (this.debugLevel >= paraTool.debugInfo && !useApiAt) console.log(`[${caller}] decodeXcmVersionedXcms [${msgHash}] Fallback decode success!`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly && !useApiAt) console.log(`decodeXcmVersionedXcms [${msgHash}](${data}) instructions`, instructions.toJSON())
+                //fragments.push(instructions.toJSON());
+                let instructionsJSON = instructions.toJSON()
+                let instructionHex = instructions.toHex()
+                let instructionLen = instructionHex.length
+                let mhash = '0x' + paraTool.blake2_256_from_hex(instructionHex)
+                //console.log(`instructionHex=${instructionHex} -> msgHash=${mhash}`)
+                msgHashes.push(mhash)
+                //console.log(`instruction(len=${instructionLen})`, instructionsJSON)
+                remainingMessage = '0x' + remainingMessage.slice(instructionLen)
+                let f = {
+                    msg: instructionsJSON,
+                    hex: instructionHex,
+                    msgHash: mhash,
+                    len: instructionHex.length - 2,
+                }
+                fragments.push(f)
+            }
+            return fragments;
+        } catch (e) {
+            if (useApiAt) {
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] apiAt decode failed. trying fallback`)
+                return this.decodeXcmVersionedXcms(indexer, data, caller, false)
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}](${data}) decode failed. error`, err.toString())
+                return false
+            }
+        }
     }
 
     decodeXcmVersionedXcm(indexer, data, caller = false, useApiAt = true) {
         let api = (useApiAt) ? indexer.apiAt : indexer.api
         let msgHash = '0x' + paraTool.blake2_256_from_hex(data)
+        let remainingFound = false
         try {
             let instructions = api.registry.createType('XcmVersionedXcm', data);
             if (this.debugLevel >= paraTool.debugInfo && !useApiAt) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] Fallback decode success!`)
             //if (this.debugLevel >= paraTool.debugErrorOnly && !useApiAt) console.log(`decodeXcmVersionedXcm [${msgHash}](${data}) instructions`, instructions.toJSON())
-            return instructions
+            let instructionLen = instructions.toHex().length
+            let dataLength = data.length
+            if (instructionLen != dataLength) {
+                let remainingMessage = '0x' + data.slice(instructionLen)
+                let remainingFound = true
+                indexer.logger.error({
+                    "op": "decodeXcmVersionedXcm",
+                    "msg": "decodeXcmVersionedXcm found extra",
+                    "chainID": indexer.chainID,
+                    "parserBlockNumber": this.parserBlockNumber,
+                    "parserBlockHash": this.parserBlockHash,
+                    "obj": JSON.stringify(instructions.toJSON()),
+                    "parsed": data.slice(0, instructionLen),
+                    "remainingMessage": remainingMessage,
+                    "err": 'decodeXcmVersionedXcm found extra'
+                });
+                console.log(`!! instruction unparsed!!  remainingMessage=${remainingMessage}(len=${remainingMessage.length})`)
+            }
+            return [instructions, remainingFound]
         } catch (err) {
             if (useApiAt) {
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] apiAt decode failed. trying fallback`)
                 return this.decodeXcmVersionedXcm(indexer, data, caller, false)
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}](${data}) decode failed. error`, err.toString())
-                return false
+                indexer.logger.error({
+                    "op": "decodeXcmVersionedXcm",
+                    "msg": "parsed failed",
+                    "chainID": indexer.chainID,
+                    "parserBlockNumber": this.parserBlockNumber,
+                    "parserBlockHash": this.parserBlockHash,
+                    "obj": data,
+                    "err": err
+                });
+                return [false, false]
             }
         }
     }
@@ -1258,45 +1326,55 @@ module.exports = class ChainParser {
         /*
         0x021000040000000007dc83b012120a130000000007dc83b01212010700f2052a010d01000400010100c656dff3da37a23aa2600edeeb0cd141bf8170eea28ae3265bc310196f48464b
         */
-        let msgHash = '0x';
         try {
-            //channelMsgIndex: extrinsicID[0-1]-mpType[2]-receiverChainID[3]-senderChainID[4]-msgIdx[5]
+            //channelMsgIndex: extrinsicID[0-1]-mpType[2]-receiverChainID[3]-senderChainID[4]-msgIdx[5]-msgsubIdx[6 - optional]
             let pieces = channelMsgIndex.split('-')
             let mpType = pieces[2]
             let chainIDDest = pieces[3]
             let chainID = pieces[4]
             let data = upwardMsg
             let sentAt = paraTool.dechexToInt(hrmpWatermark)
-            msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as ump (ExecutedUpward)?
-            var instructions = this.decodeXcmVersionedXcm(indexer, data, `decodeUpwardMsg-${channelMsgIndex}`)
-            var umpMsg = instructions.toJSON()
-            var msg0 = instructions.toJSON()
-            let beneficiaries = this.getBeneficiary(msg0)
-            console.log(`[Extrinsic] Incoming upwardMsg [${msgHash}] beneficiaries=${beneficiaries}`)
-            let p = this.getInstructionPath(umpMsg)
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`upwardMsg [${msgHash}]`, JSON.stringify(umpMsg, null, 2))
-            let r = {
-                msgIndex: channelMsgIndex,
-                chainID: chainID,
-                chainIDDest: chainIDDest,
-                isIncoming: 1, //vs outgoing
-                msgHash: msgHash,
-                msgType: 'ump',
-                msgHex: data,
-                msgStr: JSON.stringify(umpMsg),
-                blockTS: this.parserTS,
-                blockNumber: this.parserBlockNumber,
-                relayChain: indexer.relayChain,
-                sentAt: sentAt,
-                beneficiaries: beneficiaries,
+            var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decodeUpwardMsg-${channelMsgIndex}`)
+            if (!xcmFragments) {
+                console.log(`xcmFragments decode failed`)
+                return false
             }
-            if (p) {
-                r.version = p.version
-                r.path = p.path
+            let umpXcms = []
+            for (let i = 0; i < xcmFragments.length; i++) {
+                let xcm = xcmFragments[i]
+                console.log(`xcmFragment`, xcm)
+                var umpMsg = xcm.msg
+                var msg0 = xcm.msg
+                var msgHex = xcm.hex
+                var mHash = xcm.msgHash
+                let beneficiaries = this.getBeneficiary(msg0)
+                console.log(`[Extrinsic] Incoming upwardMsg [${mHash}] beneficiaries=${beneficiaries}`)
+                let p = this.getInstructionPath(umpMsg)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`upwardMsg`, JSON.stringify(umpMsg, null, 2))
+                let r = {
+                    msgIndex: (xcmFragments.length > 1) ? `${channelMsgIndex}-${i}` : channelMsgIndex,
+                    chainID: chainID,
+                    chainIDDest: chainIDDest,
+                    isIncoming: 1,
+                    msgHash: mHash,
+                    msgType: 'ump',
+                    msgHex: msgHex,
+                    msgStr: JSON.stringify(umpMsg),
+                    blockTS: this.parserTS,
+                    blockNumber: this.parserBlockNumber,
+                    relayChain: indexer.relayChain,
+                    sentAt: sentAt,
+                    beneficiaries: beneficiaries,
+                }
+                if (p) {
+                    r.version = p.version
+                    r.path = p.path
+                }
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`upwardMsg [${mHash}] [${channelMsgIndex}-${i}]`, r)
+                umpXcms.push(r)
             }
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`upwardMsg [${channelMsgIndex}]`, r)
-            return r
-            //return umpMsg
+            return umpXcms
+            //return r
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeUpwardMsg decode failed. error`, e.toString())
             return false
@@ -1314,7 +1392,6 @@ module.exports = class ChainParser {
           pubMsg: '0x0001040a01000b00f01449e90408070a01000b00f01449e9040000000000000000005ed0b200000000000001040101020082ba55bbd6e798cc015723fae77abe3fb54a2cdbbfe873b85d08a57b5aab6a6a'
         }
         */
-        let msgHash = '0x';
         try {
             //channelMsgIndex: extrinsicID[0-1]-mpType[2]-receiverChainID[3]-senderChainID[4]-msgIdx[5]
             let pieces = channelMsgIndex.split('-')
@@ -1323,37 +1400,48 @@ module.exports = class ChainParser {
             let chainID = pieces[4]
             let data = (downwardMsg.msg != undefined) ? downwardMsg.msg : downwardMsg.pubMsg
             let sentAt = (downwardMsg.sentAt != undefined) ? paraTool.dechexToInt(downwardMsg.sentAt) : paraTool.dechexToInt(downwardMsg.pubSentAt)
-            msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as dmpqueue (ExecutedDownward)
             //console.log(`decodeDownwardMsg`, downwardMsg)
-            var instructions = this.decodeXcmVersionedXcm(indexer, data, `decodeDownwardMsg-${channelMsgIndex}`)
-            var dmpMsg = instructions.toJSON()
-            var msg0 = instructions.toJSON()
-            let beneficiaries = this.getBeneficiary(msg0)
-            console.log(`[Extrinsic] Incoming downwardMsg [${msgHash}] beneficiaries=${beneficiaries}`)
-            let p = this.getInstructionPath(dmpMsg)
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`downwardMsg [${msgHash}]`, JSON.stringify(dmpMsg, null, 2))
-            let r = {
-                msgIndex: channelMsgIndex,
-                chainID: chainID,
-                chainIDDest: chainIDDest,
-                isIncoming: 1,
-                msgHash: msgHash,
-                msgType: 'dmp',
-                msgHex: data,
-                msgStr: JSON.stringify(dmpMsg),
-                blockTS: this.parserTS,
-                blockNumber: this.parserBlockNumber,
-                relayChain: indexer.relayChain,
-                sentAt: sentAt,
-                beneficiaries: beneficiaries,
+            var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decodeDownwardMsg-${channelMsgIndex}`)
+            if (!xcmFragments) {
+                console.log(`xcmFragments decode failed`)
+                return false
             }
-            if (p) {
-                r.version = p.version
-                r.path = p.path
+            let dmpXcms = []
+            for (let i = 0; i < xcmFragments.length; i++) {
+                let xcm = xcmFragments[i]
+                console.log(`xcmFragment`, xcm)
+                var dmpMsg = xcm.msg
+                var msg0 = xcm.msg
+                var msgHex = xcm.hex
+                var mHash = xcm.msgHash
+                let beneficiaries = this.getBeneficiary(msg0)
+                console.log(`[Extrinsic] Incoming downwardMsg [${mHash}] beneficiaries=${beneficiaries}`)
+                let p = this.getInstructionPath(dmpMsg)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`downwardMsg`, JSON.stringify(dmpMsg, null, 2))
+                let r = {
+                    msgIndex: (xcmFragments.length > 1) ? `${channelMsgIndex}-${i}` : channelMsgIndex,
+                    chainID: chainID,
+                    chainIDDest: chainIDDest,
+                    isIncoming: 1,
+                    msgHash: mHash,
+                    msgType: 'dmp',
+                    msgHex: msgHex,
+                    msgStr: JSON.stringify(dmpMsg),
+                    blockTS: this.parserTS,
+                    blockNumber: this.parserBlockNumber,
+                    relayChain: indexer.relayChain,
+                    sentAt: sentAt,
+                    beneficiaries: beneficiaries,
+                }
+                if (p) {
+                    r.version = p.version
+                    r.path = p.path
+                }
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`downwardMsg [${mHash}] [${channelMsgIndex}-${i}]`, r)
+                dmpXcms.push(r)
             }
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`downwardMsg [${msgHash}]`, r)
-            return r
-            //return dmpMsg
+            return dmpXcms
+            //return r
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeDownwardMsg decode failed. error`, e.toString())
             return false
@@ -1368,7 +1456,6 @@ module.exports = class ChainParser {
         }
         //want: 0x021000040000010608000c000b00204aa9d1010a130000010608000c000b00204aa9d101010700f2052a010d01000400010100b2d6460991d870119c2b5f820f977bb0c5a0a410eca38db44bc7817dc5507749
         */
-        let msgHash = '0x';
         try {
             //channelMsgIndex: extrinsicID[0-1]-mpType[2]-receiverChainID[3]-senderChainID[4]-msgIdx[5]
             let pieces = channelMsgIndex.split('-')
@@ -1383,38 +1470,47 @@ module.exports = class ChainParser {
                 console.log(`horizontalMsg sentAt fatal case!!`, JSON.stringify(hrmpMsg, null, 2))
             }
             let sentAt = (horizontalMsg.sentAt != undefined) ? paraTool.dechexToInt(horizontalMsg.sentAt) : paraTool.dechexToInt(horizontalMsg.pubSentAt)
-            msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
-            var instructions = this.decodeXcmVersionedXcm(indexer, data, `decodeHorizontalMsg-${channelMsgIndex}`)
-            var instructions2 = this.decodeXcmVersionedXcms(indexer, data, `decodeHorizontalMsg-${channelMsgIndex}`)
-            console.log(`instructions2`, instructions2)
-            var hrmpMsg = instructions.toJSON()
-            var msg0 = instructions.toJSON()
-            let beneficiaries = this.getBeneficiary(msg0)
-            console.log(`[Extrinsic] Incoming horizontalMsg [${msgHash}] beneficiaries=${beneficiaries}`)
-            let p = this.getInstructionPath(hrmpMsg)
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`horizontalMsg`, JSON.stringify(hrmpMsg, null, 2))
-            let r = {
-                msgIndex: channelMsgIndex,
-                chainID: chainID,
-                chainIDDest: chainIDDest,
-                isIncoming: 1,
-                msgHash: msgHash,
-                msgType: 'hrmp',
-                msgHex: data, // this is the modified msgHex without the first byte
-                msgStr: JSON.stringify(hrmpMsg),
-                blockTS: this.parserTS,
-                blockNumber: this.parserBlockNumber,
-                relayChain: indexer.relayChain,
-                sentAt: sentAt,
-                beneficiaries: beneficiaries,
+            var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decodeHorizontalMsg-${channelMsgIndex}`)
+            if (!xcmFragments) {
+                console.log(`xcmFragments decode failed`)
+                return false
             }
-            if (p) {
-                r.version = p.version
-                r.path = p.path
+            let hrmpXcms = []
+            for (let i = 0; i < xcmFragments.length; i++) {
+                let xcm = xcmFragments[i]
+                console.log(`xcmFragment`, xcm)
+                var hrmpMsg = xcm.msg
+                var msg0 = xcm.msg
+                var msgHex = xcm.hex
+                var mHash = xcm.msgHash
+                let beneficiaries = this.getBeneficiary(msg0)
+                console.log(`[Extrinsic] Incoming horizontalMsg [${mHash}] beneficiaries=${beneficiaries}`)
+                let p = this.getInstructionPath(hrmpMsg)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`horizontalMsg`, JSON.stringify(hrmpMsg, null, 2))
+                let r = {
+                    msgIndex: (xcmFragments.length > 1) ? `${channelMsgIndex}-${i}` : channelMsgIndex,
+                    chainID: chainID,
+                    chainIDDest: chainIDDest,
+                    isIncoming: 1,
+                    msgHash: mHash,
+                    msgType: 'hrmp',
+                    msgHex: msgHex, // this is the modified msgHex without the first byte
+                    msgStr: JSON.stringify(hrmpMsg),
+                    blockTS: this.parserTS,
+                    blockNumber: this.parserBlockNumber,
+                    relayChain: indexer.relayChain,
+                    sentAt: sentAt,
+                    beneficiaries: beneficiaries,
+                }
+                if (p) {
+                    r.version = p.version
+                    r.path = p.path
+                }
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`horizontalMsg [${mHash}] [${channelMsgIndex}-${i}]`, r)
+                hrmpXcms.push(r)
             }
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`horizontalMsg [${msgHash}]`, r)
-            return r
-            //return hrmpMsg
+            return hrmpXcms
+            //return r
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeHorizontalMsg decode failed. error`, e.toString())
             return false
@@ -3476,11 +3572,15 @@ module.exports = class ChainParser {
             for (const hrmp of hrmpOutboundMsgs) {
                 if (hrmp.data != undefined) {
                     let data = '0x' + hrmp.data.slice(4)
-                    let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
-                    var instructions = this.decodeXcmVersionedXcm(indexer, data, `decorateAutoTraceHrmp-${o.traceID}`)
-                    var hrmpMsg = instructions.toJSON()
-                    xcmMessages.push(JSON.stringify(hrmpMsg))
-                    msgHashes.push(msgHash)
+                    var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decorateAutoTraceHrmp-${o.traceID}`)
+                    if (xcmFragments) {
+                        for (const xcm of xcmFragments) {
+                            let hrmpMsg = xcm.msg
+                            let msgHash = xcm.msgHash
+                            xcmMessages.push(JSON.stringify(hrmpMsg))
+                            msgHashes.push(msgHash)
+                        }
+                    }
                 }
             }
         } catch (err) {
@@ -3499,11 +3599,22 @@ module.exports = class ChainParser {
             let v = decoratedVal.replace('[', '').replace(']', '').replaceAll(' ', '').split(',')
             for (const ump of v) {
                 let data = ump.replace(' ', '')
+                /*
                 let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
-                var instructions = this.decodeXcmVersionedXcm(indexer, data, `decorateAutoTraceUmp-${o.traceID}`)
+                var [instructions, remainingFound] = this.decodeXcmVersionedXcm(indexer, data, `decorateAutoTraceUmp-${o.traceID}`)
                 var umpMsg = instructions.toJSON()
                 xcmMessages.push(JSON.stringify(umpMsg))
                 msgHashes.push(msgHash)
+                */
+                var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decorateAutoTraceUmp-${o.traceID}`)
+                if (xcmFragments) {
+                    for (const xcm of xcmFragments) {
+                        let umpMsg = xcm.msg
+                        let msgHash = xcm.msgHash
+                        xcmMessages.push(JSON.stringify(umpMsg))
+                        msgHashes.push(msgHash)
+                    }
+                }
             }
         } catch (err) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceUmp decode failed`, err.toString())
@@ -3521,12 +3632,15 @@ module.exports = class ChainParser {
             let v = JSON.parse(decoratedVal)
             for (const dmp of v) {
                 let data = dmp.msg
-                let msgHash = '0x' + paraTool.blake2_256_from_hex(data) //same as xcmpqueue (Success) ?
-                var instructions = this.decodeXcmVersionedXcm(indexer, data, `decorateAutoTraceDmp-${o.traceID}`)
-                var dmpMsg = instructions.toJSON()
-                let p = this.getInstructionPath(dmpMsg)
-                xcmMessages.push(JSON.stringify(dmpMsg))
-                msgHashes.push(msgHash)
+                var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decorateAutoTraceDmp-${o.traceID}`)
+                if (xcmFragments) {
+                    for (const xcm of xcmFragments) {
+                        let dmpMsg = xcm.msg
+                        let msgHash = xcm.msgHash
+                        xcmMessages.push(JSON.stringify(dmpMsg))
+                        msgHashes.push(msgHash)
+                    }
+                }
             }
         } catch (err) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceDmp decode failed`, err.toString())
@@ -3749,6 +3863,7 @@ module.exports = class ChainParser {
         return xcmRec
     }
 
+    //mk: review this
     async processMPTrace(indexer, p, s, e2, mpType = false) {
         let sectionMethod = `${p}:${s}`
         if (this.debugLevel >= paraTool.debugTracing) console.log(`processMPTrace ${sectionMethod}`, e2);
