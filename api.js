@@ -460,6 +460,8 @@ app.get('/chain/:assetType/:chainID_or_chainName?', async (req, res) => {
             });
         } else if (assetType == "channels") {
             assets = await query.getChainChannels(chainID_or_chainName);
+        } else if (assetType == "System" || assetType == "ERC20" || assetType == "ERC721" || assetType == "ERC1155" || assetType == "PSP22" || assetType == "PSP34") {
+            assets = await query.getChainAssets(chainID_or_chainName, assetType);
         } else {
             assets = await query.getChainAssets(chainID_or_chainName, "Token");
         }

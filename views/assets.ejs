@@ -1,0 +1,25 @@
+<%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Chain`}); %>
+<%- include('chainheader', { chain: chain, title: `System Contracts` }); %>
+
+<table id="tableassets" class="display" style='width: 100%'>
+    <thead>
+    <tr>
+      <th scope="col">Contract Address</th>
+      <th scope="col">Name</th>
+      <th scope="col">Type</th>
+    </tr>
+    </thead>
+</table>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+
+<script>
+var chainID = '<%- chainID; %>';
+var id = '<%- id; %>';
+var assetType = '<%- assetType; %>';
+$(document).ready(function() {
+  showassets(id, assetType);
+})
+</script>
+<script src="/chainui.js"></script>
+

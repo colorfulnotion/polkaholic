@@ -462,7 +462,7 @@ function presentChain(id, chainName, iconURL = false, crawlingStatus = "", tab =
     if (!chainName) chainName = "chain" + id;
     let i = iconURL ? `<img width=24 src="${iconURL}" style="margin: 3px; padding: 3px;"/>` : "";
     let s = crawlingStatus.length > 0 ? `<span data-mdb-placement="right" title="${crawlingStatus}" ><i class="fas fa-exclamation-triangle"></i></span>` : '';
-    return i + `<a href="/chain/${id}${tab}">` + beautifyCamelCase(chainName) + '</a>' + s;
+    return i + `<a href="/blocks/${id}">` + beautifyCamelCase(chainName) + '</a>' + s;
 }
 
 function encodeURIComponent2(assetChain) {
@@ -492,8 +492,15 @@ function presentID(id) {
     return '<a href="/account/' + id + '">' + getShortHash(id) + '</a>';
 }
 
-function presentAddress(id) {
+function presentAddress(id, chainID = false) {
+    if (chainID) {
+        return `<a href="/address/${id}/${chainID}">` + getFullHash(id) + '</a>';
+    }
     return '<a href="/address/' + id + '">' + getShortHash(id) + '</a>';
+}
+
+function presentCurrencyID(currencyID, chainID = false) {
+    return `<a href="/asset/${currencyID}/${chainID}">` + getFullHash(currencyID) + '</a>';
 }
 
 function presentOffer(offer) {

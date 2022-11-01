@@ -5,38 +5,8 @@
   <option value="polkadot" data-mdb-secondary-text="Polkadot+Parachains" <%=  ( relaychain == "polkadot" ) ? "SELECTED": ""; %>>Polkadot</option>
   <option value="kusama" data-mdb-secondary-text="Kusama+Parachains" <%=  ( relaychain == "kusama" ) ? "SELECTED": ""; %>>Kusama</option>
 </select></span>
-<!-- Nav tabs -->
-<ul class="nav nav-tabs" id="chainsTab" role="tablist">
-<%
-let tabs = [
-{ title: "Chains", target: "chains", func: "showchains", stopfunc: "stopxcmtransfers" },
-{ title: "XCM Assets", target: "xcmassets", func: "showxcmassets" },
-{ title: "XCM Transfers", target: "xcmtransfers", func: "showxcmtransfers" },
-{ title: "XCM Messages", target: "xcmmessages", func: "showxcmmessages" },
-{ title: "Projects", target: "routers" },
-{ title: "Pools", target: "pools" },
-{ title: "Top Accounts", target: "addresstopn", func: "showaddresstopn" }
-];
 
-for (let i=0; i<tabs.length; i++) {
-  let t = tabs[i];
-  let title = t.title;
-  let target = t.target;
-  let id = target + "-tab";
-  let href = "#" + target;
-%>
-  <li class="nav-item" role="presentation">
-    <a class="nav-link" id="<%= id; %>" data-mdb-toggle="tab" href="<%= href; %>" role="tab" aria-controls="<%= target; %>"><%= title; %></a>
-  </li>
-<%
-}
-%>
-</ul>
-
-<!-- Tab panes -->
-<div class="tab-content">
-  <div class="tab-pane" id="chains" role="tabpanel" aria-labelledby="chains-tab">
-    <table id="tablechains" class="display" style='width: 100%'>
+<table id="tablechains" class="display" style='width: 100%'>
       <thead>
         <tr>
           <th>Chain</th>
@@ -50,94 +20,16 @@ for (let i=0; i<tabs.length; i++) {
           <th>Relay</th>
         </tr>
       </thead>
-    </table>
-  </div>
-
-  <div class="tab-pane" id="xcmassets" role="tabpanel" aria-labelledby="xcmassets-tab">
-    <table id="tablexcmassets" class="display" style='width: 100%'>
-      <thead>
-        <tr>
-          <th scope="col">Asset</th>
-          <th scope="col">Holdings</th>
-          <th scope="col">Chain</th>
-          <th scope="col"># Holders</th>
-          <th scope="col">Price</th>
-          <th scope="col">Total Free</th>
-          <th scope="col">TVL Free</th>
-          <th scope="col">Total Res</th>
-          <th scope="col">TVL Reserved</th>
-          <th scope="col">Relay Chain</th>
-        </tr>
-      </thead>
-    </table>
-  </div>
-
-  <div class="tab-pane" id="xcmtransfers" role="tabpanel" aria-labelledby="xcmtransfers-tab">
-    <table id="tablexcmtransfers" class="display" style='width: 100%'>
-      <thead>
-        <tr>
-          <th>Section:Method</th>
-          <th>Amount Sent</th>
-          <th>Value (USD)</th>
-          <th>Sender</th>
-          <th>Beneficiary</th>
-          <th>From Chain/Extrinsic ID</th>
-          <th>To Chain</th>
-          <th>Date</th>
-          <th>Relay</th>
-        </tr>
-      </thead>
-    </table>
-  </div>
-  <div class="tab-pane" id="xcmmessages" role="tabpanel" aria-labelledby="xcmmessages-tab">
-    <table id="tablexcmmessages" class="display" style="width: 100%">
-      <thead>
-        <tr>
-	  <th>Msg Hash</th>
-	  <th>Extrinsic</th>
-	  <th>Msg Type</th>
-	  <th>Sent</th>
-	  <th>Received</th>
-          <th>Assets Received/Instructions</th>
-          <th>Beneficiary</th>
-	  <th>Execution</th>
-        </tr>
-      </thead>
-    </table>
-  </div>
-
-   <%- include("routerstab", {}) %>
-   <%- include("poolstab", {}) %>
-
-
-   <div class="tab-pane" id="addresstopn" role="tabpanel" aria-labelledby="addresstopn-tab">
-    <select class="select" id="topN">
-        <% for ( const f of topNfilters ) {
-	   let sel = ( f.filter == topN ) ? " SELECTED" : ""; %>
-	     <option value="<%= f.filter %>"<%= sel; %>><%= f.display; %></option>
-	<% } %>
-    </select>
-    <table id="tableaddresstopn" class="display" style="width: 100%">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Address</th>
-          <th>Account Balance (USD)</th>
-          <th id="topnhdr">Value</th>
-        </tr>
-      </thead>
-    </table>
-  </div>
-</div>
-
+</table>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
 <script>
 var relaychainfilter = "";
-var topNfilters = <%- JSON.stringify(topNfilters) %>;
-var tabs = <%- JSON.stringify(tabs); %>;
 var accounts = <%- JSON.stringify(accounts); %>;
+$(document).ready(function() {
+show_chains()
+})
 </script>
-<script src="/chains.js"></script>
+
 <script src="/chainui.js"></script>
-<script src="/poolsui.js"></script>
+<script src="/chains.js"></script>

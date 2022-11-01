@@ -1094,6 +1094,7 @@ module.exports = class Query extends AssetManager {
         let chainList = filters.chainList ? filters.chainList : [];
         let blockNumber = filters.blockNumber ? parseInt(filters.blockNumber, 10) : null;
         let address = filters.address ? filters.address : null;
+        let xcmType = filters.xcmType ? filters.xcmType : null;
         let out = [];
         try {
             let w = [];
@@ -1102,6 +1103,9 @@ module.exports = class Query extends AssetManager {
             }
             if (blockNumber) {
                 w.push(`(blockNumber='${parseInt(blockNumber, 10)}')`)
+            }
+            if (xcmType) {
+                w.push(`(xcmType='${xcmType}')`)
             }
             let chainListFilter = "";
             if (chainList.length > 0) {
@@ -1743,6 +1747,7 @@ module.exports = class Query extends AssetManager {
         return null;
     }
 
+
     getHoldingsState(holdings, asset, chainID) {
         if (!holdings) return (false);
         for (const assetType of Object.keys(holdings)) {
@@ -2025,7 +2030,7 @@ module.exports = class Query extends AssetManager {
             chain = await this.getChain(chainID)
         }
         let assets = [];
-
+        console.log("getChainAssets", chainID_or_chainName, assetType);
         try {
             let w = "";
             // get xcmassets of a chain or relaychain
@@ -2045,10 +2050,12 @@ module.exports = class Query extends AssetManager {
             let sql = null
             if (assetType == "Token") {
                 sql = `select xcmasset.*, asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.symbol as localSymbol, xcmasset.symbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from xcmasset, asset where xcmasset.xcmInteriorKey = asset.xcmInteriorKey ${w} order by numHolders desc;`
+            } else if (assetType == "System") {
+                sql = `select assetType, assetName, asset, chainID, symbol from  asset where 1 ${w}`
             } else { // ERC20, ERC20LP, Loan
                 sql = `select asset.assetType, asset.assetName, asset.asset, asset.chainID, asset.priceUSD, asset.symbol as localSymbol, asset.decimals, asset.currencyID, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, totalFree, totalReserved, totalMiscFrozen, totalFrozen, token0Supply, token1Supply, totalSupply, numHolders from asset where priceUSD > 0 ${w} order by numHolders desc;`
             }
-
+            console.log(sql);
             assets = await this.poolREADONLY.query(sql);
             if (assets.length == 0) {
                 // TODO: throw NotFound error
@@ -2081,6 +2088,18 @@ module.exports = class Query extends AssetManager {
                         assetChain: assetChain,
                         priceUSD: v.priceUSD,
                         tvlFree: v.totalSupply * v.priceUSD0
+                    }
+                } else if (v.assetType == "System") {
+                    a = {
+                        assetType: v.assetType,
+                        assetName: v.assetName,
+                        numHolders: v.numHolders,
+                        id,
+                        asset: v.asset,
+                        symbol: v.symbol,
+                        chainID: v.chainID,
+                        chainName: v.chainName,
+                        assetChain: assetChain,
                     }
                 } else {
                     //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
@@ -3279,7 +3298,6 @@ module.exports = class Query extends AssetManager {
         }
 
         let totalUSDVal = await this.compute_holdings_USD(realtime);
-        console.log("REALTIME", realtime);
 
         let current = [];
         let covered = {};

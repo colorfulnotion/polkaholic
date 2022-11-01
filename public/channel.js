@@ -57,10 +57,6 @@ async function showxcmassetlog(f) {
         }]
     });
     await loadData2(pathParams, tableName, true)
-    const selectElement = document.querySelector('#relaychain');
-    if (selectElement) {
-        setchainfilter(selectElement.value);
-    }
 }
 
 
