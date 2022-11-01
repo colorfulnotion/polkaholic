@@ -3279,7 +3279,7 @@ module.exports = class Query extends AssetManager {
         }
 
         let totalUSDVal = await this.compute_holdings_USD(realtime);
-	    console.log("REALTIME", realtime);
+        console.log("REALTIME", realtime);
 
         let current = [];
         let covered = {};
@@ -3289,9 +3289,9 @@ module.exports = class Query extends AssetManager {
                 if (!covered[kassets[j].assetChain]) {
                     covered[kassets[j].assetChain] = true;
                     let a = kassets[j]
-                    if (a != undefined && a.state != undefined){
+                    if (a != undefined && a.state != undefined) {
                         let aState = a.state
-                        if (aState.free || aState.reserved || aState.miscFrozen || aState.feeFrozen || aState.frozen || aState.supplied || aState.borrowed){
+                        if (aState.free || aState.reserved || aState.miscFrozen || aState.feeFrozen || aState.frozen || aState.supplied || aState.borrowed) {
                             current.push(kassets[j]);
                         }
                     }

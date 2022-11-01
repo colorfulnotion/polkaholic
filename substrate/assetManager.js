@@ -669,7 +669,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 v.assetType = 'LiquidityPair';
             }
             let priceUSD = v.priceUSD
-            if (!priceUSD){
+            if (!priceUSD) {
                 let vKey = `${v.asset}${v.chainID}`
                 if (nonxcmAssetpriceUSDmap[vKey] != undefined) priceUSD = nonxcmAssetpriceUSDmap[vKey]
             }
@@ -953,7 +953,7 @@ module.exports = class AssetManager extends PolkaholicDB {
 
         let liquidMax = 0.5 // e^.5 = 1.65
         if (assetlog.assetType == paraTool.assetTypeToken || assetlog.assetType == paraTool.assetTypeERC20 ||
-            ((chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) &&  (assetlog.assetType == paraTool.assetTypeToken || assetlog.assetType == paraTool.assetTypeToken))) {
+            ((chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) && (assetlog.assetType == paraTool.assetTypeToken || assetlog.assetType == paraTool.assetTypeToken))) {
             let sql = assetlog.isXCAsset ? `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from xcmassetpricelog where symbol = '${q.symbol}' and relayChain = '${q.relayChain}' and liquid < '${liquidMax}' order by indexTS;` : `select indexTS, routerAssetChain, priceUSD, priceUSD10, priceUSD100, priceUSD1000, liquid, CONVERT(verificationPath using utf8) as path from assetpricelog where asset = '${asset}' and chainID = '${chainID}' and liquid < '${liquidMax}' order by indexTS;`
             if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
                 // using parallel+heiko oracles while https://github.com/parallel-finance/parallel-js/issues/63
@@ -1061,7 +1061,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             for (let i = 0; i < dexRecs.length; i++) {
                 let a = dexRecs[i];
-		        a.issuance = parseFloat(a.issuance);
+                a.issuance = parseFloat(a.issuance);
                 let issuance = a.issuance > 0 ? a.issuance : prevIssuance;
                 if (issuance > 0) {
                     assetlog.dexRecs.push({
@@ -1252,7 +1252,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         let priceUSDCurrent = assetInfo.priceUSD;
         let currentTS = this.getCurrentTS();
         let assetType = assetInfo.assetType
-        if ( q.chainID == paraTool.chainIDParallel || q.chainID == paraTool.chainIDHeiko) {
+        if (q.chainID == paraTool.chainIDParallel || q.chainID == paraTool.chainIDHeiko) {
             // use oracle for parallel lp
             //if (assetInfo.assetType == paraTool.assetTypeLiquidityPair) assetType = paraTool.assetTypeToken
 
@@ -1260,13 +1260,13 @@ module.exports = class AssetManager extends PolkaholicDB {
         switch (assetType) {
             case paraTool.assetTypeERC20:
             case paraTool.assetTypeToken:
-                if (ts == null && assetInfo.priceUSD) {
+                if (ts == null) {
                     // short circuit any load of assetlog
                     res.priceUSD = assetInfo.priceUSD;
                     if (q.val) res.valUSD = q.val * res.priceUSD;
                     return res;
                 } else {
-                    if (ts == null){
+                    if (ts == null) {
                         console.log(`short circuit failed! q.asset=${q.asset} assetType=${assetType}, ts=${ts}`)
                     }
                     let assetlog = q.isXCAsset ? await this.get_assetlog(q.symbol, q.relayChain, q) : await this.get_assetlog(q.asset, q.chainID, q);
@@ -1322,7 +1322,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     res.priceUSD = x0 * priceUSD0 + x1 * priceUSD1;
                     res.priceUSDCurrent = x0 * priceUSD0Current + x1 * priceUSD1Current;
                     if (q.val) res.valUSD = q.val * res.priceUSD
-                    if ( q.chainID == paraTool.chainIDParallel || q.chainID == paraTool.chainIDHeiko) {
+                    if (q.chainID == paraTool.chainIDParallel || q.chainID == paraTool.chainIDHeiko) {
                         //console.log(`MK!!! p0`, p0);
                         //console.log(`MK!!! p1`, p1);
                         //console.log(`MK!!! ts=${ts}, x0=${x0}, x1=${x1}, priceUSD0=${priceUSD0}, priceUSD1=${priceUSD1}, RES.priceUSD=${res.priceUSD}`, "dexRec=", dexRec, `res=`, res);
@@ -1603,7 +1603,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     chainID: chainID,
                     ts
                 });
-		        //console.log("COMPUTEPRICEUSD",targetAsset, chainID, p);
+                //console.log("COMPUTEPRICEUSD",targetAsset, chainID, p);
                 if (p) {
                     let rate = p.priceUSD;
                     state[fld + "USD"] = p.valUSD;

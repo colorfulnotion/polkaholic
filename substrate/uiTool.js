@@ -658,7 +658,7 @@ module.exports = {
         let localSymbol = (assetInfo != undefined && assetInfo.localSymbol != undefined) ? assetInfo.localSymbol : symbol
         let assetName = (assetInfo != undefined && assetInfo.assetName != undefined) ? assetInfo.assetName : false
         let assetRep = localSymbol
-        if (assetName){
+        if (assetName) {
             assetRep = `${assetName} (${localSymbol})`
         }
         let chainID = (assetInfo != undefined && assetInfo.chainID != undefined) ? assetInfo.chainID : false
