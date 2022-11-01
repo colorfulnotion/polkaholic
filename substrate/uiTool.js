@@ -655,11 +655,17 @@ module.exports = {
     presentERCToken: function(id, assetInfo, allowCopy = true) {
         let asset = (assetInfo != undefined && assetInfo.asset != undefined) ? assetInfo.asset : false
         let symbol = (assetInfo != undefined && assetInfo.symbol != undefined) ? assetInfo.symbol : false
+        let localSymbol = (assetInfo != undefined && assetInfo.localSymbol != undefined) ? assetInfo.localSymbol : symbol
+        let assetName = (assetInfo != undefined && assetInfo.assetName != undefined) ? assetInfo.assetName : false
+        let assetRep = localSymbol
+        if (assetName) {
+            assetRep = `${assetName} (${localSymbol})`
+        }
         let chainID = (assetInfo != undefined && assetInfo.chainID != undefined) ? assetInfo.chainID : false
         if (!chainID || !symbol || !asset) {
             return '-'
         }
-        let out = `<a href="/token/` + encodeURIComponent(asset) + '">' + symbol + '</a>';
+        let out = `<a href="/token/` + encodeURIComponent(asset) + '">' + assetRep + '</a>';
         if (allowCopy) out += copyToClipboard(id);
         return out;
     },

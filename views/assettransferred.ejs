@@ -1,0 +1,42 @@
+<table>
+<% for (let t = 0 ; t < transfers.length; t++) {
+  let tok = transfers[t];
+%>
+  <tr>
+      <td>
+      <b>From </b>
+        <% if (tok.from){  %>
+          <%- uiTool.presentBlockiesOrIdenticon(tok.from, 15) %>
+          <a href='/account/<%= paraTool.getPubKey(tok.from) %>'>
+            <%- uiTool.getShortHash(tok.from, true, false) %>
+          </a>
+        <% } else {%>
+          <%- `-`; %>
+        <% } %>
+        &emsp;
+      </td>
+      <td>
+      <b>To </b>
+        <% if (tok.to){  %>
+          <%- uiTool.presentBlockiesOrIdenticon(tok.to, 15) %>
+          <a href='/account/<%= paraTool.getPubKey(tok.to) %>'>
+              <%- uiTool.getShortHash(tok.to, true, false) %>
+          </a>
+        <% } else {%>
+          <%- `-`; %>
+        <% } %>
+        &emsp;
+      </td>
+    <td>
+    <b>For </b>
+    <%- tok.amount; %>
+    <%- tok.symbol; %> <%- ; %>
+    </td>
+    <td>
+    <% if ( tok.amountUSD ) { %>
+         (<%- uiTool.currencyFormat(tok.amountUSD, tok.priceUSD, tok.priceUSD); %> )
+    <% } %>
+    </td>
+  </tr>
+<% } %>
+</table>

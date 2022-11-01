@@ -21,8 +21,12 @@
 <% for ( let j=0; j< params.length; j++) {
      let e = params[j]; %>
   <tr>
-   <th><%- e.name; %></th>
-   <td><%- e.type; %></td>
+   <th><%- e.name; %>
+       &ensp;
+   </th>
+   <td><%- e.type; %>
+       &emsp;
+   </td>
    <td>
    <% if ( e.type == "address" ) { %>
    <%- uiTool.presentID(e.value); %>

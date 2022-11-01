@@ -1,6 +1,8 @@
 <div class="tab-pane" id="overview" role="tabpanel" aria-labelledby="overview-tab">
 <%
 let f = tx;
+let assetTransferFound = (tx.transfers && tx.transfers.length > 0 )? true : false;
+let xcmInfoFound = ( f.xcmInfo != undefined )? true : false;
 let newDate = new Date();
 newDate.setTime(f.timestamp*1000);
 let dateString = newDate.toUTCString();
@@ -28,7 +30,13 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td><a href='/xcmmessage/<%= `${tx.msgHash}/${tx.blockNumber}`; %>'><%= tx.msgHash; %></a></td>
     </tr>
     <% } %>
-<% if ( f.xcmInfo != undefined ) { %>
+<% if ( xcmInfoFound ) { %>
+    <% if ( assetTransferFound) { %>
+    <tr>
+        <td><%- include("tooltip", {k: "tokenstransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
+        <td><%- include("evmassettransferred", {transfers: f.transfers}); %></td>
+    </tr>
+    <% } %>
     <tr>
       <td><%- include("tooltip", {k: "xcmtimeline"}) %>XCM Timeline</td>
       <td><%- include("xcminfo", {xcm: f.xcmInfo}); %></td>
@@ -77,29 +85,10 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       </td>
     </tr>
 <% } %>
-<% if ( tx.transfers && tx.transfers.length > 0 ) { %>
+<% if ( assetTransferFound && !xcmInfoFound) { %>
     <tr>
       <td><%- include("tooltip", {k: "tokenstransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
-      <td>
-        <table>
-	  <tr>
-	    <th>From</td>
-	    <th>To</td>
-      <th>Token</td>
-      <th>Value</td>
-	  </tr>
-	  <% for (let t = 0 ; t < tx.transfers.length; t++) {
-	    let tok = tx.transfers[t];
-	  %>
-	    <tr>
-	      <td><%- uiTool.presentERCID(tok.from); %></td>
-	      <td><%- uiTool.presentERCID(tok.to); %></td>
-	      <td><%- uiTool.presentERCToken(tok.tokenAddress, tok.assetInfo); %> <%- ; %></td>
-        <td><%- tok.value; %> (<%- uiTool.currencyFormat(tok.valueUSD, tok.priceUSD, tok.priceUSDCurrent); %> )</td>
-	    </tr>
-	  <% } %>
-	</table>
-      </td>
+      <td><%- include("evmassettransferred", {transfers: f.transfers}); %></td>
     </tr>
 <% } %>
     <tr>
