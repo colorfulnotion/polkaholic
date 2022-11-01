@@ -61,7 +61,9 @@ for (let i=0; i<tabs.length; i++) {
 
 <!-- Tab panes -->
 <div class="tab-content">
- <%- include("poolstab", {}) %>
+  <div class="tab-pane" id="pools" role="tabpanel" aria-labelledby="pools-tab">
+   <%- include("poolstab", {}) %>
+  </div>
 </div>
 
 <script>

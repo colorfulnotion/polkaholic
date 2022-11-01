@@ -50,9 +50,12 @@ for (let i=0; i<tabs.length; i++) {
       </thead>
     </table>
   </div>
+  <div class="tab-pane" id="pools" role="tabpanel" aria-labelledby="pools-tab">
+   <%- include("poolstab", {}) %>
+  </div>
 </div>
 
- <%- include("poolstab", {}) %>
+
 
 <script src="https://code.highcharts.com/stock/highstock.js"></script>
 <script src="https://code.highcharts.com/stock/modules/data.js"></script>

@@ -55,7 +55,7 @@
 <% if ( asset.xcContractAddress ) { %>
     <tr>
       <td>Contract Address</td>
-      <td><a href='/address/<%= asset.xcContractAddress; %>'><%- uiTool.getShortHash(asset.xcContractAddress, false); %></a></td>
+      <td><a href='/address/<%= asset.xcContractAddress; %>/<%= asset.chainID %>'><%- uiTool.getShortHash(asset.xcContractAddress, false); %></a></td>
     </tr>
 <% } %>
 <% if ( asset.priceUSD >= 0 ) { %>
@@ -140,8 +140,9 @@ for (let i=0; i<tabs.length; i++) {
     </table>
   </div>
 
+  <div class="tab-pane" id="pools" role="tabpanel" aria-labelledby="pools-tab">
   <%- include("poolstab", {}) %>
-
+  </div>
 
   <div class="tab-pane" id="assetholders" role="tabpanel" aria-labelledby="assetholders-tab">
     <table id="tableassetholders" class="display" style='width: 100%'>

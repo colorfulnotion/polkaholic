@@ -3,7 +3,17 @@
 var Crawler = require("./crawler");
 async function main() {
     var crawler = new Crawler();
-    await crawler.crawlParachains();
+    let sql = `select chainID, paraID, id, iconUrl, chainName, ss58Format, isEVM, isWASM, hasSystemContracts, hasProjects from chain where crawling = 1 order by relayChain, numAccountsActive30d desc`
+    let chains = await crawler.poolREADONLY.query(sql);
+    for ( const c of chains ) {
+	if ( c.isEVM == 0 ) delete c.isEVM;
+	if ( c.isWASM == 0 ) delete c.isWASM;
+	if ( c.hasSystemContracts == 0 ) delete c.hasSystemContracts;
+	if ( c.hasProjects == 0 ) delete c.hasProjects;
+	if ( c.relayChain != c.id ) delete c.relayChain;
+    }
+    console.log(JSON.stringify(chains, null, 4));
+    //await crawler.crawlParachains();
 }
 
 main()

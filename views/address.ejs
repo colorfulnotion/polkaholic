@@ -43,7 +43,7 @@
 	<% if ( contract && contract.assetType == "ERC20LP" ) { %>
 	<tr>
 	   <td>Token Pair:</td>
-	   <td><a href='/address/<%- contract.token0 %>'><%- uiTool.getShortHash(contract.token0) %></a> / <a href='/address/<%- contract.token1 %>'><%- uiTool.getShortHash(contract.token1) %></a></td>
+	   <td><a href='/address/<%- contract.token0 %>/<%- contract.chainID %>'><%- uiTool.getShortHash(contract.token0) %></a> / <a href='/address/<%- contract.token1 %>/<%- contract.chainID %>'><%- uiTool.getShortHash(contract.token1) %></a></td>
 	</tr>
 	   <%
 	   let t0 = query.assetInfo[paraTool.makeAssetChain(contract.token0, contract.chainID)];

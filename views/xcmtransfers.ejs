@@ -1,24 +1,8 @@
-<%- include('header', {chainInfo: chainInfo, title: "XCM Transfers / Messages"}); %>
+<%- include('header', {chainInfo: chainInfo, title: "XCM Transfers"}); %>
 
-<% if ( tbl == "xcmmessages" ) { %>
-<h5>XCM Messages</h5>
-    <table id="tablexcmmessages" class="display" style="width: 100%">
-      <thead>
-        <tr>
-	  <th><%- include("tooltip", {k: "xcmmessagehash"}) %>MsgHash</th>
-	  <th><%- include("tooltip", {k: "extrinsichash"}) %>Extrinsic</th>
-	  <th><%- include("tooltip", {k: "xcmmessagetype"}) %>Msg Type</th>
-	  <th><%- include("tooltip", {k: "origination"}) %>Sent</th>
-	  <th><%- include("tooltip", {k: "destination"}) %>Received</th>
-          <th><%- include("tooltip", {k: "assets"}) %>Assets Received/Instructions</th>
-          <th><%- include("tooltip", {k: "xcmmessagehash"}) %>Beneficiary</th>
-	  <th>Matched/Time</th>
-        </tr>
-      </thead>
-    </table>
-<% } else { %>
-    <h5>XCM Transfers</h5>
-    <table id="tablexcmtransfers" class="display" style='width: 100%'>
+<h5>XCM Transfers</h5>
+
+<table id="tablexcmtransfers" class="display" style='width: 100%'>
       <thead>
         <tr>
           <th><%- include("tooltip", {k: "module"}) %>Section:Method</th>
@@ -29,27 +13,24 @@
           <th><%- include("tooltip", {k: "origination"}) %>From Chain/Extrinsic ID</th>
           <th><%- include("tooltip", {k: "destination"}) %>To Chain</th>
           <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
+          <th>Relay</th>
         </tr>
       </thead>
-    </table>
-<% } %>
-<script src="/chainui.js"></script>
+</table>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
 <script>
-var data = <%- JSON.stringify(data); %>
+let id = '<% id %>';
+let data = <%- JSON.stringify(data) %>;
+
 $(document).ready(function() {
-<% if ( tbl == "xcmtransfers" ) { %>
-  showxcmtransfers(null);
-  let table = $("#tablexcmtransfers").DataTable();
-   table.clear();
-   table.rows.add(data)
-   table.draw();
-<% } else { %>    
-  showxcmmessages(null);
-  let table = $("#tablexcmmessages").DataTable();
-   table.clear();
-   table.rows.add(data)
-   table.draw();
-<% } %>    
+    showxcmtransfers(null);
+    let table = $("#tablexcmtransfers").DataTable();
+    table.clear();
+    table.rows.add(data)
+    table.draw();
 });
 </script>
-<%- include('footer', {apiUrl: apiUrl}); %>
+<script src="/chains.js"></script>
+<script src="/chainui.js"></script>
+

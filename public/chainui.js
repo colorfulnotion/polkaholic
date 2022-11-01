@@ -1,4 +1,14 @@
+var initrecentblocks = false;
+var initchainlog = false;
+var initspecversions = false;
+var initwasmcontracts = false;
+var initwasmcode = false;
+var initchannels = false;
+var refreshIntervalMS = 5000;
+var recentBlocksIntervalId = false;
+
 function build_filter_string(filter) {
+    console.log("filter", filter);
     if (!filter) return "";
     let out = [];
     if (filter.chainID != undefined && filter.chainIDDest != undefined) {
@@ -12,6 +22,7 @@ function build_filter_string(filter) {
     if (filter.symbol != undefined) {
         out.push(`symbol=${filter.symbol}`);
     }
+    console.log("filter out", out);
     if (out.length > 0) {
         let filterStr = "?" + out.join("&");
         return filterStr;
@@ -253,10 +264,6 @@ async function showxcmmessages(filter = {}) {
     //load data here: warning this function is technically async
     if (filter) {
         await loadData2(pathParams, tableName, true)
-        const selectElement = document.querySelector('#relaychain');
-        if (selectElement) {
-            setchainfilter(selectElement.value);
-        }
     } else {
         console.log("MANUAL SETUP");
     }
@@ -352,7 +359,7 @@ async function showxcmtransfers(filter = {}) {
                             //
                             return currencyFormat(row.amountSentUSD, row.priceUSD, row.priceUSDCurrent);
                         } else {
-                            console.log("missing amountSentUSD", row);
+                            //console.log("missing amountSentUSD", row);
                             return "--";
                         }
                     } else {
@@ -430,7 +437,7 @@ async function showxcmtransfers(filter = {}) {
                                 if (secondsago <= 90) {
                                     str = pendingStr
                                 }
-                                console.log(row.xcmInfo);
+                                //console.log(row.xcmInfo);
                             }
                             if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest != undefined) {
                                 return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest) + "<BR>" + str;
@@ -574,7 +581,7 @@ function showxcmassets(chainID) {
                         return `<a href='/asset/${row.chainID}/${row.currencyID}'>${str}</a>`
                     } else {
                         //console.log(row);
-                        return `<a href='/chain/${row.chainID}#xcmassets'>${row.chainName} ${row.symbol}</a>`
+                        return `<a href='/xcmassets/${row.chainID}'>${row.chainName} ${row.symbol}</a>`
                     }
                 } else {
                     return row.assetName;
@@ -751,7 +758,6 @@ function showtokens(chainID) {
                         return `<a href='/asset/${row.chainID}/${row.currencyID}'>${str}</a>`
                     } else {
                         return "-";
-                        //return `<a href='/chain/${row.chainID}#xcmassets'>${row.chainName} ${row.symbol}</a>`
                     }
                 } else {
                     return row.assetName;
@@ -841,7 +847,7 @@ function showrouters(chainID) {
             render: function(data, type, row, meta) {
                 if (row.chainName) {
                     if (type == 'display') {
-                        return `<A href="/chain/${row.id}#routers">${row.chainName}</A>`;
+                        return `<A href="/projects/${row.id}">${row.chainName}</A>`;
                     }
                     return data;
                 }
@@ -860,32 +866,644 @@ function showrouters(chainID) {
     loadData2(pathParams, tableName, true)
 }
 
+var initassets = false;
+let assetsTable = null;
 
-function filterchains(relaychain = "all") {
-    if (relaychain == "kusama" || relaychain == "polkadot") {
-        console.log("filterchains", relaychain);
-        if (chainsTable) chainsTable.column(8).search(relaychain).draw();
-        if (xcmassetsTable) xcmassetsTable.column(9).search(relaychain).draw();
-        if (xcmtransfersTable) xcmtransfersTable.column(8).search(relaychain).draw();
-        if (xcmmessagesTable) xcmmessagesTable.column(7).search(relaychain).draw();
-    } else {
-        // empty search effectively removes the filter
-        if (chainsTable) chainsTable.search('').columns().search('').draw();
-        if (xcmassetsTable) xcmassetsTable.search('').columns().search('').draw();
-        if (xcmtransfersTable) xcmtransfersTable.search('').columns().search('').draw();
-        if (xcmmessagesTable) xcmmessagesTable.search('').columns().search('').draw();
+function showassets(chainID, assetType) {
+    if (initassets) return;
+    else initassets = true;
+    let chainIDstr = (chainID == undefined) ? "all" : chainID.toString();
+    let pathParams = `chain/${assetType}/${chainIDstr}`
+    let tableName = '#tableassets'
+    console.log("showassets", pathParams);
+    assetsTable = $(tableName).DataTable({
+        order: [
+            [0, "asc"]
+        ],
+        columnDefs: [{
+            "className": "dt-right",
+            "targets": []
+        }, {
+            "className": "dt-left",
+            "targets": [0, 1]
+        }],
+        columns: [{
+            data: 'asset',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return `<A href="/address/${row.asset}/${row.chainID}">${row.asset}</A>`;
+                }
+                return data;
+            }
+        }, {
+            data: 'assetName',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }, {
+            data: 'assetType',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, true)
+}
+
+function stoprecentblocks(chainID) {
+    if (recentBlocksIntervalId) {
+        clearInterval(recentBlocksIntervalId);
+        recentBlocksIntervalId = false
     }
 }
 
-function setchainfilter(relaychain) {
-    relaychainfilter = relaychain;
-    filterchains(relaychainfilter);
+function showrecentblocks(chainID) {
+    if (!recentBlocksIntervalId) {
+        show_recentblocks(chainID)
+    }
+    recentBlocksIntervalId = setInterval(function() {
+        show_recentblocks(chainID)
+    }, refreshIntervalMS);
+}
+
+function show_recentblocks(chainID) {
+
+    let pathParams = `chain/${chainID}`
+
+    let tableName = '#tablerecentblocks'
+    if (initrecentblocks) {
+
+    } else {
+        initrecentblocks = true;
+        var table = $(tableName).DataTable({
+            order: [
+                [0, "desc"]
+            ],
+            columnDefs: [{
+                "className": "dt-center",
+                "targets": "_all"
+            }],
+            columns: [{
+                data: 'blockNumber',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentBlockNumber(chainID, false, data)
+                    }
+                    return data;
+                }
+            }, {
+                data: 'blockHash',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        let f = (row.finalized == 0) ? presentFinalized(false) : "";
+                        return f + " " + presentBlockHash(chainID, false, row.blockNumber, data);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'blockTS',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentTS(data);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'numExtrinsics',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        // in the evm case, we show numTransactions
+                        if (row.numTransactionsEVM != undefined) {
+                            return `<a href='/txs/${chainID}/${row.blockNumber}'>` + presentNumber(row.numTransactionsEVM) + "</a>";
+                        } else {
+                            return `<a href='/block/${chainID}/${row.blockNumber}#extrinsics'>` + presentNumber(data) + "</a>";
+                        }
+                    } else {
+                        if (row.numTransactionsEVM != undefined) {
+                            return row.numTransactionsEVM;
+                        } else {
+                            return data;
+                        }
+                    }
+                    return data;
+                }
+            }, {
+                data: 'numSignedExtrinsics',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        if (row.gasUsed != undefined) {
+                            return presentNumber(row.gasUsed);
+                        } else {
+                            return presentNumber(data);
+                        }
+                    } else {
+                        if (row.gasUsed != undefined) {
+                            return row.gasUsed;
+                        } else {
+                            return data;
+                        }
+                    }
+                    return data;
+                }
+            }, {
+                data: 'numXCMTransfersOut',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        let out = [];
+                        let xcmtransfers = `/xcmtransfers?chainfilters=${chainID}&blockNumber=${row.blockNumber}`
+                        let xcmlink = `/xcmmessages?chainfilters=${chainID}&blockNumber=${row.blockNumber}`
+                        if (data > 0) {
+                            out.push(`<a href='${xcmtransfers}'>${data} XCM transfers</a>`);
+                            if (row.numXCMMessagesOut > 0 && row.numXCMMessagesOut > row.numXCMTransfers) {
+                                out.push(`<a href='${xcmlink}'>${numXCMMessagesOut} additional outgoing XCMs</a>`);
+                            }
+                        } else {
+                            if (row.numXCMMessagesOut > 0) {
+                                out.push(`<a href='${xcmlink}'>${row.numXCMMessagesOut} outgoing</a>`);
+                            }
+                        }
+                        if (row.numXCMMessagesIn > 0) {
+                            out.push(`<a href='${xcmlink}'>${row.numXCMMessagesIn} incoming XCM</a>`);
+                        }
+                        return out.join(", ");
+                    } else {
+                        return data + row.numXCMMessagesIn;
+                    }
+                }
+            }, {
+                data: 'numEvents',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return `<a href='/block/${chainID}/${row.blockNumber}#events'>` + presentNumber(data) + "</a>";
+                    }
+                    return data;
+                }
+            }, {
+                data: 'numTransfers',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return presentNumber(data);
+                    }
+                    return data;
+                }
+            }, {
+                data: 'valueTransfersUSD',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+                        return currencyFormat(data);
+                    }
+                    return data;
+                }
+            }, ]
+        });
+    }
+
+    $(tableName).on('page.dt', function() {
+        stoprecentblocks();
+    });
+    loadData2(pathParams, tableName, false, 'blocks')
+}
+
+function showspecversions(chainID) {
+    if (initspecversions) return;
+    else initspecversions = true;
+    let pathParams = `specversions/${chainID}`
+    let tableName = '#tablespecversions'
+    var table = $(tableName).DataTable({
+        order: [
+            [0, "desc"]
+        ],
+        columnDefs: [{
+            "className": "dt-center",
+            "targets": "_all"
+        }],
+        columns: [{
+            data: 'specVersion',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentSpecVersion(chainID, data)
+                }
+                return data;
+            }
+        }, {
+            data: 'blockNumber',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentBlockNumber(chainID, false, data)
+                }
+                return data;
+            }
+        }, {
+            data: 'blockHash',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentBlockHash(chainID, false, row.blockNumber, data);
+                }
+                return data;
+            }
+        }, {
+            data: 'firstSeenTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentTS(data);
+                }
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, false)
+}
+
+function showchannels(chainID) {
+    if (initchannels) return;
+    else initchannels = true;
+    let pathParams = `chain/channels/${chainID}`
+    let tableName = '#tablechannels'
+    var table = $(tableName).DataTable({
+        order: [
+            [6, "desc"],
+            [7, "desc"],
+            [4, "desc"],
+        ],
+        columnDefs: [{
+            "className": "dt-center",
+            "targets": "_all"
+        }],
+        columns: [{
+            data: 'id',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.chainID == chainID || row.id == chainID) {
+                        return "<B>" + row.chainName + "</B>";
+                    } else {
+                        return presentChain(row.id, row.chainName, false, "", "#channels");
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'idDest',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    if (row.chainIDDest == chainID || row.idDest == chainID) {
+                        return "<B>" + row.chainNameDest + "</B>";
+                    } else {
+                        return presentChain(row.idDest, row.chainNameDest, false, "", "#channels");
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'status',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'openRequestTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let s = presentXCMMessageHash(row.msgHashOpenRequest, row.sentAtOpenRequest);
+                    return presentTS(data) + s;
+                }
+                return data;
+            }
+        }, {
+            data: 'acceptTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let s = presentXCMMessageHash(row.msgHashAccepted, row.sentAtAccepted);
+                    return presentTS(data) + s;
+                }
+                return data;
+            }
+        }, {
+            data: 'symbols',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    let out = [];
+                    if (data) {
+                        for (const symbolChain of data) {
+                            let [symbol, relayChain] = parseAssetChain(symbolChain);
+                            out.push(`<a href='/channel/${row.chainID}/${row.chainIDDest}/${symbol}'>${symbol}</a>`);
+                            console.log(symbolChain, row.chainID, row.chainIDDest);
+                        }
+                        return out.join(" | ");
+                    }
+                }
+                return data;
+            }
+        }, {
+            data: 'numXCMMessagesOutgoing7d',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    console.log(row);
+                    // todo: 1d/7d/30d
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'valXCMMessagesOutgoingUSD7d',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    // todo: 1d/7d/30d
+                    return currencyFormat(data)
+                }
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, false)
 }
 
 
-const selectElement = document.querySelector('#relaychain');
-if (selectElement) {
-    selectElement.addEventListener('change', (event) => {
-        setchainfilter(event.target.value);
+function showwasmcontracts(chainID) {
+    if (initwasmcontracts) return;
+    else initwasmcontracts = true;
+    let pathParams = `wasmcontracts/${chainID}`
+    let tableName = '#tablewasmcontracts'
+    var table = $(tableName).DataTable({
+        order: [
+            [5, "desc"]
+        ],
+        columnDefs: [{
+            "className": "dt-center",
+            "targets": "_all"
+        }],
+        columns: [{
+            data: 'address',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentWASMContract(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'status',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'deployer',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentID(data)
+                }
+                return data;
+            }
+        }, {
+            data: 'codeHash',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentWASMCodeHash(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'instantiateBN',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                }
+                return data;
+            }
+        }, {
+            data: 'blockTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentTS(data);
+                }
+                return data;
+            }
+        }]
     });
+    loadData2(pathParams, tableName, false)
+}
+
+function showwasmcode(chainID) {
+    if (initwasmcode) return;
+    else initwasmcode = true;
+    let pathParams = `wasmcode/${chainID}`
+    let tableName = '#tablewasmcode'
+    var table = $(tableName).DataTable({
+        order: [
+            [6, "desc"]
+        ],
+        columnDefs: [{
+            "className": "dt-center",
+            "targets": "_all"
+        }],
+        columns: [{
+            data: 'codeHash',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentWASMCodeHash(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'status',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'storer',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentID(data)
+                }
+                return data;
+            }
+        }, {
+            data: 'codeStoredBN',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
+                }
+                return data;
+            }
+        }, {
+            data: 'language',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }, {
+            data: 'compiler',
+            render: function(data, type, row, meta) {
+                return data;
+            }
+        }, {
+            data: 'codeStoredTS',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentTS(data);
+                }
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, false)
+}
+
+function presentLoan(assetChain, assetString) {
+    let asset = JSON.parse(assetString)
+    let symbol = "UNK";
+
+    try {
+        if (asset.Loan != undefined && asset.Loan.Token != undefined) {
+            symbol = asset.Loan.Token;
+        }
+        return '<a href="/asset/' + encodeURIComponent2(assetChain) + '"> Loan: ' + symbol + '</a>';
+    } catch (e) {
+        return "Loan: UNK"
+    }
+}
+
+function showchaininfo(chainID) {
+    // no datatable
+}
+
+function showchainlog(chainID, address) {
+    if (initchainlog) return;
+    else initchainlog = true;
+    let pathParams = `chainlog/${chainID}`
+
+    let tableName = '#tablechainlog'
+    var table = $(tableName).DataTable({
+        order: [
+            [0, "desc"]
+        ],
+        columnDefs: [{
+            "className": "dt-right",
+            "targets": [6, 7, 10, 11]
+        }, {
+            "className": "dt-center",
+            "targets": [1, 2, 3, 4, 5, 8, 9, 12, 13]
+        }],
+        columns: [{
+            data: 'logDT',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data
+                }
+                return data;
+            }
+        }, {
+            data: 'numAccountsActive',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'numAddresses',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'numSignedExtrinsics',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'numTransactionsEVM',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'numTransfers',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentNumber(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'valueTransfersUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'fees',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return presentTokenCount(data);
+                } else {
+                    return data;
+                }
+            }
+        }, {
+            data: 'numXCMTransfersIn',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                } else {
+                    return data;
+                }
+            }
+        }, {
+            data: 'numXCMTransfersOut',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'valXCMTransferIncomingUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'valXCMTransferOutgoingUSD',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return currencyFormat(data);
+                }
+                return data;
+            }
+        }, {
+            data: 'numXCMMessagesIn',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'numXCMMessagesOut',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }]
+    });
+    loadData2(pathParams, tableName, true)
 }

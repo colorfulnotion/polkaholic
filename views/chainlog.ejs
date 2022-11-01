@@ -1,0 +1,37 @@
+<%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Chain`}); %>
+<%- include('chainheader', { chain: chain, title: `Daily Log` }); %>
+
+<div class="alert" role="alert" data-mdb-color="warning">
+    <i class="fas fa-exclamation-triangle"></i>This is a new feature under active development; data is being indexed.
+</div>
+<table id="tablechainlog" class="display" style='width: 100%'>
+    <thead>
+        <tr>
+          <th>Date</th>
+          <th># Active Accounts</th>
+          <th># Holders</th>
+          <th># Signed Extrinsics</th>
+          <th># EVM Txs</th>
+          <th># Transfers</th>
+          <th>Value Transfers-USD</th>
+          <th>Fees (Native Token)</th>
+          <th>XCM Transfers In</th>
+          <th>XCM Transfers Out</th>
+          <th>XCM Transfers In-USD</th>
+          <th>XCM Transfers Out-USD</th>
+          <th>XCM Messages In</th>
+          <th>XCM Messages Out</th>
+        </tr>
+    </thead>
+</table>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script>
+var chainID = '<%- chainID; %>';
+var id = '<%- id; %>';
+$(document).ready(function() {
+    showchainlog(id);
+    setupapidocs("chain", "chainlog", `${id}`);
+});
+</script>
+<script src="/chainui.js"></script>

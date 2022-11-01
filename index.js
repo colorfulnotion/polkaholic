@@ -96,53 +96,64 @@ app.use(function(req, res, next) {
     next()
 })
 
-function getHostChain(req) {
+// getHostChain first uses the host subdomain, then the cookie "selchain" to decide chainID/id; and returns chainID, id and a chain object
+async function getHostChain(req, reqChainID = null) {
+    let [chainID, id, chain] = [-1, null, {}];
+
     try {
-        let fullhost = req.get('host');
-        let chainID = 0;
-        let host = "polkadot"
-        let sa = fullhost.split(".");
-        if (sa.length >= 2) {
-            let domain = sa[sa.length - 2];
-            let subdomain = (sa.length > 2) ? sa[sa.length - 3] : "";
-            if (domain == "astarscan") {
-                if (subdomain == "shiden") {
-                    return [22007, subdomain];
-                } else if (domain == "shibuya") {
-                    return [81000, "shibuya"];
-                }
-                return [2006, "astar"];
+        if (reqChainID) {
+            let [_chainID, _id] = query.convertChainID(reqChainID)
+            if (_id) {
+                [chainID, id] = [_chainID, _id];
             }
-            if (domain == "acalascan") {
-                if (subdomain == "karura") {
-                    return [22000, subdomain];
-                }
-                return [2000, "acala"];
-            }
-            if (domain == "xcmscan") {
-                if (subdomain == "moonriver") {
-                    return [22023, subdomain];
-                } else if (domain == "moonbase") {
-                    return [61000, subdomain];
-                }
-                return [2004, "moonbeam"];
-            }
-        }
-        if (sa.length > 2) {
-            host = sa[0];
         } else {
-            return [false, false];
+            // get host
+            let fullhost = req.get('host');
+            let sa = fullhost.split(".");
+            if (sa.length >= 2) {
+                let domain = sa[sa.length - 2];
+                let subdomain = (sa.length > 2) ? sa[sa.length - 3] : "";
+                if (domain == "astarscan") {
+                    if (subdomain == "shiden") {
+                        [chainID, id] = [22007, subdomain];
+                    } else if (domain == "shibuya") {
+                        [chainID, id] = [81000, "shibuya"];
+                    }
+                    [chainID, id] = [2006, "astar"];
+                }
+                if (domain == "acalascan") {
+                    if (subdomain == "karura") {
+                        [chainID, id] = [22000, subdomain];
+                    }
+                    [chainID, id] = [2000, "acala"];
+                }
+                if (domain == "xcmscan") {
+                    if (subdomain == "moonriver") {
+                        [chainID, id] = [22023, subdomain];
+                    } else if (domain == "moonbase") {
+                        [chainID, id] = [61000, subdomain];
+                    }
+                    [chainID, id] = [2004, "moonbeam"];
+                }
+            }
+
+            if (id == null) {
+                let selchain = req.cookies.selchain;
+                if (selchain) {
+                    let [_chainID, _id] = query.convertChainID(selchain)
+                    if (_id) {
+                        [chainID, id] = [_chainID, _id];
+                    }
+                }
+            }
         }
-        [chainID, id] = query.convertChainID(host)
         if (id) {
-            return [chainID, id]
-        } else {
-            return [false, false]
+            chain = await query.getChain(chainID);
         }
     } catch (err) {
         console.log(`getHostChain err`, err.toString())
-        return [false, false]
     }
+    return [chainID, id, chain];
 }
 
 function chainFilterOptUI(req) {
@@ -476,58 +487,8 @@ app.post('/register', async (req, res) => {
 
 
 const downtime = false;
-// Usage: https://polkaholic.io/
-app.get('/', async (req, res) => {
-    if (downtime) {
-        res.render('downtime');
-        return;
-    }
-    let addresses = getHomeAddresses(req);
-    let accounts = [];
-    try {
-        if (addresses) {
-            accounts = await query.getMultiAccount(addresses);
-        }
-    } catch (e) {
-        // ok
-    }
-    try {
-        let [chainID, id] = getHostChain(req)
-        if (id) {
-            let chain = await query.getChain(chainID);
-            if (chain) {
-                var blocks = await query.getChainRecentBlocks(chainID);
-                res.render('chain', {
-                    blocks: blocks,
-                    chainID: chainID,
-                    addresses: addresses,
-                    accounts: accounts,
-                    id: id,
-                    chainInfo: query.getChainInfo(chainID),
-                    chain: chain,
-                    apiUrl: req.path,
-                    docsSection: "get-chain-recent-blocks"
-                });
-            }
-        } else {
-            await handleChains(req, res);
-        }
-    } catch (err) {
-        if (err instanceof paraTool.NotFoundError) {
-            res.render('notfound', {
-                recordtype: "chain",
-                chainInfo: query.getChainInfo()
-            });
-        } else {
-            res.render('error', {
-                chainInfo: query.getChainInfo(),
-                err: err
-            });
-        }
-    }
-})
 
-async function handleChains(req, res) {
+app.get('/', async (req, res) => {
     let accounts = [];
     let addresses = getHomeAddresses(req);
     try {
@@ -541,14 +502,11 @@ async function handleChains(req, res) {
         var relaychain = req.params.relaychain ? req.params.relaychain : "";
         var chains = await query.getChains();
 
-        let topNfilters = query.getAddressTopNFilters();
         res.render('chains', {
             chains: chains,
             chainInfo: query.getChainInfo(),
             relaychain: relaychain,
-            topNfilters: topNfilters,
             accounts: accounts,
-            topN: "balanceUSD",
             apiUrl: '/chains',
             docsSection: "get-all-chains"
         });
@@ -557,9 +515,26 @@ async function handleChains(req, res) {
             error: err.toString()
         });
     }
-}
+})
 
-app.get('/chains/:relaychain?', handleChains)
+app.get('/addresstopn', async (req, res) => {
+    try {
+        var chains = await query.getChains();
+        let topNfilters = query.getAddressTopNFilters();
+        res.render('addresstopn', {
+            chains: chains,
+            chainInfo: query.getChainInfo(),
+            topNfilters: topNfilters,
+            topN: "balanceUSD",
+            apiUrl: '/addresstopn',
+            docsSection: "get-all-chains"
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
 
 
 function getConsent(req) {
@@ -648,8 +623,267 @@ app.get('/identicon/:address', async (req, res) => {
     }
 })
 
+// Usage: https://polkaholic.io/chaininfo
+app.get('/chaininfo/:chainIDorChainName?', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        if (chain) {
+            res.render('chaininfo', {
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-chain-info"
+            });
+        } else {
+            res.redirect(`/`);
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/chainlog
+app.get('/chainlog/:chainIDorChainName?', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        if (chain) {
+            res.render('chainlog', {
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-chain-info"
+            });
+        } else {
+            res.redirect(`/`);
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/channels
+app.get('/channels', async (req, res) => {
+    try {
+        let [chainID, id, chain] = await getHostChain(req)
+        console.log("getHostChain", chainID, id, chain);
+        if (id) {
+            res.render('channels', {
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-channels"
+            });
+        } else {
+            res.redirect(`/`);
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/projects
+app.get('/projects', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        if (chain) {
+            res.render('projects', {
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-channels"
+            });
+        } else {
+            res.redirect(`/`);
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/wasmcodes
+app.get('/wasmcodes/:chainIDorChainName?', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        if (chain) {
+            res.render('wasmcodes', {
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-wasmcode"
+            });
+        } else {
+            res.redirect(`/`);
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/wasmcontracts
+app.get('/wasmcontracts/:chainIDorChainName?', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        if (chain) {
+            res.render('wasmcontracts', {
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-wasmcode"
+            });
+        } else {
+            res.redirect(`/`);
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+
+// Usage: https://polkaholic.io/specversions
+app.get('/specversions/:chainIDorChainName?', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        if (chain) {
+            res.render('specversions', {
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-specversions"
+            });
+        } else {
+            res.redirect(`/`);
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/blocks/22000
+app.get('/blocks/:chainIDorChainName?', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        if (chain) {
+            var blocks = await query.getChainRecentBlocks(chainID);
+            res.render('blocks', {
+                blocks: blocks,
+                chainID: chainID,
+                id: id,
+                chainInfo: query.getChainInfo(chainID),
+                chain: chain,
+                apiUrl: req.path,
+                docsSection: "get-chain-recent-blocks"
+            });
+        } else {
+            res.redirect(`/`);
+        }
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
 // Usage: https://polkaholic.io/chain/22000
-app.get('/chain/:chainID_or_chainName', async (req, res) => {
+app.get('/pools/:chainIDorChainName?', async (req, res) => {
     let accounts = [];
     let addresses = getHomeAddresses(req);
     try {
@@ -659,15 +893,11 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
     } catch (e) {
         // errors should not matter here
     }
-    let chainID_or_chainName = req.params["chainID_or_chainName"]
     try {
-        let [chainID, id] = query.convertChainID(chainID_or_chainName)
-        let chain = await query.getChain(chainID);
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
         if (chain) {
-            console.log(chain);
-            var blocks = await query.getChainRecentBlocks(chainID);
-            res.render('chain', {
-                blocks: blocks,
+            res.render('pools', {
                 chainID: chainID,
                 addresses: addresses,
                 accounts: accounts,
@@ -675,8 +905,10 @@ app.get('/chain/:chainID_or_chainName', async (req, res) => {
                 chainInfo: query.getChainInfo(chainID),
                 chain: chain,
                 apiUrl: req.path,
-                docsSection: "get-chain-recent-blocks"
+                docsSection: "get-pools"
             });
+        } else {
+            res.redirect(`/`);
         }
     } catch (err) {
         if (err instanceof paraTool.NotFoundError) {
@@ -707,10 +939,9 @@ app.get('/chart/:asset?', async (req, res) => {
     }
 })
 
-app.get('/extrinsicdocs/:chainID_or_chainName/:p/:m', async (req, res) => {
-    let chainID_or_chainName = req.params["chainID_or_chainName"]
+app.get('/extrinsicdocs/:chainIDorChainName/:p/:m', async (req, res) => {
     try {
-        //let chainID = (req.params.chainID);
+        let chainID_or_chainName = req.params["chainIDorChainName"]
         let [chainID, id] = query.convertChainID(chainID_or_chainName)
         let p = (req.params.p);
         let m = (req.params.m);
@@ -885,32 +1116,18 @@ app.get('/evmtxs/:chainID_or_chainName/:s?/:m?', async (req, res) => {
     }
 })
 
-app.get('/xcmtransfers', async (req, res) => {
+app.get('/assets/:assetType?', async (req, res) => {
     try {
-        let [chainID, id] = getHostChain(req)
-        if (id) {} else {
-            id = 'polkadot';
-            chainID = 0;
-        }
-        chain = await query.getChain(chainID);
-        let filters = {
-            chainList: chainFilterOptUI(req),
-            blockNumber: req.query.blockNumber ? req.query.blockNumber : null,
-        };
-        const maxRows = 1000;
-        let chains = await query.getChains(1, "chainName");
-        let xcmtransfers = await query.getXCMTransfers(filters, maxRows);
-        res.render('xcmtransfers', {
-            chainInfo: query.getChainInfo(0),
-            tbl: "xcmtransfers",
-            chains,
-            chainID,
-            fromAddress: "",
-            chain,
-            data: xcmtransfers,
-            title: `XCM Transfers Query`,
-            apiUrl: req.path,
-            docsSection: "get-xcmtransfers"
+        let assetType = req.params.assetType ? req.params.assetType : "System";
+        let [chainID, id, chain] = await getHostChain(req)
+        res.render('assets', {
+            chainInfo: query.getChainInfo(),
+            chain: chain,
+            chainID: chainID,
+            id: id,
+            assetType: assetType,
+            apiUrl: '/assets',
+            docsSection: "get-assets"
         });
     } catch (err) {
         return res.status(400).json({
@@ -919,33 +1136,143 @@ app.get('/xcmtransfers', async (req, res) => {
     }
 })
 
-app.get('/xcmmessages', async (req, res) => {
+// Usage: https://polkaholic.io/xcmassets
+app.get('/xcmassets/:chainIDorChainName?', async (req, res) => {
     try {
-        let [chainID, id] = getHostChain(req)
-        if (id) {} else {
-            id = 'polkadot';
-            chainID = 0;
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let accounts = [];
+        let addresses = getHomeAddresses(req);
+        try {
+            if (addresses) {
+                accounts = await query.getMultiAccount(addresses);
+            }
+        } catch (e) {
+            // errors should not matter here
         }
-        chain = await query.getChain(chainID);
-        let filters = {
-            chainList: chainFilterOptUI(req),
-            blockNumber: req.query.blockNumber ? req.query.blockNumber : null,
-        };
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        let filters = {}
+        if (id) {
+            filters.chainList = [chainID];
+        }
+        res.render('xcmassets', {
+            chainID: chainID,
+            id: id,
+            accounts,
+            chainInfo: query.getChainInfo(chainID),
+            chain: chain,
+            apiUrl: req.path,
+            docsSection: "get-xcmassets"
+        });
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/xcmtransfers
+app.get('/xcmtransfers/:chainIDorChainName?', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        let filters = {}
+        if (id) {
+            filters.chainList = [chainID];
+        }
+        if (req.query.blockNumber) {
+            filters.blockNumber = req.query.blockNumber;
+        }
+        if (req.query.xcmType) {
+            filters.xcmType = req.query.xcmType;
+        }
         const maxRows = 1000;
-        let chains = await query.getChains(1, "chainName");
-        let xcmmessages = await query.getRecentXCMMessages(filters, maxRows);
-        console.log(filters, xcmmessages)
+        let xcmtransfers = await query.getXCMTransfers(filters, maxRows);
         res.render('xcmtransfers', {
-            chainInfo: query.getChainInfo(0),
-            tbl: "xcmmessages",
-            chains,
-            chainID,
-            chain,
-            data: xcmmessages,
-            fromAddress: "",
-            title: `XCM Messages Query`,
+            chainID: chainID,
+            id: id,
+            data: xcmtransfers,
+            chainInfo: query.getChainInfo(chainID),
+            chain: chain,
             apiUrl: req.path,
             docsSection: "get-xcmmessages"
+        });
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+// Usage: https://polkaholic.io/xcmmessages
+app.get('/xcmmessages/:chainIDorChainName?', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        let filters = {}
+        if (id) {
+            filters.chainList = [chainID];
+        };
+        if (req.query.blockNumber) {
+            filters.blockNumber = req.query.blockNumber;
+        }
+        const maxRows = 1000;
+        let xcmmessages = await query.getRecentXCMMessages(filters, maxRows);
+        res.render('xcmmessages', {
+            chainID: chainID,
+            id: id,
+            data: xcmmessages,
+            chainInfo: query.getChainInfo(chainID),
+            chain: chain,
+            apiUrl: req.path,
+            docsSection: "get-xcmmessages"
+        });
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
+app.get('/multilocation', async (req, res) => {
+    try {
+        let relayChains = {
+            0: "Polkadot",
+            2: "Kusama",
+            60000: "Moonbase Relay"
+        };
+        let chains = await query.getChains(1, "chainName");
+
+        res.render('multilocation', {
+            chainInfo: query.getChainInfo(0),
+            chain: await query.getChain(0),
+            chains: chains,
+            relayChains,
+            apiUrl: req.path,
+            docsSection: "get-multilocation"
         });
     } catch (err) {
         return res.status(400).json({
@@ -953,6 +1280,7 @@ app.get('/xcmmessages', async (req, res) => {
         });
     }
 })
+
 
 
 // Usage: https://polkaholic.io/extrinsics/10
@@ -1262,7 +1590,8 @@ app.get('/following/:address', async (req, res) => {
 app.get('/home', async (req, res) => {
     try {
         let addresses = getHomeAddresses(req);
-        let [requestedChainID, id] = getHostChain(req);
+        let [requestedChainID, id, chainID] = await getHostChain(req);
+
         let chainList = chainFilterOptUI(req)
         let accounts = await query.getMultiAccount(addresses, requestedChainID, chainList);
         res.render('home', {
@@ -1293,7 +1622,7 @@ app.get('/home', async (req, res) => {
 app.get('/account/:address', async (req, res) => {
     try {
         let address = req.params["address"];
-        let [requestedChainID, id] = getHostChain(req);
+        let [requestedChainID, id, chain] = await getHostChain(req);
         let chainList = chainFilterOptUI(req)
         let addresses = getHomeAddresses(req);
         let accounts = await query.getMultiAccount([address], requestedChainID, chainList);
@@ -1332,11 +1661,8 @@ app.get('/account/:address', async (req, res) => {
 app.get('/address/:address/:chainID?', async (req, res) => {
     try {
         let address = req.params["address"];
-        let [requestedChainID, id] = getHostChain(req);
         let chainID = req.params["chainID"] ? req.params["chainID"] : null;
-        if (chainID == null && requestedChainID > 10) {
-            chainID = requestedChainID;
-        }
+        let [requestedChainID, id, _chain] = await getHostChain(req, chainID);
         let chainList = [];
         let [account, contract] = await query.getAddressContract(address, chainID);
         if (contract && Array.isArray(contract)) {
@@ -1348,7 +1674,7 @@ app.get('/address/:address/:chainID?', async (req, res) => {
             return;
         }
 
-        let chain = contract && contract.chainID ? await query.getChain(contract.chainID, true) : null;
+        let chain = contract && contract.chainID ? await query.getChain(contract.chainID, true) : _chain;
         res.render('address', {
             account: account,
             contract: contract,
@@ -1391,8 +1717,8 @@ app.get('/token/:address/:chainID?', async (req, res) => {
 
     try {
         let address = req.params["address"];
-        let [requestedChainID, id] = getHostChain(req);
         let chainID = req.params["chainID"] ? req.params["chainID"] : null;
+        let [requestedChainID, id, chain] = await getHostChain(req, chainID);
         if (chainID == null && requestedChainID > 10) {
             chainID = requestedChainID;
         }
@@ -1431,7 +1757,7 @@ app.get('/token/:address/:chainID?', async (req, res) => {
 // along with (a) local pricing (if available)
 // (b) the users holdings on each chain [ keyed in by nativeAssetChain using accountrealtime ], and
 // (c) "XCM Transfer" button on each line which enables the user to move their assets from one chain to the other.
-// Any chain-specific asset links to /asset/:chainID/:assetOrCurrencyID.  Any chain mention links to /chain/:chainID_or_chainName#xcmassets
+// Any chain-specific asset links to /asset/:chainID/:assetOrCurrencyID.  Any chain mention links to /xcmassets/{chainID_or_chainName}
 app.get('/symbol/:symbol', async (req, res) => {
     let accounts = [];
     let addresses = getHomeAddresses(req);

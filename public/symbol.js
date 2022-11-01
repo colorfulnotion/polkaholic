@@ -22,7 +22,7 @@ function showchains() {
             data: 'chainID',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-                    return `<A href="/chain/${row.chainID}#xcmassets">${row.chainName}</A>`;
+                    return `<A href="/xcmassets/${row.chainID}">${row.chainName}</A>`;
                 }
                 return data;
             }

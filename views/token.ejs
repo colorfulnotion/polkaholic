@@ -25,7 +25,7 @@
 	<tr>
 		<td>Contract:</td>
 		<td>
-		  <a href='/address/<%= address; %>'><%- uiTool.getShortHash(contract.asset) %></a>
+		  <a href='/address/<%= address; %>/<%- contract.chainID %>'><%- uiTool.getShortHash(contract.asset) %></a>
 		</td>
 	</tr>
 	<tr>
@@ -50,7 +50,7 @@
 	<% if ( contract.token0 && contract.token1 ) { %>
 	<tr>
 	   <td>Contract:</td>
-	   <td><a href='/address/<%- contract.token0 %>'><%- uiTool.getShortHash(contract.token0) %></a> / <a href='/address/<%- contract.token1 %>'><%- uiTool.getShortHash(contract.token1) %></a></td>
+	   <td><a href='/address/<%- contract.token0 %>/<%- contract.chainID %>'><%- uiTool.getShortHash(contract.token0) %></a> / <a href='/address/<%- contract.token1 %>/<%- contract.chainID %>'><%- uiTool.getShortHash(contract.token1) %></a></td>
 	</tr>
 	<% } %>
 	<tr>
@@ -162,7 +162,9 @@ for (let i=0; i<tabs.length; i++) {
     </table>
   </div>
 
-  <%- include("poolstab", {}) %>
+  <div class="tab-pane" id="pools" role="tabpanel" aria-labelledby="pools-tab">
+   <%- include("poolstab", {}) %>
+  </div>
 
 </div>
 

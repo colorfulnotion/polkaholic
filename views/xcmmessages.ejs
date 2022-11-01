@@ -1,0 +1,33 @@
+<%- include('header', {chainInfo: chainInfo, title: "XCM Messages"}); %>
+
+<h5>XCM Messages</h5>
+
+<table id="tablexcmmessages" class="display" style="width: 100%">
+      <thead>
+        <tr>
+	  <th><%- include("tooltip", {k: "xcmmessagehash"}) %>MsgHash</th>
+	  <th><%- include("tooltip", {k: "extrinsichash"}) %>Extrinsic</th>
+	  <th><%- include("tooltip", {k: "xcmmessagetype"}) %>Msg Type</th>
+	  <th><%- include("tooltip", {k: "origination"}) %>Sent</th>
+	  <th><%- include("tooltip", {k: "destination"}) %>Received</th>
+          <th><%- include("tooltip", {k: "assets"}) %>Assets Received/Instructions</th>
+          <th><%- include("tooltip", {k: "xcmmessagehash"}) %>Beneficiary</th>
+	  <th>Matched/Time</th>
+        </tr>
+      </thead>
+</table>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script>
+let id = '<% id %>';
+let data = <%- JSON.stringify(data) %>;
+$(document).ready(function() {
+    showxcmmessages(null);
+    let table = $("#tablexcmmessages").DataTable();
+    table.clear();
+    table.rows.add(data)
+    table.draw();
+})
+</script>
+<script src="/chains.js"></script>
+<script src="/chainui.js"></script>

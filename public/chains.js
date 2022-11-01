@@ -1,11 +1,7 @@
 var initchains = false;
-var initaddresstopn = false;
 var chainsTable = null;
-var addresstopnTable = null
 var refreshIntervalMS = 6100;
 var chainsUpdateIntervalId = false;
-
-
 
 function stopchains() {
     if (chainsUpdateIntervalId) {
@@ -116,13 +112,13 @@ async function show_chains() {
                 data: 'balanceUSD',
                 render: function(data, type, row, meta) {
                     try {
-                        // show account holdings summary on chain (linking to /chain/:chain#assets)
+                        // show account holdings summary on chain (linking to /xcmassets/${chainID})
                         let balanceUSD = get_accountBalanceOnChain(row.chainID);
                         if (type == 'display') {
                             if (balanceUSD == null) {
                                 return "-Connect Wallet-";
                             }
-                            let url = `/chain/${row.chainID}#xcmassets`;
+                            let url = `/xcmassets/${row.chainID}`;
                             return `<a href="${url}">` + currencyFormat(balanceUSD) + "</a>";
                         } else {
                             if (balanceUSD == null) return 0;
@@ -164,7 +160,7 @@ async function show_chains() {
                 render: function(data, type, row, meta) {
                     try {
                         if (type == 'display') {
-                            let url = `chain/${row.id}#chainlog`
+                            let url = `/chainlog/${row.id}`
                             return `<a href="${url}">` + presentNumber(data) + "</a>";
                         }
                         return data;
@@ -176,7 +172,7 @@ async function show_chains() {
                 data: 'numXCMTransferIncoming7d',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        let url = `chain/${row.id}#xcmtransfers`
+                        let url = `/xcmtransfers/${row.id}`
                         return `<a href="${url}">` + presentNumber(data) + " " + currencyFormat(row.valXCMTransferIncomingUSD7d) + "</a>";
                     } else {
                         return row.valXCMTransferIncomingUSD7d;
@@ -186,7 +182,7 @@ async function show_chains() {
                 data: 'numXCMTransferOutgoing7d',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        let url = `chain/${row.id}#xcmtransfers`
+                        let url = `/xcmtransfers/${row.id}`
                         return `<a href="${url}">` + presentNumber(data) + " " + currencyFormat(row.valXCMTransferOutgoingUSD7d) + "</a>";
                     }
                     return row.valXCMTransferOutgoingUSD7d;
@@ -210,186 +206,4 @@ async function show_chains() {
     //load data here: warning this function is technically async
     //load data here: warning this function is technically async
     await loadData2(pathParams, tableName, false)
-    const selectElement = document.querySelector('#relaychain');
-    if (selectElement) {
-        setchainfilter(selectElement.value);
-    }
 }
-
-async function showaddresstopn() {
-    let tableName = '#tableaddresstopn'
-    if (initaddresstopn) {} else {
-        initaddresstopn = true;
-        addresstopnTable = $(tableName).DataTable({
-            /*
-            [0] N
-            [1] address
-            [2] balanceUSD
-            [3] val
-            */
-            pageLength: 100,
-            lengthMenu: [
-                [10, 25, 50, 100, -1],
-                [10, 25, 50, 100, "All"]
-            ],
-            columnDefs: [{
-                "className": "dt-right",
-                "targets": [1, 2, 3]
-            }],
-            order: [
-                [0, "asc"]
-            ],
-            columns: [{
-                data: 'N',
-                render: function(data, type, row, meta) {
-                    let sectionMethod = `${data}:${row.method}`
-                    if (type == 'display') {
-                        return data;
-                    }
-                    return data;
-                }
-            }, {
-                data: 'address',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        try {
-                            return presentIDRow(row, "address");
-                        } catch (err) {
-                            console.log("row.asset", row.asset, err);
-                        }
-                    } else {
-                        try {
-                            return data;
-                        } catch (err) {
-                            return ""
-                        }
-                    }
-                    return data;
-                }
-            }, {
-                data: 'balanceUSD',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.balanceUSD !== undefined) {
-                            return currencyFormat(data);
-                        } else {
-                            console.log("missing balanceUSD", row);
-                            return "--";
-                        }
-                    } else {
-                        if (row.balanceUSD !== undefined) {
-                            return data
-                        } else {
-                            return 0;
-                        }
-                    }
-                    return;
-                }
-            }, {
-                data: 'val',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (filtertype == "currency") {
-                            return currencyFormat(data);
-                        } else {
-                            return presentNumber(data);
-                        }
-                    }
-                    return data;
-                }
-            }]
-        });
-    }
-
-    //load data here: warning this function is technically async
-    const topNElement = document.querySelector('#topN');
-    let topN = "balanceUSD"
-    if (topNElement) {
-        topN = topNElement.value;
-    }
-    let pathParams = `addresstopn/${topN}`
-    await loadData2(pathParams, tableName, false);
-
-    let hdr = topNfilters.filter((f) => (f.filter == topN));
-
-    if (hdr.length == 1) {
-        document.getElementById("topnhdr").innerHTML = hdr[0].display;
-        filtertype = hdr[0].type;
-    }
-}
-
-let filtertype = "currency";
-
-function showchainstab(hash) {
-    switch (hash) {
-        case "#chains":
-            setupapidocs("chains", "list");
-            showchains();
-            break;
-        case "#xcmassets":
-            setupapidocs("chains", "list");
-            showxcmassets(null);
-            break;
-        case "#routers":
-            setupapidocs("routers", "list");
-            showrouters(null);
-            break;
-        case "#pools":
-            setupapidocs("pools", "list");
-            showpools("all", "chain");
-            break;
-        case "#xcmtransfers":
-            setupapidocs("xcmtransfers");
-            showxcmtransfers();
-            break;
-        case "#xcmmessages":
-            setupapidocs("xcmmessages");
-            showxcmmessages();
-            break;
-        case "#addresstopn":
-            setupapidocs("addresstopn");
-            showaddresstopn();
-            break;
-    }
-}
-
-function setuptabs(tabs) {
-
-    for (let i = 0; i < tabs.length; i++) {
-        let t = tabs[i];
-        let id = "#" + t.target + "-tab";
-        let tabEl = document.querySelector(id);
-        tabEl.addEventListener('shown.mdb.tab', function(event) {
-            const hash = $(this).attr("href");
-            let newUrl = hash;
-            setTimeout(() => {
-                showchainstab(hash);
-            }, 250);
-            // TODO: let stopfunc = t.stopfunc; //pause the other tab when we switch?
-            history.replaceState(null, null, newUrl);
-        })
-    }
-    let url = location.href.replace(/\/$/, "");
-    let hash = "#chains";
-    if (location.hash) {
-        const urlhash = url.split("#");
-        if (urlhash.length > 1) hash = "#" + urlhash[1];
-    }
-    const triggerEl = document.querySelector('#chainsTab a[href="' + hash + '"]');
-    if (triggerEl) {
-        console.log("SHOWING", hash);
-        mdb.Tab.getInstance(triggerEl).show();
-    } else {
-        console.log("missing tab:", hash);
-    }
-}
-
-
-const topNElement = document.querySelector('#topN');
-if (topNElement) {
-    topNElement.addEventListener('change', (event) => {
-        showaddresstopn();
-    });
-}
-
-setuptabs(tabs);

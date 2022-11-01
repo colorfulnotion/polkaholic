@@ -539,7 +539,7 @@ module.exports = {
         return res;
     },
     presentChain: function(chainID, chainName) {
-        return `<a href='/chain/${chainID}'>` + chainName + `</a>`;
+        return `<a href='/blocks/${chainID}'>` + chainName + `</a>`;
     },
     presentSpecVersion: function(chainID, specVersion) {
         return `<a href='/specversion/${chainID}/${specVersion}'>` + specVersion + `</a>`;

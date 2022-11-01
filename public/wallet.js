@@ -68,14 +68,14 @@ function getWalletHome() {
 function showWalletHome() {
     let [homeName, addresses] = getWalletHome();
     if (addresses.length > 0) {
-        document.getElementById('walletHome').innerHTML = `${homeName}`;
+        /*document.getElementById('walletHome').innerHTML = `${homeName}`;
         if (addresses.length == 1) {
             document.getElementById('identicon').style.visibility = 'visible';
             document.getElementById('identicon').src = "/identicon/" + addresses[0];
-        }
+        } */
     } else {
-        document.getElementById('walletHome').innerHTML = "-Connect Wallet-";
-        document.getElementById('identicon').style.visibility = 'hidden';
+        // document.getElementById('walletHome').innerHTML = "-Connect Wallet-";
+        //    document.getElementById('identicon').style.visibility = 'hidden';
     }
 }
 

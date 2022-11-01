@@ -1051,7 +1051,6 @@ module.exports = class AssetManager extends PolkaholicDB {
             if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
                 // using parallel+heiko oracles while https://github.com/parallel-finance/parallel-js/issues/63
                 sql = `select indexTS, issuance, lp0, lp1, close from assetlog where asset = '${asset}' and chainID = '${chainID}' and indexTS > unix_timestamp(date_sub(Now(), interval ${lookbackDays} day)) and source = 'oracle' and lp0 is not null and lp1 is not null order by indexTS`;
-                console.log(` CHECKPOINT !!! ${sql}`)
             }
 
             let dexRecs = await this.poolREADONLY.query(sql);
