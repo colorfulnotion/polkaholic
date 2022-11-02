@@ -674,9 +674,9 @@ let chains = [
 	      <li>
                <a class="dropdown-item" href="/account/<%= addr; %>"> <%- uiTool.presentBlockiesOrIdenticon(addr, 24) %> <%- ` ${presName} (${uiTool.getShortHash(pres, true, false)})` %></a>
           </li>
-	              <% } else {
-                      if (addrName.substr(0,2) == '0x') evm++
-                      let presName = (addrName.substr(0,2) == '0x')? `EVM Acct#${evm}` : `${addrName}`
+	              <% } else if (addr.length == 42){
+                      if (addrName.substr(0,2) == '0x' || addrName.substr(0,4) == 'null') evm++
+                      let presName = (addrName.substr(0,2) == '0x' || addrName.substr(0,4) == 'null')? `EVM Acct#${evm}` : `${addrName}`
                   %>
 	      <li>
                <a class="dropdown-item" href="/address/<%= addr; %>"> <%- uiTool.presentBlockiesOrIdenticon(addr, 24) %>  <%- ` ${presName} (${uiTool.getShortHash(addr, true, false)})` %></a>
@@ -689,7 +689,7 @@ let chains = [
 
 	      %>
 	        <li>
-               <a class="dropdown-item" href="javascript:selectWalletAccount();">Choose Accounts</a>
+               <a class="dropdown-item" href="javascript:selectWalletAccount();">Manage Accounts</a>
             </li>
           </ul>
         </li>
@@ -701,7 +701,7 @@ let chains = [
            <a class="nav-link dropdown-toggle" href="#" id="navbarBlockchainMenuLink" role="button" data-mdb-toggle="dropdown" aria-expanded="false">Blockchain</a>
            <ul class="dropdown-menu" aria-labelledby="navbarBlockchainMenuLink">
              <li>
-               <a class="dropdown-item" href="/chaininfo"><img src="<%= sel.iconUrl; %>" width="24" class="circularClass"/>&nbsp;<%= selChainName %><% if (sel.paraID) { %> (ParaID <%= sel.paraID; %>) <% } %></a>
+               <a class="dropdown-item" href="/chaininfo"><img src="<%= sel.iconUrl; %>" width="24" class="circularClass"/>&nbsp;<%= selChainName %><% if (sel.paraID) { %> (ParaID <%= sel.paraID; %>) <% } else { %> (Relay) <% } %> </a>
              </li>
              <li>
                <a class="dropdown-item" href="/blocks">Recent Blocks</a>
@@ -901,7 +901,7 @@ var baseURL = '<%= config.baseURL; %>'
   <div class="modal-dialog" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="walletModalLabel">Choose Accounts</h5>
+        <h5 class="modal-title" id="walletModalLabel">Select Accounts <%- include("tooltip", {k: "selectwalletaccounts"}) %></h5>
         <button type="button" id="walletModalClose" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>

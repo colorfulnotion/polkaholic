@@ -51,8 +51,9 @@ function setWalletHome(selectedAccounts, selectedAccountNames) {
         setCookie("homePub", addresses, 3650);
         setCookie("homePubName", addressesnames, 3650);
         showWalletHome();
+        window.location.reload(); // reload here
     } catch (e) {
-        console.log("setWalletHome", e);
+        console.log("setWalletHome err", e);
     }
 }
 
@@ -92,14 +93,18 @@ async function connect_evmwallet() {
         });
         window.web3 = new Web3(window.ethereum);
         const account = web3.eth.accounts;
-        const evmAddress = account.givenProvider.selectedAddress;
+        const evmAddress = (account.givenProvider != undefined && account.givenProvider.selectedAddress != undefined)? account.givenProvider.selectedAddress: null
+        if (evmAddress == undefined){
+            console.log(`cannot connect to web3`)
+            return
+        }
         let address = evmAddress;
         let addr = evmAddress;
         let name = "EVM";
         console.log(`EVMWalletAccount: ${evmAddress}`, account);
         document.getElementById('evmwallettoggle').checked = true;
         document.getElementById('evmwallettoggle').value = evmAddress;
-        document.getElementById('identicon').innerHTML = `<img src='/identicon/${address}' width=50/>`;
+        document.getElementById('identicon').innerHTML = `${presentBlockiesOrIdenticon(address, 50)}`;
         document.getElementById('headerStr').innerHTML = `<span><small>EVM Address: ${address}</small></span><span style="float:right"><a class='btn btn-link' href='/address/${address}'>View Account</a></span>`;
         document.getElementById('descriptionStr').innerHTML = ``;
     } else {
@@ -115,6 +120,7 @@ async function toggle_evmwallet() {
 }
 
 function presentEVMWalletConnect(address = null) {
+    if (address != undefined) return
     let checkedStr = "";
     let addressHeaderStr = "<a class='btn btn-link' href='javascript:connect_evmwallet();'>Connect EVM Wallet</a></span>";
     let descriptionStr = "";
@@ -123,7 +129,8 @@ function presentEVMWalletConnect(address = null) {
         checkedStr = " CHECKED";
         addressHeaderStr = `<span><small>EVM Address: ${address}</small></span><span style="float:right"><a class='btn btn-link' href='/address/${address}'>View Account</a></span>`
         descriptionStr = ``
-        identiconStr = `<img src='/identicon/${address}' width=50/>`;
+        //identiconStr = `<img src='/identicon/${address}' width=50/>`;
+        identiconStr = presentBlockiesOrIdenticon(address, 50)
     }
     return `<div type="button" class="btn btn-lg btn-outline-dark  text-capitalize" style="padding-left: 0.25rem; padding-right: 0.25rem; padding-bottom: 0.15rem;padding-bottom: 0.15rem; text-align: left">
   <div id="identicon" style='float: left; width: 15%'>${identiconStr}</div>
@@ -210,7 +217,8 @@ $('#walletSelect').on('click', async function(e) {
 });
 
 $('#walletModalClose').on('click', async function(e) {
-    await selectedWallets(e);
+    // selectedWallets(e);
+    launchToast(`Wallet Section Cacnelled`);
 });
 
 showWalletHome();
