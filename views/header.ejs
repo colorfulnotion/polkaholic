@@ -829,13 +829,16 @@ let chains = [
 	<script>
 	  $('#searchChains').keyup(function( event ) {
 	      if ( event.which == 13 ) {
-		  event.preventDefault();
+		      event.preventDefault();
 	      }
 	      let txt = $('#searchChains').val().toLowerCase();
 	      $(`button.selchain`).map( (e, f) => {
-		  if ( f.id == "all" ) {
+          let paraID = f.getAttribute('paraID')
+          let chainID = f.getAttribute('chainID')
+          if (paraID == '0') paraID = 'relay'
+ 		  if ( f.id == "all" ) {
 		      // do nothing.
-		  } else if ( txt.length > 0 && f.id.includes(txt) ) {
+		  } else if ( txt.length > 0 && (f.id.includes(txt) || paraID.includes(txt) || chainID.includes(txt)) ) {
 		      f.className = "btn btn-primary text-capitalize selchain";
 		  } else {
 		      f.className = "btn btn-outline-secondary text-capitalize selchain";
@@ -845,7 +848,7 @@ let chains = [
 	</script>
       	<% for ( const c of chains ) { %>
           <% if ( c.isRelayChain ) { %><h6><%= c.chainName %></h6><% } %>
-	  <button id="<%= c.id %>" type="button" class="btn btn-outline-secondary text-capitalize selchain"  data-mdb-dismiss="modal" style="text-align: left; width: 23%; padding: 3px; margin: 3px;" data-mdb-ripple-color="dark">&nbsp;<img width=24 class="circularImage"  src='<%= c.iconUrl %>'>&nbsp;<%= c.chainName %></button>
+	  <button id="<%= c.id %>" paraID="<%= c.paraID %>" chainID="<%= c.chainID %>" type="button" class="btn btn-outline-secondary text-capitalize selchain"  data-mdb-dismiss="modal" style="text-align: center; width: 20%; height: 5em; padding: 3px; margin: 3px;" data-mdb-ripple-color="dark">&nbsp;<img width=24 class="circularImage"  src='<%= c.iconUrl %>'>&nbsp;<div style="font-size:0.85em;"><%= c.chainName %></div></button>
         <% } %>
       </div>
       <div class="modal-footer">
