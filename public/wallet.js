@@ -44,13 +44,16 @@ function hideWalletModal() {
     $('#walletModal').modal('hide');
 }
 
-function setWalletHome(selectedAccounts) {
+function setWalletHome(selectedAccounts, selectedAccountNames) {
     let addresses = selectedAccounts.join("|")
+    let addressesnames = selectedAccountNames.join("|")
     try {
         setCookie("homePub", addresses, 3650);
+        setCookie("homePubName", addressesnames, 3650);
         showWalletHome();
+        window.location.reload(); // reload here
     } catch (e) {
-        console.log("setWalletHome", e);
+        console.log("setWalletHome err", e);
     }
 }
 
@@ -90,18 +93,26 @@ async function connect_evmwallet() {
         });
         window.web3 = new Web3(window.ethereum);
         const account = web3.eth.accounts;
-        const evmAddress = account.givenProvider.selectedAddress;
+        const evmAddress = (account.givenProvider != undefined && account.givenProvider.selectedAddress != undefined)? account.givenProvider.selectedAddress: null
+        if (evmAddress == undefined){
+            document.getElementById('evmwallettoggle').checked = false;
+            document.getElementById('headerStr').innerHTML = `<span><small>Unable to connect evm wallet.</small></span><span><small><br> Please Download <a href='https://metamask.io/'  target='_new'>Metamask</a> and grant permissions to polkaholic.io</small></span>`;
+            //launchToast("Unable to connect evm wallet. Please Download <a href='https://metamask.io/'  target='_new'>Metamask</a> and grant permissions to polkaholic.io");
+            return
+        }
         let address = evmAddress;
         let addr = evmAddress;
         let name = "EVM";
         console.log(`EVMWalletAccount: ${evmAddress}`, account);
         document.getElementById('evmwallettoggle').checked = true;
         document.getElementById('evmwallettoggle').value = evmAddress;
-        document.getElementById('identicon').innerHTML = `<img src='/identicon/${address}' width=50/>`;
+        document.getElementById('identicon').innerHTML = `${presentBlockiesOrIdenticon(address, 50)}`;
         document.getElementById('headerStr').innerHTML = `<span><small>EVM Address: ${address}</small></span><span style="float:right"><a class='btn btn-link' href='/address/${address}'>View Account</a></span>`;
         document.getElementById('descriptionStr').innerHTML = ``;
     } else {
-        launchToast("Download <a href='https://metamask.io/'  target='_new'>Metamask</a>, <a href='https://subwallet.app/' target='_new'>Subwallet</a>, or <a href='https://talisman.xyz/'  target='_new'>Talisman</a> and grant permissions to polkaholic.io");
+        document.getElementById('evmwallettoggle').checked = false;
+        document.getElementById('headerStr').innerHTML = `<span><small>Unable to connect evm wallet.</small></span><span><small><br> Please Download <a href='https://metamask.io/'  target='_new'>Metamask</a> and grant permissions to polkaholic.io</small></span>`;
+        //launchToast("Download <a href='https://metamask.io/'  target='_new'>Metamask</a>, <a href='https://subwallet.app/' target='_new'>Subwallet</a>, or <a href='https://talisman.xyz/'  target='_new'>Talisman</a> and grant permissions to polkaholic.io");
     }
 }
 
@@ -113,6 +124,7 @@ async function toggle_evmwallet() {
 }
 
 function presentEVMWalletConnect(address = null) {
+    //if (address != undefined) return
     let checkedStr = "";
     let addressHeaderStr = "<a class='btn btn-link' href='javascript:connect_evmwallet();'>Connect EVM Wallet</a></span>";
     let descriptionStr = "";
@@ -121,12 +133,13 @@ function presentEVMWalletConnect(address = null) {
         checkedStr = " CHECKED";
         addressHeaderStr = `<span><small>EVM Address: ${address}</small></span><span style="float:right"><a class='btn btn-link' href='/address/${address}'>View Account</a></span>`
         descriptionStr = ``
-        identiconStr = `<img src='/identicon/${address}' width=50/>`;
+        //identiconStr = `<img src='/identicon/${address}' width=50/>`;
+        identiconStr = presentBlockiesOrIdenticon(address, 50)
     }
     return `<div type="button" class="btn btn-lg btn-outline-dark  text-capitalize" style="padding-left: 0.25rem; padding-right: 0.25rem; padding-bottom: 0.15rem;padding-bottom: 0.15rem; text-align: left">
   <div id="identicon" style='float: left; width: 15%'>${identiconStr}</div>
   <div style='float:right; width: 85%'>
-    <div class="form-check form-switch"> <input onclick="javascript:toggle_evmwallet()" class="form-check-input" type="checkbox" id="evmwallettoggle" role="switch" value="${address}" ${checkedStr}/><span id='headerStr'>${addressHeaderStr}</span></div>
+    <div class="form-check form-switch"> <input onclick="javascript:toggle_evmwallet()" class="form-check-input" type="checkbox" id="evmwallettoggle" role="switch" value="${address}" wname="${address}" ${checkedStr}/><span id='headerStr'>${addressHeaderStr}</span></div>
     <div id="descriptionStr">${descriptionStr}</div>
   </div>
 </div>`
@@ -139,7 +152,7 @@ function presentWalletAccount(name, address, pubKey, checked, isEVM = false) {
     return `<div type="button" class="btn btn-lg btn-outline-dark  text-capitalize" style="padding-left: 0.25rem; padding-right: 0.25rem; padding-bottom: 0.15rem;padding-bottom: 0.15rem; text-align: left">
   <div style='float: left; width: 15%'><img src='/identicon/${address}' width=50/></div>
   <div style='float:right; width: 85%'>
-    <div class="form-check form-switch"> <input class="form-check-input" type="checkbox" role="switch" value="${pubKey}" ${checkedStr} />${name}<span style='float:right'><a class='btn btn-link' href='${url}'>View Account</a></span></div>
+    <div class="form-check form-switch"> <input class="form-check-input" type="checkbox" role="switch" value="${pubKey}" wname="${name}" ${checkedStr} />${name}<span style='float:right'><a class='btn btn-link' href='${url}'>View Account</a></span></div>
     <div>${addressStr}</div>
   </div>
 </div>`
@@ -180,14 +193,22 @@ $('#walletModal').on('show.bs.modal', async function(event) {
 
 async function selectedWallets(e) {
     let selectedAccounts = [];
+    let selectedAccountNames = [];
     document.querySelectorAll('[role="switch"]').forEach(function(el) {
         if (el.checked) {
-            selectedAccounts.push(el.value);
+            //console.log(`el`, el)
+            let elVal = el.value
+            let walletName = (el.getAttribute('wname') != undefined)? el.getAttribute('wname') : elVal
+            if (elVal != 'null' && elVal != 'undefined'){
+                selectedAccounts.push(elVal);
+                selectedAccountNames.push(walletName);
+            }
         }
     });
-    console.log(selectedAccounts);
+    console.log(`selectedAccounts`, selectedAccounts);
+    console.log(`selectedAccountNames`, selectedAccountNames);
     hideWalletModal();
-    setWalletHome(selectedAccounts);
+    setWalletHome(selectedAccounts, selectedAccountNames);
 
     if (afterWalletSelected) {
         let res = await afterWalletSelected();
@@ -203,7 +224,8 @@ $('#walletSelect').on('click', async function(e) {
 });
 
 $('#walletModalClose').on('click', async function(e) {
-    await selectedWallets(e);
+    // selectedWallets(e);
+    launchToast(`Wallet Section Cancelled`);
 });
 
 showWalletHome();

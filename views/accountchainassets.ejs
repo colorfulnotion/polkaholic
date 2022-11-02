@@ -5,7 +5,7 @@ let cls2 = ( expanded ) ? "show" : "";
 %>
 <div>
 <a class="btn <%= cls; %> btn-block" style="text-transform: none; text-align: left" data-mdb-toggle="collapse" href="#<%= id; %>" role="button" aria-control="<%= id; %>" aria-expanded="<%= expanded; %>" style="text-align:left">
- <img width="24" src="<%= chainassets.iconUrl; %>"> <%= chainassets.chainName; %> <%= uiTool.currencyFormat(chainassets.balanceUSD); %>
+ <img class="circularImage" width="24" src="<%= chainassets.iconUrl; %>"> <%= chainassets.chainName; %> <%= uiTool.currencyFormat(chainassets.balanceUSD); %>
   <%
   for ( let i = 0; i<chainassets.assets.length; i++) { %>
   <%  let a = chainassets.assets[i]; %>

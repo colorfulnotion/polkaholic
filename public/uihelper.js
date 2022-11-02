@@ -460,7 +460,7 @@ function presentXCMMessageHash(msgHash, blockNumber, allowCopy = true) {
 
 function presentChain(id, chainName, iconURL = false, crawlingStatus = "", tab = "") {
     if (!chainName) chainName = "chain" + id;
-    let i = iconURL ? `<img width=24 src="${iconURL}" style="margin: 3px; padding: 3px;"/>` : "";
+    let i = iconURL ? `<img class="circularImage" width=24 src="${iconURL}" style="margin: 3px; padding: 3px;"/>` : "";
     let s = crawlingStatus.length > 0 ? `<span data-mdb-placement="right" title="${crawlingStatus}" ><i class="fas fa-exclamation-triangle"></i></span>` : '';
     return i + `<a href="/blocks/${id}">` + beautifyCamelCase(chainName) + '</a>' + s;
 }
@@ -581,6 +581,25 @@ function presentIDRow(row, fld) {
         }
     }
     return res;
+}
+
+function presentBlockiesOrIdenticon(address, sz = 25) {
+    if (address.length == '42') {
+        let cl = `width="${sz}px"  loading="lazy"`
+        let canvas = blockies.create({ // All options are optional
+            seed: address.toLowerCase(), // seed used to generate icon data, default: random
+            //color: '#dfe', // to manually specify the icon color, default: random
+            //bgcolor: '#aaa', // choose a different background color, default: random
+            size: 8, // width/height of the icon in blocks, default: 8
+            scale: 4, // width/height of each block in pixels, default: 4
+            //spotcolor: '#000' // each pixel has a 13% chance of being of a third color,
+            // default: random. Set to -1 to disable it. These "spots" create structures
+            // that look like eyes, mouths and noses.
+        });
+        return ('<img class="circularImage" src="' + canvas.toDataURL() + `" ${cl} />`)
+    } else {
+        return (`<img class="circularImage" src="/identicon/${address}" width="${sz}px"  loading="lazy"/>`)
+    }
 }
 
 function presentRawIDwithIdenticon(id, imageSize = '25rpx') {
@@ -833,7 +852,7 @@ function launchToast(txt, title = false) {
         width: '450px',
         position: 'top-center',
         autohide: true,
-        delay: 4000,
+        delay: 2000,
     });
     toastInstance.show();
 }

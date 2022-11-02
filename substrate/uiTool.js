@@ -28,7 +28,7 @@ const {
     renderIcon
 } = require('@download/blockies');
 
-function currency_format(c, priceUSD = false, priceUSDCurrent = false, isDefaultOriginal = true) {
+function currency_format(c, priceUSD = false, priceUSDCurrent = false, isDefaultOriginal = true, withParentheses = false) {
     if (isNaN(c)) {
         return `NA`
     }
@@ -41,17 +41,20 @@ function currency_format(c, priceUSD = false, priceUSDCurrent = false, isDefault
         currency: 'USD',
         maximumFractionDigits: _m
     });
+    //console.log(`currency_format2 c=${c}, priceUSD=${priceUSD}, priceUSDCurrent=${priceUSDCurrent},isDefaultOriginal=${isDefaultOriginal}, withParentheses=${withParentheses}`) // why this doesnt work???
+    let leftParentheses = (withParentheses == true)? '(' : ''
+    let rightParentheses = (withParentheses == true)? ')' : ''
     if (priceUSD && priceUSDCurrent && priceUSD > 0 && priceUSDCurrent > 0) {
         let originalUSD = formatter.format(c);
         let currentUSD = formatter.format(c * (priceUSDCurrent / priceUSD));
         if (isDefaultOriginal) {
             //present original USD as default value
             let msgTitle = "Displaying value at the time of Txn; Click to show current value"
-            return `<button type="button" class="btn btn-link" style="font-size:0.9rem;font-style:normal; padding:unset" currency="usd" original="0"  originalUSD="${originalUSD}" currentUSD="${currentUSD}" data-mdb-placement="right" title="${msgTitle}" >${originalUSD}</button>`
+            return `<button type="button" class="btn btn-link" style="font-size:0.9rem;font-style:normal; padding:unset" currency="usd" original="0"  originalUSD="${leftParentheses}${originalUSD}${rightParentheses}" currentUSD="${leftParentheses}${currentUSD}${rightParentheses}" data-mdb-placement="right" title="${msgTitle}" >${leftParentheses}${originalUSD}${rightParentheses}</button>`
         } else {
             //present current USD as default value
             let msgTitle = "Displaying current value; Click to show value are the time of Txn"
-            return `<button type="button" class="btn btn-link" style="font-size:0.9rem;font-style:normal; padding:unset" currency="usd" original="1"  originalUSD="${originalUSD}" currentUSD="${currentUSD}" data-mdb-placement="right" title="${msgTitle}" >${currentUSD}</button>`
+            return `<button type="button" class="btn btn-link" style="font-size:0.9rem;font-style:normal; padding:unset" currency="usd" original="1"  originalUSD="${leftParentheses}${originalUSD}${rightParentheses}" currentUSD="${leftParentheses}${currentUSD}${rightParentheses}" data-mdb-placement="right" title="${msgTitle}" >${leftParentheses}${currentUSD}${rightParentheses}</button>`
         }
     }
     return formatter.format(c);
@@ -599,8 +602,8 @@ module.exports = {
     capitalizeFirstLetter: function(inp) {
         return capitalizeFirstLetter(inp)
     },
-    currencyFormat: function(c, priceUSD = false, priceUSDCurrent = false) {
-        return currency_format(c, priceUSD, priceUSDCurrent);
+    currencyFormat: function(c, priceUSD = false, priceUSDCurrent = false, isDefaultOriginal = true, withParentheses = false) {
+        return currency_format(c, priceUSD, priceUSDCurrent, isDefaultOriginal, withParentheses);
     },
     presentTempChainIdentifer: function(chainID) {
         return presentTempChainIdentifer(chainID)
