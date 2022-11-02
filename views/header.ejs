@@ -44,7 +44,7 @@
 </head>
 <body>
 
-<%        
+<%
 
 let chains = [
     {
@@ -601,7 +601,7 @@ let chains = [
         "hasSystemContracts": 1
     },
   ]
-  
+
   let selchain = "all";
   let sel = null;
   let selid = null;
@@ -649,35 +649,46 @@ let chains = [
                <a class="dropdown-item" href="javascript:home();">View All Accounts</a>
             </li>
 	    <%
-                  if (req.cookies && req.cookies.homePub) {
-        let res = req.cookies.homePub;
-              let out = [];
-	      let ss = 0, evm = 0;
-        if (res.length > 20) {
-            let sa = res.split("|");
-            for (let a = 0; a < sa.length; a++) {
-		let addr = paraTool.getPubKey(sa[a]);
-		if ( addr.length > 60 ) {
-  	      let pres = addr;
-	      if ( sel && sel.ss58Format != undefined ) {
-  	         pres = paraTool.getAddress(addr, sel.ss58Format);
-	      } ss++;
+        if (req.cookies && req.cookies.homePub && req.cookies.homePubName) {
+            let res = req.cookies.homePub;
+            let res2 = req.cookies.homePubName;
+            let out = [];
+	        let ss = 0, evm = 0;
+            if (res.length > 20) {
+                let sa = res.split("|");
+                let sa2 = res2.split("|");
+                let sa3 = {}
+                for (let a = 0; a < sa.length; a++) {
+                    let addr = paraTool.getPubKey(sa[a]);
+                    let addrName = sa2[a];
+                    if (sa3[addr] != undefined) continue
+                    sa3[addr] = 1
+                    if ( addr.length > 60 ) {
+                        let pres = addr;
+                        let presName = addrName;
+                        if ( sel && sel.ss58Format != undefined ) {
+                            pres = paraTool.getAddress(addr, sel.ss58Format);
+                        }
+                        ss++;
 	      %>
 	      <li>
-               <a class="dropdown-item" href="/account/<%= addr; %>"> <%- uiTool.presentBlockiesOrIdenticon(addr, 24) %> SS Account <%= ss %>: <%- uiTool.getShortHash(pres, true, false) %></a>
-              </li>
-	      <% } else { evm++ %>
+               <a class="dropdown-item" href="/account/<%= addr; %>"> <%- uiTool.presentBlockiesOrIdenticon(addr, 24) %> <%- ` ${presName} (${uiTool.getShortHash(pres, true, false)})` %></a>
+          </li>
+	              <% } else {
+                      if (addrName.substr(0,2) == '0x') evm++
+                      let presName = (addrName.substr(0,2) == '0x')? `EVM Acct#${evm}` : `${addrName}`
+                  %>
 	      <li>
-               <a class="dropdown-item" href="/address/<%= addr; %>"> <%- uiTool.presentBlockiesOrIdenticon(addr, 24) %>EVM Address <%= evm %>: <%- uiTool.getShortHash(addr, true, false) %></a>
-              </li>
+               <a class="dropdown-item" href="/address/<%= addr; %>"> <%- uiTool.presentBlockiesOrIdenticon(addr, 24) %>  <%- ` ${presName} (${uiTool.getShortHash(addr, true, false)})` %></a>
+          </li>
 	      <% }
 				}
  				}
 				}
-        
-    
+
+
 	      %>
-	      <li>
+	        <li>
                <a class="dropdown-item" href="javascript:selectWalletAccount();">Choose Accounts</a>
             </li>
           </ul>
@@ -712,7 +723,7 @@ let chains = [
                <a class="dropdown-item" href="/specversions">Spec Versions</a>
              </li>
 	     <% if ( sel.isEVM ) { %>
-	     
+
 	     <% if ( sel.hasSystemContracts ) { %>
              <li>
                <a class="dropdown-item" href="/assets/System">System Contracts</a>

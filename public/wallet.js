@@ -44,10 +44,12 @@ function hideWalletModal() {
     $('#walletModal').modal('hide');
 }
 
-function setWalletHome(selectedAccounts) {
+function setWalletHome(selectedAccounts, selectedAccountNames) {
     let addresses = selectedAccounts.join("|")
+    let addressesnames = selectedAccountNames.join("|")
     try {
         setCookie("homePub", addresses, 3650);
+        setCookie("homePubName", addressesnames, 3650);
         showWalletHome();
     } catch (e) {
         console.log("setWalletHome", e);
@@ -126,7 +128,7 @@ function presentEVMWalletConnect(address = null) {
     return `<div type="button" class="btn btn-lg btn-outline-dark  text-capitalize" style="padding-left: 0.25rem; padding-right: 0.25rem; padding-bottom: 0.15rem;padding-bottom: 0.15rem; text-align: left">
   <div id="identicon" style='float: left; width: 15%'>${identiconStr}</div>
   <div style='float:right; width: 85%'>
-    <div class="form-check form-switch"> <input onclick="javascript:toggle_evmwallet()" class="form-check-input" type="checkbox" id="evmwallettoggle" role="switch" value="${address}" ${checkedStr}/><span id='headerStr'>${addressHeaderStr}</span></div>
+    <div class="form-check form-switch"> <input onclick="javascript:toggle_evmwallet()" class="form-check-input" type="checkbox" id="evmwallettoggle" role="switch" value="${address}" wname="${address}" ${checkedStr}/><span id='headerStr'>${addressHeaderStr}</span></div>
     <div id="descriptionStr">${descriptionStr}</div>
   </div>
 </div>`
@@ -139,7 +141,7 @@ function presentWalletAccount(name, address, pubKey, checked, isEVM = false) {
     return `<div type="button" class="btn btn-lg btn-outline-dark  text-capitalize" style="padding-left: 0.25rem; padding-right: 0.25rem; padding-bottom: 0.15rem;padding-bottom: 0.15rem; text-align: left">
   <div style='float: left; width: 15%'><img src='/identicon/${address}' width=50/></div>
   <div style='float:right; width: 85%'>
-    <div class="form-check form-switch"> <input class="form-check-input" type="checkbox" role="switch" value="${pubKey}" ${checkedStr} />${name}<span style='float:right'><a class='btn btn-link' href='${url}'>View Account</a></span></div>
+    <div class="form-check form-switch"> <input class="form-check-input" type="checkbox" role="switch" value="${pubKey}" wname="${name}" ${checkedStr} />${name}<span style='float:right'><a class='btn btn-link' href='${url}'>View Account</a></span></div>
     <div>${addressStr}</div>
   </div>
 </div>`
@@ -180,14 +182,19 @@ $('#walletModal').on('show.bs.modal', async function(event) {
 
 async function selectedWallets(e) {
     let selectedAccounts = [];
+    let selectedAccountNames = [];
     document.querySelectorAll('[role="switch"]').forEach(function(el) {
         if (el.checked) {
+            //console.log(`el`, el)
+            let walletName = (el.getAttribute('wname') != undefined)? el.getAttribute('wname') : el.value
             selectedAccounts.push(el.value);
+            selectedAccountNames.push(walletName);
         }
     });
     console.log(selectedAccounts);
+    console.log(selectedAccountNames);
     hideWalletModal();
-    setWalletHome(selectedAccounts);
+    setWalletHome(selectedAccounts, selectedAccountNames);
 
     if (afterWalletSelected) {
         let res = await afterWalletSelected();
