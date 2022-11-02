@@ -193,9 +193,12 @@ async function selectedWallets(e) {
     document.querySelectorAll('[role="switch"]').forEach(function(el) {
         if (el.checked) {
             //console.log(`el`, el)
-            let walletName = (el.getAttribute('wname') != undefined)? el.getAttribute('wname') : el.value
-            selectedAccounts.push(el.value);
-            selectedAccountNames.push(walletName);
+            let elVal = el.value
+            let walletName = (el.getAttribute('wname') != undefined)? el.getAttribute('wname') : elVal
+            if (elVal != 'null' && elVal != 'undefined'){
+                selectedAccounts.push(elVal);
+                selectedAccountNames.push(walletName);
+            }
         }
     });
     console.log(selectedAccounts);

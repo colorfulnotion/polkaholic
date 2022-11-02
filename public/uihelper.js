@@ -852,7 +852,7 @@ function launchToast(txt, title = false) {
         width: '450px',
         position: 'top-center',
         autohide: true,
-        delay: 4000,
+        delay: 2000,
     });
     toastInstance.show();
 }
