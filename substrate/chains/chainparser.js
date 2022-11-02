@@ -341,6 +341,10 @@ module.exports = class ChainParser {
           sentAt: 11038272,
           msg: '0x021001040001000002180d8f0a130001000002180d8f010300286bee0d0100040001010094ac3dfcff6cc5c6917b2412b26a37a5ee910ff9a3179247eba8fda08831ef12'
         }
+        {
+          pubSentAt: 9440729,
+          pubMsg: '0x0001040a01000b00f01449e90408070a01000b00f01449e9040000000000000000005ed0b200000000000001040101020082ba55bbd6e798cc015723fae77abe3fb54a2cdbbfe873b85d08a57b5aab6a6a'
+        }
         */
         //console.log(`decoratedVal=${decoratedVal}, o`, o)
         let res = {}
@@ -354,7 +358,9 @@ module.exports = class ChainParser {
             let v = JSON.parse(decoratedVal)
             if (v != undefined && v.length == 0 && chainIDDest) return extraField['mpIsEmpty'] = 1
             for (const dmp of v) {
-                let data = dmp.msg
+                let data = (dmp.msg != undefined) ? dmp.msg : dmp.pubMsg
+                let sentAt = (dmp.sentAt != undefined) ? paraTool.dechexToInt(dmp.sentAt) : paraTool.dechexToInt(dmp.pubSentAt)
+                //console.log(`[${this.parserBlockNumber}] [sentAt=${sentAt}][data=${data}]`)
                 if (data != prevData) {
                     var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `DownwardMessageQueuesVal`)
                     if (xcmFragments) {
@@ -374,7 +380,7 @@ module.exports = class ChainParser {
                                 msgHash: msgHash,
                                 msgHex: msgHex,
                                 msgStr: JSON.stringify(dmpMsg),
-                                sentAt: dmp.sentAt, //dmp is guranteed to be correct
+                                sentAt: sentAt, //dmp is guranteed to be correct
                                 chainID: indexer.chainID,
                                 chainIDDest: chainIDDest,
                                 relayChain: relayChain,
@@ -1266,10 +1272,10 @@ module.exports = class ChainParser {
             return fragments;
         } catch (e) {
             if (useApiAt) {
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] apiAt decode failed. trying fallback`)
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcms [${msgHash}] apiAt decode failed. trying fallback`)
                 return this.decodeXcmVersionedXcms(indexer, data, caller, false)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}](${data}) decode failed. error`, e.toString())
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcms [${msgHash}](${data}) decode failed. error`, e.toString())
                 return false
             }
         }
@@ -3631,7 +3637,8 @@ module.exports = class ChainParser {
         try {
             let v = JSON.parse(decoratedVal)
             for (const dmp of v) {
-                let data = dmp.msg
+                let data = (dmp.msg != undefined) ? dmp.msg : dmp.pubMsg
+                let sentAt = (dmp.sentAt != undefined) ? paraTool.dechexToInt(dmp.sentAt) : paraTool.dechexToInt(dmp.pubSentAt)
                 var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decorateAutoTraceDmp-${o.traceID}`)
                 if (xcmFragments) {
                     for (const xcm of xcmFragments) {

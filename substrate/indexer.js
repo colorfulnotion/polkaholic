@@ -6064,8 +6064,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         let k = JSON.parse(t.pkExtra)
                         let paraIDDest = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
                         for (const q of queues) {
-                            let sentAt = q.sentAt; // NO QUESTION on dmp (this is usually always the same block where xcmtransfer is initiated), sentAt = includedAt = relayedAt
-                            let msgHex = q.msg;
+                            //let sentAt = q.sentAt; // NO QUESTION on dmp (this is usually always the same block where xcmtransfer is initiated), sentAt = includedAt = relayedAt
+                            //let msgHex = q.msg;
+                            let msgHex = (q.msg != undefined) ? q.msg : q.pubMsg
+                            let sentAt = (q.sentAt != undefined) ? paraTool.dechexToInt(q.sentAt) : paraTool.dechexToInt(q.pubSentAt)
                             let dmpMsg = {
                                 msgType: "dmp",
                                 chainID: this.chainID,
@@ -7085,9 +7087,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     "msg": 'missing blockHash - check source',
                 })
             } else {
+                let forceParseTrace = false
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0)) {
+                if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0) || forceParseTrace) {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
                     autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
                 } else {
