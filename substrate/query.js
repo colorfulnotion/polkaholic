@@ -1087,6 +1087,127 @@ module.exports = class Query extends AssetManager {
         return s;
     }
 
+    async buildMissingXcmInfo(x){
+        //build systhetic xcmInfo here when xcmInfo is not set yet
+        let decorate = true
+        let decorateExtra = ["usd", "address", "related", "data"]
+        let xSection = null,
+            xMethod = null;
+        let sectionPieces = x.sectionMethod.split(':')
+        if (sectionPieces.length == 2) {
+            xSection = sectionPieces[0];
+            xMethod = sectionPieces[1];
+        }
+        let substrateTxHash = x.extrinsicHash
+        let substratetx;
+        try {
+            substratetx = await this.getTransaction(substrateTxHash);
+        } catch (err) {
+            console.log("looking for", substrateTxHash, err);
+        }
+        let sourceTxFee = (substratetx.fee != undefined)? substratetx.fee : null
+        let sourceTxFeeUSD = (substratetx.feeUSD != undefined)? substratetx.feeUSD : null
+        let sourceChainSymbol = substratetx.chainSymbol
+        let evmTransactionHash = null
+        if (substratetx.evm != undefined && substratetx.evm.transactionHash != undefined) {
+            evmTransactionHash = substratetx.evm.transactionHash
+            let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
+            if (!evmtx) return [false, false]
+            sourceTxFee = evmtx.fee
+            sourceTxFeeUSD = evmtx.feeUSD
+            sourceChainSymbol = evmtx.symbol
+        }
+        //(xcmtransfer.destStatus = 0 and xcmtransfer.incomplete = 0) or xcmtransfer.incomplete = 1)
+        let failureType = null
+        if (x.destStatus == 0 && x.incomplete == 0) failureType = 'failedDestination'
+        if (x.incomplete == 1) failureType = 'failedOrigination'
+        let xcmInfo = {
+            symbol:  x.symbol,
+            priceUSD: x.priceUSD,
+            relayChain: null,
+            origination: null,
+            destination: null,
+            version: 'V2',
+        }
+        xcmInfo.relayChain = {
+            relayChain: x.relayChain,
+            relayAt: (failureType == 'failedOrigination') ? null : x.sentAt, //?
+        }
+
+        xcmInfo.origination = {
+            chainName: x.chainName,
+            id: x.id,
+            chainID: x.chainID,
+            paraID: x.paraID,
+            sender: x.sender,
+            amountSent: (failureType == 'failedOrigination') ? 0 : x.amountSent,
+            amountSentUSD: (failureType == 'failedOrigination') ? 0 : x.amountSent,
+            txFee: sourceTxFee,
+            txFeeUSD: sourceTxFeeUSD,
+            txFeeSymbol: sourceChainSymbol,
+            blockNumber: x.blockNumber,
+            section: xSection,
+            method: xMethod,
+            extrinsicID: x.extrinsicID,
+            extrinsicHash: x.extrinsicHash,
+            //transactionHash: evmTransactionHash,
+            msgHash: x.msgHash,
+            sentAt: x.sentAt,
+            ts: x.sourceTS,
+            complete: (x.incomplete)? false: true,
+        }
+        //if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
+        if (failureType != undefined){
+            xcmInfo.destination = {
+                chainName: x.chainDestName,
+                id: x.idDest,
+                chainID: x.chainIDDest,
+                paraID: x.paraIDDest,
+                beneficiary: (x.beneficiary != undefined)? x.beneficiary : null,
+                amountReceived: 0,
+                amountReceivedUSD: 0,
+                teleportFee: 0,
+                teleportFeeUSD: 0,
+                teleportFeeChainSymbol: x.symbol,
+                blockNumber: x.blockNumberDest,
+                extrinsicID: null,
+                eventID: x.executedEventID,
+                ts: x.destTS,
+                status: false,
+                error: {},
+            }
+            if (failureType == 'failedDestination') {
+                //xcmInfo.destination.error = this.getXcmErrorDescription(x.errorDesc) TODO..
+            } else {
+                xcmInfo.destination.extrinsicID = null
+                xcmInfo.destination.error = {
+                    errorCode: `NA`,
+                    errorType: `FailedAtOriginationChain`,
+                    errorDesc: `XCM Failed at origination Chain.`,
+                }
+            }
+        }else{
+            xcmInfo.destination = {
+                chainName: x.chainDestName,
+                id: x.idDest,
+                chainID: x.chainIDDest,
+                paraID: x.paraIDDest,
+                beneficiary: (x.beneficiary != undefined)? x.beneficiary : null,
+                amountReceived: x.amountReceived,
+                amountReceivedUSD: x.amountReceivedUSD,
+                teleportFee: x.xcmFee,
+                teleportFeeUSD: x.xcmFeeUSD,
+                teleportFeeChainSymbol: x.symbol,
+                blockNumber: x.blockNumberDest,
+                //extrinsicID: x.destExtrinsicID,
+                eventID: x.executedEventID,
+                ts: x.destTS,
+                status: false,
+            }
+        }
+        console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)
+        return xcmInfo
+    }
 
     async getXCMTransfers(filters = {}, limit = 10, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
@@ -1112,13 +1233,14 @@ module.exports = class Query extends AssetManager {
                 w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest in (${chainList.join(",")}) )`)
             }
             let wstr = (w.length > 0) ? " where " + w.join(" and ") : "";
-            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
+            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
             //console.log(filters, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
                 let x = xcmtransfers[i];
                 x.chainName = this.getChainName(x.chainID);
                 [x.chainID, x.id] = this.convertChainID(x.chainID)
+                x.paraID = paraTool.getParaIDfromChainID(x.chainID)
 
                 // looks up assetInfo
                 let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
@@ -1151,8 +1273,11 @@ module.exports = class Query extends AssetManager {
                             if (x.destAddress.length == 66) x.beneficiary = paraTool.getAddress(x.destAddress, chainIDDestInfo.ss58Format)
                         }
                     }
-                    [x.chainIDDest, x.idDest] = this.convertChainID(x.chainIDDest)
+                    let [_, idDest]  = this.convertChainID(x.chainIDDest)
+                    //[x.chainIDDest, x.idDest] = this.convertChainID(x.chainIDDest)
+                    x.idDest = (idDest == false)? null : idDest
                     x.chainDestName = this.getChainName(x.chainIDDest);
+                    x.paraIDDest = paraTool.getParaIDfromChainID(x.chainIDDest)
                     let sectionPieces = x.sectionMethod.split(':')
                     if (sectionPieces.length == 2) {
                         section = sectionPieces[0];
@@ -1195,8 +1320,8 @@ module.exports = class Query extends AssetManager {
                     sourceTS: x.sourceTS,
 
                     //dest section
-                    beneficiary: x.beneficiary, //AccountKey20 or SS58
-                    destAddress: x.destAddress,
+                    beneficiary: (x.beneficiary != undefined)? x.beneficiary : null, //AccountKey20 or SS58
+                    destAddress: (x.destAddress != undefined)? x.destAddress : null,
                     idDest: x.idDest,
                     chainIDDest: x.chainIDDest,
                     chainDestName: x.chainDestName,
@@ -1216,11 +1341,17 @@ module.exports = class Query extends AssetManager {
                     priceUSD: x.priceUSD,
                     priceUSDCurrent: x.priceUSDCurrent,
                 }
-                if (parsedXcmInfo) r.xcmInfo = parsedXcmInfo
+                if (parsedXcmInfo) {
+                    r.xcmInfo = parsedXcmInfo
+                }else{
+                    r.xcmInfo = await this.buildMissingXcmInfo(x)
+                }
+                /*
                 if (decorate) {
                     this.decorateAddress(r, "fromAddress", decorateAddr, decorateRelated)
                     this.decorateAddress(r, "destAddress", decorateAddr, decorateRelated)
                 }
+                */
                 out.push(this.clean_extrinsic_object(r));
             }
 
