@@ -1,11 +1,23 @@
 <%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Chain`}); %>
 
-<h5>XCM Multilocation Tool</h5>
+<div class="alert" role="alert" data-mdb-color="warning">
+This tool is to support XCM Transfers and Remote Executions on Moonbase Alpha/Beta (active) and Moonriver + Moonbeam (planned) only (<a target="_new" href="https://docs.moonbeam.network/builders/xcm/xcm-transactor/">learn more ...</a>)
+</div>
+
+<h5>Multilocation Tool</h5>
 
 <div class="btn-group">
   <a href="javascript:showmultilocation(0, 'polkadot');" class="btn btn-primary">Polkadot</a>
   <a href="javascript:showmultilocation(2, 'kusama');" class="btn btn-primary">Kusama</a>
   <a href="javascript:showmultilocation(60000, 'moonbase-relay');" class="btn btn-primary">Moonbase Relay</a>
+</div>
+
+<div>
+Given a symbol on a network, this shows:
+<ul>
+ <li>(v1) Multilocation and EVM Multi Location Bytes, which can be used for submitting Substrate extrinsics (e.g. xTokens:Transfer) and EVM Transactions (e.g. interacting with <a href='/address/0x000000000000000000000000000000000000080d'>XCMTransactorV2 System Contract</a></li>
+ <li>XC20 Contract Addresses on EVM Chains, which behave like ERC20s and can be used to pay for XCM fees (<a href='https://docs.moonbeam.network/builders/xcm/xc20/overview/'> learn more ...</a>)</li>
+ <li>CurrencyIDs on EVM + Substrate Chains, which are required inputs to XCM Transfer (e.g. <a href='https://docs.moonbeam.network/builders/xcm/xc20/xtokens/'>xTokens:transfer</a>) </li>
 </div>
 
 <div>
@@ -20,9 +32,11 @@
         <B>Symbol:</b> <span id="symbol"></span><br/>
 	<B>Decimals:</b> <span id="decimals"></span><br/>
 
-        <B>V1 MultiLocation</B>:<br/>
+	<%- include("tooltip", {k: "xcminteriorkey"}) %><B>XCM Interior Key</B>:<br/>
+	<input size=64 id="xcmInteriorKey"/><br/>
+        <%- include("tooltip", {k: "v1multilocation"}) %><B>V1 Multilocation</B>:<br/>
 	<input size=64 id="xcmV1MultiLocation"/><br/>
-	<B>EVM Location Bytes</B>:<br/>
+	<%- include("tooltip", {k: "evmmultilocation"}) %><B>EVM Multilocation Bytes</B>:<br/>
 	<input size=64 id="evmMultiLocation"/><br/>
       </p>
     </div>
@@ -30,7 +44,7 @@
   
    <div class="card">
     <div class="card-body">
-      <h5 class="card-title">XC20 Contract Addresses</h5>
+      <h5 class="card-title"><%- include("tooltip", {k: "xc20contractaddress"}) %>XC20 Contract Addresses</h5>
       <div id="xc20">
       </div>
     </div>
@@ -38,7 +52,7 @@
 
    <div class="card">
     <div class="card-body">
-      <h5 class="card-title">CurrencyID / Foreign Asset</h5>
+      <h5 class="card-title"><%- include("tooltip", {k: "currencyid"}) %>CurrencyID / Foreign Asset</h5>
       <p class="card-text">
         <div id="currencyid">
         </div>
@@ -48,11 +62,13 @@
  </div>
 </div>
 
+
+<script src="/multilocation.js"></script>
 <script>
 var chains = <%- JSON.stringify(chains); %>;
 $(document).ready(function() {
-showmultilocation(0, 'polkadot')
+  showmultilocation(0, 'polkadot')
 })
 </script>
 <%- include('footer', {apiUrl: apiUrl}); %>
-<script src="/multilocation.js"></script>
+

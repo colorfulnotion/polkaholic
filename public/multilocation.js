@@ -8,10 +8,92 @@ function get_chain(chainID)
     return(null);
 }
 
+async function getAPI(chainID) {
+    const {
+        WsProvider,
+        ApiPromise,
+    } = polkadotApi;
+    const {
+	Keyring
+    } = polkadotKeyring;
+    
+    let wsEndpoints = {
+        60000: "wss://moonbase-internal.polkaholic.io",
+        60888: "wss://moonbase-beta-internal.polkaholic.io",
+        61000: "wss://moonbase-internal.polkaholic.io"
+    }
+    let wssEndpoint = wsEndpoints[chainID];
+    if (wssEndpoint == undefined) {
+        console.log("No API Endpoint for chainID", chainID);
+        return (null);
+    }
+    console.log("Connecting to chainID", chainID, wssEndpoint);
+    
+    var api = await ApiPromise.create({
+        provider: new WsProvider(wssEndpoint)
+    });
+    await api.isReady;
+    return api;
+}
+
+function make_multilocation(paraID = null, address = null, namedNetwork = 'Any') {
+    const named = (namedNetwork != 'Any') ? {
+        Named: namedNetwork
+    } : namedNetwork;
+    const account = address.length === 42 ? {
+        AccountKey20: {
+            network: named,
+            key: address
+        }
+    } : {
+        AccountId32: {
+            network: named,
+            id: polkadotUtil.u8aToHex(polkadotUtilCrypto.decodeAddress(address))
+        }
+    };
+    // make a multilocation object
+    let interior = {
+        here: null
+    }
+    if (paraID && account) {
+        interior = {
+            X2: [{
+                Parachain: paraID
+            }, account]
+        }
+    }
+    return {
+        parents: 1,
+        interior: interior
+    }
+}
+
+// Converts a given MultiLocation into a 20/32 byte accountID by hashing with blake2_256 and taking the first 20/32 bytes
+async function calculateMultilocationDerivative(paraID = null, address = null, namedNetwork = 'Any') {
+    var api = await getAPI(61000);
+    let multilocationStruct = make_multilocation(paraID, address, namedNetwork)
+    const multilocation = api.createType('XcmV1MultiLocation', multilocationStruct)
+    const toHash = new Uint8Array([
+        ...new Uint8Array([32]),
+        ...new TextEncoder().encode('multiloc'),
+        ...multilocation.toU8a(),
+    ]);
+    
+
+    const DescendOriginAddress20 = polkadotUtil.u8aToHex(api.registry.hash(toHash).slice(0, 20));
+    const DescendOriginAddress32 = polkadotUtil.u8aToHex(api.registry.hash(toHash).slice(0, 32));
+    //console.log("calculateMultilocationDerivative", multilocation.toString(), DescendOriginAddress20, DescendOriginAddress32);
+    // multilocation {"parents":1,"interior":{"x2":[{"parachain":1000},{"accountKey20":{"network":{"any":null},"key":"0x44236223ab4291b93eed10e4b511b37a398dee55"}}]}}
+    // 20 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45c
+    // 32 byte: 0x5c27c4bb7047083420eddff9cddac4a0a120b45cdfa7831175e442b8f14391aa
+    return [DescendOriginAddress20, DescendOriginAddress32]
+}
+
 function showmultilocationasset(a, relayChain) {
     try {
-	document.getElementById('symbol').innerHTML = a.symbol;
-	document.getElementById('decimals').innerHTML = a.decimals;
+	document.getElementById('symbol').innerHTML = a.symbol ? a.symbol : "Not available";
+	document.getElementById('decimals').innerHTML = a.decimals ? a.decimals : "Not available";
+	document.getElementById('xcmInteriorKey').value = a.xcmInteriorKey;
 	document.getElementById('xcmV1MultiLocation').value = JSON.stringify(a.xcmV1MultiLocation);
 	document.getElementById('evmMultiLocation').value = JSON.stringify(a.evmMultiLocation);
 	let xc20arr = []
@@ -58,7 +140,7 @@ async function showmultilocation(chainID, relayChain) {
 		$(`#${id}`).on('change', function(e) {
 		    let v = $(`#${id}`).find(":selected").val();
 		    for ( const x of data ) {
-			if ( x.symbol == v ) {
+			if ( x.xcmInteriorKey == v ) {
 			    showmultilocationasset(x, relayChain);
 			    break;
 			}
@@ -71,14 +153,17 @@ async function showmultilocation(chainID, relayChain) {
 		}
 		data.map( (s) => {
 		    var option = document.createElement("option");
-		    option.text = s.symbol;
-		    option.value = s.symbol;
-		    if ( element && s.symbol ) {
-			element.add(option);
+		    if (s.symbol) {
+			option.text = s.symbol;
+			option.value = s.xcmInteriorKey;
 		    } else {
+			option.text = s.xcmInteriorKey;
+			option.value = s.xcmInteriorKey;
+		    }
+		    if ( element && s.xcmInteriorKey ) {
+			element.add(option);
 		    }
 		})
-		console.log("SML", chainID, endpoint, data);
             } catch (err) {
                 console.log(err);
             }

@@ -36,7 +36,7 @@ let f = xcm;
     <tr>
       <td><%- include("tooltip", {k: "sentatblock"}) %>Origination</td>
       <td>
-        <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
+        <a href='/blocks/<%= f.chainID; %>'><%= f.chainName; %></a>
         <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.sourceBlocknumber}); %>
 	<% if ( f.sourceTS ) { %>
         <%=` `%> Sent: <%= uiTool.presentTS(f.sourceTS); %>
@@ -47,7 +47,7 @@ let f = xcm;
     <tr>
       <td><%- include("tooltip", {k: "relayedatblock"}) %>Relayed At</td>
       <td>
-        <a href='/chain/<%= f.relayChain; %>'><%= uiTool.capitalizeFirstLetter(f.relayChain); %></a>
+        <a href='/blocks/<%= f.relayChain; %>'><%= uiTool.capitalizeFirstLetter(f.relayChain); %></a>
         <%- include("blockNumber", {chainID: f.relayChain, blockNumber: f.sentAt}); %>
       </td>
     </tr>
@@ -55,7 +55,7 @@ let f = xcm;
     <tr>
       <td><%- include("tooltip", {k: "relayedatblock"}) %>Destination</td>
       <td>
-        <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
+        <a href='/blocks/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
         <%- include("blockNumber", {chainID: f.idDest, blockNumber: f.destBlocknumber}); %>
 	<% if ( f.destTS ) { %>
         <%=` `%> Received: <%= uiTool.presentTS(f.destTS); %>
@@ -66,7 +66,7 @@ let f = xcm;
     <tr>
       <td><%- include("tooltip", {k: "executionstatus"}) %>Execution Status</td>
       <td>
-          <a href='/chain/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
+          <a href='/blocks/<%= f.chainIDDest; %>'><%= f.chainDestName; %></a>
           <% if ( f.executedEventID) {
           let executionBN = f.executedEventID.split('-')[1] %>
           <%- include("blockNumber", {chainID: f.chainIDDest, blockNumber: executionBN}); %>

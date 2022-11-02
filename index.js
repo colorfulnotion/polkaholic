@@ -101,6 +101,7 @@ async function getHostChain(req, reqChainID = null) {
     let [chainID, id, chain] = [-1, null, {}];
 
     try {
+
         if (reqChainID) {
             let [_chainID, _id] = query.convertChainID(reqChainID)
             if (_id) {
@@ -1222,15 +1223,21 @@ app.get('/xcmtransfers/:chainIDorChainName?', async (req, res) => {
 // Usage: https://polkaholic.io/xcmmessages
 app.get('/xcmmessages/:chainIDorChainName?', async (req, res) => {
     try {
+
         let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
         let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
         let filters = {}
         if (id) {
             filters.chainList = [chainID];
         };
+        let chainfilterList = chainFilterOptUI(req);
+        if (chainfilterList && chainfilterList.length > 0) {
+            filters.chainList = chainfilterList;
+        }
         if (req.query.blockNumber) {
             filters.blockNumber = req.query.blockNumber;
         }
+
         const maxRows = 1000;
         let xcmmessages = await query.getRecentXCMMessages(filters, maxRows);
         res.render('xcmmessages', {
@@ -1257,7 +1264,7 @@ app.get('/xcmmessages/:chainIDorChainName?', async (req, res) => {
     }
 })
 
-app.get('/multilocation', async (req, res) => {
+app.get('/multilocation/:relayChain?', async (req, res) => {
     try {
         let relayChains = {
             0: "Polkadot",
@@ -1265,8 +1272,33 @@ app.get('/multilocation', async (req, res) => {
             60000: "Moonbase Relay"
         };
         let chains = await query.getChains(1, "chainName");
-
         res.render('multilocation', {
+            chainInfo: query.getChainInfo(0),
+            chain: await query.getChain(0),
+            chains: chains,
+            relayChains,
+            apiUrl: req.path,
+            docsSection: "get-multilocation"
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+
+app.get('/remoteexecution/:address?', async (req, res) => {
+    try {
+        let address = req.params.address ? req.params.address : "0xDcB4651B5BbD105CDa8d3bA5740b6C4f02b9256D"; // 0x44236223aB4291b93EEd10E4B511B37a398DEE55";
+        let relayChains = {
+            0: "Polkadot",
+            2: "Kusama",
+            60000: "Moonbase Relay"
+        };
+        let chains = await query.getChains(1, "chainName");
+        res.render('remoteexecution', {
+            address: address,
             chainInfo: query.getChainInfo(0),
             chain: await query.getChain(0),
             chains: chains,
