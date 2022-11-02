@@ -460,7 +460,7 @@ function presentXCMMessageHash(msgHash, blockNumber, allowCopy = true) {
 
 function presentChain(id, chainName, iconURL = false, crawlingStatus = "", tab = "") {
     if (!chainName) chainName = "chain" + id;
-    let i = iconURL ? `<img width=24 src="${iconURL}" style="margin: 3px; padding: 3px;"/>` : "";
+    let i = iconURL ? `<img class="circularImage" width=24 src="${iconURL}" style="margin: 3px; padding: 3px;"/>` : "";
     let s = crawlingStatus.length > 0 ? `<span data-mdb-placement="right" title="${crawlingStatus}" ><i class="fas fa-exclamation-triangle"></i></span>` : '';
     return i + `<a href="/blocks/${id}">` + beautifyCamelCase(chainName) + '</a>' + s;
 }

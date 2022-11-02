@@ -1,5 +1,7 @@
 <table>
-<% for (let t = 0 ; t < tx.transfers.length; t++) {
+<%
+let transfersLen = tx.transfers.length
+for (let t = 0 ; t < transfersLen; t++) {
 let tok = tx.transfers[t];
 %>
 <tr>
@@ -9,9 +11,12 @@ let tok = tx.transfers[t];
   <td><b>To </b><%- uiTool.presentBlockiesOrIdenticon(tok.to, 15); %><a href='/account/<%= paraTool.getPubKey(tok.to) %>'><%- uiTool.getShortHash(tok.to, true, false) %></a>
       &emsp;
   </td>
-  <td><b>For </b><%- tok.value; %> <%- uiTool.presentERCToken(tok.tokenAddress, tok.assetInfo, false); %> <%- ; %>
+  <td><b>For </b><%- tok.value; %> <%- uiTool.presentERCToken(tok.tokenAddress, tok.assetInfo, false); %>
+      &emsp;
   </td>
-  <td>(<%- uiTool.currencyFormat(tok.valueUSD, tok.priceUSD, tok.priceUSDCurrent); %> )</td>
+  <td>
+  <%- uiTool.currencyFormat(tok.valueUSD, tok.priceUSD, tok.priceUSDCurrent, true, true) %>
+  </td>
 </tr>
 <% } %>
 </table>
