@@ -36,7 +36,7 @@ let f = contract;
     <tr>
       <td>Chain</td>
       <td>
-        <a href='/chain/<%= f.chainID; %>'><%= f.chainName; %></a>
+        <a href='/blocks/<%= f.chainID; %>'><%= f.chainName; %></a>
         <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.sourceBlocknumber}); %>
       </td>
     </tr>
@@ -44,7 +44,7 @@ let f = contract;
     <tr>
       <td>Instantiated At</td>
       <td>
-        <a href='/chain/<%= f.id; %>'><%= uiTool.capitalizeFirstLetter(f.chainName); %></a>
+        <a href='/blocks/<%= f.id; %>'><%= uiTool.capitalizeFirstLetter(f.chainName); %></a>
         <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.instantiateBN}); %>
       </td>
     </tr>

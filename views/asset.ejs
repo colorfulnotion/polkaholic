@@ -3,7 +3,7 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="/">Polkaholic</a></li>
-    <li class="breadcrumb-item"><img src="<%= asset.iconUrl; %>" width="20"/><a href='/chain/<%= asset.id; %>#xcmassets'><%= asset.chainName; %> [Chain <%= asset.chainID %> : <%= asset.id %>]</a></li>
+    <li class="breadcrumb-item"><img src="<%= asset.iconUrl; %>" width="20"/><a href='/xcmassets/<%= asset.id; %>'><%= asset.chainName; %> [Chain <%= asset.chainID %> : <%= asset.id %>]</a></li>
     <li class="breadcrumb-item active" aria-current="page"><%= asset.assetName; %></li>
   </ol>
 </nav>
