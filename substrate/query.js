@@ -1109,7 +1109,7 @@ module.exports = class Query extends AssetManager {
             }
             let chainListFilter = "";
             if (chainList.length > 0) {
-                w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest = ${chainList.join(",")} )`)
+                w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest in (${chainList.join(",")}) )`)
             }
             let wstr = (w.length > 0) ? " where " + w.join(" and ") : "";
             let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, sourceTS, destTS, amountSent, amountReceived, status, relayChain, incomplete, relayChain, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
