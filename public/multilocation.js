@@ -10,8 +10,9 @@ function get_chain(chainID)
 
 function showmultilocationasset(a, relayChain) {
     try {
-	document.getElementById('symbol').innerHTML = a.symbol;
-	document.getElementById('decimals').innerHTML = a.decimals;
+	document.getElementById('symbol').innerHTML = a.symbol ? a.symbol : "Not available";
+	document.getElementById('decimals').innerHTML = a.decimals ? a.decimals : "Not available";
+	document.getElementById('xcmInteriorKey').value = a.xcmInteriorKey;
 	document.getElementById('xcmV1MultiLocation').value = JSON.stringify(a.xcmV1MultiLocation);
 	document.getElementById('evmMultiLocation').value = JSON.stringify(a.evmMultiLocation);
 	let xc20arr = []
@@ -58,7 +59,7 @@ async function showmultilocation(chainID, relayChain) {
 		$(`#${id}`).on('change', function(e) {
 		    let v = $(`#${id}`).find(":selected").val();
 		    for ( const x of data ) {
-			if ( x.symbol == v ) {
+			if ( x.xcmInteriorKey == v ) {
 			    showmultilocationasset(x, relayChain);
 			    break;
 			}
@@ -71,14 +72,17 @@ async function showmultilocation(chainID, relayChain) {
 		}
 		data.map( (s) => {
 		    var option = document.createElement("option");
-		    option.text = s.symbol;
-		    option.value = s.symbol;
-		    if ( element && s.symbol ) {
-			element.add(option);
+		    if (s.symbol) {
+			option.text = s.symbol;
+			option.value = s.xcmInteriorKey;
 		    } else {
+			option.text = s.xcmInteriorKey;
+			option.value = s.xcmInteriorKey;
+		    }
+		    if ( element && s.xcmInteriorKey ) {
+			element.add(option);
 		    }
 		})
-		console.log("SML", chainID, endpoint, data);
             } catch (err) {
                 console.log(err);
             }

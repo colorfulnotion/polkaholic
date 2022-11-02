@@ -20,9 +20,11 @@
         <B>Symbol:</b> <span id="symbol"></span><br/>
 	<B>Decimals:</b> <span id="decimals"></span><br/>
 
-        <B>V1 MultiLocation</B>:<br/>
+	<%- include("tooltip", {k: "xcminteriorkey"}) %><B>XCM Interior Key</B>:<br/>
+	<input size=64 id="xcmInteriorKey"/><br/>
+        <%- include("tooltip", {k: "v1multilocation"}) %><B>V1 MultiLocation</B>:<br/>
 	<input size=64 id="xcmV1MultiLocation"/><br/>
-	<B>EVM Location Bytes</B>:<br/>
+	<%- include("tooltip", {k: "evmmultilocation"}) %><B>EVM Location Bytes</B>:<br/>
 	<input size=64 id="evmMultiLocation"/><br/>
       </p>
     </div>
@@ -30,7 +32,7 @@
   
    <div class="card">
     <div class="card-body">
-      <h5 class="card-title">XC20 Contract Addresses</h5>
+      <h5 class="card-title"><%- include("tooltip", {k: "xc20contractaddress"}) %>XC20 Contract Addresses</h5>
       <div id="xc20">
       </div>
     </div>
@@ -38,7 +40,7 @@
 
    <div class="card">
     <div class="card-body">
-      <h5 class="card-title">CurrencyID / Foreign Asset</h5>
+      <h5 class="card-title"><%- include("tooltip", {k: "currencyid"}) %>CurrencyID / Foreign Asset</h5>
       <p class="card-text">
         <div id="currencyid">
         </div>

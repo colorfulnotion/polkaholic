@@ -101,6 +101,7 @@ async function getHostChain(req, reqChainID = null) {
     let [chainID, id, chain] = [-1, null, {}];
 
     try {
+
         if (reqChainID) {
             let [_chainID, _id] = query.convertChainID(reqChainID)
             if (_id) {
@@ -1222,15 +1223,21 @@ app.get('/xcmtransfers/:chainIDorChainName?', async (req, res) => {
 // Usage: https://polkaholic.io/xcmmessages
 app.get('/xcmmessages/:chainIDorChainName?', async (req, res) => {
     try {
+
         let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
         let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
         let filters = {}
         if (id) {
             filters.chainList = [chainID];
         };
+        let chainfilterList = chainFilterOptUI(req);
+        if (chainfilterList && chainfilterList.length > 0) {
+            filters.chainList = chainfilterList;
+        }
         if (req.query.blockNumber) {
             filters.blockNumber = req.query.blockNumber;
         }
+
         const maxRows = 1000;
         let xcmmessages = await query.getRecentXCMMessages(filters, maxRows);
         res.render('xcmmessages', {

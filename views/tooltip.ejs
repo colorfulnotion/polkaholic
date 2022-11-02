@@ -49,8 +49,10 @@ let tooltips = {
  "price": "Price of the asset",
  "evmprice": "Price of the native token at the time of the transaction",
  "evmposition": "Index position of the transaction in the EVM Block",
-
-
+ "xc20contractaddress": "The XC20 Contract address is a special precompiled contract address for an asset that may be interacted with in EVM chains in the same way as an ERC20 Contract",
+ "xcminteriorkey": "The XCM Interior Key is a JSON string (with a tilde and relay chain appended) that uniquely identifies an asset in a network",
+ "v1multilocation": "V1 MultiLocation  is a JSON string that uniquely identifies a Multilocation in a network, which may be used as an argument for substrate extrinsics",
+ "evmmultilocation": "EVM Multilocation is a JSON string that uniquely identifies a Multilocation in a network, which may be used an argument for EVM XCM transfers + remote executions",
  "extrinsicid": "An extrinsicID, by convention is the blocknumber of the block which includes the extrinsic followed by the index of the extrinsic in the block.",
  "eventid": "Event ID, generally included in a block's extrinsic",
  "sender": "Sender of extrinsic/tx",
@@ -73,7 +75,7 @@ let tooltips = {
  "crowdloanscontributed": "Amount contributed",
  "parenttxhash": "For internal transaction, the initating transaction hash",
  "assets": "Assets involved in transaction",
- "currencyid": "Currency ID of the wallet, assigned by the parachain",
+ "currencyid": "Currency ID of the asset, assigned by the parachain to uniquely represent an asset within the parachain and unambiguously specify XCM assets in XCM transfer and fee payment for XCM transactions",
  "holdings": "Holdings across all wallets",
  "numholders": "Number of holders of the asset",
  "free": "Free",

@@ -5381,7 +5381,7 @@ module.exports = class Query extends AssetManager {
         let blockNumber = (filters.blockNumber != undefined) ? filters.blockNumber : null;
         let beneficiaries = (filters.beneficiaries != undefined) ? filters.beneficiaries : null;
         let chainListFilter = "";
-        console.log("getRecentXCMMessages", filters);
+
         if (filters.chainID != undefined && filters.chainIDDest != undefined) {
             let chainID = parseInt(filters.chainID);
             let chainIDDest = parseInt(filters.chainIDDest);

@@ -687,8 +687,11 @@ let chains = [
     selChainName = sel.chainName;
 %>
         <li class="nav-item dropdown">
-           <a class="nav-link dropdown-toggle" href="#" id="navbarBlockchainMenuLink" role="button" data-mdb-toggle="dropdown" aria-expanded="false"><%= sel.chainName %> Blockchain</a>
+           <a class="nav-link dropdown-toggle" href="#" id="navbarBlockchainMenuLink" role="button" data-mdb-toggle="dropdown" aria-expanded="false">Blockchain</a>
            <ul class="dropdown-menu" aria-labelledby="navbarBlockchainMenuLink">
+             <li>
+               <a class="dropdown-item" href="/chaininfo"><img src="<%= sel.iconUrl; %>" width="24" class="circularClass"/>&nbsp;<%= selChainName %><% if (sel.paraID) { %> (ParaID <%= sel.paraID; %>) <% } %></a>
+             </li>
              <li>
                <a class="dropdown-item" href="/blocks">Recent Blocks</a>
              </li>
@@ -789,13 +792,12 @@ let chains = [
       </div>
 
       <div class="dropdown">
-	<button type="button" class="btn btn-primary" data-mdb-toggle="modal" data-mdb-target="#selectChain">
+	<button type="button" class="btn btn-primary btn-block" style="text-align: left; text-transform: none; " data-mdb-toggle="modal" data-mdb-target="#selectChain">
 	  <% if ( sel && sel.iconUrl ) { %>
-	  <img src="<%= sel.iconUrl %>" width=24>
+	  <img src="<%= sel.iconUrl %>" width=24 class="circularClass"/>
 	  <% } else { %>
-	  <img src="<%= iconUrl %>" width=24>
-	  <% } %>
-	  <%= selChainName %>
+	  <img src="<%= iconUrl %>" width=24 class="circularClass"/>
+	  <% } %>&nbsp;<%= selChainName %>
 	</button>
 
 <div class="modal fade" id="selectChain" tabindex="-1" aria-labelledby="Select Chain" aria-hidden="true">
@@ -803,17 +805,40 @@ let chains = [
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="select">Select Chain</h5>
-        <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Select All"></button>
       </div>
       <div class="modal-body">
-	<button id="all" class="button btn btn-primary text-capitalize selchain" data-mdb-dismiss="modal"  style="width: 98%; height: 50px; padding: 2px; margin: 5px;" data-mdb-ripple-color="dark">Select ALL CHAINS</button>
+	<div>
+	  <button id="all" class="button btn btn-primary text-capitalize selchain" data-mdb-dismiss="modal"  style="width: 98%; height: 50px; padding: 2px; margin: 5px;" data-mdb-ripple-color="dark">Select ALL CHAINS</button>
+	</div>
+	<div class="form-outline" style="margin-top: 15px; margin-bottom: 15px; margin-left: 5px; margin-right: 5px;">
+	  <input type="text" id="searchChains" class="form-control" value=""/>
+	  <label class="form-label" for="searchChains">Search chains</label>
+        </div>
+	<script>
+	  $('#searchChains').keyup(function( event ) {
+	      if ( event.which == 13 ) {
+		  event.preventDefault();
+	      }
+	      let txt = $('#searchChains').val().toLowerCase();
+	      $(`button.selchain`).map( (e, f) => {
+		  if ( f.id == "all" ) {
+		      // do nothing.
+		  } else if ( txt.length > 0 && f.id.includes(txt) ) {
+		      f.className = "btn btn-primary text-capitalize selchain";
+		  } else {
+		      f.className = "btn btn-outline-secondary text-capitalize selchain";
+		  }
+	      })
+	  });
+	</script>
       	<% for ( const c of chains ) { %>
           <% if ( c.isRelayChain ) { %><h6><%= c.chainName %></h6><% } %>
-	  <button id="<%= c.id %>" type="button" class="btn btn-outline-secondary text-capitalize selchain" data-mdb-dismiss="modal" style="width: 23%; padding: 2px; margin: 5px;" data-mdb-ripple-color="dark"><img width=24 src='<%= c.iconUrl %>'>&nbsp;<%= c.chainName %></button>
+	  <button id="<%= c.id %>" type="button" class="btn btn-outline-secondary text-capitalize selchain"  data-mdb-dismiss="modal" style="text-align: left; width: 23%; padding: 3px; margin: 3px;" data-mdb-ripple-color="dark">&nbsp;<img width=24 class="circularImage"  src='<%= c.iconUrl %>'>&nbsp;<%= c.chainName %></button>
         <% } %>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" data-mdb-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
