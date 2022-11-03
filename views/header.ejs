@@ -847,8 +847,13 @@ let chains = [
 	  });
 	</script>
       	<% for ( const c of chains ) { %>
-          <% if ( c.isRelayChain ) { %><h6><%= c.chainName %></h6><% } %>
-	  <button id="<%= c.id %>" paraID="<%= c.paraID %>" chainID="<%= c.chainID %>" type="button" class="btn btn-outline-secondary text-capitalize selchain"  data-mdb-dismiss="modal" style="text-align: center; width: 20%; height: 5em; padding: 3px; margin: 3px;" data-mdb-ripple-color="dark">&nbsp;<img width=24 class="circularImage"  src='<%= c.iconUrl %>'>&nbsp;<div style="font-size:0.85em;"><%= c.chainName %></div></button>
+          <% if ( c.isRelayChain ) {
+              let relay = `${c.chainName.replace('-relay', '')} & Parachain`
+               %>
+              <br>
+              <h6><%= relay %></h6>
+          <% } %>
+	  <button id="<%= c.id %>" paraID="<%= c.paraID %>" chainID="<%= c.chainID %>" type="button" class="btn btn-outline-secondary text-capitalize selchain"  data-mdb-dismiss="modal" style="text-align: center; width: 20%; height: 5em; padding: 3px; margin-left: 2%; margin-right: 2%; margin-top: 3px; margin-bottom: 3px" data-mdb-ripple-color="dark">&nbsp;<img width=24 class="circularImage"  src='<%= c.iconUrl %>'>&nbsp;<div style="font-size:0.85em;"><%= c.chainName %></div></button>
         <% } %>
       </div>
       <div class="modal-footer">
@@ -859,6 +864,18 @@ let chains = [
 </div>
 
 <script>
+$(`.selchain`).map( (e, f) => {
+         // adjusting font size here
+         let width = $(window).width()
+         let height = $(window).height()
+         let btn = `button#${f.id}`
+         console.log(`btn ${btn} ${width}x${height}`)
+         if (width >= 764 && height >= 1200) {
+             $(btn).css('text-align', 'center')
+             $(btn).css('font-size', '1.1em')
+             $(btn).css('height', '3em')
+         }
+});
 $(".selchain").click(function (e) {
     e.preventDefault();
     let selchain = e.currentTarget.id;

@@ -584,7 +584,7 @@ function presentIDRow(row, fld) {
 }
 
 function presentBlockiesOrIdenticon(address, sz = 25) {
-    if (address.length == '42') {
+    if (address && address.length == '42') {
         let cl = `width="${sz}px"  loading="lazy"`
         let canvas = blockies.create({ // All options are optional
             seed: address.toLowerCase(), // seed used to generate icon data, default: random
@@ -603,7 +603,7 @@ function presentBlockiesOrIdenticon(address, sz = 25) {
 }
 
 function presentRawIDwithIdenticon(id, imageSize = '25rpx') {
-    if (id.length == 42) {
+    if (id && id.length == 42) {
         let cl = `width="${imageSize}"  loading="lazy"`
         let canvas = blockies.create({ // All options are optional
             seed: id.toLowerCase(), // seed used to generate icon data, default: random
@@ -616,14 +616,14 @@ function presentRawIDwithIdenticon(id, imageSize = '25rpx') {
             // that look like eyes, mouths and noses.
         });
         return (`<img class="circularImage" src="${canvas.toDataURL()}" ${cl} /> ${getShortHash(id, false)}`)
-    } else if (id.length > 2) {
+    } else if (id && id.length > 2) {
         return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/> ${getShortHash(id, false)}`;
     }
     return "";
 }
 
 function presentIDwithIdenticon(id, imageSize = '25rpx') {
-    if (id.length == 42) {
+    if (id && id.length == 42) {
         let cl = `width="${imageSize}"  loading="lazy"`
         let canvas = blockies.create({ // All options are optional
             seed: id.toLowerCase(), // seed used to generate icon data, default: random
@@ -636,7 +636,7 @@ function presentIDwithIdenticon(id, imageSize = '25rpx') {
             // that look like eyes, mouths and noses.
         });
         return (`<img class="circularImage" src="${canvas.toDataURL()}" ${cl} /><a href="/account/${id}">${getShortHash(id)} </a>`)
-    } else if (id.length > 2) {
+    } else if (id && id.length > 2) {
         return `<img src="/identicon/${id} " class="rounded-start"  width="${imageSize}"  loading="lazy" class="card-img-center"/><a href="/account/${id}">${getShortHash(id)} </a>`;
     }
     return "";
