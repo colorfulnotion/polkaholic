@@ -1964,7 +1964,7 @@ create table talismanEndpoint (
                 "bn": bn,
                 "chainID": chainID
             }
-            this.sendWSMessage(subscribeFinalizedHeadsMsg, "subscribeFinalizedHeads", "crawlBlocks");
+            
             await this.processFinalizedHead(chain, chainID, bn, finalizedHash, parentHash, true);
             this.finalizedHashes[bn] = finalizedHash;
             // because we do not always get the finalized hash signal, we brute force use the parentHash => grandparentHash => greatgrandparentHash => greatgreatgrandparentHash  (3 up)
@@ -2036,7 +2036,7 @@ create table talismanEndpoint (
                         "bn": blockNumber,
                         "chainID": chainID
                     }
-                    this.sendWSMessage(subscribeStorageMsg, "subscribeStorage", "crawlBlocks");
+
                     // get trace from block
                     let trace = await this.dedupChanges(results.changes);
                     if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;

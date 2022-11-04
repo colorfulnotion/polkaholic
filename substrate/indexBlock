@@ -7,18 +7,20 @@ const paraTool = require("./paraTool");
 async function main() {
     let chainID = paraTool.chainIDMoonriver;
     let blockNumber = 2863182;
-    let blockHash = "0x44a1fe068af3ae83f99dd90efa6bbf5ebbf92972adde190e8b3e5d1f3d513017"; //substrate
+    //let blockHash = "0x44a1fe068af3ae83f99dd90efa6bbf5ebbf92972adde190e8b3e5d1f3d513017"; //substrate
     //let evmBlockHash = "0xdf092452d679df2cef2d83dbf818f73cae470fca6192d646b04f383e35df60ee"; //evm
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = val;
         }
         if (index == 3 && val.length > 0) {
-            blockNumber = val;
+            blockNumber = paraTool.dechexToInt(val);
         }
+        /*
         if (index == 4 && val.length > 0) {
-            blockHash = val;
+            blockHash = ;
         }
+        */
     });
     let crawler = new Crawler();
     crawler.setDebugLevel(paraTool.debugTracing)
@@ -27,6 +29,7 @@ async function main() {
     await crawler.setupAPI(chain);
     await crawler.assetManagerInit();
     await crawler.setupChainAndAPI(chainID);
+    let blockHash = await crawler.getBlockHashFinalized(chainID, blockNumber)
 
     let t2 = null
     /*{

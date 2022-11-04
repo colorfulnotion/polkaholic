@@ -38,6 +38,8 @@ app.use(express.urlencoded({
     extended: true
 }))
 
+let isDevelopment =  (process.env.NODE_ENV == "development")? true : false
+
 const disableAuthorizationCheck = false;
 
 function setCrossOrigin(res) {
@@ -958,7 +960,7 @@ app.use(function(err, req, res, next) {
     var e = {
         code: http_code
     };
-    if (process.env.NODE_ENV == "development") {
+    if (isDevelopment) {
         e.error = errString
     }
     res.status(http_code);
@@ -972,13 +974,21 @@ app.use(function(err, req, res, next) {
 
 
 const hostname = "::";
-
+if (isDevelopment) {
+    app.listen(port, hostname, () => {
+        console.log(`Polkaholic listening on port ${hostname}:${port} preemptively`)
+    })
+}
 let x = query.init();
+console.log(`[${new Date().toLocaleString()}] Initiating query`)
 Promise.all([x]).then(() => {
     // delayed listening of your app
-    app.listen(port, hostname, () => {
-        console.log(`Polkaholic listening on port ${hostname}:${port}`)
-    })
+    console.log(`[${new Date().toLocaleString()}] query ready`)
+    if (!isDevelopment){
+        app.listen(port, hostname, () => {
+            console.log(`Polkaholic listening on port ${hostname}:${port}`)
+        })
+    }
     // reload chains/assets/specVersions regularly
     query.autoUpdate()
 }).catch(err => {

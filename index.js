@@ -45,7 +45,9 @@ if (process.env.POLKAHOLIC_API_URL != undefined) {
     app.locals.config.baseURL = process.env.POLKAHOLIC_API_URL;
 }
 
-if (process.env.NODE_ENV == "development") {
+let isDevelopment =  (process.env.NODE_ENV == "development")? true : false
+
+if (isDevelopment) {
     app.use(express.static('public', {
         maxAge: '5s'
     }))
@@ -2206,22 +2208,25 @@ app.use(function(err, req, res, next) {
 })
 
 const hostname = "::";
-// MK: should we listen before queyr init?
-app.listen(port, hostname, () => {
-    let uiHostName = `${query.hostname}.polkaholic.io`
-    console.log(`Polkaholic listening on ${uiHostName}:${port} API URL:`, app.locals.config.baseURL);
-})
+// MK: preemptive listening when in dev
+if (isDevelopment) {
+    app.listen(port, hostname, () => {
+        let uiHostName = `${query.hostname}.polkaholic.io`
+        console.log(`Polkaholic listening on ${uiHostName}:${port} API URL: ${app.locals.config.baseURL} preemptively`);
+    })
+}
 // delayed listening of your app
 // reload chains/assets/specVersions regularly
 let x = query.init(); // lower in dev, higher in production
+console.log(`[${new Date().toLocaleString()}] Initiating query`)
 Promise.all([x]).then(() => {
-    console.log(`query ready`)
-    /*
-    app.listen(port, hostname, () => {
-        let uiHostName = `${query.hostname}.polkaholic.io`
-        console.log(`Polkaholic listening on ${uiHostName}:${port} API URL:`, app.locals.config.baseURL);
-    })
-    */
+    console.log(`[${new Date().toLocaleString()}] query ready`)
+    if (!isDevelopment) {
+        app.listen(port, hostname, () => {
+            let uiHostName = `${query.hostname}.polkaholic.io`
+            console.log(`Polkaholic listening on ${uiHostName}:${port} API URL:`, app.locals.config.baseURL);
+        })
+    }
     query.autoUpdate()
 }).catch(err => {
     // handle error here

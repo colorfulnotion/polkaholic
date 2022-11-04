@@ -1300,7 +1300,6 @@ module.exports = class Indexer extends AssetManager {
                 //MK: send violation here
                 if (isTip) {
                     console.log(`[Delay=${this.chainParser.parserBlockNumber-v.sourceBlocknumber}]  send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${v.instructionHash}), isTip=${isTip}`)
-                    //this.sendWSMessage(r, "xcmViolation", "flushXCM");
                 }
                 //["chainID", "instructionHash", "sourceBlocknumber"]
                 //["chainIDDest", "violationType", "parser", "caller", "errorcase", "instruction", "sourceTS", "indexDT"]
@@ -1340,19 +1339,15 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
-    sendWSMessage(m, msgType = null, caller = null) {
-        return;
+    sendWSMessage(m, msgType = null) {
         if (msgType == undefined) msgType = 'Unknown'
-        //m.source = this.hostname;
         let wrapper = {
             type: msgType,
             msg: m,
             source: this.hostname,
             commit: this.indexerInfo,
         }
-        console.log(`sendWSMessage [${msgType}] [${caller}]`, wrapper)
-        return;
-        const endpoint = null;
+        const endpoint = "ws://kusama-internal.polkaholic.io:9101"
         try {
             const ws = new WebSocket(endpoint);
             ws.on('error', function error() {})
@@ -1627,10 +1622,9 @@ module.exports = class Indexer extends AssetManager {
             })
         }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
-        //MK: send xcmtransfer here
         if (isTip) {
             console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
-            this.sendWSMessage(xcmtransfer, "xcmtransfer", "updateXCMTransferStorage");
+            this.sendWSMessage(xcmtransfer, "xcmtransfer");
         }
     }
 
@@ -1650,7 +1644,7 @@ module.exports = class Indexer extends AssetManager {
         //MK: send xcmtransfer here
         if (isTip) {
             console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
-            this.sendWSMessage(candidate, "xcmtransferdestcandidate", caller);
+            this.sendWSMessage(candidate, "xcmtransferdestcandidate");
         }
     }
 
@@ -5937,7 +5931,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let out = [];
         for (const x of xcmList) {
             try {
-                //if (x.isTip) this.sendWSMessage(x, "relayxcmmessage", "process_rcxcm")
                 let isFinalized = (x.finalized) ? 1 : 0
                 out.push(`('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayChain}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(x.msg))}, '${x.msgHex}', ${mysql.escape(x.path)}, '${x.version}', ${mysql.escape(x.beneficiaries)}, Now(), ${isFinalized})`)
             } catch (err) {
@@ -6373,10 +6366,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let mp = this.xcmmsgMap[xcmKey]
                 let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
                 if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
-                //MK: send xcmmsg here
                 if (mp != undefined && (isTip)) {
                     console.log(`[Delay=${this.chainParser.parserBlockNumber-mp.blockNumber}] send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
-                    this.sendWSMessage(mp, "xcmmessage", "processBlockEvents")
+                    this.sendWSMessage(mp, "xcmmessage")
                 }
                 let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
                 let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
