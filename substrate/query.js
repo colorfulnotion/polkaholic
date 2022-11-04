@@ -2287,14 +2287,6 @@ module.exports = class Query extends AssetManager {
         return assets;
     }
 
-    async getBlockHashFinalized(chainID, blockNumber) {
-        let sql = `select blockHash, if(blockDT is Null, 0, 1) as finalized from block${chainID} where blockNumber = '${blockNumber}' and blockDT is not Null`
-        let blocks = await this.poolREADONLY.query(sql);
-        if (blocks.length == 1) {
-            return blocks[0].blockHash;
-        }
-    }
-
     async getChainRecentBlocks(chainID_or_chainName, startBN = false, limit = 50) {
         let chain = await this.getChain(chainID_or_chainName);
         let [chainID, id] = this.convertChainID(chainID_or_chainName)

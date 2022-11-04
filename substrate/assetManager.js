@@ -72,7 +72,14 @@ module.exports = class AssetManager extends PolkaholicDB {
         return s.replace('CDP_Supply', 'CDP');
     }
 
-
+    async getBlockHashFinalized(chainID, blockNumber) {
+        let sql = `select blockHash, if(blockDT is Null, 0, 1) as finalized from block${chainID} where blockNumber = '${blockNumber}' and blockDT is not Null`
+        let blocks = await this.poolREADONLY.query(sql);
+        if (blocks.length == 1) {
+            return blocks[0].blockHash;
+        }
+    }
+    
     async autoRefreshAssetManager(crawler) {
         await crawler.assetManagerInit();
         if (crawler.web3Api) {
