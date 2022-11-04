@@ -567,7 +567,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             this.xcmSymbolInfo = xcmSymbolInfo; // key: symbol~relayChain => a (1, ignore asset/chain)
             this.xcmConceptInfo = xcmConceptInfo;
             // console.log(`this.xcmSymbolInfo`, this.xcmSymbolInfo)
-            console.log(`this.xcmConceptInfo`, this.xcmConceptInfo)
+            //if (this.debugLevel >= paraTool.debugVerbose)console.log(`this.xcmConceptInfo`, this.xcmConceptInfo)
             for (let i = 0; i < xcmAssets.length; i++) {
 
             }
@@ -733,7 +733,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             assetInfo[assetChain] = a;
             if (alternativeAssetChain) {
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`adding alternative assetInfo[${alternativeAssetChain}]`, a)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`adding alternative assetInfo[${alternativeAssetChain}]`, a)
                 alternativeAssetInfo[alternativeAssetChain] = a;
             }
             if (v.currencyID != null && v.currencyID.length > 0) {
