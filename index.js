@@ -2206,14 +2206,22 @@ app.use(function(err, req, res, next) {
 })
 
 const hostname = "::";
+// MK: should we listen before queyr init?
+app.listen(port, hostname, () => {
+    let uiHostName = `${query.hostname}.polkaholic.io`
+    console.log(`Polkaholic listening on ${uiHostName}:${port} API URL:`, app.locals.config.baseURL);
+})
+// delayed listening of your app
+// reload chains/assets/specVersions regularly
 let x = query.init(); // lower in dev, higher in production
 Promise.all([x]).then(() => {
-    // delayed listening of your app
+    console.log(`query ready`)
+    /*
     app.listen(port, hostname, () => {
         let uiHostName = `${query.hostname}.polkaholic.io`
         console.log(`Polkaholic listening on ${uiHostName}:${port} API URL:`, app.locals.config.baseURL);
     })
-    // reload chains/assets/specVersions regularly
+    */
     query.autoUpdate()
 }).catch(err => {
     // handle error here
