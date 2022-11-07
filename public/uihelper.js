@@ -450,8 +450,11 @@ function presentTxHash(txHash) {
     return '<a href="/tx/' + txHash + '">' + getShortHash(txHash) + '</a>';
 }
 
-function presentXCMTimeline(hash, hashType, blockNumber) {
-    return `<a href="/timeline/${hash}/${hashType}/${blockNumber}">timeline</a>`
+function presentXCMTrace(traceID) {
+    if (traceID) {
+        return `<div><a target="_new" class="btn-sm btn-link" href="https://xcmscan.polkaholic.io/trace/${traceID}?uiEmbed=v0">timeline</a></div>`
+    }
+    return "";
 }
 
 function presentXCMMessageHash(msgHash, blockNumber, allowCopy = true) {

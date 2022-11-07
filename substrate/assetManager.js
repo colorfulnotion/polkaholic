@@ -79,7 +79,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             return blocks[0].blockHash;
         }
     }
-    
+
     async autoRefreshAssetManager(crawler) {
         await crawler.assetManagerInit();
         if (crawler.web3Api) {

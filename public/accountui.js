@@ -740,9 +740,8 @@ function showxcmtransfers(address, chainListStr = 'all') {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     let s = presentExtrinsicIDHash(row.extrinsicID, row.extrinsicHash);
-                    let timelineURL = `/timeline/${row.extrinsicHash}`
-                    let timelineLink = `<div class="explorer"><a href="${timelineURL}">timeline</a></div>`
-                    return `${presentChain(row.id, row.chainName)} (${s})` + timelineLink;
+                    let xcmtraceLink = row.traceID ? presentXCMTrace(row.traceID) : "";
+                    return `${presentChain(row.id, row.chainName)} (${s})` + xcmtraceLink;
                 }
                 return data;
             }
