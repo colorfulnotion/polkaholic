@@ -339,8 +339,15 @@ module.exports = class AstarParser extends ChainParser {
                     let isEthereumXCM = this.etherumXCMFilter(indexer, args, feed.events)
                     if (isEthereumXCM) {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
-                        let outgoingXcmList3 = this.processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM ethereum`, outgoingXcmList3)
+                        let methodID = args.methodID
+                        let outgoingXcmList4 = false
+                        if (methodID == "0xecf766ff" || methodID == "0xecf766ff"){
+                            outgoingXcmList4 = this.processOutgoingEthereumAssetWithdraw(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
+                        }else if (methodID == "0xf90eb212"){
+                            console.log(`Astar Remote [${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] found!!`)
+                            //outgoingXcmList4 = this.processOutgoingEthereumRemoteExecution(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
+                        }
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM ethereum [methodID=${methodID}]`, outgoingXcmList4)
                         //return outgoingXcmList
                     }
                 }
@@ -362,6 +369,11 @@ module.exports = class AstarParser extends ChainParser {
     fingerprintID: 0x019054d0
     signatureID: 0x019054d0
     signatureRaw: assets_withdraw(address[],uint256[],bytes32,bool,uint256,uint256)
+
+    name: Remote_transact
+    fingerprintID: 0xf90eb212
+    signatureID: 0xf90eb212
+    signatureRaw: remote_transact(uint256,bool,address,uint256,bytes,uint64)
     */
 
     etherumXCMFilter(indexer, args, events) {
@@ -375,7 +387,7 @@ module.exports = class AstarParser extends ChainParser {
             //console.log(`evmTx`, evmTx)
             if (evmTx && evmTx.input != undefined) {
                 let txInput = evmTx.input
-                if (txInput.substr(0, 10) == "0xecf766ff" || txInput.substr(0, 10) == "0x019054d0") {
+                if (txInput.substr(0, 10) == "0xecf766ff" || txInput.substr(0, 10) == "0x019054d0" || txInput.substr(0, 10) == "0xf90eb212") {
                     let output = ethTool.decodeTransactionInput(evmTx, indexer.contractABIs, indexer.contractABISignatures)
                     for (const ev of events) {
                         let eventMethodSection = `${ev.section}(${ev.method})`
@@ -447,12 +459,12 @@ module.exports = class AstarParser extends ChainParser {
         return outgoingXcmList
     }
 
-
-
-    processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, a) {
+    processOutgoingEthereumAssetWithdraw(indexer, extrinsic, feed, fromAddress, section_method, a){
         // need additional processing for currency_id part
         try {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereum start`)
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereumAssetWithdraw start`)
+            let params = a.params
+            let methodID = a.methodID
             /*
             {
                 "decodeStatus": "success",
@@ -472,7 +484,7 @@ module.exports = class AstarParser extends ChainParser {
                 }
                 "fromAddress": "0xf09a89daf59b238d9698fe400880db92dc45ac36da08241be7decd27a5deaf53"
             */
-            let params = a.params
+
             //console.log(`a`, a)
             //console.log(`params`, params)
             let assetAndAmountSents = [];
@@ -510,7 +522,7 @@ module.exports = class AstarParser extends ChainParser {
                 let rawAssetID = `${params.asset_id[i]}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
                 if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
                 let targetedSymbol = this.processXcmGenericCurrencyID(indexer, rawAssetID) //inferred approach
-                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "astar processOutgoingEthereum", rawAssetID)
+                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "astar processOutgoingEthereumAssetWithdraw", rawAssetID)
                 //console.log(`!!!! rawAssetID=${rawAssetID} targetedSymbol=${targetedSymbol}, targetedXcmInteriorKey=${targetedXcmInteriorKey}`)
                 //let assetString = this.processGenericCurrencyID(indexer, rawAssetID);
                 //let rawAssetString = this.processRawGenericCurrencyID(indexer, rawAssetID);
@@ -562,12 +574,147 @@ module.exports = class AstarParser extends ChainParser {
                         xcmType: "xcmtransfer",
                     }
                     //if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
-                    console.log(`processOutgoingEthereum`, r)
+                    console.log(`processOutgoingEthereumAssetWithdraw`, r)
                     extrinsic.xcms.push(r)
                     outgoingEtherumXCM.push(r)
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingEthereum unknown asset/amountSent`);
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingEthereumAssetWithdraw unknown asset/amountSent`);
                 }
+            }
+            return outgoingEtherumXCM
+        } catch (e) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] ${e.toString()}`)
+            return
+        }
+    }
+
+    processOutgoingEthereumRemoteExecution(indexer, extrinsic, feed, fromAddress, section_method, a) {
+        // need additional processing for currency_id part
+        let outgoingEtherumXCM = []
+        if (extrinsic.xcms == undefined) extrinsic.xcms = []
+        try {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereumRemoteExecution start`)
+            let a = args
+            let params = a.params
+            let methodID = a.methodID
+            let evmMethod = `${a.signature.split('(')[0]}:${a.methodID}`
+            if (a.fromAddress != undefined) fromAddress = a.fromAddress
+            //console.log(`a`, a)
+            //console.log(`params`, params)
+            let xcmIndex = extrinsic.xcms.length
+            let destAddress = '0x' //unknown
+            let isFeeItem = 1 // irrelevant?
+            let transferIndex = 0
+            let relayChain = indexer.relayChain
+            let chainID = indexer.chainID
+            let paraID = paraTool.getParaIDfromChainID(chainID)
+            let chainIDDest = null;
+            let paraIDDest = null;
+            let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
+            let innerCall = null
+            let r = {
+                sectionMethod: evmMethod,
+                extrinsicHash: feed.extrinsicHash,
+                extrinsicID: feed.extrinsicID,
+                transferIndex: 0,
+                xcmIndex: xcmIndex,
+                relayChain: relayChain,
+                chainID: chainID,
+                chainIDDest: chainIDDest, // unknown
+                paraID: paraID,
+                paraIDDest: paraIDDest, // unknown
+                blockNumber: this.parserBlockNumber,
+                fromAddress: fromAddress,
+                destAddress: destAddress, //unknown
+                asset: false, //unknown
+                rawAsset: false, //unknown
+                sourceTS: feed.ts,
+                amountSent: 0, // unknown
+                incomplete: incomplete,
+                isFeeItem: isFeeItem,
+                msgHash: '0x',
+                sentAt: this.parserWatermark,
+                xcmSymbol: null, // unknown
+                xcmInteriorKey: null, // unknown
+                innerCall: innerCall,
+                xcmType: "xcmtransact",
+            }
+            /*
+            0xf90eb212: remote_transact
+            */
+            if (methodID == '0xf90eb212') {
+                let ethereumMethod = (methodID == '0xf90eb212') ? 'remote_transact' : 'unknown'
+                /*
+                name: Remote_transact
+                fingerprintID: 0xf90eb212
+                signatureID: 0xf90eb212
+                signatureRaw: remote_transact(uint256,bool,address,uint256,bytes,uint64)
+                {
+                    "decodeStatus": "success",
+                    "methodID": "0xf90eb212",
+                    "signature": "remote_transact(uint256 parachain_id, bool is_relay, address payment_asset_id, uint256 payment_amount, bytes call, uint64 transact_weight)",
+                    "params": {
+                        "parachain_id": "0"
+                        "is_relay": true,
+                        "payment_asset_id": "0xffffffffffffffffffffffffffffffffffffffff",
+                        "payment_amount": "5300000000000000",
+                        "call" : "0x1234...",
+                        "transact_weight": "941000000"
+                    }
+                    "fromAddress": "0xf09a89daf59b238d9698fe400880db92dc45ac36da08241be7decd27a5deaf53"
+                */
+
+                try {
+                    // process Dest
+                    if (params.is_relay) {
+                        paraIDDest = 0
+                        chainIDDest = paraTool.getRelayChainID(relayChain)
+                    } else {
+                        paraIDDest = paraTool.dechexToInt(params.parachain_id)
+                        chainIDDest = paraIDExtra + paraIDDest
+                    }
+
+                    //process fee
+                    let rawAssetID = `${params.payment_asset_id}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
+                    if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
+                    let targetedSymbol = this.processXcmGenericCurrencyID(indexer, rawAssetID) //inferred approach
+                    let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "astar processOutgoingEthereumRemoteExecution", rawAssetID)
+                    let assetAmount = paraTool.dechexToInt(params.payment_amount)
+
+                    // get msgHash, innerCall from event
+                    // let [msgHash, innerCall] = this.getMsgHashAndInnerCall(indexer, extrinsic, feed)
+                    // is msgHash emitted by the call?
+                    let innerCall = params.call
+
+                    // weight_info (not sure about astar formt yet)
+                    let weight_info = {
+                        transactRequiredWeightAtMost: paraTool.dechexToInt(params.transact_weight), //??
+                        overallWeight: paraTool.dechexToInt(params.transact_weight) //??
+                    }
+
+                    // compute derivedAccount at destChain?
+                    try {
+                        let isEVM = indexer.getChainEVMStatus(chainIDDest)
+                        let [derivedAccount20, derivedAccount32] = this.calculateMultilocationDerivative(indexer.api, paraID, fromAddress)
+                        r.destAddress = (isEVM) ? derivedAccount20 : derivedAccount32
+                    } catch (e) {
+                        console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod} calculateMultilocationDerivative failed`, e)
+                    }
+
+                    r.xcmInteriorKey = targetedXcmInteriorKey
+                    r.xcmSymbol = targetedSymbol
+                    r.chainIDDest = chainIDDest
+                    r.paraIDDest = paraIDDest
+                    r.innerCall = innerCall
+                    //r.msgHash = msgHash
+                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod}`, r)
+                    extrinsic.xcms.push(r)
+                    outgoingEtherumXCM.push(r)
+                } catch (e1) {
+                    console.log(`processOutgoingEthereumRemoteExecution:${ethereumMethod} err`, e1)
+                }
+            } else {
+                console.log(`TODO [${feed.extrinsicID}] [${extrinsic.extrinsicHash}] unknown section_method:${evmMethod}`, r)
             }
             return outgoingEtherumXCM
         } catch (e) {
