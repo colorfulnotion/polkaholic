@@ -1216,6 +1216,7 @@ module.exports = class Query extends AssetManager {
         let blockNumber = filters.blockNumber ? parseInt(filters.blockNumber, 10) : null;
         let address = filters.address ? filters.address : null;
         let xcmType = filters.xcmType ? filters.xcmType : null;
+        let patchedXcms = [] // we will update the missing xcmInfo once instead of rebuilding it over and over again
         let out = [];
         try {
             let w = [];
@@ -1233,7 +1234,7 @@ module.exports = class Query extends AssetManager {
                 w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest in (${chainList.join(",")}) )`)
             }
             let wstr = (w.length > 0) ? " where " + w.join(" and ") : "";
-            let sql = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo, traceID from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
+            let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo, traceID from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
             //console.log(filters, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
@@ -1343,6 +1344,12 @@ module.exports = class Query extends AssetManager {
                 }
                 if (parsedXcmInfo) {
                     r.xcmInfo = parsedXcmInfo
+                    let xcmInfoStr = (parsedXcmInfo != undefined) ? JSON.stringify(parsedXcmInfo) : false
+                    let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
+                    let t = "(" + [`'${x.extrinsicHash}'`, `'${x.extrinsicID}'`, `'${x.transferIndex}'`, `'${x.xcmIndex}'`,
+                        `-1`, xcmInfoBlob
+                    ].join(",") + ")";
+                    patchedXcms.push(t);
                 } else {
                     r.xcmInfo = await this.buildMissingXcmInfo(x)
                 }
@@ -1352,6 +1359,7 @@ module.exports = class Query extends AssetManager {
                     this.decorateAddress(r, "destAddress", decorateAddr, decorateRelated)
                 }
                 */
+                let sqlDebug = false
                 out.push(this.clean_extrinsic_object(r));
             }
 
@@ -1363,7 +1371,13 @@ module.exports = class Query extends AssetManager {
                 err
             });
         }
-
+        await this.upsertSQL({
+            "table": "xcmtransfer",
+            "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
+            "vals": ["xcmInfoAudited", "xcmInfo"],
+            "data": patchedXcms,
+            "replace": ["xcmInfoAudited", "xcmInfo"]
+        }, sqlDebug);
         return out;
     }
 
