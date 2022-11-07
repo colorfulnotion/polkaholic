@@ -1344,14 +1344,17 @@ module.exports = class Query extends AssetManager {
                 }
                 if (parsedXcmInfo) {
                     r.xcmInfo = parsedXcmInfo
+                } else {
+                    parsedXcmInfo = await this.buildMissingXcmInfo(x)
+                    r.xcmInfo = parsedXcmInfo
                     let xcmInfoStr = (parsedXcmInfo != undefined) ? JSON.stringify(parsedXcmInfo) : false
                     let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
-                    let t = "(" + [`'${x.extrinsicHash}'`, `'${x.extrinsicID}'`, `'${x.transferIndex}'`, `'${x.xcmIndex}'`,
-                        `-1`, xcmInfoBlob
-                    ].join(",") + ")";
-                    patchedXcms.push(t);
-                } else {
-                    r.xcmInfo = await this.buildMissingXcmInfo(x)
+                    if (x.chainID != undefined && x.chainIDDest != undefined && x.blockNumber != undefined){
+                        let t = "(" + [`'${x.extrinsicHash}'`, `'${x.extrinsicID}'`, `'${x.transferIndex}'`, `'${x.xcmIndex}'`,
+                             `'${x.chainID}'`,`'${x.chainIDDest}'`,`'${x.blockNumber}'`, `-1`, xcmInfoBlob
+                        ].join(",") + ")";
+                        patchedXcms.push(t);
+                    }
                 }
                 /*
                 if (decorate) {
@@ -1359,7 +1362,6 @@ module.exports = class Query extends AssetManager {
                     this.decorateAddress(r, "destAddress", decorateAddr, decorateRelated)
                 }
                 */
-                let sqlDebug = false
                 out.push(this.clean_extrinsic_object(r));
             }
 
@@ -1371,13 +1373,16 @@ module.exports = class Query extends AssetManager {
                 err
             });
         }
-        await this.upsertSQL({
-            "table": "xcmtransfer",
-            "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-            "vals": ["xcmInfoAudited", "xcmInfo"],
-            "data": patchedXcms,
-            "replace": ["xcmInfoAudited", "xcmInfo"]
-        }, sqlDebug);
+        if (patchedXcms.length > 0 ){
+            let sqlDebug = true
+            await this.upsertSQL({
+                "table": "xcmtransfer",
+                "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
+                "vals": ["chainID","chainIDDest","blockNumber","xcmInfoAudited", "xcmInfo"],
+                "data": patchedXcms,
+                "replace": ["xcmInfoAudited", "xcmInfo"]
+            }, sqlDebug);
+        }
         return out;
     }
 
