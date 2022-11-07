@@ -226,6 +226,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                         if (eventMethodSection == 'balances(Withdraw)') {
                             //this is the fromAddress (ss58)
                             output.fromAddress = paraTool.getPubKey(ev.data[0])
+                            output.msgValue = paraTool.dechexToInt(evmTx.value)
                             break;
                         }
                     }

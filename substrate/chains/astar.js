@@ -409,6 +409,7 @@ module.exports = class AstarParser extends ChainParser {
                         if (eventMethodSection == 'balances(Withdraw)') {
                             //this is the fromAddress (ss58)
                             output.fromAddress = paraTool.getPubKey(ev.data[0])
+                            output.msgValue = paraTool.dechexToInt(evmTx.value)
                             break;
                         }
                     }
@@ -485,7 +486,6 @@ module.exports = class AstarParser extends ChainParser {
             Precompile implemenation checks msg.value and, if positive, treats it as another asset to be sent (MultiLocation { parents: 0, interior: Here }).
             In that case, native asset is added to the tail of asset_id and asset_amount lists and can be indexed by fee_index as any other asset in the list.
             Its value would be set equal to
-            TODO: we are not handling msg.value yet
             {
                 "decodeStatus": "success",
                 "methodID": "0x019054d0",
@@ -502,7 +502,8 @@ module.exports = class AstarParser extends ChainParser {
                     "parachain_id": "0",
                     "fee_index": "0"
                 }
-                "fromAddress": "0xf09a89daf59b238d9698fe400880db92dc45ac36da08241be7decd27a5deaf53"
+                "fromAddress": "0xf09a89daf59b238d9698fe400880db92dc45ac36da08241be7decd27a5deaf53",
+                "msgValue": 1234
             */
 
             //console.log(`a`, a)
@@ -538,18 +539,19 @@ module.exports = class AstarParser extends ChainParser {
 
             let evmMethod = `${a.signature.split('(')[0]}:${a.methodID}`
 
+            if (a.msgValue > 0){
+                let nativeSymbol = indexer.getNativeSymbol()
+                console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] Adding native ${nativeSymbol} transfer!`)
+                params.asset_id.push(`${native}-${nativeSymbol}`)
+                params.asset_amount.push(a.msgValue)
+            }
             for (let i = 0; i < params.asset_id.length; i++) {
                 let rawAssetID = `${params.asset_id[i]}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
                 if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
-                let targetedSymbol = this.processXcmGenericCurrencyID(indexer, rawAssetID) //inferred approach
+                let targetedSymbol = (rawAssetID.includes("native"))? indexer.getNativeSymbol() : this.processXcmGenericCurrencyID(indexer, rawAssetID)
                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "astar processOutgoingEthereumAssetWithdraw", rawAssetID)
-                //console.log(`!!!! rawAssetID=${rawAssetID} targetedSymbol=${targetedSymbol}, targetedXcmInteriorKey=${targetedXcmInteriorKey}`)
-                //let assetString = this.processGenericCurrencyID(indexer, rawAssetID);
-                //let rawAssetString = this.processRawGenericCurrencyID(indexer, rawAssetID);
                 let assetAmount = paraTool.dechexToInt(params.asset_amount[i])
                 let aa = {
-                    //asset: assetString,
-                    //rawAsset: rawAssetString,
                     xcmInteriorKey: targetedXcmInteriorKey,
                     xcmSymbol: targetedSymbol,
                     amountSent: assetAmount,
