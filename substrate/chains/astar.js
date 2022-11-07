@@ -6,6 +6,9 @@ const ChainParser = require("./chainparser");
 
 module.exports = class AstarParser extends ChainParser {
 
+    xcmTransferMethodList = ["0xecf766ff", "0x019054d0", "0x106d59fe", "0x400c0e8d"];
+    xcmTransactorMethodList = ["0xf90eb212"];
+
     processWasmContracts(indexer, extrinsic, feed, fromAddress, section = false, method = false, args = false) {
         let module_section = section;
         let module_method = method
@@ -341,10 +344,10 @@ module.exports = class AstarParser extends ChainParser {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
                         let methodID = args.methodID
                         let outgoingXcmList4 = false
-                        if (methodID == "0xecf766ff" || methodID == "0xecf766ff"){
+                        if (this.xcmTransferMethodList.includes(methodID)){
                             outgoingXcmList4 = this.processOutgoingEthereumAssetWithdraw(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
-                        }else if (methodID == "0xf90eb212"){
-                            console.log(`Astar Remote [${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] found!!`)
+                        }else if (this.xcmTransactorMethodList.includes(methodID)){
+                            console.log(`Astar Remote Execution [${methodID}] [${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] found!!`)
                             //outgoingXcmList4 = this.processOutgoingEthereumRemoteExecution(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
                         }
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM ethereum [methodID=${methodID}]`, outgoingXcmList4)
@@ -370,10 +373,21 @@ module.exports = class AstarParser extends ChainParser {
     signatureID: 0x019054d0
     signatureRaw: assets_withdraw(address[],uint256[],bytes32,bool,uint256,uint256)
 
+    name: Assets_reserve_transfer (account20)
+    fingerprintID: 0x106d59fe
+    signatureID: 0x106d59fe
+    signatureRaw: assets_reserve_transfer(address[],uint256[],address,bool,uint256,uint256)
+
+    name: Assets_reserve_transfer (ss58)
+    fingerprintID: 0x400c0e8d
+    signatureID: 0x400c0e8d
+    signatureRaw: assets_reserve_transfer(address[],uint256[],bytes32,bool,uint256,uint256)
+
     name: Remote_transact
     fingerprintID: 0xf90eb212
     signatureID: 0xf90eb212
     signatureRaw: remote_transact(uint256,bool,address,uint256,bytes,uint64)
+
     */
 
     etherumXCMFilter(indexer, args, events) {
@@ -384,10 +398,11 @@ module.exports = class AstarParser extends ChainParser {
             } else if (args.transaction.legacy != undefined) {
                 evmTx = args.transaction.legacy
             }
-            //console.log(`evmTx`, evmTx)
             if (evmTx && evmTx.input != undefined) {
                 let txInput = evmTx.input
-                if (txInput.substr(0, 10) == "0xecf766ff" || txInput.substr(0, 10) == "0x019054d0" || txInput.substr(0, 10) == "0xf90eb212") {
+                let txMethodID = txInput.substr(0, 10)
+                if (this.xcmTransferMethodList.includes(txMethodID) || this.xcmTransactorMethodList.includes(txMethodID)) {
+                    console.log(`Precompiled evmTx!`, evmTx)
                     let output = ethTool.decodeTransactionInput(evmTx, indexer.contractABIs, indexer.contractABISignatures)
                     for (const ev of events) {
                         let eventMethodSection = `${ev.section}(${ev.method})`
@@ -466,6 +481,11 @@ module.exports = class AstarParser extends ChainParser {
             let params = a.params
             let methodID = a.methodID
             /*
+            See: https://docs.astar.network/docs/xcm/building-with-xcm/xc-reserve-transfer
+            Precompile implemenation checks msg.value and, if positive, treats it as another asset to be sent (MultiLocation { parents: 0, interior: Here }).
+            In that case, native asset is added to the tail of asset_id and asset_amount lists and can be indexed by fee_index as any other asset in the list.
+            Its value would be set equal to
+            TODO: we are not handling msg.value yet
             {
                 "decodeStatus": "success",
                 "methodID": "0x019054d0",
