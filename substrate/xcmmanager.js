@@ -1067,6 +1067,7 @@ module.exports = class XCMManager extends Query {
                 matched = 1,
                 matchedExtrinsicID = '${d.destExtrinsicID}',
                 matchedEventID = '${d.eventID}',
+                xcmInfoAudited = '1',
                 xcmInfo = ${xcmInfoBlob}
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
                     console.log(`match_xcm (B)`)
@@ -1147,7 +1148,7 @@ module.exports = class XCMManager extends Query {
         //   (c) time difference matching has to be less than 7200 (and greater than 0)
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
-        let rematchClause = forceRematch ? ` ` : `((xcmtransfer.matched = 0 and d.matched = 0) or xcmtransfer.xcmInfo is null) and `
+        let rematchClause = forceRematch ? ` ` : `((xcmtransfer.matched = 0 and d.matched = 0) or xcmtransfer.xcmInfo is null or xcmtransfer.xcmInfoAudited = -1) and `
         let targetChainClause = (targetChainID == 'all') ? ` ` : `(xcmtransfer.chainID = ${targetChainID} or xcmtransfer.chainIDDest = ${targetChainID}) and `
         let sqlA = `select
           chainID, extrinsicHash, d.chainIDDest, d.fromAddress, d.symbol, d.relayChain,
@@ -1319,6 +1320,7 @@ module.exports = class XCMManager extends Query {
                 matched = 1,
                 matchedExtrinsicID = '${d.destExtrinsicID}',
                 matchedEventID = '${d.eventID}',
+                xcmInfoAudited = '1',
                 xcmInfo = ${xcmInfoBlob}
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
                     console.log(`match_xcmtransact (B)`)
@@ -1564,6 +1566,7 @@ module.exports = class XCMManager extends Query {
                 matched = 1,
                 matchedExtrinsicID = '${d.destExtrinsicID}',
                 matchedEventID = '${d.eventID}',
+                xcmInfoAudited = '1',
                 xcmInfo = ${xcmInfoBlob}
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
                     console.log(`match_xcm_failure (B)`)
