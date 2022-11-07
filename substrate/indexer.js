@@ -6334,6 +6334,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         } catch (e) {
                             console.log(`[${blockNumber}] [${connectedTxn.transactionHash}] connectTransaction `, e, connectedTxn)
                         }
+                        // remote execution here
+                        if (connectedTxn.msgHash != undefined && (isTip)) {
+                            this.sendWSMessage(connectedTxn, "remoteExecution")
+                        }
                         connectedTxns.push(connectedTxn)
                         evmFullBlock.transactions[connectedTxn.transactionIndex] = connectedTxn
                         evmFullBlock.transactionsConnected = connectedTxns
