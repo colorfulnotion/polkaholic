@@ -42,8 +42,8 @@ function currency_format(c, priceUSD = false, priceUSDCurrent = false, isDefault
         maximumFractionDigits: _m
     });
     //console.log(`currency_format2 c=${c}, priceUSD=${priceUSD}, priceUSDCurrent=${priceUSDCurrent},isDefaultOriginal=${isDefaultOriginal}, withParentheses=${withParentheses}`) // why this doesnt work???
-    let leftParentheses = (withParentheses == true)? '(' : ''
-    let rightParentheses = (withParentheses == true)? ')' : ''
+    let leftParentheses = (withParentheses == true) ? '(' : ''
+    let rightParentheses = (withParentheses == true) ? ')' : ''
     if (priceUSD && priceUSDCurrent && priceUSD > 0 && priceUSDCurrent > 0) {
         let originalUSD = formatter.format(c);
         let currentUSD = formatter.format(c * (priceUSDCurrent / priceUSD));

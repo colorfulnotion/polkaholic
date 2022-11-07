@@ -38,7 +38,7 @@ app.use(express.urlencoded({
     extended: true
 }))
 
-let isDevelopment =  (process.env.NODE_ENV == "development")? true : false
+let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
 
 const disableAuthorizationCheck = false;
 
@@ -984,7 +984,7 @@ console.log(`[${new Date().toLocaleString()}] Initiating query`)
 Promise.all([x]).then(() => {
     // delayed listening of your app
     console.log(`[${new Date().toLocaleString()}] query ready`)
-    if (!isDevelopment){
+    if (!isDevelopment) {
         app.listen(port, hostname, () => {
             console.log(`Polkaholic listening on port ${hostname}:${port}`)
         })

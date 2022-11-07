@@ -93,8 +93,8 @@ async function connect_evmwallet() {
         });
         window.web3 = new Web3(window.ethereum);
         const account = web3.eth.accounts;
-        const evmAddress = (account.givenProvider != undefined && account.givenProvider.selectedAddress != undefined)? account.givenProvider.selectedAddress: null
-        if (evmAddress == undefined){
+        const evmAddress = (account.givenProvider != undefined && account.givenProvider.selectedAddress != undefined) ? account.givenProvider.selectedAddress : null
+        if (evmAddress == undefined) {
             document.getElementById('evmwallettoggle').checked = false;
             document.getElementById('headerStr').innerHTML = `<span><small>Unable to connect evm wallet.</small></span><span><small><br> Please Download <a href='https://metamask.io/'  target='_new'>Metamask</a> and grant permissions to polkaholic.io</small></span>`;
             //launchToast("Unable to connect evm wallet. Please Download <a href='https://metamask.io/'  target='_new'>Metamask</a> and grant permissions to polkaholic.io");
@@ -198,8 +198,8 @@ async function selectedWallets(e) {
         if (el.checked) {
             //console.log(`el`, el)
             let elVal = el.value
-            let walletName = (el.getAttribute('wname') != undefined)? el.getAttribute('wname') : elVal
-            if (elVal != 'null' && elVal != 'undefined'){
+            let walletName = (el.getAttribute('wname') != undefined) ? el.getAttribute('wname') : elVal
+            if (elVal != 'null' && elVal != 'undefined') {
                 selectedAccounts.push(elVal);
                 selectedAccountNames.push(walletName);
             }

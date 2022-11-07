@@ -237,15 +237,15 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         const indexTS = Math.floor(this.getCurrentTS() / 3600) * 3600;
         let blocks = await this.get_blocks_by_interval(chainID, startDate, endDate, interval);
 
-	if ( chainID == 2012 || chainID == 22085 ) {
-	    let assetlog = await this.poolREADONLY.query(`select avg(priceUSD) as  priceUSD, asset, chainID from assetlog where chainID = '${chainID}' and source = 'oracle' and indexTS > unix_timestamp(date_sub(Now(), interval 4 hour)) group by asset, chainID`)
-	    for (let i = 0; i < assetlog.length; i++ ) {
-		let a = assetlog[i];
-		let sql0 = `update asset set priceUSD = ${a.priceUSD} where asset = '${a.asset}' and chainID = '${chainID}'`
-		this.batchedSQL.push(sql0);
-	    }
-	    await this.update_batchedSQL();
-	}
+        if (chainID == 2012 || chainID == 22085) {
+            let assetlog = await this.poolREADONLY.query(`select avg(priceUSD) as  priceUSD, asset, chainID from assetlog where chainID = '${chainID}' and source = 'oracle' and indexTS > unix_timestamp(date_sub(Now(), interval 4 hour)) group by asset, chainID`)
+            for (let i = 0; i < assetlog.length; i++) {
+                let a = assetlog[i];
+                let sql0 = `update asset set priceUSD = ${a.priceUSD} where asset = '${a.asset}' and chainID = '${chainID}'`
+                this.batchedSQL.push(sql0);
+            }
+            await this.update_batchedSQL();
+        }
         const {
             FixedPointNumber,
             Token,
@@ -497,7 +497,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                 await this.assetpricelogGenerationParachain(chainID, interval);
                 break;
         }
-	
+
 
         // TODO:
         // DELETE from assetpricelog where indexTS % 300 = 0 and indexTS % 3600 > 0 AND indexTS < unix_timestamp(date_sub(Now(), interval 48 hour));

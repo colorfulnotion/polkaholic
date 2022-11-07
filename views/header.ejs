@@ -1,7 +1,29 @@
+<%
+function getHostChain() {
+  let fullhost = req.get('host');
+  let sa = fullhost.split(".");
+  if (sa.length < 2) return(null);
+  let domain = sa[sa.length - 2];
+  let subdomain = (sa.length > 2) ? sa[sa.length - 3] : "";
+  if (domain == "astarscan") {
+     if (subdomain == "shiden") {
+       return { chainID: 22007, id: subdomain, siteName: "shidenscan.io", baseiconUrl: "https://cdn.polkaholic.io/astarscanicon.png" };
+     } else if (domain == "shibuya") {
+       return { chainID: 81000, id: subdomain, siteName: "shibuyascan.io", baseiconUrl: "https://cdn.polkaholic.io/astarscanicon.png" };
+     }
+     return { chainID: 2006, id: "astar", siteName: "astarscan.io", baseiconUrl: "https://cdn.polkaholic.io/astarscanicon.png" };
+  }
+}
+  let site = getHostChain();
+  let siteName = "Polkaholic";
+  if ( site ) {
+     siteName = site.siteName;
+  }
+%>
 <!doctype html>
 <html lang="en">
   <head>
-    <title><% if ( title != undefined ) { %> <%= title; %><% } %> - Polkaholic.io</title>
+    <title><% if ( title != undefined ) { %> <%= title; %><% } %> - <%= siteName %></title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Polkaholic Style / UI Helpers -->
@@ -606,12 +628,22 @@ let chains = [
   let sel = null;
   let selid = null;
   let selChainName = "All chains";
+  let baseiconUrl = "/browser_icon.png";
   let iconUrl = "/browser_icon.png";
   if (req.cookies && req.cookies.selchain) {
    selchain = req.cookies.selchain;
     for (const c of chains ) {
       if ( c.id == selchain) {
        sel = c;
+      }
+    }
+  } else if ( site ) {
+    baseiconUrl = site.baseiconUrl; 
+    selchain = site.id;
+    for (const c of chains ) {
+      if ( c.id == selchain) {
+       sel = c;
+       
       }
     }
   }
@@ -636,11 +668,11 @@ let chains = [
     <!-- Collapsible wrapper -->
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <!-- Navbar brand -->
-      <a href="/" class="nav-link  mt-2 mt-lg-0"><img src="/browser_icon.png"/></a>
+      <a href="/" class="nav-link  mt-2 mt-lg-0"><img width=50 src="<%= baseiconUrl; %>"/></a>
       <!-- Left links -->
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item">
-          <a href="/" class="nav-link"><B>Polkaholic</B></a>
+          <a href="/" class="nav-link"><B><%= siteName; %></B></a>
         </li>
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="navbarAccountsMenuLink" role="button" data-mdb-toggle="dropdown" aria-expanded="false">Accounts</a>

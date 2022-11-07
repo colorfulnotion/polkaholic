@@ -45,7 +45,7 @@ if (process.env.POLKAHOLIC_API_URL != undefined) {
     app.locals.config.baseURL = process.env.POLKAHOLIC_API_URL;
 }
 
-let isDevelopment =  (process.env.NODE_ENV == "development")? true : false
+let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
 
 if (isDevelopment) {
     app.use(express.static('public', {
@@ -103,42 +103,12 @@ async function getHostChain(req, reqChainID = null) {
     let [chainID, id, chain] = [-1, null, {}];
 
     try {
-
         if (reqChainID) {
             let [_chainID, _id] = query.convertChainID(reqChainID)
             if (_id) {
                 [chainID, id] = [_chainID, _id];
             }
         } else {
-            // get host
-            let fullhost = req.get('host');
-            let sa = fullhost.split(".");
-            if (sa.length >= 2) {
-                let domain = sa[sa.length - 2];
-                let subdomain = (sa.length > 2) ? sa[sa.length - 3] : "";
-                if (domain == "astarscan") {
-                    if (subdomain == "shiden") {
-                        [chainID, id] = [22007, subdomain];
-                    } else if (domain == "shibuya") {
-                        [chainID, id] = [81000, "shibuya"];
-                    }
-                    [chainID, id] = [2006, "astar"];
-                }
-                if (domain == "acalascan") {
-                    if (subdomain == "karura") {
-                        [chainID, id] = [22000, subdomain];
-                    }
-                    [chainID, id] = [2000, "acala"];
-                }
-                if (domain == "xcmscan") {
-                    if (subdomain == "moonriver") {
-                        [chainID, id] = [22023, subdomain];
-                    } else if (domain == "moonbase") {
-                        [chainID, id] = [61000, subdomain];
-                    }
-                    [chainID, id] = [2004, "moonbeam"];
-                }
-            }
 
             if (id == null) {
                 let selchain = req.cookies.selchain;
@@ -492,6 +462,7 @@ app.post('/register', async (req, res) => {
 const downtime = false;
 
 app.get('/', async (req, res) => {
+
     let accounts = [];
     let addresses = getHomeAddresses(req);
     try {
@@ -584,15 +555,6 @@ function getHomeDefault(req) {
     return (false);
 }
 
-function getCookieOptions() {
-    return {
-        maxAge: 1000 * 86400 * 365, // would expire after 1 year
-        domain: 'polkaholic.io', // Indicates if the cookie should be signed
-        path: '/'
-    };
-}
-
-// http://karura.polkaholic.io:3000/qrcode/5D58imQFuMXDTknQS2D14gDU2duiUC18MGxDnTKajjJS9F3g
 app.get('/qrcode/:address', async (req, res) => {
     try {
         let address = req.params["address"];
@@ -2063,31 +2025,6 @@ app.get('/xcmmessage/:msgHash/:blockNumber?', async (req, res) => {
     }
 })
 
-// Sample cases:
-// /timeline/0x00068acbbecec355f0c495389a29d7829f265553e258ad44d37bd52130bc44be
-// /timeline/0x5f69a283785972097f08e568a4bc61d94912e973ba418dfd32d868339ed03c7a/xcm/10121074
-app.get('/timeline/:hash/:hashType?/:blockNumber?', async (req, res) => {
-    try {
-        let hash = req.params['hash'];
-        let hashType = req.params['hashType'] ? req.params['hashType'] : "extrinsic";
-        let blockNumber = (req.params['blockNumber'] && hashType == "xcm") ? req.params['blockNumber'] : null;
-        let [decorate, decorateExtra] = decorateOptUI(req)
-        let [_, timeline, xcmmessages] = await query.getXCMTimeline(hash, hashType, blockNumber, decorate, decorateExtra)
-        res.render('timeline', {
-            timeline: timeline,
-            hash: hash,
-            hashType: hashType,
-            xcmmessages: xcmmessages,
-            apiUrl: "/",
-            chainInfo: query.getChainInfo()
-        });
-    } catch (err) {
-        return res.status(400).json({
-            error: err.toString()
-        });
-    }
-})
-
 
 // Sample cases:
 // /xcmtransfer/0x00068acbbecec355f0c495389a29d7829f265553e258ad44d37bd52130bc44be
@@ -2126,13 +2063,6 @@ app.post('/uploadcontract/:address', async (req, res) => {
         res.send('Contract File uploaded!');
     });
 
-})
-
-app.get('/ws', async (req, res) => {
-    var chains = await query.getChains();
-    res.render('ws', {
-        chains
-    });
 })
 
 app.get('/xcmexecutor/:src?/:idx?', async (req, res) => {

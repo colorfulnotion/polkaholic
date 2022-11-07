@@ -75,7 +75,6 @@ async function showxcmmessages(filter = {}) {
                         if (row.childMsgHash && row.childSentAt) {
                             str = "<BR><i>Child Msg:</i> " + presentXCMMessageHash(row.childMsgHash, row.childBlocknumber);
                         }
-                        str += "<BR><small>" + presentXCMTimeline(row.msgHash, "xcm", row.blockNumber) + "</small>";
                         return presentXCMMessageHash(row.msgHash, row.blockNumber) + str;
                         //return presentXCMMessageHash(row.msgHash, row.sentAt) + str;
                     } else {
@@ -321,7 +320,8 @@ async function showxcmtransfers(filter = {}) {
                 render: function(data, type, row, meta) {
                     let sectionMethod = `${data}:${row.method}`
                     if (type == 'display') {
-                        return '<button type="button" class="btn btn-outline-primary text-capitalize">' + sectionMethod + '</button>';
+                        let xcmtraceLink = row.traceID ? presentXCMTrace(row.traceID) : "";
+                        return '<button type="button" class="btn btn-outline-primary text-capitalize">' + sectionMethod + '</button>' + xcmtraceLink;
                     }
                     return sectionMethod;
                 }

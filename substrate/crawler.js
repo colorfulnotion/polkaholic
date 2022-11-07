@@ -1964,7 +1964,7 @@ create table talismanEndpoint (
                 "bn": bn,
                 "chainID": chainID
             }
-            
+
             await this.processFinalizedHead(chain, chainID, bn, finalizedHash, parentHash, true);
             this.finalizedHashes[bn] = finalizedHash;
             // because we do not always get the finalized hash signal, we brute force use the parentHash => grandparentHash => greatgrandparentHash => greatgreatgrandparentHash  (3 up)

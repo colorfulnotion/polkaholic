@@ -20,6 +20,6 @@ let txFeeSymbol = ( xcmdest.sourceChainSymbol ) ? xcmdest.sourceChainSymbol : ""
     <b>XCM Fees</b>: <%= uiTool.presentNumber(xcmdest.fee); %> <%= symbol; %> (<%- uiTool.currencyFormat(xcmdest.feeUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>) + <b>TX Fees</b>: <%= uiTool.presentNumber(xcmdest.sourceTxFee); %> <%= txFeeSymbol; %> (<%- uiTool.currencyFormat(xcmdest.sourceTxFeeUSD, xcmdest.priceUSD, xcmdest.priceUSDCurrent) %>)<br>
     <b>Confirmed at Block</b>: <%- uiTool.presentBlock(xcmdest.chainIDDest, xcmdest.blockNumberDest); %> (<%- uiTool.presentSecondsAgoTS(xcmdest.destTS); %>)<br/>
     <b>Confirmed Time</b>: <%= uiTool.presentTS(xcmdest.destTS); %><br>
-    <a href='/timeline/<%= extrinsicHash; %>'>XCM timeline</a>
+
   </div>
 </div>
