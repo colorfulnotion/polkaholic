@@ -1058,6 +1058,10 @@ module.exports = class XCMManager extends Query {
 
                     let xcmInfoStr = (xcmInfo != undefined) ? JSON.stringify(xcmInfo) : false
                     let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
+                    if (isNaN(amountSentUSD) || isNaN(amountReceivedUSD) || priceUSD == undefined){
+                        console.log(`extrinsicHash ${substrateTxHash} priceInfo missing!!`, xcmInfo)
+                        continue
+                    }
                     let sqlB = `update xcmtransfer
             set blockNumberDest = ${d.blockNumberDest},
                 destTS = ${d.destTS},
