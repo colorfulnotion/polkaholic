@@ -715,7 +715,7 @@ module.exports = class Query extends AssetManager {
         if (c && (c.chainID != undefined)) {
             let chainID = c.chainID;
             res.push({
-                link: `/chain/${c.id}`,
+                link: `/blocks/${c.id}`,
                 text: `${c.chainName}`,
                 description: `chainID: ${c.chainID} id: ${c.id} para ID: ${c.paraID} relay chain: ${c.relayChain}`,
                 numHolders: c.numHolders
@@ -1088,6 +1088,7 @@ module.exports = class Query extends AssetManager {
     }
 
     async buildMissingXcmInfo(x) {
+	return;
         //build systhetic xcmInfo here when xcmInfo is not set yet
         let decorate = true
         let decorateExtra = ["usd", "address", "related", "data"]

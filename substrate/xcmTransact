@@ -25,6 +25,13 @@ async function main() {
     let contract = "0x49ba58e2ef3047b1f90375c79b93578d90d24e24"; // flip contract
     let input = "0xcde4efa9" // flip
 
+    // balances transfer test case
+    /*
+    if ( true ) {
+	input = "100000000000000"; //
+	contract = "0xAA237a6EafE6714FdAab6B74a767893630bdD533"
+    }
+    */
     // could use flags instead, too many inputs but pretty much all are needed, so...
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
@@ -56,11 +63,29 @@ async function main() {
     xcmtransact.setupEvmPair();
     xcmtransact.setupEvmPairFromMnemonic()
     let execute = true;
-    let isEVMTx = false;
+    let isEVMTx = true;
     let useMultilocation = false;
+    let echo = true;
+    if ( echo ) {
+      // remote execution cause remote execution test case:
+      // 1000 => 888 with a xcmTransactor_transactThroughSigned remote execution on beta ( (0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d is the sender on alpha, 0x02931229f6fcc2b02ada8638143fe0dfd0b313ae is the derivative account on beta) which will then result in
+      let [web3Api, txStruct] = await xcmtransact.evm_xcmTransactor_transactThroughSignedECHO(address, paraID, paraIDDest, feePaymentAddress, "0x3a7798ca28cfe64c974f8196450e1464f43a0d1e", input, chainIDRelay, useMultilocation);
+      var signedTx = await ethTool.signEvmTx(web3Api, txStruct, xcmtransact.evmpair)
+      var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
+      console.log(`ECHO ----- signedTx`, signedTx, `decodedTx`, decodedTx)
+      if (execute) {
+          console.log(`broadcasting signed evmTx`)
+          //if execute true, brocast the tx
+          let txHash = signedTx.transactionHash
+          console.log("EVM Transfer sent with hash", txHash);
+          console.log(`View Transaction: https://polkaholic.io/tx/${txHash}`);
+          var result = await ethTool.sendSignedTx(web3Api, signedTx)
+          console.log(`signedTX result=`, result)
+      }
+    }
+    process.exit(0);
     if (isEVMTx){
-	//let [web3Api, txStruct] = await xcmtransact.evm_xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, feePaymentAddress, contract, input, chainIDRelay);
-        let [web3Api, txStruct] = await xcmtransact.evm_xcmTransactor_transactThroughSignedMultilocation(address, paraID, paraIDDest, feePaymentAddress, contract, input, chainIDRelay, useMultilocation);
+        let [web3Api, txStruct] = await xcmtransact.evm_xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, feePaymentAddress, contract, input, chainIDRelay, useMultilocation);
         var signedTx = await ethTool.signEvmTx(web3Api, txStruct, xcmtransact.evmpair)
         var decodedTx = ethTool.decodeRLPTransaction(signedTx.rawTransaction)
         console.log(`signedTx`, signedTx, `decodedTx`, decodedTx)
@@ -74,7 +99,7 @@ async function main() {
             console.log(`signedTX result=`, result)
         }
     } else {
-	let [sectionMethod, func, args, isEVMTx] = await xcmtransact.xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, currencyID, contract, input, chainIDRelay);
+	let [sectionMethod, func, args, isEVMTx] = await xcmtransact.xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, currencyID, contract, input, chainIDRelay, useMultilocation);
 	let argsStr = JSON.stringify(args, null, 4)
 	console.log(`${sectionMethod} args`, argsStr);
         let xcmTxn = func.apply(null, args)
