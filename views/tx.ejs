@@ -16,6 +16,7 @@ let feeUSD = (f.feeUSD != undefined)? `($${f.feeUSD})`: ''
 let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
 %>
 <script src="/tx.js"></script>
+<div class="scrollable">
 <table class="table table-hover table-bordered">
   <tbody>
 
@@ -194,6 +195,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       </td>
     </tr>
 </table>
+</div>
 
 <script>
 let tabs = [];

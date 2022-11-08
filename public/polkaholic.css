@@ -160,3 +160,10 @@ table.dataTable tbody td {
 .explorer {
     font-size: 8pt;
 }
+
+
+.scrollable
+{
+    width: 100%;
+    overflow: auto;
+}
