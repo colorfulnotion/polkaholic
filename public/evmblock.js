@@ -329,7 +329,11 @@ function showevmblockremote(objects) {
                     data: 'msgHash',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentXCMMessageHash(row.msgHash, row.blockNumber);
+                            let str = ""
+                            if (row.childMsgHash) {
+                                str = "<BR><i>Child Msg:</i> " + presentXCMMessageHash(row.childMsgHash, row.blockNumber);
+                            }
+                            return presentXCMMessageHash(row.msgHash, row.blockNumber) + str;
                         }
                         return data;
                     }

@@ -1378,6 +1378,7 @@ module.exports = class Indexer extends AssetManager {
                     blockNumber: xcmMsg.blockNumber,
                     msgHex: xcmMsg.msgHex,
                     msgHash: xcmMsg.msgHash,
+                    msgStr: xcmMsg.msgStr,
                     isFresh: true,
                     matchable: true,
                 }
@@ -3222,7 +3223,20 @@ module.exports = class Indexer extends AssetManager {
             return false
         }
         let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
+        let outgoingTransactMsg = []
         if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${evmTxHash}] [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingKeys`, trailingKeys)
+        for (const tk of trailingKeys) {
+            let trailingXcm = this.xcmTrailingKeyMap[tk]
+            if (trailingXcm.chainID == this.chainID){
+                let msgHash = trailingXcm.msgHash
+                let msgStr = trailingXcm.msgStr
+                let r = paraTool.getXCMTransactList(msgHash, msgStr)
+                if (r){
+                    outgoingTransactMsg.push(r)
+                }
+            }
+        }
+
         for (const tk of trailingKeys) {
             let trailingXcm = this.xcmTrailingKeyMap[tk]
             //console.log(`getEvmMsgHashCandidate tk=${tk}`, trailingXcm)
@@ -3230,6 +3244,8 @@ module.exports = class Indexer extends AssetManager {
             let firstSeenBN = trailingXcm.blockNumber
             let msgHex = trailingXcm.msgHex
             let msgHash = trailingXcm.msgHash
+            let msgStr = trailingXcm.msgStr
+            let childMsgHash = false // this is the second leg, if available
             if (firstSeenBN == targetBN && msgHex.includes(txInput) && msgHex.includes(txTo) && msgHex.includes(txGasLimit)) {
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
@@ -3237,11 +3253,19 @@ module.exports = class Indexer extends AssetManager {
                 if (this.xcmmsgMap[tk] != undefined) {
                     this.xcmmsgMap[tk].connectedTxHash = evmTxHash
                 }
-                return msgHash
+                for (const m of outgoingTransactMsg){
+                    for (const t of m.transactList) {
+                        if (msgHex.includes(t)){
+                            childMsgHash = m.msgHash
+                            break;
+                        }
+                    }
+                }
+                return [msgHash, childMsgHash]
             }
         }
         if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${evmTxHash}] [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}], ${matcherType}] MISS`)
-        return false
+        return [false, false]
     }
 
 
@@ -6329,8 +6353,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     let connectedTxns = []
                     for (const connectedTxn of evmFullBlock.transactionsConnected) {
                         try {
-                            let msgHash = this.getEvmMsgHashCandidate(blockNumber, connectedTxn, 'evm')
+                            let [msgHash, childMsgHash] = this.getEvmMsgHashCandidate(blockNumber, connectedTxn, 'evm')
                             if (msgHash) connectedTxn.msgHash = msgHash
+                            if (childMsgHash) connectedTxn.childMsgHash = childMsgHash
                         } catch (e) {
                             console.log(`[${blockNumber}] [${connectedTxn.transactionHash}] connectTransaction `, e, connectedTxn)
                         }

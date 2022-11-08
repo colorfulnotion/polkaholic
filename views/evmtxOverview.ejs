@@ -30,6 +30,12 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       <td><a href='/xcmmessage/<%= `${tx.msgHash}/${tx.blockNumber}`; %>'><%= tx.msgHash; %></a></td>
     </tr>
     <% } %>
+    <% if ( tx.isConnectedCall && tx.childMsgHash) { %>
+    <tr>
+      <td><%- include("tooltip", {k: "remoteexecutionmessagechild"}) %>Child Message</td>
+      <td><a href='/xcmmessage/<%= `${tx.childMsgHash}/${tx.blockNumber}`; %>'><%= tx.childMsgHash; %></a></td>
+    </tr>
+    <% } %>
 <% if ( xcmInfoFound ) { %>
     <% if ( assetTransferFound) { %>
     <tr>

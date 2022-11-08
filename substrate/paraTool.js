@@ -1178,6 +1178,33 @@ function convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation, api = false) {
     return multiLocationHex
 }
 
+function getXCMTransactList(msgHash, msgStr){
+    try {
+        var xcmVersionedXcm = JSON.parse(msgStr)
+        var version = Object.keys(xcmVersionedXcm)[0]
+        var instructions = xcmVersionedXcm[version]
+        let transactList = []
+        for (const ins of instructions){
+            let insKey = Object.keys(ins)
+            if (insKey == 'transact'){
+                let insV = ins[insKey]
+                if (insV.call != undefined && insV.call.encoded!= undefined){
+                    let call = insV.call.encoded.replace('0x','')
+                    transactList.push(call)
+                }
+            }
+        }
+        //console.log(`transactList`, transactList)
+        let r = {
+            msgHash: msgHash,
+            transactList: transactList
+        }
+        return r
+    } catch (e){
+        console.log(`err`, e)
+        return false
+    }
+}
 
 class NotFoundError extends Error {
     constructor(message) {
@@ -1907,5 +1934,8 @@ module.exports = {
     },
     convertMoonbeamEvmMultiLocationToXcmV1MultiLocation: function(xcmV1MultiLocation) {
         return convert_moonbeam_evm_multiLocation_to_xcmV1MultiLocation(xcmV1MultiLocation)
+    },
+    getXCMTransactList: function(msgHash, msgStr) {
+        return getXCMTransactList(msgHash, msgStr)
     },
 };
