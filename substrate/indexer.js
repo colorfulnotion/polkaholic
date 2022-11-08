@@ -7161,6 +7161,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         await this.setup_chainParser(chain, this.debugLevel);
         await this.initApiAtStorageKeys(chain, blockHash, blockNumber);
         this.chainID = chain.chainID;
+        blockNumber = paraTool.dechexToInt(blockNumber)
         //await this.setupChainAndAPI(chainID);
 
         try {
