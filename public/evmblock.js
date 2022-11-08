@@ -304,7 +304,7 @@ function showevmblockremote(objects) {
         tableEVMBlockRemote = $(tableName).DataTable({
             columnDefs: [{
                 "className": "dt-center",
-                "targets": [3, 4]
+                "targets": [4, 5]
             }],
             columns: [{
                     data: 'transactionHash',
@@ -323,6 +323,15 @@ function showevmblockremote(objects) {
                             return data;
                         }
                         return "";
+                    }
+                },
+                {
+                    data: 'msgHash',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            return presentXCMMessageHash(row.msgHash, row.blockNumber);
+                        }
+                        return data;
                     }
                 },
                 {
