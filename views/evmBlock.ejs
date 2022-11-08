@@ -16,6 +16,10 @@ if ( b.evmBlock.transactionsInternal && ( b.evmBlock.transactionsInternal.length
   tabs.splice(2, 0, { title: "Internal Txns", target: "internal" });
 }
 
+if ( b.evmBlock.transactionsConnected && ( b.evmBlock.transactionsConnected.length > 0 ) ) {
+  tabs.splice(2, 0, { title: "Remote Executions", target: "remote" });
+}
+
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
   let title = t.title;
@@ -36,6 +40,24 @@ for (let i=0; i<tabs.length; i++) {
 
 <div class="tab-pane" id="evmtxs" role="tabpanel" aria-labelledby="evmtxs-tab">
   <table id="tableevmtxs" class="display" style="width: 100%">
+    <thead>
+    <tr class="tableheader">
+      <th><%- include("tooltip", {k: "transactionhash"}) %>Tx Hash</th>
+      <th><%- include("tooltip", {k: "method"}) %>Method</th>
+      <th><%- include("tooltip", {k: "block"}) %>Block</th>
+      <th><%- include("tooltip", {k: "blocktimestampago"}) %></th>
+      <th><%- include("tooltip", {k: "txresult"}) %>Result</th>
+      <th><%- include("tooltip", {k: "evmfrom"}) %>From</th>
+      <th><%- include("tooltip", {k: "evmto"}) %>To</th>
+      <th><%- include("tooltip", {k: "evmvalue"}) %>Value</th>
+      <th><%- include("tooltip", {k: "txfees"}) %>Fee</th>
+    </tr>
+    </thead>
+  </table>
+</div>
+
+<div class="tab-pane" id="remote" role="tabpanel" aria-labelledby="remote-tab">
+  <table id="tableremote" class="display" style="width: 100%">
     <thead>
     <tr class="tableheader">
       <th><%- include("tooltip", {k: "transactionhash"}) %>Tx Hash</th>
@@ -131,6 +153,12 @@ let evminternal = <%- JSON.stringify(b.evmBlock.transactionsInternal); %>;
 let evminternal = '[]';
 <% } %>
 
+<% if (b.evmBlock != undefined && b.evmBlock.transactionsConnected !=undefined) { %>
+let evmremote = <%- JSON.stringify(b.evmBlock.transactionsConnected); %>;
+<% } else { %>
+let evmremote = '[]';
+<% } %>
+
 <% if (b.extrinsics != undefined) { %>
 let extrinsics = <%- JSON.stringify(b.extrinsics); %>;
 <% } else { %>
@@ -159,6 +187,8 @@ for (const extrinsic of extrinsics) {
 document.getElementById('evmtxs-tab').innerHTML = `Transactions (${evmtxs.length})`;
 let internalTab = document.getElementById('internal-tab');
 if ( evminternal && internalTab ) internalTab.innerHTML = `Internal Txns (${evminternal.length})`;
+let remoteTab = document.getElementById('remote-tab');
+if ( evmremote && remoteTab ) remoteTab.innerHTML = `Remote Executions (${evmremote.length})`;
 document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
 document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
 </script>

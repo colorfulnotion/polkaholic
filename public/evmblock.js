@@ -2,8 +2,10 @@ let initevmblocktransactions = false;
 let initevmblockinternal = false;
 let initevmblockextrinsics = false;
 let initevmblockevents = false;
+let initevmblockremote = false;
 let tableEVMBlockTransactions = false;
 let tableEVMBlockInternal = false;
+let tableEVMBlockRemote = false;
 let tableEVMBlockExtrinsics = false;
 let tableEVMBlockEvents = false;
 
@@ -294,6 +296,155 @@ function showevmblocktransactions(objects) {
     table.draw();
 }
 
+function showevmblockremote(objects) {
+    //refreshTabcount("events")
+    let tableName = '#tableremote'
+    if (!initevmblockremote) {
+        initevmblockremote = true;
+        tableEVMBlockRemote = $(tableName).DataTable({
+            columnDefs: [{
+                "className": "dt-center",
+                "targets": [3, 4]
+            }],
+            columns: [{
+                    data: 'transactionHash',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            try {
+                                if (row.transactionHash != undefined) {
+                                    let s = presentTxHash(row.transactionHash);
+                                    return `${s}`
+                                }
+                            } catch (e) {
+                                console.log(row);
+                            }
+                        }
+                        if (row.extrinsicID != undefined) {
+                            return data;
+                        }
+                        return "";
+                    }
+                },
+                {
+                    data: 'method',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            if (row.decodedInput !== undefined && row.decodedInput.methodID !== undefined) {
+                                let method = row.decodedInput.methodID;
+                                if (row.decodedInput.decodeStatus == "success") {
+                                    let sa = row.decodedInput.signature.split("(");
+                                    method = sa[0];
+                                }
+                                return '<button type="button" class="btn btn-outline-primary text-capitalize">' + method + '</button>';
+                            } else {
+                                return "-";
+                            }
+                        } else {
+                            if (row.method !== undefined) {
+                                return data;
+                            } else {
+                                return "-";
+                            }
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'blockNumber',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            return row.blockNumber;
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'ts',
+                    render: function(data, type, row, meta) {
+                        let x = 0
+                        if (type == 'display') {
+                            if (row.ts !== undefined) {
+                                return presentTS(row.ts);
+                            } else if (row.timestamp !== undefined) {
+                                return presentTS(row.timestamp);
+                            }
+                        } else {
+                            if (row.ts !== undefined) {
+                                return (row.ts);
+                            } else if (row.timestamp !== undefined) {
+                                return (row.timestamp);
+                            }
+                        }
+
+                    }
+                },
+                {
+                    data: 'status',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            if (row.status != undefined) {
+                                let txStatus = presentSuccessFailure(row.status, "");
+                                return txStatus;
+                            }
+                        }
+                        return "";
+                    }
+                },
+                {
+                    data: 'from',
+                    render: function(data, type, row, meta) {
+                        if (row.from != undefined) {
+                            return presentID(row.from);
+                        }
+                        return "";
+                    }
+                },
+                {
+                    data: 'to',
+                    render: function(data, type, row, meta) {
+                        if (row.to) {
+                            return presentID(row.to);
+                        } else {
+                            return "";
+                        }
+                    }
+                },
+                {
+                    data: 'value',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            if (row.fee) {
+                                return `${row.value} ${chainSymbol}`;
+                            } else {
+                                return "-";
+                            }
+                        }
+                        return data;
+                    }
+                },
+                {
+                    data: 'fee',
+                    render: function(data, type, row, meta) {
+                        if (type == 'display') {
+                            if (row.fee) {
+                                return `${row.fee.toFixed(8)}`;
+                            } else {
+                                return "-";
+                            }
+                        }
+                        return data;
+                    }
+                }
+            ]
+        });
+    }
+    let table = tableEVMBlockRemote;
+    table.clear();
+    if (objects != undefined) {
+        table.rows.add(objects);
+    }
+    table.draw();
+}
 
 function showevmblockinternal(objects) {
     let tableName = '#tableinternal'
@@ -620,6 +771,7 @@ $(document).ready(function() {
     setuptabs(tabs, id, blockNumber, blockHash, defHash);
     showevmblocktransactions(evmtxs);
     showevmblockinternal(evminternal);
+    showevmblockremote(evmremote);
     showevmblockextrinsics(extrinsics);
     showevmblockevents(events);
 });
