@@ -1,0 +1,64 @@
+#!/usr/bin/env node
+// indexBlock [chainID] [blockNumber] [blockHash]
+var Crawler = require("./crawler");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
+
+async function main() {
+    let chainID = paraTool.chainIDAstar;
+    //let blockNumber = 2863182;
+    //let blockHash = "0x44a1fe068af3ae83f99dd90efa6bbf5ebbf92972adde190e8b3e5d1f3d513017"; //substrate
+    //let evmBlockHash = "0xdf092452d679df2cef2d83dbf818f73cae470fca6192d646b04f383e35df60ee"; //evm
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            chainID = val;
+        }
+        /*
+        if (index == 3 && val.length > 0) {
+            blockNumber = paraTool.dechexToInt(val);
+        }
+        if (index == 4 && val.length > 0) {
+            blockHash = ;
+        }
+        */
+    });
+    let crawler = new Crawler();
+    crawler.setDebugLevel(paraTool.debugTracing)
+    crawler.exitOnDisconnect = true;
+    let chain = await crawler.getChain(chainID);
+    await crawler.setupAPI(chain);
+    await crawler.assetManagerInit();
+    await crawler.setupChainAndAPI(chainID);
+    let targetSQL = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber from xcmtransfer where xcminteriorkey is null and chainID = '${chainID}' order by blockNumber`;
+    let recs = await crawler.poolREADONLY.query(targetSQL);
+    for (let i = 0; i < recs.length; i++) {
+        let m = recs[i]
+        let extrinsicID = m.extrinsicID
+        let extrinsicHash = m.extrinsicHash
+        let blockNumber = m.blockNumber
+        let blockHash = await crawler.getBlockHashFinalized(chainID, blockNumber)
+        let t2 = null
+        /*{
+    	   chainID,
+           blockNumber,
+           crawlTrace: 1,
+           crawlBlockEVM: 1,
+           crawlReceiptsEVM: 1,
+           crawlTraceEVM: 1
+        }; */
+        if ( t2 ) {
+            await crawler.crawl_block_trace(chain, t2)
+        }
+        console.log(`[${i+1}/${recs.length}] indexBlocks [${extrinsicID}] [${extrinsicHash}] blkHash=${blockHash}`)
+        await crawler.index_block(chain, blockNumber, blockHash);
+    }
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
