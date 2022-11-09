@@ -1050,7 +1050,7 @@ module.exports = class XCMManager extends Query {
                         try {
                             [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
                         } catch (e) {
-                            console.log(`!!!!buildSuccessXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
+                            console.log(`!!!!buildSuccessXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo, 'e', e)
                             continue
                         }
                     }

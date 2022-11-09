@@ -1235,7 +1235,7 @@ module.exports = class Query extends AssetManager {
                 w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest in (${chainList.join(",")}) )`)
             }
             let wstr = (w.length > 0) ? " where " + w.join(" and ") : "";
-            let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo, traceID from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
+            let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo, convert(pendingXcmInfo using utf8) as pendingXcmInfo, traceID from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
             //console.log(filters, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
@@ -1288,7 +1288,7 @@ module.exports = class Query extends AssetManager {
                 }
                 let parsedXcmInfo;
                 try {
-                    parsedXcmInfo = JSON.parse(`${x.xcmInfo}`)
+                    parsedXcmInfo = (x.xcmInfo != undefined)? JSON.parse(`${x.xcmInfo}`) : JSON.parse(`${x.pendingXcmInfo}`)
                     if (parsedXcmInfo.origination) {
                         x.amountSent = parsedXcmInfo.origination.amountSent;
                         x.amountSentUSD = parsedXcmInfo.origination.amountSentUSD;
@@ -1346,6 +1346,7 @@ module.exports = class Query extends AssetManager {
                 if (parsedXcmInfo) {
                     r.xcmInfo = parsedXcmInfo
                 } else {
+                    /*
                     parsedXcmInfo = await this.buildMissingXcmInfo(x)
                     r.xcmInfo = parsedXcmInfo
                     let xcmInfoStr = (parsedXcmInfo != undefined) ? JSON.stringify(parsedXcmInfo) : false
@@ -1356,6 +1357,7 @@ module.exports = class Query extends AssetManager {
                         ].join(",") + ")";
                         patchedXcms.push(t);
                     }
+                    */
                 }
                 /*
                 if (decorate) {
@@ -1374,6 +1376,7 @@ module.exports = class Query extends AssetManager {
                 err
             });
         }
+        /*
         if (patchedXcms.length > 0 ){
             let sqlDebug = true
             await this.upsertSQL({
@@ -1384,6 +1387,7 @@ module.exports = class Query extends AssetManager {
                 "replace": ["xcmInfoAudited", "xcmInfo"]
             }, sqlDebug);
         }
+        */
         return out;
     }
 
@@ -2443,23 +2447,6 @@ module.exports = class Query extends AssetManager {
             });
         }
         return trace
-    }
-
-    convertChainID(chainID_or_chainName) {
-        let chainID = false
-        let id = false
-        try {
-            chainID = parseInt(chainID_or_chainName, 10);
-            if (isNaN(chainID)) {
-                [chainID, id] = this.getChainIDByName(chainID_or_chainName)
-            } else {
-                [chainID, id] = this.getNameByChainID(chainID_or_chainName)
-            }
-        } catch (e) {
-            [chainID, id] = this.getChainIDByName(chainID_or_chainName)
-        }
-        //console.log(`chainID=${chainID}, id=${id}, chainID_or_chainName=${chainID_or_chainName}`)
-        return [chainID, id]
     }
 
     async getBlock(chainID_or_chainName, blockNumber, blockHash = false, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
