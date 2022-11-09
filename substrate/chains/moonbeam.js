@@ -46,10 +46,10 @@ module.exports = class MoonbeamParser extends ChainParser {
                         //mpState.description = `Executed ${mpState.eventID}`
                         mpState.eventID = ev.eventID // update eventID with AssetsTrapped
                         this.mpReceivedHashes[idxKey] = mpState
-                        console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
+                        //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
                     }
                 }
-                console.log(`MoonbeamParser mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
+                //console.log(`MoonbeamParser mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
                 //update xcmMessages
                 indexer.updateMPState(mpState)
                 //only compute candiate mpState is successful
@@ -62,7 +62,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                         }
                     }
                 } else {
-                    console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
+                    //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
                 }
                 prevIdx = parseInt(idxKey) + 1
             }
@@ -165,17 +165,17 @@ module.exports = class MoonbeamParser extends ChainParser {
         switch (module_section) {
             case 'xTokens':
                 let outgoingXcmList1 = this.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingXCM xTokens`, outgoingXcmList1)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingXCM xTokens`, outgoingXcmList1)
                 //return outgoingXcmList
                 break;
             case 'xcmPallet':
                 let outgoingXcmList2 = this.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
                 //return outgoingXcmList
                 break;
             case 'polkadotXcm':
                 let outgoingXcmList3 = this.processOutgoingPolkadotXcm(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingXCM polkadotXcm`, outgoingXcmList3)
+              //  if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingXCM polkadotXcm`, outgoingXcmList3)
                 //return outgoingXcmList
                 break;
             case 'xcmTransactor':
@@ -187,9 +187,9 @@ module.exports = class MoonbeamParser extends ChainParser {
                 if (module_method == 'transact') {
                     let isEthereumXCM = this.etherumXCMFilter(indexer, args, feed.events)
                     if (isEthereumXCM) {
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
+                        //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
                         let outgoingXcmList5 = this.processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingXCM ethereum`, outgoingXcmList5)
+                        //if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingXCM ethereum`, outgoingXcmList5)
                         //return outgoingXcmList
                     }
                 }
@@ -236,7 +236,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                         xcmInput[input.name] = input.value
                     }
                     output.params = xcmInput
-                    console.log(`output >>`, JSON.stringify(output, null, 2))
+                    //console.log(`output >>`, JSON.stringify(output, null, 2))
                     if (output != undefined) {
                         args.decodedEvmInput = output
                     }
@@ -358,7 +358,7 @@ module.exports = class MoonbeamParser extends ChainParser {
             v1: v1
         }
         if (dest.length != 2) {
-            console.log('Invalid dest')
+            //console.log('Invalid dest')
             return false
         }
         v1.parents = paraTool.dechexToInt(dest[0])
@@ -381,13 +381,13 @@ module.exports = class MoonbeamParser extends ChainParser {
             v1.interior[interiorType] = interiorValArr
         }
         cDest.v1 = v1
-        console.log(`dest ${JSON.stringify(dest, null, 4)} -> cDest ${JSON.stringify(cDest, null, 4)}`)
+        //console.log(`dest ${JSON.stringify(dest, null, 4)} -> cDest ${JSON.stringify(cDest, null, 4)}`)
         return cDest
     }
 
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // need additional processing for currency_id part
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXTokens start`)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXTokens start`)
         let a = args
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
@@ -399,7 +399,7 @@ module.exports = class MoonbeamParser extends ChainParser {
         let outgoingXcmList = []
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] moonbeam processOutgoingXTokens xcmPallet missing`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] moonbeam processOutgoingXTokens xcmPallet missing`)
             } else if (xcmAssetSymbol) {
                 let relayChain = xcmtransfer.relayChain
                 let chainID = xcmtransfer.chainID
@@ -409,18 +409,18 @@ module.exports = class MoonbeamParser extends ChainParser {
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] moonbeam processOutgoingXTokens xcmPallet assetString missing`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] moonbeam processOutgoingXTokens xcmPallet assetString missing`)
                 outgoingXcmList.push(xcmtransfer)
             }
         }
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] moonbeam processOutgoingXTokens DONE`, outgoingXcmList)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] moonbeam processOutgoingXTokens DONE`, outgoingXcmList)
         extrinsic.xcms = outgoingXcmList
         return outgoingXcmList
     }
 
     processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // TODO: have not seen case like this yet
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXcmPallet start`)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXcmPallet start`)
         let a = args
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
@@ -433,7 +433,7 @@ module.exports = class MoonbeamParser extends ChainParser {
         let outgoingXcmList = []
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`moonbeam processOutgoingXcmPallet xcmPallet missing`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`moonbeam processOutgoingXcmPallet xcmPallet missing`)
             } else if (xcmAssetSymbol) {
                 let relayChain = xcmtransfer.relayChain
                 let chainID = xcmtransfer.chainID
@@ -443,11 +443,11 @@ module.exports = class MoonbeamParser extends ChainParser {
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`moonbeam processOutgoingXcmPallet assetString missing`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`moonbeam processOutgoingXcmPallet assetString missing`)
                 outgoingXcmList.push(xcmtransfer)
             }
         }
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXcmPallet DONE`, outgoingXcmList)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXcmPallet DONE`, outgoingXcmList)
         extrinsic.xcms = outgoingXcmList
         return outgoingXcmList
     }
@@ -457,13 +457,12 @@ module.exports = class MoonbeamParser extends ChainParser {
         let outgoingEtherumXCM = []
         if (extrinsic.xcms == undefined) extrinsic.xcms = []
         try {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingEthereum start`)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`moonbeam processOutgoingEthereum start`)
             let a = args
             let params = a.params
             let methodID = a.methodID
             if (a.fromAddress != undefined) fromAddress = a.fromAddress
-            //console.log(`a`, a)
-            //console.log(`params`, params)
+
             if (extrinsic.xcms == undefined) extrinsic.xcms = []
             let xcmIndex = extrinsic.xcms.length
             let destAddress = '0x' //unknown
@@ -606,7 +605,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                     r.paraIDDest = paraIDDest
                     r.innerCall = innerCall
                     r.msgHash = msgHash
-                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod}`, r)
+                    //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod}`, r)
                     extrinsic.xcms.push(r)
                     outgoingEtherumXCM.push(r)
                 } catch (e1) {
@@ -682,7 +681,7 @@ module.exports = class MoonbeamParser extends ChainParser {
 
             */
 
-            console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=${section_method} args`, a)
+            //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=${section_method} args`, a)
             //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=${section_method} default`, r)
             if (section_method == "xcmTransactor:transactThroughDerivative") {
                 /*
@@ -701,7 +700,7 @@ module.exports = class MoonbeamParser extends ChainParser {
 
                 // reject legacy fee_currency_id
                 if (a.currency_id != undefined) {
-                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivative skip old version`)
+                    //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivative skip old version`)
                     return outgoingXcmPallet
                 }
 
@@ -724,8 +723,8 @@ module.exports = class MoonbeamParser extends ChainParser {
                 r.chainIDDest = chainIDDest
                 r.paraIDDest = paraIDDest
                 r.innerCall = innerCall
-                console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} here 4`)
-                console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivative`, r)
+                //console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} here 4`)
+                //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughDerivative`, r)
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
 
@@ -794,7 +793,7 @@ module.exports = class MoonbeamParser extends ChainParser {
 
                 // reject legacy fee_currency_id
                 if (a.fee_currency_id != undefined) {
-                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned skip old version`)
+                    //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned skip old version`)
                     return outgoingXcmPallet
                 }
 
@@ -828,7 +827,7 @@ module.exports = class MoonbeamParser extends ChainParser {
 
                 // get msgHash, innerCall from event
                 let [msgHash, innerCall] = this.getMsgHashAndInnerCall(indexer, extrinsic, feed)
-                console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned msgHash=${msgHash}, innerCall=${innerCall}`)
+                //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSigned msgHash=${msgHash}, innerCall=${innerCall}`)
 
                 //processing weight_info
                 if (a.weight_info != undefined) {
@@ -903,7 +902,6 @@ module.exports = class MoonbeamParser extends ChainParser {
                 console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=xcmTransactor:transactThroughSovereign`, r)
                 extrinsic.xcms.push(r)
                 outgoingXcmPallet.push(r)
-
             } else {
                 console.log(`!!! NOT COVERED [${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=${section_method} `, r)
                 extrinsic.xcms.push(r)
@@ -971,7 +969,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 [paraIDDest, chainIDDest] = this.processDestV0X2(dest_v0.x2, relayChain)
 
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
                 chainIDDest = false
             }
         } else if ((dest.v1 !== undefined) && (dest.v1.interior !== undefined)) {
@@ -986,7 +984,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 // dest for parachain, add 20000 for kusama-relay
                 [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
                 chainIDDest = false
             }
         }

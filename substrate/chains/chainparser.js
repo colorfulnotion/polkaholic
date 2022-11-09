@@ -81,7 +81,7 @@ module.exports = class ChainParser {
                 }
                 if (JSON.stringify(o) == '{}') {
                     //debug: explore bifrost assetType here
-                    console.log(`new BIFROST currency type`, i)
+                    //console.log(`new BIFROST currency type`, i)
                     o = i
                 }
             }
@@ -132,7 +132,7 @@ module.exports = class ChainParser {
 
             if (JSON.stringify(o) == '{}') {
                 //debug: explore bifrost assetType here
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`new BIFROST currency type`, i)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`new BIFROST currency type`, i)
                 o = i
             }
         }
@@ -166,7 +166,7 @@ module.exports = class ChainParser {
         let props = JSON.parse(propsNative.toString());
         // {"ss58Format":10,"tokenDecimals":[12,12,10,10],"tokenSymbol":["ACA","AUSD","DOT","LDOT"]}
         // NOT MAINTAINED let ss58Format = props.ss58Format;
-        console.log(propsNative)
+        //console.log(propsNative)
         if (props.tokenSymbol) {
             for (let i = 0; i < props.tokenSymbol.length; i++) {
                 let symbol = props.tokenSymbol[i];
@@ -194,7 +194,7 @@ module.exports = class ChainParser {
                         let newAsset = JSON.stringify({
                             Token: symbol
                         })
-                        console.log("adding NEW asset to chain", newAsset)
+                        //console.log("adding NEW asset to chain", newAsset)
                         indexer.batchedSQL.push(`update chain set asset = '${newAsset}' where chainID = '${chainID}'`);
                     }
                 }
@@ -268,7 +268,7 @@ module.exports = class ChainParser {
     getIdentityVal(indexer, decoratedVal) {
         let v = JSON.parse(decoratedVal)
         //let v = ledec(val)
-        console.log(`getIdentityVal`, v)
+        //console.log(`getIdentityVal`, v)
         let res = {}
         let identityRec = {
             judgements: [],
@@ -370,7 +370,7 @@ module.exports = class ChainParser {
                             var msg0 = xcm.msg
                             var msgHex = xcm.hex
                             let beneficiaries = this.getBeneficiary(msg0)
-                            console.log(`[Trace] Outgoing DownwardMessageQueuesVal [${msgHash}] beneficiaries=${beneficiaries}`)
+                            //console.log(`[Trace] Outgoing DownwardMessageQueuesVal [${msgHash}] beneficiaries=${beneficiaries}`)
                             let p = this.getInstructionPath(dmpMsg)
                             let dmpDecoded = {
                                 msg: JSON.stringify(dmpMsg),
@@ -401,10 +401,10 @@ module.exports = class ChainParser {
             //res["pv"] = dmps
             res["pv2"] = dmpRaws
             res["extra"] = extraField
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${mpType}] DownwardMessageQueuesVal`, res)
+            //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${mpType}] DownwardMessageQueuesVal`, res)
             return res
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${mpType}] DownwardMessageQueuesVal decoratedVal=${decoratedVal}, error`, e)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${mpType}] DownwardMessageQueuesVal decoratedVal=${decoratedVal}, error`, e)
         }
     }
 
@@ -441,7 +441,7 @@ module.exports = class ChainParser {
                             var msg0 = xcm.msg
                             var msgHex = xcm.hex
                             let beneficiaries = this.getBeneficiary(msg0)
-                            console.log(`[Trace] Outgoing UpwardMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
+                            //console.log(`[Trace] Outgoing UpwardMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
                             let p = this.getInstructionPath(umpMsg)
                             let umpDecoded = {
                                 msg: JSON.stringify(umpMsg),
@@ -473,7 +473,7 @@ module.exports = class ChainParser {
             //res["pv"] = umps
             res["pv2"] = umpRaws
             res["extra"] = extraField
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${mpType}] UpwardMessageseVal`, res)
+            //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${mpType}] UpwardMessageseVal`, res)
             return res
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${mpType}] UpwardMessageseVal decoratedVal=${decoratedVal}, error`, e)
@@ -510,7 +510,7 @@ module.exports = class ChainParser {
                             var msg0 = xcm.msg
                             var msgHex = xcm.hex
                             let beneficiaries = this.getBeneficiary(msg0)
-                            console.log(`[Trace] Outgoing HrmpOutboundMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
+                            //console.log(`[Trace] Outgoing HrmpOutboundMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
                             let p = this.getInstructionPath(hrmpMsg)
                             let hrmpDecoded = {
                                 msg: JSON.stringify(hrmpMsg),
@@ -614,11 +614,11 @@ module.exports = class ChainParser {
         switch (instructionK) {
             case "teleportAsset":
                 if (instructionV.effects != undefined) {
-                    console.log(`instructionV.effects`, instructionV.effects)
+                    //console.log(`instructionV.effects`, instructionV.effects)
                     for (let i = 0; i < instructionV.effects.length; i++) {
                         let instructionXCMK = Object.keys(instructionV.effects[i])[0]
                         let instructionXCMV = instructionV.effects[i][instructionXCMK]
-                        console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
+                        //console.log(`instructionXCMK=${instructionXCMK}, instructionXCMV`, instructionXCMV)
                         this.processInternalXCMInstructionBeneficiary(dXcmMsg, instructionV.effects[i], instructionXCMK, instructionXCMV)
                     }
                 }
@@ -786,7 +786,7 @@ module.exports = class ChainParser {
             case 'multisig:asMulti':
                 if (fromAddress != undefined && Array.isArray(params.other_signatories) && params.threshold != undefined) {
                     let m = paraTool.computeMultisig(fromAddress, params.other_signatories, params.threshold)
-                    if (this.debugLevel >= paraTool.debugTracing) console.log(`processMultisig [${section_method}]`, m)
+                    //if (this.debugLevel >= paraTool.debugTracing) console.log(`processMultisig [${section_method}]`, m)
                     return m
                 }
                 break;
@@ -794,7 +794,7 @@ module.exports = class ChainParser {
                 //caller, addresses, threshold
                 if (fromAddress != undefined && Array.isArray(params.other_signatories)) {
                     let m = paraTool.computeMultisig(fromAddress, params.other_signatories, 1)
-                    if (this.debugLevel >= paraTool.debugTracing) console.log(`processMultisig [${section_method}]`, m)
+                    //if (this.debugLevel >= paraTool.debugTracing) console.log(`processMultisig [${section_method}]`, m)
                     return m
                 }
                 break;
@@ -865,31 +865,31 @@ module.exports = class ChainParser {
             let isHexEncoded = (typeof call === 'object') ? false : true
             //console.log(`[${extrinsic.extrinsicID}] descend into call`, call)
             if (!isHexEncoded && call_args != undefined) {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] descend into call=${call}, call_section=${call_section}, call_method=${call_method}, call_args`, call_args)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] descend into call=${call}, call_section=${call_section}, call_method=${call_method}, call_args`, call_args)
                 this.processOutgoingXCM(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args)
             } else {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] skip call=${call}, call_section=${call_section}, call_method=${call_method}, call.args`, call_args)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] skip call=${call}, call_section=${call_section}, call_method=${call_method}, call.args`, call_args)
             }
         }
         switch (module_section) {
             case 'xTransfer':
                 let outgoingXcmList0 = this.processOutgoingXTransfer(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTransfer`, outgoingXcmList0)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTransfer`, outgoingXcmList0)
                 //return outgoingXcmList
                 break;
             case 'xTokens':
                 let outgoingXcmList1 = this.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTokens`, outgoingXcmList1)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTokens`, outgoingXcmList1)
                 //return outgoingXcmList
                 break;
             case 'xcmPallet':
                 let outgoingXcmList2 = this.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
                 //return outgoingXcmList
                 break;
             case 'polkadotXcm':
                 let outgoingXcmList3 = this.processOutgoingPolkadotXcm(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM polkadotXcm`, outgoingXcmList3)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM polkadotXcm`, outgoingXcmList3)
                 //return outgoingXcmList
                 break;
             default:
@@ -954,7 +954,7 @@ module.exports = class ChainParser {
                         console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
                     }
                 }
-                console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
+                //console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
                 //console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] eventRange`,eventRange)
                 //update xcmMessages
                 indexer.updateMPState(mpState)
@@ -969,12 +969,12 @@ module.exports = class ChainParser {
                             indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
                         }
                     }
-                    console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
+                    //console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
                     if (candiateCnt == 0) {
                         let lastEvent = eventRange[eventRange.length - 1]
                         if (lastEvent) {
                             let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, lastEvent, mpState, finalized)
-                            console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
+                            //console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
                             if (candidate) {
                                 candiateCnt++
                                 indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
@@ -982,7 +982,7 @@ module.exports = class ChainParser {
                         }
                     }
                 } else {
-                    console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
+                    //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
                 }
                 prevIdx = parseInt(idxKey) + 1
             }
@@ -1131,7 +1131,7 @@ module.exports = class ChainParser {
                     for (let j = 0; j < candidateCommitments.upwardMessages.length; j++) {
                         let upwardMsg = candidateCommitments.upwardMessages[j]
                         let channelMsgIndex = `${extrinsic.extrinsicID}-ump-${indexer.chainID}-${paraChainID}-${j}`
-                        if (this.debugLevel >= paraTool.debugTracing) console.log(`[${channelMsgIndex}] upwardMessages[${j}]`, upwardMsg)
+                        //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${channelMsgIndex}] upwardMessages[${j}]`, upwardMsg)
                         let uMsgs = this.decodeUpwardMsg(indexer, upwardMsg, hrmpWatermark, channelMsgIndex)
                         if (uMsgs) {
                             for (const uMsg of uMsgs) {
@@ -1191,7 +1191,7 @@ module.exports = class ChainParser {
                     let relayParentStorageRoot = data.validationData.relayParentStorageRoot
                     this.parserWatermark = hrmpWatermark
                     this.relayParentStorageRoot = relayParentStorageRoot
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark} (${relayParentStorageRoot})`)
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark} (${relayParentStorageRoot})`)
                     //update all outgoing trace msg with this hrmp
                     indexer.fixOutgoingUnknownSentAt(hrmpWatermark);
                 } catch (err1) {
@@ -1208,7 +1208,7 @@ module.exports = class ChainParser {
                     //console.log(`[${channelMsgIndex}] downwardMessages[${j}]`, downwardMsg)
                     //console.log(`[${extrinsic.extrinsicID}] downwardMessages[${j}]`, downwardMsg)
                     let dMsgs = this.decodeDownwardMsg(indexer, downwardMsg, channelMsgIndex)
-                    console.log(`decodeDownwardMsg downwardMessages[${j}]`, dMsgs)
+                    //console.log(`decodeDownwardMsg downwardMessages[${j}]`, dMsgs)
                     if (dMsgs) {
                         for (const dMsg of dMsgs) {
                             indexer.updateXCMChannelMsg(dMsg, this.parserBlockNumber, this.parserTS)
@@ -1272,10 +1272,10 @@ module.exports = class ChainParser {
             return fragments;
         } catch (e) {
             if (useApiAt) {
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcms [${msgHash}] apiAt decode failed. trying fallback`)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcms [${msgHash}] apiAt decode failed. trying fallback`)
                 return this.decodeXcmVersionedXcms(indexer, data, caller, false)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcms [${msgHash}](${data}) decode failed. error`, e.toString())
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcms [${msgHash}](${data}) decode failed. error`, e.toString())
                 return false
             }
         }
@@ -1287,7 +1287,7 @@ module.exports = class ChainParser {
         let remainingFound = false
         try {
             let instructions = api.registry.createType('XcmVersionedXcm', data);
-            if (this.debugLevel >= paraTool.debugInfo && !useApiAt) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] Fallback decode success!`)
+            //if (this.debugLevel >= paraTool.debugInfo && !useApiAt) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] Fallback decode success!`)
             //if (this.debugLevel >= paraTool.debugErrorOnly && !useApiAt) console.log(`decodeXcmVersionedXcm [${msgHash}](${data}) instructions`, instructions.toJSON())
             let instructionLen = instructions.toHex().length
             let dataLength = data.length
@@ -1305,15 +1305,15 @@ module.exports = class ChainParser {
                     "remainingMessage": remainingMessage,
                     "err": 'decodeXcmVersionedXcm found extra'
                 });
-                console.log(`!! instruction unparsed!!  remainingMessage=${remainingMessage}(len=${remainingMessage.length})`)
+                //console.log(`!! instruction unparsed!!  remainingMessage=${remainingMessage}(len=${remainingMessage.length})`)
             }
             return [instructions, remainingFound]
         } catch (err) {
             if (useApiAt) {
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] apiAt decode failed. trying fallback`)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}] apiAt decode failed. trying fallback`)
                 return this.decodeXcmVersionedXcm(indexer, data, caller, false)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}](${data}) decode failed. error`, err.toString())
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${caller}] decodeXcmVersionedXcm [${msgHash}](${data}) decode failed. error`, err.toString())
                 indexer.logger.error({
                     "op": "decodeXcmVersionedXcm",
                     "msg": "parsed failed",
@@ -1342,21 +1342,21 @@ module.exports = class ChainParser {
             let sentAt = paraTool.dechexToInt(hrmpWatermark)
             var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decodeUpwardMsg-${channelMsgIndex}`)
             if (!xcmFragments) {
-                console.log(`xcmFragments decode failed`)
+                //console.log(`xcmFragments decode failed`)
                 return false
             }
             let umpXcms = []
             for (let i = 0; i < xcmFragments.length; i++) {
                 let xcm = xcmFragments[i]
-                console.log(`xcmFragment`, xcm)
+                //console.log(`xcmFragment`, xcm)
                 var umpMsg = xcm.msg
                 var msg0 = xcm.msg
                 var msgHex = xcm.hex
                 var mHash = xcm.msgHash
                 let beneficiaries = this.getBeneficiary(msg0)
-                console.log(`[Extrinsic] Incoming upwardMsg [${mHash}] beneficiaries=${beneficiaries}`)
+                //console.log(`[Extrinsic] Incoming upwardMsg [${mHash}] beneficiaries=${beneficiaries}`)
                 let p = this.getInstructionPath(umpMsg)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`upwardMsg`, JSON.stringify(umpMsg, null, 2))
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`upwardMsg`, JSON.stringify(umpMsg, null, 2))
                 let r = {
                     msgIndex: (xcmFragments.length > 1) ? `${channelMsgIndex}-${i}` : channelMsgIndex,
                     chainID: chainID,
@@ -1376,13 +1376,13 @@ module.exports = class ChainParser {
                     r.version = p.version
                     r.path = p.path
                 }
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`upwardMsg [${mHash}] [${channelMsgIndex}-${i}]`, r)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`upwardMsg [${mHash}] [${channelMsgIndex}-${i}]`, r)
                 umpXcms.push(r)
             }
             return umpXcms
             //return r
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeUpwardMsg decode failed. error`, e.toString())
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeUpwardMsg decode failed. error`, e.toString())
             return false
         }
     }
@@ -1409,21 +1409,21 @@ module.exports = class ChainParser {
             //console.log(`decodeDownwardMsg`, downwardMsg)
             var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decodeDownwardMsg-${channelMsgIndex}`)
             if (!xcmFragments) {
-                console.log(`xcmFragments decode failed`)
+                //console.log(`xcmFragments decode failed`)
                 return false
             }
             let dmpXcms = []
             for (let i = 0; i < xcmFragments.length; i++) {
                 let xcm = xcmFragments[i]
-                console.log(`xcmFragment`, xcm)
+                //console.log(`xcmFragment`, xcm)
                 var dmpMsg = xcm.msg
                 var msg0 = xcm.msg
                 var msgHex = xcm.hex
                 var mHash = xcm.msgHash
                 let beneficiaries = this.getBeneficiary(msg0)
-                console.log(`[Extrinsic] Incoming downwardMsg [${mHash}] beneficiaries=${beneficiaries}`)
+                //console.log(`[Extrinsic] Incoming downwardMsg [${mHash}] beneficiaries=${beneficiaries}`)
                 let p = this.getInstructionPath(dmpMsg)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`downwardMsg`, JSON.stringify(dmpMsg, null, 2))
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`downwardMsg`, JSON.stringify(dmpMsg, null, 2))
                 let r = {
                     msgIndex: (xcmFragments.length > 1) ? `${channelMsgIndex}-${i}` : channelMsgIndex,
                     chainID: chainID,
@@ -1443,13 +1443,13 @@ module.exports = class ChainParser {
                     r.version = p.version
                     r.path = p.path
                 }
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`downwardMsg [${mHash}] [${channelMsgIndex}-${i}]`, r)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`downwardMsg [${mHash}] [${channelMsgIndex}-${i}]`, r)
                 dmpXcms.push(r)
             }
             return dmpXcms
             //return r
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeDownwardMsg decode failed. error`, e.toString())
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeDownwardMsg decode failed. error`, e.toString())
             return false
         }
     }
@@ -1470,27 +1470,27 @@ module.exports = class ChainParser {
             let chainID = pieces[4]
             let data = '0x' + horizontalMsg.data.slice(4)
             if (horizontalMsg.data == undefined) {
-                console.log(`horizontalMsg data fatal case!!`, JSON.stringify(horizontalMsg, null, 2))
+                //console.log(`horizontalMsg data fatal case!!`, JSON.stringify(horizontalMsg, null, 2))
             }
             if (horizontalMsg.sentAt == undefined && horizontalMsg.pubSentAt == undefined) {
-                console.log(`horizontalMsg sentAt fatal case!!`, JSON.stringify(hrmpMsg, null, 2))
+                //console.log(`horizontalMsg sentAt fatal case!!`, JSON.stringify(hrmpMsg, null, 2))
             }
             let sentAt = (horizontalMsg.sentAt != undefined) ? paraTool.dechexToInt(horizontalMsg.sentAt) : paraTool.dechexToInt(horizontalMsg.pubSentAt)
             var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `decodeHorizontalMsg-${channelMsgIndex}`)
             if (!xcmFragments) {
-                console.log(`xcmFragments decode failed`)
+                //console.log(`xcmFragments decode failed`)
                 return false
             }
             let hrmpXcms = []
             for (let i = 0; i < xcmFragments.length; i++) {
                 let xcm = xcmFragments[i]
-                console.log(`xcmFragment`, xcm)
+                //console.log(`xcmFragment`, xcm)
                 var hrmpMsg = xcm.msg
                 var msg0 = xcm.msg
                 var msgHex = xcm.hex
                 var mHash = xcm.msgHash
                 let beneficiaries = this.getBeneficiary(msg0)
-                console.log(`[Extrinsic] Incoming horizontalMsg [${mHash}] beneficiaries=${beneficiaries}`)
+                //console.log(`[Extrinsic] Incoming horizontalMsg [${mHash}] beneficiaries=${beneficiaries}`)
                 let p = this.getInstructionPath(hrmpMsg)
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`horizontalMsg`, JSON.stringify(hrmpMsg, null, 2))
                 let r = {
@@ -1512,13 +1512,13 @@ module.exports = class ChainParser {
                     r.version = p.version
                     r.path = p.path
                 }
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`horizontalMsg [${mHash}] [${channelMsgIndex}-${i}]`, r)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`horizontalMsg [${mHash}] [${channelMsgIndex}-${i}]`, r)
                 hrmpXcms.push(r)
             }
             return hrmpXcms
             //return r
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeHorizontalMsg decode failed. error`, e.toString())
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeHorizontalMsg decode failed. error`, e.toString())
             return false
         }
     }
@@ -1689,7 +1689,7 @@ module.exports = class ChainParser {
                 chainIDDest = paraTool.chainIDKusama;
             }
         } else {
-            console.log(`processX2 unknown v0x1`, x2)
+            //console.log(`processX2 unknown v0x1`, x2)
         }
         return [paraIDDest, chainIDDest]
     }
@@ -1770,7 +1770,7 @@ module.exports = class ChainParser {
                 paraIDDest = 0
                 chainIDDest = relayChainID
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x2_1`, x2)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x2_1`, x2)
             }
             //let accKey = x2[1]
             destAddress = this.processAccountKey(x2[1], decorate, indexer)
@@ -1817,7 +1817,7 @@ module.exports = class ChainParser {
                 paraIDDest = 0
                 chainIDDest = relayChainID
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x3_1`, x3_1)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x3_1`, x3_1)
             }
             //let accKey = x3[2]
             destAddress = this.processAccountKey(x3[2], decorate, indexer)
@@ -1835,7 +1835,7 @@ module.exports = class ChainParser {
         } else if (accKey.accountKey20 != undefined && accKey.accountKey20.key != undefined) {
             destAddress = paraTool.getPubKey(accKey.accountKey20.key);
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log('accKey unknown', accKey)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log('accKey unknown', accKey)
         }
         return destAddress
     }
@@ -1848,8 +1848,8 @@ module.exports = class ChainParser {
             return this.xcmMsgFilter(`${ev.section}(${ev.method})`);
         })
         if (xTokensEvents.length == 0) return
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent found len=${xTokensEvents.length}`, xTokensEvents)
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent msgHash len=${xcmMsgHashEvents.length}`, xcmMsgHashEvents)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent found len=${xTokensEvents.length}`, xTokensEvents)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXCMFromXTokensEvent msgHash len=${xcmMsgHashEvents.length}`, xcmMsgHashEvents)
         extrinsic.xcms = []
         for (let i = 0; i < xTokensEvents.length; i++) {
             let xTokensEvent = xTokensEvents[i]
@@ -1944,16 +1944,16 @@ module.exports = class ChainParser {
         let paraID = paraTool.getParaIDfromChainID(chainID)
         let dest = evetnData[3] //XcmV1MultilocationJunctions
         let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
+        //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
         if (chainIDDest == -1 || paraIDDest == -1) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
             return
         }
 
         let aAsset = evetnData[1] //Vec<XcmV1MultiAsset>
         if (aAsset != undefined && Array.isArray(aAsset)) {
             // todo: extract this
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent xTokens:transferMultiasset`)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokensEvent xTokens:transferMultiasset`)
             let assetArr = []
             //let aAssetv1 = aAsset.v1
             //assetArr.push(aAsset)
@@ -1986,7 +1986,7 @@ module.exports = class ChainParser {
                 transferIndex++
             }
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset asset unknown`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset asset unknown`)
         }
 
         for (const assetAndAmountSent of assetAndAmountSents) {
@@ -2023,12 +2023,12 @@ module.exports = class ChainParser {
                     xcmType: "xcmtransfer",
                 }
                 if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
-                console.log(`processOutgoingXTokensEvent`, r)
+                //console.log(`processOutgoingXTokensEvent`, r)
                 //outgoingXTokens.push(r)
                 extrinsic.xcms.push(r)
                 //outgoingXcmList.push(r)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens unknown asset/amountSent`);
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens unknown asset/amountSent`);
             }
         }
 
@@ -2038,58 +2038,55 @@ module.exports = class ChainParser {
         let paraIDDest = -1;
         let chainIDDest = -1;
         let destAddress = false;
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest`, JSON.stringify(dest, null, 4))
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest`, JSON.stringify(dest, null, 4))
         if (dest.v1 !== undefined && dest.v1.interior !== undefined) {
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior`)
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior`)
             let destV1Interior = dest.v1.interior;
             // dest for relaychain
             if (destV1Interior.x1 !== undefined) {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior x1`)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior x1`)
                 // {"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}
                 let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX1(destV1Interior.x1, relayChain)
                 return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             } else if (destV1Interior.x2 !== undefined) {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior x2`)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest v1 interior x2`)
                 // dest for parachain, add 20000 for kusama-relay
                 // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
                 let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX2(destV1Interior.x2, relayChain)
                 return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             }
         } else if (dest.x2 != undefined) {
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest dest x2`)
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest dest x2`)
             //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
             let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX2(dest.x2, relayChain)
             return [targetParaIDDest, targetChainIDDest, targetDestAddress]
         } else if (dest.x3 != undefined) {
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest dest x3`)
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest dest x3`)
             //0xbe57dd955bc7aca3bf91626e38ee2349df871240e2695c5115e3ffb27e92e925
             let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX3(dest.x3, relayChain)
             return [targetParaIDDest, targetChainIDDest, targetDestAddress]
         } else if (dest.interior !== undefined) {
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior`)
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior`)
             let destInterior = dest.interior;
             // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
             if (destInterior.x1 !== undefined) {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior x1`, JSON.stringify(destInterior.x1, null, 4))
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior x1`, JSON.stringify(destInterior.x1, null, 4))
                 let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX1(destInterior.x1, relayChain)
                 return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             } else if (destInterior.x2 !== undefined) {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior x2`)
-                // 0x9576445f90c98fe89e752d20020b9825543e9076d93cae52a59299a1625bd1c6
-                // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior x2`)
                 let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX2(destInterior.x2, relayChain)
                 return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             } else if (destInterior.x3 !== undefined) {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior x3`)
-                // 0x4508d07a10c09203fd9c9687712e3654a409ee2c6d023255a673c98d9812ea23
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`processDest destInterior x3`)
                 // [{"parachain":2001},{"accountId32":{"network":{"any":null},"id":"0xbc7668c63c9f8869ed84996865a32d400bbee0a86ae8d204b4f990e617ed6a1c"}}]
                 let [targetParaIDDest, targetChainIDDest, targetDestAddress] = this.processX3(destInterior.x3, relayChain)
                 return [targetParaIDDest, targetChainIDDest, targetDestAddress]
             } else {
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`Unknown dest.interior`, JSON.stringify(dest, null, 2))
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`Unknown dest.interior`, JSON.stringify(dest, null, 2))
             }
         } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`Unknown dest`, JSON.stringify(dest, null, 2))
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`Unknown dest`, JSON.stringify(dest, null, 2))
         }
         //console.log(`processDest paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
         return [paraIDDest, chainIDDest, destAddress]
@@ -2154,9 +2151,9 @@ module.exports = class ChainParser {
                 let chainID = indexer.chainID
                 let paraID = paraTool.getParaIDfromChainID(chainID)
                 let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
                 if (chainIDDest == -1 || paraIDDest == -1) {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
                     return
                 }
 
@@ -2175,11 +2172,11 @@ module.exports = class ChainParser {
                         }
                         assetAndAmountSents.push(aa)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log("xTransfer:transfer asset unknown", a);
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("xTransfer:transfer asset unknown", a);
                         asset = false;
                     }
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset unknown case`, section_method)
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset unknown case`, section_method)
                 }
 
                 for (const assetAndAmountSent of assetAndAmountSents) {
@@ -2221,20 +2218,20 @@ module.exports = class ChainParser {
                             if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
                             if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
                         }
-                        console.log("processOutgoingXTokens xTokens", r);
+                        //console.log("processOutgoingXTokens xTokens", r);
                         outgoingXTransfer.push(r)
                         extrinsic.xcms.push(r)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTransfer xTokens unknown asset/amountSent`);
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTransfer xTokens unknown asset/amountSent`);
                     }
                 }
 
             } else {
                 // TODO: tally errors in logger
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processOutgoingXTransfer Unknown`, `module:${section_method}`);
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processOutgoingXTransfer Unknown`, `module:${section_method}`);
             }
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXTransfer error`, e)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXTransfer error`, e)
         }
         return outgoingXTransfer;
     }
@@ -2265,9 +2262,9 @@ module.exports = class ChainParser {
                 // dest for relaychain  {"v1":{"parents":1,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}}}}
 
                 let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
                 if (chainIDDest == -1 || paraIDDest == -1) {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
                     return
                 }
 
@@ -2316,7 +2313,7 @@ module.exports = class ChainParser {
                         transferIndex++
                     }
                 } else if (section_method == "xTokens:transferMultiasset" && a.asset != undefined) {
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens new case`, section_method)
+                    //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens new case`, section_method)
                     /*
                     "asset": {
                     {
@@ -2345,7 +2342,7 @@ module.exports = class ChainParser {
                     let aAsset = a.asset
                     if (aAsset.v1 !== undefined) {
                         // todo: extract this
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset`)
+                        //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset`)
                         let aAssetv1 = aAsset.v1
                         let transferIndex = 0
                         let assetArr = []
@@ -2366,16 +2363,16 @@ module.exports = class ChainParser {
                                 }
                                 assetAndAmountSents.push(aa)
                             } else {
-                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("asset v1 unknown", asset);
+                                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("asset v1 unknown", asset);
                                 asset = false;
                             }
                             transferIndex++
                         }
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset asset unknown`)
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset asset unknown`)
                     }
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset unknown case`, section_method)
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens:transferMultiasset unknown case`, section_method)
                 }
 
                 for (const assetAndAmountSent of assetAndAmountSents) {
@@ -2417,16 +2414,16 @@ module.exports = class ChainParser {
                         extrinsic.xcms.push(r)
                         //outgoingXcmList.push(r)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens unknown asset/amountSent`);
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens unknown asset/amountSent`);
                     }
                 }
 
             } else {
                 // TODO: tally errors in logger
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processOutgoingXTokens Unknown`, `module:${section_method}`);
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processOutgoingXTokens Unknown`, `module:${section_method}`);
             }
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXTokens error`, e)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXTokens error`, e)
         }
         return outgoingXTokens;
     }
@@ -2438,11 +2435,11 @@ module.exports = class ChainParser {
             let e = events[i];
             let sectionMethod = `${e.section}(${e.method})`
             if (sectionMethod == 'system(ExtrinsicFailed)') {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
                 incomplete = 1
                 return incomplete;
             } else if (sectionMethod == 'xTokens(TransferFailed)') {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
                 incomplete = 1
                 return incomplete;
             } else if ((e.section == "xcmPallet" || e.section == "polkadotXcm") && e.method == "Attempted") {
@@ -2455,7 +2452,7 @@ module.exports = class ChainParser {
                         if (d.incomplete !== undefined) {
                             let info = d.incomplete; // [1000000000,{"failedToTransactAsset":null}]
                             incomplete = 1;
-                            if (this.debugLevel >= paraTool.debugTracing) console.log("extract_xcm_incomplete INCOMPLETE");
+                            //if (this.debugLevel >= paraTool.debugTracing) console.log("extract_xcm_incomplete INCOMPLETE");
                             return (incomplete);
                         }
                     }
@@ -2537,7 +2534,7 @@ module.exports = class ChainParser {
         let rawTargetedAsset = false;
         let targetSymbol = false;
         let targetXcmInteriorKey = false;
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`processV1ConcreteFungible asset`, fungibleAsset)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`processV1ConcreteFungible asset`, fungibleAsset)
         if (fungibleAsset.id != undefined && fungibleAsset.id.null !== undefined) {
             targetSymbol = indexer.getNativeSymbol()
             //targetedAsset = indexer.getNativeAsset()
@@ -2555,13 +2552,13 @@ module.exports = class ChainParser {
                         targetSymbol = indexer.getNativeSymbol()
                         //targetedAsset = indexer.getNativeAsset()
                         //rawTargetedAsset = indexer.getNativeAsset()
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:0, here`, targetSymbol)
+                        //if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:0, here`, targetSymbol)
                     } else if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 1) {
                         //ump
                         targetSymbol = indexer.getRelayChainSymbol()
                         //targetedAsset = indexer.getRelayChainAsset()
                         //rawTargetedAsset = indexer.getRelayChainAsset()
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:1, here`, targetSymbol)
+                        //if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:1, here`, targetSymbol)
                     }
                     //} else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
                 } else {
@@ -2586,11 +2583,11 @@ module.exports = class ChainParser {
                             //x2/x3...
                             for (const v of v1_id_concrete_interiorVal) {
                                 new_v1_id_concrete_interiorVal.push(v)
-                                if (this.debugLevel >= paraTool.debugInfo) console.log(`${indexer.chainID}, [parents=${v1_id_concrete_parents}] expandedkey ${JSON.stringify(v1_id_concrete_interiorVal)} ->  ${JSON.stringify(new_v1_id_concrete_interiorVal)}`)
+                                //if (this.debugLevel >= paraTool.debugInfo) console.log(`${indexer.chainID}, [parents=${v1_id_concrete_parents}] expandedkey ${JSON.stringify(v1_id_concrete_interiorVal)} ->  ${JSON.stringify(new_v1_id_concrete_interiorVal)}`)
                             }
                             //new_v1_id_concrete_interiorVal.concat(v1_id_concrete_interiorVal)
                         } else {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
+                            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
                         }
                         v1_id_concrete_interiorVal = new_v1_id_concrete_interiorVal
                     }
@@ -2617,7 +2614,7 @@ module.exports = class ChainParser {
                             targetSymbol = symbol
                         }
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
                         //lookup failed... should store the interiorVStr some where else for further debugging
                         //targetedAsset = interiorVStr
                         //rawTargetedAsset = interiorVStr
@@ -2625,10 +2622,10 @@ module.exports = class ChainParser {
                 }
 
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible unknown v1.id.concrete unknown!`, JSON.stringify(v1_id_concrete, null, 2))
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible unknown v1.id.concrete unknown!`, JSON.stringify(v1_id_concrete, null, 2))
             }
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible fungibleAsset unknown id not found?`, fungibleAsset)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible fungibleAsset unknown id not found?`, fungibleAsset)
         }
         return [targetSymbol, relayChain]
         //return [targetedAsset, rawTargetedAsset]
@@ -2673,7 +2670,7 @@ module.exports = class ChainParser {
           }
         },
         */
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`fungibleAsset`, fungibleAsset)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`fungibleAsset`, fungibleAsset)
         if (fungibleAsset.id != undefined) {
             let fungibleAsset_id = fungibleAsset.id
             let xType = Object.keys(fungibleAsset_id)[0]
@@ -2725,11 +2722,11 @@ module.exports = class ChainParser {
                             }
                             interiorVStr = JSON.stringify(new_interiorV0)
                         } else {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible unknown fungibleAsset type [${xType}]`, JSON.stringify(interiorV0, null, 2))
+                            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible unknown fungibleAsset type [${xType}]`, JSON.stringify(interiorV0, null, 2))
                         }
                         break;
                 }
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible derived interiorVStr [${xType}] ${JSON.stringify(interiorV0)} -> ${interiorVStr}`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible derived interiorVStr [${xType}] ${JSON.stringify(interiorV0)} -> ${interiorVStr}`)
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
@@ -2749,9 +2746,9 @@ module.exports = class ChainParser {
                         targetSymbol = symbol
 
                     }
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`xcmInteriorKey ${xcmInteriorKey} Found -> targetSymbol=${targetSymbol} (${relayChain})`)
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`xcmInteriorKey ${xcmInteriorKey} Found -> targetSymbol=${targetSymbol} (${relayChain})`)
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible cachedXcmAssetInfo lookup failed! [${xType}]`, xcmInteriorKey)
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible cachedXcmAssetInfo lookup failed! [${xType}]`, xcmInteriorKey)
                     //targetedAsset = interiorVStr
                     //rawTargetedAsset = interiorVStr
                 }
@@ -2760,9 +2757,9 @@ module.exports = class ChainParser {
 
         if (fungibleAsset.amount !== undefined) {
             amountSent = paraTool.dechexToInt(fungibleAsset.amount);
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`fungibleAsset amountSent`, amountSent)
+            //if (this.debugLevel >= paraTool.debugVerbose) console.log(`fungibleAsset amountSent`, amountSent)
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processV0ConcreteFungible fungibleAsset unknown", fungibleAsset);
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processV0ConcreteFungible fungibleAsset unknown", fungibleAsset);
             //targetedAsset = false;
             //rawTargetedAsset = false;
         }
@@ -2797,7 +2794,7 @@ module.exports = class ChainParser {
                 break;
             case 'x3':
                 [paraIDDest, chainIDDest, destAddress] = this.processX3(beneficiaryV, relayChain, true, indexer)
-                console.log(`x3!!!! paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`, JSON.stringify(beneficiaryV, null, 4))
+            //console.log(`x3!!!! paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`, JSON.stringify(beneficiaryV, null, 4))
                 if (isInterior) {
                     beneficiary['interior'][beneficiaryType] = beneficiaryV
                 } else {
@@ -2814,7 +2811,7 @@ module.exports = class ChainParser {
                     // I think this this can happen when xcmPallet to para?
                     [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV0V, relayChain, true, indexer)
                 } else {
-                    console.log(`unknown beneficiaryV0XType=${beneficiaryV0XType}`)
+                    //console.log(`unknown beneficiaryV0XType=${beneficiaryV0XType}`)
                     break;
                 }
                 if (isInterior) {
@@ -2836,7 +2833,7 @@ module.exports = class ChainParser {
                         // I think this this can happen when xcmPallet to para?
                         [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV1VInteriorV, relayChain, true, indexer)
                     } else {
-                        console.log(`unknown beneficiaryV1VInteriorXType=${beneficiaryV1VInteriorXType}`)
+                        //console.log(`unknown beneficiaryV1VInteriorXType=${beneficiaryV1VInteriorXType}`)
                         break;
                     }
                     if (isInterior) {
@@ -2845,11 +2842,11 @@ module.exports = class ChainParser {
                         beneficiary[beneficiaryType][beneficiaryV1XType]['interior'][beneficiaryV1VInteriorXType] = beneficiaryV1VInteriorV
                     }
                 } else {
-                    console.log(`unknown beneficiaryV1V interior not exist`)
+                    //console.log(`unknown beneficiaryV1V interior not exist`)
                 }
                 break;
             case 'v2':
-                console.log(`unknown beneficiaryV2Type=${beneficiaryV}`)
+            //console.log(`unknown beneficiaryV2Type=${beneficiaryV}`)
                 break;
             default:
                 console.log(`unknown beneficiaryType ${beneficiaryType}`)
@@ -2895,8 +2892,6 @@ module.exports = class ChainParser {
                     } else if (beneficiary.v1 !== undefined) {
                         //console.log(`beneficiary.v1 case`, JSON.stringify(beneficiary.v1, null, 2))
                         //console.log("beneficiary v1=", JSON.stringify(a.beneficiary.v1));
-                        //0xfda47f26aa64e7824f6791162bfa87de83bfaa67c57f614299b5e1b687eb13b2
-                        //0x3a47436114ee38a5d93cb3f248127464dd1be797cdf174f8759bfcbf6503952c
                         if (beneficiary.v1.interior !== undefined) {
                             let beneficiaryV1Interior = beneficiary.v1.interior;
                             // dest for relaychain
@@ -2905,19 +2900,17 @@ module.exports = class ChainParser {
                             } else if (beneficiaryV1Interior.x2 !== undefined) {
                                 [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV1Interior.x2, relayChain)
                             } else {
-                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1.interior unknown case`, beneficiaryV1Interior)
+                                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1.interior unknown case`, beneficiaryV1Interior)
                             }
                         } else {
                             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1 unknown case`, beneficiary.v1)
                         }
                     } else if (beneficiary.x1 !== undefined) {
-                        //0x87d746fe20eb988a34a45b515ce8e09868ffd4dba725a5cfb941cb11dc37a51c
                         [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary.x1, relayChain)
                     } else if (beneficiary.x2 !== undefined) {
-                        //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
                         [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x2, relayChain)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown beneficiary`, beneficiary)
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown beneficiary`, beneficiary)
                     }
                 }
                 // dest processing
@@ -2939,9 +2932,9 @@ module.exports = class ChainParser {
                         //MK check
                         //0x98324306c4ae1a6ecb9ab3798ba3a300e5a7cdef377fccb9ee716209d4c16891
                         [paraIDDest, chainIDDest] = this.processDestV0X2(dest_v0.x2, relayChain)
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}`)
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}`)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] dest v0 unk = `, JSON.stringify(dest.v0));
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] dest v0 unk = `, JSON.stringify(dest.v0));
                         chainIDDest = false
                     }
                 } else if ((dest.v1 !== undefined) && (dest.v1.interior !== undefined)) {
@@ -2952,14 +2945,14 @@ module.exports = class ChainParser {
                         //[paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
                         [paraIDDest, chainIDDest] = this.processDestV0X1(destV1Interior.x1, relayChain)
                     } else if (destV1Interior.x2 !== undefined) {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
                         // dest for parachain, add 20000 for kusama-relay
                         [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
                     } else if (dest.v1.parents !== undefined && dest.v1.parents == 1 && destV1Interior != undefined && destV1Interior.here !== undefined) {
                         paraIDDest = 0
                         chainIDDest = paraTool.getChainIDFromParaIDAndRelayChain(0, relayChain)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
                         chainIDDest = false
                     }
                 }
@@ -2986,12 +2979,12 @@ module.exports = class ChainParser {
                                 }
                                 */
                                 let fungibleAsset = asset.concreteFungible;
-                                if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] processV0ConcreteFungible`)
+                                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] processV0ConcreteFungible`)
                                 //let [targetedAsset, rawTargetedAsset, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
                                 //rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingPolkadotXcm - processV0ConcreteFungible", fungibleAsset)
                                 let [targetedSymbol, targetedRelayChain, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
                                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV0ConcreteFungible", `processOutgoingPolkadotXcm ${section_method}`, fungibleAsset)
-                                if (this.debugLevel >= paraTool.debugVerbose) console.log(`targetedSymbol=${targetedSymbol}, amountSent=${amountSent}`)
+                                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`targetedSymbol=${targetedSymbol}, amountSent=${amountSent}`)
                                 let aa = {
                                     //asset: targetedAsset,
                                     //rawAsset: rawTargetedAsset,
@@ -3001,14 +2994,14 @@ module.exports = class ChainParser {
                                     transferIndex: transferIndex,
                                     isFeeItem: (transferIndex == feeAssetIndex) ? 1 : 0,
                                 }
-                                if (this.debugLevel >= paraTool.debugInfo) console.log(`assetAndAmountSents`, aa)
+                                //if (this.debugLevel >= paraTool.debugInfo) console.log(`assetAndAmountSents`, aa)
                                 assetAndAmountSents.push(aa)
                             }
                             transferIndex++
                         }
                     } else if (assets.v1 !== undefined && Array.isArray(assets.v1) && assets.v1.length > 0) {
                         // todo: extract this
-                        if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] polkadotXcm assets.v1 case`)
+                        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] polkadotXcm assets.v1 case`)
                         let assetsv1 = assets.v1
                         let transferIndex = 0
                         for (const asset of assetsv1) {
@@ -3026,14 +3019,12 @@ module.exports = class ChainParser {
                                 }
                                 assetAndAmountSents.push(aa)
                             } else {
-                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("polkadotXcm asset v1 unknown", asset);
+                                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("polkadotXcm asset v1 unknown", asset);
                                 asset = false;
                             }
                             transferIndex++
                         }
                     }
-
-
 
                     for (const assetAndAmountSent of assetAndAmountSents) {
                         let targetedSymbol = assetAndAmountSent.xcmSymbol
@@ -3069,12 +3060,12 @@ module.exports = class ChainParser {
                                 xcmInteriorKey: targetedXcmInteriorKey,
                                 xcmType: "xcmtransfer",
                             }
-                            if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingPolkadotXcm xcmPallet", r);
+                            //if (this.debugLevel >= paraTool.debugTracing) console.log("processOutgoingPolkadotXcm xcmPallet", r);
                             outgoingXcmPallet.push(r)
                             extrinsic.xcms.push(r)
                             //outgoingXcmList.push(r)
                         } else if (incomplete) {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer incomplete `, `module:${section_method}`, a);
+                            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer incomplete `, `module:${section_method}`, a);
                             // TODO: tally error
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcms.length
@@ -3102,18 +3093,18 @@ module.exports = class ChainParser {
                                 xcmInteriorKey: targetedXcmInteriorKey,
                                 xcmType: "xcmtransfer",
                             }
-                            console.log("processOutgoingPolkadotXcm xcmPallet incomplete", r);
+                            //console.log("processOutgoingPolkadotXcm xcmPallet incomplete", r);
                             //outgoingXcmPallet.push(r)
                             //extrinsic.xcms.push(r)
                         } else {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer unknown `, `module:${section_method}`, a);
+                            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer unknown `, `module:${section_method}`, a);
                             // TODO: tally error
                         }
                     }
                 }
             }
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingPolkadotXcm error`, e)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingPolkadotXcm error`, e)
             return outgoingXcmPallet
         }
         return outgoingXcmPallet
@@ -3168,10 +3159,10 @@ module.exports = class ChainParser {
                             } else if (beneficiaryV1Interior.x2 !== undefined) {
                                 [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV1Interior.x2, relayChain)
                             } else {
-                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1.interior unknown case`, beneficiaryV1Interior)
+                                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1.interior unknown case`, beneficiaryV1Interior)
                             }
                         } else {
-                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1 unknown case`, beneficiary.v1)
+                            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1 unknown case`, beneficiary.v1)
                         }
                     } else if (beneficiary.x1 !== undefined) {
                         //0x2cfbeb75fe9a1e13a3a6cf700c27d1afd53c7f164c127e60763c2e27b959e195
@@ -3180,7 +3171,7 @@ module.exports = class ChainParser {
                         //0x0f51db2f3f23091aa1c0108358160c958db46f62e08fcdda13d0d864841821ad
                         [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiary.x2, relayChain)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown beneficiary`, beneficiary)
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} Unknown beneficiary`, beneficiary)
                     }
                 }
                 // dest processing
@@ -3198,7 +3189,7 @@ module.exports = class ChainParser {
                         [paraIDDest, chainIDDest] = this.processDestV0X2(dest_v0.x2, relayChain)
 
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v0 unk = ", JSON.stringify(dest.v0));
                         chainIDDest = false
                     }
                 } else if ((dest.v1 !== undefined) && (dest.v1.interior !== undefined)) {
@@ -3209,11 +3200,11 @@ module.exports = class ChainParser {
                         //[paraIDDest, chainIDDest, destAddress] = this.processX1(destV1Interior.x1, relayChain)
                         [paraIDDest, chainIDDest] = this.processDestV0X1(destV1Interior.x1, relayChain)
                     } else if (destV1Interior.x2 !== undefined) {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV1Interior.x2`, destV1Interior.x2)
                         // dest for parachain, add 20000 for kusama-relay
                         [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
                     } else {
-                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
                         chainIDDest = false
                     }
                 }
@@ -3224,7 +3215,7 @@ module.exports = class ChainParser {
                     let assets = a.assets;
                     let feeAssetIndex = a.fee_asset_item
                     if (assets.v0 !== undefined && Array.isArray(assets.v0) && assets.v0.length > 0) {
-                        if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} v0 case`, JSON.stringify(a, null, 2))
+                        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} v0 case`, JSON.stringify(a, null, 2))
                         let assetsv0 = assets.v0
                         let transferIndex = 0
                         for (const asset of assetsv0) {
@@ -3256,7 +3247,7 @@ module.exports = class ChainParser {
                         }
                     } else if (assets.v1 !== undefined && Array.isArray(assets.v1) && assets.v1.length > 0) {
                         // todo: extract this
-                        if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] xcmPallet assets.v1 case`)
+                        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] xcmPallet assets.v1 case`)
                         let assetsv1 = assets.v1
                         let transferIndex = 0
                         for (const asset of assetsv1) {
@@ -3294,7 +3285,7 @@ module.exports = class ChainParser {
                                 }
                                 assetAndAmountSents.push(aa)
                             } else {
-                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("asset v1 unknown", asset);
+                                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("asset v1 unknown", asset);
                                 asset = false;
                             }
                             transferIndex++
@@ -3347,7 +3338,7 @@ module.exports = class ChainParser {
                 }
             }
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXcmPallet error`, e)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXcmPallet error`, e)
             return outgoingXcmPallet
         }
         return outgoingXcmPallet
@@ -3590,7 +3581,7 @@ module.exports = class ChainParser {
                 }
             }
         } catch (err) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceHrmp decode failed`, err.toString())
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceHrmp decode failed`, err.toString())
         }
         o.msgHashes = msgHashes
         o.xcmMessages = xcmMessages
@@ -3623,7 +3614,7 @@ module.exports = class ChainParser {
                 }
             }
         } catch (err) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceUmp decode failed`, err.toString())
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceUmp decode failed`, err.toString())
         }
         o.msgHashes = msgHashes
         o.xcmMessages = xcmMessages
@@ -3650,7 +3641,7 @@ module.exports = class ChainParser {
                 }
             }
         } catch (err) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceDmp decode failed`, err.toString())
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceDmp decode failed`, err.toString())
         }
         o.msgHashes = msgHashes
         o.xcmMessages = xcmMessages
@@ -3662,12 +3653,12 @@ module.exports = class ChainParser {
         //console.log(`decorateAutoTraceValidationData`, o)
         try {
             let v = JSON.parse(decoratedVal)
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`decorateAutoTraceValidationData`, v) //TODO: we can find  the parent's state root here at relayParentStorageRoot
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`decorateAutoTraceValidationData`, v) //TODO: we can find  the parent's state root here at relayParentStorageRoot
             let hrmpWatermark = paraTool.dechexToInt(v.relayParentNumber)
             this.parserWatermark = hrmpWatermark
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark: ${hrmpWatermark}`)
+            //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark: ${hrmpWatermark}`)
         } catch (err) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceValidationData error`, err.toString())
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${o.traceID}] decorateAutoTraceValidationData error`, err.toString())
         }
     }
 
@@ -3789,7 +3780,7 @@ module.exports = class ChainParser {
     }
 
     async processAccountIdentity(indexer, p, s, e2, rAssetkey, fromAddress) {
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAccountIdentity  ${fromAddress}`, e2);
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAccountIdentity  ${fromAddress}`, e2);
         try {
             // stub
         } catch (err) {
@@ -3825,7 +3816,7 @@ module.exports = class ChainParser {
                     aa["free"] = v.balance / 10 ** decimals;
                     let assetType = paraTool.assetTypeToken;
                     let assetChain = paraTool.makeAssetChain(rAssetkey, indexer.chainID)
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAssetsAccount  ${fromAddress}`, aa);
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAssetsAccount  ${fromAddress}`, aa);
                     indexer.updateAddressStorage(fromAddress, assetChain, "parallel:processAssetsAccount", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
                 } else {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processAssetsAccount MISSING pv", e2);
@@ -3859,21 +3850,21 @@ module.exports = class ChainParser {
                 beneficiaries: (msg.beneficiaries != undefined && msg.beneficiaries != '') ? msg.beneficiaries : null
             }
             if (xcmRec.msgType == 'dmp' && xcmRec.blockNumber != xcmRec.sentAt) {
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`duplicates ${msg.msgHash}`)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`duplicates ${msg.msgHash}`)
                 return false
             }
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processxcmMsgRaw error`, e.toString())
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processxcmMsgRaw error`, e.toString())
             return false
         }
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`processxcmMsgRaw xcmRec`, xcmRec)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`processxcmMsgRaw xcmRec`, xcmRec)
         return xcmRec
     }
 
     //mk: review this
     async processMPTrace(indexer, p, s, e2, mpType = false) {
         let sectionMethod = `${p}:${s}`
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`processMPTrace ${sectionMethod}`, e2);
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`processMPTrace ${sectionMethod}`, e2);
         try {
             let msgs = JSON.parse(e2.pv2)
             for (const msg of msgs) {
@@ -3883,7 +3874,7 @@ module.exports = class ChainParser {
                 }
             }
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processMPTrace err`, e.toString());
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processMPTrace err`, e.toString());
         }
         /*
          */
@@ -3891,7 +3882,7 @@ module.exports = class ChainParser {
     }
 
     async processAssetsAsset(indexer, p, s, e2) {
-        console.log(`processAssetsAsset ${p}:${s}`, e2)
+        //console.log(`processAssetsAsset ${p}:${s}`, e2)
         /*
         processAssetsAsset Assets Asset {
           bn: 440631,
@@ -3910,7 +3901,7 @@ module.exports = class ChainParser {
         let v = JSON.parse(e2.pv);
         let asset = e2.asset;
         let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, asset);
-        console.log(`processAssetsAsset rAssetkey=${rAssetkey}`, v)
+        //console.log(`processAssetsAsset rAssetkey=${rAssetkey}`, v)
         indexer.updateAssetMetadata(rAssetkey, v, paraTool.assetTypeToken, paraTool.assetSourceOnChain); // add currencyID
     }
 
@@ -3926,7 +3917,7 @@ module.exports = class ChainParser {
             flds.forEach((fld) => {
                 aa[fld] = e2[fld] / 10 ** chainDecimal;
             });
-            if (this.debugVerbose >= paraTool.debugVerbose) console.log(`${rAssetkey}`, e2, aa)
+            //if (this.debugVerbose >= paraTool.debugVerbose) console.log(`${rAssetkey}`, e2, aa)
             let assetChain = paraTool.makeAssetChain(rAssetkey, indexer.chainID);
             indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-tokens", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
         } else if (pallet_section == "Assets:Account") {
@@ -3934,7 +3925,7 @@ module.exports = class ChainParser {
         } else if (pallet_section == "Identity:IdentityOf" && indexer.chainID == paraTool.chainIDPolkadot) {
             await this.processAccountIdentity(indexer, p, s, e2, rAssetkey, fromAddress);
         } else {
-            console.log("UNK", p, s, e2);
+            //console.log("UNK", p, s, e2);
         }
         return;
     }
@@ -3949,7 +3940,7 @@ module.exports = class ChainParser {
         } else if (pallet_section == 'Assets:Asset') {
             await this.processAssetsAsset(indexer, p, s, e2);
         } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`process Asset: (unknown) ${pallet_section}`, JSON.stringify(e2));
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`process Asset: (unknown) ${pallet_section}`, JSON.stringify(e2));
         }
         return;
     }
@@ -3966,7 +3957,7 @@ module.exports = class ChainParser {
             //TODO
             await this.processMPTrace(indexer, p, s, e2, 'ump');
         } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`pallet_section ${pallet_section} not handled`)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`pallet_section ${pallet_section} not handled`)
         }
     }
 
@@ -3981,10 +3972,10 @@ module.exports = class ChainParser {
         let cachedAssetInfo = indexer.assetInfo[assetChain]
         if (cachedAssetInfo != undefined && cachedAssetInfo.decimals != undefined) {
             let issuance = e2.totalIssuance / 10 ** cachedAssetInfo.decimals
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`processBalancesTotalIssuance ${asset}, issuance=${issuance}, decimals=${cachedAssetInfo.decimals}`)
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`processBalancesTotalIssuance ${asset}, issuance=${issuance}, decimals=${cachedAssetInfo.decimals}`)
             indexer.updateAssetIssuance(e2.asset, issuance, paraTool.assetTypeToken);
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processBalancesTotalIssuance not found ${asset}`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processBalancesTotalIssuance not found ${asset}`)
             indexer.logger.debug({
                 "op": "acala-processBalancesTotalIssuance",
                 "msg": "getAssetDecimal"
@@ -3999,7 +3990,7 @@ module.exports = class ChainParser {
     async fetchXCMAssetRegistryLocations(indexer) {
         let isAcala = true;
         if (!indexer.api) {
-            console.log(`[fetchXCMAssetRegistryLocations] Fatal indexer.api not initiated`)
+            //console.log(`[fetchXCMAssetRegistryLocations] Fatal indexer.api not initiated`)
             return
         }
         let relayChain = indexer.relayChain
@@ -4099,7 +4090,7 @@ module.exports = class ChainParser {
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                 let updateXcmConcept = true
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
                     updateXcmConcept = false
                     //already cached
                 }
@@ -4121,7 +4112,7 @@ module.exports = class ChainParser {
                 //console.log(`xcmAssetInfo`, xcmAssetInfo)
                 if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetRegistryLocations');
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
         }
     }
@@ -4132,7 +4123,7 @@ module.exports = class ChainParser {
     //assetRegistry:assetIdType
     async fetchXCMAssetIdType(indexer) {
         if (!indexer.api) {
-            console.log(`[fetchXCMAssetIdType] Fatal indexer.api not initiated`)
+            //console.log(`[fetchXCMAssetIdType] Fatal indexer.api not initiated`)
             return
         }
         let relayChain = indexer.relayChain
@@ -4182,7 +4173,7 @@ module.exports = class ChainParser {
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                 let updateXcmConcept = true
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
                     updateXcmConcept = false
                     //already cached
                 }
@@ -4250,7 +4241,7 @@ module.exports = class ChainParser {
     async fetchXCMAssetIdToLocation(indexer) {
         let isAcala = true;
         if (!indexer.api) {
-            console.log(`[fetchXCMAssetIdToLocation] Fatal indexer.api not initiated`)
+            //console.log(`[fetchXCMAssetIdToLocation] Fatal indexer.api not initiated`)
             return
         }
         let relayChain = indexer.relayChain
@@ -4353,7 +4344,7 @@ module.exports = class ChainParser {
                 let updateXcmConcept = true
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     updateXcmConcept = false
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
                 }
 
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
@@ -4380,11 +4371,11 @@ module.exports = class ChainParser {
                     if (updateXcmConcept) {
                         let c = `('${asset}', '${indexer.chainID}', '${xcmAssetInfo.xcmInteriorKey}', '${xcContractAddress}')`
                         xcmInteriorUpdates.push(c)
-                        console.log(`xcmInteriorUpdates`, c)
+                        //console.log(`xcmInteriorUpdates`, c)
                     }
                 }
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
             }
         };
 
@@ -4413,7 +4404,7 @@ module.exports = class ChainParser {
         var a;
         switch (indexer.chainID) {
             case paraTool.chainIDListen:
-                console.log(`fetch currencies:listenAssetsInfo`)
+            //console.log(`fetch currencies:listenAssetsInfo`)
                 a = await indexer.api.query.currencies.listenAssetsInfo.entries()
                 break;
             case paraTool.chainIDMangataX:
@@ -4422,16 +4413,16 @@ module.exports = class ChainParser {
                 break;
             case paraTool.chainIDBasilisk:
             case paraTool.chainIDHydraDX:
-                console.log(`fetch assetRegistry:assetMetadataMap`)
+            //console.log(`fetch assetRegistry:assetMetadataMap`)
                 a = await indexer.api.query.assetRegistry.assetMetadataMap.entries()
                 break;
             default:
-                console.log(`fetch asset:metadata`)
+            //console.log(`fetch asset:metadata`)
                 a = await indexer.api.query.assets.metadata.entries()
                 break;
         }
         if (!a) {
-            console.log(`returned`)
+            //console.log(`returned`)
             return
         }
         let assetList = {}
@@ -4448,7 +4439,7 @@ module.exports = class ChainParser {
             let cachedAssetInfo = indexer.assetInfo[assetChain]
             if (cachedAssetInfo != undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
                 //cached found
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
                 assetList[asset] = cachedAssetInfo
             } else {
                 if (indexer.chainID == paraTool.chainIDListen) assetMetadata = assetMetadata.metadata
@@ -4463,13 +4454,13 @@ module.exports = class ChainParser {
                     };
                     if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
                         if (assetInfo.symbol.includes('LP-')) assetInfo.assetType = paraTool.assetTypeLiquidityPair
-                        console.log('im here fetchAsset assetInfo', assetInfo)
+                        //console.log('im here fetchAsset assetInfo', assetInfo)
                     }
                     assetList[asset] = assetInfo
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
+                    //if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
                     await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAsset');
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
             }
         }
@@ -4479,18 +4470,18 @@ module.exports = class ChainParser {
     //localAssets.metadata
     async fetchLocalAsset(indexer) {
         if (!indexer.api) {
-            console.log(`[fetchLocalAsset] Fatal indexer.api not initiated`)
+            //console.log(`[fetchLocalAsset] Fatal indexer.api not initiated`)
             return
         }
         var a;
         switch (indexer.chainID) {
             default:
-                console.log(`fetch localAssets:metadata`)
+            //console.log(`fetch localAssets:metadata`)
                 a = await indexer.api.query.localAssets.metadata.entries()
                 break;
         }
         if (!a) {
-            console.log(`returned`)
+            //console.log(`returned`)
             return
         }
         let assetList = {}
@@ -4507,7 +4498,7 @@ module.exports = class ChainParser {
             let cachedAssetInfo = indexer.assetInfo[assetChain]
             if (cachedAssetInfo != undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
                 //cached found
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
                 assetList[asset] = cachedAssetInfo
             } else {
                 if (assetMetadata.decimals !== false && assetMetadata.symbol) {
@@ -4521,14 +4512,14 @@ module.exports = class ChainParser {
                         isLocalAsset: 1,
                     };
                     assetList[asset] = assetInfo
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
+                    //if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
                     await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'localAssets');
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
             }
         }
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
     }
 
     //acala/karura/bifrost/basilisk
@@ -4544,14 +4535,14 @@ module.exports = class ChainParser {
         switch (indexer.chainID) {
             case paraTool.chainIDBifrostDOT:
             case paraTool.chainIDBifrostKSM:
-                console.log(`fetch assetRegistry:currencyMetadatas`)
+            //console.log(`fetch assetRegistry:currencyMetadatas`)
                 a = await indexer.api.query.assetRegistry.currencyMetadatas.entries()
                 isAcala = false
                 break;
             case paraTool.chainIDAcala:
             case paraTool.chainIDKarura:
             default:
-                console.log(`fetch assetRegistry:assetMetadatas`)
+            //console.log(`fetch assetRegistry:assetMetadatas`)
                 a = await indexer.api.query.assetRegistry.assetMetadatas.entries()
                 break;
         }
@@ -4580,7 +4571,7 @@ module.exports = class ChainParser {
             let cachedAssetInfo = indexer.assetInfo[assetChain]
             if (cachedAssetInfo != undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined && cachedAssetInfo.symbol != 'false') {
                 //cached found
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`cached AssetInfo found`, cachedAssetInfo)
                 assetList[assetChain] = cachedAssetInfo
             } else {
                 if (assetMetadata.decimals !== false && assetMetadata.symbol) {
@@ -4600,14 +4591,14 @@ module.exports = class ChainParser {
                         assetType: paraTool.assetTypeToken
                     };
                     assetList[assetChain] = assetInfo
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
+                    //if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
                     await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAssetRegistry');
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
             }
         }
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
     }
 
     //moonbeam/parallel/astar/statemine
@@ -4625,7 +4616,7 @@ module.exports = class ChainParser {
                     let nativeAssetString = indexer.getNativeAsset()
                     return nativeAssetString
                 } else {
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processDecHexCurrencyID currency_id unknown struct`, currency_id)
+                    //if (this.debugLevel >= paraTool.debugInfo) console.log(`processDecHexCurrencyID currency_id unknown struct`, currency_id)
                 }
             } else {
                 // numbers
@@ -4645,7 +4636,7 @@ module.exports = class ChainParser {
                     Token: assetInfo.symbol
                 }
                 assetString = this.token_to_string(rAasset);
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> ${assetString}`)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> ${assetString}`)
             }
         }
         return assetString
@@ -4666,7 +4657,7 @@ module.exports = class ChainParser {
                     let nativeAssetString = indexer.getNativeAsset()
                     return nativeAssetString
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processRawDecHexCurrencyID currency_id unknown struct`, currency_id)
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processRawDecHexCurrencyID currency_id unknown struct`, currency_id)
                 }
             } else {
                 // numbers
@@ -4699,7 +4690,7 @@ module.exports = class ChainParser {
                     Token: assetInfo.symbol
                 }
                 newAssetString = this.token_to_string(rAasset);
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`convert assetString [${assetString}] -> ${newAssetString}`)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`convert assetString [${assetString}] -> ${newAssetString}`)
                 return newAssetString
             }
         }
@@ -4735,7 +4726,7 @@ module.exports = class ChainParser {
                     let nativeSymbol = indexer.getNativeSymbol()
                     return nativeSymbol
                 } else {
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processDecHexCurrencyID currency_id unknown struct`, currency_id)
+                    //if (this.debugLevel >= paraTool.debugInfo) console.log(`processDecHexCurrencyID currency_id unknown struct`, currency_id)
                     //TODO..
                 }
             } else {
@@ -4753,11 +4744,11 @@ module.exports = class ChainParser {
             let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
             if (assetInfo != undefined && assetInfo.symbol != undefined && assetInfo.isXCAsset) {
                 let xcmAssetSymbol = assetInfo.symbol
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> xcmAssetSymbol ${xcmAssetSymbol}`)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> xcmAssetSymbol ${xcmAssetSymbol}`)
                 return xcmAssetSymbol
             } else {
                 //TODO: not found case
-                console.log(`processXcmDecHexCurrencyID assetID=${assetID}, rawAssetID=${rawAssetID}, parsedAsset=${parsedAsset}, assetInfo`, assetInfo)
+                //console.log(`processXcmDecHexCurrencyID assetID=${assetID}, rawAssetID=${rawAssetID}, parsedAsset=${parsedAsset}, assetInfo`, assetInfo)
             }
         }
         return assetString
@@ -4773,7 +4764,7 @@ module.exports = class ChainParser {
             let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
             if (assetInfo != undefined && assetInfo.symbol != undefined && assetInfo.isXCAsset) {
                 let xcmAssetSymbol = assetInfo.symbol
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`convert currency_id [${JSON.stringify(currency_id)}] ->  xcmAssetSymbol ${xcmAssetSymbol}`)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`convert currency_id [${JSON.stringify(currency_id)}] ->  xcmAssetSymbol ${xcmAssetSymbol}`)
                 return xcmAssetSymbol
             } else {
                 //TODO
@@ -4821,7 +4812,7 @@ module.exports = class ChainParser {
                     decimals = indexer.getChainDecimal(indexer.chainID)
                     return [symbol, decimals, nativeAssetString]
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processDecHexCurrencyID currency_id unknown struct`, currency_id)
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processDecHexCurrencyID currency_id unknown struct`, currency_id)
                 }
             } else {
                 // numbers
@@ -4841,7 +4832,7 @@ module.exports = class ChainParser {
                     Token: assetInfo.symbol
                 }
                 assetString = this.token_to_string(rAasset);
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> ${assetString}`)
+                //if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> ${assetString}`)
                 symbol = assetInfo.symbol
                 decimals = assetInfo.decimals
             }
@@ -4873,7 +4864,7 @@ module.exports = class ChainParser {
                 return [symbols, decimals, assetString]
             }
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getGenericSymbolAndDecimal error`, e.toString())
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getGenericSymbolAndDecimal error`, e.toString())
             return [false, false, false]
         }
     }
@@ -4952,7 +4943,7 @@ module.exports = class ChainParser {
     }
 
     processCurrenciesDepositedSignal(indexer, extrinsicID, e, mpState, finalized) {
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`currencies(Deposited)`, e.data)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`currencies(Deposited)`, e.data)
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         let eventIndex = e.eventID.split('-')[3]
@@ -4993,7 +4984,7 @@ module.exports = class ChainParser {
     }
 
     processTokensDepositedSignal(indexer, extrinsicID, e, mpState, finalized) {
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`tokens(Deposited)`, e.data)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`tokens(Deposited)`, e.data)
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         let eventIndex = e.eventID.split('-')[3]
@@ -5080,7 +5071,7 @@ module.exports = class ChainParser {
             let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
             */
             let eventIndex = e.eventID.split('-')[3]
-            if (this.debugLevel >= paraTool.debugTracing) console.log(`processAssetIssued`, fromAddress, amountReceived, targetedSymbol)
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`processAssetIssued`, fromAddress, amountReceived, targetedSymbol)
             if (paraTool.validAmount(amountReceived) && finalized) {
                 let caller = `generic processIncomingAssetSignal assets:Issued`
                 candidate = {
@@ -5116,7 +5107,7 @@ module.exports = class ChainParser {
         if (cachedAssetInfo !== undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
             return (cachedAssetInfo);
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`parsedAsset not found --skip key=[${assetChain}]`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`parsedAsset not found --skip key=[${assetChain}]`)
         }
     }
 
@@ -5127,7 +5118,7 @@ module.exports = class ChainParser {
 
     setAssetSymbolAndDecimals(indexer, assetID, out = {}) {
         if (assetID == undefined) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`FATAL! assetID undefined`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`FATAL! assetID undefined`)
         }
         let parsedAsset = {
             Token: assetID
@@ -5137,7 +5128,7 @@ module.exports = class ChainParser {
         if (cachedAssetInfo != undefined && cachedAssetInfo.decimals != undefined) {
             out.decimals = cachedAssetInfo.decimals
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`setAssetSymbolAndDecimals ${assetID} decimals not found`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`setAssetSymbolAndDecimals ${assetID} decimals not found`)
             out.decimals = 12
         }
         if (cachedAssetInfo != undefined && cachedAssetInfo.decimals != undefined) {
@@ -5145,7 +5136,7 @@ module.exports = class ChainParser {
                 Token: cachedAssetInfo.symbol
             }
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`setAssetSymbolAndDecimals ${assetID} symbol not found`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`setAssetSymbolAndDecimals ${assetID} symbol not found`)
             out.decoratedAsset = {
                 Token: `unknown-${assetID}`
             }
@@ -5255,7 +5246,7 @@ module.exports = class ChainParser {
             } = apiAt.registry.findMetaCall(paraTool.hexAsU8(callIndex))
             return [method, section]
         } catch (e) {
-            console.log(`getMethodSection unable to decode ${callIndex}`)
+            //console.log(`getMethodSection unable to decode ${callIndex}`)
         }
         return [null, null]
     }
@@ -5308,7 +5299,7 @@ module.exports = class ChainParser {
         try {
             // cater for an extrinsic input...
             extrinsicCall = apiAt.registry.createType('Call', opaqueCall);
-            console.log("d decoded opaqueCall", extrinsicCall.toString())
+            //console.log("d decoded opaqueCall", extrinsicCall.toString())
             let innerexs = JSON.parse(extrinsicCall.toString());
             let innerOutput = {}
             try {
@@ -5330,7 +5321,7 @@ module.exports = class ChainParser {
                     }
                 }
             } catch (err1) {
-                console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, err1)
+                //console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, err1)
             }
 
             //console.log("innerexs", JSON.stringify(innerexs))
@@ -5379,7 +5370,7 @@ module.exports = class ChainParser {
                             }
                         }
                     } catch (err1) {
-                        console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, err1)
+                        //console.log(`* [${extrinsicID}] ${extrinsicHash} try errored`, err1)
                     }
 
                     //console.log("innerexs", JSON.stringify(innerexs))

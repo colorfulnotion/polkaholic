@@ -5,17 +5,34 @@ function getHostChain() {
   if (sa.length < 2) return(null);
   let domain = sa[sa.length - 2];
   let subdomain = (sa.length > 2) ? sa[sa.length - 3] : "";
+
   if (domain == "astarscan") {
+     let baseiconUrl = "https://cdn.polkaholic.io/astarscanicon.png"
      if (subdomain == "shiden") {
-       return { chainID: 22007, id: subdomain, siteName: "shidenscan.io", baseiconUrl: "https://cdn.polkaholic.io/astarscanicon.png" };
+       return { chainID: 22007, id: subdomain, siteName: "shidenscan.io", baseiconUrl };
      } else if (domain == "shibuya") {
-       return { chainID: 81000, id: subdomain, siteName: "shibuyascan.io", baseiconUrl: "https://cdn.polkaholic.io/astarscanicon.png" };
+       return { chainID: 81000, id: subdomain, siteName: "shibuyascan.io", baseiconUrl };
      }
-     return { chainID: 2006, id: "astar", siteName: "astarscan.io", baseiconUrl: "https://cdn.polkaholic.io/astarscanicon.png" };
+     return { chainID: 2006, id: "astar", siteName: "astarscan.io", baseiconUrl };
+  } else if ( domain == "xcmscan" ) {
+     let baseiconUrl =  "https://cdn.polkaholic.io/xcmscan.png"
+     if (subdomain == "moonriver") {
+       return { chainID: 22023, id: subdomain, siteName: "xcmscan.io", baseiconUrl };
+     } else if (domain == "moonbase") {
+       return { chainID: 61000, id: subdomain, siteName: "xcmscan.io", baseiconUrl };
+     }
+     return { chainID: 2004, id: "moonbeam", siteName: "xcmscan.io", baseiconUrl };
+  } else if ( domain == "acalascan" ) {
+     let baseiconUrl =  "https://cdn.polkaholic.io/acalascan.jpg"
+     if (subdomain == "karura") {
+       return { chainID: 22000, id: subdomain, siteName: "karurascan", baseiconUrl };
+     }
+     return { chainID: 2000, id: "acala", siteName: "acalascan.io", baseiconUrl };
   }
 }
   let site = getHostChain();
   let siteName = "Polkaholic";
+
   if ( site ) {
      siteName = site.siteName;
   }
@@ -630,15 +647,17 @@ let chains = [
   let selChainName = "All chains";
   let baseiconUrl = "/browser_icon.png";
   let iconUrl = "/browser_icon.png";
+  if ( site ) {
+    baseiconUrl = site.baseiconUrl; 
+  }
   if (req.cookies && req.cookies.selchain) {
-   selchain = req.cookies.selchain;
+    selchain = req.cookies.selchain;
     for (const c of chains ) {
       if ( c.id == selchain) {
        sel = c;
       }
     }
   } else if ( site ) {
-    baseiconUrl = site.baseiconUrl; 
     selchain = site.id;
     for (const c of chains ) {
       if ( c.id == selchain) {

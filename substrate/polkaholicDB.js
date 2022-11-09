@@ -478,7 +478,7 @@ module.exports = class PolkaholicDB {
                 await this.pool.query(sql);
                 let sqlTS = (new Date().getTime() - sqlStartTS) / 1000;
                 if (sqlTS > sqlMax) {
-                    this.logger.warn({
+                    this.logger.info({
                         "op": "SLOWSQL",
                         "sql": (sql.length > 4096) ? sql.substring(0, 4096) : sql,
                         "len": sql.length,
@@ -822,7 +822,7 @@ from chain where chainID = '${chainID}' limit 1`);
             if (this.exitOnDisconnect) process.exit(1);
         });
         provider.on('connected', () => console.log('chain API connected', chain.chainID));
-        provider.on('error', (error) => console.log('chain API error', chain.chainID, error));
+        provider.on('error', (error) => console.log('chain API error', chain.chainID));
 
         var api = false;
         // https://polkadot.js.org/docs/api/start/types.extend/

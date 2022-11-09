@@ -27,8 +27,7 @@
 <% if ( req.cookies.consent == undefined ) { %>
 <div id="cookieconsent" class="cookie-consent"> <span>This site uses cookies to enhance user experience. See <a href="/privacy" class="ml-1 text-decoration-none">Privacy policy</a> </span>
     <div class=" ml-2 d-flex align-items-center justify-content-center g-2">
-       <button id="allowCookies" class="allow-button mr-1">Allow cookies</button>
-       <button id="rejectCookies" class="allow-button">Cancel</button>
+       <button id="allowCookies" class="allow-button mr-1">Accept</button>
     </div>
 </div>
 
@@ -36,10 +35,6 @@
 let allowCookiesButton = document.getElementById("allowCookies");
 allowCookiesButton.addEventListener("click", (e) => {
   setConsent(1)
-});
-let rejectCookiesButton = document.getElementById("rejectCookies");
-rejectCookiesButton.addEventListener("click", (e) => {
-  setConsent(0)
 });
 </script>
 <% } %>

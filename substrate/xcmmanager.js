@@ -181,7 +181,7 @@ module.exports = class XCMManager extends Query {
               channel.valXCMMessagesOutgoingUSD${daysAgo}d = t.valXCMMessagesOutgoingUSD
              where  channel.chainID = t.chainID and
                     channel.chainIDDest = t.chainIDDest`;
-            console.log(daysAgo, sql_channel);
+            //console.log(daysAgo, sql_channel);
             this.batchedSQL.push(sql_channel);
             await this.update_batchedSQL();
             // tally recent xcmtransfer into xcmasset (1/7/30d)
@@ -197,7 +197,7 @@ module.exports = class XCMManager extends Query {
                 xcmasset.valXCMTransferUSD${daysAgo}d = t.valXCMTransferUSD
                where  xcmasset.symbol = t.symbol and
                       xcmasset.symbol = t.symbol`;
-            console.log(daysAgo, sql_xcmasset);
+            //console.log(daysAgo, sql_xcmasset);
             this.batchedSQL.push(sql_xcmasset);
             await this.update_batchedSQL();
         }
@@ -207,25 +207,25 @@ module.exports = class XCMManager extends Query {
         let alphaAssets = await this.poolREADONLY.query(`select assetType, asset.assetName, asset.numHolders, asset.totalSupply, asset.asset, asset.symbol, asset.xcmInteriorKey, xcmasset.symbol as xcmasset_symbol, xcmasset.relayChain as xcmasset_relayChain, asset.decimals, asset.token0, asset.token0Symbol, asset.token0Decimals, asset.token1, asset.token1Symbol, asset.token1Decimals, asset.chainID, chain.id, chain.chainName, asset.isUSD, asset.priceUSD, asset.priceUSDPercentChange,  asset.nativeAssetChain, currencyID, xcContractAddress, from_unixtime(createDT) as createTS from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey, chain where asset.chainID = chain.chainID and assetType in ('Token') and asset.chainID = ${paraTool.chainIDMoonbaseAlpha}`);
         let alphaMap = {}
         for (const a of alphaAssets) {
-            console.log(a)
+            //console.log(a)
             let alphaSymbol = a.symbol.replace('xc', '')
             let relayChain = paraTool.getRelayChainByChainID(a.chainID)
             let alphaSymbolRelayChain = paraTool.makeAssetChain(alphaSymbol, relayChain)
             alphaMap[alphaSymbolRelayChain] = a
         }
-        console.log(`alphaMap`, alphaMap)
+        //console.log(`alphaMap`, alphaMap)
         let relayChain = paraTool.getRelayChainByChainID(paraTool.chainIDMoonbaseAlpha)
         let xcmAssets = await this.poolREADONLY.query(`select * from xcmasset where relayChain = '${relayChain}'`);
         let xcmAssetsOut = []
         let assetsOut = []
         for (const x of xcmAssets) {
-            console.log(x)
+            //console.log(x)
             let symbol = x.symbol
             let relayChain = x.relayChain
             let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain)
             let alphaAsset = alphaMap[symbolRelayChain]
             if (alphaAsset != undefined) {
-                console.log(`${symbolRelayChain} found, decimals`, alphaAsset.decimals)
+                //console.log(`${symbolRelayChain} found, decimals`, alphaAsset.decimals)
                 let t = "(" + [`'${x.xcmInteriorKey}'`, `'${symbol}'`, `'${relayChain}'`, `'${x.parent}'`, `'${x.nativeAssetChain}'`, `'${alphaAsset.decimals}'`, `Now()`].join(",") + ")";
                 xcmAssetsOut.push(t)
                 let xcContractAddress = paraTool.xcAssetIDToContractAddr(alphaAsset.currencyID).toLowerCase()
@@ -391,7 +391,7 @@ module.exports = class XCMManager extends Query {
             //xcInteriorKeyUpdates.push(x)
         }
 
-        console.log(xcContractAddrUpdates)
+        //console.log(xcContractAddrUpdates)
         //console.log(xcInteriorKeyUpdates)
 
         let sqlDebug = true
@@ -437,8 +437,8 @@ module.exports = class XCMManager extends Query {
             sourceChainSymbol = evmtx.symbol
         }
         if (sourceTxFeeUSD == undefined) sourceTxFeeUSD = 0
-        console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
-        console.log(`rawXCM`, xcm)
+        //console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
+        //console.log(`rawXCM`, xcm)
         xcm.chainName = this.getChainName(xcm.chainID);
         xcm.chainDestName = this.getChainName(xcm.chainIDDest);
         xcm.id = this.getIDByChainID(xcm.chainID)
@@ -487,7 +487,7 @@ module.exports = class XCMManager extends Query {
                 ts: xcm.destTS
             });
             if (p) {
-                console.log(`p found`, p)
+                //console.log(`p found`, p)
                 xcm.amountSentUSD = p.valUSD;
                 xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
                 xcm.feeUSD = p.priceUSD * xcm.fee
@@ -572,8 +572,8 @@ module.exports = class XCMManager extends Query {
             sourceChainSymbol = evmtx.symbol
         }
         if (sourceTxFeeUSD == undefined) sourceTxFeeUSD = 0
-        console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
-        console.log(`rawXCM`, xcm)
+        //console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
+        //console.log(`rawXCM`, xcm)
         xcm.chainName = this.getChainName(xcm.chainID);
         xcm.chainDestName = this.getChainName(xcm.chainIDDest);
         xcm.id = this.getIDByChainID(xcm.chainID)
@@ -638,7 +638,7 @@ module.exports = class XCMManager extends Query {
                 ts: xcm.destTS
             });
             if (p) {
-                console.log(`p found`, p)
+                //console.log(`p found`, p)
                 xcm.amountSentUSD = p.valUSD;
                 xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
                 xcm.feeUSD = p.priceUSD * xcm.fee
@@ -724,8 +724,8 @@ module.exports = class XCMManager extends Query {
             sourceChainSymbol = evmtx.symbol
         }
 
-        console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
-        console.log(`rawXCM`, xcm)
+        //console.log(`sourceTxFee=${sourceTxFee}, sourceTxFeeUSD=${sourceTxFeeUSD}, sourceChainSymbol=${sourceChainSymbol}`)
+        //console.log(`rawXCM`, xcm)
         xcm.chainName = this.getChainName(xcm.chainID);
         xcm.chainDestName = this.getChainName(xcm.chainIDDest);
         xcm.id = this.getIDByChainID(xcm.chainID)
@@ -942,9 +942,9 @@ module.exports = class XCMManager extends Query {
           order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
-        console.log(`match_xcm [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin} chain=${targetChainID}`)
-        console.log(`match_xcm (A)`)
-        console.log(paraTool.removeNewLine(sqlA))
+        //console.log(`match_xcm [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin} chain=${targetChainID}`)
+        //console.log(`match_xcm (A)`)
+        //console.log(paraTool.removeNewLine(sqlA))
         try {
             let xcmmatches = await this.poolREADONLY.query(sqlA);
             let addressextrinsic = []
@@ -952,13 +952,13 @@ module.exports = class XCMManager extends Query {
             let matched = {}
             let matches = 0;
             if (xcmmatches.length > 0) {
-                console.log(`[Found] match_xcm (A) len=${xcmmatches.length}`)
+                //console.log(`[Found] match_xcm (A) len=${xcmmatches.length}`)
             } else {
                 //enable this for debugging
                 //console.log("[Empty] match_xcm", sqlA)
             }
             for (let i = 0; i < xcmmatches.length; i++) {
-                console.log("i", i);
+                //console.log("i", i);
                 let d = xcmmatches[i];
                 if (matched[d.extrinsicHash] == undefined && matched[d.eventID] == undefined) {
                     let priceUSD = 0;
@@ -995,8 +995,8 @@ module.exports = class XCMManager extends Query {
                     // (a) with extrinsicID, we get both the fee (rat << 1) ANDthe transferred item for when one is isFeeItem=0 and another is isFeeItem=1; ... otherwise we get (b) with just the eventID
                     let w = d.destExtrinsicID && (d.destExtrinsicID.length > 0) ? `extrinsicID = '${d.destExtrinsicID}'` : `eventID = '${d.eventID}'`;
                     let sqlC = `update xcmtransferdestcandidate set matched = 1, matchedExtrinsicHash = '${d.extrinsicHash}' where ${w}`
-                    console.log(`match_xcm (C)`)
-                    console.log(paraTool.removeNewLine(sqlC))
+                    //console.log(`match_xcm (C)`)
+                    //console.log(paraTool.removeNewLine(sqlC))
                     this.batchedSQL.push(sqlC);
                     // never match more than once, by marking both the sending record and the receiving record
                     matched[d.extrinsicHash] = true;
@@ -1054,12 +1054,12 @@ module.exports = class XCMManager extends Query {
                             continue
                         }
                     }
-                    console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
+                    //console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
 
                     let xcmInfoStr = (xcmInfo != undefined) ? JSON.stringify(xcmInfo) : false
                     let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
                     if (isNaN(amountSentUSD) || isNaN(amountReceivedUSD) || priceUSD == undefined) {
-                        console.log(`extrinsicHash ${substrateTxHash} priceInfo missing!!`, xcmInfo)
+                        //console.log(`extrinsicHash ${substrateTxHash} priceInfo missing!!`, xcmInfo)
                         continue
                     }
                     let sqlB = `update xcmtransfer
@@ -1074,8 +1074,8 @@ module.exports = class XCMManager extends Query {
                 xcmInfoAudited = '1',
                 xcmInfo = ${xcmInfoBlob}
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
-                    console.log(`match_xcm (B)`)
-                    console.log(paraTool.removeNewLine(sqlB))
+                    //console.log(`match_xcm (B)`)
+                    //console.log(paraTool.removeNewLine(sqlB))
                     this.batchedSQL.push(sqlB);
                     matches++;
 
@@ -1121,7 +1121,7 @@ module.exports = class XCMManager extends Query {
                         timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
                     };
                     */
-                    console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
+                    //console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
                     hashes.push(hres)
                 } else {
                     //console.log("SKIP", matched[d.extrinsicHash], matched[d.eventID]);
@@ -1138,10 +1138,9 @@ module.exports = class XCMManager extends Query {
             }
         } catch (err) {
             console.log("WRITE_FEEDXCMDEST", err)
-            //process.exit(0);
         }
         let logDT = new Date(startTS * 1000)
-        console.log(`match_xcm ${startTS} covered ${logDT}`)
+        //console.log(`match_xcm ${startTS} covered ${logDT}`)
     }
 
     async xcmtransact_match(startTS, endTS = null, lookbackSeconds = 7200, forceRematch = false, targetChainID = 'all') {
@@ -1191,8 +1190,8 @@ module.exports = class XCMManager extends Query {
           order by chainID, extrinsicHash, diffTS`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
-        console.log(`match_xcmtransact [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, chain=${targetChainID}`)
-        console.log(`match_xcmtransact (A)`)
+        //console.log(`match_xcmtransact [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, chain=${targetChainID}`)
+        //console.log(`match_xcmtransact (A)`)
         console.log(paraTool.removeNewLine(sqlA))
         try {
             let xcmmatches = await this.poolREADONLY.query(sqlA);
@@ -1201,13 +1200,12 @@ module.exports = class XCMManager extends Query {
             let matched = {}
             let matches = 0;
             if (xcmmatches.length > 0) {
-                console.log(`[Found] match_xcmtransact (A) len=${xcmmatches.length}`)
+                //console.log(`[Found] match_xcmtransact (A) len=${xcmmatches.length}`)
             } else {
                 //enable this for debugging
                 //console.log("[Empty] match_xcm", sqlA)
             }
             for (let i = 0; i < xcmmatches.length; i++) {
-                console.log("i", i);
                 let d = xcmmatches[i];
                 if (matched[d.extrinsicHash] == undefined && matched[d.eventID] == undefined) {
                     let priceUSD = 0;
@@ -1239,13 +1237,12 @@ module.exports = class XCMManager extends Query {
                         amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
                         amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
                     } else {
-                        console.log(`XCM Asset not found [${d.extrinsicHash}], symbol=${d.symbol}, relayChain=${d.relayChain}`)
+                        //console.log(`XCM Asset not found [${d.extrinsicHash}], symbol=${d.symbol}, relayChain=${d.relayChain}`)
                     }
                     // (a) with extrinsicID, we get both the fee (rat << 1) ANDthe transferred item for when one is isFeeItem=0 and another is isFeeItem=1; ... otherwise we get (b) with just the eventID
                     let w = d.destExtrinsicID && (d.destExtrinsicID.length > 0) ? `extrinsicID = '${d.destExtrinsicID}'` : `eventID = '${d.eventID}'`;
                     let sqlC = `update xcmtransferdestcandidate set matched = 1, matchedExtrinsicHash = '${d.extrinsicHash}' where ${w}`
-                    console.log(`match_xcmtransact (C)`)
-                    console.log(paraTool.removeNewLine(sqlC))
+                    //console.log(`match_xcmtransact (C)`, paraTool.removeNewLine(sqlC))
                     this.batchedSQL.push(sqlC);
                     // never match more than once, by marking both the sending record and the receiving record
                     matched[d.extrinsicHash] = true;
@@ -1311,7 +1308,7 @@ module.exports = class XCMManager extends Query {
                             continue
                         }
                     }
-                    console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
+                    //console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
 
                     let xcmInfoStr = (xcmInfo != undefined) ? JSON.stringify(xcmInfo) : false
                     let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
@@ -1327,8 +1324,7 @@ module.exports = class XCMManager extends Query {
                 xcmInfoAudited = '1',
                 xcmInfo = ${xcmInfoBlob}
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
-                    console.log(`match_xcmtransact (B)`)
-                    console.log(paraTool.removeNewLine(sqlB))
+                    //console.log(`match_xcmtransact (B)`, paraTool.removeNewLine(sqlB))
                     this.batchedSQL.push(sqlB);
                     matches++;
 
@@ -1362,7 +1358,7 @@ module.exports = class XCMManager extends Query {
                         timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
                     };
 
-                    console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
+                    //console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
                     hashes.push(hres)
                     if (d.remoteEVMTxHash) {
                         let remoteRec = {
@@ -1378,14 +1374,13 @@ module.exports = class XCMManager extends Query {
                             timestamp: d.sourceTS * 1000000
                         };
                         hashes.push(remoteRec)
-                        console.log("REMOTE MATCH#", matches, "hashes rowkey", d.remoteEVMTxHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
+                        //console.log("REMOTE MATCH#", matches, "hashes rowkey", d.remoteEVMTxHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
                     }
 
                 } else {
                     //console.log("SKIP", matched[d.extrinsicHash], matched[d.eventID]);
                 }
             }
-            //process.exit(0);
             if (addressextrinsic.length > 0) {
                 await this.insertBTRows(this.btAddressExtrinsic, addressextrinsic, "addressextrinsic")
             }
@@ -1397,18 +1392,17 @@ module.exports = class XCMManager extends Query {
             }
         } catch (err) {
             console.log("WRITE_FEEDXCMDEST", err)
-            //process.exit(0);
         }
         let logDT = new Date(startTS * 1000)
-        console.log(`match_xcm ${startTS} covered ${logDT}`)
+        //console.log(`match_xcm ${startTS} covered ${logDT}`)
     }
 
     //write xcmInfo for failure case
     async xcmtransfer_match_failure(startTS, endTS = null, ratMin = .99, lookbackSeconds = 7200, forceRematch = false, targetChainID = 'all') {
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
-        console.log(`match_xcm_failure [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin} chain=${targetChainID}`)
-        console.log(`match_xcm_failure (A)`)
+        //console.log(`match_xcm_failure [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin} chain=${targetChainID}`)
+        //console.log(`match_xcm_failure (A)`)
 
         let endWhere = endTS ? `and xcmtransfer.sourceTS < ${endTS} ` : ""
         // match xcmtransferdestcandidate of the last 2 hours
@@ -1443,19 +1437,19 @@ module.exports = class XCMManager extends Query {
         and ${rematchClause} ${targetChainClause}
         length(xcmtransfer.extrinsicID) > 0
   order by chainID, extrinsicHash`
-        console.log("EXEC", paraTool.removeNewLine(sqlA))
+        //console.log("EXEC", paraTool.removeNewLine(sqlA))
         try {
             let xcmmatches = await this.poolREADONLY.query(sqlA);
-            console.log("FIN", xcmmatches.length);
+            //console.log("FIN", xcmmatches.length);
             let addressextrinsic = []
             let hashes = []
             let matched = {}
             let matches = 0;
             if (xcmmatches.length > 0) {
-                console.log(`[Found] match_xcm_failure (A) len=${xcmmatches.length}`)
+                //console.log(`[Found] match_xcm_failure (A) len=${xcmmatches.length}`)
             } else {
                 //enable this for debugging
-                console.log("[Empty] match_xcm_failure")
+                //console.log("[Empty] match_xcm_failure")
             }
             let incompleteTransfers = []
             let destErrorTransfers = []
@@ -1464,7 +1458,7 @@ module.exports = class XCMManager extends Query {
             for (let i = 0; i < xcmmatches.length; i++) {
                 let d = xcmmatches[i];
                 let failureType = (d.incomplete == 1) ? 'failedOrigination' : 'failedDestination'
-                console.log(`failureType = ${failureType}`, d)
+                //console.log(`failureType = ${failureType}`, d)
                 if (matched[d.extrinsicHash] == undefined) {
                     let priceUSD = 0;
                     let amountSent = 0;
@@ -1494,7 +1488,7 @@ module.exports = class XCMManager extends Query {
                         priceUSD = priceSource.priceUSD;
                         amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
                     } else {
-                        console.log(`XCM Asset not found [${d.extrinsicHash}], symbol=${d.symbol}, relayChain=${d.relayChain}`)
+                        //console.log(`XCM Asset not found [${d.extrinsicHash}], symbol=${d.symbol}, relayChain=${d.relayChain}`)
                     }
                     // (a) with extrinsicID, we get both the fee (rat << 1) AND the transferred item for when one is isFeeItem=0 and another is isFeeItem=1; ... otherwise we get (b) with just the eventID
                     /*
@@ -1558,10 +1552,17 @@ module.exports = class XCMManager extends Query {
                             continue
                         }
                     }
-                    console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
+                    //console.log(`extrinsicHash=${substrateTxHash}, xcmInfo`, xcmInfo)
 
                     let xcmInfoStr = (xcmInfo != undefined) ? JSON.stringify(xcmInfo) : false
                     let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
+		    if ( matchedExtrinsicID == undefined ) matchedExtrinsicID = "";
+		    if ( matchedEventID == undefined ) matchedEventID = "";
+		    if (isNaN(amountSentUSD) || priceUSD == undefined ) {
+			amountSentUSD = 0;
+			priceUSD = 0;
+                    }
+
                     let sqlB = `update xcmtransfer
             set blockNumberDest = ${d.blockNumberDest},
                 destTS = ${d.destTS},
@@ -1573,8 +1574,7 @@ module.exports = class XCMManager extends Query {
                 xcmInfoAudited = '1',
                 xcmInfo = ${xcmInfoBlob}
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
-                    console.log(`match_xcm_failure (B)`)
-                    console.log(paraTool.removeNewLine(sqlB))
+                    //console.log(`match_xcm_failure (B)`, paraTool.removeNewLine(sqlB))
                     this.batchedSQL.push(sqlB);
                     matches++;
 
@@ -1620,7 +1620,7 @@ module.exports = class XCMManager extends Query {
                         timestamp: d.sourceTS * 1000000 // NOTE: to support rematching, we do NOT use d.destTS
                     };
                     */
-                    console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
+                    //console.log("MATCH#", matches, "hashes rowkey", d.extrinsicHash, "col", "addressExtrinsic rowkey=", rowKey, "col", extrinsicHashEventID);
                     hashes.push(hres)
                 } else {
                     //console.log("SKIP", matched[d.extrinsicHash], matched[d.eventID]);
@@ -1637,10 +1637,9 @@ module.exports = class XCMManager extends Query {
             }
         } catch (err) {
             console.log("WRITE_FEEDXCMDEST", err)
-            //process.exit(0);
         }
         let logDT = new Date(startTS * 1000)
-        console.log(`match_xcm_failure ${startTS} covered ${logDT}`)
+        //console.log(`match_xcm_failure ${startTS} covered ${logDT}`)
     }
 
     // This is the key workhorse that matches xcmmessages with
@@ -1668,19 +1667,18 @@ module.exports = class XCMManager extends Query {
  having (diffSentAt >= 0 and diffSentAt <= 4)
  order by msgHash, diffSentAt, diffTS`
         sqlA = paraTool.removeNewLine(sqlA).replaceAll("and and", "and ")
-        console.log(`xcmmessages_match (A)`)
-        console.log(sqlA)
+        //console.log(`xcmmessages_match (A)`, sqlA)
         try {
             let xcmmatches = await this.pool.query(sqlA);
             let matched = {}
             let numRecs = 0;
             if (xcmmatches.length > 0) {
-                console.log(`[Found] xcmmessages_match ${xcmmatches.length}`)
-                console.log(paraTool.removeNewLine(sqlA))
+                //console.log(`[Found] xcmmessages_match ${xcmmatches.length}`)
+                //console.log(paraTool.removeNewLine(sqlA))
             } else {
                 //enable this for debugging
                 //console.log("[Empty] xcmmessages_match")
-                console.log(paraTool.removeNewLine(sqlA))
+                //console.log(paraTool.removeNewLine(sqlA))
             }
             let vals = ["chainID", "chainIDDest", "sourceTS", "destTS", "matched", "sourceSentAt", "destSentAt", "sourceBlocknumber", "destBlocknumber", "matchDT", "errorDesc", "destStatus", "executedEventID"];
             let out = [];
@@ -1710,7 +1708,7 @@ module.exports = class XCMManager extends Query {
                 }
             }
             let logDT = new Date(startTS * 1000)
-            console.log(`xcmmessages_match ${startTS} covered ${logDT} MATCHES: `, out.length);
+            //console.log(`xcmmessages_match ${startTS} covered ${logDT} MATCHES: `, out.length);
             await this.upsertSQL({
                 "table": "xcmmessages",
                 "keys": ["msgHash", "blockNumber", "incoming"],
@@ -1719,7 +1717,7 @@ module.exports = class XCMManager extends Query {
                 "replace": vals
             });
             await this.btHashes.insert(rows);
-            console.log("xcmmessages_match wrote btHashes rows=", rows.length);
+            //console.log("xcmmessages_match wrote btHashes rows=", rows.length);
             return (numRecs);
         } catch (err) {
             console.log("xcmmessages_match", err)
@@ -1763,7 +1761,7 @@ module.exports = class XCMManager extends Query {
                 try {
                     let targetAssetChain = (parents == 0) ? this.getNativeChainAsset(chainIDDest) : this.getNativeChainAsset(relayChainID)
                     if (targetAssetChain == undefined) {
-                        console.log(`get_concrete_assetChain missing!!! parents=${parents}, chainID=${chainID}, chainIDDest=${chainIDDest}, relayChain=${relayChain}, relayChainID=${relayChainID}, targetAssetChain=${targetAssetChain}`)
+                        //console.log(`get_concrete_assetChain missing!!! parents=${parents}, chainID=${chainID}, chainIDDest=${chainIDDest}, relayChain=${relayChain}, relayChainID=${relayChainID}, targetAssetChain=${targetAssetChain}`)
                         return [false, false]
                     }
                     let [targetAsset, targetChainID] = paraTool.parseAssetChain(targetAssetChain)
@@ -1774,7 +1772,7 @@ module.exports = class XCMManager extends Query {
                     //console.log(`[paranets=${parents}] ${chainID} ${chainIDDest} ${JSON.stringify(interior)} -> ${targetAssetChain}, symbolRelayChain=${symbolRelayChain}, xcmInteriorKey=${xcmInteriorKey}, xcmAssetInfo`, xcmAssetInfo)
                     return [targetAssetChain, xcmInteriorKey]
                 } catch (err) {
-                    console.log(`get_concrete_assetChain parents=${parents}, chainID=${chainID}, chainIDDest=${chainIDDest}, relayChain=${relayChain}, relayChainID=${relayChainID}, error`, err)
+                    //console.log(`get_concrete_assetChain parents=${parents}, chainID=${chainID}, chainIDDest=${chainIDDest}, relayChain=${relayChain}, relayChainID=${relayChainID}, error`, err)
                     return [false, false]
                 }
 
@@ -1799,25 +1797,25 @@ module.exports = class XCMManager extends Query {
                         }
                         //new_interiorVal.concat(interiorVal)
                     } else {
-                        console.log(`expansion error. expecting array`, JSON.stringify(interior))
+                        //console.log(`expansion error. expecting array`, JSON.stringify(interior))
                         return [false, false]
                     }
-                    console.log(`${chainID}, ${chainIDDest} [parents=${parents}] expandedkey ${JSON.stringify(interiorVal)} ->  ${JSON.stringify(new_interiorVal)}`)
+                    //console.log(`${chainID}, ${chainIDDest} [parents=${parents}] expandedkey ${JSON.stringify(interiorVal)} ->  ${JSON.stringify(new_interiorVal)}`)
                     interiorVal = new_interiorVal
                 }
                 let interiorVStr = JSON.stringify(interiorVal)
                 let res = this.getXCMAsset(interiorVStr, relayChain)
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain);
                 if (res) {
-                    console.log(`get_concrete_assetChain FOUND ${chainID}, ${chainIDDest} [parents=${parents}] [${interiorType}] ${JSON.stringify(interior)} -> ${res}, ${xcmInteriorKey}`)
+                    //console.log(`get_concrete_assetChain FOUND ${chainID}, ${chainIDDest} [parents=${parents}] [${interiorType}] ${JSON.stringify(interior)} -> ${res}, ${xcmInteriorKey}`)
                     return [res, xcmInteriorKey];
                 } else {
-                    console.log(`get_concrete_assetChain error ${chainID}, ${chainIDDest} [parents=${parents}] [${interiorType}] ${JSON.stringify(interior)}`)
+                    //console.log(`get_concrete_assetChain error ${chainID}, ${chainIDDest} [parents=${parents}] [${interiorType}] ${JSON.stringify(interior)}`)
                     return [false, false]
                 }
             }
         } else {
-            console.log("get_concrete_assetChain FAILED2 - parents/interior not set", c);
+            //console.log("get_concrete_assetChain FAILED2 - parents/interior not set", c);
             return [null, false];
         }
     }
@@ -1834,11 +1832,11 @@ module.exports = class XCMManager extends Query {
                         //console.log("PUSHING", assetChain, xcmInteriorKey,  c.id.concrete);
                         return [assetChain, xcmInteriorKey];
                     } else {
-                        console.log("analyzeXCM_MultiAsset MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.id.concrete));
+                        //console.log("analyzeXCM_MultiAsset MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.id.concrete));
                     }
                 }
             } else {
-                console.log("analyzeXCM_MultiAsset NOT CONCRETE PROBLEM", chainID, chainIDDest, JSON.stringify(c))
+                //console.log("analyzeXCM_MultiAsset NOT CONCRETE PROBLEM", chainID, chainIDDest, JSON.stringify(c))
             }
         } else if (c.concreteFungible != undefined) {
             let [assetChain, xcmInteriorKey] = this.get_concrete_assetChain(analysis, c.concreteFungible.id, chainID, chainIDDest);
@@ -1848,10 +1846,10 @@ module.exports = class XCMManager extends Query {
                 //console.log("PUSHING", assetChain, xcmInteriorKey, c.id.concrete);
                 return [assetChain, xcmInteriorKey];
             } else {
-                console.log("analyzeXCM_MultiAsset V0 MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.concreteFungible.id));
+                //console.log("analyzeXCM_MultiAsset V0 MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.concreteFungible.id));
             }
         } else {
-            console.log("analyzeXCM_MultiAsset NO ID PROBLEM", chainID, chainIDDest, JSON.stringify(c))
+            //console.log("analyzeXCM_MultiAsset NO ID PROBLEM", chainID, chainIDDest, JSON.stringify(c))
         }
         return [false, false];
     }
@@ -1866,7 +1864,7 @@ module.exports = class XCMManager extends Query {
                 for (let i = 0; i < c[fld].length; i++) {
                     let [ac, xcmKey] = this.analyzeXCM_MultiAsset(analysis, c[fld][i], chainID, chainIDDest, "multiassetfilter")
                     if (ac) {
-                        console.log("analyzeXCM_MultiAssetFilter", ctx, chainID, chainIDDest, JSON.stringify(c[fld][i]), ac, xcmKey);
+                        //console.log("analyzeXCM_MultiAssetFilter", ctx, chainID, chainIDDest, JSON.stringify(c[fld][i]), ac, xcmKey);
                     }
                 }
             }
@@ -2176,7 +2174,7 @@ module.exports = class XCMManager extends Query {
                 this.analyzeXCMInstructionsV0(analysis, msg.v0, chainID, chainIDDest, "computeAssetChains")
                 break;
             default:
-                console.log("unknown version", version);
+                //console.log("unknown version", version);
         }
         return analysis;
     }
@@ -2197,7 +2195,7 @@ module.exports = class XCMManager extends Query {
         let out = [];
         let vals = ["chainID", "chainIDDest", "parentInclusionFingerprints", "instructionFingerprints", "assetChains", "xcmInteriorKeys"];
         let parentIncFingerprints = [];
-        console.log("computeXCMFingerprints:", xcmRecs.length, sql)
+        //console.log("computeXCMFingerprints:", xcmRecs.length, sql)
         for (let r = 0; r < xcmRecs.length; r++) {
             let rec = xcmRecs[r];
             let msg = JSON.parse(rec.msgStr);
@@ -2224,7 +2222,6 @@ module.exports = class XCMManager extends Query {
                 let res = `('${rec.msgHash}', '${rec.blockNumber}', '${rec.incoming}', '${rec.chainID}', '${rec.chainIDDest}', '${JSON.stringify(parentInclusionFingerprints)}', '${JSON.stringify(instructionFingerprints)}', ${mysql.escape(JSON.stringify(assetChains))}, ${xcmInteriorKeys})`
                 //console.log(`computeXCMFingerprint`, res)
                 out.push(res);
-
             } catch (err) {
                 console.log(err);
             }
@@ -2236,7 +2233,7 @@ module.exports = class XCMManager extends Query {
         }
 
         if (out.length > 0) {
-            console.log(`computeXCMFingerprints len=${out.length}`);
+            //console.log(`computeXCMFingerprints len=${out.length}`);
             let sqlDebug = false
             await this.upsertSQL({
                 "table": "xcmmessages",
@@ -2253,7 +2250,7 @@ module.exports = class XCMManager extends Query {
     async xcmmatch2_matcher(startTS, endTS = null, forceRematch = false, lookbackSeconds = 120, targetChainID = 'all') {
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
-        console.log(`[${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds} chain=${targetChainID}`)
+        //console.log(`[${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds} chain=${targetChainID}`)
 
         let targetChainClause = (targetChainID == 'all') ? ` ` : `(xcmtransfer.chainID = ${targetChainID} or xcmtransfer.chainIDDest = ${targetChainID}) and `
         let endWhere = endTS ? `and xcmmessages.blockTS <= ${endTS} and xcmtransfer.sourceTS <= ${endTS}` : "";
@@ -2266,8 +2263,8 @@ module.exports = class XCMManager extends Query {
                  xcmtransfer.sourceTS >= ${startTS} and
                  abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4 ${endWhere}`;
         this.batchedSQL.push(sqlA);
-        console.log(`xcmmatch2_matcher (A)`)
-        console.log(paraTool.removeNewLine(sqlA))
+        //console.log(`xcmmatch2_matcher (A)`)
+        //console.log(paraTool.removeNewLine(sqlA))
         await this.update_batchedSQL();
 
         // update xcmtransfer's (update executedEventID, errorDesc, destStatus, connectedTxHash) using incoming xcmMsg
@@ -2279,8 +2276,8 @@ module.exports = class XCMManager extends Query {
                  xcmtransfer.sourceTS >= ${startTS} and
                  abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4 ${endWhere}`
         this.batchedSQL.push(sqlA1);
-        console.log(`xcmmatch2_matcher (A1)`)
-        console.log(paraTool.removeNewLine(sqlA1))
+        //console.log(`xcmmatch2_matcher (A1)`)
+        //console.log(paraTool.removeNewLine(sqlA1))
         await this.update_batchedSQL();
 
         // update xcmmessages of children
@@ -2293,8 +2290,8 @@ module.exports = class XCMManager extends Query {
              p.blockTS >= ${startTS} and
              c.blockTS >= ${startTS} ${endWhere}`
         this.batchedSQL.push(sqlB);
-        console.log(`xcmmatch2_matcher (B)`)
-        console.log(paraTool.removeNewLine(sqlB))
+        //console.log(`xcmmatch2_matcher (B)`)
+        //console.log(paraTool.removeNewLine(sqlB))
         await this.update_batchedSQL();
 
         // update
@@ -2329,8 +2326,7 @@ module.exports = class XCMManager extends Query {
         d.destTS - xcmmessages.blockTS >= 0 and
         d.destTS - xcmmessages.blockTS < ${lookbackSeconds} and ${rematchClause}
         length(xcmmessages.extrinsicID) > 0  ${endWhere}`;
-        console.log(`xcmmatch2_matcher (C)`)
-        console.log(paraTool.removeNewLine(sqlC))
+        //console.log(`xcmmatch2_matcher (C)`, paraTool.removeNewLine(sqlC))
         try {
             let matches = await this.pool.query(sqlC);
             let assetsReceived = {};
@@ -2362,7 +2358,7 @@ module.exports = class XCMManager extends Query {
                 let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
                 let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined) ? false : xcmAssetInfo.xcmInteriorKey
                 let xcmInteriorKey0 = m.xcmInteriorKeys0 // from computeXCMFingerprints
-                if (xcmInteriorKey != xcmInteriorKey0) console.log(`mismatch xcmInteriorKey0=${xcmInteriorKey0}, xcmInteriorKey=${xcmInteriorKey}`)
+                //if (xcmInteriorKey != xcmInteriorKey0) console.log(`mismatch xcmInteriorKey0=${xcmInteriorKey0}, xcmInteriorKey=${xcmInteriorKey}`)
                 let p = await this.computePriceUSD({
                     symbol: m.symbol,
                     relayChain: m.relayChain,
@@ -2390,7 +2386,7 @@ module.exports = class XCMManager extends Query {
                     ts: m.destTS
                 };
                 if (isIncompleteRec) {
-                    console.log(`Incomplete destMatch`, destMatch)
+                    //console.log(`Incomplete destMatch`, destMatch)
                 } else {
                     destMatch.decimals = decimals;
                     //console.log(`OK destMatch`, destMatch)
@@ -2452,10 +2448,9 @@ module.exports = class XCMManager extends Query {
                     if (outgoing[`${msgHash}-${blockNumber}`] != undefined) out.push(`('${msgHash}', '${blockNumber}', '0', ${mysql.escape(ar)}, '${valueUSD}', '${chainID}', '${chainIDDest}', ${xcmInteriorKeysStr})`);
                     if (incoming[`${msgHash}-${blockNumber}`] != undefined) out.push(`('${msgHash}', '${blockNumber}', '1', ${mysql.escape(ar)}, '${valueUSD}', '${chainID}', '${chainIDDest}', ${xcmInteriorKeysStr})`);
                 } else {
-                    console.log("LONG VAL", k, "RECS", ar.length, "assetsreceived=", ar);
+                    //console.log("LONG VAL", k, "RECS", ar.length, "assetsreceived=", ar);
                 }
             }
-            console.log(out.length);
             let sqlDebug = true
             let vals = ["assetsReceived", "amountReceivedUSD", "chainID", "chainIDDest", "xcmInteriorKeys"];
             await this.upsertSQL({
@@ -2484,10 +2479,9 @@ module.exports = class XCMManager extends Query {
                     this.batchedSQL.push(sqlD);
                     await this.update_batchedSQL();
                 } else {
-                    console.log("LONG VAL", k, "RECS", ar.length, "assetsreceived=", ar);
+                    //console.log("LONG VAL", k, "RECS", ar.length, "assetsreceived=", ar);
                 }
             }
-
         } catch (e) {
             console.log(e);
         }
@@ -2499,11 +2493,14 @@ module.exports = class XCMManager extends Query {
         if (r && Array.isArray(r)) {
             for (let i = 0; i < r.length; i++) {
                 if (events[r[i].eventID] == undefined) {
-                    valueUSD += r[i].amountReceivedUSD;
-                    events[r[i].eventID] = true;
+		    if ( r[i].amountReceivedUSD > 0 ) {
+			valueUSD += r[i].amountReceivedUSD;
+			events[r[i].eventID] = true;
+		    }
                 }
             }
         }
+	if ( isNaN(valueUSD) ) return(0);
         return (valueUSD);
     }
     /* because the indexer may insert multiple xcmmessages record when a partcular xcmmessage sits in the chains message queue for 1 or more blocks, this xcmmessages_dedup process cleans out any records that exist after the above matching process */
@@ -2523,8 +2520,7 @@ module.exports = class XCMManager extends Query {
         d.matched = 1 ${endWhere}
 having (diffSentAt >= 0 and diffSentAt <= 4)
 order by msgHash`
-        console.log("xcmmessages_dedup")
-        console.log(paraTool.removeNewLine(sql))
+        //console.log("xcmmessages_dedup", paraTool.removeNewLine(sql))
         try {
             let xcmsingles = await this.pool.query(sql);
             let vals = ["matched"];
@@ -2533,7 +2529,7 @@ order by msgHash`
                 let s = xcmsingles[i];
                 out.push(`('${s.msgHash}', ${s.s_blockNumber}, ${s.incoming}, '-1')`)
             }
-            console.log(`xcmmessages_singles_dedup`, out);
+            //console.log(`xcmmessages_singles_dedup`, out);
             await this.upsertSQL({
                 "table": "xcmmessages",
                 "keys": ["msgHash", "blockNumber", "incoming"],
@@ -2550,7 +2546,7 @@ order by msgHash`
         let iterations = 0;
         do {
             let sql = `select msgHash, blockTS from xcmmessages where blockTS > ${minTS} order by blockTS`
-            console.log(sql);
+            //console.log(sql);
             let x = await this.poolREADONLY.query(sql);
             if (x.length > 0) {
                 return x[0].blockTS;
@@ -2568,10 +2564,10 @@ order by msgHash`
 
         if (forceRematch) {
             let numRecs_ = await this.xcmmessages_match(t0, t1, msgLookbackwindow, targetChainID, forceRematch);
-            console.log(`[FORCED] FAILURE CASES ${t0} ${t1} (chain:${targetChainID})`);
+            //console.log(`[FORCED] FAILURE CASES ${t0} ${t1} (chain:${targetChainID})`);
             await this.xcmtransfer_match_failure(t0, t1, rat, transferLookbackwindow, forceRematch, targetChainID);
 
-            console.log(`[FORCED] NORMAL CASES ${t0} ${t1} (chain:${targetChainID})`);
+            //console.log(`[FORCED] NORMAL CASES ${t0} ${t1} (chain:${targetChainID})`);
             let numRecs = 0,
                 lastTS = 0;
 
@@ -2579,7 +2575,7 @@ order by msgHash`
             await this.xcmtransact_match(t0, t1, transferLookbackwindow, forceRematch, targetChainID);
             return [0, 0];
         } else {
-            console.log(`[NONFORCED] match ${t0} ${t1} (chain:${targetChainID}, msgLookbackwindow:${msgLookbackwindow})`);
+            //console.log(`[NONFORCED] match ${t0} ${t1} (chain:${targetChainID}, msgLookbackwindow:${msgLookbackwindow})`);
             // xcmmessages_match matches incoming=0 and incoming=1 records
             let numRecs = await this.xcmmessages_match(t0, t1, msgLookbackwindow, targetChainID, forceRematch);
             // computeXCMFingerprints updates any xcmmessages which have not been fingerprinted, fill in xcmmessages.{parentInclusionFingerprints, instructionFingerprints}
@@ -2590,10 +2586,10 @@ order by msgHash`
             // marks duplicates in xcmmessages
             await this.xcmmessages_dedup(t0, t1, msgLookbackwindow, targetChainID);
 
-            console.log(`FAILURE CASES ${t0} ${t1} (chain:${targetChainID})`);
+            //console.log(`FAILURE CASES ${t0} ${t1} (chain:${targetChainID})`);
             await this.xcmtransfer_match_failure(t0, t1, rat, transferLookbackwindow, forceRematch, targetChainID);
 
-            console.log(`NORMAL CASES ${t0} ${t1} (chain:${targetChainID})`);
+            //console.log(`NORMAL CASES ${t0} ${t1} (chain:${targetChainID})`);
             await this.xcmtransfer_match(t0, t1, rat, transferLookbackwindow, forceRematch, targetChainID);
             await this.xcmtransact_match(t0, t1, transferLookbackwindow, forceRematch, targetChainID);
 
@@ -2673,8 +2669,8 @@ order by msgHash`
 order by chainID, extrinsicHash`
         let [logDTS, hr] = paraTool.ts_to_logDT_hr(startTS)
         let windowTS = (endTS != undefined) ? endTS - startTS : 'NA'
-        console.log(`xcm_reanalytics [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
-        console.log(paraTool.removeNewLine(sql))
+        //console.log(`xcm_reanalytics [${logDTS} ${hr}] windowTS=${windowTS},lookbackSeconds=${lookbackSeconds}, ratMin=${ratMin}`)
+        //console.log(paraTool.removeNewLine(sql))
         try {
             let xcmmatches = await this.poolREADONLY.query(sql);
             let out = [];
@@ -2696,7 +2692,7 @@ order by chainID, extrinsicHash`
                     let amountSentUSD = (amountSent > 0) ? priceUSD * amountSent : 0;
                     let amountReceivedUSD = (amountReceived > 0) ? priceUSD * amountReceived : 0;
                     let sql = `update xcmtransfer set amountSentUSD = '${amountSentUSD}', amountReceivedUSD = '${amountReceivedUSD}' where extrinsicHash = '${m.extrinsicHash}' and  transferIndex = '${m.transferIndex}' and xcmIndex = '${m.xcmIndex}'`;
-                    console.log("amountSent=", amountSent, "amountReceived=", amountReceived, "priceUSD", priceUSD, "amountSentUSD", amountSentUSD, "amountReceivedUSD", amountReceivedUSD, sql);
+                    //console.log("amountSent=", amountSent, "amountReceived=", amountReceived, "priceUSD", priceUSD, "amountSentUSD", amountSentUSD, "amountReceivedUSD", amountReceivedUSD, sql);
                     this.batchedSQL.push(sql);
                     await this.update_batchedSQL()
                 } else {
@@ -2730,7 +2726,7 @@ order by chainID, extrinsicHash`
             let k = t[0].toHuman();
             let address = t[1].toJSON();
             let index = paraTool.toNumWithoutComma(k[0]);
-            console.log(index, k[0], address);
+            //console.log(index, k[0], address);
             out.push(`( '${chainID}', '${index}', '${relayChain}', '${address}', Now() )`);
             // TODO: store in BigTable addressrealtime new column family "derivedAccounts" ?
         }

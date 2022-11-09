@@ -9,7 +9,7 @@ module.exports = class KicoParser extends ChainParser {
 
     parseStorageKey(indexer, p, s, key, decoratedKey) {
         let pallet_section = `${p}:${s}`
-        console.log(`kico parseStorageKey ps=${pallet_section}`)
+        //console.log(`kico parseStorageKey ps=${pallet_section}`)
         if (pallet_section == "dicoOracle:lockedPrice") {
             return this.getDicoOracleLockedPriceKey(indexer, decoratedKey);
         } else if (pallet_section == "stub_pallet:stub_section_a") {
@@ -22,7 +22,7 @@ module.exports = class KicoParser extends ChainParser {
 
     parseStorageVal(indexer, p, s, val, decoratedVal, o = false) {
         let pallet_section = `${p}:${s}`
-        console.log(`kico parseStorageVal ps=${pallet_section}`)
+        //console.log(`kico parseStorageVal ps=${pallet_section}`)
         if (pallet_section == "dicoOracle:lockedPrice") {
             //skip oracle:rawvalues
             //console.log(`kico parseStorageVal ps=${pallet_section} Im here`, `decoratedVal=${decoratedVal}`)
@@ -37,7 +37,7 @@ module.exports = class KicoParser extends ChainParser {
 
     getDicoOracleLockedPriceKey(indexer, decoratedKey) {
         let k = JSON.parse(decoratedKey)
-        console.log(`getDicoOracleLockedPriceKey`, k)
+        //console.log(`getDicoOracleLockedPriceKey`, k)
         var out = {};
         // oracle is in k[0]
         let assetID = this.cleanedAssetID(k[0]); //currencyID
@@ -50,14 +50,14 @@ module.exports = class KicoParser extends ChainParser {
     */
     getDicoOracleLockedPriceVal(indexer, decoratedVal) {
         let k = JSON.parse(decoratedVal)
-        console.log(`getDicoOracleLockedPriceVal in `, k)
+        //console.log(`getDicoOracleLockedPriceVal in `, k)
         let res = {}
         let extraField = []
         //extraField['timestamp'] = Math.floor(k.timestamp / 1000)
         extraField['rawPrice'] = paraTool.dechexToInt(k)
         res["pv"] = ''
         res["extra"] = extraField
-        console.log(`getDicoOracleLockedPriceVal`, res)
+        //console.log(`getDicoOracleLockedPriceVal`, res)
         return res
     }
 
@@ -75,13 +75,13 @@ module.exports = class KicoParser extends ChainParser {
             indexer.updateAssetPrice(nativeAssetString, price, paraTool.assetTypeToken, paraTool.assetSourceOracle)
         }
         let assetString = JSON.stringify(parsedAsset);
-        console.log(`processAssetsDicoOracles asset=${assetString}, price=${price}`, e2)
+        //console.log(`processAssetsDicoOracles asset=${assetString}, price=${price}`, e2)
         //indexer.updateAssetPrice(assetString, price, paraTool.assetTypeToken, paraTool.assetSourceOracle)
     }
 
     async processAccountAsset(indexer, p, s, e2, rAssetkey, fromAddress) {
         let pallet_section = `${p}:${s}`
-        console.log(`kico processAccountAsset ${pallet_section}`)
+        //console.log(`kico processAccountAsset ${pallet_section}`)
         switch (pallet_section) {
             case "Stub_pallet:Stub_section_a":
                 //await this.processAssetsAccount_XYZ(indexer, p, s, e2, rAssetkey, fromAddress);
@@ -95,7 +95,7 @@ module.exports = class KicoParser extends ChainParser {
 
     async processAsset(indexer, p, s, e2) {
         let pallet_section = `${p}:${s}`
-        console.log(`kico processAsset ${pallet_section}`)
+        //console.log(`kico processAsset ${pallet_section}`)
         switch (pallet_section) {
             case "DicoOracle:LockedPrice":
                 //console.log(`parallel here ${p}:${s} `, e2)
@@ -154,13 +154,13 @@ module.exports = class KicoParser extends ChainParser {
                         currencyID: assetID
                     };
                     assetList[asset] = assetInfo
-                    console.log(`addAssetInfo [${asset}]`, assetInfo)
+                    //console.log(`addAssetInfo [${asset}]`, assetInfo)
                     await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAsset');
                 } else {
-                    console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+                    //console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
             }
         }
-        console.log(assetList);
+        //console.log(assetList);
     }
 }

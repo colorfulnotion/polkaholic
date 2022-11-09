@@ -1111,10 +1111,10 @@ module.exports = class Query extends AssetManager {
             if (xcmType) {
                 w.push(`(xcmType='${xcmType}')`)
             }
-            if (symbols.length > 0){
+            if (symbols.length > 0) {
                 w.push(`( symbol in ( '${symbols.join("','")}'))`)
             }
-            if (!isNaN(startTS) && !isNaN(endTS) && startTS && endTS){
+            if (!isNaN(startTS) && !isNaN(endTS) && startTS && endTS) {
                 w.push(`( sourceTS >= ${startTS} && sourceTS < ${endTS})`)
             }
             let chainListFilter = "";

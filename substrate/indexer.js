@@ -934,11 +934,12 @@ module.exports = class Indexer extends AssetManager {
                 let reserved = lastState.reserved ? lastState.reserved : 0;
                 let miscFrozen = lastState.miscFrozen ? lastState.miscFrozen : 0;
                 let frozen = lastState.frozen ? lastState.frozen : 0;
-
-                let t = "(" + [`'${asset}'`, `'${this.chainID}'`, `'${accKey}'`, `'${blockNumber}'`, `'${blockNumber}'`, mysql.escape(JSON.stringify(lastState)), `'${free}'`, `'${reserved}'`, `'${miscFrozen}'`, `'${frozen}'`].join(",") + ")";
-                if (this.validAsset(asset, this.chainID, "assetholder", t)) {
-                    assetholders.push(t);
-                }
+		if ( free < 10**32 ) { 
+                    let t = "(" + [`'${asset}'`, `'${this.chainID}'`, `'${accKey}'`, `'${blockNumber}'`, `'${blockNumber}'`, mysql.escape(JSON.stringify(lastState)), `'${free}'`, `'${reserved}'`, `'${miscFrozen}'`, `'${frozen}'`].join(",") + ")";
+                    if (this.validAsset(asset, this.chainID, "assetholder", t)) {
+			assetholders.push(t);
+                    }
+		}
             } else {
                 // if lastState == false that means we are (a) in a EVM chain  (b) with isTip = false  (c) with an ERC20 asset and (d) we know it should be updated, but we are not going to get the state.
                 // However, we would like to record in assetholder${chainID} that this asset-holder combination SHOULD be covered
@@ -1301,7 +1302,7 @@ module.exports = class Indexer extends AssetManager {
                 let errorcase = (v.errorcase != undefined && v.errorcase != "") ? `'${v.errorcase}'` : `NULL`
                 //MK: send violation here
                 if (isTip) {
-                    console.log(`[Delay=${this.chainParser.parserBlockNumber-v.sourceBlocknumber}]  send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${v.instructionHash}), isTip=${isTip}`)
+                    //console.log(`[Delay=${this.chainParser.parserBlockNumber-v.sourceBlocknumber}]  send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${v.instructionHash}), isTip=${isTip}`)
                 }
                 //["chainID", "instructionHash", "sourceBlocknumber"]
                 //["chainIDDest", "violationType", "parser", "caller", "errorcase", "instruction", "sourceTS", "indexDT"]
@@ -1335,7 +1336,7 @@ module.exports = class Indexer extends AssetManager {
         for (const xcmKey of xcmKeys) {
             let xcmMsg = this.xcmmsgSentAtUnknownMap[xcmKey]
             xcmMsg.sentAt = sentAt
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`Adding sentAt ${sentAt} [${xcmKey}]`)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`Adding sentAt ${sentAt} [${xcmKey}]`)
             this.updateXCMMsg(xcmMsg, true)
         }
         this.xcmmsgSentAtUnknownMap = {}
@@ -1384,10 +1385,10 @@ module.exports = class Indexer extends AssetManager {
                     isFresh: true,
                     matchable: true,
                 }
-                console.log(`updateXCMMsg ${Object.keys(this.xcmTrailingKeyMap)}`)
+                //console.log(`updateXCMMsg ${Object.keys(this.xcmTrailingKeyMap)}`)
                 this.xcmmsgMap[xcmKey] = xcmMsg
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
             } else {
                 /*
                 let trailingXcm = this.xcmTrailingKeyMap[xcmKey]
@@ -1398,13 +1399,13 @@ module.exports = class Indexer extends AssetManager {
                      if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg valid duplicates! ${xcmKey}`, trailingXcm)
                 }
                 */
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
             }
         }
     }
 
     addWasmContract(wasmContract, withCode = false) {
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`addWasmContract withCode=${withCode}`)
+        //if (this.debugLevel >= paraTool.debugInfo) console.log(`addWasmContract withCode=${withCode}`)
         this.wasmContractMap[wasmContract.extrinsicHash] = wasmContract
     }
 
@@ -1626,7 +1627,7 @@ module.exports = class Indexer extends AssetManager {
         }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
         if (isTip) {
-            console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
+            //console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(xcmtransfer, "xcmtransfer");
         }
     }
@@ -1646,7 +1647,7 @@ module.exports = class Indexer extends AssetManager {
         }
         //MK: send xcmtransfer here
         if (isTip) {
-            console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
+            //console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(candidate, "xcmtransferdestcandidate");
         }
     }
@@ -1850,7 +1851,7 @@ module.exports = class Indexer extends AssetManager {
         }
         if (holders.length == 0) return;
         if (isXcAsset) console.log(`***fetchAssetHolderBalances ${tokenAddress} -> ${assetChain} (original:${rawAssetChain})`)
-        console.log(`fetchAssetHolderBalances [${tokenAddress}] [${blockNumber}] holders=${JSON.stringify(holders)}, isXcAsset=${isXcAsset}`)
+        //console.log(`fetchAssetHolderBalances [${tokenAddress}] [${blockNumber}] holders=${JSON.stringify(holders)}, isXcAsset=${isXcAsset}`)
         let i = 0;
         let n = 0
         let batchSize = 50; // safety check
@@ -1883,7 +1884,7 @@ module.exports = class Indexer extends AssetManager {
         if (!isTip) {
             return false; // hourly update by other process
         }
-        console.log(`processAssetTypeERC20 tip update [${blockNumber}], assetChain=${assetChain}`);
+        //console.log(`processAssetTypeERC20 tip update [${blockNumber}], assetChain=${assetChain}`);
         let [asset, _] = paraTool.parseAssetChain(assetChain);
         let assetInfo = this.tallyAsset[assetChain];
         var totalSupplyUpdated = false
@@ -1936,7 +1937,7 @@ module.exports = class Indexer extends AssetManager {
             let token1 = lp20TokenInfo.token1.toLowerCase();
             var o = `('${assetKey}', '${chainID}', '${paraTool.assetTypeERC20LiquidityPair}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${createDTSql}, ${creatorSql}, ${createdAtTxSql}, '${token0}', '${token1}', ${lp20TokenInfo.token0Decimals}, ${lp20TokenInfo.token1Decimals}, ${lp20TokenInfo.token0Supply}, ${lp20TokenInfo.token1Supply}, '${lp20TokenInfo.token0Symbol}', '${lp20TokenInfo.token1Symbol}')`;
             if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
-                console.log(`erc20 LP`, o)
+                //console.log(`erc20 LP`, o)
                 // write { asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol } to accountrealtime evmcontract:{chainID}
                 let lp = {
                     asset: assetKey,
@@ -1967,7 +1968,7 @@ module.exports = class Indexer extends AssetManager {
                 let [assetK, _] = paraTool.parseAssetChain(assetChainStr)
                 o = `('${assetK}', '${chainID}', '${paraTool.assetTypeToken}', ` + mysql.escape(this.clip_string(assetInfo.name)) + `, ` + mysql.escape(this.clip_string(assetInfo.symbol, 32)) + `, ` + mysql.escape(lastState) + `, '${assetInfo.decimal}', '${totalSupply}', FROM_UNIXTIME('${ts}'), '${blockNumber}', ${createDTSql}, ${creatorSql}, ${createdAtTxSql}, Null, Null, Null, Null, Null, Null, Null, Null)`;
             }
-            console.log(`erc20 nonLP, isXcAsset=${isXcAsset}`, o)
+            //console.log(`erc20 nonLP, isXcAsset=${isXcAsset}`, o)
             if (this.validAsset(assetKey, chainID, assetInfo.assetType, o)) {
                 // write { asset, assetType, chainID, token0, token0Symbol, token1, token1Symbol, symbol }
                 let nlp = {
@@ -2009,7 +2010,7 @@ module.exports = class Indexer extends AssetManager {
         let rows = [];
         for (const k of Object.keys(this.evmcontractMap)) {
             let c = this.evmcontractMap[k];
-            console.log(`!! flush_evmcontractMap ${k}`, c)
+            // console.log(`!! flush_evmcontractMap ${k}`, c)
             this.add_index_metadata(c);
             this.push_rows_related_keys("evmcontract", c.chainID.toString(), rows, c.asset, c)
         }
@@ -2018,7 +2019,7 @@ module.exports = class Indexer extends AssetManager {
             let [tblName, tblRealtime] = this.get_btTableRealtime()
             try {
                 await tblRealtime.insert(rows);
-                console.log("flush_evmcontractMap rows=", rows.length);
+                //console.log("flush_evmcontractMap rows=", rows.length);
                 return [];
             } catch (err) {
                 console.log(err);
@@ -2075,7 +2076,7 @@ module.exports = class Indexer extends AssetManager {
             switch (assetType) {
                 case paraTool.assetTypeERC20:
                     if (isTip) {
-                        console.log(`${assetType} len=${assetChains.length}`, assetChains)
+                        //console.log(`${assetType} len=${assetChains.length}`, assetChains)
                     }
                     erc20Promise = await assetChains.map(async (assetChain) => {
                         try {
@@ -2660,7 +2661,7 @@ module.exports = class Indexer extends AssetManager {
                     let currBatch = this.evmTxRowsToInsert.slice(i, i + batchSize);
                     if (currBatch.length > 0) {
                         await this.insertBTRows(this.btEVMTx, currBatch, "evmtx");
-                        if (currBatch.length > 50) console.log(`flush: flushEVMTxRows btEVMTx=${currBatch.length}`);
+                        //if (currBatch.length > 50) console.log(`flush: flushEVMTxRows btEVMTx=${currBatch.length}`);
                         i += batchSize;
                     }
                 }
@@ -2679,7 +2680,7 @@ module.exports = class Indexer extends AssetManager {
                     //console.log(`currBatch#${n}`, currBatch)
                     if (currBatch.length > 0) {
                         await this.insertBTRows(this.btHashes, currBatch, "hashes");
-                        if (currBatch.length > 50) console.log(`flush: flushHashesRows btHashes=${currBatch.length}`);
+                        //if (currBatch.length > 50) console.log(`flush: flushHashesRows btHashes=${currBatch.length}`);
                         i += batchSize;
                     }
                 }
@@ -5190,7 +5191,7 @@ module.exports = class Indexer extends AssetManager {
             //console.log(`${assetChain}`, this.tallyAsset[assetChain])
             let contractAddress = tokenInfo.tokenAddress.toLowerCase()
             this.ercTokenList[contractAddress] = tokenInfo;
-            console.log('CONTRACT FETCH ON MISS', assetType, assetChain, tokenInfo);
+            console.log('CONTRACT FETCH ON MISS', assetType, assetChain);
         }
     }
 
@@ -5368,11 +5369,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     } else {
                         let tokenAddress = asset;
                         let assetInfo = this.assetInfo[assetChain];
-                        if (assetInfo.xcContractAddress) {
+                        if (assetInfo && assetInfo.xcContractAddress) {
                             // if there is a mapping from asset => xcContractAddress,use that for the tokenAddress in this ethTool rpccall
                             tokenAddress = assetInfo.xcContractAddress;
                         }
-                        console.log("FETCH", tokenAddress, holders.length)
                         holderBalances = await ethTool.getTokenHoldersRawBalances(web3Api, tokenAddress, holders, tokenDecimal, bn)
                         if (holderBalances.holders.length != holders.length) {
                             console.log("FETCH FAIL", tokenAddress, holders.length, holderBalances.holders.length);
@@ -5402,7 +5402,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             reserved = newState.reserved;
                             feeFrozen = newState.feeFrozen;
                             miscFrozen = newState.miscFrozen;
-                            console.log(newState);
+
                         } else if (b.balance != undefined) {
                             free = b.balance;
                             if (b.error != undefined) {
@@ -5413,21 +5413,23 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             }
                         }
 
+        		if ( free < 10**32 ) {
                         let rec = {};
-                        let lastUpdateTS = assetholders[holder];
-                        rec[assetChain] = {
-                            value: JSON.stringify(newState),
-                            // timestamp could be added from lastUpdateTS
-                            timestamp: ts * 1000000
-                        }
-                        rows.push({
-                            key: accKey,
-                            data: {
-                                realtime: rec
+                            let lastUpdateTS = assetholders[holder];
+                            rec[assetChain] = {
+				value: JSON.stringify(newState),
+				// timestamp could be added from lastUpdateTS
+				timestamp: ts * 1000000
                             }
-                        });
-                        out.push(`('${asset}', '${chainID}', '${accKey}', '${free}', '${reserved}', '${feeFrozen}', '${miscFrozen}', '${lastCrawlBN}')`);
-                        nwrites++;
+                            rows.push({
+				key: accKey,
+				data: {
+                                    realtime: rec
+				}
+                            });
+	                    out.push(`('${asset}', '${chainID}', '${accKey}', '${free}', '${reserved}', '${feeFrozen}', '${miscFrozen}', '${lastCrawlBN}')`);
+                            nwrites++;
+			}
                     });
                     console.log(" --> ", asset, nwrites);
                 }
@@ -5809,7 +5811,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     }
                 }
             }
-            console.log("processPendingEVMTransaction", evmTxHashRec, fTxn);
+            //console.log("processPendingEVMTransaction", evmTxHashRec, fTxn);
             this.hashesRowsToInsert.push(evmTxHashRec)
         }
     }
@@ -6335,7 +6337,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
         }
         if (xcmList.length > 0) {
-            console.log(`!!! indexRelayChainTrace [${relayChain}-${bn}] len=${xcmList.length} (finalized=${finalized}, isTip=${isTip})`, xcmList)
+            //console.log(`!!! indexRelayChainTrace [${relayChain}-${bn}] len=${xcmList.length} (finalized=${finalized}, isTip=${isTip})`, xcmList)
             await this.process_rcxcm(xcmList)
         }
     }
@@ -6527,7 +6529,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if ((isTip || forceTry) && (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama || chainID == paraTool.chainIDMoonbaseRelay)) {
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             if (autoTraces) {
-                console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
+                //console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
                 await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain, isTip, finalized);
             } else {
                 console.log("this.indexRelayChainTrace FAIL", blockNumber, chainID, relayChain);
@@ -6613,7 +6615,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
                 if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
                 if (mp != undefined && (isTip)) {
-                    console.log(`[Delay=${this.chainParser.parserBlockNumber-mp.blockNumber}] send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
+                    //console.log(`[Delay=${this.chainParser.parserBlockNumber-mp.blockNumber}] send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
                     this.sendWSMessage(mp, "xcmmessage")
                 }
                 let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'

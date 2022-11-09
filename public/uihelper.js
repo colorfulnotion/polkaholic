@@ -926,11 +926,25 @@ function getCookie(cname) {
     return "";
 }
 
+function fetchDomain(hostname) {
+    if (hostname.includes("astarscan")) {
+        return ("astarscan.io");
+    }
+    if (hostname.includes("acalascan")) {
+        return ("acalascan.io");
+    }
+    if (hostname.includes("xcmscan")) {
+        return ("xcmscan.io");
+    }
+    return "polkaholic.io"
+}
+
 function setCookie(cname, cvalue, exdays) {
     const d = new Date();
     d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
     let expires = "expires=" + d.toUTCString();
-    document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;domain=polkaholic.io";
+    let domain = fetchDomain(window.location.hostname);
+    document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;domain=" + domain;
 }
 
 

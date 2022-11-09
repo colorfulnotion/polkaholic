@@ -584,7 +584,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     let tx1559Type = 2
     let txType = (dTxn.type != undefined) ? dTxn.type : txLegacyType
     if (txType != txLegacyType && txType != tx1559Type) {
-        console.log(`unknown txType=${dTxn.type}, dTxn`, dTxn)
+        //console.log(`unknown txType=${dTxn.type}, dTxn`, dTxn)
         //process.exit(0)
     }
     let fee = gasUsed * gasPrice

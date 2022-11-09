@@ -142,7 +142,7 @@ module.exports = class AssetManager extends PolkaholicDB {
  xcmasset.symbol, xcmasset.decimals, xcmasset.priceUSD, xcmasset.priceUSDPercentChange,
  githubURL, subscanURL, parachainsURL, dappURL, WSEndpoint
  from chain left join xcmasset on chain.symbol = xcmasset.symbol where ( (crawling = 1 or paraID > 0 or chain.relayChain = '${paraTool.getRelayChainByChainID(60000)}') and id is not null);`
-        console.log(`init_chainInfos chainSQL`, paraTool.removeNewLine(chainSQL))
+        //console.log(`init_chainInfos chainSQL`, paraTool.removeNewLine(chainSQL))
         var chains = await this.poolREADONLY.query(chainSQL);
         var specVersions = await this.poolREADONLY.query(`select chainID, blockNumber, specVersion from specVersions order by chainID, blockNumber`);
         var assets = await this.poolREADONLY.query(`select asset, chainID, symbol, decimals from asset where decimals is not Null and asset not like '0x%' `);

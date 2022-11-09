@@ -38,28 +38,28 @@ module.exports = class AstarParser extends ChainParser {
             let isHexEncoded = (typeof call === 'object') ? false : true
             //console.log(`[${extrinsic.extrinsicID}] descend into call`, call)
             if (!isHexEncoded && call_args != undefined) {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] descend into call=${call}, call_section=${call_section}, call_method=${call_method}, call_args`, call_args)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] descend into call=${call}, call_section=${call_section}, call_method=${call_method}, call_args`, call_args)
                 this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args)
             } else {
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] skip call=${call}, call_section=${call_section}, call_method=${call_method}, call.args`, call_args)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] skip call=${call}, call_section=${call_section}, call_method=${call_method}, call.args`, call_args)
             }
         }
         switch (section_method) {
             case 'contracts:call': //contract write
                 //0xd4ffe56c661d718cd4ca6039c0d5519aa3d20b0f32d6b18dc4809d60dd7b3d03
                 let contactWrite = this.processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:call`, contactWrite)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:call`, contactWrite)
                 break;
             case 'contracts:instantiate': //contract deploy with available codehash
                 //0x7e020cd122a51d4f037f95a86761f6af33228d0a8c68f8f79fd1f27c17885914
                 let wasmWithoutCode = this.processContractsInstantiate(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiate`, wasmWithoutCode)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiate`, wasmWithoutCode)
                 indexer.addWasmContract(wasmWithoutCode, wasmWithoutCode.withCode);
                 break;
             case 'contracts:instantiateWithCode': //contract deploy with wasm code
                 //0x2c986a6cb47b94a9e50f5d3f660e0f37177989594eb087bf7309c2e15e2340c8
                 let wasmWithCode = this.processContractsInstantiateWithCode(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiateWithCode`, wasmWithCode)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiateWithCode`, wasmWithCode)
                 indexer.addWasmContract(wasmWithCode, wasmWithCode.withCode);
                 break;
             default:
@@ -69,7 +69,7 @@ module.exports = class AstarParser extends ChainParser {
                     contracts:setCode
                     contracts:uploadCode
                     */
-                    console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] unhandled contracts case: ${section_method}`)
+                    //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] unhandled contracts case: ${section_method}`)
                 } else {
                     //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] ${section_method}`)
                     break
@@ -90,7 +90,7 @@ module.exports = class AstarParser extends ChainParser {
                 //index, raw ??
             }
         } catch (e) {
-            console.log(`processWasmDest error=${e.toString()}`)
+            //console.log(`processWasmDest error=${e.toString()}`)
         }
         return destAddress
     }
@@ -109,7 +109,7 @@ module.exports = class AstarParser extends ChainParser {
                 return true
             default:
                 if (palletMethod.includes('contracts(')) {
-                    console.log(`Uncovered contracts case: ${palletMethod}`)
+                    //console.log(`Uncovered contracts case: ${palletMethod}`)
                     return true
                 } else {
                     return false
@@ -162,7 +162,7 @@ module.exports = class AstarParser extends ChainParser {
           "data": "0xdb20f9f52c8feeab5bd9a317375e01adb6cb959f1fea78c751936d556fa2e36ede425a4740e2010000000000000000000000000000"
         }
         */
-        console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
+        //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
         let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
         let r = {
             chainID: indexer.chainID,
@@ -181,7 +181,7 @@ module.exports = class AstarParser extends ChainParser {
         }
         for (const ev of wasmContractsEvents) {
             let eventMethodSection = `${ev.section}(${ev.method})`
-            console.log(`[${ev.eventID}] ${eventMethodSection}`, ev)
+            //console.log(`[${ev.eventID}] ${eventMethodSection}`, ev)
             if (eventMethodSection == 'contracts(ContractEmitted)') {
                 // WARNING: contract address here is not the same as called contract
                 /* contractAddr, encodedEvents ["anCpiHdWuGUiQbsrqsbmYyRzdG4zP8LzmnyDy9GZxQS28Yq","0x000001d2ae8d7ab7db366b2451da59e1af3eb2398315c512d0cc400a9d70566f76e96040420f00000000000000000000000000"]*/
@@ -203,7 +203,7 @@ module.exports = class AstarParser extends ChainParser {
           "salt": "0x"
         }
         */
-        console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
+        //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
         let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
         let r = {
             chainID: indexer.chainID,
@@ -248,7 +248,7 @@ module.exports = class AstarParser extends ChainParser {
           "salt": "0xeb1ec10346938ca57e7c9b4932999863a384f646ea567475a5514882cbf11920"
         }
         */
-        console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
+        //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
         let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
         let r = {
             chainID: indexer.chainID,
@@ -270,7 +270,7 @@ module.exports = class AstarParser extends ChainParser {
         }
         for (const ev of wasmContractsEvents) {
             let eventMethodSection = `${ev.section}(${ev.method})`
-            console.log(`[${ev.eventID}] ${eventMethodSection}`, ev)
+            //console.log(`[${ev.eventID}] ${eventMethodSection}`, ev)
             if (eventMethodSection == 'contracts(CodeStored)') {
                 r.codeHash = ev.data[0] //eastablish mapping between code <-> codeHash
                 r.withCode = true
@@ -324,17 +324,17 @@ module.exports = class AstarParser extends ChainParser {
         switch (module_section) {
             case 'xTokens':
                 let outgoingXcmList1 = this.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM xTokens`, outgoingXcmList1)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM xTokens`, outgoingXcmList1)
                 //return outgoingXcmList
                 break;
             case 'xcmPallet':
                 let outgoingXcmList2 = this.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
                 //return outgoingXcmList
                 break;
             case 'polkadotXcm':
                 let outgoingXcmList3 = this.processOutgoingPolkadotXcm(indexer, extrinsic, feed, fromAddress, section_method, args)
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM polkadotXcm`, outgoingXcmList3)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM polkadotXcm`, outgoingXcmList3)
                 //return outgoingXcmList
                 break;
             case 'ethereum':
@@ -347,7 +347,7 @@ module.exports = class AstarParser extends ChainParser {
                         if (this.xcmTransferMethodList.includes(methodID)) {
                             outgoingXcmList4 = this.processOutgoingEthereumAssetWithdraw(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
                         } else if (this.xcmTransactorMethodList.includes(methodID)) {
-                            console.log(`Astar Remote Execution [${methodID}] [${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] found!!`)
+                            //console.log(`Astar Remote Execution [${methodID}] [${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] found!!`)
                             //outgoingXcmList4 = this.processOutgoingEthereumRemoteExecution(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
                         }
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM ethereum [methodID=${methodID}]`, outgoingXcmList4)
@@ -402,7 +402,7 @@ module.exports = class AstarParser extends ChainParser {
                 let txInput = evmTx.input
                 let txMethodID = txInput.substr(0, 10)
                 if (this.xcmTransferMethodList.includes(txMethodID) || this.xcmTransactorMethodList.includes(txMethodID)) {
-                    console.log(`Precompiled evmTx!`, evmTx)
+                    //console.log(`Precompiled evmTx!`, evmTx)
                     let output = ethTool.decodeTransactionInput(evmTx, indexer.contractABIs, indexer.contractABISignatures)
                     for (const ev of events) {
                         let eventMethodSection = `${ev.section}(${ev.method})`
@@ -419,7 +419,7 @@ module.exports = class AstarParser extends ChainParser {
                         xcmInput[input.name] = input.value
                     }
                     output.params = xcmInput
-                    console.log(`output >>`, JSON.stringify(output, null, 2))
+                    //console.log(`output >>`, JSON.stringify(output, null, 2))
                     if (output != undefined) {
                         args.decodedEvmInput = output
                     }
@@ -432,7 +432,7 @@ module.exports = class AstarParser extends ChainParser {
 
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // need additional processing for currency_id part
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXTokens start`)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXTokens start`)
         let a = args
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
@@ -454,7 +454,7 @@ module.exports = class AstarParser extends ChainParser {
         let outgoingXcmList = []
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXTokens xcmPallet missing`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXTokens xcmPallet missing`)
             } else if (xcmAssetSymbol) {
                 //xcmtransfer.asset = assetString
                 let relayChain = xcmtransfer.relayChain
@@ -465,12 +465,12 @@ module.exports = class AstarParser extends ChainParser {
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXTokens xcmPallet assetString missing`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXTokens xcmPallet assetString missing`)
                 //TODO
                 outgoingXcmList.push(xcmtransfer)
             }
         }
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXTokens DONE`, outgoingXcmList)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXTokens DONE`, outgoingXcmList)
         extrinsic.xcms = outgoingXcmList
         return outgoingXcmList
     }
@@ -478,7 +478,7 @@ module.exports = class AstarParser extends ChainParser {
     processOutgoingEthereumAssetWithdraw(indexer, extrinsic, feed, fromAddress, section_method, a) {
         // need additional processing for currency_id part
         try {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereumAssetWithdraw start`)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereumAssetWithdraw start`)
             let params = a.params
             let methodID = a.methodID
             /*
@@ -506,16 +506,15 @@ module.exports = class AstarParser extends ChainParser {
                 "msgValue": 1234
             */
 
-            //console.log(`a`, a)
             //console.log(`params`, params)
             let assetAndAmountSents = [];
             let feeIdx = paraTool.dechexToInt(params.fee_index)
             let transferIndex = 0
             if (params.asset_id.length != params.asset_amount.length) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] Invalid EVM asset Input`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] Invalid EVM asset Input`)
                 return
             }
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(assetAndAmountSents)
+            //if (this.debugLevel >= paraTool.debugVerbose) console.log(assetAndAmountSents)
             let outgoingEtherumXCM = []
             if (extrinsic.xcms == undefined) extrinsic.xcms = []
             let xcmIndex = extrinsic.xcms.length
@@ -541,7 +540,7 @@ module.exports = class AstarParser extends ChainParser {
 
             if (a.msgValue > 0) {
                 let nativeSymbol = indexer.getNativeSymbol()
-                console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] Adding native ${nativeSymbol} transfer!`)
+                //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] Adding native ${nativeSymbol} transfer!`)
                 params.asset_id.push(`${native}-${nativeSymbol}`)
                 params.asset_amount.push(a.msgValue)
             }
@@ -596,16 +595,16 @@ module.exports = class AstarParser extends ChainParser {
                         xcmType: "xcmtransfer",
                     }
                     //if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
-                    console.log(`processOutgoingEthereumAssetWithdraw`, r)
+                    //console.log(`processOutgoingEthereumAssetWithdraw`, r)
                     extrinsic.xcms.push(r)
                     outgoingEtherumXCM.push(r)
                 } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingEthereumAssetWithdraw unknown asset/amountSent`);
+                    //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingEthereumAssetWithdraw unknown asset/amountSent`);
                 }
             }
             return outgoingEtherumXCM
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] ${e.toString()}`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] ${e.toString()}`)
             return
         }
     }
@@ -720,7 +719,7 @@ module.exports = class AstarParser extends ChainParser {
                         let [derivedAccount20, derivedAccount32] = this.calculateMultilocationDerivative(indexer.api, paraID, fromAddress)
                         r.destAddress = (isEVM) ? derivedAccount20 : derivedAccount32
                     } catch (e) {
-                        console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod} calculateMultilocationDerivative failed`, e)
+                        //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod} calculateMultilocationDerivative failed`, e)
                     }
 
                     r.xcmInteriorKey = targetedXcmInteriorKey
@@ -729,25 +728,25 @@ module.exports = class AstarParser extends ChainParser {
                     r.paraIDDest = paraIDDest
                     r.innerCall = innerCall
                     //r.msgHash = msgHash
-                    console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod}`, r)
+                    //console.log(`[${feed.extrinsicID}] [${extrinsic.extrinsicHash}] section_method=ethereum:${ethereumMethod}`, r)
                     extrinsic.xcms.push(r)
                     outgoingEtherumXCM.push(r)
                 } catch (e1) {
-                    console.log(`processOutgoingEthereumRemoteExecution:${ethereumMethod} err`, e1)
+                    //console.log(`processOutgoingEthereumRemoteExecution:${ethereumMethod} err`, e1)
                 }
             } else {
-                console.log(`TODO [${feed.extrinsicID}] [${extrinsic.extrinsicHash}] unknown section_method:${evmMethod}`, r)
+                //console.log(`TODO [${feed.extrinsicID}] [${extrinsic.extrinsicHash}] unknown section_method:${evmMethod}`, r)
             }
             return outgoingEtherumXCM
         } catch (e) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] ${e.toString()}`)
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] ${e.toString()}`)
             return
         }
     }
 
     processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // TODO: have not seen case like this yet
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXcmPallet start`)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXcmPallet start`)
         let a = args
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
@@ -759,7 +758,7 @@ module.exports = class AstarParser extends ChainParser {
         let outgoingXcmList = []
         for (var xcmtransfer of generalOutgoingXcmList) {
             if (xcmtransfer == undefined) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXcmPallet xcmPallet missing`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXcmPallet xcmPallet missing`)
             } else if (xcmAssetSymbol) {
                 let relayChain = xcmtransfer.relayChain
                 let chainID = xcmtransfer.chainID
@@ -769,11 +768,11 @@ module.exports = class AstarParser extends ChainParser {
                 xcmtransfer.xcmInteriorKey = targetedXcmInteriorKey
                 outgoingXcmList.push(xcmtransfer)
             } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXcmPallet assetString missing`)
+                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`astar processOutgoingXcmPallet assetString missing`)
                 outgoingXcmList.push(xcmtransfer)
             }
         }
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXcmPallet DONE`, outgoingXcmList)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXcmPallet DONE`, outgoingXcmList)
         extrinsic.xcms = outgoingXcmList
         return outgoingXcmList
     }

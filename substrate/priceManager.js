@@ -824,6 +824,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     // update assetlog with prices/market_caps/volumes from coingecko API
     async update_coingecko_market_chart(id, symbol, relayChain, startTS, endTS) {
         const axios = require("axios");
+	if ( id == "" ) return;
         var url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=USD&from=${startTS}&to=${endTS}`;
         try {
             console.log("update_coingecko_market_chart URL", url)
@@ -936,7 +937,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     }
 
     async getCoinPricesRange(startTS, endTS) {
-        var coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, symbol, relayChain from xcmasset where coingeckoID is not null and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) order by coingeckoLastUpdateDT limit 1000`);
+        var coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, symbol, relayChain from xcmasset where coingeckoID is not null and length(coingeckoID) > 0 and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) order by coingeckoLastUpdateDT limit 1000`);
         console.log(`getCoinPricesRange ${coingeckoIDs.length}`)
         let batchSize = 86400 * 30
         for (let currDailyTS = startTS; currDailyTS < endTS; currDailyTS += batchSize) {

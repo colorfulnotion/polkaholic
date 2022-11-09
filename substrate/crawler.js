@@ -162,7 +162,7 @@ module.exports = class Crawler extends Indexer {
                 console.log(blockNumber, traceData.result.length, cmd);
                 return (traceData.result);
             }
-            console.log(cmd);
+            //console.log(cmd);
             return (null);
         } catch (error) {
             this.logger.warn({
@@ -457,7 +457,7 @@ module.exports = class Crawler extends Indexer {
             };
             save = true;
         }
-        console.log(`save_evm_block: cbt read chain${chainID} prefix=${paraTool.blockNumberToHex(bn)}`);
+        //console.log(`save_evm_block: cbt read chain${chainID} prefix=${paraTool.blockNumberToHex(bn)}`);
         // flush out BT updates
         if (save) {
             try {
@@ -1266,7 +1266,7 @@ module.exports = class Crawler extends Indexer {
             let highestBlock = parseInt(syncState.highestBlock.toString(), 10);
             let currentBlock = parseInt(syncState.currentBlock.toString(), 10);
             let startingBlock = parseInt(syncState.startingBlock.toString(), 10);
-            console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
+            //console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
             let startBN = chain.blocksFinalized - 150000 // dont do  a full table scan for chain 0/2 anymore 150000*6=10 days should be enough...
             let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and attempted < ${maxTraceAttempts} and blockNumber > ${startBN} limit 1000`
@@ -1275,7 +1275,7 @@ module.exports = class Crawler extends Indexer {
                 let endBN = techniqueParams[2];
                 sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < ${maxTraceAttempts} order by rand() limit 1000`
             }
-            console.log(sql);
+
             let tasks = await this.poolREADONLY.query(sql);
             let jmp = 1;
             for (var i = 0; i < tasks.length; i += jmp) {
@@ -1290,7 +1290,6 @@ module.exports = class Crawler extends Indexer {
                         blockTS: t1.blockTS, // could be null
                         attempted: t1.attempted // should be
                     };
-                    console.log(t2);
                     if (t1.crawlBlock) {
                         return this.crawl_block_trace(chain, t2)
                     } else {
