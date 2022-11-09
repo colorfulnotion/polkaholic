@@ -1158,6 +1158,15 @@ app.get('/xcmtransfers/:chainIDorChainName?', async (req, res) => {
         if (req.query.xcmType) {
             filters.xcmType = req.query.xcmType;
         }
+        if (req.query.symbol){
+            filters.symbol = req.query.symbol;
+        }
+        if (req.query.startTS){
+            filters.startTS = req.query.startTS;
+        }
+        if (req.query.endTS){
+            filters.endTS = req.query.endTS;
+        }
         const maxRows = 1000;
         let xcmtransfers = await query.getXCMTransfers(filters, maxRows);
         res.render('xcmtransfers', {

@@ -223,6 +223,18 @@ app.get('/xcmtransfers', async (req, res) => {
             chainList: chainFilterOpt(req),
             blockNumber: req.params["blockNumber"] ? req.params["blockNumber"] : null,
         };
+        if (req.query.symbol){
+            filters.symbol = req.query.symbol;
+        }
+        if (req.query.xcmType) {
+            filters.xcmType = req.query.xcmType;
+        }
+        if (req.query.startTS){
+            filters.startTS = req.query.startTS;
+        }
+        if (req.query.endTS){
+            filters.endTS = req.query.endTS;
+        }
         let xcmtransfers = await query.getXCMTransfers(filters, limit, decorate, decorateExtra);
         if (xcmtransfers) {
             res.write(JSON.stringify(xcmtransfers));
