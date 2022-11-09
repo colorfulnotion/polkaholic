@@ -553,115 +553,115 @@ module.exports = class XCMTransfer extends XCMTransact {
     }
 
     get_xcmtransactor_abi() {
-      return [{
-            "inputs": [{
-                    "components": [{
-                            "internalType": "uint8",
-                            "name": "parents",
-                            "type": "uint8"
-                        },
-                        {
-                            "internalType": "bytes[]",
-                            "name": "interior",
-                            "type": "bytes[]"
-                        }
-                    ],
-                    "internalType": "struct XcmTransactorV2.Multilocation",
-                    "name": "dest",
-                    "type": "tuple"
-                },
-                {
-                    "internalType": "address",
-                    "name": "feeLocationAddress",
-                    "type": "address"
-                },
-                {
-                    "internalType": "uint64",
-                    "name": "transactRequiredWeightAtMost",
-                    "type": "uint64"
-                },
-                {
-                    "internalType": "bytes",
-                    "name": "call",
-                    "type": "bytes"
-                },
-                {
-                    "internalType": "uint256",
-                    "name": "feeAmount",
-                    "type": "uint256"
-                },
-                {
-                    "internalType": "uint64",
-                    "name": "overallWeight",
-                    "type": "uint64"
-                }
-            ],
-            "name": "transactThroughSigned",
-            "outputs": [],
-            "stateMutability": "nonpayable",
-            "type": "function"
-        },
-        {
-            "inputs": [{
-                    "components": [{
-                            "internalType": "uint8",
-                            "name": "parents",
-                            "type": "uint8"
-                        },
-                        {
-                            "internalType": "bytes[]",
-                            "name": "interior",
-                            "type": "bytes[]"
-                        }
-                    ],
-                    "internalType": "struct XcmTransactorV2.Multilocation",
-                    "name": "dest",
-                    "type": "tuple"
-                },
-                {
-                    "components": [{
-                            "internalType": "uint8",
-                            "name": "parents",
-                            "type": "uint8"
-                        },
-                        {
-                            "internalType": "bytes[]",
-                            "name": "interior",
-                            "type": "bytes[]"
-                        }
-                    ],
-                    "internalType": "struct XcmTransactorV2.Multilocation",
-                    "name": "feeLocation",
-                    "type": "tuple"
-                },
-                {
-                    "internalType": "uint64",
-                    "name": "transactRequiredWeightAtMost",
-                    "type": "uint64"
-                },
-                {
-                    "internalType": "bytes",
-                    "name": "call",
-                    "type": "bytes"
-                },
-                {
-                    "internalType": "uint256",
-                    "name": "feeAmount",
-                    "type": "uint256"
-                },
-                {
-                    "internalType": "uint64",
-                    "name": "overallWeight",
-                    "type": "uint64"
-                }
-            ],
-            "name": "transactThroughSignedMultilocation",
-            "outputs": [],
-            "stateMutability": "nonpayable",
-            "type": "function"
-        }
-    ]
-  }
+        return [{
+                "inputs": [{
+                        "components": [{
+                                "internalType": "uint8",
+                                "name": "parents",
+                                "type": "uint8"
+                            },
+                            {
+                                "internalType": "bytes[]",
+                                "name": "interior",
+                                "type": "bytes[]"
+                            }
+                        ],
+                        "internalType": "struct XcmTransactorV2.Multilocation",
+                        "name": "dest",
+                        "type": "tuple"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "feeLocationAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint64",
+                        "name": "transactRequiredWeightAtMost",
+                        "type": "uint64"
+                    },
+                    {
+                        "internalType": "bytes",
+                        "name": "call",
+                        "type": "bytes"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "feeAmount",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint64",
+                        "name": "overallWeight",
+                        "type": "uint64"
+                    }
+                ],
+                "name": "transactThroughSigned",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [{
+                        "components": [{
+                                "internalType": "uint8",
+                                "name": "parents",
+                                "type": "uint8"
+                            },
+                            {
+                                "internalType": "bytes[]",
+                                "name": "interior",
+                                "type": "bytes[]"
+                            }
+                        ],
+                        "internalType": "struct XcmTransactorV2.Multilocation",
+                        "name": "dest",
+                        "type": "tuple"
+                    },
+                    {
+                        "components": [{
+                                "internalType": "uint8",
+                                "name": "parents",
+                                "type": "uint8"
+                            },
+                            {
+                                "internalType": "bytes[]",
+                                "name": "interior",
+                                "type": "bytes[]"
+                            }
+                        ],
+                        "internalType": "struct XcmTransactorV2.Multilocation",
+                        "name": "feeLocation",
+                        "type": "tuple"
+                    },
+                    {
+                        "internalType": "uint64",
+                        "name": "transactRequiredWeightAtMost",
+                        "type": "uint64"
+                    },
+                    {
+                        "internalType": "bytes",
+                        "name": "call",
+                        "type": "bytes"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "feeAmount",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint64",
+                        "name": "overallWeight",
+                        "type": "uint64"
+                    }
+                ],
+                "name": "transactThroughSignedMultilocation",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
+        ]
+    }
     get_encoded_xcmTransaction(contract, input, gasLimit = 600000) {
         let api = this.apis["origination"].api;
         // ***** TODO: get ethereum call from ethers contract ABI, estimate gasLimit
@@ -723,26 +723,26 @@ module.exports = class XCMTransfer extends XCMTransact {
         // "flip" on alpha 
         let encodedCall = this.get_encoded_xcmTransaction(contract, input)
         console.log("encodedCall", contract, encodedCall);
-	// let feePaymentAddress = "0xffffffff1ab2b146c526d4154905ff12e6e57675"; // BetaDev on 1000
-	// let feeLocationAddress2 = "0xffffffffa7b17e706a2391f346d8c82b6788db41"; // AlphaDev on 888
+        // let feePaymentAddress = "0xffffffff1ab2b146c526d4154905ff12e6e57675"; // BetaDev on 1000
+        // let feeLocationAddress2 = "0xffffffffa7b17e706a2391f346d8c82b6788db41"; // AlphaDev on 888
 
         // 888 => 1000 : flip on alpha with AlphaDev (wrapped in EthereumXCM) -- dest2 = 1000; feeLocationAddress2 = BetaDev on 888
         let encodedCall1 = xcmTransactorContract.methods.transactThroughSigned(dest2, "0xffffffffa7b17e706a2391f346d8c82b6788db41", transactRequiredWeightAtMost, encodedCall, feeAmount, overallWeight).encodeABI()
-	console.log("dest2", dest2, paraID);
+        console.log("dest2", dest2, paraID);
         console.log("encodedCall1", encodedCall1);
-/*
-|   60888 | AlphaDev  | 0xffffffffa7b17e706a2391f346d8c82b6788db41 |
-|   61000 | BetaDev   | 0xffffffff1ab2b146c526d4154905ff12e6e57675 |
-|   61000 | AlphaDev  | 0x0000000000000000000000000000000000000802 |
-|   60888 | BetaDev   | 0x0000000000000000000000000000000000000802 |
-*/
+        /*
+        |   60888 | AlphaDev  | 0xffffffffa7b17e706a2391f346d8c82b6788db41 |
+        |   61000 | BetaDev   | 0xffffffff1ab2b146c526d4154905ff12e6e57675 |
+        |   61000 | AlphaDev  | 0x0000000000000000000000000000000000000802 |
+        |   60888 | BetaDev   | 0x0000000000000000000000000000000000000802 |
+        */
         // 1000 => 888 [ 888 => 1000 : flip on alpha with AlphaDev ]
         let encodedCall2 = this.get_encoded_xcmTransaction(xcmTransactorContractAddress, encodedCall1)
         console.log("encodedCall2", encodedCall2);
 
         // 1000 => 888 [ 888 => 1000 : flip on alpha with AlphaDev ] (wrapped in EthereumXCM) dest = 888 ; feeLocationAddress = AlphaDev on 1000 // 0xa7a22adba12af4cfbdbaff07d318681bfd0c4a9f702700f12eb136a54100cbb0
         let encodedCall3 = xcmTransactorContract.methods.transactThroughSigned(dest, "0xffffffff1ab2b146c526d4154905ff12e6e57675", transactRequiredWeightAtMost, encodedCall2, feeAmount, overallWeight).encodeABI()
-	console.log("dest", dest, paraIDDest);
+        console.log("dest", dest, paraIDDest);
         console.log("encodedCall3", encodedCall3);
         let txStruct = {
             to: xcmTransactorContractAddress,

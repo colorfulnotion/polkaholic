@@ -329,7 +329,15 @@ function showevmblockremote(objects) {
                     data: 'msgHash',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return presentXCMMessageHash(row.msgHash, row.blockNumber);
+                            if (row.msgHash != undefined && row.blockNumber != undefined) {
+                                let str = ''
+                                if (row.childMsgHash) {
+                                    str = "<BR><i>Child Msg:</i> " + presentXCMMessageHash(row.childMsgHash, row.blockNumber);
+                                }
+                                return presentXCMMessageHash(row.msgHash, row.blockNumber) + str;
+                            } else {
+                                return "-";
+                            }
                         }
                         return data;
                     }
@@ -362,7 +370,11 @@ function showevmblockremote(objects) {
                     data: 'blockNumber',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            return row.blockNumber;
+                            if (row.blockNumber != undefined) {
+                                return row.blockNumber;
+                            } else {
+                                return "-"
+                            }
                         }
                         return data;
                     }
@@ -376,12 +388,16 @@ function showevmblockremote(objects) {
                                 return presentTS(row.ts);
                             } else if (row.timestamp !== undefined) {
                                 return presentTS(row.timestamp);
+                            } else {
+                                return "-"
                             }
                         } else {
                             if (row.ts !== undefined) {
                                 return (row.ts);
                             } else if (row.timestamp !== undefined) {
                                 return (row.timestamp);
+                            } else {
+                                return "-"
                             }
                         }
 

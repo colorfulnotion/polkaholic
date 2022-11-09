@@ -7,6 +7,7 @@ const events = require('events');
 const readline = require('readline');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
+const xcmInstructions = require("./xcmInstructions");
 
 class XCMTracer extends AssetManager {
     xcm = {};
@@ -18,105 +19,6 @@ class XCMTracer extends AssetManager {
     idhash(id) {
         return paraTool.twox_128("GB" + id).substring(0, 16);
     }
-    getInstructionSet() {
-        let instructionSet = {
-            'withdrawAsset': { // Remove the on-chain asset(s) (assets) and accrue them into Holding
-                MultiAssets: ['assets'],
-                MultiAssetFilter: ['assets'], //v0
-                Effects: ['effects'] //v0
-            },
-            'reserveAssetDeposited': { // Accrue into Holding derivative assets to represent the asset(s) (assets) on Origin.
-                MultiAssets: ['assets']
-            },
-            'receiveTeleportedAsset': {
-                MultiAssets: ['assets']
-            },
-            'queryResponse': {},
-            'transferAsset': {
-                MultiAssetFilter: ['assets'],
-                MultiLocation: ['beneficiary'],
-            },
-            'transferReserveAsset': {
-                MultiAsset: ['assets'],
-                MultiLocation: ['destination'],
-                XCM: ['xcm']
-            },
-            'transact': {
-                Call: ['call']
-            },
-            'hrmpNewChannelOpenRequest': {},
-            'hrmpChannelAccepted': {},
-            'hrmpChannelClosing': {},
-            'clearOrigin': {},
-            'descendOrigin': {},
-            'reportError': {},
-            'depositAsset': { // Subtract the asset(s) (assets) from Holding and deposit on-chain equivalent assets under the ownership of beneficiary.
-                MultiAssetFilter: ['assets'],
-                MultiLocation: ['beneficiary']
-            },
-            'depositReserveAsset': {
-                MultiAssetFilter: ['assets'],
-                MultiLocation: ['beneficiary'],
-                XCM: ['xcm']
-            },
-            'exchangeAsset': {
-                MultiAssetFilter: ['give'],
-                MultiAssets: ['receive']
-            },
-            'initiateReserveWithdraw': {
-                MultiAssetFilter: ['assets'],
-                XCM: ['xcm']
-            },
-            'initiateTeleport': {
-                MultiAssetFilter: ['assets'],
-                MultiLocation: ['destination'],
-                XCM: ['xcm']
-            },
-            'queryHolding': {
-                MultiLocation: ['destination'],
-                MultiAssetFilter: ['assets']
-            },
-            'buyExecution': { //Pay for the execution of the current message from Holding.
-                MultiAsset: ['fees']
-            },
-            'refundSurplus': {},
-            'setErrorHandler': {},
-            'setAppendix': {},
-            'clearError': {},
-            'claimAsset': {
-                MultiAsset: ['assets'],
-                MultiLocation: ['ticket']
-            },
-            'trap': {},
-            'subscribeVersion': {},
-            'unsubscribeVersion': {},
-            'burnAsset': {
-                MultiAsset: ['assets']
-            },
-            'expectAsset': {
-                MultiAsset: ['assets']
-            },
-            'expectOrigin': {
-                MultiLocation: ['origin']
-            },
-            'expectError': {},
-            //V1
-            'reserveAssetDeposited': {
-                MultiAssetFilter: ['assets'],
-                Effects: ['effects'],
-            },
-            //V0
-            'teleportAsset': {
-                MultiAsset: ['assets'],
-                Effects: ['effects'],
-            },
-            'reserveAssetDeposit': {
-                MultiAsset: ['assets'],
-                Effects: ['effects'],
-            }
-        }
-        return instructionSet
-    }
 
     // maps dest like "{ parents: 0, interior: { x1: { parachain: 2000 } } }" into just "2000"
     dest_to_chainID(dest, relayChain = "polkadot") {
@@ -125,6 +27,42 @@ class XCMTracer extends AssetManager {
             return (paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain));
         }
         return (null)
+    }
+
+    compute_instruction_weight(instruction, id, relayChain) {
+	// Polkadot per instruction
+	if ( relayChain == "polkadot" ) {
+	    let DOTWeightToFeeCoefficient = ( 10 ** 10 / ( 10 * 100 * 85212000));
+	    let XCMDotCost = 1000000000 * DOTWeightToFeeCoefficient / 10 ** 10; // per instruction
+	    return XCMDotCost;
+	}
+	if ( relayChain == "kusama" ) {
+	    let weight_per_read =   25000000;
+	    let weight_per_write = 100000000;
+	    let model = xcmInstructions.getInstructionSet();
+	    let reads = model.reads ? model.reads : 0;
+	    let writes = model.writes ? model.writes : 0;
+	    let ExtrinsicBaseWeight = 86309000;
+	    let TotalWeight = reads * weight_per_read + writes * weight_per_write + ExtrinsicBaseWeight;
+	    let KSMWeightToFeeCoefficient = ( 10 ** 12 / ( 10 * 30000 * 86309000 ) )
+	    let XCMKSMCost = (TotalWeight * KSMWeightToFeeCoefficient)/ ( 10**12);
+	    return XCMKSMCost;
+	}
+
+	if ( id == "moonbeam" || id == "moonriver" ) {
+	    // all instructions have fixed amount of weight per instruction.
+	    let weight = 200000000
+	    // TODO: 
+	    return weight;
+	} else if ( id == "moonbase-alpha" || id == "moonbase-beta" ) {
+	    // generic XCM instructions benchmarked, fungible XCM instructions fixed amount of weight per instruction.
+	    let weight_per_read =   25000000;
+            let weight_per_write = 100000000;
+	    // TODO: 
+	    return weight;
+	}
+				      
+	return 1000000;
     }
 
     async submitleg(extrinsicID, ext, msgHash, destEventID, parentspanid = null, chainIDDest = null) {
@@ -140,8 +78,10 @@ class XCMTracer extends AssetManager {
             let [_, _idDest] = this.getNameByChainID(ext.chainIDDest)
             id = _id;
             idDest = _idDest;
+	    
             for (const [k, v] of Object.entries(ext)) {
-                switch (k) {
+		if ( v) {
+		    switch (k) {
                     case "chainID":
                     case "chainIDDest":
                     case "incomplete":
@@ -180,9 +120,9 @@ class XCMTracer extends AssetManager {
                         break;
                     default:
                         exttags[k.toString()] = v.toString();
-                }
-            }
-
+                    }
+		}
+	    }
             this.push_span(extrinsicID, {
                 id: traceId,
                 traceId: traceId,
@@ -284,7 +224,8 @@ class XCMTracer extends AssetManager {
                     } = xcm.instructions[i];
                     let spanid = this.idhash(prevspanid + hex);
                     let [opcode, params] = this.get_instruction_opcode_params(xcm.instructions[i].instruction.toJSON());
-                    let ms = 1000; // TODO: put weight here instead
+                    let weight = this.compute_instruction_weight(instruction, idDest, this.relayChain);
+		    let duration = weight / 10 ** 6; // microseconds
                     let instructiontags = {
                         "hex": xcm.instructions[i].hex
                     };
@@ -310,14 +251,14 @@ class XCMTracer extends AssetManager {
                         parentId: prevspanid,
                         traceId: traceId,
                         timestamp: ts,
-                        duration: ms,
+                        duration: duration,
                         name: `xcvm:${opcode}`,
                         tags: instructiontags,
                         localEndpoint: {
                             serviceName: idDest // this is the parachain executing the instruction -- compute it using "dest" multilocation
                         }
                     })
-                    ts += ms;
+                    ts += duration;
                     ts++;
                     prevspanid = spanid;
 
@@ -711,9 +652,13 @@ class XCMTracer extends AssetManager {
 
 async function main() {
     let tracefn = "/root/xcmscan.log";
+    let lookbackSeconds = 300;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             tracefn = val;
+        }
+        if (index == 3 && val.length > 0) {
+            lookbackSeconds = parseInt(val, 10);
         }
     });
 
@@ -721,7 +666,6 @@ async function main() {
     await tracer.assetManagerInit();
     let chain = await tracer.getChain(0);
     await tracer.setupAPI(chain);
-    let lookbackSeconds = 300;
 
     try {
         const rl = readline.createInterface({

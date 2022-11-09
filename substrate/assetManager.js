@@ -72,6 +72,23 @@ module.exports = class AssetManager extends PolkaholicDB {
         return s.replace('CDP_Supply', 'CDP');
     }
 
+    convertChainID(chainID_or_chainName) {
+        let chainID = false
+        let id = false
+        try {
+            chainID = parseInt(chainID_or_chainName, 10);
+            if (isNaN(chainID)) {
+                [chainID, id] = this.getChainIDByName(chainID_or_chainName)
+            } else {
+                [chainID, id] = this.getNameByChainID(chainID_or_chainName)
+            }
+        } catch (e) {
+            [chainID, id] = this.getChainIDByName(chainID_or_chainName)
+        }
+        //console.log(`chainID=${chainID}, id=${id}, chainID_or_chainName=${chainID_or_chainName}`)
+        return [chainID, id]
+    }
+
     async getBlockHashFinalized(chainID, blockNumber) {
         let sql = `select blockHash, if(blockDT is Null, 0, 1) as finalized from block${chainID} where blockNumber = '${blockNumber}' and blockDT is not Null`
         let blocks = await this.poolREADONLY.query(sql);

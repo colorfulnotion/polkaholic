@@ -1214,10 +1214,13 @@ module.exports = class Indexer extends AssetManager {
                     let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `${mysql.escape(r.xcmInteriorKey)}` : `NULL`
                     let xcmSymbol = (r.xcmSymbol) ? `${mysql.escape(r.xcmSymbol)}` : `NULL`
                     let xcmType = (r.xcmType != undefined) ? `'${r.xcmType}'` : 'xcmtransfer'
+                    let pendingXcmInfoStr = (r.xcmInfo != undefined) ? JSON.stringify(r.xcmInfo) : false
+                    let pendingXcmInfoBlob = (pendingXcmInfoStr != false) ? mysql.escape(pendingXcmInfoStr) : 'NULL'
+
                     //["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"]
                     //["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"]
                     let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
-                        `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey, innerCall, xcmType
+                        `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey, innerCall, xcmType, pendingXcmInfoBlob
                     ].join(",") + ")";
                     xcmtransfers.push(t);
                     if (numXCMTransfersOut[r.blockNumber] == undefined) {
@@ -1232,9 +1235,9 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "pendingXcmInfo"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"]
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "pendingXcmInfo"]
             }, sqlDebug);
 
 
@@ -1378,6 +1381,7 @@ module.exports = class Indexer extends AssetManager {
                     blockNumber: xcmMsg.blockNumber,
                     msgHex: xcmMsg.msgHex,
                     msgHash: xcmMsg.msgHash,
+                    msgStr: xcmMsg.msgStr,
                     isFresh: true,
                     matchable: true,
                 }
@@ -3222,7 +3226,20 @@ module.exports = class Indexer extends AssetManager {
             return false
         }
         let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
+        let outgoingTransactMsg = []
         if (this.debugLevel >= paraTool.debugTracing) console.log(`getEvmMsgHashCandidate [${evmTxHash}] [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}] trailingKeys`, trailingKeys)
+        for (const tk of trailingKeys) {
+            let trailingXcm = this.xcmTrailingKeyMap[tk]
+            if (trailingXcm.chainID == this.chainID) {
+                let msgHash = trailingXcm.msgHash
+                let msgStr = trailingXcm.msgStr
+                let r = paraTool.getXCMTransactList(msgHash, msgStr)
+                if (r) {
+                    outgoingTransactMsg.push(r)
+                }
+            }
+        }
+
         for (const tk of trailingKeys) {
             let trailingXcm = this.xcmTrailingKeyMap[tk]
             //console.log(`getEvmMsgHashCandidate tk=${tk}`, trailingXcm)
@@ -3230,6 +3247,8 @@ module.exports = class Indexer extends AssetManager {
             let firstSeenBN = trailingXcm.blockNumber
             let msgHex = trailingXcm.msgHex
             let msgHash = trailingXcm.msgHash
+            let msgStr = trailingXcm.msgStr
+            let childMsgHash = false // this is the second leg, if available
             if (firstSeenBN == targetBN && msgHex.includes(txInput) && msgHex.includes(txTo) && msgHex.includes(txGasLimit)) {
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
@@ -3237,11 +3256,19 @@ module.exports = class Indexer extends AssetManager {
                 if (this.xcmmsgMap[tk] != undefined) {
                     this.xcmmsgMap[tk].connectedTxHash = evmTxHash
                 }
-                return msgHash
+                for (const m of outgoingTransactMsg) {
+                    for (const t of m.transactList) {
+                        if (msgHex.includes(t)) {
+                            childMsgHash = m.msgHash
+                            break;
+                        }
+                    }
+                }
+                return [msgHash, childMsgHash]
             }
         }
         if (this.debugLevel >= paraTool.debugInfo) console.log(`getEvmMsgHashCandidate [${evmTxHash}] [${targetBN}, matcher=[${txInput}, ${txTo}, ${txGasLimit}], ${matcherType}] MISS`)
-        return false
+        return [false, false]
     }
 
 
@@ -4707,8 +4734,14 @@ module.exports = class Indexer extends AssetManager {
                                 }
                                 if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                             }
+
                             this.stat.addressRows.xcmsend++;
-                            this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized);
+                            this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized); //not sure about bt write here..
+
+                            // build pendingXCMInfo here
+                            let pendingXcmInfo = await this.buildPendingXcmInfo(xcmtransfer, rExtrinsic)
+                            if (this.debugLevel >= paraTool.debugInfo) console.log(`pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, pendingXcmInfo)
+                            xcmtransfer.xcmInfo = pendingXcmInfo
                             this.updateXCMTransferStorage(xcmtransfer, isTip); // store, flushed in flushXCM
                         }
                     } else {
@@ -4847,6 +4880,209 @@ module.exports = class Indexer extends AssetManager {
         }
 
         return (rExtrinsic);
+    }
+
+    async buildPendingXcmInfo(x, extrinsic) {
+        //build systhetic xcmInfo here when xcmInfo is not set yet
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
+        try {
+            let sectionPieces = x.sectionMethod.split(':')
+            let xSection = null,
+                xMethod = null;
+            if (sectionPieces.length == 2) {
+                xSection = sectionPieces[0];
+                xMethod = sectionPieces[1];
+            }
+
+            /*
+            let substrateTxHash = x.extrinsicHash
+            let substratetx;
+            try {
+                substratetx = await this.getTransaction(substrateTxHash);
+            } catch (err) {
+                console.log("looking for", substrateTxHash, err);
+            }
+            let sourceTxFeeUSD = (substratetx.feeUSD != undefined) ? substratetx.feeUSD : null
+            let sourceChainSymbol = this.getChainSymbol(chainID)
+            let evmTransactionHash = null
+            if (substratetx.evm != undefined && substratetx.evm.transactionHash != undefined) {
+                evmTransactionHash = substratetx.evm.transactionHash
+                let evmtx = await this.getTransaction(evmTransactionHash, decorate, decorateExtra, false);
+                if (!evmtx) return [false, false]
+                sourceTxFee = evmtx.fee
+                sourceTxFeeUSD = evmtx.feeUSD
+                sourceChainSymbol = evmtx.symbol
+            }
+            */
+
+            // looks up assetInfo
+            let symbolRelayChain = paraTool.makeAssetChain(x.xcmSymbol, x.relayChain);
+            let sourceTxFee = (extrinsic.fee != undefined && extrinsic.fee > 0) ? extrinsic.fee : null //can't do evm fee for now
+            let sourceTxFeeUSD = null
+            let sourceChainSymbol = this.getChainSymbol(x.chainID)
+            if (sourceTxFee != undefined) {
+                let p = await this.computePriceUSD({
+                    val: sourceTxFee,
+                    asset: sourceChainSymbol,
+                    chainID: x.chainID,
+                    ts: x.sourceTS
+                })
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD fee`, p)
+                if (p) {
+                    x.sourceTxFeeUSD = p.valUSD;
+                }
+            }
+
+
+            let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
+            if (assetInfo) {
+                x.decimals = assetInfo.decimals;
+                x.amountSent = x.amountSent / 10 ** x.decimals;
+                x.priceUSD = null;
+                x.amountSentUSD = null;
+                let p = await this.computePriceUSD({
+                    val: x.amountSent,
+                    asset: x.xcmSymbol,
+                    chainID: x.chainID,
+                    ts: x.sourceTS
+                })
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD p`, p)
+                if (p) {
+                    x.amountSentUSD = p.valUSD;
+                    x.priceUSD = p.priceUSD;
+                }
+                //x.amountReceived = x.amountReceived / 10 ** x.decimals;
+                //x.xcmFee = x.amountSent - x.amountReceived
+                x.symbol = assetInfo.symbol;
+                //if (assetInfo.localSymbol) x.localSymbol = assetInfo.localSymbol;
+            } else {
+                console.log(`[${x.extrinsicHash}] [${x.extrinsicID}] MISSING x.asset`, x.asset, x.chainID);
+            }
+
+            if (x.chainID != undefined) {
+                let [_, id] = this.convertChainID(x.chainID)
+                //[x.chainIDDest, x.idDest] = this.convertChainID(x.chainIDDest)
+                x.id = (id == false) ? null : id
+                x.chainName = this.getChainName(x.chainID);
+                x.paraIDDest = paraTool.getParaIDfromChainID(x.chainID)
+                let chainIDOriginationInfo = this.chainInfos[x.chainID]
+                if (chainIDOriginationInfo != undefined && chainIDOriginationInfo.ss58Format != undefined) {
+                    if (x.fromAddress != undefined) {
+                        if (x.fromAddress.length == 42) x.sender = x.fromAddress
+                        if (x.fromAddress.length == 66) x.sender = paraTool.getAddress(x.fromAddress, chainIDOriginationInfo.ss58Format)
+                    }
+                }
+            }
+            if (x.chainIDDest != undefined) {
+                let [_, idDest] = this.convertChainID(x.chainIDDest)
+                //[x.chainIDDest, x.idDest] = this.convertChainID(x.chainIDDest)
+                x.idDest = (idDest == false) ? null : idDest
+                x.chainDestName = this.getChainName(x.chainIDDest);
+                x.paraIDDest = paraTool.getParaIDfromChainID(x.chainIDDest)
+                let chainIDDestInfo = this.chainInfos[x.chainIDDest]
+                if (chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
+                    if (x.destAddress != undefined) {
+                        if (x.destAddress.length == 42) x.beneficiary = x.destAddress
+                        if (x.destAddress.length == 66) x.beneficiary = paraTool.getAddress(x.destAddress, chainIDDestInfo.ss58Format)
+                    }
+                }
+            }
+
+            //(xcmtransfer.destStatus = 0 and xcmtransfer.incomplete = 0) or xcmtransfer.incomplete = 1)
+            let failureType = null
+            //if (x.destStatus == 0 && x.incomplete == 0) failureType = 'failedDestination'
+            if (x.incomplete == 1) failureType = 'failedOrigination'
+            let xcmInfo = {
+                symbol: x.symbol,
+                priceUSD: (x.priceUSD != undefined) ? x.priceUSD : null,
+                relayChain: null,
+                origination: null,
+                destination: null,
+                version: 'V2',
+            }
+            xcmInfo.relayChain = {
+                relayChain: this.relayChain,
+                relayAt: (failureType == 'failedOrigination') ? null : x.sentAt, //?
+            }
+
+            xcmInfo.origination = {
+                chainName: x.chainName,
+                id: x.id,
+                chainID: x.chainID,
+                paraID: x.paraID,
+                sender: x.sender,
+                amountSent: (failureType == 'failedOrigination') ? 0 : x.amountSent,
+                amountSentUSD: (failureType == 'failedOrigination') ? 0 : x.amountSentUSD,
+                txFee: sourceTxFee,
+                txFeeUSD: sourceTxFeeUSD,
+                txFeeSymbol: sourceChainSymbol,
+                blockNumber: x.blockNumber,
+                section: xSection,
+                method: xMethod,
+                extrinsicID: x.extrinsicID,
+                extrinsicHash: x.extrinsicHash,
+                //transactionHash: evmTransactionHash,
+                msgHash: x.msgHash,
+                sentAt: x.sentAt,
+                ts: x.sourceTS,
+                complete: (x.incomplete) ? false : true,
+            }
+            //if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
+            if (failureType != undefined) {
+                xcmInfo.destination = {
+                    chainName: x.chainDestName,
+                    id: x.idDest,
+                    chainID: x.chainIDDest,
+                    paraID: x.paraIDDest,
+                    beneficiary: (x.beneficiary != undefined) ? x.beneficiary : null,
+                    amountReceived: 0,
+                    amountReceivedUSD: 0,
+                    teleportFee: 0,
+                    teleportFeeUSD: 0,
+                    teleportFeeChainSymbol: x.symbol,
+                    blockNumber: null,
+                    extrinsicID: null,
+                    eventID: null,
+                    ts: null,
+                    status: false,
+                    error: {},
+                }
+                if (failureType == 'failedDestination') {
+                    //xcmInfo.destination.error = this.getXcmErrorDescription(x.errorDesc) TODO..
+                } else {
+                    xcmInfo.destination.extrinsicID = null
+                    xcmInfo.destination.error = {
+                        errorCode: `NA`,
+                        errorType: `FailedAtOriginationChain`,
+                        errorDesc: `XCM Failed at origination Chain.`,
+                    }
+                }
+            } else {
+                xcmInfo.destination = {
+                    chainName: x.chainDestName,
+                    id: x.idDest,
+                    chainID: x.chainIDDest,
+                    paraID: x.paraIDDest,
+                    beneficiary: (x.beneficiary != undefined) ? x.beneficiary : null,
+                    amountReceived: null,
+                    amountReceivedUSD: null,
+                    teleportFee: null,
+                    teleportFeeUSD: null,
+                    teleportFeeChainSymbol: x.symbol,
+                    blockNumber: null,
+                    //extrinsicID: x.destExtrinsicID,
+                    eventID: null,
+                    ts: null,
+                    status: false,
+                }
+            }
+            //console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)
+            return xcmInfo
+        } catch (e) {
+            console.log(`buildPendingXcmInfo [${x.extrinsicID}]  [${x.extrinsicHash}] err`, e)
+            return false
+        }
     }
 
     get_block_timestamp(block) {
@@ -6329,8 +6565,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     let connectedTxns = []
                     for (const connectedTxn of evmFullBlock.transactionsConnected) {
                         try {
-                            let msgHash = this.getEvmMsgHashCandidate(blockNumber, connectedTxn, 'evm')
+                            let [msgHash, childMsgHash] = this.getEvmMsgHashCandidate(blockNumber, connectedTxn, 'evm')
                             if (msgHash) connectedTxn.msgHash = msgHash
+                            if (childMsgHash) connectedTxn.childMsgHash = childMsgHash
                         } catch (e) {
                             console.log(`[${blockNumber}] [${connectedTxn.transactionHash}] connectTransaction `, e, connectedTxn)
                         }

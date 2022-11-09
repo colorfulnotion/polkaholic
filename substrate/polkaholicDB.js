@@ -423,7 +423,7 @@ module.exports = class PolkaholicDB {
             let cID = parseInt(chainID, 10)
             return [cID, this.chainInfos[chainID].id]
         }
-        return false
+        return [false, false]
     }
 
     getIDByChainID(chainID) {
