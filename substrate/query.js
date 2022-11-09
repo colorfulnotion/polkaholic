@@ -1094,6 +1094,10 @@ module.exports = class Query extends AssetManager {
         let blockNumber = filters.blockNumber ? parseInt(filters.blockNumber, 10) : null;
         let address = filters.address ? filters.address : null;
         let xcmType = filters.xcmType ? filters.xcmType : null;
+        let symbols = filters.symbol ? filters.symbol.split(',') : [];
+        let startTS = filters.startTS ? filters.startTS : null;
+        let endTS = filters.endTS ? filters.endTS : null;
+        //console.log(`filters`, filters)
         let patchedXcms = [] // we will update the missing xcmInfo once instead of rebuilding it over and over again
         let out = [];
         try {
@@ -1106,6 +1110,12 @@ module.exports = class Query extends AssetManager {
             }
             if (xcmType) {
                 w.push(`(xcmType='${xcmType}')`)
+            }
+            if (symbols.length > 0){
+                w.push(`( symbol in ( '${symbols.join("','")}'))`)
+            }
+            if (!isNaN(startTS) && !isNaN(endTS) && startTS && endTS){
+                w.push(`( sourceTS >= ${startTS} && sourceTS < ${endTS})`)
             }
             let chainListFilter = "";
             if (chainList.length > 0) {

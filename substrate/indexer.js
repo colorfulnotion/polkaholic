@@ -1240,7 +1240,6 @@ module.exports = class Indexer extends AssetManager {
                 "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "pendingXcmInfo"]
             }, sqlDebug);
 
-
             let out = [];
             for (const blockNumber of Object.keys(numXCMTransfersOut)) {
                 out.push(`('${blockNumber}', '${numXCMTransfersOut[blockNumber]}')`);
@@ -4882,7 +4881,8 @@ module.exports = class Indexer extends AssetManager {
         return (rExtrinsic);
     }
 
-    async buildPendingXcmInfo(x, extrinsic) {
+    async buildPendingXcmInfo(xcmtransfer, extrinsic) {
+        let x = xcmtransfer // need deep clone?
         //build systhetic xcmInfo here when xcmInfo is not set yet
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
@@ -4922,12 +4922,13 @@ module.exports = class Indexer extends AssetManager {
             let sourceTxFeeUSD = null
             let sourceChainSymbol = this.getChainSymbol(x.chainID)
             if (sourceTxFee != undefined) {
-                let p = await this.computePriceUSD({
+                let inp = {
                     val: sourceTxFee,
-                    asset: sourceChainSymbol,
-                    chainID: x.chainID,
+                    symbol: sourceChainSymbol,
+                    relayChain: x.relayChain,
                     ts: x.sourceTS
-                })
+                }
+                let p = await this.computePriceUSD(inp);
                 if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD fee`, p)
                 if (p) {
                     x.sourceTxFeeUSD = p.valUSD;
@@ -4936,24 +4937,28 @@ module.exports = class Indexer extends AssetManager {
 
 
             let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
+            let amountSent = x.amountSent
             if (assetInfo) {
                 x.decimals = assetInfo.decimals;
-                x.amountSent = x.amountSent / 10 ** x.decimals;
+                amountSent = x.amountSent / 10 ** x.decimals;
                 x.priceUSD = null;
                 x.amountSentUSD = null;
-                let p = await this.computePriceUSD({
-                    val: x.amountSent,
-                    asset: x.xcmSymbol,
-                    chainID: x.chainID,
+                let inp = {
+                    val: amountSent,
+                    symbol: x.xcmSymbol,
+                    relayChain: x.relayChain,
                     ts: x.sourceTS
-                })
+                }
+
+                let p = await this.computePriceUSD(inp);
+
                 if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD p`, p)
                 if (p) {
                     x.amountSentUSD = p.valUSD;
                     x.priceUSD = p.priceUSD;
                 }
                 //x.amountReceived = x.amountReceived / 10 ** x.decimals;
-                //x.xcmFee = x.amountSent - x.amountReceived
+                //x.xcmFee = amountSent - x.amountReceived
                 x.symbol = assetInfo.symbol;
                 //if (assetInfo.localSymbol) x.localSymbol = assetInfo.localSymbol;
             } else {
@@ -5012,7 +5017,7 @@ module.exports = class Indexer extends AssetManager {
                 chainID: x.chainID,
                 paraID: x.paraID,
                 sender: x.sender,
-                amountSent: (failureType == 'failedOrigination') ? 0 : x.amountSent,
+                amountSent: (failureType == 'failedOrigination') ? 0 : amountSent,
                 amountSentUSD: (failureType == 'failedOrigination') ? 0 : x.amountSentUSD,
                 txFee: sourceTxFee,
                 txFeeUSD: sourceTxFeeUSD,
