@@ -199,21 +199,33 @@ module.exports = class AssetManager extends PolkaholicDB {
 
 
     async assetManagerInit() {
+
+        //init_chainInfos: {chainInfos, chainNames, specVersions}
         await this.init_chainInfos()
-        await this.init_chain_asset_and_nativeAsset() // this will init assetInfo and assetLog
+
+        //init_asset_info: {assetInfo, alternativeAssetInfo, symbolRelayChainAsset, xcContractAddress, currencyIDInfo}
+        //init_xcm_asset:  {routers, xcmAssetInfo, xcmInteriorInfo, xcmSymbolInfo, xcmConceptInfo}
+        //init_paras: {paras}
+        await this.init_chain_asset_and_nativeAsset()
+
+        //init_storage_keys: {storageKeys}
         await this.init_storage_keys();
+
+        //init_accounts: {accounts}
         await this.init_accounts();
         return (true);
     }
 
     async init_storage_keys() {
         let keys = await this.poolREADONLY.query(`select storageKey, palletName, storageName, docs from chainPalletStorage;`);
+        let storageKeysMap = {}
         for (const p of keys) {
-            this.storageKeys[p.storageKey] = {
+            storageKeysMap[p.storageKey] = {
                 palletName: p.palletName,
                 storageName: p.storageName
             };
         }
+        this.storageKeys = storageKeysMap
     }
 
     async init_accounts() {
@@ -222,6 +234,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         let subaccountsDOT = await this.poolREADONLY.query(`select address, parent, subName from subaccount where parent is not null;`);
 
         this.accounts = {}
+        let accountsMap = {}
         // fetch chain idendity
         for (const p of accounts) {
             if (p.info != null) p.info = JSON.parse(p.info.toString('utf8'));
@@ -245,13 +258,13 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
 
             p.childKSM = []
-            this.accounts[p.address] = p
+            accountsMap[p.address] = p
         }
 
         for (const sd of subaccountsKSM) {
             let parentKSMAddress = sd.parentKSM
             let subAddress = sd.address
-            let p = this.accounts[subAddress]
+            let p = accountsMap[subAddress]
             if (p == undefined) {
                 // init p here
                 p = {}
@@ -259,7 +272,7 @@ module.exports = class AssetManager extends PolkaholicDB {
 
             p.parentKSM = sd.parentKSM
             p.subNameKSM = (sd.subNameKSM != undefined) ? sd.subNameKSM.toString('utf8') : null
-            let parentIdentity = this.accounts[parentKSMAddress]
+            let parentIdentity = accountsMap[parentKSMAddress]
             if (parentIdentity != undefined) {
                 if (parentIdentity.infoKSM != undefined) {
                     p.infoKSM = parentIdentity.infoKSM
@@ -280,8 +293,8 @@ module.exports = class AssetManager extends PolkaholicDB {
                     subName: p.subNameKSM
                 })
             }
-            this.accounts[subAddress] = p
-            this.accounts[parentKSMAddress] = parentIdentity
+            accountsMap[subAddress] = p
+            accountsMap[parentKSMAddress] = parentIdentity
         }
 
         for (const sd of subaccountsDOT) {
@@ -294,7 +307,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             p.parent = sd.parent
             p.subName = (sd.subName != undefined) ? sd.subName.toString('utf8') : null
-            let parentIdentity = this.accounts[parentAddress]
+            let parentIdentity = accountsMap[parentAddress]
             if (parentIdentity != undefined) {
                 if (parentIdentity.info != undefined) {
                     p.info = parentIdentity.info
@@ -316,8 +329,8 @@ module.exports = class AssetManager extends PolkaholicDB {
                     subName: p.subName
                 })
             }
-            this.accounts[subAddress] = p
-            this.accounts[parentAddress] = parentIdentity
+            accountsMap[subAddress] = p
+            accountsMap[parentAddress] = parentIdentity
         }
 
 
@@ -367,16 +380,17 @@ module.exports = class AssetManager extends PolkaholicDB {
 
         for (let i = 0; i < related.length; i++) {
             let r = related[i];
-            if (this.accounts[r.address] == undefined) {
-                this.accounts[r.address] = {}
+            if (accountsMap[r.address] == undefined) {
+                accountsMap[r.address] = {}
             }
-            if (this.accounts[r.address].related == undefined) {
-                this.accounts[r.address].related = [];
+            if (accountsMap[r.address].related == undefined) {
+                accountsMap[r.address].related = [];
             }
 
-            this.accounts[r.address].related.push(r);
+            accountsMap[r.address].related.push(r);
         }
 
+        this.accounts = accountsMap
         //console.log(`init_accounts`, this.accounts)
     }
 
@@ -422,9 +436,12 @@ module.exports = class AssetManager extends PolkaholicDB {
 
     async init_paras() {
         let paras = await this.poolREADONLY.query(`select id, chainID, chainName, relayChain, paraID, concat(relayChain,'-',paraID) as fullparaID, symbol from chain order by relayChain desc, chainID;`);
+        let paraMap = {}
         for (const p of paras) {
-            this.paras[p.fullparaID] = p
+            paraMap[p.fullparaID] = p
+            //this.paras[p.fullparaID] = p
         }
+        this.paras = paraMap
     }
 
     async init_chain_asset_and_nativeAsset() {
@@ -777,6 +794,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         this.xcContractAddress = xcContractAddress;
         this.currencyIDInfo = currencyIDInfo;
     }
+
     validXCMSymbol(symbol, chainID, ctx, o) {
         let relayChain = paraTool.getRelayChainByChainID(chainID);
         let symbolRelayChain = paraTool.makeAssetChain(symbol, relayChain);

@@ -85,6 +85,8 @@ module.exports = class Indexer extends AssetManager {
     recentExtrinsics = [];
     recentTransfers = [];
 
+    xcmList = []; //this should be removed after every block
+
     wasmContractMap = {};
 
     addressBalanceRequest = {}
@@ -6229,6 +6231,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         let paraID = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
                         let backed = backedMap[paraID]
                         let sourceSentAt = backed.relayParentNumber // this is the true "sentAt" at sourceChain, same as commitments.hrmpWatermark
+                        let sourceSentBlockHash = backed.paraHead // this is supposedly the "sentBN"
                         let relayedAt = bn // "relayedAt" -- aka backed at this relay bn
                         let includedAt = bn + 1 // "includedAt" -- aka when it's being delivered to destChain
                         for (const msgHex of commitments.upwardMessages) {
@@ -6340,6 +6343,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             //console.log(`!!! indexRelayChainTrace [${relayChain}-${bn}] len=${xcmList.length} (finalized=${finalized}, isTip=${isTip})`, xcmList)
             await this.process_rcxcm(xcmList)
         }
+        this.xcmList = xcmList
+        return xcmList
     }
 
     async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, evmTrace = false, autoTraces = false, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false) {
@@ -6525,7 +6530,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 timestamp: blockTS * 1000000
             };
         }
-        let forceTry = true
+        let forceTry = true //MK: need to review this
         if ((isTip || forceTry) && (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama || chainID == paraTool.chainIDMoonbaseRelay)) {
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             if (autoTraces) {
@@ -6712,7 +6717,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXcmMsgs.length > 0) {
             this.add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs)
         }
-        return (blockStats);
+        //let xcmList = this.xcmList;
+        if (this.xcmList.length > 0) console.log(`[${blockNumber}] [${blockHash}] xcmList found!`, this.xcmList)
+        return [blockStats, this.xcmList];
     }
 
     add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs) {
@@ -7366,7 +7373,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let processBlockEventsStartTS = new Date().getTime()
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
             let tracesPresent = (r.trace) ? true : false;
-            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, true, write_bq_log, isTip, tracesPresent);
+            let [blockStats, xcmList] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, true, write_bq_log, isTip, tracesPresent);
+            r.blockStats = blockStats
+            r.xcmList = xcmList
 
             let processBlockEventsTS = (new Date().getTime() - processBlockEventsStartTS) / 1000
             this.timeStat.processBlockEventsTS += processBlockEventsTS
@@ -7435,7 +7444,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
             this.dump_update_block_stats(chain.chainID, statRows, indexTS)
             await this.flush(indexTS, blockNumber, false, false); //ts, bn, isFullPeriod, isTip
-            return (r);
+            return (r.xcmList);
         } catch (err) {
             console.log(err);
             this.logger.warn({

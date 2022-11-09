@@ -2055,7 +2055,7 @@ create table talismanEndpoint (
                             //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
                             // IMPORTANT NOTE: we only need to do this for evm chains... (review)
                             let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, "subscribeStorage", this.api);
-                            let blockStats = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces); // autotrace, finalized, write_bq_log are all false
+                            let [blockStats, xcmList] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces); // autotrace, finalized, write_bq_log are all false
 
                             await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
                             if (blockNumber > this.blocksCovered) {
