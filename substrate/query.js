@@ -2243,6 +2243,7 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                 }
+                if (evmBlock.transactionsConnected == undefined) evmBlock.transactionsConnected = []
                 block.evmBlock = evmBlock
                 // decorate transactionsInternal
             }
