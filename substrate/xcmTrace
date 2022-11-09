@@ -30,39 +30,39 @@ class XCMTracer extends AssetManager {
     }
 
     compute_instruction_weight(instruction, id, relayChain) {
-	// Polkadot per instruction
-	if ( relayChain == "polkadot" ) {
-	    let DOTWeightToFeeCoefficient = ( 10 ** 10 / ( 10 * 100 * 85212000));
-	    let XCMDotCost = 1000000000 * DOTWeightToFeeCoefficient / 10 ** 10; // per instruction
-	    return XCMDotCost;
-	}
-	if ( relayChain == "kusama" ) {
-	    let weight_per_read =   25000000;
-	    let weight_per_write = 100000000;
-	    let model = xcmInstructions.getInstructionSet();
-	    let reads = model.reads ? model.reads : 0;
-	    let writes = model.writes ? model.writes : 0;
-	    let ExtrinsicBaseWeight = 86309000;
-	    let TotalWeight = reads * weight_per_read + writes * weight_per_write + ExtrinsicBaseWeight;
-	    let KSMWeightToFeeCoefficient = ( 10 ** 12 / ( 10 * 30000 * 86309000 ) )
-	    let XCMKSMCost = (TotalWeight * KSMWeightToFeeCoefficient)/ ( 10**12);
-	    return XCMKSMCost;
-	}
-
-	if ( id == "moonbeam" || id == "moonriver" ) {
-	    // all instructions have fixed amount of weight per instruction.
-	    let weight = 200000000
-	    // TODO: 
-	    return weight;
-	} else if ( id == "moonbase-alpha" || id == "moonbase-beta" ) {
-	    // generic XCM instructions benchmarked, fungible XCM instructions fixed amount of weight per instruction.
-	    let weight_per_read =   25000000;
+        // Polkadot per instruction
+        if (relayChain == "polkadot") {
+            let DOTWeightToFeeCoefficient = (10 ** 10 / (10 * 100 * 85212000));
+            let XCMDotCost = 1000000000 * DOTWeightToFeeCoefficient / 10 ** 10; // per instruction
+            return XCMDotCost;
+        }
+        if (relayChain == "kusama") {
+            let weight_per_read = 25000000;
             let weight_per_write = 100000000;
-	    // TODO: 
-	    return weight;
-	}
-				      
-	return 1000000;
+            let model = xcmInstructions.getInstructionSet();
+            let reads = model.reads ? model.reads : 0;
+            let writes = model.writes ? model.writes : 0;
+            let ExtrinsicBaseWeight = 86309000;
+            let TotalWeight = reads * weight_per_read + writes * weight_per_write + ExtrinsicBaseWeight;
+            let KSMWeightToFeeCoefficient = (10 ** 12 / (10 * 30000 * 86309000))
+            let XCMKSMCost = (TotalWeight * KSMWeightToFeeCoefficient) / (10 ** 12);
+            return XCMKSMCost;
+        }
+
+        if (id == "moonbeam" || id == "moonriver") {
+            // all instructions have fixed amount of weight per instruction.
+            let weight = 200000000
+            // TODO: 
+            return weight;
+        } else if (id == "moonbase-alpha" || id == "moonbase-beta") {
+            // generic XCM instructions benchmarked, fungible XCM instructions fixed amount of weight per instruction.
+            let weight_per_read = 25000000;
+            let weight_per_write = 100000000;
+            // TODO: 
+            return weight;
+        }
+
+        return 1000000;
     }
 
     async submitleg(extrinsicID, ext, msgHash, destEventID, parentspanid = null, chainIDDest = null) {
@@ -78,51 +78,51 @@ class XCMTracer extends AssetManager {
             let [_, _idDest] = this.getNameByChainID(ext.chainIDDest)
             id = _id;
             idDest = _idDest;
-	    
+
             for (const [k, v] of Object.entries(ext)) {
-		if ( v) {
-		    switch (k) {
-                    case "chainID":
-                    case "chainIDDest":
-                    case "incomplete":
-                    case "isFeeItem":
-                    case "msgHash":
-                    case "relayChain":
-                    case "xcmIndex":
-                    case "transferIndex":
-                    case "sourceTS":
-                    case "sentAt":
-                    case "xcmType":
-                        break;
-                    case "amountSent":
-                        exttags[k.toString()] = v.toString();
-                        let p = await this.computePriceUSD({
-                            symbol: ext.xcmSymbol,
-                            relayChain: ext.relayChain,
-                            ts: ext.sourceTS
-                        });
-                        if (p) {
-                            exttags[`amountSentRaw`] = ext.amountSent.toString();
-                            exttags[`amountSent`] = `${ext.amountSent/10**p.assetInfo.decimals} ${ext.xcmSymbol}`;
-                            exttags["amountSentUSD"] = (p.priceUSD * ext.amountSent / 10 ** p.assetInfo.decimals).toString();
-                        }
-                        break;
-                    case "extrinsicHash":
-                        exttags[k.toString()] = v.toString();
-                        exttags["extrinsicURL"] = `https://polkaholic.io/extrinsic/${v}`
-                        break;
-                    case "blockNumber":
-                        exttags[k.toString()] = v.toString();
-                        exttags["blockNumberURL"] = `https://polkaholic.io/block/${id}/${v}`
-                        break;
-                    case "sectionMethod":
-                        sectionMethod = v.toString();
-                        break;
-                    default:
-                        exttags[k.toString()] = v.toString();
+                if (v) {
+                    switch (k) {
+                        case "chainID":
+                        case "chainIDDest":
+                        case "incomplete":
+                        case "isFeeItem":
+                        case "msgHash":
+                        case "relayChain":
+                        case "xcmIndex":
+                        case "transferIndex":
+                        case "sourceTS":
+                        case "sentAt":
+                        case "xcmType":
+                            break;
+                        case "amountSent":
+                            exttags[k.toString()] = v.toString();
+                            let p = await this.computePriceUSD({
+                                symbol: ext.xcmSymbol,
+                                relayChain: ext.relayChain,
+                                ts: ext.sourceTS
+                            });
+                            if (p) {
+                                exttags[`amountSentRaw`] = ext.amountSent.toString();
+                                exttags[`amountSent`] = `${ext.amountSent/10**p.assetInfo.decimals} ${ext.xcmSymbol}`;
+                                exttags["amountSentUSD"] = (p.priceUSD * ext.amountSent / 10 ** p.assetInfo.decimals).toString();
+                            }
+                            break;
+                        case "extrinsicHash":
+                            exttags[k.toString()] = v.toString();
+                            exttags["extrinsicURL"] = `https://polkaholic.io/extrinsic/${v}`
+                            break;
+                        case "blockNumber":
+                            exttags[k.toString()] = v.toString();
+                            exttags["blockNumberURL"] = `https://polkaholic.io/block/${id}/${v}`
+                            break;
+                        case "sectionMethod":
+                            sectionMethod = v.toString();
+                            break;
+                        default:
+                            exttags[k.toString()] = v.toString();
                     }
-		}
-	    }
+                }
+            }
             this.push_span(extrinsicID, {
                 id: traceId,
                 traceId: traceId,
@@ -225,7 +225,7 @@ class XCMTracer extends AssetManager {
                     let spanid = this.idhash(prevspanid + hex);
                     let [opcode, params] = this.get_instruction_opcode_params(xcm.instructions[i].instruction.toJSON());
                     let weight = this.compute_instruction_weight(instruction, idDest, this.relayChain);
-		    let duration = weight / 10 ** 6; // microseconds
+                    let duration = weight / 10 ** 6; // microseconds
                     let instructiontags = {
                         "hex": xcm.instructions[i].hex
                     };
