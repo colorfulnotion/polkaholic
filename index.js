@@ -98,6 +98,37 @@ app.use(function(req, res, next) {
     next()
 })
 
+function map_host_chain(hostname) {
+    let sa = hostname.split(".");
+    if (sa.length >= 2) {
+        let domain = sa[sa.length - 2];
+        let defaultid = null;
+        let subdomains = [];
+        switch (domain) {
+            case "astarscan":
+                defaultid = "astar"
+                subdomains = ["shiden", "shibuya"];
+                break;
+            case "acalascan":
+                defaultid = "acala"
+                subdomains = ["karura", "mandala"]
+                break;
+            case "xcmscan":
+                defaultid = "moonbeam";
+                subdomains = ["moonriver", "moonbase"]
+                break;
+        }
+        if (defaultid) {
+            let subdomain = (sa.length > 2) ? sa[sa.length - 3].toLowerCase() : null;
+            let [chainID, id] = query.convertChainID(subdomain && ((subdomains.length > 0 && subdomains.includes(subdomain)) || domain == "xcmscan") ? subdomain : defaultid);
+            if (id) {
+                return [chainID, id];
+            }
+        }
+    }
+    return [null, null];
+}
+
 // getHostChain first uses the host subdomain, then the cookie "selchain" to decide chainID/id; and returns chainID, id and a chain object
 async function getHostChain(req, reqChainID = null) {
     let [chainID, id, chain] = [-1, null, {}];
@@ -109,13 +140,17 @@ async function getHostChain(req, reqChainID = null) {
                 [chainID, id] = [_chainID, _id];
             }
         } else {
-
             if (id == null) {
                 let selchain = req.cookies.selchain;
                 if (selchain) {
                     let [_chainID, _id] = query.convertChainID(selchain)
                     if (_id) {
                         [chainID, id] = [_chainID, _id];
+                    }
+                } else {
+                    let [_defaultchainID, _defaultid] = map_host_chain(req.get('host'));
+                    if (_defaultid) {
+                        [chainID, id] = [_defaultchainID, _defaultid];
                     }
                 }
             }
@@ -834,10 +869,7 @@ app.get('/blocks/:chainIDorChainName?', async (req, res) => {
         }
     } catch (err) {
         if (err instanceof paraTool.NotFoundError) {
-            res.render('notfound', {
-                recordtype: "chain",
-                chainInfo: query.getChainInfo()
-            });
+            res.redirect(`/`);
         } else {
             res.render('error', {
                 chainInfo: query.getChainInfo(),
