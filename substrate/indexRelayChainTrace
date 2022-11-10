@@ -53,10 +53,10 @@ async function main() {
     console.log(`[relayChain=${relayCrawler.chain.chainName}] target blocks`, blocks)
     let xcmMap = await crawlermanager.indexBlockRanges(relayCrawler, blocks)
     console.log(`xcmMap`, xcmMap)
-    let indexRangeMap = crawlermanager.analyzeXcmMap(xcmMap)
-    console.log(`indexRangeMap`, xcmMap)
+    let [blockRangeMap, hrmpRangeMap] = await crawlermanager.analyzeXcmMap(xcmMap)
+    console.log(`blockRangeMap`, blockRangeMap)
     //TODO: not handling missing traces for now
-    await crawlermanager.processIndexRangeMap(indexRangeMap)
+    await crawlermanager.processIndexRangeMap(blockRangeMap)
 }
 
 main()

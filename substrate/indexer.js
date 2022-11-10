@@ -62,6 +62,7 @@ module.exports = class Indexer extends AssetManager {
     contractABIs = false;
     contractABISignatures = {};
     chainID = false;
+    chainName = false;
     relayChain = "";
     metadata = {};
     authorErrorSpecVersion = 0; //query.session.currentIndex is not available for certain v. cache the errorV and do not ask author until specV changed again

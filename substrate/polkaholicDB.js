@@ -247,6 +247,18 @@ module.exports = class PolkaholicDB {
         });
     }
 
+    async getBlockRangebyTS(chainID, startTS, endTS) {
+        let sql = `select UNIX_TIMESTAMP(min(blockDT)) startTS, UNIX_TIMESTAMP(max(blockDT)) endTS, min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT > from_unixtime(${startTS}) and blockDT < from_unixtime(${endTS});`
+        var res = await this.poolREADONLY.query(sql);
+        if (res.length > 0) {
+            let r = res[0]
+            r.rangeLen = 1 + r.endBN - r.startBN
+            r.chainID = chainID
+            return r
+        }else{
+            return false
+        }
+    }
 
     async getKnownParachains() {
         let knownParaChainsMap = {}
@@ -783,6 +795,7 @@ from chain where chainID = '${chainID}' limit 1`);
             }
         }
         this.chainID = chain.chainID;
+        this.chainName = chain.chainName;
     }
 
     async get_chain_hostname_endpoint(chain, useWSBackfill) {

@@ -99,7 +99,7 @@ module.exports = class CrawlerManager extends Crawler {
         relayCrawler.chain = chain
         this.relayCrawler = relayCrawler
         this.allCrawlers[relayChainID] = relayCrawler
-        console.log(`setup relayCrawler [${chain.chainName}]`)
+        console.log(`setup relayCrawler [${chain.chainID}:${chain.chainName}]`)
     }
 
     async initCrawler(parachainID){
@@ -109,8 +109,9 @@ module.exports = class CrawlerManager extends Crawler {
         }
         let chain = await this.getChain(parachainID);
         if (this.relayChainIDs.includes(parachainID)){
-            console.log(`Expecting parachain. Got chain [${chain.chainName}] instead`)
-            process.exit(0)
+            console.log(`Expecting parachain. Got chain [${chain.chainID}:${chain.chainName}] instead`)
+            return
+            //process.exit(0)
         }
 
         let paraCrawler = new Crawler();
@@ -121,7 +122,7 @@ module.exports = class CrawlerManager extends Crawler {
         paraCrawler.chain = chain
         if (this.allCrawlers[parachainID] == undefined) this.allCrawlers[parachainID] = {}
         this.allCrawlers[parachainID] = paraCrawler
-        console.log(`setup relayChainID [${chain.chainName}] Done`)
+        console.log(`setup ChainID [${chain.chainID}:${chain.chainName}] Done`)
     }
 
     /*
@@ -132,12 +133,142 @@ module.exports = class CrawlerManager extends Crawler {
       '2012': { blockTSMin: 1668045225, blockTSMax: 1668045243 }
     }
     */
-    async processIndexRangeMap(indexRangeMap){
-        for (const chainID of Object.keys(indexRangeMap)){
+
+    async batchCrawlerInit(chainIDs){
+        let initChainIDs= []
+        for (const chainID of chainIDs){
             let crawler = this.getCrawler(chainID)
-            if (!crawler) await this.initCrawler(chainID)
-            //let xcmMap = await crawlermanager.indexBlockRanges(crawler, blocks)
+            if (!crawler) {
+                initChainIDs.push(chainID)
+            }
         }
+
+        let crawlerInitPromise = await initChainIDs.map(async (initChainID) => {
+            try {
+                return this.initCrawler(initChainID)
+            } catch (err) {
+                console.log(`batch initCrawler ${initChainID}`, err)
+                return false
+            }
+        });
+
+        // parallel init..
+        let crawlerInitStates;
+        try {
+            crawlerInitStates = await Promise.allSettled(crawlerInitPromise);
+            //{ status: 'fulfilled', value: ... },
+            //{ status: 'rejected', reason: Error: '.....'}
+        } catch (e) {
+            console.log(`crawlerInitPromise error`, e, crawlerInitStates)
+        }
+
+        for (let i = 0; i < crawlerInitPromise.length; i += 1){
+            let crawlerChainID = initChainIDs[i]
+            let crawlerInitState = crawlerInitStates[i]
+            if (crawlerInitState['status'] == 'fulfilled') {
+                console.log(`crawler ${crawlerChainID} Init Completed`)
+            }else{
+                console.log(`crawler ${crawlerChainID} Failed! reason=${crawlerInitState['reason']}`)
+            }
+        }
+    }
+
+    //TODO: parallel indexing?
+    async batchCrawls(blockRangeMap){
+        let crawlerPromise = []
+        let crawlChainIDs= []
+        let chainIDs = Object.keys(blockRangeMap)
+        for (const chainID of chainIDs){
+            let crawler = this.getCrawler(chainID)
+            if (!crawler) {
+                console.log(`crawler not ready ${chainID} skipped`)
+            }else{
+                let rangeStruct = blockRangeMap[chainID]
+                if (rangeStruct != undefined && Array.isArray(rangeStruct.blocks) && rangeStruct.blocks.length > 0){
+                    let targetBlocks = rangeStruct.blocks
+                    crawlChainIDs.push(chainID)
+                    crawlerPromise.push(this.indexBlockRanges(crawler, targetBlocks))
+                }else{
+                    console.log(`batchCrawls [${chainID}:${crawler.chainName}] rejected rangeStruct`, rangeStruct)
+                }
+            }
+        }
+        //parallel crawls..
+        let crawlerStates;
+        try {
+            crawlerStates = await Promise.allSettled(crawlerPromise);
+            //{ status: 'fulfilled', value: ... },
+            //{ status: 'rejected', reason: Error: '.....'}
+        } catch (e) {
+            console.log(`crawlerPromise error`, e, crawlerStates)
+        }
+
+        for (let i = 0; i < crawlerPromise.length; i += 1){
+            let crawlerChainID = crawlChainIDs[i]
+            let crawlerState = crawlerStates[i]
+            if (crawlerStates['status'] == 'fulfilled') {
+                console.log(`crawler ${crawlerChainID} DONE`)
+            }else{
+                console.log(`crawler ${crawlerChainID} ${crawlerStates['status']}. Reason=${crawlerStates['reason']}`)
+            }
+        }
+    }
+
+    //easy to debug...
+    async serialCrawls(blockRangeMap){
+        let chainIDs = Object.keys(blockRangeMap)
+        for (const chainID of chainIDs){
+            let crawler = this.getCrawler(chainID)
+            if (!crawler) {
+                console.log(`crawler not ready ${chainID} skipped`)
+            }else{
+                let rangeStruct = blockRangeMap[chainID]
+                if (rangeStruct != undefined && Array.isArray(rangeStruct.blocks) && rangeStruct.blocks.length > 0){
+                    let targetBlocks = rangeStruct.blocks
+                    await this.indexBlockRanges(crawler, targetBlocks)
+                }else{
+                    console.log(`serialCrawls ${chainID} rejected rangeStruct`, rangeStruct)
+                }
+            }
+        }
+    }
+
+    async processIndexRangeMap(blockRangeMap){
+        let chainIDs = Object.keys(blockRangeMap)
+        await this.batchCrawlerInit(chainIDs)
+        await this.batchCrawls(blockRangeMap)
+        //await this.serialCrawls(blockRangeMap)
+    }
+
+    async blockRangeToblocks(rangeStruct){
+        let chainID = rangeStruct.chainID
+        let blocks = []
+        for (let i = rangeStruct.startBN; i <= rangeStruct.endBN; i++){
+            let blockHash = await this.getBlockHashFinalized(chainID, i)
+            let r = {
+                blockNumber: i,
+                blockHash: blockHash
+            }
+            blocks.push(r)
+        }
+        console.log(`blockRangeToblocks blocks`, blocks)
+        return blocks
+    }
+
+    async hrmpRangeMapToBlockRangeMap(hrmpRangeMap){
+        let blockRangeMap = {}
+        let chainIDs = Object.keys(hrmpRangeMap)
+        for (const chainID of chainIDs){
+            let t = hrmpRangeMap[chainID]
+            let r = await this.getBlockRangebyTS(chainID, t.blockTSMin, t.blockTSMax)
+            if (r){
+                console.log(`rangeStruct`, r)
+                r.blocks = await this.blockRangeToblocks(r)
+                blockRangeMap[chainID] = r
+            }
+        }
+        console.log(`blockRangeMap`, blockRangeMap)
+        return blockRangeMap
     }
 
 
@@ -173,7 +304,7 @@ module.exports = class CrawlerManager extends Crawler {
 
         //init_accounts: {accounts}
         crawler.accounts = this.accounts
-        console.log(`cloneAssetManager [${crawler.chainID}] Done`)
+        console.log(`cloneAssetManager [${crawler.chainID}:${crawler.chainName}] Done`)
     }
 
     async indexBlockRanges(crawler, blocks){
@@ -183,7 +314,7 @@ module.exports = class CrawlerManager extends Crawler {
             let b = blocks[i]
             let bn = b.blockNumber
             let blkHash = b.blockHash
-            console.log(`indexBlockRanges [${i+1}/${blockRangeLen}] chainID=${crawler.chainID} bn=${bn} blkHash=${blkHash}`)
+            console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] indexBlockRanges bn=${bn} blkHash=${blkHash}`)
             let xcmList = await crawler.index_block(crawler.chain, bn, blkHash);
             if (Array.isArray(xcmList) && xcmList.length > 0){
                 xcmMap[bn] = xcmList
@@ -192,8 +323,8 @@ module.exports = class CrawlerManager extends Crawler {
         return xcmMap
     }
 
-    analyzeXcmMap(xcmMap){
-        let indexMap = {}
+    async analyzeXcmMap(xcmMap){
+        let hrmpRangeMap = {}
         for (const relayBN of Object.keys(xcmMap)){
             let xcmList = xcmMap[relayBN]
             //console.log(`relayBN=${relayBN}`, xcmList)
@@ -206,55 +337,58 @@ module.exports = class CrawlerManager extends Crawler {
                 let blockTS = x.blockTS
                 let includedAt = x.includedAt //potentially off by 1
                 let blockFreq = 6 // 6s per block
-                if (indexMap[chainID] == undefined) indexMap[chainID] = {
+                if (hrmpRangeMap[chainID] == undefined) hrmpRangeMap[chainID] = {
                     //hrmpBN: [],
                     blockTSMin: blockTS,
                     blockTSMax: blockTS,
                 }
-                if (indexMap[chainIDDest] == undefined) indexMap[chainIDDest] = {
+                if (hrmpRangeMap[chainIDDest] == undefined) hrmpRangeMap[chainIDDest] = {
                     //hrmpBN: [],
                     blockTSMin: blockTS,
                     blockTSMax: blockTS,
                 }
                 if (msgType == 'ump'){
-                    //indexMap[chainID].hrmpBN.push(sentAt)
-                    //indexMap[chainIDDest].hrmpBN.push(includedAt)
+                    //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
+                    //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
                     let originationTSMin = blockTS - blockFreq*1.5
                     let originationTSMax = blockTS + blockFreq*1.5
                     let destinationTSMin = blockTS
                     let destinationTSMax = blockTS + blockFreq*3
                     //console.log(`ump [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
-                    if (indexMap[chainID].blockTSMin > originationTSMin) indexMap[chainID].blockTSMin = originationTSMin
-                    if (originationTSMax > indexMap[chainID].blockTSMax) indexMap[chainID].blockTSMax = originationTSMax
-                    if (indexMap[chainIDDest].blockTSMin > destinationTSMin) indexMap[chainIDDest].blockTSMin = destinationTSMin
-                    if (destinationTSMax > indexMap[chainIDDest].blockTSMax) indexMap[chainIDDest].blockTSMax = destinationTSMax
+                    if (hrmpRangeMap[chainID].blockTSMin > originationTSMin) hrmpRangeMap[chainID].blockTSMin = originationTSMin
+                    if (originationTSMax > hrmpRangeMap[chainID].blockTSMax) hrmpRangeMap[chainID].blockTSMax = originationTSMax
+                    if (hrmpRangeMap[chainIDDest].blockTSMin > destinationTSMin) hrmpRangeMap[chainIDDest].blockTSMin = destinationTSMin
+                    if (destinationTSMax > hrmpRangeMap[chainIDDest].blockTSMax) hrmpRangeMap[chainIDDest].blockTSMax = destinationTSMax
                 }else if (msgType == 'dmp'){
-                    //indexMap[chainID].hrmpBN.push(sentAt)
-                    //indexMap[chainIDDest].hrmpBN.push(includedAt)
+                    //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
+                    //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
                     let originationTSMin = blockTS
                     let originationTSMax = blockTS + blockFreq*3
                     let destinationTSMin = blockTS
                     let destinationTSMax = blockTS + blockFreq*3
                     //console.log(`dmp [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
-                    if (indexMap[chainID].blockTSMin > originationTSMin) indexMap[chainID].blockTSMin = originationTSMin
-                    if (originationTSMax > indexMap[chainID].blockTSMax) indexMap[chainID].blockTSMax = originationTSMax
-                    if (indexMap[chainIDDest].blockTSMin > destinationTSMin) indexMap[chainIDDest].blockTSMin = destinationTSMin
-                    if (destinationTSMax > indexMap[chainIDDest].blockTSMax) indexMap[chainIDDest].blockTSMax = destinationTSMax
+                    if (hrmpRangeMap[chainID].blockTSMin > originationTSMin) hrmpRangeMap[chainID].blockTSMin = originationTSMin
+                    if (originationTSMax > hrmpRangeMap[chainID].blockTSMax) hrmpRangeMap[chainID].blockTSMax = originationTSMax
+                    if (hrmpRangeMap[chainIDDest].blockTSMin > destinationTSMin) hrmpRangeMap[chainIDDest].blockTSMin = destinationTSMin
+                    if (destinationTSMax > hrmpRangeMap[chainIDDest].blockTSMax) hrmpRangeMap[chainIDDest].blockTSMax = destinationTSMax
                 }else if (msgType == 'hrmp'){
-                    //indexMap[chainID].hrmpBN.push(sentAt)
-                    //indexMap[chainIDDest].hrmpBN.push(includedAt)
+                    //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
+                    //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
                     let originationTSMin = blockTS - blockFreq*1.5
                     let originationTSMax = blockTS + blockFreq*1.5
                     let destinationTSMin = blockTS
                     let destinationTSMax = blockTS + blockFreq*4
                     //console.log(`hrmp [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
-                    if (indexMap[chainID].blockTSMin > originationTSMin) indexMap[chainID].blockTSMin = originationTSMin
-                    if (originationTSMax > indexMap[chainID].blockTSMax) indexMap[chainID].blockTSMax = originationTSMax
-                    if (indexMap[chainIDDest].blockTSMin > destinationTSMin) indexMap[chainIDDest].blockTSMin = destinationTSMin
-                    if (destinationTSMax > indexMap[chainIDDest].blockTSMax) indexMap[chainIDDest].blockTSMax = destinationTSMax
+                    if (hrmpRangeMap[chainID].blockTSMin > originationTSMin) hrmpRangeMap[chainID].blockTSMin = originationTSMin
+                    if (originationTSMax > hrmpRangeMap[chainID].blockTSMax) hrmpRangeMap[chainID].blockTSMax = originationTSMax
+                    if (hrmpRangeMap[chainIDDest].blockTSMin > destinationTSMin) hrmpRangeMap[chainIDDest].blockTSMin = destinationTSMin
+                    if (destinationTSMax > hrmpRangeMap[chainIDDest].blockTSMax) hrmpRangeMap[chainIDDest].blockTSMax = destinationTSMax
                 }
             }
         }
-        return indexMap
+        console.log(`hrmpRangeMap`, hrmpRangeMap)
+        let blockRangeMap = await this.hrmpRangeMapToBlockRangeMap(hrmpRangeMap)
+        console.log(`blockRangeMap`, blockRangeMap)
+        return [blockRangeMap, hrmpRangeMap]
     }
 }
