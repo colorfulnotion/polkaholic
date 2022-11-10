@@ -39,15 +39,20 @@ module.exports = class CrawlerManager extends Crawler {
         super("crawler")
     }
 
-    setDebugLevel(debugLevel = paraTool.debugInfo) {
+    setDebugLevel(debugLevel = paraTool.debugErrorOnly) {
         this.debugLevel = debugLevel
     }
 
-    assetReady = false
-    relayCrawler = false
-    allCrawlers = {}
+    assetReady = false;
+    relayCrawler = false;
+    allCrawlers = {};
+    incomingMsg = {};
 
     relayChainIDs = [paraTool.chainIDPolkadot, paraTool.chainIDKusama, paraTool.chainIDMoonbaseRelay]
+
+    setMsg(chainID, msg){
+        console.log(`[${chainID}] msg`, msg)
+    }
 
     //init_chainInfos: {chainInfos, chainNames, specVersions}
     //init_asset_info: {assetInfo, alternativeAssetInfo, symbolRelayChainAsset, xcContractAddress, currencyIDInfo}
@@ -58,17 +63,12 @@ module.exports = class CrawlerManager extends Crawler {
     async initManagerState(){
         this.assetManagerInit()
         this.assetReady = true
-        console.log(`initManagerState Done`)
-    }
-
-    getCrawler(chainID){
-
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`initManagerState Done`)
     }
 
     getRelayCrawler(){
         if (!this.relayCrawler){
-            console.log(`relayCrawler not ready`)
-            process.exit(0)
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`relayCrawler not ready`)
             return
         }
         return this.relayCrawler
@@ -77,7 +77,7 @@ module.exports = class CrawlerManager extends Crawler {
     getCrawler(parachainID){
         let paraCrawler = this.allCrawlers[parachainID]
         if (paraCrawler == undefined && paraCrawler) {
-            console.log(`crawler [${parachainID}] not ready`)
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler [${parachainID}] not ready`)
             //process.exit(0)
             return false
         }
@@ -88,41 +88,44 @@ module.exports = class CrawlerManager extends Crawler {
         let chain = await this.getChain(relayChainID);
 
         if (!this.relayChainIDs.includes(relayChainID)){
-            console.log(`Expecting relaychain/ Got chain [${chain.chainName}] instead`)
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`Expecting relaychain/ Got chain [${chain.chainName}] instead`)
             process.exit(0)
         }
         let relayCrawler = new Crawler();
+        relayCrawler.setDebugLevel(this.debugLevel)
         await relayCrawler.setupAPI(chain);
-        await this.cloneAssetManager(relayCrawler)
-        //await relayCrawler.assetManagerInit();
+        await this.cloneAssetManager(relayCrawler) // clone from copy instead of initiating assetManagerInit again
         await relayCrawler.setupChainAndAPI(relayChainID);
         relayCrawler.chain = chain
         this.relayCrawler = relayCrawler
-        this.allCrawlers[relayChainID] = relayCrawler
-        console.log(`setup relayCrawler [${chain.chainID}:${chain.chainName}]`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`setup relayCrawler [${chain.chainID}:${chain.chainName}]`)
     }
 
     async initCrawler(parachainID){
+        if (!this.relayCrawler){
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`relayCrawler not ready. must call relayCrawler before calling crawler`)
+            return
+        }
         if (this.allCrawlers[parachainID] != undefined) {
-            console.log(` v parachainID already initiated`)
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`${parachainID} already initiated`)
             return
         }
         let chain = await this.getChain(parachainID);
         if (this.relayChainIDs.includes(parachainID)){
-            console.log(`Expecting parachain. Got chain [${chain.chainID}:${chain.chainName}] instead`)
+            if (this.debugLevel >= paraTool.debugInfo)  console.log(`Expecting parachain. Got chain [${chain.chainID}:${chain.chainName}] instead`)
             return
             //process.exit(0)
         }
-
         let paraCrawler = new Crawler();
+        paraCrawler.setDebugLevel(this.debugLevel)
         await paraCrawler.setupAPI(chain);
-        await this.cloneAssetManager(paraCrawler)
-        //await paraCrawler.assetManagerInit();
+        await this.cloneAssetManager(paraCrawler) // clone from copy instead of initiating assetManagerInit again
         await paraCrawler.setupChainAndAPI(parachainID);
+        await paraCrawler.setParentRelayCrawler(this.relayCrawler)
         paraCrawler.chain = chain
         if (this.allCrawlers[parachainID] == undefined) this.allCrawlers[parachainID] = {}
         this.allCrawlers[parachainID] = paraCrawler
-        console.log(`setup ChainID [${chain.chainID}:${chain.chainName}] Done`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`setup ChainID [${chain.chainID}:${chain.chainName}] Done`)
     }
 
     /*
@@ -147,7 +150,7 @@ module.exports = class CrawlerManager extends Crawler {
             try {
                 return this.initCrawler(initChainID)
             } catch (err) {
-                console.log(`batch initCrawler ${initChainID}`, err)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`batch initCrawler ${initChainID}`, err)
                 return false
             }
         });
@@ -159,16 +162,17 @@ module.exports = class CrawlerManager extends Crawler {
             //{ status: 'fulfilled', value: ... },
             //{ status: 'rejected', reason: Error: '.....'}
         } catch (e) {
-            console.log(`crawlerInitPromise error`, e, crawlerInitStates)
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawlerInitPromise error`, e, crawlerInitStates)
         }
 
         for (let i = 0; i < crawlerInitPromise.length; i += 1){
             let crawlerChainID = initChainIDs[i]
             let crawlerInitState = crawlerInitStates[i]
-            if (crawlerInitState['status'] == 'fulfilled') {
-                console.log(`crawler ${crawlerChainID} Init Completed`)
+            if (crawlerInitState.status != undefined && crawlerInitState.status == "fulfilled") {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler ${crawlerChainID} Init Completed`)
             }else{
-                console.log(`crawler ${crawlerChainID} Failed! reason=${crawlerInitState['reason']}`)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} state`, crawlerInitState)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} Failed! reason=${crawlerInitState['reason']}`)
             }
         }
     }
@@ -181,7 +185,7 @@ module.exports = class CrawlerManager extends Crawler {
         for (const chainID of chainIDs){
             let crawler = this.getCrawler(chainID)
             if (!crawler) {
-                console.log(`crawler not ready ${chainID} skipped`)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler not ready ${chainID} skipped`)
             }else{
                 let rangeStruct = blockRangeMap[chainID]
                 if (rangeStruct != undefined && Array.isArray(rangeStruct.blocks) && rangeStruct.blocks.length > 0){
@@ -189,7 +193,7 @@ module.exports = class CrawlerManager extends Crawler {
                     crawlChainIDs.push(chainID)
                     crawlerPromise.push(this.indexBlockRanges(crawler, targetBlocks))
                 }else{
-                    console.log(`batchCrawls [${chainID}:${crawler.chainName}] rejected rangeStruct`, rangeStruct)
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`batchCrawls [${chainID}:${crawler.chainName}] rejected rangeStruct`, rangeStruct)
                 }
             }
         }
@@ -200,16 +204,17 @@ module.exports = class CrawlerManager extends Crawler {
             //{ status: 'fulfilled', value: ... },
             //{ status: 'rejected', reason: Error: '.....'}
         } catch (e) {
-            console.log(`crawlerPromise error`, e, crawlerStates)
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawlerPromise error`, e, crawlerStates)
         }
 
         for (let i = 0; i < crawlerPromise.length; i += 1){
             let crawlerChainID = crawlChainIDs[i]
             let crawlerState = crawlerStates[i]
-            if (crawlerStates['status'] == 'fulfilled') {
-                console.log(`crawler ${crawlerChainID} DONE`)
+            if (crawlerState['status'] == 'fulfilled') {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler ${crawlerChainID} DONE`)
             }else{
-                console.log(`crawler ${crawlerChainID} ${crawlerStates['status']}. Reason=${crawlerStates['reason']}`)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} state`, crawlerState)
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`crawler ${crawlerChainID} ${crawlerStates['status']}. Reason=${crawlerStates['reason']}`)
             }
         }
     }
@@ -227,7 +232,7 @@ module.exports = class CrawlerManager extends Crawler {
                     let targetBlocks = rangeStruct.blocks
                     await this.indexBlockRanges(crawler, targetBlocks)
                 }else{
-                    console.log(`serialCrawls ${chainID} rejected rangeStruct`, rangeStruct)
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`serialCrawls ${chainID} rejected rangeStruct`, rangeStruct)
                 }
             }
         }
@@ -251,7 +256,7 @@ module.exports = class CrawlerManager extends Crawler {
             }
             blocks.push(r)
         }
-        console.log(`blockRangeToblocks blocks`, blocks)
+        //console.log(`blockRangeToblocks blocks`, blocks)
         return blocks
     }
 
@@ -262,19 +267,19 @@ module.exports = class CrawlerManager extends Crawler {
             let t = hrmpRangeMap[chainID]
             let r = await this.getBlockRangebyTS(chainID, t.blockTSMin, t.blockTSMax)
             if (r){
-                console.log(`rangeStruct`, r)
+                // if (this.debugLevel >= paraTool.debugTracing) console.log(`rangeStruct`, r)
                 r.blocks = await this.blockRangeToblocks(r)
                 blockRangeMap[chainID] = r
             }
         }
-        console.log(`blockRangeMap`, blockRangeMap)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`blockRangeMap`, blockRangeMap)
         return blockRangeMap
     }
 
 
     async cloneAssetManager(crawler){
         if (!this.assetReady){
-            console.log(`AssetInit not ready!`)
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`AssetInit not ready!`)
             await this.initManagerState();
         }
         //init_chainInfos {chainInfos, chainNames, specVersions}
@@ -304,7 +309,7 @@ module.exports = class CrawlerManager extends Crawler {
 
         //init_accounts: {accounts}
         crawler.accounts = this.accounts
-        console.log(`cloneAssetManager [${crawler.chainID}:${crawler.chainName}] Done`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`cloneAssetManager [${crawler.chainID}:${crawler.chainName}] Done`)
     }
 
     async indexBlockRanges(crawler, blocks){
@@ -314,7 +319,7 @@ module.exports = class CrawlerManager extends Crawler {
             let b = blocks[i]
             let bn = b.blockNumber
             let blkHash = b.blockHash
-            console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] indexBlockRanges bn=${bn} blkHash=${blkHash}`)
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] indexBlockRanges bn=${bn} blkHash=${blkHash}`)
             let xcmList = await crawler.index_block(crawler.chain, bn, blkHash);
             if (Array.isArray(xcmList) && xcmList.length > 0){
                 xcmMap[bn] = xcmList
@@ -386,9 +391,9 @@ module.exports = class CrawlerManager extends Crawler {
                 }
             }
         }
-        console.log(`hrmpRangeMap`, hrmpRangeMap)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`hrmpRangeMap`, hrmpRangeMap)
         let blockRangeMap = await this.hrmpRangeMapToBlockRangeMap(hrmpRangeMap)
-        console.log(`blockRangeMap`, blockRangeMap)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`blockRangeMap`, blockRangeMap)
         return [blockRangeMap, hrmpRangeMap]
     }
 }

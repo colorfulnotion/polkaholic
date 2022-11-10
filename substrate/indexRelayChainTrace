@@ -3,6 +3,13 @@
 var CrawlerManager = require("./crawlermanager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
+let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
+var debugLevel = paraTool.debugErrorOnly
+if (isDevelopment){
+    //debugLevel = paraTool.debugTracing
+    debugLevel = paraTool.debugInfo
+    console.log(`[isDevelopment:${isDevelopment}] debugLevel: ${debugLevel}`)
+}
 
 async function main() {
     let relayChainID = paraTool.chainIDPolkadot;
@@ -30,7 +37,7 @@ async function main() {
     });
     let crawlermanager = new CrawlerManager();
     await crawlermanager.initManagerState()
-    crawlermanager.setDebugLevel(paraTool.debugTracing)
+    crawlermanager.setDebugLevel(debugLevel)
     crawlermanager.exitOnDisconnect = true;
     await crawlermanager.initRelayCrawler(relayChainID)
     let relayCrawler = crawlermanager.getRelayCrawler()
@@ -50,11 +57,11 @@ async function main() {
         blocks.push(r)
     }
 
-    console.log(`[relayChain=${relayCrawler.chain.chainName}] target blocks`, blocks)
+    if (this.debugLevel >= paraTool.debugInfo) console.log(`[relayChain=${relayCrawler.chain.chainName}] target blocks`, blocks)
     let xcmMap = await crawlermanager.indexBlockRanges(relayCrawler, blocks)
-    console.log(`xcmMap`, xcmMap)
+    if (this.debugLevel >= paraTool.debugInfo) console.log(`xcmMap`, xcmMap)
     let [blockRangeMap, hrmpRangeMap] = await crawlermanager.analyzeXcmMap(xcmMap)
-    console.log(`blockRangeMap`, blockRangeMap)
+    if (this.debugLevel >= paraTool.debugInfo) console.log(`blockRangeMap`, blockRangeMap)
     //TODO: not handling missing traces for now
     await crawlermanager.processIndexRangeMap(blockRangeMap)
 }
