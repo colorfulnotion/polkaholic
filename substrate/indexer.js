@@ -189,6 +189,9 @@ module.exports = class Indexer extends AssetManager {
     debugTracing: 4,
     */
 
+    parentRelayCrawler = false;
+    parentManager = false;
+
     setDebugLevel(debugLevel = paraTool.debugNoLog) {
         this.debugLevel = debugLevel
     }
@@ -223,6 +226,12 @@ module.exports = class Indexer extends AssetManager {
         obj.op = op;
         obj.err = err;
         this.logger.warn(obj);
+    }
+
+    setParentRelayAndManager(relayCrawler, manager){
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] setParentRelayAndManager`)
+        this.parentRelayCrawler = relayCrawler
+        this.parentManager = manager
     }
 
     validAddress(addr) {
@@ -937,7 +946,7 @@ module.exports = class Indexer extends AssetManager {
                 let reserved = lastState.reserved ? lastState.reserved : 0;
                 let miscFrozen = lastState.miscFrozen ? lastState.miscFrozen : 0;
                 let frozen = lastState.frozen ? lastState.frozen : 0;
-		if ( free < 10**32 ) { 
+		if ( free < 10**32 ) {
                     let t = "(" + [`'${asset}'`, `'${this.chainID}'`, `'${accKey}'`, `'${blockNumber}'`, `'${blockNumber}'`, mysql.escape(JSON.stringify(lastState)), `'${free}'`, `'${reserved}'`, `'${miscFrozen}'`, `'${frozen}'`].join(",") + ")";
                     if (this.validAsset(asset, this.chainID, "assetholder", t)) {
 			assetholders.push(t);
@@ -1345,11 +1354,30 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
+    sendManagerMessage(m, msgType = null) {
+        if (!this.parentManager) {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${this.chainID}:${this.chainName}] parentManager not set`)
+            return
+        }
+        if (msgType == undefined) msgType = 'Unknown'
+        let wrapper = {
+            type: msgType,
+            msg: m,
+            blockTS: this.chainParser.parserTS,
+            relayBN: `${this.relayChain}-${this.chainParser.parserWatermark}`,
+            source: this.hostname,
+            commit: this.indexerInfo,
+        }
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${this.chainID}:${this.chainName}] sendManagerMessage`, wrapper)
+        this.parentManager.sendMsg(this.chainID, wrapper)
+    }
+
     sendWSMessage(m, msgType = null) {
         if (msgType == undefined) msgType = 'Unknown'
         let wrapper = {
             type: msgType,
             msg: m,
+            blockTS: this.chainParser.parserTS,
             source: this.hostname,
             commit: this.indexerInfo,
         }
@@ -1629,6 +1657,7 @@ module.exports = class Indexer extends AssetManager {
             })
         }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
+        this.sendManagerMessage(xcmtransfer, "xcmtransfer");
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(xcmtransfer, "xcmtransfer");
@@ -1649,6 +1678,7 @@ module.exports = class Indexer extends AssetManager {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
         }
         //MK: send xcmtransfer here
+        this.sendManagerMessage(candidate, "xcmtransferdestcandidate");
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(candidate, "xcmtransferdestcandidate");
@@ -6585,8 +6615,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             console.log(`[${blockNumber}] [${connectedTxn.transactionHash}] connectTransaction `, e, connectedTxn)
                         }
                         // remote execution here
-                        if (connectedTxn.msgHash != undefined && (isTip)) {
-                            this.sendWSMessage(connectedTxn, "remoteExecution")
+                        if (connectedTxn.msgHash != undefined) {
+                            this.sendManagerMessage(candidate, "xcmtransferdestcandidate");
+                            if (isTip) this.sendWSMessage(connectedTxn, "remoteExecution")
                         }
                         connectedTxns.push(connectedTxn)
                         evmFullBlock.transactions[connectedTxn.transactionIndex] = connectedTxn
@@ -6620,9 +6651,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let mp = this.xcmmsgMap[xcmKey]
                 let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
                 if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
-                if (mp != undefined && (isTip)) {
+                if (mp != undefined) {
                     //console.log(`[Delay=${this.chainParser.parserBlockNumber-mp.blockNumber}] send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
-                    this.sendWSMessage(mp, "xcmmessage")
+                    this.sendManagerMessage(mp, "xcmmessage")
+                    if (isTip) this.sendWSMessage(mp, "xcmmessage")
                 }
                 let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
                 let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'

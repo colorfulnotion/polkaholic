@@ -29,11 +29,9 @@ async function main() {
         if (index == 3 && val.length > 0) {
             blockNumber = paraTool.dechexToInt(val);
         }
-        /*
         if (index == 4 && val.length > 0) {
-            blockHash = ;
+            blockExtra = paraTool.dechexToInt(val);
         }
-        */
     });
     let crawlermanager = new CrawlerManager();
     await crawlermanager.initManagerState()
@@ -41,12 +39,6 @@ async function main() {
     crawlermanager.exitOnDisconnect = true;
     await crawlermanager.initRelayCrawler(relayChainID)
     let relayCrawler = crawlermanager.getRelayCrawler()
-    /*
-    let chain = await crawlermanager.getChain(relayChainID);
-    await crawlermanager.setupAPI(chain);
-    await crawlermanager.assetManagerInit();
-    await crawlermanager.setupChainAndAPI(relayChainID);
-    */
     let blocks = []
     for (let i = blockNumber; i < blockNumber+blockExtra; i++) {
         let blockHash = await crawlermanager.getBlockHashFinalized(relayChainID, i)
@@ -64,6 +56,8 @@ async function main() {
     if (this.debugLevel >= paraTool.debugInfo) console.log(`blockRangeMap`, blockRangeMap)
     //TODO: not handling missing traces for now
     await crawlermanager.processIndexRangeMap(blockRangeMap)
+    let mMsg = crawlermanager.processReceivedmsg()
+    console.log(`mMsg`, mMsg)
 }
 
 main()

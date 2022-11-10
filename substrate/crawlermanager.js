@@ -46,12 +46,34 @@ module.exports = class CrawlerManager extends Crawler {
     assetReady = false;
     relayCrawler = false;
     allCrawlers = {};
-    incomingMsg = {};
+    receviedMsgs = {};
 
     relayChainIDs = [paraTool.chainIDPolkadot, paraTool.chainIDKusama, paraTool.chainIDMoonbaseRelay]
 
-    setMsg(chainID, msg){
-        console.log(`[${chainID}] msg`, msg)
+    sendMsg(chainID, wrapper){
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`Incoming msg from [${chainID}] !!!`, wrapper)
+        let relayBN = wrapper.relayBN
+        if (this.receviedMsgs[relayBN] == undefined) this.receviedMsgs[relayBN] = []
+        this.receviedMsgs[relayBN].push(wrapper)
+    }
+
+    processReceivedmsg(){
+        //TODO...
+        let receviedMsgs = this.receviedMsgs
+        if (this.debugLevel >= paraTool.debugInfo) console.log(receviedMsgs)
+        let returnedMsgs = {}
+        for (const relayBN of Object.keys(receviedMsgs)){
+            let relayBNRecs = receviedMsgs[relayBN]
+            let recStrList = []
+            for (const rec of relayBNRecs){
+                recStrList.push(JSON.stringify(rec))
+            }
+            returnedMsgs[relayBN] = recStrList
+        }
+        if (Object.keys(returnedMsgs).length = 0){
+            return false
+        }
+        return returnedMsgs
     }
 
     //init_chainInfos: {chainInfos, chainNames, specVersions}
@@ -121,7 +143,7 @@ module.exports = class CrawlerManager extends Crawler {
         await paraCrawler.setupAPI(chain);
         await this.cloneAssetManager(paraCrawler) // clone from copy instead of initiating assetManagerInit again
         await paraCrawler.setupChainAndAPI(parachainID);
-        await paraCrawler.setParentRelayCrawler(this.relayCrawler)
+        await paraCrawler.setParentRelayAndManager(this.relayCrawler, this)
         paraCrawler.chain = chain
         if (this.allCrawlers[parachainID] == undefined) this.allCrawlers[parachainID] = {}
         this.allCrawlers[parachainID] = paraCrawler

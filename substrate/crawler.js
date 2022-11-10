@@ -74,14 +74,9 @@ module.exports = class Crawler extends Indexer {
     lastmarkedTS = 0;
     lastmarkedlogDT = '2019-01-01';
     coveredtx = {};
-    parentRelayCrawler = false;
-
+    
     constructor() {
         super("crawler")
-    }
-
-    setParentRelayCrawler(relayCrawler){
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`setParentRelayCrawler`)
     }
 
     async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
