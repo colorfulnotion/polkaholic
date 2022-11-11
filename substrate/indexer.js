@@ -1665,6 +1665,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
+    // this is send in real time (both unfinalized/finalized)
     updateXCMTransferDestCandidate(candidate, caller = false, isTip = false) {
         //potentially add sentAt here, but it's 2-4
         let eventID = candidate.eventID
@@ -4779,6 +4780,21 @@ module.exports = class Indexer extends AssetManager {
                         }
                     } else {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length} - skip`)
+                        for (const xcmtransfer of rExtrinsic.xcms) {
+                            //Look up msgHash
+                            let unsafeXcmtransfer = xcmtransfer
+                            if (unsafeXcmtransfer.msgHash == undefined || unsafeXcmtransfer.msgHash.length != 66) {
+                                let msgHashCandidate;
+                                if (unsafeXcmtransfer.innerCall != undefined) {
+                                    msgHashCandidate = this.getMsgHashCandidate(unsafeXcmtransfer.blockNumber, unsafeXcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
+                                } else {
+                                    msgHashCandidate = this.getMsgHashCandidate(unsafeXcmtransfer.blockNumber, unsafeXcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'address')
+                                }
+                                if (msgHashCandidate) unsafeXcmtransfer.msgHash = msgHashCandidate
+                            }
+                            //for unsafeXcmtransfer. we will send xcmtransfer that may eventually got dropped
+                            this.sendWSMessage(xcmtransfer, "xcmtransfer");
+                        }
                     }
                     delete rExtrinsic.xcms
                 }
@@ -6616,7 +6632,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         }
                         // remote execution here
                         if (connectedTxn.msgHash != undefined) {
-                            this.sendManagerMessage(candidate, "xcmtransferdestcandidate");
+                            this.sendManagerMessage(connectedTxn, "remoteExecution");
                             if (isTip) this.sendWSMessage(connectedTxn, "remoteExecution")
                         }
                         connectedTxns.push(connectedTxn)

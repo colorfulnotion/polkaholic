@@ -16,15 +16,12 @@ async function main() {
     let blockNumber = 12855329; // this is the hrmp
     let blockExtra = 7;
     let relayChainIDs = [paraTool.chainIDPolkadot, paraTool.chainIDKusama, paraTool.chainIDMoonbaseRelay]
-    if (!relayChainIDs.includes(relayChainID)){
-        console.log(`Invalid relay chainID provided ${relayChainID}`)
-    }
     //let blockHash = "0x44a1fe068af3ae83f99dd90efa6bbf5ebbf92972adde190e8b3e5d1f3d513017"; //substrate
     //let evmBlockHash = "0xdf092452d679df2cef2d83dbf818f73cae470fca6192d646b04f383e35df60ee"; //evm
     //0xd097ce2e3a2a5a6068c51f356df6fca90b07399fc9ea72d6b344236580960394 (acala 2258177-2 @12855329)
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
-            chainID = val;
+            relayChainID = paraTool.dechexToInt(val);
         }
         if (index == 3 && val.length > 0) {
             blockNumber = paraTool.dechexToInt(val);
@@ -33,6 +30,9 @@ async function main() {
             blockExtra = paraTool.dechexToInt(val);
         }
     });
+    if (!relayChainIDs.includes(relayChainID)){
+        console.log(`Invalid relay chainID provided ${relayChainID}`)
+    }
     let crawlermanager = new CrawlerManager();
     await crawlermanager.initManagerState()
     crawlermanager.setDebugLevel(debugLevel)
