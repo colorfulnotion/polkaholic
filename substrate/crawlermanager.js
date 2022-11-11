@@ -375,8 +375,10 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
     unwrapXcmMeta(xcmMeta){
-        let fieldListStr = 'blockTS|msgType|relayChain|relayedAt|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|includedAt|msgHash'
+        let fieldListStr = "blockTS|msgType|relayChain|blockNumber|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|relayedAt|includedAt|msgHash"
+        let intFldStr = "blockTS|blockNumber|chainID|chainIDDest|sentAt|relayedAt|includedAt"
         let fileds = fieldListStr.split('|')
+        let intFileds = intFldStr.split('|')
         let xcmMetaFlds = xcmMeta.split('|')
         if (xcmMetaFlds.length != fileds.length){
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`unrecognized xcmMeta! xcmMetaFlds=${xcmMetaFlds}, expectedFlds=${fileds}`)
@@ -384,7 +386,10 @@ module.exports = class CrawlerManager extends Crawler {
         }
         let xcm = {}
         for (let i = 0; i < fileds.length; i++){
-            xcm[fileds[i]] = xcmMetaFlds[i]
+            let fieldkey = fileds[i]
+            let fieldVal = xcmMetaFlds[i]
+            if (intFileds.includes(fieldkey)) fieldVal = paraTool.dechexToInt(fieldVal)
+            xcm[fieldkey] = fieldVal
         }
         return xcm
     }

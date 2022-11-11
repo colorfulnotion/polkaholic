@@ -6430,8 +6430,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let xcmMeta = []
         for (const x of xcmList){
             // TODO: keep minimal essential data
-            // blockTS|msgType|relayChain|relayedAt|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|includedAt|msgHash
-            let s = `${x.blockTS}|${x.msgType}|${this.relayChain}|${x.relayedAt}|${this.chainParser.relayParentStateRoot}|${this.chainParser.parserBlockHash}|${x.chainID}|${x.chainIDDest}|${x.sentAt}|${x.includedAt}|${x.msgHash}`
+            // blockTS|msgType|relayChain|blockNumber|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|relayedAt|includedAt|msgHash
+            // (integer) blockTS|blockNumber|chainID|chainIDDest|sentAt|relayedAt|includedAt
+            let s = `${x.blockTS}|${x.msgType}|${this.relayChain}|${this.chainParser.parserBlockNumber}|${this.chainParser.relayParentStateRoot}|${this.chainParser.parserBlockHash}|${x.chainID}|${x.chainIDDest}|${x.sentAt}|${x.relayedAt}|${x.includedAt}|${x.msgHash}`
             if (this.debugLevel >= paraTool.debugInfo) console.log(`xcmMeta: ${s}`)
             xcmMeta.push(s)
         }
@@ -6562,14 +6563,26 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
         }
         block.extrinsics = extrinsics;
-        if (paraTool.isRelayChain(this.chainID)){
-            block.xcmMeta = this.xcmMeta
-            console.log(`[${blockNumber}] [${blockHash}] xcmMeta found!`, this.xcmMeta)
-        }
 
         let processExtrinsicTS = (new Date().getTime() - processExtrinsicStartTS) / 1000
         this.timeStat.processExtrinsicTS += processExtrinsicTS
         this.timeStat.processExtrinsic += block.extrinsics.length
+
+        let forceTry = true //MK: need to review this
+        if ((isTip || forceTry) && (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama || chainID == paraTool.chainIDMoonbaseRelay)) {
+            let relayChain = paraTool.getRelayChainByChainID(chainID);
+            if (autoTraces) {
+                //console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
+                await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain, isTip, finalized);
+            } else {
+                console.log("this.indexRelayChainTrace FAIL", blockNumber, chainID, relayChain);
+            }
+        }
+
+        if (paraTool.isRelayChain(this.chainID)){
+            block.xcmMeta = this.xcmMeta
+            console.log(`[${blockNumber}] [${blockHash}] xcmMeta found!`, this.xcmMeta)
+        }
 
         // (1) record blockHash in BT hashes
         let blockfeed = {
@@ -6630,16 +6643,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 timestamp: blockTS * 1000000
             };
         }
-        let forceTry = true //MK: need to review this
-        if ((isTip || forceTry) && (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama || chainID == paraTool.chainIDMoonbaseRelay)) {
-            let relayChain = paraTool.getRelayChainByChainID(chainID);
-            if (autoTraces) {
-                //console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
-                await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain, isTip, finalized);
-            } else {
-                console.log("this.indexRelayChainTrace FAIL", blockNumber, chainID, relayChain);
-            }
-        }
+
         // (3) fuse block+receipt for evmchain, if both evmBlock and evmReceipts are available
         let web3Api = this.web3Api
         let contractABIs = this.contractABIs
