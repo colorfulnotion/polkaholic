@@ -6562,6 +6562,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
         }
         block.extrinsics = extrinsics;
+        if (paraTool.isRelayChain(this.chainID)){
+            block.xcmMeta = this.xcmMeta
+            console.log(`[${blockNumber}] [${blockHash}] xcmMeta found!`, this.xcmMeta)
+        }
 
         let processExtrinsicTS = (new Date().getTime() - processExtrinsicStartTS) / 1000
         this.timeStat.processExtrinsicTS += processExtrinsicTS
@@ -6819,9 +6823,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXcmMsgs.length > 0) {
             this.add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs)
         }
-        //let xcmMeta = this.xcmMeta;
-        if (this.xcmMeta.length > 0) console.log(`[${blockNumber}] [${blockHash}] xcmMeta found!`, this.xcmMeta)
-        return [blockStats, this.xcmMeta];
+        let xcmMeta = this.xcmMeta;
+        this.xcmMeta = []
+        if (xcmMeta.length > 0) console.log(`[${blockNumber}] [${blockHash}] xcmMeta found!`, xcmMeta)
+        return [blockStats, xcmMeta];
     }
 
     add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs) {
