@@ -49,11 +49,14 @@ async function main() {
         blocks.push(r)
     }
 
-    if (this.debugLevel >= paraTool.debugInfo) console.log(`[relayChain=${relayCrawler.chain.chainName}] target blocks`, blocks)
-    let xcmMap = await crawlermanager.indexBlockRanges(relayCrawler, blocks)
-    if (this.debugLevel >= paraTool.debugInfo) console.log(`xcmMap`, xcmMap)
+    if (debugLevel >= paraTool.debugInfo) console.log(`[relayChain=${relayCrawler.chain.chainName}] target blocks`, blocks)
+    let xcmMetaMapStr = await crawlermanager.indexBlockRanges(relayCrawler, blocks)
+    if (debugLevel >= paraTool.debugInfo) console.log(`xcmMetaMapStr`, xcmMetaMapStr)
+    let xcmMap = crawlermanager.decodeXcmMetaMap(xcmMetaMapStr)
+    console.log(`xcmMap`, xcmMap)
+    return
     let [blockRangeMap, hrmpRangeMap] = await crawlermanager.analyzeXcmMap(xcmMap)
-    if (this.debugLevel >= paraTool.debugInfo) console.log(`blockRangeMap`, blockRangeMap)
+    if (debugLevel >= paraTool.debugInfo) console.log(`blockRangeMap`, blockRangeMap)
     //TODO: not handling missing traces for now
     await crawlermanager.processIndexRangeMap(blockRangeMap)
     let mMsg = crawlermanager.processReceivedmsg()

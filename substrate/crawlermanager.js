@@ -337,19 +337,56 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
     async indexBlockRanges(crawler, blocks){
-        let xcmMap = {}
+        let xcmMetaMap = {}
         let blockRangeLen = blocks.length
         for (let i = 0; i < blockRangeLen; i++){
             let b = blocks[i]
             let bn = b.blockNumber
             let blkHash = b.blockHash
             if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] indexBlockRanges bn=${bn} blkHash=${blkHash}`)
-            let xcmList = await crawler.index_block(crawler.chain, bn, blkHash);
-            if (Array.isArray(xcmList) && xcmList.length > 0){
-                xcmMap[bn] = xcmList
+            let xcmMeta = await crawler.index_block(crawler.chain, bn, blkHash);
+            if (Array.isArray(xcmMeta) && xcmMeta.length > 0){
+                xcmMetaMap[bn] = xcmMeta
             }
         }
+        let xcmMetaMapStr = JSON.stringify(xcmMetaMap)
+        return xcmMetaMapStr
+    }
+
+    decodeXcmMetaMap(xcmMetaMapStr){
+        let xcmMap = {}
+        try {
+            let xcmMetaMap = JSON.parse(xcmMetaMapStr)
+            for (const relayBN of Object.keys(xcmMetaMap)){
+                let xcmMetas = xcmMetaMap[relayBN]
+                let xcmList = []
+                for (const xcmMeta of xcmMetas){
+                    let xcm = this.unwrapXcmMeta(xcmMeta)
+                    if (xcm){
+                        xcmList.push(xcm)
+                    }
+                }
+                if (xcmList.length > 0) xcmMap[relayBN] = xcmList
+            }
+        } catch (e){
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeXcmMetaMap err`, e)
+        }
         return xcmMap
+    }
+
+    unwrapXcmMeta(xcmMeta){
+        let fieldListStr = 'blockTS|msgType|relayChain|relayedAt|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|includedAt|msgHash'
+        let fileds = fieldListStr.split('|')
+        let xcmMetaFlds = xcmMeta.split('|')
+        if (xcmMetaFlds.length != fileds.length){
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`unrecognized xcmMeta! xcmMetaFlds=${xcmMetaFlds}, expectedFlds=${fileds}`)
+            return false
+        }
+        let xcm = {}
+        for (let i = 0; i < fileds.length; i++){
+            xcm[fileds[i]] = xcmMetaFlds[i]
+        }
+        return xcm
     }
 
     async analyzeXcmMap(xcmMap){

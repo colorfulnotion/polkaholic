@@ -598,7 +598,7 @@ class XCMTracer extends AssetManager {
                 //should just use msgStr directly
                 var o = this.api.registry.createType('XcmVersionedXcm', xcm.msgHex)
                 /*
-                //var o = this.api.registry.createType('XcmVersionedXcm', JSON.parse(xcm.msgHex))
+                //var o = this.api.registry.createType('XcmVersionedXcm', JSON.parse(xcm.msgStr))
                 let derivedInstructionHex = o.toHex()
                 if (derivedInstructionHex != xcm.msgHash) {
                     console.error(`msgHex mismatch. raw=${xcm.msgHex}, derived:${derivedInstructionHex}`);

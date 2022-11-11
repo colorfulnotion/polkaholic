@@ -86,7 +86,7 @@ module.exports = class Indexer extends AssetManager {
     recentExtrinsics = [];
     recentTransfers = [];
 
-    xcmList = []; //this should be removed after every block
+    xcmMeta = []; //this should be removed after every block
 
     wasmContractMap = {};
 
@@ -1356,7 +1356,7 @@ module.exports = class Indexer extends AssetManager {
 
     sendManagerMessage(m, msgType = null, finalized = false) {
         if (!this.parentManager) {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${this.chainID}:${this.chainName}] parentManager not set`)
+            //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.chainID}:${this.chainName}] parentManager not set`)
             return
         }
         if (msgType == undefined) msgType = 'Unknown'
@@ -6200,9 +6200,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
     patch_xcm(xcmMsg) {
         try {
-            let xcmObj = this.api.registry.createType("XcmVersionedXcm", xcmMsg.msgHex);
-            let msg = xcmObj.toJSON();
-            console.log("patch_xcm COMPUTE", xcmMsg.msgType, xcmMsg.msgHex);
+            //let xcmObj = this.api.registry.createType("XcmVersionedXcm", xcmMsg.msgHex);
+            //let msg = xcmObj.toJSON();
+            let msg = xcmMsg.msg
+            //console.log("patch_xcm COMPUTE", xcmMsg.msgType, xcmMsg.msgHex);
             // generate beneficiaries, version, path
             let r = {
                 beneficiaries: "",
@@ -6217,7 +6218,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     r.path = p.path
                 }
             }
-            xcmMsg.msg = msg
+            //xcmMsg.msg = msg
             xcmMsg.beneficiaries = r.beneficiaries
             xcmMsg.version = r.version
             xcmMsg.path = r.path
@@ -6294,27 +6295,35 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         let sourceSentBlockHash = backed.paraHead // this is supposedly the "sentBN"
                         let relayedAt = bn // "relayedAt" -- aka backed at this relay bn
                         let includedAt = bn + 1 // "includedAt" -- aka when it's being delivered to destChain
-                        for (const msgHex of commitments.upwardMessages) {
-                            let umpMsg = {
-                                msgType: "ump",
-                                chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-                                chainIDDest: this.chainID,
-                                paraID: paraID,
-                                paraIDDest: 0,
-                                sentAt: sourceSentAt,
-                                relayedAt: relayedAt,
-                                includedAt: includedAt,
-                                msgHex: msgHex,
-                                msgHash: '0x' + paraTool.blake2_256_from_hex(msgHex),
-                                relayedBlockHash: this.chainParser.parserBlockHash,
-                                blockTS: blockTS,
-                                relayChain: relayChain,
-                                isTip: isTip,
-                                finalized: finalized,
-                                ctx: t.s,
+                        for (const data of commitments.upwardMessages) {
+                            var xcmFragments = this.chainParser.decodeXcmVersionedXcms(this, data, `upwardMessages`)
+                            if (xcmFragments) {
+                                for (const xcm of xcmFragments) {
+                                    var msgHash = xcm.msgHash
+                                    var msg = xcm.msg
+                                    var msgHex = xcm.hex
+                                    let umpMsg = {
+                                        msgType: "ump",
+                                        chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
+                                        chainIDDest: this.chainID,
+                                        paraID: paraID,
+                                        paraIDDest: 0,
+                                        sentAt: sourceSentAt,
+                                        relayedAt: relayedAt,
+                                        includedAt: includedAt,
+                                        msgHex: msgHex,
+                                        msgHash: msgHash,
+                                        msg: xcm.msg,
+                                        blockTS: blockTS,
+                                        relayChain: relayChain,
+                                        isTip: isTip,
+                                        finalized: finalized,
+                                        ctx: t.s,
+                                    }
+                                    this.patch_xcm(umpMsg)
+                                    xcmList.push(umpMsg)
+                                }
                             }
-                            this.patch_xcm(umpMsg)
-                            xcmList.push(umpMsg)
                         }
                         for (const h of commitments.horizontalMessages) {
                             /*
@@ -6324,27 +6333,35 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             }
                             */
                             let paraIDDest = parseInt(paraTool.toNumWithoutComma(h.recipient), 10)
-                            let msgHex = '0x' + h.data.substring(4).toString();
-                            let hrmpMsg = {
-                                msgType: "hrmp",
-                                chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-                                chainIDDest: paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain),
-                                paraID: paraID,
-                                paraIDDest: paraIDDest,
-                                sentAt: sourceSentAt,
-                                relayedAt: relayedAt,
-                                includedAt: includedAt,
-                                msgHex: msgHex,
-                                msgHash: '0x' + paraTool.blake2_256_from_hex(msgHex),
-                                relayedBlockHash: this.chainParser.parserBlockHash,
-                                blockTS: blockTS,
-                                relayChain: relayChain,
-                                isTip: isTip,
-                                finalized: finalized,
-                                ctx: t.s,
+                            let data = '0x' + h.data.substring(4).toString();
+                            var xcmFragments = this.chainParser.decodeXcmVersionedXcms(this, data, `horizontalMessages`)
+                            if (xcmFragments) {
+                                for (const xcm of xcmFragments) {
+                                    var msgHash = xcm.msgHash
+                                    var msg = xcm.msg
+                                    var msgHex = xcm.hex
+                                    let hrmpMsg = {
+                                        msgType: "hrmp",
+                                        chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
+                                        chainIDDest: paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain),
+                                        paraID: paraID,
+                                        paraIDDest: paraIDDest,
+                                        sentAt: sourceSentAt,
+                                        relayedAt: relayedAt,
+                                        includedAt: includedAt,
+                                        msgHex: msgHex,
+                                        msgHash: msgHash,
+                                        msg: xcm.msg,
+                                        blockTS: blockTS,
+                                        relayChain: relayChain,
+                                        isTip: isTip,
+                                        finalized: finalized,
+                                        ctx: t.s,
+                                    }
+                                    this.patch_xcm(hrmpMsg)
+                                    xcmList.push(hrmpMsg)
+                                }
                             }
-                            this.patch_xcm(hrmpMsg)
-                            xcmList.push(hrmpMsg)
                         }
                     }
                 } catch (err) {
@@ -6364,29 +6381,36 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         let paraIDDest = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
                         for (const q of queues) {
                             //let sentAt = q.sentAt; // NO QUESTION on dmp (this is usually always the same block where xcmtransfer is initiated), sentAt = includedAt = relayedAt
-                            //let msgHex = q.msg;
-                            let msgHex = (q.msg != undefined) ? q.msg : q.pubMsg
+                            let data = (q.msg != undefined) ? q.msg : q.pubMsg
                             let sentAt = (q.sentAt != undefined) ? paraTool.dechexToInt(q.sentAt) : paraTool.dechexToInt(q.pubSentAt)
-                            let dmpMsg = {
-                                msgType: "dmp",
-                                chainID: this.chainID,
-                                chainIDDest: paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain),
-                                paraID: 0,
-                                paraIDDest: paraIDDest,
-                                sentAt: sentAt,
-                                relayedAt: sentAt,
-                                includedAt: sentAt,
-                                msgHex: msgHex,
-                                msgHash: '0x' + paraTool.blake2_256_from_hex(msgHex),
-                                relayedBlockHash: this.chainParser.parserBlockHash,
-                                blockTS: blockTS,
-                                relayChain: relayChain,
-                                isTip: isTip,
-                                finalized: finalized,
-                                ctx: t.s,
+                            var xcmFragments = this.chainParser.decodeXcmVersionedXcms(this, data, `DownwardMessages`)
+                            if (xcmFragments) {
+                                for (const xcm of xcmFragments) {
+                                    var msgHash = xcm.msgHash
+                                    var msg = xcm.msg
+                                    var msgHex = xcm.hex
+                                    let dmpMsg = {
+                                        msgType: "dmp",
+                                        chainID: this.chainID,
+                                        chainIDDest: paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain),
+                                        paraID: 0,
+                                        paraIDDest: paraIDDest,
+                                        sentAt: sentAt,
+                                        relayedAt: sentAt,
+                                        includedAt: sentAt,
+                                        msgHex: msgHex,
+                                        msgHash: msgHash,
+                                        msg: xcm.msg,
+                                        blockTS: blockTS,
+                                        relayChain: relayChain,
+                                        isTip: isTip,
+                                        finalized: finalized,
+                                        ctx: t.s,
+                                    }
+                                    this.patch_xcm(dmpMsg)
+                                    xcmList.push(dmpMsg)
+                                }
                             }
-                            this.patch_xcm(dmpMsg)
-                            xcmList.push(dmpMsg)
                         }
                     }
                 } catch (err) {
@@ -6403,9 +6427,19 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             //console.log(`!!! indexRelayChainTrace [${relayChain}-${bn}] len=${xcmList.length} (finalized=${finalized}, isTip=${isTip})`, xcmList)
             await this.process_rcxcm(xcmList)
         }
-        this.xcmList = xcmList
+        let xcmMeta = []
+        for (const x of xcmList){
+            // TODO: keep minimal essential data
+            // blockTS|msgType|relayChain|relayedAt|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|includedAt|msgHash
+            let s = `${x.blockTS}|${x.msgType}|${this.relayChain}|${x.relayedAt}|${this.chainParser.relayParentStateRoot}|${this.chainParser.parserBlockHash}|${x.chainID}|${x.chainIDDest}|${x.sentAt}|${x.includedAt}|${x.msgHash}`
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`xcmMeta: ${s}`)
+            xcmMeta.push(s)
+        }
+        this.xcmMeta = xcmMeta
         return xcmList
     }
+
+
 
     async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, evmTrace = false, autoTraces = false, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
@@ -6785,9 +6819,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXcmMsgs.length > 0) {
             this.add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs)
         }
-        //let xcmList = this.xcmList;
-        if (this.xcmList.length > 0) console.log(`[${blockNumber}] [${blockHash}] xcmList found!`, this.xcmList)
-        return [blockStats, this.xcmList];
+        //let xcmMeta = this.xcmMeta;
+        if (this.xcmMeta.length > 0) console.log(`[${blockNumber}] [${blockHash}] xcmMeta found!`, this.xcmMeta)
+        return [blockStats, this.xcmMeta];
     }
 
     add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs) {
@@ -7441,9 +7475,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let processBlockEventsStartTS = new Date().getTime()
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
             let tracesPresent = (r.trace) ? true : false;
-            let [blockStats, xcmList] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, true, write_bq_log, isTip, tracesPresent);
+            let [blockStats, xcmMeta] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, true, write_bq_log, isTip, tracesPresent);
             r.blockStats = blockStats
-            r.xcmList = xcmList
+            r.xcmMeta = xcmMeta
 
             let processBlockEventsTS = (new Date().getTime() - processBlockEventsStartTS) / 1000
             this.timeStat.processBlockEventsTS += processBlockEventsTS
@@ -7512,7 +7546,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
             this.dump_update_block_stats(chain.chainID, statRows, indexTS)
             await this.flush(indexTS, blockNumber, false, false); //ts, bn, isFullPeriod, isTip
-            return (r.xcmList);
+            return (r.xcmMeta);
         } catch (err) {
             console.log(err);
             this.logger.warn({
