@@ -970,7 +970,7 @@ module.exports = class ChainParser {
                         let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
                         if (candidate) {
                             candiateCnt++
-                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
+                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
                         }
                     }
                     //console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
@@ -981,7 +981,7 @@ module.exports = class ChainParser {
                             //console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
                             if (candidate) {
                                 candiateCnt++
-                                indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
+                                indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
                             }
                         }
                     }

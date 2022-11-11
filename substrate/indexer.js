@@ -1354,7 +1354,7 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
-    sendManagerMessage(m, msgType = null) {
+    sendManagerMessage(m, msgType = null, finalized = false) {
         if (!this.parentManager) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${this.chainID}:${this.chainName}] parentManager not set`)
             return
@@ -1369,6 +1369,7 @@ module.exports = class Indexer extends AssetManager {
             relayBN: this.chainParser.parserWatermark,
             relayStateRoot: this.chainParser.relayParentStateRoot,
             relayChain: this.relayChain,
+            finalized: finalized,
             source: this.hostname,
             commit: this.indexerInfo,
         }
@@ -1376,7 +1377,7 @@ module.exports = class Indexer extends AssetManager {
         this.parentManager.sendMsg(this.chainID, wrapper)
     }
 
-    sendWSMessage(m, msgType = null) {
+    sendWSMessage(m, msgType = null, finalized = false) {
         if (msgType == undefined) msgType = 'Unknown'
         let wrapper = {
             type: msgType,
@@ -1387,6 +1388,7 @@ module.exports = class Indexer extends AssetManager {
             relayBN: this.chainParser.parserWatermark,
             relayStateRoot: this.chainParser.relayParentStateRoot,
             relayChain: this.relayChain,
+            finalized: finalized,
             source: this.hostname,
             commit: this.indexerInfo,
         }
@@ -1423,10 +1425,12 @@ module.exports = class Indexer extends AssetManager {
                     msgHash: xcmMsg.msgHash,
                     msgStr: xcmMsg.msgStr,
                     isFresh: true,
+                    isPreemptive: true,
                     matchable: true,
                 }
                 //console.log(`updateXCMMsg ${Object.keys(this.xcmTrailingKeyMap)}`)
-                this.xcmmsgMap[xcmKey] = xcmMsg
+                this.xcmmsgMap[xcmKey] = xcmMsg //TODO: MK review
+
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
             } else {
@@ -1617,7 +1621,7 @@ module.exports = class Indexer extends AssetManager {
         return (asset);
     }
 
-    updateXCMTransferStorage(xcmtransfer, isTip) {
+    updateXCMTransferStorage(xcmtransfer, isTip, finalized) {
         //console.log(`adding xcmtransfer`, xcmtransfer)
         //!only isXcmTipSafe can get here
         try {
@@ -1666,16 +1670,16 @@ module.exports = class Indexer extends AssetManager {
             })
         }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
-        this.sendManagerMessage(xcmtransfer, "xcmtransfer");
+        this.sendManagerMessage(xcmtransfer, "xcmtransfer", finalized);
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
-            this.sendWSMessage(xcmtransfer, "xcmtransfer");
+            this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
         }
     }
 
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
     // this is send in real time (both unfinalized/finalized)
-    updateXCMTransferDestCandidate(candidate, caller = false, isTip = false) {
+    updateXCMTransferDestCandidate(candidate, caller = false, isTip = false, finalized = false) {
         //potentially add sentAt here, but it's 2-4
         let eventID = candidate.eventID
         let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
@@ -1688,10 +1692,10 @@ module.exports = class Indexer extends AssetManager {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
         }
         //MK: send xcmtransfer here
-        this.sendManagerMessage(candidate, "xcmtransferdestcandidate");
+        this.sendManagerMessage(candidate, "xcmtransferdestcandidate", finalized);
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
-            this.sendWSMessage(candidate, "xcmtransferdestcandidate");
+            this.sendWSMessage(candidate, "xcmtransferdestcandidate", finalized);
         }
     }
 
@@ -4785,7 +4789,7 @@ module.exports = class Indexer extends AssetManager {
                             let pendingXcmInfo = await this.buildPendingXcmInfo(xcmtransfer, rExtrinsic)
                             if (this.debugLevel >= paraTool.debugInfo) console.log(`pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, pendingXcmInfo)
                             xcmtransfer.xcmInfo = pendingXcmInfo
-                            this.updateXCMTransferStorage(xcmtransfer, isTip); // store, flushed in flushXCM
+                            this.updateXCMTransferStorage(xcmtransfer, isTip, finalized); // store, flushed in flushXCM
                         }
                     } else {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length} - skip`)
@@ -4802,7 +4806,7 @@ module.exports = class Indexer extends AssetManager {
                                 if (msgHashCandidate) unsafeXcmtransfer.msgHash = msgHashCandidate
                             }
                             //for unsafeXcmtransfer. we will send xcmtransfer that may eventually got dropped
-                            this.sendWSMessage(xcmtransfer, "xcmtransfer");
+                            this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
                         }
                     }
                     delete rExtrinsic.xcms
@@ -6643,8 +6647,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         }
                         // remote execution here
                         if (connectedTxn.msgHash != undefined) {
-                            this.sendManagerMessage(connectedTxn, "remoteExecution");
-                            if (isTip) this.sendWSMessage(connectedTxn, "remoteExecution")
+                            this.sendManagerMessage(connectedTxn, "remoteExecution", finalized);
+                            if (isTip) this.sendWSMessage(connectedTxn, "remoteExecution", finalized)
                         }
                         connectedTxns.push(connectedTxn)
                         evmFullBlock.transactions[connectedTxn.transactionIndex] = connectedTxn
@@ -6674,14 +6678,18 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] xcmKeys=${xcmKeys}`)
         for (const xcmKey of xcmKeys) {
             let mpKey = this.xcmTrailingKeyMap[xcmKey]
+            if (mpKey != undefined && mpKey.isPreemptive) { //MK: TODO: bypass isFresh without breaking the current implementation.. can't gurantee the correctness of the msg content..
+                this.xcmTrailingKeyMap[xcmKey].isPreemptive = false // mark the record as preemptive sent
+                if (isTip) this.sendWSMessage(mp, "xcmmessage", finalized)
+            }
             if (mpKey != undefined && mpKey.isFresh) {
                 let mp = this.xcmmsgMap[xcmKey]
                 let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
                 if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
                 if (mp != undefined) {
                     //console.log(`[Delay=${this.chainParser.parserBlockNumber-mp.blockNumber}] send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
-                    this.sendManagerMessage(mp, "xcmmessage")
-                    if (isTip) this.sendWSMessage(mp, "xcmmessage")
+                    this.sendManagerMessage(mp, "xcmmessage", finalized)
+                    if (isTip) this.sendWSMessage(mp, "xcmmessage", finalized)
                 }
                 let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
                 let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
