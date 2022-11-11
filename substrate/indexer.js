@@ -1363,8 +1363,12 @@ module.exports = class Indexer extends AssetManager {
         let wrapper = {
             type: msgType,
             msg: m,
+            blockHash: this.chainParser.parserBlockHash,
             blockTS: this.chainParser.parserTS,
-            relayBN: `${this.relayChain}-${this.chainParser.parserWatermark}`,
+            blockBN: this.chainParser.parserBlockNumber,
+            relayBN: this.chainParser.parserWatermark,
+            relayStateRoot: this.chainParser.relayParentStateRoot,
+            relayChain: this.relayChain,
             source: this.hostname,
             commit: this.indexerInfo,
         }
@@ -1377,7 +1381,12 @@ module.exports = class Indexer extends AssetManager {
         let wrapper = {
             type: msgType,
             msg: m,
+            blockHash: this.chainParser.parserBlockHash,
             blockTS: this.chainParser.parserTS,
+            blockBN: this.chainParser.parserBlockNumber,
+            relayBN: this.chainParser.parserWatermark,
+            relayStateRoot: this.chainParser.relayParentStateRoot,
+            relayChain: this.relayChain,
             source: this.hostname,
             commit: this.indexerInfo,
         }
@@ -6401,6 +6410,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let blockNumber = block.header.number;
         let blockHash = block.hash;
         let blockTS = block.blockTS;
+        let stateRoot = block.header.stateRoot
         let paraID = paraTool.getParaIDfromChainID(chainID)
         if (paraID == 0) {
             //this.trailingBlockHashs[blockHash] = blockNumber;
@@ -6453,6 +6463,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
         // setParserContext
         this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash, chainID);
+        if (paraTool.isRelayChain(chainID)) this.chainParser.setRelayParentStateRoot(stateRoot)
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
         block.finalized = finalized;
 

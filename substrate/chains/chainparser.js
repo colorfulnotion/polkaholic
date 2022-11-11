@@ -13,7 +13,7 @@ module.exports = class ChainParser {
     parserBlockNumber = false;
     parserBlockHash = false;
     parserWatermark = 0;
-    relayParentStorageRoot = false;
+    relayParentStateRoot = false;
     paraStates = {}
     numParserErrors = 0;
     mpReceived = false;
@@ -39,6 +39,10 @@ module.exports = class ChainParser {
         }
         this.parserBlockHash = blockHash;
         this.mpReceived = false;
+    }
+
+    setRelayParentStateRoot(stateRoot){
+        this.relayParentStateRoot = stateRoot
     }
 
     tokens_to_string(tokens) {
@@ -1188,10 +1192,10 @@ module.exports = class ChainParser {
                 let data = extrinsic.params.data
                 try {
                     let hrmpWatermark = data.validationData.relayParentNumber
-                    let relayParentStorageRoot = data.validationData.relayParentStorageRoot
+                    let relayParentStateRoot = data.validationData.relayParentStorageRoot
                     this.parserWatermark = hrmpWatermark
-                    this.relayParentStorageRoot = relayParentStorageRoot
-                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark} (${relayParentStorageRoot})`)
+                    this.setRelayParentStateRoot(relayParentStateRoot)
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark} (${relayParentStateRoot})`)
                     //update all outgoing trace msg with this hrmp
                     indexer.fixOutgoingUnknownSentAt(hrmpWatermark);
                 } catch (err1) {

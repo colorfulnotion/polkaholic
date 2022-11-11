@@ -53,8 +53,10 @@ module.exports = class CrawlerManager extends Crawler {
     sendMsg(chainID, wrapper){
         if (this.debugLevel >= paraTool.debugInfo) console.log(`Incoming msg from [${chainID}] !!!`, wrapper)
         let relayBN = wrapper.relayBN
-        if (this.receviedMsgs[relayBN] == undefined) this.receviedMsgs[relayBN] = []
-        this.receviedMsgs[relayBN].push(wrapper)
+        let relayChain = wrapper.relayChain
+        let relayBNKey = `${relayChain}_${relayBN}`
+        if (this.receviedMsgs[relayBNKey] == undefined) this.receviedMsgs[relayBNKey] = []
+        this.receviedMsgs[relayBNKey].push(wrapper)
     }
 
     processReceivedmsg(){
@@ -62,13 +64,13 @@ module.exports = class CrawlerManager extends Crawler {
         let receviedMsgs = this.receviedMsgs
         if (this.debugLevel >= paraTool.debugInfo) console.log(receviedMsgs)
         let returnedMsgs = {}
-        for (const relayBN of Object.keys(receviedMsgs)){
-            let relayBNRecs = receviedMsgs[relayBN]
+        for (const relayBNKey of Object.keys(receviedMsgs)){
+            let relayBNRecs = receviedMsgs[relayBNKey]
             let recStrList = []
             for (const rec of relayBNRecs){
                 recStrList.push(JSON.stringify(rec))
             }
-            returnedMsgs[relayBN] = recStrList
+            returnedMsgs[relayBNKey] = recStrList
         }
         if (Object.keys(returnedMsgs).length = 0){
             return false
