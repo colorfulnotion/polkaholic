@@ -52,13 +52,13 @@ class XCMTracer extends AssetManager {
         if (id == "moonbeam" || id == "moonriver") {
             // all instructions have fixed amount of weight per instruction.
             let weight = 200000000
-            // TODO: 
+            // TODO:
             return weight;
         } else if (id == "moonbase-alpha" || id == "moonbase-beta") {
             // generic XCM instructions benchmarked, fungible XCM instructions fixed amount of weight per instruction.
             let weight_per_read = 25000000;
             let weight_per_write = 100000000;
-            // TODO: 
+            // TODO:
             return weight;
         }
 
@@ -537,7 +537,7 @@ class XCMTracer extends AssetManager {
 
                 }
             } else {
-                // no messagehash in extrinsic, find dest by 
+                // no messagehash in extrinsic, find dest by
                 let dest = this.find_dest_extrinsic(e);
                 if (dest && this.xcm[dest.msgHash] != undefined) {
                     e.msgHash = dest.msgHash;
@@ -595,7 +595,15 @@ class XCMTracer extends AssetManager {
                 let xcm = msg.msg;
                 if (this.xcm[xcm.msgHash] || xcm.blockTS < startTS) return;
                 this.xcm[xcm.msgHash] = xcm
+                //should just use msgStr directly
                 var o = this.api.registry.createType('XcmVersionedXcm', xcm.msgHex)
+                /*
+                //var o = this.api.registry.createType('XcmVersionedXcm', JSON.parse(xcm.msgStr))
+                let derivedInstructionHex = o.toHex()
+                if (derivedInstructionHex != xcm.msgHash) {
+                    console.error(`msgHex mismatch. raw=${xcm.msgHex}, derived:${derivedInstructionHex}`);
+                }
+                */
                 xcm.instructions = [];
                 if (o.isV2) {
                     for (let i = 0; i < o.asV2.length; i++) {
@@ -627,7 +635,7 @@ class XCMTracer extends AssetManager {
                         if (inst[is]) { // ok, this instruction could exhibit recursion
                             let o2 = inst[as];
                             if (o2.xcm != undefined) { // ok, this instruction actually does exhibit recursion, containing one or more of "xcm" messages
-                                // for each of the "child" instructions within "xcm", store the hex 
+                                // for each of the "child" instructions within "xcm", store the hex
                                 for (let k = 0; k < o2.xcm.length; k++) {
                                     instruction.childinstruction.push(o2.xcm[k]);
                                     instruction.childhex.push(o2.xcm[k].toHex());

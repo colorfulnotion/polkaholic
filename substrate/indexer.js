@@ -62,6 +62,7 @@ module.exports = class Indexer extends AssetManager {
     contractABIs = false;
     contractABISignatures = {};
     chainID = false;
+    chainName = false;
     relayChain = "";
     metadata = {};
     authorErrorSpecVersion = 0; //query.session.currentIndex is not available for certain v. cache the errorV and do not ask author until specV changed again
@@ -84,6 +85,11 @@ module.exports = class Indexer extends AssetManager {
     bqlogindexTS = 0;
     recentExtrinsics = [];
     recentTransfers = [];
+
+    xcmMeta = []; //this should be removed after every block
+
+    xcmMetaMap = {};
+    isRelayChain = false;
 
     wasmContractMap = {};
 
@@ -186,6 +192,9 @@ module.exports = class Indexer extends AssetManager {
     debugTracing: 4,
     */
 
+    parentRelayCrawler = false;
+    parentManager = false;
+
     setDebugLevel(debugLevel = paraTool.debugNoLog) {
         this.debugLevel = debugLevel
     }
@@ -220,6 +229,12 @@ module.exports = class Indexer extends AssetManager {
         obj.op = op;
         obj.err = err;
         this.logger.warn(obj);
+    }
+
+    setParentRelayAndManager(relayCrawler, manager){
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] setParentRelayAndManager`)
+        this.parentRelayCrawler = relayCrawler
+        this.parentManager = manager
     }
 
     validAddress(addr) {
@@ -753,6 +768,12 @@ module.exports = class Indexer extends AssetManager {
         let batchedSQLTS = (new Date().getTime() - batchedSQLStartTS) / 1000
         if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(e): update_batchedSQL", batchedSQLTS);
 
+        let xcmMetaStartTS = new Date().getTime();
+        if (this.isRelayChain) await this.flushXCMMeta(isFullPeriod);
+
+        let xcmMetaTS = (new Date().getTime() - xcmMetaStartTS) / 1000
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(g): flush_xcmMeta", xcmMetaTS);
+
         await this.dump_xcm_messages()
         await this.dump_recent_activity()
         await this.dump_failed_traces()
@@ -766,6 +787,31 @@ module.exports = class Indexer extends AssetManager {
         }
         //removes address state after flushing
         this.resetAddressStats()
+    }
+
+    async flushXCMMeta(isFullPeriod) {
+        if (!this.isRelayChain) return
+        let xcmMetaMapKeys = Object.keys(this.xcmMetaMap)
+        if (xcmMetaMapKeys.length > 0) {
+            let xcmMetaRecs = [];
+            for (let i = 0; i < xcmMetaMapKeys.length; i++) {
+                let r = this.xcmMetaMap[xcmMetaMapKeys[i]];
+                //["blockNumber"] + ["blockTS", "blockHash", "stateRoot", "xcmMeta"]
+                let xcmMeta = mysql.escape(JSON.stringify(r.xcmMeta))
+                let t = "(" + [`'${r.blockNumber}'`, `'${r.blockTS}'`, `'${r.blockHash}'`, `'${r.stateRoot}'`, mysql.escape(JSON.stringify(r.xcmMeta))].join(",") + ")";
+                xcmMetaRecs.push(t)
+            }
+            let sqlDebug = false
+            this.xcmMetaMap = {};
+            await this.upsertSQL({
+                "table": `xcmmeta${this.chainID}`,
+                "keys": ["blockNumber"],
+                "vals": ["blockTS", "blockHash", "stateRoot", "xcmMeta"],
+                "data": xcmMetaRecs,
+                "replace": ["blockTS", "blockHash", "stateRoot", "xcmMeta"]
+            }, sqlDebug);
+        }
+        //TODO: update indexlog when isFullPeriod?
     }
 
     // write this.addressStorage [filled in updateAddressStorage] to tblRealtime
@@ -934,7 +980,7 @@ module.exports = class Indexer extends AssetManager {
                 let reserved = lastState.reserved ? lastState.reserved : 0;
                 let miscFrozen = lastState.miscFrozen ? lastState.miscFrozen : 0;
                 let frozen = lastState.frozen ? lastState.frozen : 0;
-		if ( free < 10**32 ) { 
+		if ( free < 10**32 ) {
                     let t = "(" + [`'${asset}'`, `'${this.chainID}'`, `'${accKey}'`, `'${blockNumber}'`, `'${blockNumber}'`, mysql.escape(JSON.stringify(lastState)), `'${free}'`, `'${reserved}'`, `'${miscFrozen}'`, `'${frozen}'`].join(",") + ")";
                     if (this.validAsset(asset, this.chainID, "assetholder", t)) {
 			assetholders.push(t);
@@ -1342,11 +1388,41 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
-    sendWSMessage(m, msgType = null) {
+    sendManagerMessage(m, msgType = null, finalized = false) {
+        if (!this.parentManager) {
+            //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.chainID}:${this.chainName}] parentManager not set`)
+            return
+        }
         if (msgType == undefined) msgType = 'Unknown'
         let wrapper = {
             type: msgType,
             msg: m,
+            blockHash: this.chainParser.parserBlockHash,
+            blockTS: this.chainParser.parserTS,
+            blockBN: this.chainParser.parserBlockNumber,
+            relayBN: this.chainParser.parserWatermark,
+            relayStateRoot: this.chainParser.relayParentStateRoot,
+            relayChain: this.relayChain,
+            finalized: finalized,
+            source: this.hostname,
+            commit: this.indexerInfo,
+        }
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${this.chainID}:${this.chainName}] sendManagerMessage`, wrapper)
+        this.parentManager.sendMsg(this.chainID, wrapper)
+    }
+
+    sendWSMessage(m, msgType = null, finalized = false) {
+        if (msgType == undefined) msgType = 'Unknown'
+        let wrapper = {
+            type: msgType,
+            msg: m,
+            blockHash: this.chainParser.parserBlockHash,
+            blockTS: this.chainParser.parserTS,
+            blockBN: this.chainParser.parserBlockNumber,
+            relayBN: this.chainParser.parserWatermark,
+            relayStateRoot: this.chainParser.relayParentStateRoot,
+            relayChain: this.relayChain,
+            finalized: finalized,
             source: this.hostname,
             commit: this.indexerInfo,
         }
@@ -1383,10 +1459,12 @@ module.exports = class Indexer extends AssetManager {
                     msgHash: xcmMsg.msgHash,
                     msgStr: xcmMsg.msgStr,
                     isFresh: true,
+                    isPreemptive: true,
                     matchable: true,
                 }
                 //console.log(`updateXCMMsg ${Object.keys(this.xcmTrailingKeyMap)}`)
-                this.xcmmsgMap[xcmKey] = xcmMsg
+                this.xcmmsgMap[xcmKey] = xcmMsg //TODO: MK review
+
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
             } else {
@@ -1577,7 +1655,7 @@ module.exports = class Indexer extends AssetManager {
         return (asset);
     }
 
-    updateXCMTransferStorage(xcmtransfer, isTip) {
+    updateXCMTransferStorage(xcmtransfer, isTip, finalized) {
         //console.log(`adding xcmtransfer`, xcmtransfer)
         //!only isXcmTipSafe can get here
         try {
@@ -1626,14 +1704,16 @@ module.exports = class Indexer extends AssetManager {
             })
         }
         this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
+        this.sendManagerMessage(xcmtransfer, "xcmtransfer", finalized);
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
-            this.sendWSMessage(xcmtransfer, "xcmtransfer");
+            this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
         }
     }
 
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
-    updateXCMTransferDestCandidate(candidate, caller = false, isTip = false) {
+    // this is send in real time (both unfinalized/finalized)
+    updateXCMTransferDestCandidate(candidate, caller = false, isTip = false, finalized = false) {
         //potentially add sentAt here, but it's 2-4
         let eventID = candidate.eventID
         let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
@@ -1646,9 +1726,10 @@ module.exports = class Indexer extends AssetManager {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
         }
         //MK: send xcmtransfer here
+        this.sendManagerMessage(candidate, "xcmtransferdestcandidate", finalized);
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
-            this.sendWSMessage(candidate, "xcmtransferdestcandidate");
+            this.sendWSMessage(candidate, "xcmtransferdestcandidate", finalized);
         }
     }
 
@@ -3356,14 +3437,14 @@ module.exports = class Indexer extends AssetManager {
                         }
                         //let executedEventID = (r.eventID != undefined) ? `'${r.eventID}'` : `NULL`
                         let t = "(" + [`'${r.msgHash}'`, `'${r.xcmBN}'`, `'1'`, `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${destStatus}'`, `'${r.eventID}'`, errorDesc].join(",") + ")";
-                        console.log(`mpStates`, t)
+                        //console.log(`mpStates`, t)
                         mpStates.push(t);
                     } else {
                         console.log(`[${r.msgHash}] xcmInfo missing! xcmBN=${r.xcmBN}, chainID=${r.chainID}, chainIDDest=${r.chainIDDest}`)
                     }
                 }
                 this.incomingXcmState = {};
-                let sqlDebug = true
+                let sqlDebug = false
                 try {
                     // these events we can't say for sure without matching to recent sends
                     if (mpStates.length > 0) {
@@ -3394,7 +3475,7 @@ module.exports = class Indexer extends AssetManager {
                     "data": out,
                     "replace": vals
                 });
-                console.log("numXCMMessagesOut", this.numXCMMessagesOut);
+                //console.log("numXCMMessagesOut", this.numXCMMessagesOut);
                 this.numXCMMessagesIn = {};
             }
 
@@ -3411,7 +3492,7 @@ module.exports = class Indexer extends AssetManager {
                     "data": out,
                     "replace": vals
                 });
-                console.log("numXCMMessagesOut", this.numXCMMessagesOut);
+                //console.log("numXCMMessagesOut", this.numXCMMessagesOut);
                 this.numXCMMessagesOut = {};
             }
         }
@@ -4742,10 +4823,25 @@ module.exports = class Indexer extends AssetManager {
                             let pendingXcmInfo = await this.buildPendingXcmInfo(xcmtransfer, rExtrinsic)
                             if (this.debugLevel >= paraTool.debugInfo) console.log(`pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, pendingXcmInfo)
                             xcmtransfer.xcmInfo = pendingXcmInfo
-                            this.updateXCMTransferStorage(xcmtransfer, isTip); // store, flushed in flushXCM
+                            this.updateXCMTransferStorage(xcmtransfer, isTip, finalized); // store, flushed in flushXCM
                         }
                     } else {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length} - skip`)
+                        for (const xcmtransfer of rExtrinsic.xcms) {
+                            //Look up msgHash
+                            let unsafeXcmtransfer = xcmtransfer
+                            if (unsafeXcmtransfer.msgHash == undefined || unsafeXcmtransfer.msgHash.length != 66) {
+                                let msgHashCandidate;
+                                if (unsafeXcmtransfer.innerCall != undefined) {
+                                    msgHashCandidate = this.getMsgHashCandidate(unsafeXcmtransfer.blockNumber, unsafeXcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
+                                } else {
+                                    msgHashCandidate = this.getMsgHashCandidate(unsafeXcmtransfer.blockNumber, unsafeXcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'address')
+                                }
+                                if (msgHashCandidate) unsafeXcmtransfer.msgHash = msgHashCandidate
+                            }
+                            //for unsafeXcmtransfer. we will send xcmtransfer that may eventually got dropped
+                            this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
+                        }
                     }
                     delete rExtrinsic.xcms
                 }
@@ -6138,9 +6234,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
     patch_xcm(xcmMsg) {
         try {
-            let xcmObj = this.api.registry.createType("XcmVersionedXcm", xcmMsg.msgHex);
-            let msg = xcmObj.toJSON();
-            console.log("patch_xcm COMPUTE", xcmMsg.msgType, xcmMsg.msgHex);
+            //let xcmObj = this.api.registry.createType("XcmVersionedXcm", xcmMsg.msgHex);
+            //let msg = xcmObj.toJSON();
+            let msg = xcmMsg.msg
+            //console.log("patch_xcm COMPUTE", xcmMsg.msgType, xcmMsg.msgHex);
             // generate beneficiaries, version, path
             let r = {
                 beneficiaries: "",
@@ -6155,7 +6252,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     r.path = p.path
                 }
             }
-            xcmMsg.msg = msg
+            //xcmMsg.msg = msg
             xcmMsg.beneficiaries = r.beneficiaries
             xcmMsg.version = r.version
             xcmMsg.path = r.path
@@ -6229,29 +6326,38 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         let paraID = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
                         let backed = backedMap[paraID]
                         let sourceSentAt = backed.relayParentNumber // this is the true "sentAt" at sourceChain, same as commitments.hrmpWatermark
+                        let sourceSentBlockHash = backed.paraHead // this is supposedly the "sentBN"
                         let relayedAt = bn // "relayedAt" -- aka backed at this relay bn
                         let includedAt = bn + 1 // "includedAt" -- aka when it's being delivered to destChain
-                        for (const msgHex of commitments.upwardMessages) {
-                            let umpMsg = {
-                                msgType: "ump",
-                                chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-                                chainIDDest: this.chainID,
-                                paraID: paraID,
-                                paraIDDest: 0,
-                                sentAt: sourceSentAt,
-                                relayedAt: relayedAt,
-                                includedAt: includedAt,
-                                msgHex: msgHex,
-                                msgHash: '0x' + paraTool.blake2_256_from_hex(msgHex),
-                                relayedBlockHash: this.chainParser.parserBlockHash,
-                                blockTS: blockTS,
-                                relayChain: relayChain,
-                                isTip: isTip,
-                                finalized: finalized,
-                                ctx: t.s,
+                        for (const data of commitments.upwardMessages) {
+                            var xcmFragments = this.chainParser.decodeXcmVersionedXcms(this, data, `upwardMessages`)
+                            if (xcmFragments) {
+                                for (const xcm of xcmFragments) {
+                                    var msgHash = xcm.msgHash
+                                    var msg = xcm.msg
+                                    var msgHex = xcm.hex
+                                    let umpMsg = {
+                                        msgType: "ump",
+                                        chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
+                                        chainIDDest: this.chainID,
+                                        paraID: paraID,
+                                        paraIDDest: 0,
+                                        sentAt: sourceSentAt,
+                                        relayedAt: relayedAt,
+                                        includedAt: includedAt,
+                                        msgHex: msgHex,
+                                        msgHash: msgHash,
+                                        msg: xcm.msg,
+                                        blockTS: blockTS,
+                                        relayChain: relayChain,
+                                        isTip: isTip,
+                                        finalized: finalized,
+                                        ctx: t.s,
+                                    }
+                                    this.patch_xcm(umpMsg)
+                                    xcmList.push(umpMsg)
+                                }
                             }
-                            this.patch_xcm(umpMsg)
-                            xcmList.push(umpMsg)
                         }
                         for (const h of commitments.horizontalMessages) {
                             /*
@@ -6261,27 +6367,35 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             }
                             */
                             let paraIDDest = parseInt(paraTool.toNumWithoutComma(h.recipient), 10)
-                            let msgHex = '0x' + h.data.substring(4).toString();
-                            let hrmpMsg = {
-                                msgType: "hrmp",
-                                chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-                                chainIDDest: paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain),
-                                paraID: paraID,
-                                paraIDDest: paraIDDest,
-                                sentAt: sourceSentAt,
-                                relayedAt: relayedAt,
-                                includedAt: includedAt,
-                                msgHex: msgHex,
-                                msgHash: '0x' + paraTool.blake2_256_from_hex(msgHex),
-                                relayedBlockHash: this.chainParser.parserBlockHash,
-                                blockTS: blockTS,
-                                relayChain: relayChain,
-                                isTip: isTip,
-                                finalized: finalized,
-                                ctx: t.s,
+                            let data = '0x' + h.data.substring(4).toString();
+                            var xcmFragments = this.chainParser.decodeXcmVersionedXcms(this, data, `horizontalMessages`)
+                            if (xcmFragments) {
+                                for (const xcm of xcmFragments) {
+                                    var msgHash = xcm.msgHash
+                                    var msg = xcm.msg
+                                    var msgHex = xcm.hex
+                                    let hrmpMsg = {
+                                        msgType: "hrmp",
+                                        chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
+                                        chainIDDest: paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain),
+                                        paraID: paraID,
+                                        paraIDDest: paraIDDest,
+                                        sentAt: sourceSentAt,
+                                        relayedAt: relayedAt,
+                                        includedAt: includedAt,
+                                        msgHex: msgHex,
+                                        msgHash: msgHash,
+                                        msg: xcm.msg,
+                                        blockTS: blockTS,
+                                        relayChain: relayChain,
+                                        isTip: isTip,
+                                        finalized: finalized,
+                                        ctx: t.s,
+                                    }
+                                    this.patch_xcm(hrmpMsg)
+                                    xcmList.push(hrmpMsg)
+                                }
                             }
-                            this.patch_xcm(hrmpMsg)
-                            xcmList.push(hrmpMsg)
                         }
                     }
                 } catch (err) {
@@ -6301,29 +6415,36 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         let paraIDDest = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
                         for (const q of queues) {
                             //let sentAt = q.sentAt; // NO QUESTION on dmp (this is usually always the same block where xcmtransfer is initiated), sentAt = includedAt = relayedAt
-                            //let msgHex = q.msg;
-                            let msgHex = (q.msg != undefined) ? q.msg : q.pubMsg
+                            let data = (q.msg != undefined) ? q.msg : q.pubMsg
                             let sentAt = (q.sentAt != undefined) ? paraTool.dechexToInt(q.sentAt) : paraTool.dechexToInt(q.pubSentAt)
-                            let dmpMsg = {
-                                msgType: "dmp",
-                                chainID: this.chainID,
-                                chainIDDest: paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain),
-                                paraID: 0,
-                                paraIDDest: paraIDDest,
-                                sentAt: sentAt,
-                                relayedAt: sentAt,
-                                includedAt: sentAt,
-                                msgHex: msgHex,
-                                msgHash: '0x' + paraTool.blake2_256_from_hex(msgHex),
-                                relayedBlockHash: this.chainParser.parserBlockHash,
-                                blockTS: blockTS,
-                                relayChain: relayChain,
-                                isTip: isTip,
-                                finalized: finalized,
-                                ctx: t.s,
+                            var xcmFragments = this.chainParser.decodeXcmVersionedXcms(this, data, `DownwardMessages`)
+                            if (xcmFragments) {
+                                for (const xcm of xcmFragments) {
+                                    var msgHash = xcm.msgHash
+                                    var msg = xcm.msg
+                                    var msgHex = xcm.hex
+                                    let dmpMsg = {
+                                        msgType: "dmp",
+                                        chainID: this.chainID,
+                                        chainIDDest: paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain),
+                                        paraID: 0,
+                                        paraIDDest: paraIDDest,
+                                        sentAt: sentAt,
+                                        relayedAt: sentAt,
+                                        includedAt: sentAt,
+                                        msgHex: msgHex,
+                                        msgHash: msgHash,
+                                        msg: xcm.msg,
+                                        blockTS: blockTS,
+                                        relayChain: relayChain,
+                                        isTip: isTip,
+                                        finalized: finalized,
+                                        ctx: t.s,
+                                    }
+                                    this.patch_xcm(dmpMsg)
+                                    xcmList.push(dmpMsg)
+                                }
                             }
-                            this.patch_xcm(dmpMsg)
-                            xcmList.push(dmpMsg)
                         }
                     }
                 } catch (err) {
@@ -6340,7 +6461,29 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             //console.log(`!!! indexRelayChainTrace [${relayChain}-${bn}] len=${xcmList.length} (finalized=${finalized}, isTip=${isTip})`, xcmList)
             await this.process_rcxcm(xcmList)
         }
+        let xcmMeta = []
+        for (const x of xcmList){
+            // TODO: keep minimal essential data
+            // blockTS|msgType|relayChain|blockNumber|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|relayedAt|includedAt|msgHash
+            // (integer) blockTS|blockNumber|chainID|chainIDDest|sentAt|relayedAt|includedAt
+            let s = `${x.blockTS}|${x.msgType}|${this.relayChain}|${this.chainParser.parserBlockNumber}|${this.chainParser.relayParentStateRoot}|${this.chainParser.parserBlockHash}|${x.chainID}|${x.chainIDDest}|${x.sentAt}|${x.relayedAt}|${x.includedAt}|${x.msgHash}`
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`xcmMeta: ${s}`)
+            xcmMeta.push(s)
+        }
+        //this.xcmMeta = xcmMeta
+        if (xcmMeta.length > 0){
+            this.xcmMetaMap[bn] = {
+                blockNumber: this.chainParser.parserBlockNumber,
+                blockTS: this.chainParser.parserTS,
+                blockHash: this.chainParser.parserBlockHash,
+                stateRoot: this.chainParser.relayParentStateRoot,
+                xcmMeta: xcmMeta,
+            }
+        }
+        return xcmList
     }
+
+
 
     async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, evmTrace = false, autoTraces = false, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
@@ -6349,6 +6492,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let blockNumber = block.header.number;
         let blockHash = block.hash;
         let blockTS = block.blockTS;
+        let stateRoot = block.header.stateRoot
         let paraID = paraTool.getParaIDfromChainID(chainID)
         if (paraID == 0) {
             //this.trailingBlockHashs[blockHash] = blockNumber;
@@ -6401,6 +6545,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
         // setParserContext
         this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash, chainID);
+        if (this.isRelayChain) this.chainParser.setRelayParentStateRoot(stateRoot)
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
         block.finalized = finalized;
 
@@ -6466,6 +6611,30 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         this.timeStat.processExtrinsicTS += processExtrinsicTS
         this.timeStat.processExtrinsic += block.extrinsics.length
 
+        let forceTry = true //MK: need to review this
+        if ((isTip || forceTry) && this.isRelayChain) {
+            let relayChain = paraTool.getRelayChainByChainID(chainID);
+            if (autoTraces) {
+                //console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
+                await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain, isTip, finalized);
+            } else {
+                console.log("this.indexRelayChainTrace FAIL", blockNumber, chainID, relayChain);
+            }
+        }
+
+        let xcmMeta = []
+        if (this.isRelayChain){
+            let xcmMetaInfo = this.xcmMetaMap[blockNumber]
+            if (xcmMetaInfo != undefined){
+                xcmMeta = xcmMetaInfo.xcmMeta
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] xcmMeta found via xcmMetaMap!!`, xcmMeta)
+            }
+            block.xcmMeta = xcmMeta
+        }
+
+        block.relayBN = this.chainParser.parserWatermark
+        block.relayStateRoot = this.chainParser.relayParentStateRoot
+
         // (1) record blockHash in BT hashes
         let blockfeed = {
             chainID: chainID,
@@ -6525,16 +6694,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 timestamp: blockTS * 1000000
             };
         }
-        let forceTry = true
-        if ((isTip || forceTry) && (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama || chainID == paraTool.chainIDMoonbaseRelay)) {
-            let relayChain = paraTool.getRelayChainByChainID(chainID);
-            if (autoTraces) {
-                //console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
-                await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain, isTip, finalized);
-            } else {
-                console.log("this.indexRelayChainTrace FAIL", blockNumber, chainID, relayChain);
-            }
-        }
+
         // (3) fuse block+receipt for evmchain, if both evmBlock and evmReceipts are available
         let web3Api = this.web3Api
         let contractABIs = this.contractABIs
@@ -6579,8 +6739,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             console.log(`[${blockNumber}] [${connectedTxn.transactionHash}] connectTransaction `, e, connectedTxn)
                         }
                         // remote execution here
-                        if (connectedTxn.msgHash != undefined && (isTip)) {
-                            this.sendWSMessage(connectedTxn, "remoteExecution")
+                        if (connectedTxn.msgHash != undefined) {
+                            this.sendManagerMessage(connectedTxn, "remoteExecution", finalized);
+                            if (isTip) this.sendWSMessage(connectedTxn, "remoteExecution", finalized)
                         }
                         connectedTxns.push(connectedTxn)
                         evmFullBlock.transactions[connectedTxn.transactionIndex] = connectedTxn
@@ -6610,13 +6771,18 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] xcmKeys=${xcmKeys}`)
         for (const xcmKey of xcmKeys) {
             let mpKey = this.xcmTrailingKeyMap[xcmKey]
+            if (mpKey != undefined && mpKey.isPreemptive) { //MK: TODO: bypass isFresh without breaking the current implementation.. can't gurantee the correctness of the msg content..
+                this.xcmTrailingKeyMap[xcmKey].isPreemptive = false // mark the record as preemptive sent
+                if (isTip) this.sendWSMessage(mp, "xcmmessage", finalized)
+            }
             if (mpKey != undefined && mpKey.isFresh) {
                 let mp = this.xcmmsgMap[xcmKey]
                 let direction = (mp.isIncoming) ? 'incoming' : 'outgoing'
                 if (xcmKeys.length > 0 && this.debugLevel >= paraTool.debugInfo) console.log(`xcmMessages ${direction}`, mp)
-                if (mp != undefined && (isTip)) {
+                if (mp != undefined) {
                     //console.log(`[Delay=${this.chainParser.parserBlockNumber-mp.blockNumber}] send ${direction} xcmmessage ${mp.msgHash}, isTip=${isTip}, finalized=${finalized}`)
-                    this.sendWSMessage(mp, "xcmmessage")
+                    this.sendManagerMessage(mp, "xcmmessage", finalized)
+                    if (isTip) this.sendWSMessage(mp, "xcmmessage", finalized)
                 }
                 let extrinsicID = (mp.extrinsicID != undefined) ? `'${mp.extrinsicID}'` : 'NULL'
                 let extrinsicHash = (mp.extrinsicHash != undefined) ? `'${mp.extrinsicHash}'` : 'NULL'
@@ -6712,7 +6878,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXcmMsgs.length > 0) {
             this.add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs)
         }
-        return (blockStats);
+        //let xcmMeta = this.xcmMeta;
+        //this.xcmMeta = []
+        if (xcmMeta.length > 0) {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`returning [${blockNumber}] [${blockHash}] xcmMeta!`, xcmMeta)
+        }
+        return [blockStats, xcmMeta];
     }
 
     add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs) {
@@ -7366,7 +7537,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let processBlockEventsStartTS = new Date().getTime()
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
             let tracesPresent = (r.trace) ? true : false;
-            r.blockStats = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, true, write_bq_log, isTip, tracesPresent);
+            let [blockStats, xcmMeta] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, true, write_bq_log, isTip, tracesPresent);
+            r.blockStats = blockStats
+            r.xcmMeta = xcmMeta
 
             let processBlockEventsTS = (new Date().getTime() - processBlockEventsStartTS) / 1000
             this.timeStat.processBlockEventsTS += processBlockEventsTS
@@ -7435,7 +7608,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
             this.dump_update_block_stats(chain.chainID, statRows, indexTS)
             await this.flush(indexTS, blockNumber, false, false); //ts, bn, isFullPeriod, isTip
-            return (r);
+            return (r.xcmMeta);
         } catch (err) {
             console.log(err);
             this.logger.warn({

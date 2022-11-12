@@ -1,16 +1,22 @@
 #!/usr/bin/env node
-
 var Crawler = require("./crawler");
 var paraTool = require("./paraTool");
+let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
+var debugLevel = paraTool.debugErrorOnly
+if (isDevelopment){
+    debugLevel = paraTool.debugTracing
+    console.log(`[isDevelopment:${isDevelopment}] debugLevel: ${debugLevel}`)
+}
 
 async function main() {
     let chainID = paraTool.chainIDKarura;
     let crawler = new Crawler();
     //crawler.setDebugLevel(paraTool.debugNoLog)
-    crawler.setDebugLevel(paraTool.debugErrorOnly)
+    //crawler.setDebugLevel(paraTool.debugErrorOnly)
     //crawler.setDebugLevel(paraTool.debugInfo)
     //crawler.setDebugLevel(paraTool.debugVerbose)
     //crawler.setDebugLevel(paraTool.debugTracing)
+    crawler.setDebugLevel(paraTool.debugLevel)
     await crawler.assetManagerInit();
     let logDT = "2021-11-18";
     let hrs = [10];

@@ -84,8 +84,7 @@ async function show_chains() {
                 data: 'id',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
-                        let subexplorerURL = `https://${row.id}.polkaholic.io`;
-                        let links = [`<a href='${subexplorerURL}'>explorer</a>`];
+                        let links = [];
                         if (row.dappURL) {
                             links.push(`<a href='${row.dappURL}' target='_new'>app</a>`);
                         }

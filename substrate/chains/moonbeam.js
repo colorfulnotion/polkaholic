@@ -58,7 +58,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                         let e = eventRange[i]
                         let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
                         if (candidate) {
-                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip)
+                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
                         }
                     }
                 } else {
