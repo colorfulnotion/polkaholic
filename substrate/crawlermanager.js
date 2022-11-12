@@ -289,13 +289,29 @@ module.exports = class CrawlerManager extends Crawler {
         let chainIDs = Object.keys(hrmpRangeMap)
         for (const chainID of chainIDs){
             let t = hrmpRangeMap[chainID]
-            let r = await this.getBlockRangebyTS(chainID, t.blockTSMin, t.blockTSMax)
-            if (r){
-                // if (this.debugLevel >= paraTool.debugTracing) console.log(`rangeStruct`, r)
-                r.blocks = await this.blockRangeToblocks(r)
-                blockRangeMap[chainID] = r
+            let blockTSRange = t.blockTSRange
+            let blockMap = {}
+            let uniqueBlks = []
+            for (const rn of blockTSRange){
+                let r = await this.getBlockRangebyTS(chainID, rn.blockTSMin, rn.blockTSMax)
+                if (r){
+                    // if (this.debugLevel >= paraTool.debugTracing) console.log(`rangeStruct`, r)
+                    let blocks = await this.blockRangeToblocks(r)
+                    for (const b of blocks){
+                        if (blockMap[b.blockNumber] == undefined){
+                            blockMap[b.blockNumber] = 1
+                            uniqueBlks.push(b)
+                        }
+                    }
+                }
+
             }
+            t.blocks = uniqueBlks
+            t.blockLen = t.blocks.length
+            blockRangeMap[chainID] = t
+            console.log(`${chainID} unique=${t.blocks.length}`, t.blocks)
         }
+        //TODO: reduction here
         if (this.debugLevel >= paraTool.debugTracing) console.log(`blockRangeMap`, blockRangeMap)
         return blockRangeMap
     }
@@ -404,21 +420,23 @@ module.exports = class CrawlerManager extends Crawler {
                 let chainID = x.chainID
                 let chainIDDest = x.chainIDDest
                 let sentAt = x.sentAt
+                let blockNumber = x.blockNumber
                 let relayedAt = x.relayedAt
-                let blockTS = x.blockTS
                 let includedAt = x.includedAt //potentially off by 1
                 let blockFreq = 6 // 6s per block
+                let diffAdjustmentTS = (relayedAt - blockNumber)*blockFreq
+                let rawBlockTS = x.blockTS
+                let blockTS = rawBlockTS + diffAdjustmentTS
+                if (diffAdjustmentTS != 0){
+                    console.log(`[${x.msgHash}] [${msgType}] diffAdjustmentTS=${diffAdjustmentTS}, relayedAt=${relayedAt}, blockNumber=${blockNumber} rawBlockTS=${rawBlockTS}, adjustedTS=${blockTS}`)
+                }
                 if (hrmpRangeMap[chainID] == undefined) hrmpRangeMap[chainID] = {
                     //hrmpBN: [],
                     blockTSRange: [],
-                    blockTSMin: blockTS,
-                    blockTSMax: blockTS,
                 }
                 if (hrmpRangeMap[chainIDDest] == undefined) hrmpRangeMap[chainIDDest] = {
                     //hrmpBN: [],
                     blockTSRange: [],
-                    blockTSMin: blockTS,
-                    blockTSMax: blockTS,
                 }
                 if (msgType == 'ump'){
                     //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
@@ -427,11 +445,15 @@ module.exports = class CrawlerManager extends Crawler {
                     let originationTSMax = blockTS + blockFreq*1.5
                     let destinationTSMin = blockTS
                     let destinationTSMax = blockTS + blockFreq*3
+                    hrmpRangeMap[chainID].blockTSRange.push({
+                        blockTSMin: originationTSMin,
+                        blockTSMax: originationTSMax,
+                    })
+                    hrmpRangeMap[chainIDDest].blockTSRange.push({
+                        blockTSMin: destinationTSMin,
+                        blockTSMax: destinationTSMax,
+                    })
                     //console.log(`ump [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
-                    if (hrmpRangeMap[chainID].blockTSMin > originationTSMin) hrmpRangeMap[chainID].blockTSMin = originationTSMin
-                    if (originationTSMax > hrmpRangeMap[chainID].blockTSMax) hrmpRangeMap[chainID].blockTSMax = originationTSMax
-                    if (hrmpRangeMap[chainIDDest].blockTSMin > destinationTSMin) hrmpRangeMap[chainIDDest].blockTSMin = destinationTSMin
-                    if (destinationTSMax > hrmpRangeMap[chainIDDest].blockTSMax) hrmpRangeMap[chainIDDest].blockTSMax = destinationTSMax
                 }else if (msgType == 'dmp'){
                     //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
                     //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
@@ -439,11 +461,15 @@ module.exports = class CrawlerManager extends Crawler {
                     let originationTSMax = blockTS + blockFreq*3
                     let destinationTSMin = blockTS
                     let destinationTSMax = blockTS + blockFreq*3
+                    hrmpRangeMap[chainID].blockTSRange.push({
+                        blockTSMin: originationTSMin,
+                        blockTSMax: originationTSMax,
+                    })
+                    hrmpRangeMap[chainIDDest].blockTSRange.push({
+                        blockTSMin: destinationTSMin,
+                        blockTSMax: destinationTSMax,
+                    })
                     //console.log(`dmp [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
-                    if (hrmpRangeMap[chainID].blockTSMin > originationTSMin) hrmpRangeMap[chainID].blockTSMin = originationTSMin
-                    if (originationTSMax > hrmpRangeMap[chainID].blockTSMax) hrmpRangeMap[chainID].blockTSMax = originationTSMax
-                    if (hrmpRangeMap[chainIDDest].blockTSMin > destinationTSMin) hrmpRangeMap[chainIDDest].blockTSMin = destinationTSMin
-                    if (destinationTSMax > hrmpRangeMap[chainIDDest].blockTSMax) hrmpRangeMap[chainIDDest].blockTSMax = destinationTSMax
                 }else if (msgType == 'hrmp'){
                     //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
                     //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
@@ -451,11 +477,15 @@ module.exports = class CrawlerManager extends Crawler {
                     let originationTSMax = blockTS + blockFreq*1.5
                     let destinationTSMin = blockTS
                     let destinationTSMax = blockTS + blockFreq*4
+                    hrmpRangeMap[chainID].blockTSRange.push({
+                        blockTSMin: originationTSMin,
+                        blockTSMax: originationTSMax,
+                    })
+                    hrmpRangeMap[chainIDDest].blockTSRange.push({
+                        blockTSMin: destinationTSMin,
+                        blockTSMax: destinationTSMax,
+                    })
                     //console.log(`hrmp [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
-                    if (hrmpRangeMap[chainID].blockTSMin > originationTSMin) hrmpRangeMap[chainID].blockTSMin = originationTSMin
-                    if (originationTSMax > hrmpRangeMap[chainID].blockTSMax) hrmpRangeMap[chainID].blockTSMax = originationTSMax
-                    if (hrmpRangeMap[chainIDDest].blockTSMin > destinationTSMin) hrmpRangeMap[chainIDDest].blockTSMin = destinationTSMin
-                    if (destinationTSMax > hrmpRangeMap[chainIDDest].blockTSMax) hrmpRangeMap[chainIDDest].blockTSMax = destinationTSMax
                 }
             }
         }

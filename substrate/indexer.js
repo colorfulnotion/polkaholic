@@ -788,7 +788,7 @@ module.exports = class Indexer extends AssetManager {
         //removes address state after flushing
         this.resetAddressStats()
     }
-    
+
     async flushXCMMeta(isFullPeriod) {
         if (!this.isRelayChain) return
         let xcmMetaMapKeys = Object.keys(this.xcmMetaMap)
@@ -6475,7 +6475,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             this.xcmMetaMap[bn] = {
                 blockNumber: this.chainParser.parserBlockNumber,
                 blockTS: this.chainParser.parserTS,
-                blockHash: this.chainParser.parserBlockNumber,
+                blockHash: this.chainParser.parserBlockHash,
                 stateRoot: this.chainParser.relayParentStateRoot,
                 xcmMeta: xcmMeta,
             }
