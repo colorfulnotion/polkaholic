@@ -84,7 +84,7 @@ module.exports = class Crawler extends Indexer {
 
         await this.setupAPI(chain, backfill);
 
-
+        this.isRelayChain = paraTool.isRelayChain(chainID)
         this.relayChain = chain.relayChain;
         return (chain);
     }
@@ -1051,8 +1051,8 @@ module.exports = class Crawler extends Indexer {
     async indexPeriod(chainID, logDT, hr, write_bq_log = false) {
         let indexTSPeriod = paraTool.logDT_hr_to_ts(logDT, hr);
         var sql = `select floor(UNIX_TIMESTAMP(blockDT)/3600)*3600 as indexTS, min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT >= FROM_UNIXTIME(${indexTSPeriod}) and blockDT < FROM_UNIXTIME(${indexTSPeriod+3600}) group by indexTS order by indexTS;`
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`indexPeriod sql=`, sql) //why debugLevel doesn't work???
         var periods = await this.poolREADONLY.query(sql);
-
         let chain = await this.setupChainAndAPI(chainID);
         console.log(chain);
 

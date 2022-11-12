@@ -410,11 +410,13 @@ module.exports = class CrawlerManager extends Crawler {
                 let blockFreq = 6 // 6s per block
                 if (hrmpRangeMap[chainID] == undefined) hrmpRangeMap[chainID] = {
                     //hrmpBN: [],
+                    blockTSRange: [],
                     blockTSMin: blockTS,
                     blockTSMax: blockTS,
                 }
                 if (hrmpRangeMap[chainIDDest] == undefined) hrmpRangeMap[chainIDDest] = {
                     //hrmpBN: [],
+                    blockTSRange: [],
                     blockTSMin: blockTS,
                     blockTSMax: blockTS,
                 }

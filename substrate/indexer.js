@@ -88,6 +88,9 @@ module.exports = class Indexer extends AssetManager {
 
     xcmMeta = []; //this should be removed after every block
 
+    xcmMetaMap = {};
+    isRelayChain = false;
+
     wasmContractMap = {};
 
     addressBalanceRequest = {}
@@ -765,6 +768,12 @@ module.exports = class Indexer extends AssetManager {
         let batchedSQLTS = (new Date().getTime() - batchedSQLStartTS) / 1000
         if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(e): update_batchedSQL", batchedSQLTS);
 
+        let xcmMetaStartTS = new Date().getTime();
+        if (this.isRelayChain) await this.flushXCMMeta(isFullPeriod);
+
+        let xcmMetaTS = (new Date().getTime() - xcmMetaStartTS) / 1000
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(g): flush_xcmMeta", xcmMetaTS);
+
         await this.dump_xcm_messages()
         await this.dump_recent_activity()
         await this.dump_failed_traces()
@@ -778,6 +787,31 @@ module.exports = class Indexer extends AssetManager {
         }
         //removes address state after flushing
         this.resetAddressStats()
+    }
+    
+    async flushXCMMeta(isFullPeriod) {
+        if (!this.isRelayChain) return
+        let xcmMetaMapKeys = Object.keys(this.xcmMetaMap)
+        if (xcmMetaMapKeys.length > 0) {
+            let xcmMetaRecs = [];
+            for (let i = 0; i < xcmMetaMapKeys.length; i++) {
+                let r = this.xcmMetaMap[xcmMetaMapKeys[i]];
+                //["blockNumber"] + ["blockTS", "blockHash", "stateRoot", "xcmMeta"]
+                let xcmMeta = mysql.escape(JSON.stringify(r.xcmMeta))
+                let t = "(" + [`'${r.blockNumber}'`, `'${r.blockTS}'`, `'${r.blockHash}'`, `'${r.stateRoot}'`, mysql.escape(JSON.stringify(r.xcmMeta))].join(",") + ")";
+                xcmMetaRecs.push(t)
+            }
+            let sqlDebug = true
+            this.xcmMetaMap = {};
+            await this.upsertSQL({
+                "table": `xcmmeta${this.chainID}`,
+                "keys": ["blockNumber"],
+                "vals": ["blockTS", "blockHash", "stateRoot", "xcmMeta"],
+                "data": xcmMetaRecs,
+                "replace": ["blockTS", "blockHash", "stateRoot", "xcmMeta"]
+            }, sqlDebug);
+        }
+        //TODO: update indexlog when isFullPeriod?
     }
 
     // write this.addressStorage [filled in updateAddressStorage] to tblRealtime
@@ -6436,7 +6470,16 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (this.debugLevel >= paraTool.debugInfo) console.log(`xcmMeta: ${s}`)
             xcmMeta.push(s)
         }
-        this.xcmMeta = xcmMeta
+        //this.xcmMeta = xcmMeta
+        if (xcmMeta.length > 0){
+            this.xcmMetaMap[bn] = {
+                blockNumber: this.chainParser.parserBlockNumber,
+                blockTS: this.chainParser.parserTS,
+                blockHash: this.chainParser.parserBlockNumber,
+                stateRoot: this.chainParser.relayParentStateRoot,
+                xcmMeta: xcmMeta,
+            }
+        }
         return xcmList
     }
 
@@ -6502,7 +6545,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
         // setParserContext
         this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash, chainID);
-        if (paraTool.isRelayChain(chainID)) this.chainParser.setRelayParentStateRoot(stateRoot)
+        if (this.isRelayChain) this.chainParser.setRelayParentStateRoot(stateRoot)
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
         block.finalized = finalized;
 
@@ -6569,7 +6612,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         this.timeStat.processExtrinsic += block.extrinsics.length
 
         let forceTry = true //MK: need to review this
-        if ((isTip || forceTry) && (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama || chainID == paraTool.chainIDMoonbaseRelay)) {
+        if ((isTip || forceTry) && this.isRelayChain) {
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             if (autoTraces) {
                 //console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
@@ -6579,10 +6622,18 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
         }
 
-        if (paraTool.isRelayChain(this.chainID)){
-            block.xcmMeta = this.xcmMeta
-            console.log(`[${blockNumber}] [${blockHash}] xcmMeta found!`, this.xcmMeta)
+        let xcmMeta = []
+        if (this.isRelayChain){
+            let xcmMetaInfo = this.xcmMetaMap[blockNumber]
+            if (xcmMetaInfo != undefined){
+                xcmMeta = xcmMetaInfo.xcmMeta
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] xcmMeta found via xcmMetaMap!!`, xcmMeta)
+            }
+            block.xcmMeta = xcmMeta
         }
+
+        block.relayBN = this.chainParser.parserWatermark
+        block.relayStateRoot = this.chainParser.relayParentStateRoot
 
         // (1) record blockHash in BT hashes
         let blockfeed = {
@@ -6827,9 +6878,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXcmMsgs.length > 0) {
             this.add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs)
         }
-        let xcmMeta = this.xcmMeta;
-        this.xcmMeta = []
-        if (xcmMeta.length > 0) console.log(`[${blockNumber}] [${blockHash}] xcmMeta found!`, xcmMeta)
+        //let xcmMeta = this.xcmMeta;
+        //this.xcmMeta = []
+        if (xcmMeta.length > 0) {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`returning [${blockNumber}] [${blockHash}] xcmMeta!`, xcmMeta)
+        }
         return [blockStats, xcmMeta];
     }
 
