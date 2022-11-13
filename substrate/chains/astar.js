@@ -48,18 +48,18 @@ module.exports = class AstarParser extends ChainParser {
             case 'contracts:call': //contract write
                 //0xd4ffe56c661d718cd4ca6039c0d5519aa3d20b0f32d6b18dc4809d60dd7b3d03
                 let contactWrite = this.processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:call`, contactWrite)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:call`, contactWrite)
                 break;
             case 'contracts:instantiate': //contract deploy with available codehash
                 //0x7e020cd122a51d4f037f95a86761f6af33228d0a8c68f8f79fd1f27c17885914
                 let wasmWithoutCode = this.processContractsInstantiate(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiate`, wasmWithoutCode)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiate`, wasmWithoutCode)
                 indexer.addWasmContract(wasmWithoutCode, wasmWithoutCode.withCode);
                 break;
             case 'contracts:instantiateWithCode': //contract deploy with wasm code
                 //0x2c986a6cb47b94a9e50f5d3f660e0f37177989594eb087bf7309c2e15e2340c8
                 let wasmWithCode = this.processContractsInstantiateWithCode(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiateWithCode`, wasmWithCode)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiateWithCode`, wasmWithCode)
                 indexer.addWasmContract(wasmWithCode, wasmWithCode.withCode);
                 break;
             default:
@@ -324,17 +324,17 @@ module.exports = class AstarParser extends ChainParser {
         switch (module_section) {
             case 'xTokens':
                 let outgoingXcmList1 = this.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM xTokens`, outgoingXcmList1)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM xTokens`, outgoingXcmList1)
                 //return outgoingXcmList
                 break;
             case 'xcmPallet':
                 let outgoingXcmList2 = this.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
                 //return outgoingXcmList
                 break;
             case 'polkadotXcm':
                 let outgoingXcmList3 = this.processOutgoingPolkadotXcm(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM polkadotXcm`, outgoingXcmList3)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM polkadotXcm`, outgoingXcmList3)
                 //return outgoingXcmList
                 break;
             case 'ethereum':

@@ -41,7 +41,7 @@ module.exports = class ChainParser {
         this.mpReceived = false;
     }
 
-    setRelayParentStateRoot(stateRoot){
+    setRelayParentStateRoot(stateRoot) {
         this.relayParentStateRoot = stateRoot
     }
 
@@ -878,22 +878,22 @@ module.exports = class ChainParser {
         switch (module_section) {
             case 'xTransfer':
                 let outgoingXcmList0 = this.processOutgoingXTransfer(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTransfer`, outgoingXcmList0)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTransfer`, outgoingXcmList0)
                 //return outgoingXcmList
                 break;
             case 'xTokens':
                 let outgoingXcmList1 = this.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTokens`, outgoingXcmList1)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM xTokens`, outgoingXcmList1)
                 //return outgoingXcmList
                 break;
             case 'xcmPallet':
                 let outgoingXcmList2 = this.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXcmPallet xcmPallet`, outgoingXcmList2)
                 //return outgoingXcmList
                 break;
             case 'polkadotXcm':
                 let outgoingXcmList3 = this.processOutgoingPolkadotXcm(indexer, extrinsic, feed, fromAddress, section_method, args)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM polkadotXcm`, outgoingXcmList3)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`generic processOutgoingXCM polkadotXcm`, outgoingXcmList3)
                 //return outgoingXcmList
                 break;
             default:
@@ -2798,7 +2798,7 @@ module.exports = class ChainParser {
                 break;
             case 'x3':
                 [paraIDDest, chainIDDest, destAddress] = this.processX3(beneficiaryV, relayChain, true, indexer)
-            //console.log(`x3!!!! paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`, JSON.stringify(beneficiaryV, null, 4))
+                //console.log(`x3!!!! paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`, JSON.stringify(beneficiaryV, null, 4))
                 if (isInterior) {
                     beneficiary['interior'][beneficiaryType] = beneficiaryV
                 } else {
@@ -2850,7 +2850,7 @@ module.exports = class ChainParser {
                 }
                 break;
             case 'v2':
-            //console.log(`unknown beneficiaryV2Type=${beneficiaryV}`)
+                //console.log(`unknown beneficiaryV2Type=${beneficiaryV}`)
                 break;
             default:
                 console.log(`unknown beneficiaryType ${beneficiaryType}`)
@@ -4408,7 +4408,7 @@ module.exports = class ChainParser {
         var a;
         switch (indexer.chainID) {
             case paraTool.chainIDListen:
-            //console.log(`fetch currencies:listenAssetsInfo`)
+                //console.log(`fetch currencies:listenAssetsInfo`)
                 a = await indexer.api.query.currencies.listenAssetsInfo.entries()
                 break;
             case paraTool.chainIDMangataX:
@@ -4417,11 +4417,11 @@ module.exports = class ChainParser {
                 break;
             case paraTool.chainIDBasilisk:
             case paraTool.chainIDHydraDX:
-            //console.log(`fetch assetRegistry:assetMetadataMap`)
+                //console.log(`fetch assetRegistry:assetMetadataMap`)
                 a = await indexer.api.query.assetRegistry.assetMetadataMap.entries()
                 break;
             default:
-            //console.log(`fetch asset:metadata`)
+                //console.log(`fetch asset:metadata`)
                 a = await indexer.api.query.assets.metadata.entries()
                 break;
         }
@@ -4480,7 +4480,7 @@ module.exports = class ChainParser {
         var a;
         switch (indexer.chainID) {
             default:
-            //console.log(`fetch localAssets:metadata`)
+                //console.log(`fetch localAssets:metadata`)
                 a = await indexer.api.query.localAssets.metadata.entries()
                 break;
         }
@@ -4539,14 +4539,14 @@ module.exports = class ChainParser {
         switch (indexer.chainID) {
             case paraTool.chainIDBifrostDOT:
             case paraTool.chainIDBifrostKSM:
-            //console.log(`fetch assetRegistry:currencyMetadatas`)
+                //console.log(`fetch assetRegistry:currencyMetadatas`)
                 a = await indexer.api.query.assetRegistry.currencyMetadatas.entries()
                 isAcala = false
                 break;
             case paraTool.chainIDAcala:
             case paraTool.chainIDKarura:
             default:
-            //console.log(`fetch assetRegistry:assetMetadatas`)
+                //console.log(`fetch assetRegistry:assetMetadatas`)
                 a = await indexer.api.query.assetRegistry.assetMetadatas.entries()
                 break;
         }

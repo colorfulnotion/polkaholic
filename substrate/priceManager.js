@@ -824,7 +824,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     // update assetlog with prices/market_caps/volumes from coingecko API
     async update_coingecko_market_chart(id, symbol, relayChain, startTS, endTS) {
         const axios = require("axios");
-	if ( id == "" ) return;
+        if (id == "") return;
         var url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart/range?vs_currency=USD&from=${startTS}&to=${endTS}`;
         try {
             console.log("update_coingecko_market_chart URL", url)

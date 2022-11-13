@@ -50,7 +50,7 @@ module.exports = class CrawlerManager extends Crawler {
 
     relayChainIDs = [paraTool.chainIDPolkadot, paraTool.chainIDKusama, paraTool.chainIDMoonbaseRelay]
 
-    sendMsg(chainID, wrapper){
+    sendMsg(chainID, wrapper) {
         if (this.debugLevel >= paraTool.debugInfo) console.log(`Incoming msg from [${chainID}] !!!`, wrapper)
         let relayBN = wrapper.relayBN
         let relayChain = wrapper.relayChain
@@ -59,20 +59,20 @@ module.exports = class CrawlerManager extends Crawler {
         this.receviedMsgs[relayBNKey].push(wrapper)
     }
 
-    processReceivedmsg(){
+    processReceivedmsg() {
         //TODO...
         let receviedMsgs = this.receviedMsgs
         if (this.debugLevel >= paraTool.debugInfo) console.log(receviedMsgs)
         let returnedMsgs = {}
-        for (const relayBNKey of Object.keys(receviedMsgs)){
+        for (const relayBNKey of Object.keys(receviedMsgs)) {
             let relayBNRecs = receviedMsgs[relayBNKey]
             let recStrList = []
-            for (const rec of relayBNRecs){
+            for (const rec of relayBNRecs) {
                 recStrList.push(JSON.stringify(rec))
             }
             returnedMsgs[relayBNKey] = recStrList
         }
-        if (Object.keys(returnedMsgs).length = 0){
+        if (Object.keys(returnedMsgs).length = 0) {
             return false
         }
         return returnedMsgs
@@ -84,21 +84,21 @@ module.exports = class CrawlerManager extends Crawler {
     //init_paras: {paras}
     //init_storage_keys: {storageKeys}
     //init_accounts: {accounts}
-    async initManagerState(){
+    async initManagerState() {
         this.assetManagerInit()
         this.assetReady = true
         if (this.debugLevel >= paraTool.debugTracing) console.log(`initManagerState Done`)
     }
 
-    getRelayCrawler(){
-        if (!this.relayCrawler){
+    getRelayCrawler() {
+        if (!this.relayCrawler) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`relayCrawler not ready`)
             return
         }
         return this.relayCrawler
     }
 
-    getCrawler(parachainID){
+    getCrawler(parachainID) {
         let paraCrawler = this.allCrawlers[parachainID]
         if (paraCrawler == undefined && paraCrawler) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler [${parachainID}] not ready`)
@@ -108,10 +108,10 @@ module.exports = class CrawlerManager extends Crawler {
         return paraCrawler
     }
 
-    async initRelayCrawler(relayChainID){
+    async initRelayCrawler(relayChainID) {
         let chain = await this.getChain(relayChainID);
 
-        if (!this.relayChainIDs.includes(relayChainID)){
+        if (!this.relayChainIDs.includes(relayChainID)) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`Expecting relaychain/ Got chain [${chain.chainName}] instead`)
             process.exit(0)
         }
@@ -125,8 +125,8 @@ module.exports = class CrawlerManager extends Crawler {
         if (this.debugLevel >= paraTool.debugInfo) console.log(`setup relayCrawler [${chain.chainID}:${chain.chainName}]`)
     }
 
-    async initCrawler(parachainID){
-        if (!this.relayCrawler){
+    async initCrawler(parachainID) {
+        if (!this.relayCrawler) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`relayCrawler not ready. must call relayCrawler before calling crawler`)
             return
         }
@@ -135,8 +135,8 @@ module.exports = class CrawlerManager extends Crawler {
             return
         }
         let chain = await this.getChain(parachainID);
-        if (this.relayChainIDs.includes(parachainID)){
-            if (this.debugLevel >= paraTool.debugInfo)  console.log(`Expecting parachain. Got chain [${chain.chainID}:${chain.chainName}] instead`)
+        if (this.relayChainIDs.includes(parachainID)) {
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`Expecting parachain. Got chain [${chain.chainID}:${chain.chainName}] instead`)
             return
             //process.exit(0)
         }
@@ -161,9 +161,9 @@ module.exports = class CrawlerManager extends Crawler {
     }
     */
 
-    async batchCrawlerInit(chainIDs){
-        let initChainIDs= []
-        for (const chainID of chainIDs){
+    async batchCrawlerInit(chainIDs) {
+        let initChainIDs = []
+        for (const chainID of chainIDs) {
             let crawler = this.getCrawler(chainID)
             if (!crawler) {
                 initChainIDs.push(chainID)
@@ -189,12 +189,12 @@ module.exports = class CrawlerManager extends Crawler {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawlerInitPromise error`, e, crawlerInitStates)
         }
 
-        for (let i = 0; i < crawlerInitPromise.length; i += 1){
+        for (let i = 0; i < crawlerInitPromise.length; i += 1) {
             let crawlerChainID = initChainIDs[i]
             let crawlerInitState = crawlerInitStates[i]
             if (crawlerInitState.status != undefined && crawlerInitState.status == "fulfilled") {
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler ${crawlerChainID} Init Completed`)
-            }else{
+            } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} state`, crawlerInitState)
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} Failed! reason=${crawlerInitState['reason']}`)
             }
@@ -202,21 +202,21 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
     //TODO: parallel indexing?
-    async batchCrawls(blockRangeMap){
+    async batchCrawls(blockRangeMap) {
         let crawlerPromise = []
-        let crawlChainIDs= []
+        let crawlChainIDs = []
         let chainIDs = Object.keys(blockRangeMap)
-        for (const chainID of chainIDs){
+        for (const chainID of chainIDs) {
             let crawler = this.getCrawler(chainID)
             if (!crawler) {
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler not ready ${chainID} skipped`)
-            }else{
+            } else {
                 let rangeStruct = blockRangeMap[chainID]
-                if (rangeStruct != undefined && Array.isArray(rangeStruct.blocks) && rangeStruct.blocks.length > 0){
+                if (rangeStruct != undefined && Array.isArray(rangeStruct.blocks) && rangeStruct.blocks.length > 0) {
                     let targetBlocks = rangeStruct.blocks
                     crawlChainIDs.push(chainID)
                     crawlerPromise.push(this.indexBlockRanges(crawler, targetBlocks))
-                }else{
+                } else {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`batchCrawls [${chainID}:${crawler.chainName}] rejected rangeStruct`, rangeStruct)
                 }
             }
@@ -231,12 +231,12 @@ module.exports = class CrawlerManager extends Crawler {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawlerPromise error`, e, crawlerStates)
         }
 
-        for (let i = 0; i < crawlerPromise.length; i += 1){
+        for (let i = 0; i < crawlerPromise.length; i += 1) {
             let crawlerChainID = crawlChainIDs[i]
             let crawlerState = crawlerStates[i]
             if (crawlerState['status'] == 'fulfilled') {
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler ${crawlerChainID} DONE`)
-            }else{
+            } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} state`, crawlerState)
                 if (this.debugLevel >= paraTool.debugVerbose) console.log(`crawler ${crawlerChainID} ${crawlerStates['status']}. Reason=${crawlerStates['reason']}`)
             }
@@ -244,35 +244,35 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
     //easy to debug...
-    async serialCrawls(blockRangeMap){
+    async serialCrawls(blockRangeMap) {
         let chainIDs = Object.keys(blockRangeMap)
-        for (const chainID of chainIDs){
+        for (const chainID of chainIDs) {
             let crawler = this.getCrawler(chainID)
             if (!crawler) {
                 console.log(`crawler not ready ${chainID} skipped`)
-            }else{
+            } else {
                 let rangeStruct = blockRangeMap[chainID]
-                if (rangeStruct != undefined && Array.isArray(rangeStruct.blocks) && rangeStruct.blocks.length > 0){
+                if (rangeStruct != undefined && Array.isArray(rangeStruct.blocks) && rangeStruct.blocks.length > 0) {
                     let targetBlocks = rangeStruct.blocks
                     await this.indexBlockRanges(crawler, targetBlocks)
-                }else{
+                } else {
                     if (this.debugLevel >= paraTool.debugVerbose) console.log(`serialCrawls ${chainID} rejected rangeStruct`, rangeStruct)
                 }
             }
         }
     }
 
-    async processIndexRangeMap(blockRangeMap){
+    async processIndexRangeMap(blockRangeMap) {
         let chainIDs = Object.keys(blockRangeMap)
         await this.batchCrawlerInit(chainIDs)
         await this.batchCrawls(blockRangeMap)
         //await this.serialCrawls(blockRangeMap)
     }
 
-    async blockRangeToblocks(rangeStruct){
+    async blockRangeToblocks(rangeStruct) {
         let chainID = rangeStruct.chainID
         let blocks = []
-        for (let i = rangeStruct.startBN; i <= rangeStruct.endBN; i++){
+        for (let i = rangeStruct.startBN; i <= rangeStruct.endBN; i++) {
             let blockHash = await this.getBlockHashFinalized(chainID, i)
             let r = {
                 blockNumber: i,
@@ -284,21 +284,21 @@ module.exports = class CrawlerManager extends Crawler {
         return blocks
     }
 
-    async hrmpRangeMapToBlockRangeMap(hrmpRangeMap){
+    async hrmpRangeMapToBlockRangeMap(hrmpRangeMap) {
         let blockRangeMap = {}
         let chainIDs = Object.keys(hrmpRangeMap)
-        for (const chainID of chainIDs){
+        for (const chainID of chainIDs) {
             let t = hrmpRangeMap[chainID]
             let blockTSRange = t.blockTSRange
             let blockMap = {}
             let uniqueBlks = []
-            for (const rn of blockTSRange){
+            for (const rn of blockTSRange) {
                 let r = await this.getBlockRangebyTS(chainID, rn.blockTSMin, rn.blockTSMax)
-                if (r){
+                if (r) {
                     // if (this.debugLevel >= paraTool.debugTracing) console.log(`rangeStruct`, r)
                     let blocks = await this.blockRangeToblocks(r)
-                    for (const b of blocks){
-                        if (blockMap[b.blockNumber] == undefined){
+                    for (const b of blocks) {
+                        if (blockMap[b.blockNumber] == undefined) {
                             blockMap[b.blockNumber] = 1
                             uniqueBlks.push(b)
                         }
@@ -317,8 +317,8 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
 
-    async cloneAssetManager(crawler){
-        if (!this.assetReady){
+    async cloneAssetManager(crawler) {
+        if (!this.assetReady) {
             if (this.debugLevel >= paraTool.debugVerbose) console.log(`AssetInit not ready!`)
             await this.initManagerState();
         }
@@ -352,16 +352,16 @@ module.exports = class CrawlerManager extends Crawler {
         if (this.debugLevel >= paraTool.debugInfo) console.log(`cloneAssetManager [${crawler.chainID}:${crawler.chainName}] Done`)
     }
 
-    async indexBlockRanges(crawler, blocks){
+    async indexBlockRanges(crawler, blocks) {
         let xcmMetaMap = {}
         let blockRangeLen = blocks.length
-        for (let i = 0; i < blockRangeLen; i++){
+        for (let i = 0; i < blockRangeLen; i++) {
             let b = blocks[i]
             let bn = b.blockNumber
             let blkHash = b.blockHash
             if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] indexBlockRanges bn=${bn} blkHash=${blkHash}`)
             let xcmMeta = await crawler.index_block(crawler.chain, bn, blkHash);
-            if (Array.isArray(xcmMeta) && xcmMeta.length > 0){
+            if (Array.isArray(xcmMeta) && xcmMeta.length > 0) {
                 xcmMetaMap[bn] = xcmMeta
             }
         }
@@ -369,39 +369,39 @@ module.exports = class CrawlerManager extends Crawler {
         return xcmMetaMapStr
     }
 
-    decodeXcmMetaMap(xcmMetaMapStr){
+    decodeXcmMetaMap(xcmMetaMapStr) {
         let xcmMap = {}
         try {
             let xcmMetaMap = JSON.parse(xcmMetaMapStr)
-            for (const relayBN of Object.keys(xcmMetaMap)){
+            for (const relayBN of Object.keys(xcmMetaMap)) {
                 let xcmMetas = xcmMetaMap[relayBN]
                 let xcmList = []
-                for (const xcmMeta of xcmMetas){
+                for (const xcmMeta of xcmMetas) {
                     let xcm = this.unwrapXcmMeta(xcmMeta)
-                    if (xcm){
+                    if (xcm) {
                         xcmList.push(xcm)
                     }
                 }
                 if (xcmList.length > 0) xcmMap[relayBN] = xcmList
             }
-        } catch (e){
+        } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`decodeXcmMetaMap err`, e)
         }
         return xcmMap
     }
 
-    unwrapXcmMeta(xcmMeta){
+    unwrapXcmMeta(xcmMeta) {
         let fieldListStr = "blockTS|msgType|relayChain|blockNumber|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|relayedAt|includedAt|msgHash"
         let intFldStr = "blockTS|blockNumber|chainID|chainIDDest|sentAt|relayedAt|includedAt"
         let fileds = fieldListStr.split('|')
         let intFileds = intFldStr.split('|')
         let xcmMetaFlds = xcmMeta.split('|')
-        if (xcmMetaFlds.length != fileds.length){
+        if (xcmMetaFlds.length != fileds.length) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`unrecognized xcmMeta! xcmMetaFlds=${xcmMetaFlds}, expectedFlds=${fileds}`)
             return false
         }
         let xcm = {}
-        for (let i = 0; i < fileds.length; i++){
+        for (let i = 0; i < fileds.length; i++) {
             let fieldkey = fileds[i]
             let fieldVal = xcmMetaFlds[i]
             if (intFileds.includes(fieldkey)) fieldVal = paraTool.dechexToInt(fieldVal)
@@ -410,12 +410,12 @@ module.exports = class CrawlerManager extends Crawler {
         return xcm
     }
 
-    async analyzeXcmMap(xcmMap){
+    async analyzeXcmMap(xcmMap) {
         let hrmpRangeMap = {}
-        for (const relayBN of Object.keys(xcmMap)){
+        for (const relayBN of Object.keys(xcmMap)) {
             let xcmList = xcmMap[relayBN]
             //console.log(`relayBN=${relayBN}`, xcmList)
-            for (const x of xcmList){
+            for (const x of xcmList) {
                 let msgType = x.msgType
                 let chainID = x.chainID
                 let chainIDDest = x.chainIDDest
@@ -424,10 +424,10 @@ module.exports = class CrawlerManager extends Crawler {
                 let relayedAt = x.relayedAt
                 let includedAt = x.includedAt //potentially off by 1
                 let blockFreq = 6 // 6s per block
-                let diffAdjustmentTS = (relayedAt - blockNumber)*blockFreq
+                let diffAdjustmentTS = (relayedAt - blockNumber) * blockFreq
                 let rawBlockTS = x.blockTS
                 let blockTS = rawBlockTS + diffAdjustmentTS
-                if (diffAdjustmentTS != 0){
+                if (diffAdjustmentTS != 0) {
                     console.log(`[${x.msgHash}] [${msgType}] diffAdjustmentTS=${diffAdjustmentTS}, relayedAt=${relayedAt}, blockNumber=${blockNumber} rawBlockTS=${rawBlockTS}, adjustedTS=${blockTS}`)
                 }
                 if (hrmpRangeMap[chainID] == undefined) hrmpRangeMap[chainID] = {
@@ -438,13 +438,13 @@ module.exports = class CrawlerManager extends Crawler {
                     //hrmpBN: [],
                     blockTSRange: [],
                 }
-                if (msgType == 'ump'){
+                if (msgType == 'ump') {
                     //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
                     //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
-                    let originationTSMin = blockTS - blockFreq*1.5
-                    let originationTSMax = blockTS + blockFreq*1.5
+                    let originationTSMin = blockTS - blockFreq * 1.5
+                    let originationTSMax = blockTS + blockFreq * 1.5
                     let destinationTSMin = blockTS
-                    let destinationTSMax = blockTS + blockFreq*3
+                    let destinationTSMax = blockTS + blockFreq * 3
                     hrmpRangeMap[chainID].blockTSRange.push({
                         blockTSMin: originationTSMin,
                         blockTSMax: originationTSMax,
@@ -454,13 +454,13 @@ module.exports = class CrawlerManager extends Crawler {
                         blockTSMax: destinationTSMax,
                     })
                     //console.log(`ump [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
-                }else if (msgType == 'dmp'){
+                } else if (msgType == 'dmp') {
                     //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
                     //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
                     let originationTSMin = blockTS
-                    let originationTSMax = blockTS + blockFreq*3
+                    let originationTSMax = blockTS + blockFreq * 3
                     let destinationTSMin = blockTS
-                    let destinationTSMax = blockTS + blockFreq*3
+                    let destinationTSMax = blockTS + blockFreq * 3
                     hrmpRangeMap[chainID].blockTSRange.push({
                         blockTSMin: originationTSMin,
                         blockTSMax: originationTSMax,
@@ -470,13 +470,13 @@ module.exports = class CrawlerManager extends Crawler {
                         blockTSMax: destinationTSMax,
                     })
                     //console.log(`dmp [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
-                }else if (msgType == 'hrmp'){
+                } else if (msgType == 'hrmp') {
                     //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
                     //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
-                    let originationTSMin = blockTS - blockFreq*1.5
-                    let originationTSMax = blockTS + blockFreq*1.5
+                    let originationTSMin = blockTS - blockFreq * 1.5
+                    let originationTSMax = blockTS + blockFreq * 1.5
                     let destinationTSMin = blockTS
-                    let destinationTSMax = blockTS + blockFreq*4
+                    let destinationTSMax = blockTS + blockFreq * 4
                     hrmpRangeMap[chainID].blockTSRange.push({
                         blockTSMin: originationTSMin,
                         blockTSMax: originationTSMax,

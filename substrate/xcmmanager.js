@@ -1556,11 +1556,11 @@ module.exports = class XCMManager extends Query {
 
                     let xcmInfoStr = (xcmInfo != undefined) ? JSON.stringify(xcmInfo) : false
                     let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
-		    if ( matchedExtrinsicID == undefined ) matchedExtrinsicID = "";
-		    if ( matchedEventID == undefined ) matchedEventID = "";
-		    if (isNaN(amountSentUSD) || priceUSD == undefined ) {
-			amountSentUSD = 0;
-			priceUSD = 0;
+                    if (matchedExtrinsicID == undefined) matchedExtrinsicID = "";
+                    if (matchedEventID == undefined) matchedEventID = "";
+                    if (isNaN(amountSentUSD) || priceUSD == undefined) {
+                        amountSentUSD = 0;
+                        priceUSD = 0;
                     }
 
                     let sqlB = `update xcmtransfer
@@ -2493,14 +2493,14 @@ module.exports = class XCMManager extends Query {
         if (r && Array.isArray(r)) {
             for (let i = 0; i < r.length; i++) {
                 if (events[r[i].eventID] == undefined) {
-		    if ( r[i].amountReceivedUSD > 0 ) {
-			valueUSD += r[i].amountReceivedUSD;
-			events[r[i].eventID] = true;
-		    }
+                    if (r[i].amountReceivedUSD > 0) {
+                        valueUSD += r[i].amountReceivedUSD;
+                        events[r[i].eventID] = true;
+                    }
                 }
             }
         }
-	if ( isNaN(valueUSD) ) return(0);
+        if (isNaN(valueUSD)) return (0);
         return (valueUSD);
     }
     /* because the indexer may insert multiple xcmmessages record when a partcular xcmmessage sits in the chains message queue for 1 or more blocks, this xcmmessages_dedup process cleans out any records that exist after the above matching process */
