@@ -255,7 +255,7 @@ module.exports = class PolkaholicDB {
             r.rangeLen = 1 + r.endBN - r.startBN
             r.chainID = chainID
             return r
-        }else{
+        } else {
             return false
         }
     }

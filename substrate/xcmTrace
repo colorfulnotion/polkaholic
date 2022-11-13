@@ -17,7 +17,7 @@ class XCMTracer extends AssetManager {
     remoteexecution = {};
 
     idhash(id) {
-        return paraTool.twox_128("GB" + id).substring(0, 16);
+        return paraTool.twox_128("cn" + id).substring(0, 16);
     }
 
     // maps dest like "{ parents: 0, interior: { x1: { parachain: 2000 } } }" into just "2000"
@@ -59,14 +59,35 @@ class XCMTracer extends AssetManager {
             let weight_per_read = 25000000;
             let weight_per_write = 100000000;
             // TODO:
-            return weight;
+            return 0;
         }
 
         return 1000000;
     }
+    generate_span_trace(extrinsicID, finalized = true, blockHash = "") {
+        return this.idhash((finalized === false) ? `${extrinsicID}UNF${blockHash}` : extrinsicID);
+    }
+
+    generate_span_extrinsic(extrinsicID, finalized = true, blockHash = "", xcmIndex = 0, transferIndex = 0) {
+        let base = `${extrinsicID}${xcmIndex}${transferIndex}`
+        return this.idhash((finalized === false) ? `${base}UNF${blockHash}` : base);
+    }
+
+    generate_span_remoteexecution(xcmid, transactIdx, finalized = true, blockHash = "") {
+        let base = `${xcmid}${transactIdx}`
+        return this.idhash((finalized === false) ? `${base}UNF${blockHash}` : base);
+    }
+
+    generate_span_dest(destEventID, finalized = true, blockHash = "") {
+        return this.idhash((finalized === false) ? `${destEventID}UNF${blockHash}` : destEventID);
+    }
+
+    generate_span_xcmmessage(msgHash, finalized = true, stateRoot = "") {
+        return this.idhash((finalized === false) ? `${msgHash}UNF${stateRoot}` : msgHash);
+    }
 
     async submitleg(extrinsicID, ext, msgHash, destEventID, parentspanid = null, chainIDDest = null) {
-        let traceId = this.idhash(extrinsicID);
+        let traceId = this.generate_span_trace(extrinsicID, ext ? ext.finalized : true, ext ? ext.blockHash : "");
         let sectionMethod = "extrinsic";
         let id = "origination"
         let idDest = "destination";
@@ -123,8 +144,9 @@ class XCMTracer extends AssetManager {
                     }
                 }
             }
+            let spanextrinsic = this.generate_span_extrinsic(extrinsicID, ext.finalized, ext.blockHash, ext.xcmIndex, ext.transferIndex);
             this.push_span(extrinsicID, {
-                id: traceId,
+                id: spanextrinsic,
                 traceId: traceId,
                 timestamp: ext.sourceTS * 1000000,
                 duration: 1000000,
@@ -135,7 +157,7 @@ class XCMTracer extends AssetManager {
                 }
             })
             if (parentspanid == null) {
-                parentspanid = traceId;
+                parentspanid = spanextrinsic;
             }
         } else {
             if (chainIDDest != null) {
@@ -149,7 +171,7 @@ class XCMTracer extends AssetManager {
         }
 
         let xcm = this.xcm[msgHash];
-        let xcmid = this.idhash(msgHash);
+        let xcmid = this.generate_span_xcmmessage(msgHash, xcm.finalized, xcm.relayStateRoot);
         let msgtags = {}
         let msgType = "xcmp";
         let msgHex = null;
@@ -174,7 +196,6 @@ class XCMTracer extends AssetManager {
                                 } catch (err) {
                                     console.log(err)
                                     console.log("this.getNameByChainID FAIL1", xcm.chainIDDest, JSON.stringify(Object.keys(this.chainInfos)));
-                                    process.exit(0);
                                 }
                             }
                             break;
@@ -308,7 +329,9 @@ class XCMTracer extends AssetManager {
                             }
                         }
                         let duration = requireWeightAtMost / 10 ** 6; // requireAtMost is in picoseconds (10^12), but spans are in microseconds thus 10^6/10^12 = /10^6
-                        let remoteexecspanid = this.idhash(xcmid + "-" + i.toString()); // NOTE: in case there are multiple transacts caused by the xcm message
+                        // NOTE: in case there are multiple transacts caused by the xcm message
+                        let remoteexecspanid = this.generate_span_remoteexecution(xcmid, i, remoteexecution.finalized, remoteexecution.blockHash);
+
                         this.push_span(extrinsicID, {
                             id: remoteexecspanid,
                             traceId: traceId,
@@ -321,6 +344,15 @@ class XCMTracer extends AssetManager {
                                 serviceName: idDest
                             }
                         })
+                        if (remoteexecution.childMsgHash) {
+                            if (this.xcm[remoteexecution.childMsgHash]) {
+                                console.log("READY", remoteexecution.childMsgHash);
+                                await this.submitleg(extrinsicID, null, remoteexecution.childMsgHash, null, remoteexecspanid, chainIDDest);
+                            } else {
+                                console.log("NOT READY", remoteexecution.childMsgHash);
+                            }
+                        }
+
                         if (childextrinsicID) {
                             if (this.extrinsic[childextrinsicID]) {
                                 // there is a child extrinsic!  so we continue to child extrinsicID.  BUT:
@@ -370,11 +402,10 @@ class XCMTracer extends AssetManager {
 
         } else {
             console.log("Missing", msgHash);
-            process.exit(0);
         }
         if (destEventID && this.dest[destEventID]) {
             let dest = this.dest[destEventID];
-            let destid = this.idhash(destEventID);
+            let destid = this.generate_span_dest(destEventID, dest.finalized, dest.blockHash);
             let desttags = {}
             let idDest = "destination";
             let [_chainIDDest, _idDest] = this.getNameByChainID(dest.chainIDDest)
@@ -553,8 +584,7 @@ class XCMTracer extends AssetManager {
                 let endpoint = "http://efinity-internal.polkaholic.io:9411"
                 let cmd = `curl -X POST ${endpoint} -H 'Content-Type: application/json' -d '${JSON.stringify(spans, null, 4)}'`
                 if (spans) {
-                    console.log(cmd);
-
+                    //console.log(cmd);
                     const {
                         stdout,
                         stderr
@@ -573,6 +603,38 @@ class XCMTracer extends AssetManager {
             }
         }
 
+    }
+
+    decodeXcmVersionedXcms(api, xcm) {
+        var o = this.api.registry.createType('XcmVersionedXcm', xcm.msgHex)
+        return;
+        let msgHash = '0x' + paraTool.blake2_256_from_hex(data)
+        try {
+            let fragments = [];
+            let msgHashes = [];
+            let remainingMessage = data;
+            while (remainingMessage.length >= 0 && remainingMessage != '0x') {
+                let instructions = api.registry.createType('XcmVersionedXcm', remainingMessage);
+                let instructionsJSON = instructions.toJSON()
+                let instructionHex = instructions.toHex()
+                let instructionLen = instructionHex.length
+                let mhash = '0x' + paraTool.blake2_256_from_hex(instructionHex)
+                //console.log(`instructionHex=${instructionHex} -> msgHash=${mhash}`)
+                msgHashes.push(mhash)
+                //console.log(`instruction(len=${instructionLen})`, instructionsJSON)
+                remainingMessage = '0x' + remainingMessage.slice(instructionLen)
+                let f = {
+                    msg: instructionsJSON,
+                    hex: instructionHex,
+                    msgHash: mhash,
+                    len: instructionHex.length - 2,
+                }
+                fragments.push(f)
+            }
+            return fragments;
+        } catch (e) {
+            return false
+        }
     }
 
     receiveMsg(msg, lookbackSeconds = 3600) {

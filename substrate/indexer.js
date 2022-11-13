@@ -231,7 +231,7 @@ module.exports = class Indexer extends AssetManager {
         this.logger.warn(obj);
     }
 
-    setParentRelayAndManager(relayCrawler, manager){
+    setParentRelayAndManager(relayCrawler, manager) {
         if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] setParentRelayAndManager`)
         this.parentRelayCrawler = relayCrawler
         this.parentManager = manager
@@ -980,12 +980,12 @@ module.exports = class Indexer extends AssetManager {
                 let reserved = lastState.reserved ? lastState.reserved : 0;
                 let miscFrozen = lastState.miscFrozen ? lastState.miscFrozen : 0;
                 let frozen = lastState.frozen ? lastState.frozen : 0;
-		if ( free < 10**32 ) {
+                if (free < 10 ** 32) {
                     let t = "(" + [`'${asset}'`, `'${this.chainID}'`, `'${accKey}'`, `'${blockNumber}'`, `'${blockNumber}'`, mysql.escape(JSON.stringify(lastState)), `'${free}'`, `'${reserved}'`, `'${miscFrozen}'`, `'${frozen}'`].join(",") + ")";
                     if (this.validAsset(asset, this.chainID, "assetholder", t)) {
-			assetholders.push(t);
+                        assetholders.push(t);
                     }
-		}
+                }
             } else {
                 // if lastState == false that means we are (a) in a EVM chain  (b) with isTip = false  (c) with an ERC20 asset and (d) we know it should be updated, but we are not going to get the state.
                 // However, we would like to record in assetholder${chainID} that this asset-holder combination SHOULD be covered
@@ -5509,23 +5509,23 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                             }
                         }
 
-        		if ( free < 10**32 ) {
-                        let rec = {};
+                        if (free < 10 ** 32) {
+                            let rec = {};
                             let lastUpdateTS = assetholders[holder];
                             rec[assetChain] = {
-				value: JSON.stringify(newState),
-				// timestamp could be added from lastUpdateTS
-				timestamp: ts * 1000000
+                                value: JSON.stringify(newState),
+                                // timestamp could be added from lastUpdateTS
+                                timestamp: ts * 1000000
                             }
                             rows.push({
-				key: accKey,
-				data: {
+                                key: accKey,
+                                data: {
                                     realtime: rec
-				}
+                                }
                             });
-	                    out.push(`('${asset}', '${chainID}', '${accKey}', '${free}', '${reserved}', '${feeFrozen}', '${miscFrozen}', '${lastCrawlBN}')`);
+                            out.push(`('${asset}', '${chainID}', '${accKey}', '${free}', '${reserved}', '${feeFrozen}', '${miscFrozen}', '${lastCrawlBN}')`);
                             nwrites++;
-			}
+                        }
                     });
                     console.log(" --> ", asset, nwrites);
                 }
@@ -6462,7 +6462,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             await this.process_rcxcm(xcmList)
         }
         let xcmMeta = []
-        for (const x of xcmList){
+        for (const x of xcmList) {
             // TODO: keep minimal essential data
             // blockTS|msgType|relayChain|blockNumber|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|relayedAt|includedAt|msgHash
             // (integer) blockTS|blockNumber|chainID|chainIDDest|sentAt|relayedAt|includedAt
@@ -6471,7 +6471,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             xcmMeta.push(s)
         }
         //this.xcmMeta = xcmMeta
-        if (xcmMeta.length > 0){
+        if (xcmMeta.length > 0) {
             this.xcmMetaMap[bn] = {
                 blockNumber: this.chainParser.parserBlockNumber,
                 blockTS: this.chainParser.parserTS,
@@ -6623,9 +6623,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
 
         let xcmMeta = []
-        if (this.isRelayChain){
+        if (this.isRelayChain) {
             let xcmMetaInfo = this.xcmMetaMap[blockNumber]
-            if (xcmMetaInfo != undefined){
+            if (xcmMetaInfo != undefined) {
                 xcmMeta = xcmMetaInfo.xcmMeta
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] xcmMeta found via xcmMetaMap!!`, xcmMeta)
             }

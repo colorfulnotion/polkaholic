@@ -14,7 +14,7 @@ const {
 
 let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
 var debugLevel = paraTool.debugErrorOnly
-if (isDevelopment){
+if (isDevelopment) {
     //debugLevel = paraTool.debugTracing
     debugLevel = paraTool.debugInfo
     console.log(`[isDevelopment:${isDevelopment}] debugLevel: ${debugLevel}`)
@@ -49,10 +49,10 @@ async function main() {
     console.log(`targetSQL`, targetSQL)
     let recs = await crawlermanager.poolREADONLY.query(targetSQL);
     let xcmMetaMap = {}
-    for (const rec of recs){
+    for (const rec of recs) {
         try {
             xcmMetaMap[rec.blockNumber] = JSON.parse(rec.xcmMeta)
-        } catch (e){
+        } catch (e) {
             console.log(`err`, e)
         }
     }

@@ -694,10 +694,10 @@ function getChainIDFromParaIDAndRelayChain(paraID, relayChain = 'polkadot') {
     return paraIDExtra + paraID
 }
 
-function isRelayChain(chainID){
+function isRelayChain(chainID) {
     if (chainID == 0 || chainID == 2 || chainID == 30000 || chainID == 40000 || chainID == 60000 || chainID == 80000) {
         return true
-    }else{
+    } else {
         return false
     }
 }
