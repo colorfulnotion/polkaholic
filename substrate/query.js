@@ -695,6 +695,24 @@ module.exports = class Query extends AssetManager {
         }
     }
 
+    redirect_search_stateroot(hash, blockcells, res = []) {
+        let cell = blockcells[0];
+        let feed = JSON.parse(cell.value);
+        if (feed) {
+            let blockHash = feed.blockHash
+            let chainID = feed.chainID;
+            let blockNumber = feed.blockNumber;
+            if (blockNumber) {
+                // send users to eg /block/0/9963670?blockhash=0xcf10b0c43f5c87de7cb9b3c0be6187097bd936bde19bd937516482ac01a8d46f
+                res.push({
+                    link: `/block/${chainID}/${blockNumber}?blockhash=${blockHash}`,
+                    text: `chain: ${chainID} blockNumber: ${blockNumber} hash: ${blockHash}`,
+                    description: this.getChainName(chainID) + " Block " + blockNumber + " : " + blockHash
+                })
+            }
+        }
+    }
+
     // send users to eg /xcmmessage/{msgHash}
     redirect_search_xcmmessage(search, cells, res = []) {
         let cell = cells[0];
@@ -826,6 +844,8 @@ module.exports = class Query extends AssetManager {
                 if (data) {
                     if (data["block"]) {
                         this.redirect_search_block(hash, data["block"], res)
+                    } else if (data["stateroot"]) {
+                        this.redirect_search_stateroot(hash, data["stateroot"], res)
                     } else if (data["tx"]) {
                         this.redirect_search_tx(hash, data["tx"], res)
                     }
