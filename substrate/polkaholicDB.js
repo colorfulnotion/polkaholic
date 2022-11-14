@@ -369,7 +369,8 @@ module.exports = class PolkaholicDB {
                 evmChainID: chainInfo.evmChainID,
                 decimals: chainInfo.decimal,
                 priceUSD: chainInfo.priceUSD,
-                priceUSDPercentChange: paraTool.round(chainInfo.priceUSDPercentChange, 2)
+                priceUSDPercentChange: paraTool.round(chainInfo.priceUSDPercentChange, 2),
+                relayChain: chainInfo.relayChain,
             }
             //console.log("getChainFullInfo", chainInfo, r)
             return r
@@ -380,7 +381,8 @@ module.exports = class PolkaholicDB {
                 symbol: "NA",
                 decimals: 12,
                 priceUSD: 0,
-                priceUSDPercentChange: 0
+                priceUSDPercentChange: 0,
+                relayChain: "NA",
             }
         }
     }

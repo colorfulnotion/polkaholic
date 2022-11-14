@@ -69,6 +69,22 @@ let defHash = "#overview";
       <%- uiTool.getFullHash(b.header.stateRoot); %>
     </td>
   </tr>
+  <% if (b.relayBN && b.relayStateRoot && b.header.stateRoot != b.relayStateRoot){
+      let relayParentBlock = `/block/${id}/${b.relayBN}`;
+  %>
+  <tr>
+    <td><%- include("tooltip", {k: "relayStateRoot"}) %>Relay Parent StateRoot</td>
+    <td>
+      <%- uiTool.getFullHash(b.relayStateRoot); %>
+    </td>
+  </tr>
+  <tr>
+    <td><%- include("tooltip", {k: "relayparentnumber"}) %>Relay Parent BN</td>
+    <td>
+      <%- uiTool.presentRelayBlock(chainID, b.relayBN); %>
+    </td>
+  </tr>
+  <% } %>
   <% if (b.author){  %>
   <tr>
     <td><%- include("tooltip", {k: "blockauthor"}) %>Author</td>
