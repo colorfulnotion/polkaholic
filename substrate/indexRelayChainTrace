@@ -42,10 +42,13 @@ async function main() {
     let blocks = []
     for (let i = blockNumber; i < blockNumber+blockExtra; i++) {
         let blockHash = await crawlermanager.getBlockHashFinalized(relayChainID, i)
+        /*
         let r = {
             blockNumber: i,
             blockHash: blockHash
         }
+        */
+        r = `${i}|${blockHash}`
         blocks.push(r)
     }
 

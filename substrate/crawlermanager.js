@@ -262,6 +262,30 @@ module.exports = class CrawlerManager extends Crawler {
         }
     }
 
+    async createParaChainBlockRangePeriod(relayChainID, logDT, hr) {
+        let indexTSPeriod = paraTool.logDT_hr_to_ts(logDT, hr);
+        let targetSQL = `select floor(UNIX_TIMESTAMP(blockTS)/3600)*3600 as indexTS, blockNumber, blockTS, blockHash, stateRoot, convert(xcmMeta using utf8) as xcmMeta from xcmmeta${relayChainID} where blockTS >= ${indexTSPeriod} and blockTS < ${indexTSPeriod+3600} order by indexTS;`
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`targetSQL`, targetSQL)
+        let recs = await this.poolREADONLY.query(targetSQL);
+        let xcmMetaMap = {}
+        for (const rec of recs) {
+            try {
+                xcmMetaMap[rec.blockNumber] = JSON.parse(rec.xcmMeta)
+            } catch (e) {
+                console.log(`err`, e)
+            }
+        }
+
+        //console.log(`xcmMetaMap`, xcmMetaMap)
+        let xcmMetaMapStr = JSON.stringify(xcmMetaMap)
+        let xcmMap = this.decodeXcmMetaMap(xcmMetaMapStr)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`xcmMap`, xcmMap)
+        let [blockRangeMap, hrmpRangeMap] = await this.analyzeXcmMap(xcmMap)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`hrmpRangeMap`, hrmpRangeMap)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`blockRangeMap`, blockRangeMap)
+        return blockRangeMap
+    }
+
     async processIndexRangeMap(blockRangeMap) {
         let chainIDs = Object.keys(blockRangeMap)
         await this.batchCrawlerInit(chainIDs)
@@ -274,11 +298,16 @@ module.exports = class CrawlerManager extends Crawler {
         let blocks = []
         for (let i = rangeStruct.startBN; i <= rangeStruct.endBN; i++) {
             let blockHash = await this.getBlockHashFinalized(chainID, i)
-            let r = {
-                blockNumber: i,
-                blockHash: blockHash
+            if (blockHash != undefined){
+                let r = {
+                    blockNumber: i,
+                    blockHash: blockHash
+                }
+                //let r = `${i}|${blockHash}`
+                blocks.push(r)
+            }else{
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`blockRangeToblocks [${chainID}] block#${i} not found!!!`)
             }
-            blocks.push(r)
         }
         //console.log(`blockRangeToblocks blocks`, blocks)
         return blocks
@@ -292,24 +321,27 @@ module.exports = class CrawlerManager extends Crawler {
             let blockTSRange = t.blockTSRange
             let blockMap = {}
             let uniqueBlks = []
-            for (const rn of blockTSRange) {
+            let blockTSRangeLen = blockTSRange.length
+            for (let i = 0; i < blockTSRangeLen; i++) {
+                let rn = blockTSRange[i]
                 let r = await this.getBlockRangebyTS(chainID, rn.blockTSMin, rn.blockTSMax)
                 if (r) {
-                    // if (this.debugLevel >= paraTool.debugTracing) console.log(`rangeStruct`, r)
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`[chainID=${chainID}] [${i+1}/${blockTSRangeLen}] rangeStruct [${rn.blockTSMin}, ${rn.blockTSMax})`, r)
                     let blocks = await this.blockRangeToblocks(r)
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`[chainID=${chainID}] [${i+1}/${blockTSRangeLen}] rangeStruct blockLen=${blocks.length}`, blocks)
                     for (const b of blocks) {
                         if (blockMap[b.blockNumber] == undefined) {
                             blockMap[b.blockNumber] = 1
-                            uniqueBlks.push(b)
+                            let bStr = `${b.blockNumber}|${b.blockHash}`
+                            uniqueBlks.push(bStr)
                         }
                     }
                 }
-
             }
-            t.blocks = uniqueBlks
-            t.blockLen = t.blocks.length
-            blockRangeMap[chainID] = t
-            console.log(`${chainID} unique=${t.blocks.length}`, t.blocks)
+            blockRangeMap[chainID] = {}
+            blockRangeMap[chainID].blocks = uniqueBlks
+            blockRangeMap[chainID].blockLen = uniqueBlks.length
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`${chainID} unique=${uniqueBlks.length}`, uniqueBlks)
         }
         //TODO: reduction here
         if (this.debugLevel >= paraTool.debugTracing) console.log(`blockRangeMap`, blockRangeMap)
@@ -357,8 +389,12 @@ module.exports = class CrawlerManager extends Crawler {
         let blockRangeLen = blocks.length
         for (let i = 0; i < blockRangeLen; i++) {
             let b = blocks[i]
-            let bn = b.blockNumber
-            let blkHash = b.blockHash
+            let pieces = b.split('|')
+            if (pieces.length != 2) {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] malformed pieces=${pieces}`)
+            }
+            let bn = pieces[0]
+            let blkHash = pieces[1]
             if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] indexBlockRanges bn=${bn} blkHash=${blkHash}`)
             let xcmMeta = await crawler.index_block(crawler.chain, bn, blkHash);
             if (Array.isArray(xcmMeta) && xcmMeta.length > 0) {
@@ -439,11 +475,9 @@ module.exports = class CrawlerManager extends Crawler {
                     blockTSRange: [],
                 }
                 if (msgType == 'ump') {
-                    //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
-                    //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
                     let originationTSMin = blockTS - blockFreq * 1.5
                     let originationTSMax = blockTS + blockFreq * 1.5
-                    let destinationTSMin = blockTS
+                    let destinationTSMin = blockTS - blockFreq * 0.25 // optimistically it's 0, but use higher bound to be safe
                     let destinationTSMax = blockTS + blockFreq * 3
                     hrmpRangeMap[chainID].blockTSRange.push({
                         blockTSMin: originationTSMin,
@@ -455,11 +489,9 @@ module.exports = class CrawlerManager extends Crawler {
                     })
                     //console.log(`ump [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
                 } else if (msgType == 'dmp') {
-                    //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
-                    //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
-                    let originationTSMin = blockTS
+                    let originationTSMin = blockTS - blockFreq * 0.25 // optimistically it's 0, but use higher bound to be safe
                     let originationTSMax = blockTS + blockFreq * 3
-                    let destinationTSMin = blockTS
+                    let destinationTSMin = blockTS - blockFreq * 0.25  // optimistically it's 0, but use higher bound to be safe
                     let destinationTSMax = blockTS + blockFreq * 3
                     hrmpRangeMap[chainID].blockTSRange.push({
                         blockTSMin: originationTSMin,
@@ -471,11 +503,9 @@ module.exports = class CrawlerManager extends Crawler {
                     })
                     //console.log(`dmp [${chainID}->${chainIDDest}] (source:${chainID})=[${originationTSMin}-${originationTSMax}], (dest:${chainIDDest})=[${destinationTSMin}-${destinationTSMax}]`)
                 } else if (msgType == 'hrmp') {
-                    //hrmpRangeMap[chainID].hrmpBN.push(sentAt)
-                    //hrmpRangeMap[chainIDDest].hrmpBN.push(includedAt)
                     let originationTSMin = blockTS - blockFreq * 1.5
                     let originationTSMax = blockTS + blockFreq * 1.5
-                    let destinationTSMin = blockTS
+                    let destinationTSMin = blockTS - blockFreq * 0.25 // optimistically it's 0, but use higher bound to be safe
                     let destinationTSMax = blockTS + blockFreq * 4
                     hrmpRangeMap[chainID].blockTSRange.push({
                         blockTSMin: originationTSMin,
@@ -489,9 +519,9 @@ module.exports = class CrawlerManager extends Crawler {
                 }
             }
         }
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`hrmpRangeMap`, hrmpRangeMap)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`hrmpRangeMap`, JSON.stringify(hrmpRangeMap))
         let blockRangeMap = await this.hrmpRangeMapToBlockRangeMap(hrmpRangeMap)
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`blockRangeMap`, blockRangeMap)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`blockRangeMap`, JSON.stringify(hrmpRangeMap))
         return [blockRangeMap, hrmpRangeMap]
     }
 }

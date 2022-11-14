@@ -248,7 +248,8 @@ module.exports = class PolkaholicDB {
     }
 
     async getBlockRangebyTS(chainID, startTS, endTS) {
-        let sql = `select UNIX_TIMESTAMP(min(blockDT)) startTS, UNIX_TIMESTAMP(max(blockDT)) endTS, min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT > from_unixtime(${startTS}) and blockDT < from_unixtime(${endTS});`
+        let sql = `select UNIX_TIMESTAMP(min(blockDT)) startTS, UNIX_TIMESTAMP(max(blockDT)) endTS, min(blockNumber) startBN, max(blockNumber) endBN from block${chainID} where blockDT >= from_unixtime(${startTS}) and blockDT < from_unixtime(${endTS});`
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`getBlockRangebyTS`, sql)
         var res = await this.poolREADONLY.query(sql);
         if (res.length > 0) {
             let r = res[0]
