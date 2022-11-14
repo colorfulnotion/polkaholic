@@ -148,6 +148,8 @@ let tooltips = {
  "teleportfees": "Fees charged by the destination chain for processing the XCM Message",
  "evmtransaction": "Every EVM Transaction has a associated substrate extrinsic, which have two different hashes: there is a substrate extrinsic hash (which may not be unique, because of the possibility of reaped accounts) and a unique transaction hash.",
  "selectwalletaccounts":  "Connect your substrate and evm accounts by toggling and untoggling them from the dropdown menu",
+ "relayparentnumber": "The validation data provides information about how to create the inputs for validation of a para block candidate. The Relay Parent Number informs collator the context(i.e. relayChain's BlockNumber) where this parachain block is being built on.",
+ "relayStateRoot": "The validation data provides information about how to create the inputs for validation of a para block candidate. The Relay Parent Number informs collator the context(i.e. relayChain's stateRoot) where this parachain block is being built on.",
  "todo": "" // add missing desc
 };
 if ( k && tooltips[k] != undefined ) {

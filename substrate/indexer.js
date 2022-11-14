@@ -6632,13 +6632,17 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             block.xcmMeta = xcmMeta
         }
 
-        block.relayBN = this.chainParser.parserWatermark
-        block.relayStateRoot = this.chainParser.relayParentStateRoot
+        let relayParentStateRoot = this.chainParser.relayParentStateRoot
+        let relayBN = this.chainParser.parserWatermark
+        block.relayBN = relayBN
+        block.relayStateRoot = relayParentStateRoot
 
         // (1) record blockHash in BT hashes
         let blockfeed = {
             chainID: chainID,
             blockNumber: blockNumber,
+            relayBN: relayBN,
+            relayStateRoot: relayParentStateRoot,
             blockType: 'substrate'
         }
 
@@ -6672,6 +6676,42 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
 
         this.hashesRowsToInsert.push(substrateBlockHashRec)
+
+        if (this.isRelayChain) {
+            //only write stateRoot for relaychain
+            let substrateStateRootRec = {
+                key: relayParentStateRoot,
+                data: {}, //feed/feedunfinalized
+            }
+            let blockfeedWithBlkHash = {
+                chainID: chainID,
+                blockNumber: blockNumber,
+                relayBN: relayBN,
+                relayStateRoot: relayParentStateRoot,
+                blockHash: blockHash,
+                blockType: 'substrate'
+            }
+            if (block.finalized) {
+                substrateStateRootRec.data = {
+                    feed: {
+                        stateroot: {
+                            value: JSON.stringify(blockfeedWithBlkHash),
+                            timestamp: blockTS * 1000000
+                        }
+                    }
+                }
+            } else {
+                substrateStateRootRec.data = {
+                    feedunfinalized: {
+                        stateroot: {
+                            value: JSON.stringify(blockfeedWithBlkHash),
+                            timestamp: blockTS * 1000000
+                        }
+                    }
+                }
+            }
+            this.hashesRowsToInsert.push(substrateStateRootRec)
+        }
 
         // (2) record block in BT chain${chainID} feed
         let cres = {
@@ -6772,8 +6812,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         for (const xcmKey of xcmKeys) {
             let mpKey = this.xcmTrailingKeyMap[xcmKey]
             if (mpKey != undefined && mpKey.isPreemptive) { //MK: TODO: bypass isFresh without breaking the current implementation.. can't gurantee the correctness of the msg content..
-                this.xcmTrailingKeyMap[xcmKey].isPreemptive = false // mark the record as preemptive sent
-                if (isTip) this.sendWSMessage(mp, "xcmmessage", finalized)
+                let mp = this.xcmmsgMap[xcmKey]
+                if (mp != undefined) {
+                    this.xcmTrailingKeyMap[xcmKey].isPreemptive = false // mark the record as preemptive sent
+                    if (isTip) this.sendWSMessage(mp, "xcmmessage", finalized)
+                }
             }
             if (mpKey != undefined && mpKey.isFresh) {
                 let mp = this.xcmmsgMap[xcmKey]

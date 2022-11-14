@@ -1556,8 +1556,8 @@ module.exports = class XCMManager extends Query {
 
                     let xcmInfoStr = (xcmInfo != undefined) ? JSON.stringify(xcmInfo) : false
                     let xcmInfoBlob = (xcmInfoStr != false) ? mysql.escape(xcmInfoStr) : 'NULL'
-                    if (matchedExtrinsicID == undefined) matchedExtrinsicID = "";
-                    if (matchedEventID == undefined) matchedEventID = "";
+                    let matchedExtrinsicID = (d.destExtrinsicID != undefined) ? `${d.destExtrinsicID}` : 'NULL'
+                    let matchedEventID = (d.eventID != undefined) ? `${d.eventID}` : 'NULL'
                     if (isNaN(amountSentUSD) || priceUSD == undefined) {
                         amountSentUSD = 0;
                         priceUSD = 0;
@@ -1569,8 +1569,8 @@ module.exports = class XCMManager extends Query {
                 amountSentUSD = '${amountSentUSD}',
                 priceUSD = '${priceUSD}',
                 matched = 1,
-                matchedExtrinsicID = '${d.destExtrinsicID}',
-                matchedEventID = '${d.eventID}',
+                matchedExtrinsicID = ${matchedExtrinsicID},
+                matchedEventID = ${matchedEventID},
                 xcmInfoAudited = '1',
                 xcmInfo = ${xcmInfoBlob}
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`

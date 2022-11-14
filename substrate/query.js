@@ -695,6 +695,24 @@ module.exports = class Query extends AssetManager {
         }
     }
 
+    redirect_search_stateroot(hash, blockcells, res = []) {
+        let cell = blockcells[0];
+        let feed = JSON.parse(cell.value);
+        if (feed) {
+            let blockHash = feed.blockHash
+            let chainID = feed.chainID;
+            let blockNumber = feed.blockNumber;
+            if (blockNumber) {
+                // send users to eg /block/0/9963670?blockhash=0xcf10b0c43f5c87de7cb9b3c0be6187097bd936bde19bd937516482ac01a8d46f
+                res.push({
+                    link: `/block/${chainID}/${blockNumber}?blockhash=${blockHash}`,
+                    text: `chain: ${chainID} blockNumber: ${blockNumber} hash: ${blockHash}`,
+                    description: this.getChainName(chainID) + " Block " + blockNumber + " : " + blockHash
+                })
+            }
+        }
+    }
+
     // send users to eg /xcmmessage/{msgHash}
     redirect_search_xcmmessage(search, cells, res = []) {
         let cell = cells[0];
@@ -756,6 +774,8 @@ module.exports = class Query extends AssetManager {
         if (feed) {
             let chainID = feed.chainID;
             let blockNumber = feed.blockNumber;
+            let relayBN = (feed.relayBN != undefined) ? feed.relayBN : null
+            let relayStateRoot = (feed.relayStateRoot != undefined) ? feed.relayStateRoot : null
             let blockType = 'substrate'
             if (feed.blockType != undefined) {
                 blockType = feed.blockType
@@ -767,8 +787,28 @@ module.exports = class Query extends AssetManager {
                 if (blockType == 'evm') {
                     res.hashType = 'evmBlockHash'
                 } else if (blockType == 'substrate') {
+                    if (relayBN) res.relayBN = relayBN
+                    if (relayStateRoot) res.relayStateRoot = relayStateRoot
                     res.hashType = 'substrateBlockHash'
                 }
+            }
+        }
+    }
+
+    check_stateroot_hash(hash, blockcells, res) {
+        let cell = blockcells[0];
+        let feed = JSON.parse(cell.value);
+        if (feed) {
+            let chainID = feed.chainID;
+            let blockNumber = feed.blockNumber;
+            let blockhash = feed.blockHash;
+            let hashType = 'stateroot'
+            if (blockNumber) {
+                res.hash = hash
+                res.blockhash = blockhash
+                res.chainID = chainID
+                res.blockNumber = blockNumber
+                res.hashType = hashType
             }
         }
     }
@@ -826,6 +866,8 @@ module.exports = class Query extends AssetManager {
                 if (data) {
                     if (data["block"]) {
                         this.redirect_search_block(hash, data["block"], res)
+                    } else if (data["stateroot"]) {
+                        this.redirect_search_stateroot(hash, data["stateroot"], res)
                     } else if (data["tx"]) {
                         this.redirect_search_tx(hash, data["tx"], res)
                     }
@@ -938,6 +980,9 @@ module.exports = class Query extends AssetManager {
                     if (data["block"]) {
                         blockcells = data["block"]
                         this.check_block_hash(hash, blockcells, res)
+                    } else if (data["stateroot"]) {
+                        blockcells = data["stateroot"]
+                        this.check_stateroot_hash(hash, blockcells, res)
                     } else if (data["tx"]) {
                         txcells = data["tx"]
                         this.check_tx_hash(hash, txcells, res)
@@ -1611,7 +1656,9 @@ module.exports = class Query extends AssetManager {
             w.push(`routerAssetChain = '${q.routerAssetChain}'`)
         }
         let wstr = w.join(" and ");
-        let assetlog = await this.poolREADONLY.query(`select indexTS, priceUSD, routerAssetChain, verificationPath, liquid from ${tbl} where ${wstr} order by indexTS  limit ${limit*10}`);
+        let assetSQL = `select indexTS, priceUSD, routerAssetChain, verificationPath, liquid from ${tbl} where ${wstr} order by indexTS  limit ${limit*10}`
+        //console.log(`assetSQL`, assetSQL)
+        let assetlog = await this.poolREADONLY.query(assetSQL);
         try {
             if (assetlog && assetlog.length > 0) {
                 let priceinfo = {};
@@ -1690,8 +1737,14 @@ module.exports = class Query extends AssetManager {
         let assetChain = paraTool.makeAssetChain(asset, chainID);
         console.log("assetChain", assetChain)
         if (this.assetInfo[assetChain] == undefined) {
-            throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
+            let alternativeAssetChain = paraTool.makeAssetChainFromXcContractAddress(asset, chainID); //fall back
+            if (this.assetInfo[alternativeAssetChain] == undefined) {
+                throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
+            } else {
+                assetChain = alternativeAssetChain
+            }
         }
+        console.log(`assetInfo found!`, this.assetInfo[assetChain])
         try {
             let [asset, chainID] = paraTool.parseAssetChain(assetChain)
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";

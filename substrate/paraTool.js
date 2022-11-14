@@ -768,6 +768,22 @@ function contractAddrToXcAssetID(xcAssetAddress) {
     return xcAssetID
 }
 
+// (0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF, 2004) -> {"Token":"42259045809535163221576417993425387648"}~2004
+function makeAssetChainFromXcContractAddress(xcAssetAddress, chainID = 99) {
+    let xcAssetID = false
+    let asset = {
+        Token: null,
+    }
+    if (xcAssetAddress != undefined) {
+        if (xcAssetAddress.length = 42 && xcAssetAddress.substr(0, 2) == "0x") {
+            xcAssetID = contractAddrToXcAssetID(xcAssetAddress)
+            asset.Token = xcAssetID
+            return (JSON.stringify(asset) + assetChainSeparator + chainID);
+        }
+    }
+    return false
+}
+
 function is_public_endpoint(wss) {
     if (wss == undefined) return true
     if (wss.includes("polkaholic.io") || wss.includes("g.moonbase")) {
@@ -1700,6 +1716,9 @@ module.exports = {
     },
     makeAssetChain: function(asset, chainID = 99) {
         return (asset + assetChainSeparator + chainID);
+    },
+    makeAssetChainFromXcContractAddress: function(xcContractAddress, chainID = 99) {
+        return makeAssetChainFromXcContractAddress(xcContractAddress, chainID);
     },
     //paraTool.getErcTokenAssetChain('0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080', 2004) -> [true, '{"Token":"42259045809535163221576417993425387648"}~2004', '0xffffffff1fcacbd218edc0eba20fc2308c778080~2004']
     //paraTool.getErcTokenAssetChain('0x0fFFfFff1FcaCBd218EDc0EbA20Fc2308C778080', 2004) -> [false, '0x0fffffff1fcacbd218edc0eba20fc2308c778080~2004', '0x0fffffff1fcacbd218edc0eba20fc2308c778080~2004' ]
