@@ -105,6 +105,13 @@ module.exports = class AssetManager extends PolkaholicDB {
         }
     }
 
+    async selfTerminate(crawler) {
+        if (crawler.getCurrentTS() - crawler.lastEventReceivedTS > 300) {
+            console.log("No event received in 5mins, terminating")
+            process.exit(1);
+        }
+    }
+
     async chainParserInit(chainID, debugLevel = 0) {
         if (this.chainParser && (this.chainParserChainID == chainID)) return;
         if (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala) {
