@@ -1611,7 +1611,9 @@ module.exports = class Query extends AssetManager {
             w.push(`routerAssetChain = '${q.routerAssetChain}'`)
         }
         let wstr = w.join(" and ");
-        let assetlog = await this.poolREADONLY.query(`select indexTS, priceUSD, routerAssetChain, verificationPath, liquid from ${tbl} where ${wstr} order by indexTS  limit ${limit*10}`);
+        let assetSQL = `select indexTS, priceUSD, routerAssetChain, verificationPath, liquid from ${tbl} where ${wstr} order by indexTS  limit ${limit*10}`
+        //console.log(`assetSQL`, assetSQL)
+        let assetlog = await this.poolREADONLY.query(assetSQL);
         try {
             if (assetlog && assetlog.length > 0) {
                 let priceinfo = {};
@@ -1690,8 +1692,14 @@ module.exports = class Query extends AssetManager {
         let assetChain = paraTool.makeAssetChain(asset, chainID);
         console.log("assetChain", assetChain)
         if (this.assetInfo[assetChain] == undefined) {
-            throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
+            let alternativeAssetChain = paraTool.makeAssetChainFromXcContractAddress(asset, chainID); //fall back
+            if(this.assetInfo[alternativeAssetChain] == undefined){
+                throw new paraTool.InvalidError(`Invalid asset: ${assetChain}`)
+            }else{
+                assetChain = alternativeAssetChain
+            }
         }
+        console.log(`assetInfo found!`, this.assetInfo[assetChain])
         try {
             let [asset, chainID] = paraTool.parseAssetChain(assetChain)
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
