@@ -774,6 +774,8 @@ module.exports = class Query extends AssetManager {
         if (feed) {
             let chainID = feed.chainID;
             let blockNumber = feed.blockNumber;
+            let relayBN = (feed.relayBN != undefined)? feed.relayBN : null
+            let relayStateRoot = (feed.relayStateRoot != undefined)? feed.relayStateRoot : null
             let blockType = 'substrate'
             if (feed.blockType != undefined) {
                 blockType = feed.blockType
@@ -785,8 +787,28 @@ module.exports = class Query extends AssetManager {
                 if (blockType == 'evm') {
                     res.hashType = 'evmBlockHash'
                 } else if (blockType == 'substrate') {
+                    if (relayBN) res.relayBN = relayBN
+                    if (relayStateRoot) res.relayStateRoot = relayStateRoot
                     res.hashType = 'substrateBlockHash'
                 }
+            }
+        }
+    }
+
+    check_stateroot_hash(hash, blockcells, res) {
+        let cell = blockcells[0];
+        let feed = JSON.parse(cell.value);
+        if (feed) {
+            let chainID = feed.chainID;
+            let blockNumber = feed.blockNumber;
+            let blockhash = feed.blockHash;
+            let hashType = 'stateroot'
+            if (blockNumber) {
+                res.hash = hash
+                res.blockhash = blockhash
+                res.chainID = chainID
+                res.blockNumber = blockNumber
+                res.hashType = hashType
             }
         }
     }
@@ -958,6 +980,9 @@ module.exports = class Query extends AssetManager {
                     if (data["block"]) {
                         blockcells = data["block"]
                         this.check_block_hash(hash, blockcells, res)
+                    } else if (data["stateroot"]) {
+                        blockcells = data["stateroot"]
+                        this.check_stateroot_hash(hash, blockcells, res)
                     } else if (data["tx"]) {
                         txcells = data["tx"]
                         this.check_tx_hash(hash, txcells, res)

@@ -6683,11 +6683,19 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 key: relayParentStateRoot,
                 data: {}, //feed/feedunfinalized
             }
+            let blockfeedWithBlkHash = {
+                chainID: chainID,
+                blockNumber: blockNumber,
+                relayBN: relayBN,
+                relayStateRoot: relayParentStateRoot,
+                blockHash: blockHash,
+                blockType: 'substrate'
+            }
             if (block.finalized) {
                 substrateStateRootRec.data = {
                     feed: {
                         stateroot: {
-                            value: JSON.stringify(blockfeed),
+                            value: JSON.stringify(blockfeedWithBlkHash),
                             timestamp: blockTS * 1000000
                         }
                     }
@@ -6696,7 +6704,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 substrateStateRootRec.data = {
                     feedunfinalized: {
                         stateroot: {
-                            value: JSON.stringify(blockfeed),
+                            value: JSON.stringify(blockfeedWithBlkHash),
                             timestamp: blockTS * 1000000
                         }
                     }
