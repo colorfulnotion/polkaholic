@@ -47,11 +47,11 @@ module.exports = class CrawlerManager extends Crawler {
     relayCrawler = false;
     allCrawlers = {};
     receviedMsgs = {};
-
+    crawlerStat = {};
     relayChainIDs = [paraTool.chainIDPolkadot, paraTool.chainIDKusama, paraTool.chainIDMoonbaseRelay]
 
     sendMsg(chainID, wrapper) {
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`Incoming msg from [${chainID}] !!!`, wrapper)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`Incoming msg from [${chainID}] !!!`, wrapper)
         let relayBN = wrapper.relayBN
         let relayChain = wrapper.relayChain
         let relayBNKey = `${relayChain}_${relayBN}`
@@ -262,7 +262,7 @@ module.exports = class CrawlerManager extends Crawler {
         }
     }
 
-    async createParaChainBlockRangePeriod(relayChainID, logDT, hr) {
+    async prepareParaChainBlockRangePeriod(relayChainID, logDT, hr) {
         let indexTSPeriod = paraTool.logDT_hr_to_ts(logDT, hr);
         let targetSQL = `select floor(UNIX_TIMESTAMP(blockTS)/3600)*3600 as indexTS, blockNumber, blockTS, blockHash, stateRoot, convert(xcmMeta using utf8) as xcmMeta from xcmmeta${relayChainID} where blockTS >= ${indexTSPeriod} and blockTS < ${indexTSPeriod+3600} order by indexTS;`
         if (this.debugLevel >= paraTool.debugInfo) console.log(`targetSQL`, targetSQL)
@@ -391,11 +391,12 @@ module.exports = class CrawlerManager extends Crawler {
             let b = blocks[i]
             let pieces = b.split('|')
             if (pieces.length != 2) {
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] malformed pieces=${pieces}`)
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] malformed pieces=${pieces}`)
+                return
             }
             let bn = pieces[0]
             let blkHash = pieces[1]
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] indexBlockRanges bn=${bn} blkHash=${blkHash}`)
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] indexBlockRanges bn=${bn} blkHash=${blkHash}`)
             let xcmMeta = await crawler.index_block(crawler.chain, bn, blkHash);
             if (Array.isArray(xcmMeta) && xcmMeta.length > 0) {
                 xcmMetaMap[bn] = xcmMeta
@@ -464,7 +465,7 @@ module.exports = class CrawlerManager extends Crawler {
                 let rawBlockTS = x.blockTS
                 let blockTS = rawBlockTS + diffAdjustmentTS
                 if (diffAdjustmentTS != 0) {
-                    console.log(`[${x.msgHash}] [${msgType}] diffAdjustmentTS=${diffAdjustmentTS}, relayedAt=${relayedAt}, blockNumber=${blockNumber} rawBlockTS=${rawBlockTS}, adjustedTS=${blockTS}`)
+                    if (this.debugLevel >= paraTool.debugTracing) console.log(`[${x.msgHash}] [${msgType}] diffAdjustmentTS=${diffAdjustmentTS}, relayedAt=${relayedAt}, blockNumber=${blockNumber} rawBlockTS=${rawBlockTS}, adjustedTS=${blockTS}`)
                 }
                 if (hrmpRangeMap[chainID] == undefined) hrmpRangeMap[chainID] = {
                     //hrmpBN: [],

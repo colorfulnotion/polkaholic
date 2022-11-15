@@ -1407,7 +1407,7 @@ module.exports = class Indexer extends AssetManager {
             source: this.hostname,
             commit: this.indexerInfo,
         }
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${this.chainID}:${this.chainName}] sendManagerMessage`, wrapper)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] sendManagerMessage`, wrapper)
         this.parentManager.sendMsg(this.chainID, wrapper)
     }
 
