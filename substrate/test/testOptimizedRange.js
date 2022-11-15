@@ -62,7 +62,8 @@ async function main() {
 
     console.log(`xcmMap`, xcmMap)
     let [blockRangeMap, hrmpRangeMap] = await crawlermanager.analyzeXcmMap(xcmMap)
-    console.log(`blockRangeMap`, blockRangeMap)
+    let blockRangeMapStr = JSON.stringify(blockRangeMap)
+    console.log(`blockRangeMap(len=${blockRangeMapStr.length})`, blockRangeMapStr)
     console.log(`hrmpRangeMap`, hrmpRangeMap)
 }
 

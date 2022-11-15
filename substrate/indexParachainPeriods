@@ -37,24 +37,7 @@ async function main() {
     crawlermanager.exitOnDisconnect = true;
     await crawlermanager.initRelayCrawler(relayChainID)
     for (const hr of hrs) {
-        // step1: generating blockRangeMap
-        let prepareParaChainBlockRangePeriodStartTS = new Date().getTime();
-        let blockRangeMap = await crawlermanager.prepareParaChainBlockRangePeriod(relayChainID, logDT, hr);
-        let prepareParaChainBlockRangePeriodTS = (new Date().getTime() - prepareParaChainBlockRangePeriodStartTS) / 1000
-        console.log(`prepareParaChainBlockRangePeriodTS logDT=${logDT}, hr=${hr}, DONE in ${indexParachainStartTS}s`)
-
-        // step2: processIndexRangeMap for all relaychain
-        if (debugLevel > paraTool.debugVerbose) console.log(`prepareParaChainBlockRangePeriod logDT=${logDT}, hr=${hr}, blockRangeMap`, blockRangeMap)
-        let indexParachainStartTS = new Date().getTime();
-        await crawlermanager.processIndexRangeMap(blockRangeMap)
-        let indexParachainTS = (new Date().getTime() - indexParachainStartTS) / 1000
-        console.log(`prepareParaChainBlockRangePeriod logDT=${logDT}, hr=${hr}, DONE in ${indexParachainStartTS}s`)
-
-        // step3: TODO: write xcm trace to disk1
-        let mMsg = crawlermanager.processReceivedmsg()
-        //TODO store mMsg at disk1
-        console.log(`mMsg`, mMsg)
-
+        await crawlermanager.processXcmBlockRangePeriod(relayChainID, logDT, hr)
     }
 }
 

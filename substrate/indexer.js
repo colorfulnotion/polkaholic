@@ -1408,7 +1408,7 @@ module.exports = class Indexer extends AssetManager {
             commit: this.indexerInfo,
         }
         if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] sendManagerMessage`, wrapper)
-        this.parentManager.sendMsg(this.chainID, wrapper)
+        this.parentManager.sendManagerMessage(this.chainID, wrapper)
     }
 
     sendWSMessage(m, msgType = null, finalized = false) {
@@ -7617,7 +7617,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     // fetches a SINGLE row r (of block, events + trace) with fetch_block_row and indexes the row with index_chain_block_row
-    async index_block(chain, blockNumber, blockHash) {
+    async index_block(chain, blockNumber, blockHash = null) {
+        if (blockHash == undefined){
+            //need to fetch it..
+            blockHash = await this.getBlockHashFinalized(chain.chainID, blockNumber)
+        }
         await this.setup_chainParser(chain, this.debugLevel);
         await this.initApiAtStorageKeys(chain, blockHash, blockNumber);
         this.chainID = chain.chainID;
