@@ -81,8 +81,11 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
     showCrawlerTimeUsage(ctx="") {
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`${ctx}`, this.crawlerTimeStat)
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`${ctx}`, this.crawlUsageMap)
+        if (this.debugLevel >= paraTool.debugInfo) {
+            console.log(`${ctx}`)
+            console.log(this.crawlerTimeStat)
+            console.log(this.crawlUsageMap)
+        }
     }
 
     showCrawlerCurrentMemoryUsage(ctx="") {
@@ -150,10 +153,11 @@ module.exports = class CrawlerManager extends Crawler {
         }
     }
 
-    async processReceivedManagerMsg(isFullPeriod = false) {
+    async processReceivedManagerMsg(isFullPeriod = false, xcmIndex = false) {
         let receviedMsgs = this.receviedMsgs
         if (this.debugLevel >= paraTool.debugInfo) console.log(receviedMsgs)
         let xcmList = []
+
         for (const relayBNKey of Object.keys(receviedMsgs)) {
             let relayBNRecs = receviedMsgs[relayBNKey]
             for (const rec of relayBNRecs) {
@@ -161,18 +165,23 @@ module.exports = class CrawlerManager extends Crawler {
             }
         }
         if (isFullPeriod) {
-            await this.write_xcm_log(xcmList)
+            if (xcmIndex){
+                await this.write_relayxcm_log(xcmList)
+            }else{
+                //if xcmIndex. delete it
+                await this.write_relayxcm_log([])
+            }
         }
         this.receviedMsgs = {}
         if (this.debugLevel >= paraTool.debugInfo) console.log(`processReceivedManagerMsg xcmList`, xcmList)
         return xcmList
     }
 
-    async write_xcm_log(xcmList) {
+    async write_relayxcm_log(xcmList=[]) {
         if (xcmList.length > 0) {
             xcmList.push("");
             try {
-                console.log("***** write_xcm_log ***** ", this.relayxcmfn)
+                console.log("***** write_relayxcm_log ***** ", this.relayxcmfn)
                 await fs.appendFileSync(this.relayxcmfn, xcmList.join("\n"));
             } catch (err) {
                 console.log(err);
@@ -766,7 +775,7 @@ module.exports = class CrawlerManager extends Crawler {
         let blockRangeMap = await this.prepareParaChainBlockRangePeriod(relayChainID, logDT, hr);
         let prepareParaChainBlockRangePeriodTS = (new Date().getTime() - prepareParaChainBlockRangePeriodStartTS) / 1000
         this.crawlerTimeStat.prepareParaChainBlockRangePeriodTS += prepareParaChainBlockRangePeriodTS
-        await this.open_log(relayChainID, indexTS)
+
 
         // step2: processIndexRangeMap for all relaychain
         if (this.debugLevel > paraTool.debugVerbose) console.log(`prepareParaChainBlockRangePeriod [${ctx}] blockRangeMap`, blockRangeMap)
@@ -775,18 +784,33 @@ module.exports = class CrawlerManager extends Crawler {
         let indexRes = await this.processIndexRangeMap(blockRangeMap)
         let indexParachainTS = (new Date().getTime() - indexParachainStartTS) / 1000
         this.crawlerTimeStat.indexParachainsTS += indexParachainTS
-        if (indexRes.status == "failure") return false
+        let xcmIndexed = (indexRes.status == "success") ? 1 : 0;
 
         // step3: TODO: write xcm trace to disk1
+        await this.open_log(relayChainID, indexTS)
         this.crawlerTimeStat.storeManagerMsg++
         let storeManagerMsgStartTS = new Date().getTime();
-        await this.processReceivedManagerMsg(true)
+        await this.processReceivedManagerMsg(true, xcmIndexed)
         let storeManagerMsgTS = (new Date().getTime() - storeManagerMsgStartTS) / 1000
         this.crawlerTimeStat.storeManagerMsgTS +=  storeManagerMsgTS
 
-        let overallTS = (new Date().getTime() - overallStartTS) / 1000
-        this.crawlerTimeStat.overallTS +=  overallTS
+        let xcmElapsedSeconds = (new Date().getTime() - overallStartTS) / 1000
+        this.crawlerTimeStat.overallTS +=  xcmElapsedSeconds
 
+        await this.upsertSQL({
+            "table": "indexlog",
+            "keys": ["chainID", "indexTS"],
+            "vals": ["logDT", "hr", "xcmIndexDT", "xcmElapsedSeconds", "xcmIndexed", "xcmReadyForIndexing"],
+            "data": [`('${relayChainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${xcmElapsedSeconds}', '${xcmIndexed}', 1)`],
+            "replace": ["logDT", "hr", "xcmIndexDT", "xcmElapsedSeconds", "xcmIndexed", "xcmReadyForIndexing"]
+        });
+
+        await this.update_batchedSQL();
+        this.logger.info({
+            op: "processXcmBlockRangePeriod",
+            relayChainID,
+            logDT
+        });
         this.showCrawlerTimeUsage(ctx)
         this.showCrawlerCurrentMemoryUsage(ctx)
         this.resetCrawlerTimeUsage(ctx)
