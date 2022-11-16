@@ -234,6 +234,10 @@ module.exports = class Indexer extends AssetManager {
         this.logger.warn(obj);
     }
 
+    resetErrorWarnings(){
+        this.numIndexingErrors = 0
+        this.numIndexingWarns = 0
+    }
     setParentRelayAndManager(relayCrawler, manager) {
         if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] setParentRelayAndManager`)
         this.parentRelayCrawler = relayCrawler
@@ -1389,6 +1393,30 @@ module.exports = class Indexer extends AssetManager {
             this.updateXCMMsg(xcmMsg, true)
         }
         this.xcmmsgSentAtUnknownMap = {}
+    }
+
+    sendManagerStat(numIndexingErrors, numIndexingWarns, elapsedSeconds){
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`sendManagerStat numIndexingErrors=${numIndexingErrors}, numIndexingWarns=${numIndexingWarns}, elapsedSeconds=${elapsedSeconds}`)
+        if (!this.parentManager) return
+        if (numIndexingErrors >= 0 && numIndexingWarns >= 0){
+            let m = {
+                blockHash: this.chainParser.parserBlockHash,
+                blockTS: this.chainParser.parserTS,
+                blockBN: this.chainParser.parserBlockNumber,
+                numIndexingErrors: numIndexingErrors,
+                numIndexingWarns: numIndexingWarns,
+                elapsedTS: elapsedSeconds,
+            }
+            let wrapper = {
+                type: "stat",
+                msg: m,
+                chainID: this.chainID,
+                source: this.hostname,
+                commit: this.indexerInfo,
+            }
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] sendManagerStat`, wrapper)
+            this.parentManager.sendManagerStat(this.chainID, wrapper)
+        }
     }
 
     sendManagerMessage(m, msgType = null, finalized = false) {
@@ -7621,6 +7649,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
     // fetches a SINGLE row r (of block, events + trace) with fetch_block_row and indexes the row with index_chain_block_row
     async index_block(chain, blockNumber, blockHash = null) {
+        this.resetErrorWarnings()
+        let elapsedStartTS = new Date().getTime();
         if (blockHash == undefined){
             //need to fetch it..
             blockHash = await this.getBlockHashFinalized(chain.chainID, blockNumber)
@@ -7657,7 +7687,16 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 statRows.push(sql);
             }
             this.dump_update_block_stats(chain.chainID, statRows, indexTS)
+            let elapsedTS = (new Date().getTime() - elapsedStartTS) / 1000
             await this.flush(indexTS, blockNumber, false, false); //ts, bn, isFullPeriod, isTip
+
+            // errors, warns within this block ..
+            let numIndexingErrors = this.numIndexingErrors;
+            if (this.chainParser) {
+                numIndexingErrors += this.chainParser.numParserErrors;
+            }
+            let numIndexingWarns = this.numIndexingWarns;
+            this.sendManagerStat(numIndexingErrors, numIndexingWarns, elapsedTS)
             return (r.xcmMeta);
         } catch (err) {
             console.log(err);
@@ -8158,9 +8197,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let specVersion = false
 
         await this.setup_chainParser(chain, this.debugLevel);
-
-        this.numIndexingErrors = 0;
-        this.numIndexingWarns = 0;
+        this.resetErrorWarnings()
         // NOTE: we do not set this.tallyAsset = {}
 
         this.currentPeriodKey = indexTS;
