@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// indexBlock [chainID] [blockNumber] [blockHash]
+// indexRelayChainTrace [chainID] [blockNumber] [blockExtra]
+
 var CrawlerManager = require("./crawlermanager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
@@ -42,14 +43,6 @@ async function main() {
     if (relayCrawler == false) await crawlermanager.initRelayCrawler(relayChainID)
     let blocks = []
     for (let i = blockNumber; i < blockNumber+blockExtra; i++) {
-        let blockHash = await crawlermanager.getBlockHashFinalized(relayChainID, i)
-        /*
-        let r = {
-            blockNumber: i,
-            blockHash: blockHash
-        }
-        r = `${i}|${blockHash}`
-        */
         blocks.push(i)
     }
 

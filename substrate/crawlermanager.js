@@ -49,8 +49,8 @@ module.exports = class CrawlerManager extends Crawler {
         return {
                 prepareParaChainBlockRangePeriod: 0,
                 initRelayCrawler: 0,
-                batchCrawlerInit: 0,
-                batchCrawl: 0,
+                batchCrawlerInit: [],
+                batchCrawl: [],
                 indexParachains: 0,
                 storeManagerMsg: 0,
 
@@ -61,7 +61,7 @@ module.exports = class CrawlerManager extends Crawler {
                 indexParachainsTS: 0,
                 storeManagerMsgTS: 0,
 
-                overallTS: 0,
+                xcmElapsedTS: 0,
         }
     }
 
@@ -143,7 +143,7 @@ module.exports = class CrawlerManager extends Crawler {
             // set up relayxcm log (deleting old file if exists)
             try {
                 this.relayxcmfn = path.join(relayXcmDir, fn);
-                console.log("****open_log****", this.relayxcmfn);
+                if (this.debugLevel >= paraTool.debugTracing) console.log("****open_log****", this.relayxcmfn);
                 await fs.closeSync(fs.openSync(this.relayxcmfn, 'w'));
             } catch (err) {
                 console.log(err);
@@ -181,7 +181,7 @@ module.exports = class CrawlerManager extends Crawler {
         if (xcmList.length > 0) {
             xcmList.push("");
             try {
-                console.log("***** write_relayxcm_log ***** ", this.relayxcmfn)
+                if (this.debugLevel >= paraTool.debugTracing) console.log("***** write_relayxcm_log ***** ", this.relayxcmfn)
                 await fs.appendFileSync(this.relayxcmfn, xcmList.join("\n"));
             } catch (err) {
                 console.log(err);
@@ -266,7 +266,7 @@ module.exports = class CrawlerManager extends Crawler {
         if (this.allCrawlers[parachainID] == undefined) this.allCrawlers[parachainID] = {}
         this.allCrawlers[parachainID] = paraCrawler
         paraCrawler.initTS =  new Date().getTime();
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`setup ChainID [${chain.chainID}:${chain.chainName}] Done ${paraCrawler.initTS/1000}`)
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`setup ChainID [${chain.chainID}:${chain.chainName}] Done @ ${paraCrawler.initTS/1000}`)
     }
 
     /*
@@ -320,7 +320,7 @@ module.exports = class CrawlerManager extends Crawler {
                 let crawler = this.getCrawler(crawlerChainID)
                 let initTS = (crawler.initTS - batchCrawlerInitStartTS) / 1000
                 this.crawlUsageMap[crawlerChainID].initTS +=  initTS
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler ${crawlerChainID} Init Completed DONE in ${initTS}s`, this.crawlUsageMap)
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`crawler ${crawlerChainID} Init Completed DONE in ${initTS}s`)
             } else {
                 this.crawlUsageMap[crawlerChainID].initStatus = `Failed`
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} state`, crawlerInitState)
@@ -329,8 +329,9 @@ module.exports = class CrawlerManager extends Crawler {
             }
         }
         let batchCrawlerInitTS = (new Date().getTime() - batchCrawlerInitStartTS) / 1000
-        this.crawlerTimeStat.batchCrawlerInit += initChainIDs.length
+        this.crawlerTimeStat.batchCrawlerInit = initChainIDs
         this.crawlerTimeStat.batchCrawlerInitTS +=  batchCrawlerInitTS
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`batchCrawlerInit Completed in ${batchCrawlerInitTS}s`, this.crawlUsageMap)
         return failedChainIDs
     }
 
@@ -378,7 +379,7 @@ module.exports = class CrawlerManager extends Crawler {
                 let crawler = this.getCrawler(crawlerChainID)
                 let crawlTS = (crawler.crawlTS - batchCrawlStartTS) / 1000
                 this.crawlUsageMap[crawlerChainID].crawlTS +=  crawlTS
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`crawler ${crawlerChainID} DONE in ${crawlTS}s`)
+                if (this.debugLevel >= paraTool.debugTracing) console.log(`crawler ${crawlerChainID} DONE in ${crawlTS}s`)
             } else {
                 this.crawlUsageMap[crawlerChainID].crawlStatus = `Failed`
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} state`, crawlerState)
@@ -388,8 +389,9 @@ module.exports = class CrawlerManager extends Crawler {
         }
 
         let batchCrawlTS = (new Date().getTime() - batchCrawlStartTS) / 1000
-        this.crawlerTimeStat.batchCrawl += crawlChainIDs.length
+        this.crawlerTimeStat.batchCrawl = crawlChainIDs
         this.crawlerTimeStat.batchCrawlTS +=  batchCrawlTS
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`batchCrawls Completed in ${batchCrawlTS}s`, this.crawlUsageMap)
         return failedChainIDs
     }
 
@@ -463,19 +465,6 @@ module.exports = class CrawlerManager extends Crawler {
         let blocks = []
         for (let i = rangeStruct.startBN; i <= rangeStruct.endBN; i++) {
             blocks.push(i)
-            /*
-            let blockHash = await this.getBlockHashFinalized(chainID, i)
-            if (blockHash != undefined){
-                let r = {
-                    blockNumber: i,
-                    blockHash: blockHash
-                }
-                //let r = `${i}|${blockHash}`
-                blocks.push(r)
-            }else{
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`blockRangeToblocks [${chainID}] block#${i} not found!!!`)
-            }
-            */
         }
         //console.log(`blockRangeToblocks blocks`, blocks)
         return blocks
@@ -555,20 +544,9 @@ module.exports = class CrawlerManager extends Crawler {
     async indexBlockRanges(crawler, blocks) {
         let xcmMetaMap = {}
         let blockRangeLen = blocks.length
-        console.log(`blocks`, blocks)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`[${crawler.chainID}:${crawler.chainName}] blocks to index`, blocks)
         for (let i = 0; i < blockRangeLen; i++) {
-            /*
-            let b = blocks[i]
-            let pieces = b.split('|')
-            if (pieces.length != 2) {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] malformed pieces=${pieces}`)
-                continue
-            }
-            let bn = pieces[0]
-            let blkHash = pieces[1]
-            */
             let bn = blocks[i]
-            console.log(`bn`, bn)
             if (this.debugLevel >= paraTool.debugInfo) console.log(`[${crawler.chainID}:${crawler.chainName}] [${i+1}/${blockRangeLen}] indexBlockRanges bn=${bn}`)
             let xcmMeta = await crawler.index_block(crawler.chain, bn);
             if (Array.isArray(xcmMeta) && xcmMeta.length > 0) {
@@ -582,6 +560,7 @@ module.exports = class CrawlerManager extends Crawler {
         }
         this.crawlUsageMap[crawler.chainID].crawl += blockRangeLen
         crawler.crawlTS = new Date().getTime();
+        if (this.debugLevel >= paraTool.debugInfo) console.log(`indexBlockRanges [${crawler.chainID}:${crawler.chainName}] Done @ ${crawler.crawlTS/1000}`)
         let xcmMetaMapStr = JSON.stringify(xcmMetaMap)
         return xcmMetaMapStr
     }
@@ -707,25 +686,8 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
     async indexXcmBlockRangePeriod(relayChainID, lookbackBackfillDays = 60, audit = false, backfill = false, write_bq_log = true, techniqueParams = ["mod", 0, 1]) {
-        /*
-        this.chainID = chain.chainID;
-        // (1) audit_chain the period, which marks crawlBlock=1, crawlTrace=1 for the period
-        if (audit) {
-            console.log("auditChain");
-            await this.auditChain(chain);
-        }
 
-        // (2) get the missed blocks for the last {lookback} days (assumes 360 blocks per hour)
-        if (backfill) {
-            console.log("backfill");
-            await this.crawlBackfill(chain, ["range", chain.blocksFinalized - lookbackBackfillDays * 360 * 24, chain.blocksFinalized])
-        }
-        chain = await this.setupChainAndAPI(relayChainID);
-        await this.assetManagerInit()
-        this.resetTimeUsage()
-        */
-
-        // adding xcmIndexed, xcmReadyForIndexing, xcmAttempted, xcmIndexDT, xcmElapsedSeconds, xcmLastAttemptStartDT
+        // indexXcmBlockRangePeriod requires xcmIndexed, xcmReadyForIndexing, xcmAttempted, xcmIndexDT, xcmElapsedSeconds, xcmLastAttemptStartDT from indexlog
         var w = "";
         if (techniqueParams[0] == "mod") {
             let n = techniqueParams[1];
@@ -745,7 +707,6 @@ module.exports = class CrawlerManager extends Crawler {
             let indexTS = indexlogs[i].indexTS
             let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
             let isSuccess = await this.processXcmBlockRangePeriod(relayChainID, logDT, hr);
-            //need xcmElapsedSeconds
             if (isSuccess) {
                 //success
                 // increment attempted, which generally will mean some other indexer won't attempt the same thing until its the last unprocessed hour
@@ -762,7 +723,7 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
     async processXcmBlockRangePeriod(relayChainID, logDT, hr) {
-        let overallStartTS = new Date().getTime();
+        let xcmElapsedStartTS = new Date().getTime();
         let indexTS = paraTool.logDT_hr_to_ts(logDT, hr)
         let ctx = `${paraTool.getRelayChainByChainID(relayChainID)} ${logDT} ${hr} | ${indexTS}`
         //step 0: init relayCrawler if not cached
@@ -776,7 +737,6 @@ module.exports = class CrawlerManager extends Crawler {
         let prepareParaChainBlockRangePeriodTS = (new Date().getTime() - prepareParaChainBlockRangePeriodStartTS) / 1000
         this.crawlerTimeStat.prepareParaChainBlockRangePeriodTS += prepareParaChainBlockRangePeriodTS
 
-
         // step2: processIndexRangeMap for all relaychain
         if (this.debugLevel > paraTool.debugVerbose) console.log(`prepareParaChainBlockRangePeriod [${ctx}] blockRangeMap`, blockRangeMap)
         this.crawlerTimeStat.indexParachains++
@@ -786,7 +746,7 @@ module.exports = class CrawlerManager extends Crawler {
         this.crawlerTimeStat.indexParachainsTS += indexParachainTS
         let xcmIndexed = (indexRes.status == "success") ? 1 : 0;
 
-        // step3: TODO: write xcm trace to disk1
+        // step3: write xcm trace to disk1
         await this.open_log(relayChainID, indexTS)
         this.crawlerTimeStat.storeManagerMsg++
         let storeManagerMsgStartTS = new Date().getTime();
@@ -794,8 +754,8 @@ module.exports = class CrawlerManager extends Crawler {
         let storeManagerMsgTS = (new Date().getTime() - storeManagerMsgStartTS) / 1000
         this.crawlerTimeStat.storeManagerMsgTS +=  storeManagerMsgTS
 
-        let xcmElapsedSeconds = (new Date().getTime() - overallStartTS) / 1000
-        this.crawlerTimeStat.overallTS +=  xcmElapsedSeconds
+        let xcmElapsedSeconds = (new Date().getTime() - xcmElapsedStartTS) / 1000
+        this.crawlerTimeStat.xcmElapsedTS +=  xcmElapsedSeconds
 
         await this.upsertSQL({
             "table": "indexlog",

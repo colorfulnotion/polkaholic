@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// indexBlock [chainID] [blockNumber] [blockHash]
+// indexBlock [chainID] [blockNumber]
+
 var Crawler = require("./crawler");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
@@ -16,11 +17,6 @@ async function main() {
         if (index == 3 && val.length > 0) {
             blockNumber = paraTool.dechexToInt(val);
         }
-        /*
-        if (index == 4 && val.length > 0) {
-            blockHash = ;
-        }
-        */
     });
     let crawler = new Crawler();
     crawler.setDebugLevel(paraTool.debugTracing)
@@ -30,7 +26,6 @@ async function main() {
     await crawler.assetManagerInit();
     await crawler.setupChainAndAPI(chainID);
     let blockHash = await crawler.getBlockHashFinalized(chainID, blockNumber)
-
     let t2 = null
     /*{
 	   chainID,

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// indexBlock [chainID] [blockNumber] [blockHash]
+// indexParachainPeriods [relayChainID] [logDT] [hrs]
+
 var CrawlerManager = require("./crawlermanager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");

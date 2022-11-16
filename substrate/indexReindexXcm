@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// while true; do ./indexReindexXcm [relayChainID] [n] [nmax]; sleep 30; done
+
 var CrawlerManager = require("./crawlermanager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");

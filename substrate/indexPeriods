@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// indexPeriods [chainID] [logDT] [hrs]
+
 var Crawler = require("./crawler");
 var paraTool = require("./paraTool");
 let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
