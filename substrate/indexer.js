@@ -8338,14 +8338,17 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             numIndexingErrors += this.chainParser.numParserErrors;
         }
         let indexed = (numIndexingErrors == 0) ? 1 : 0;
+        // mark relaychain period's xcmIndexed = 0 and xcmReadyForIndexing = 1 if indexing is successful and without errors.
+        // this signals that the record is reeady for indexReindexXcm
+        let xcmReadyForIndexing = (this.isRelayChain && indexed)? 1 : 0;
         let numIndexingWarns = this.numIndexingWarns;
         let elapsedSeconds = (new Date().getTime() - indexStartTS) / 1000
         await this.upsertSQL({
             "table": "indexlog",
             "keys": ["chainID", "indexTS"],
-            "vals": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns"],
-            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', '${indexed}', 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}')`],
-            "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns"]
+            "vals": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"],
+            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', '${indexed}', 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}', 0, '${xcmReadyForIndexing}')`],
+            "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"]
         });
 
         await this.update_batchedSQL();

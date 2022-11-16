@@ -706,7 +706,7 @@ module.exports = class CrawlerManager extends Crawler {
         return [blockRangeMap, hrmpRangeMap]
     }
 
-    async indexXcmBlockRangePeriod(chain, relayChainID, lookbackBackfillDays = 60, audit = false, backfill = false, write_bq_log = true, techniqueParams = ["mod", 0, 1]) {
+    async indexXcmBlockRangePeriod(relayChainID, lookbackBackfillDays = 60, audit = false, backfill = false, write_bq_log = true, techniqueParams = ["mod", 0, 1]) {
         /*
         this.chainID = chain.chainID;
         // (1) audit_chain the period, which marks crawlBlock=1, crawlTrace=1 for the period
@@ -814,7 +814,6 @@ module.exports = class CrawlerManager extends Crawler {
         this.showCrawlerTimeUsage(ctx)
         this.showCrawlerCurrentMemoryUsage(ctx)
         this.resetCrawlerTimeUsage(ctx)
-
-        return true
+        return xcmIndexed
     }
 }
