@@ -42,6 +42,9 @@ module.exports = class Indexer extends AssetManager {
 
     currentPeriodKey = false;
 
+    initTS = false;
+    crawlTS = false;
+
     numUpdated = 0
     tallyAsset = {};
     xcmtransfer = {};
