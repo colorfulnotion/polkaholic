@@ -45,7 +45,7 @@ async function main() {
     crawlermanager.setDebugLevel(debugLevel)
     crawlermanager.exitOnDisconnect = true;
     await crawlermanager.initRelayCrawler(relayChainID)
-    let targetSQL = `select floor(UNIX_TIMESTAMP(blockTS)/3600)*3600 as indexTS, blockNumber, blockTS, blockHash, stateRoot, convert(xcmMeta using utf8) as xcmMeta from xcmmeta0 where blockTS >= 1666879200 and blockTS < 1666882800 order by indexTS;`
+    let targetSQL = `select floor(UNIX_TIMESTAMP(blockTS)/3600)*3600 as indexTS, blockNumber, blockTS, blockHash, stateRoot, convert(xcmMeta using utf8) as xcmMeta from xcmmeta${relayChainID} where blockTS >= 1666879200 and blockTS < 1666882800 order by indexTS;`
     console.log(`targetSQL`, targetSQL)
     let recs = await crawlermanager.poolREADONLY.query(targetSQL);
     let xcmMetaMap = {}
@@ -62,7 +62,8 @@ async function main() {
 
     console.log(`xcmMap`, xcmMap)
     let [blockRangeMap, hrmpRangeMap] = await crawlermanager.analyzeXcmMap(xcmMap)
-    console.log(`blockRangeMap`, blockRangeMap)
+    let blockRangeMapStr = JSON.stringify(blockRangeMap)
+    console.log(`blockRangeMap(len=${blockRangeMapStr.length})`, blockRangeMapStr)
     console.log(`hrmpRangeMap`, hrmpRangeMap)
 }
 

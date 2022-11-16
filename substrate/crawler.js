@@ -31,6 +31,7 @@ const exec = util.promisify(require('child_process').exec);
 const ethTool = require("./ethTool");
 const Endpoints = require("./summary/endpoints");
 const fs = require('fs');
+const path = require("path");
 const {
     bnToHex,
     hexToBn,

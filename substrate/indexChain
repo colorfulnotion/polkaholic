@@ -1,7 +1,7 @@
 #!/usr/bin/env node
- // Usage: while true; do ./indexChain 10; done
-var Crawler = require("./crawler");
+// Usage: while true; do ./indexChain 10; done
 
+var Crawler = require("./crawler");
 async function main() {
     let chainID = -1;
     process.argv.forEach(function(val, index, array) {

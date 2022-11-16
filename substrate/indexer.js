@@ -42,6 +42,9 @@ module.exports = class Indexer extends AssetManager {
 
     currentPeriodKey = false;
 
+    initTS = false;
+    crawlTS = false;
+
     numUpdated = 0
     tallyAsset = {};
     xcmtransfer = {};
@@ -231,6 +234,10 @@ module.exports = class Indexer extends AssetManager {
         this.logger.warn(obj);
     }
 
+    resetErrorWarnings(){
+        this.numIndexingErrors = 0
+        this.numIndexingWarns = 0
+    }
     setParentRelayAndManager(relayCrawler, manager) {
         if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] setParentRelayAndManager`)
         this.parentRelayCrawler = relayCrawler
@@ -1388,6 +1395,30 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
+    sendManagerStat(numIndexingErrors, numIndexingWarns, elapsedSeconds){
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`sendManagerStat numIndexingErrors=${numIndexingErrors}, numIndexingWarns=${numIndexingWarns}, elapsedSeconds=${elapsedSeconds}`)
+        if (!this.parentManager) return
+        if (numIndexingErrors >= 0 && numIndexingWarns >= 0){
+            let m = {
+                blockHash: this.chainParser.parserBlockHash,
+                blockTS: this.chainParser.parserTS,
+                blockBN: this.chainParser.parserBlockNumber,
+                numIndexingErrors: numIndexingErrors,
+                numIndexingWarns: numIndexingWarns,
+                elapsedTS: elapsedSeconds,
+            }
+            let wrapper = {
+                type: "stat",
+                msg: m,
+                chainID: this.chainID,
+                source: this.hostname,
+                commit: this.indexerInfo,
+            }
+            if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] sendManagerStat`, wrapper)
+            this.parentManager.sendManagerStat(this.chainID, wrapper)
+        }
+    }
+
     sendManagerMessage(m, msgType = null, finalized = false) {
         if (!this.parentManager) {
             //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.chainID}:${this.chainName}] parentManager not set`)
@@ -1407,8 +1438,8 @@ module.exports = class Indexer extends AssetManager {
             source: this.hostname,
             commit: this.indexerInfo,
         }
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${this.chainID}:${this.chainName}] sendManagerMessage`, wrapper)
-        this.parentManager.sendMsg(this.chainID, wrapper)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`[${this.chainID}:${this.chainName}] sendManagerMessage`, wrapper)
+        this.parentManager.sendManagerMessage(this.chainID, wrapper)
     }
 
     sendWSMessage(m, msgType = null, finalized = false) {
@@ -7617,7 +7648,13 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     // fetches a SINGLE row r (of block, events + trace) with fetch_block_row and indexes the row with index_chain_block_row
-    async index_block(chain, blockNumber, blockHash) {
+    async index_block(chain, blockNumber, blockHash = null) {
+        this.resetErrorWarnings()
+        let elapsedStartTS = new Date().getTime();
+        if (blockHash == undefined){
+            //need to fetch it..
+            blockHash = await this.getBlockHashFinalized(chain.chainID, blockNumber)
+        }
         await this.setup_chainParser(chain, this.debugLevel);
         await this.initApiAtStorageKeys(chain, blockHash, blockNumber);
         this.chainID = chain.chainID;
@@ -7650,7 +7687,16 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 statRows.push(sql);
             }
             this.dump_update_block_stats(chain.chainID, statRows, indexTS)
+            let elapsedTS = (new Date().getTime() - elapsedStartTS) / 1000
             await this.flush(indexTS, blockNumber, false, false); //ts, bn, isFullPeriod, isTip
+
+            // errors, warns within this block ..
+            let numIndexingErrors = this.numIndexingErrors;
+            if (this.chainParser) {
+                numIndexingErrors += this.chainParser.numParserErrors;
+            }
+            let numIndexingWarns = this.numIndexingWarns;
+            this.sendManagerStat(numIndexingErrors, numIndexingWarns, elapsedTS)
             return (r.xcmMeta);
         } catch (err) {
             console.log(err);
@@ -8151,9 +8197,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let specVersion = false
 
         await this.setup_chainParser(chain, this.debugLevel);
-
-        this.numIndexingErrors = 0;
-        this.numIndexingWarns = 0;
+        this.resetErrorWarnings()
         // NOTE: we do not set this.tallyAsset = {}
 
         this.currentPeriodKey = indexTS;
@@ -8331,14 +8375,17 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             numIndexingErrors += this.chainParser.numParserErrors;
         }
         let indexed = (numIndexingErrors == 0) ? 1 : 0;
+        // mark relaychain period's xcmIndexed = 0 and xcmReadyForIndexing = 1 if indexing is successful and without errors.
+        // this signals that the record is reeady for indexReindexXcm
+        let xcmReadyForIndexing = (this.isRelayChain && indexed)? 1 : 0;
         let numIndexingWarns = this.numIndexingWarns;
         let elapsedSeconds = (new Date().getTime() - indexStartTS) / 1000
         await this.upsertSQL({
             "table": "indexlog",
             "keys": ["chainID", "indexTS"],
-            "vals": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns"],
-            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', '${indexed}', 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}')`],
-            "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns"]
+            "vals": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"],
+            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', '${indexed}', 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}', 0, '${xcmReadyForIndexing}')`],
+            "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"]
         });
 
         await this.update_batchedSQL();

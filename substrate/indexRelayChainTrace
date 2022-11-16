@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// indexBlock [chainID] [blockNumber] [blockHash]
+// indexRelayChainTrace [chainID] [blockNumber] [blockExtra]
+
 var CrawlerManager = require("./crawlermanager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
@@ -39,14 +40,10 @@ async function main() {
     crawlermanager.exitOnDisconnect = true;
     await crawlermanager.initRelayCrawler(relayChainID)
     let relayCrawler = crawlermanager.getRelayCrawler()
+    if (relayCrawler == false) await crawlermanager.initRelayCrawler(relayChainID)
     let blocks = []
     for (let i = blockNumber; i < blockNumber+blockExtra; i++) {
-        let blockHash = await crawlermanager.getBlockHashFinalized(relayChainID, i)
-        let r = {
-            blockNumber: i,
-            blockHash: blockHash
-        }
-        blocks.push(r)
+        blocks.push(i)
     }
 
     if (debugLevel >= paraTool.debugInfo) console.log(`[relayChain=${relayCrawler.chain.chainName}] target blocks`, blocks)
@@ -59,7 +56,7 @@ async function main() {
     if (debugLevel >= paraTool.debugInfo) console.log(`blockRangeMap`, blockRangeMap)
     //TODO: not handling missing traces for now
     await crawlermanager.processIndexRangeMap(blockRangeMap)
-    let mMsg = crawlermanager.processReceivedmsg()
+    let mMsg = await crawlermanager.processReceivedManagerMsg(false)
     console.log(`mMsg`, mMsg)
 }
 

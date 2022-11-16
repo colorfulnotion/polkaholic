@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// while true; do ./indexReindex [chainID] [n] [nmax]; sleep 30; done
 
 var Crawler = require("./crawler");
 var paraTool = require("./paraTool");
