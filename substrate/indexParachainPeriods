@@ -35,7 +35,6 @@ async function main() {
     let crawlermanager = new CrawlerManager();
     await crawlermanager.initManagerState()
     crawlermanager.setDebugLevel(debugLevel)
-    crawlermanager.exitOnDisconnectAny = true;
     await crawlermanager.initRelayCrawler(relayChainID)
     for (const hr of hrs) {
         await crawlermanager.processXcmBlockRangePeriod(relayChainID, logDT, hr)

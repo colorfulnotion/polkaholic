@@ -23,14 +23,12 @@ async function main() {
     });
     if (chainID >= 0) {
 	var crawler = new Crawler();
-	crawler.exitOnDisconnect = true;
 	await crawler.assetManagerInit();
         await crawler.crawlTraces(chainID, ["mod", n, m], lookback);
 	await crawler.release(5000);
     } else {
         do {
 	    var crawler = new Crawler();
-	    crawler.exitOnDisconnect = true;
 	    await crawler.assetManagerInit();
             await crawler.crawlTracesRandom();
             await crawler.release(5000);

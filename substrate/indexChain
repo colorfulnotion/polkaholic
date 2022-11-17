@@ -9,19 +9,20 @@ async function main() {
             chainID = val;
         }
     });
-    // TODO: THIS causes problems on large writes
+    // TODO: exitOnDisconnect causes problems on large writes??
+    crawler.setExitOnDisconnect(false)
     // crawler.exitOnDisconnect = true;
     if ( chainID >= 0 ) {
        let crawler = new Crawler();
-	crawler.exitOnDisconnect = true;
-	let chain = await crawler.getChain(chainID);
-	await crawler.indexChain(chain, 60, true, true);
-	await crawler.sleep(3*1000);
+       crawler.setExitOnDisconnect(true)
+       let chain = await crawler.getChain(chainID);
+       await crawler.indexChain(chain, 60, true, true);
+       await crawler.sleep(3*1000);
     } else {
 	do {
 	    let crawler = new Crawler();
 	    await crawler.assetManagerInit();
-	    crawler.exitOnDisconnect = true;
+	    crawler.setExitOnDisconnect(true)
 	    let indexed = await crawler.indexChainRandom();
 	    if ( indexed ) {
 		await crawler.release(3*1000);

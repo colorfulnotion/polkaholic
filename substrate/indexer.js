@@ -93,6 +93,7 @@ module.exports = class Indexer extends AssetManager {
 
     xcmMetaMap = {};
     isRelayChain = false;
+    isMarkedForExit = false;
 
     wasmContractMap = {};
 
@@ -208,6 +209,10 @@ module.exports = class Indexer extends AssetManager {
 
     setLoggingContext(ctx) {
         this.context = ctx;
+    }
+
+    setMarkForExit(){
+        this.isMarkedForExit = 'errored'
     }
 
     log_indexing_error(err, op, obj = {}, showOnConsole = true) {

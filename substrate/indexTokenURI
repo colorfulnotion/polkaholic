@@ -10,8 +10,8 @@ async function main() {
             chainID = val;
         }
     });
-    // TODO: THIS causes problems on large writes
-    // crawler.exitOnDisconnect = true;
+    // TODO: exitOnDisconnect causes problems on large writes
+    crawler.setExitOnDisconnect(false);
     await crawler.assetManagerInit();
     if (chainID >= 0) {
         await crawler.crawlTokenURI(chainID);

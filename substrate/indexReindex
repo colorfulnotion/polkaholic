@@ -23,7 +23,6 @@ async function main() {
     });
     let chain = await crawler.getChain(chainID);
     await crawler.assetManagerInit();
-    crawler.exitOnDisconnect = true;
 
     await crawler.indexChain(chain, 60, false, false, true, ["mod", n, nmax]);
 }

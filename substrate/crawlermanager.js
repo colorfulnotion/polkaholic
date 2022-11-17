@@ -35,6 +35,7 @@ const paraTool = require("./paraTool");
 const Crawler = require("./crawler");
 const fs = require('fs');
 const path = require("path");
+//const { spawn } = require('child_process');
 
 module.exports = class CrawlerManager extends Crawler {
     constructor() {
@@ -79,7 +80,6 @@ module.exports = class CrawlerManager extends Crawler {
     crawlUsageMap = {};
 
     crawlerContext = false
-    exitOnDisconnectAny = true
     healthCheckTS = 0;
 
     resetManagerErrorWarnings(){
@@ -123,13 +123,16 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
     async paraCrawlerSelfTerminate(paraCrawler) {
-        //console.log(`paraCrawlerSelfTerminate this`, paraCrawler)
+        let maxDisconnectedCntAllowed = 10
+        let disconnectedCnt = paraCrawler.getDisconnectedCnt()
         let disconnected = paraCrawler.getDisconnected()
         let errrored = paraCrawler.getErrored()
-        console.log(`[${paraCrawler.chainID}:${paraCrawler.chainName}] paraCrawlerSelfTerminate called! [disconnected=${disconnected}, errored=${errrored}]`)
-        if (disconnected || errrored) {
-            console.log(`paraCrawler disconnect/errored, terminating`)
-            process.exit(1);
+        if (disconnectedCnt || disconnected || errrored) console.log(`[${paraCrawler.chainID}:${paraCrawler.chainName}] paraCrawlerSelfTerminate called! [Disconnected=${disconnected}, Errored=${errrored}, disconnectedCnt=${disconnectedCnt}]`)
+        if (disconnectedCnt >= maxDisconnectedCntAllowed) {
+            console.log(`[${paraCrawler.chainID}:${paraCrawler.chainName}] paraCrawler maxDisconnectedCnt(${maxDisconnectedCntAllowed}) reached, terminating`)
+            paraCrawler.setMarkForExit()
+            return false
+            //process.exit(1);
         }
     }
 
@@ -221,12 +224,8 @@ module.exports = class CrawlerManager extends Crawler {
             }
         }
         if (isFullPeriod) {
-            if (xcmIndex){
-                await this.write_relayxcm_log(xcmList)
-            }else{
-                //if xcmIndex. delete it
-                await this.write_relayxcm_log([])
-            }
+            //write for both cases
+            await this.write_relayxcm_log(xcmList)
         }
         this.receivedMsg = {}
         if (this.debugLevel >= paraTool.debugInfo) console.log(`processReceivedManagerMsg xcmList`, xcmList)
@@ -309,10 +308,12 @@ module.exports = class CrawlerManager extends Crawler {
         let initRelayCrawlerStartTS = new Date().getTime();
         let relayCrawler = new Crawler();
         relayCrawler.setDebugLevel(this.debugLevel)
+        relayCrawler.setExitOnDisconnect(false) //set disconnect here?
+        let isExitDisconneted = relayCrawler.getExitOnDisconnect()
+        console.log(`[relayChainID=${relayChainID}] isExitDisconneted=${isExitDisconneted}`)
         await relayCrawler.setupAPI(chain);
         await this.cloneAssetManager(relayCrawler) // clone from copy instead of initiating assetManagerInit again
         await relayCrawler.setupChainAndAPI(relayChainID);
-        relayCrawler.exitOnDisconnect = this.exitOnDisconnectAny //set disconnect here?
         relayCrawler.chain = chain
         this.relayCrawler = relayCrawler
         this.relayChainID = chain.chainID
@@ -335,21 +336,18 @@ module.exports = class CrawlerManager extends Crawler {
         if (this.relayChainIDs.includes(parachainID)) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`Expecting parachain. Got chain [${chain.chainID}:${chain.chainName}] instead`)
             return
-            //process.exit(0)
         }
+
         let paraCrawler = new Crawler();
         paraCrawler.setDebugLevel(this.debugLevel)
-        await paraCrawler.setupAPI(chain);
-        console.log(`[chainID=${parachainID}] showExitOnDisconnect here!!!`)
-        let isExitDisconneted = paraCrawler.getExitOnDisconnect()
-        console.log(`[chainID=${parachainID}] this.exitOnDisconnectAny=${this.exitOnDisconnectAny}, paraCrawler.exitOnDisconnect=${isExitDisconneted}`)
-        await this.cloneAssetManager(paraCrawler) // clone from copy instead of initiating assetManagerInit again
-        await paraCrawler.setupChainAndAPI(parachainID);
-        await paraCrawler.setParentRelayAndManager(this.relayCrawler, this)
-        paraCrawler.setExitOnDisconnect(this.exitOnDisconnectAny) //set disconnect here?
-        paraCrawler.chain = chain
+        paraCrawler.setExitOnDisconnect(false) //set disconnect here?
         // health check every 6s, if stalled, terminate paraCrawler accordingly
-        setInterval(this.paraCrawlerSelfTerminate, Math.round(6000), paraCrawler);
+        //setInterval(this.paraCrawlerSelfTerminate, Math.round(6000), paraCrawler);
+        //await paraCrawler.setupAPI(chain);
+        await paraCrawler.setupParaCrawlerChainAndAPI(parachainID);
+        await this.cloneAssetManager(paraCrawler) // clone from copy instead of initiating assetManagerInit again
+        await paraCrawler.setParentRelayAndManager(this.relayCrawler, this)
+        paraCrawler.chain = chain
         if (this.allCrawlers[parachainID] == undefined) this.allCrawlers[parachainID] = {}
         this.allCrawlers[parachainID] = paraCrawler
         paraCrawler.initTS =  new Date().getTime();
@@ -405,7 +403,7 @@ module.exports = class CrawlerManager extends Crawler {
                 this.crawlUsageMap[crawlerChainID].initStatus = `Failed`
                 //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} state`, crawlerInitState)
                 //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawler ${crawlerChainID} Failed! reason=${crawlerInitState['reason']}`)
-                this.log_manager_error(`${crawlerInitState['reason']}`, `batchCrawlerInit ${crawlerChainID}`, "crawlerInitState Failed", crawlerInitState);
+                this.log_manager_error(`${crawlerInitState['reason']}`, `batchCrawlerInit ${crawlerChainID}`, `crawlerInitState Failed`, crawlerInitState);
                 failedChainIDs.push(crawlerChainID)
             }
         }

@@ -14,7 +14,6 @@ async function main() {
         }
     });
     let crawler = new Crawler();
-    crawler.exitOnDisconnect = true;
     let chain = await crawler.getChain(chainID);
     await crawler.indexEVMTrace(chain, blockNumber);
     await crawler.sleep(3*1000);
