@@ -36,7 +36,7 @@ module.exports = class PolkaholicDB {
     finished = util.promisify(stream.finished);
     exitOnDisconnect = true;
     isDisconneted = false;
-    isError = false;
+    isErrored = false;
     // general purpose sql batches
     // Creates a Bunyan Cloud Logging client
     logger = false;
@@ -821,11 +821,38 @@ from chain where chainID = '${chainID}' limit 1`);
         return (chain.WSEndpoint);
     }
 
-    showExitOnDisconnect(){
-        console.log(`exitOnDisconnect!!!`, this.exitOnDisconnect)
-        return this.exitOnDisconnect
+    getExitOnDisconnect(){
+        let exitOnDisconnect = this.exitOnDisconnect
+        console.log(`getExitOnDisconnect=${exitOnDisconnect}`)
+        return exitOnDisconnect
     }
 
+    setExitOnDisconnect(exitOnDisconnect){
+        this.exitOnDisconnect = exitOnDisconnect
+        console.log(`setExitOnDisconnect=${this.exitOnDisconnect}`)
+    }
+
+    getDisconnected(){
+        let disconnected = this.isDisconneted
+        console.log(`Disconnected=${disconnected}`)
+        return disconnected
+    }
+
+    setDisconnected(isDisconneted=true){
+        this.isDisconneted = isDisconneted
+        console.log(`setDisconnected=${this.isDisconneted }`)
+    }
+
+    getErrored(){
+        let disconnected = this.isDisconneted
+        console.log(`Disconnected=${disconnected}`)
+        return disconnected
+    }
+
+    setErrored(isErrored=true){
+        this.isErrored = isErrored
+        console.log(`Errored=${this.isErrored}`)
+    }
 
     async get_api(chain, useWSBackfill = false) {
         const chainID = chain.chainID;
@@ -843,16 +870,20 @@ from chain where chainID = '${chainID}' limit 1`);
         const provider = new WsProvider(endpoint);
         let crawls2 = this
         provider.on('disconnected', () => {
-            this.isDisconneted = true
+            crawls2.setDisconnected(true)
+            let isDisconneted = crawls2.getDisconnected()
+            let exitOnDisconnect = crawls2.getExitOnDisconnect()
             console.log(`*** disconnected this`, crawls2)
-            console.log(`*CHAIN API DISCONNECTED [exitOnDisconnect=${crawls2.showExitOnDisconnect()}]  [disconnected=${crawls2.isDisconneted}]`, chain.chainID);
-            if (this.exitOnDisconnect) process.exit(1);
+            console.log(`*CHAIN API DISCONNECTED [exitOnDisconnect=${exitOnDisconnect}]  [disconnected=${isDisconneted}]`, chain.chainID);
+            if (exitOnDisconnect) process.exit(1);
         });
-        provider.on('connected', () => console.log(`*CHAIN API connected [exitOnDisconnect=${crawls2.showExitOnDisconnect()}]`, chain.chainID));
+        provider.on('connected', () => console.log(`*CHAIN API connected [exitOnDisconnect=${crawls2.getExitOnDisconnect()}]`, chain.chainID));
         provider.on('error', (error) => {
-            this.isError = true
+            crawls2.setErrored(true)
+            let isErrored = crawls2.getErrored()
+            let exitOnDisconnect = crawls2.getExitOnDisconnect()
             console.log(`*** ERROR this`, crawls2)
-            console.log(`CHAIN API error [exitOnDisconnect=${crawls2.showExitOnDisconnect()}] [errored=${crawls2.isError}]`, chain.chainID, error)
+            console.log(`CHAIN API error [exitOnDisconnect=${crawls2.getExitOnDisconnect()}] [errored=${isErrored}]`, chain.chainID, error)
         });
 
         var api = false;

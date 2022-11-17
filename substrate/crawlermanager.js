@@ -93,11 +93,17 @@ module.exports = class CrawlerManager extends Crawler {
     }
 
     showManagerTimeUsage(ctx="") {
+        let r = {
+            ctx: ctx,
+            managerTimeStat: this.managerTimeStat,
+            crawlUsageMap: this.crawlUsageMap
+        }
         if (this.debugLevel >= paraTool.debugInfo) {
             console.log(`${ctx}`)
             console.log(this.managerTimeStat)
             console.log(this.crawlUsageMap)
         }
+        this.log_manager_info(`processXcmBlockRangePeriod`, `showManagerTimeUsage ctx`, r);
     }
 
     showManagerCurrentMemoryUsage(ctx="") {
@@ -112,6 +118,17 @@ module.exports = class CrawlerManager extends Crawler {
         let maxAllowedTS = 600
         if (this.healthCheckTS > 0 && this.getCurrentTS() - this.healthCheckTS > maxAllowedTS) {
             console.log(`Manager Stalled for ${maxAllowedTS}, terminating`)
+            process.exit(1);
+        }
+    }
+
+    async paraCrawlerSelfTerminate(paraCrawler) {
+        //console.log(`paraCrawlerSelfTerminate this`, paraCrawler)
+        let disconnected = paraCrawler.getDisconnected()
+        let errrored = paraCrawler.getErrored()
+        console.log(`[${paraCrawler.chainID}:${paraCrawler.chainName}] paraCrawlerSelfTerminate called! [disconnected=${disconnected}, errored=${errrored}]`)
+        if (disconnected || errrored) {
+            console.log(`paraCrawler disconnect/errored, terminating`)
             process.exit(1);
         }
     }
@@ -140,6 +157,17 @@ module.exports = class CrawlerManager extends Crawler {
         obj.op = op;
         obj.err = err;
         this.logger.warn(obj);
+    }
+
+    log_manager_info(op, extra = '', obj = {}, showOnConsole = true) {
+        if (showOnConsole) {
+            console.log("Info", "extra", extra, "op", op, obj, this.crawlerContext);
+        }
+        obj.relayChainID = this.relayChainID;
+        obj.context = this.crawlerContext;
+        obj.extra = extra;
+        obj.op = op;
+        this.logger.info(obj);
     }
 
     sendManagerStat(chainID, wrapper) {
@@ -312,16 +340,16 @@ module.exports = class CrawlerManager extends Crawler {
         let paraCrawler = new Crawler();
         paraCrawler.setDebugLevel(this.debugLevel)
         await paraCrawler.setupAPI(chain);
+        console.log(`[chainID=${parachainID}] showExitOnDisconnect here!!!`)
+        let isExitDisconneted = paraCrawler.getExitOnDisconnect()
+        console.log(`[chainID=${parachainID}] this.exitOnDisconnectAny=${this.exitOnDisconnectAny}, paraCrawler.exitOnDisconnect=${isExitDisconneted}`)
         await this.cloneAssetManager(paraCrawler) // clone from copy instead of initiating assetManagerInit again
         await paraCrawler.setupChainAndAPI(parachainID);
         await paraCrawler.setParentRelayAndManager(this.relayCrawler, this)
-        paraCrawler.exitOnDisconnect = this.exitOnDisconnectAny //set disconnect here?
-        console.log(`[chainID=${parachainID}] showExitOnDisconnect here!!!`)
-        paraCrawler.showExitOnDisconnect()
-        console.log(`[chainID=${parachainID}] this.exitOnDisconnectAny=${this.exitOnDisconnectAny}, paraCrawler.exitOnDisconnect=${paraCrawler.exitOnDisconnect}`)
+        paraCrawler.setExitOnDisconnect(this.exitOnDisconnectAny) //set disconnect here?
         paraCrawler.chain = chain
         // health check every 6s, if stalled, terminate paraCrawler accordingly
-        setInterval(paraCrawler.paraCrawlerSelfTerminate, Math.round(6000), paraCrawler);
+        setInterval(this.paraCrawlerSelfTerminate, Math.round(6000), paraCrawler);
         if (this.allCrawlers[parachainID] == undefined) this.allCrawlers[parachainID] = {}
         this.allCrawlers[parachainID] = paraCrawler
         paraCrawler.initTS =  new Date().getTime();
