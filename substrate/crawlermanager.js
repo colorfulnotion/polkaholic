@@ -79,6 +79,7 @@ module.exports = class CrawlerManager extends Crawler {
     crawlUsageMap = {};
 
     crawlerContext = false
+    exitOnDisconnectAny = true
     healthCheckTS = 0;
 
     resetManagerErrorWarnings(){
@@ -283,6 +284,7 @@ module.exports = class CrawlerManager extends Crawler {
         await relayCrawler.setupAPI(chain);
         await this.cloneAssetManager(relayCrawler) // clone from copy instead of initiating assetManagerInit again
         await relayCrawler.setupChainAndAPI(relayChainID);
+        relayCrawler.exitOnDisconnect = this.exitOnDisconnectAny //set disconnect here?
         relayCrawler.chain = chain
         this.relayCrawler = relayCrawler
         this.relayChainID = chain.chainID
@@ -313,7 +315,13 @@ module.exports = class CrawlerManager extends Crawler {
         await this.cloneAssetManager(paraCrawler) // clone from copy instead of initiating assetManagerInit again
         await paraCrawler.setupChainAndAPI(parachainID);
         await paraCrawler.setParentRelayAndManager(this.relayCrawler, this)
+        paraCrawler.exitOnDisconnect = this.exitOnDisconnectAny //set disconnect here?
+        console.log(`[chainID=${parachainID}] showExitOnDisconnect here!!!`)
+        paraCrawler.showExitOnDisconnect()
+        console.log(`[chainID=${parachainID}] this.exitOnDisconnectAny=${this.exitOnDisconnectAny}, paraCrawler.exitOnDisconnect=${paraCrawler.exitOnDisconnect}`)
         paraCrawler.chain = chain
+        // health check every 6s, if stalled, terminate paraCrawler accordingly
+        setInterval(paraCrawler.paraCrawlerSelfTerminate, Math.round(6000), paraCrawler);
         if (this.allCrawlers[parachainID] == undefined) this.allCrawlers[parachainID] = {}
         this.allCrawlers[parachainID] = paraCrawler
         paraCrawler.initTS =  new Date().getTime();
@@ -758,6 +766,7 @@ module.exports = class CrawlerManager extends Crawler {
         for (let i = 0; i < indexlogs.length; i++) {
             let indexTS = indexlogs[i].indexTS
             let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+            console.log(`indexXcmBlockRangePeriod ${relayChainID} [${logDT} ${hr} | ${indexTS}]`)
             let isSuccess = await this.processXcmBlockRangePeriod(relayChainID, logDT, hr);
             if (isSuccess) {
                 //success

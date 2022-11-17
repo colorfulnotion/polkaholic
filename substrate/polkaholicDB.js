@@ -34,7 +34,9 @@ const {
 
 module.exports = class PolkaholicDB {
     finished = util.promisify(stream.finished);
-    exitOnDisconnect = false;
+    exitOnDisconnect = true;
+    isDisconneted = false;
+    isError = false;
     // general purpose sql batches
     // Creates a Bunyan Cloud Logging client
     logger = false;
@@ -819,6 +821,12 @@ from chain where chainID = '${chainID}' limit 1`);
         return (chain.WSEndpoint);
     }
 
+    showExitOnDisconnect(){
+        console.log(`exitOnDisconnect!!!`, this.exitOnDisconnect)
+        return this.exitOnDisconnect
+    }
+
+
     async get_api(chain, useWSBackfill = false) {
         const chainID = chain.chainID;
         const {
@@ -833,12 +841,19 @@ from chain where chainID = '${chainID}' limit 1`);
         } = require('@polkadot/types');
         let endpoint = await this.get_chain_hostname_endpoint(chain, useWSBackfill);
         const provider = new WsProvider(endpoint);
+        let crawls2 = this
         provider.on('disconnected', () => {
-            console.log('CHAIN API DISCONNECTED', chain.chainID);
+            this.isDisconneted = true
+            console.log(`*** disconnected this`, crawls2)
+            console.log(`*CHAIN API DISCONNECTED [exitOnDisconnect=${crawls2.showExitOnDisconnect()}]  [disconnected=${crawls2.isDisconneted}]`, chain.chainID);
             if (this.exitOnDisconnect) process.exit(1);
         });
-        provider.on('connected', () => console.log('chain API connected', chain.chainID));
-        provider.on('error', (error) => console.log('chain API error', chain.chainID));
+        provider.on('connected', () => console.log(`*CHAIN API connected [exitOnDisconnect=${crawls2.showExitOnDisconnect()}]`, chain.chainID));
+        provider.on('error', (error) => {
+            this.isError = true
+            console.log(`*** ERROR this`, crawls2)
+            console.log(`CHAIN API error [exitOnDisconnect=${crawls2.showExitOnDisconnect()}] [errored=${crawls2.isError}]`, chain.chainID, error)
+        });
 
         var api = false;
         // https://polkadot.js.org/docs/api/start/types.extend/
@@ -990,10 +1005,14 @@ from chain where chainID = '${chainID}' limit 1`);
 
         api.on('disconnected', () => {
             console.log('CHAIN API DISCONNECTED', chain.chainID);
+            this.isDisconneted = true
             if (this.exitOnDisconnect) process.exit(1);
         });
-        api.on('connected', () => console.log('chain API connected', chain.chainID));
-        api.on('error', (error) => console.log('chain API error', chain.chainID, error));
+        api.on('connected', () => console.log('CHAIN API connected', chain.chainID));
+        api.on('error', (error) => {
+            this.isError = true
+            console.log('CHAIN API error', chain.chainID, error)
+        });
         return api;
     }
 

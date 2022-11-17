@@ -234,6 +234,14 @@ module.exports = class Indexer extends AssetManager {
         this.logger.warn(obj);
     }
 
+    async paraCrawlerSelfTerminate() {
+        console.log(`paraCrawlerSelfTerminate called! [disconnected=${this.isDisconneted}, errored=${this.isError}]`)
+        if (this.isDisconneted || this.isError) {
+            console.log(`paraCrawler disconnect/errored, terminating`)
+            process.exit(1);
+        }
+    }
+
     resetErrorWarnings(){
         this.numIndexingErrors = 0
         this.numIndexingWarns = 0

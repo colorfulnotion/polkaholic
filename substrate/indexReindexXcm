@@ -36,7 +36,7 @@ async function main() {
     let chain = await crawlermanager.getChain(relayChainID);
     await crawlermanager.initManagerState()
     crawlermanager.setDebugLevel(debugLevel)
-    crawlermanager.exitOnDisconnect = true;
+    crawlermanager.exitOnDisconnectAny = true;
     //await crawlermanager.initRelayCrawler(relayChainID)
     await crawlermanager.indexXcmBlockRangePeriod(relayChainID, 60, false, false, true, ["mod", n, nmax]);
 }
