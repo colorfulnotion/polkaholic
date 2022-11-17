@@ -79,6 +79,7 @@ module.exports = class CrawlerManager extends Crawler {
     crawlUsageMap = {};
 
     crawlerContext = false
+    healthCheckTS = 0;
 
     resetManagerErrorWarnings(){
         this.xcmNumIndexingErrors = 0
@@ -103,6 +104,14 @@ module.exports = class CrawlerManager extends Crawler {
         if (this.debugLevel >= paraTool.debugVerbose) {
             console.log(`${ctx} USED: [${used}MB]`);
             console.log(this.stat);
+        }
+    }
+
+    async managerSelfTerminate() {
+        let maxAllowedTS = 600
+        if (this.healthCheckTS > 0 && this.getCurrentTS() - this.healthCheckTS > maxAllowedTS) {
+            console.log(`Manager Stalled for ${maxAllowedTS}, terminating`)
+            process.exit(1);
         }
     }
 
@@ -742,6 +751,10 @@ module.exports = class CrawlerManager extends Crawler {
             return (false);
         }
         let indexPeriodProcessedCnt = 0
+
+        // health check every min, if stalled for 10min, terminate crawler accordingly
+        setInterval(this.managerSelfTerminate, Math.round(60000), this);
+
         for (let i = 0; i < indexlogs.length; i++) {
             let indexTS = indexlogs[i].indexTS
             let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
@@ -767,6 +780,7 @@ module.exports = class CrawlerManager extends Crawler {
         let ctx = `${paraTool.getRelayChainByChainID(relayChainID)} ${logDT} ${hr} | ${indexTS}`
 
         this.crawlerContext = ctx
+        this.healthCheckTS = this.getCurrentTS()
         this.resetManagerErrorWarnings()
 
         //step 0: init relayCrawler if not cached
