@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// while true; do ./indexReindexXcm [relayChainID] [n] [nmax]; sleep 30; done
-
 var CrawlerManager = require("./crawlermanager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
@@ -31,12 +29,11 @@ async function main() {
         }
     });
     if (!relayChainIDs.includes(relayChainID)){
-        process.exit(1, `Invalid relay chainID provided ${relayChainID}`);
+        console.log(`Invalid relay chainID provided ${relayChainID}`)
     }
     let chain = await crawlermanager.getChain(relayChainID);
     await crawlermanager.initManagerState()
     crawlermanager.setDebugLevel(debugLevel)
-    crawlermanager.exitOnDisconnect = true;
     //await crawlermanager.initRelayCrawler(relayChainID)
     await crawlermanager.indexXcmBlockRangePeriod(relayChainID, 60, false, false, true, ["mod", n, nmax]);
 }

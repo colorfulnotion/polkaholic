@@ -37,7 +37,6 @@ async function main() {
     let crawlermanager = new CrawlerManager();
     await crawlermanager.initManagerState()
     crawlermanager.setDebugLevel(debugLevel)
-    crawlermanager.exitOnDisconnect = true;
     await crawlermanager.initRelayCrawler(relayChainID)
     let relayCrawler = crawlermanager.getRelayCrawler()
     if (relayCrawler == false) await crawlermanager.initRelayCrawler(relayChainID)

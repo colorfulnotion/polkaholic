@@ -34,7 +34,11 @@ const {
 
 module.exports = class PolkaholicDB {
     finished = util.promisify(stream.finished);
-    exitOnDisconnect = false;
+    exitOnDisconnect = true;
+    isDisconneted = false;
+    isConneted = false;
+    disconnectedCnt = 0;
+    isErrored = false;
     // general purpose sql batches
     // Creates a Bunyan Cloud Logging client
     logger = false;
@@ -784,6 +788,8 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async setupAPI(chain, backfill = false) {
+        this.chainID = chain.chainID;
+        this.chainName = chain.chainName;
         if (backfill) {
             chain.WSEndpoint = chain.WSBackfill
             console.log("API using backfill endpoint", chain.WSEndpoint);
@@ -797,8 +803,6 @@ from chain where chainID = '${chainID}' limit 1`);
                 this.contractABIs = await this.getContractABI();
             }
         }
-        this.chainID = chain.chainID;
-        this.chainName = chain.chainName;
     }
 
     async get_chain_hostname_endpoint(chain, useWSBackfill) {
@@ -819,6 +823,56 @@ from chain where chainID = '${chainID}' limit 1`);
         return (chain.WSEndpoint);
     }
 
+    getExitOnDisconnect() {
+        let exitOnDisconnect = this.exitOnDisconnect
+        return exitOnDisconnect
+    }
+
+    setExitOnDisconnect(exitOnDisconnect) {
+        this.exitOnDisconnect = exitOnDisconnect
+        //console.log(`*** setting ExitOnDisconnect=${this.exitOnDisconnect}`)
+    }
+
+    getDisconnectedCnt() {
+        let disconnectedCnt = this.disconnectedCnt
+        return disconnectedCnt
+    }
+
+    getDisconnected() {
+        let disconnected = this.isDisconneted
+        return disconnected
+    }
+
+    getConnected() {
+        let connected = this.isConneted
+        return connected
+    }
+
+    setConnected() {
+        //successful connection will overwrite its previous error state
+        this.isConneted = true
+        this.isDisconneted = false
+        this.isErrored = false
+        this.disconnectedCnt = 0
+    }
+
+    setDisconnected() {
+        this.isConneted = false
+        this.isDisconneted = true
+        this.disconnectedCnt += 1
+    }
+
+    getErrored() {
+        let errored = this.isErrored
+        return errored
+    }
+
+    setErrored() {
+        this.isConneted = false
+        this.isErrored = true
+        this.disconnectedCnt += 1
+    }
+
     async get_api(chain, useWSBackfill = false) {
         const chainID = chain.chainID;
         const {
@@ -833,12 +887,31 @@ from chain where chainID = '${chainID}' limit 1`);
         } = require('@polkadot/types');
         let endpoint = await this.get_chain_hostname_endpoint(chain, useWSBackfill);
         const provider = new WsProvider(endpoint);
+        //let crawls2 = this
         provider.on('disconnected', () => {
-            console.log('CHAIN API DISCONNECTED', chain.chainID);
-            if (this.exitOnDisconnect) process.exit(1);
+            this.setDisconnected()
+            let isDisconneted = this.getDisconnected()
+            let exitOnDisconnect = this.getExitOnDisconnect()
+            let disconnectedCnt = this.getDisconnectedCnt()
+            console.log(`*CHAIN API DISCONNECTED [exitOnDisconnect=${exitOnDisconnect}]  [disconnected=${isDisconneted}]`, chain.chainID);
+            if (exitOnDisconnect) process.exit(1);
+            if (disconnectedCnt >= 10) {
+                console.log(`*CHAIN API DISCONNECTED max fail reached!`, chain.chainID);
+                return false
+            }
+
         });
-        provider.on('connected', () => console.log('chain API connected', chain.chainID));
-        provider.on('error', (error) => console.log('chain API error', chain.chainID));
+        provider.on('connected', () => {
+            this.setConnected()
+            let exitOnDisconnect = this.getExitOnDisconnect()
+            console.log(`*CHAIN API connected [exitOnDisconnect=${exitOnDisconnect}]`, chain.chainID)
+        });
+        provider.on('error', (error) => {
+            this.setErrored()
+            let isErrored = this.getErrored()
+            let exitOnDisconnect = this.getExitOnDisconnect()
+            console.log(`CHAIN API error [exitOnDisconnect=${exitOnDisconnect}] [errored=${isErrored}]`, chain.chainID)
+        });
 
         var api = false;
         // https://polkadot.js.org/docs/api/start/types.extend/
@@ -989,11 +1062,19 @@ from chain where chainID = '${chainID}' limit 1`);
         }
 
         api.on('disconnected', () => {
+            this.setDisconnected()
             console.log('CHAIN API DISCONNECTED', chain.chainID);
             if (this.exitOnDisconnect) process.exit(1);
         });
-        api.on('connected', () => console.log('chain API connected', chain.chainID));
-        api.on('error', (error) => console.log('chain API error', chain.chainID, error));
+        api.on('connected', () => {
+            this.setConnected()
+            console.log('CHAIN API connected', chain.chainID)
+
+        });
+        api.on('error', (error) => {
+            this.setErrored()
+            console.log('CHAIN API error', chain.chainID, error)
+        });
         return api;
     }
 

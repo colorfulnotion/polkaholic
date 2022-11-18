@@ -80,11 +80,89 @@ module.exports = class Crawler extends Indexer {
         super("crawler")
     }
 
+    checkAPIStatus(self, chainID, maxDisconnectedCnt) {
+        let connected = self.getConnected()
+        let disconnectedCnt = self.getDisconnectedCnt()
+        // If the condition below is true the timer finishes
+        let apiInitStatus = 'pending'
+        if (disconnectedCnt >= maxDisconnectedCnt) {
+            console.log(`${chainID} checkAPIStatus MaxDisconnectedCnt(${maxDisconnectedCnt}) reached`)
+            apiInitStatus = 'terminate'
+        }
+        if (connected) {
+            console.log(`${chainID} checkAPIStatus connected!`)
+            apiInitStatus = 'done'
+        }
+        return apiInitStatus
+    }
+
+    waitMaxAPIRetry(callback, self, chainID, maxDisconnectedCnt) {
+        let checkIntervalMS = 500
+        let maxInteration = 30
+        return new Promise((_, reject) => {
+            let iteration = 0;
+            const interval = setInterval(async () => {
+                let apiInitStatus = await callback(self, chainID, maxDisconnectedCnt, interval)
+                if (apiInitStatus == 'terminate') {
+                    //console.log(`waitInterval`, callback)
+                    clearInterval(interval);
+                    //setTimeout(() => reject(new Error(`TERMINATING ${chainID} checkAPIStatus maxDisconnectedCnt reached!!!`)), 10);
+                    return reject(new Error(`TERMINATING ${chainID} checkAPIStatus maxDisconnectedCnt reached!!!`))
+                } else if (apiInitStatus == "done") {
+                    clearInterval(interval);
+                }
+                if (iteration >= maxInteration) {
+                    clearInterval(interval);
+                }
+                iteration++;
+            }, checkIntervalMS);
+        });
+    }
+
+    wait(maxTimeMS) {
+        return new Promise((_, reject) => {
+            setTimeout(() => reject(new Error(`TIMEOUT in ${maxTimeMS/1000}s`)), maxTimeMS);
+        });
+    }
+
+    async validateApi() {
+        //TODO
+        if (this.debugLevel > paraTool.debugVerbose) console.log(`[chainID=${this.chainID}], connected=${this.getConnected()}, exitOnDisconnect=${this.getExitOnDisconnect()}`)
+    }
+
+    async setupParaCrawlerChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
+        let maxTimeMS = 30000
+        let maxDisconnectedCnt = 3
+
+        let chain = await this.getChain(chainID, withSpecVersions);
+        let resolve = this.setupAPI(chain, backfill);
+        this.isRelayChain = paraTool.isRelayChain(chainID)
+        this.relayChain = chain.relayChain;
+
+        //race: {maxTimeMS reached, maxDisconnectedCnt reached, successfully initiated} whichever comes first
+        try {
+            await Promise.race([this.wait(maxTimeMS), resolve, this.waitMaxAPIRetry(this.checkAPIStatus, this, chainID, maxDisconnectedCnt)]);
+        } catch (err) {
+            if (this.debugLevel > paraTool.debugInfo) console.log(`race error cauth`, err);
+        }
+
+        let resolve2 = this.validateApi();
+        await new Promise((resolve2, reject) => {
+            setTimeout(() => {
+                if (this.getConnected()) {
+                    resolve2();
+                } else {
+                    return reject(new Error(`${chainID} setupChainAndAPI Errored`));
+                }
+            }, 10);
+        });
+        return (chain);
+    }
+
     async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
         let chain = await this.getChain(chainID, withSpecVersions);
-
-        await this.setupAPI(chain, backfill);
-
+        var resolve = this.setupAPI(chain, backfill);
+        var maxTimeMS = 10000
         this.isRelayChain = paraTool.isRelayChain(chainID)
         this.relayChain = chain.relayChain;
         return (chain);

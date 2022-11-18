@@ -17,7 +17,6 @@ async function main() {
     });
     let crawler = new Crawler();
     crawler.setDebugLevel(paraTool.debugTracing)
-    crawler.exitOnDisconnect = true;
     let chain = await crawler.getChain(chainID);
     await crawler.setupAPI(chain);
     await crawler.assetManagerInit();
@@ -63,7 +62,6 @@ async function main() {
         console.log(`[chainID:${chainID}] len=${blocks.length}`)
         let ccrawler = new Crawler();
         ccrawler.setDebugLevel(paraTool.debugTracing)
-        ccrawler.exitOnDisconnect = true;
         let chain = await crawler.getChain(chainID);
         await ccrawler.setupAPI(chain);
         await ccrawler.assetManagerInit();
