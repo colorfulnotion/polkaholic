@@ -161,8 +161,7 @@ module.exports = class Crawler extends Indexer {
 
     async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
         let chain = await this.getChain(chainID, withSpecVersions);
-        var resolve = this.setupAPI(chain, backfill);
-        var maxTimeMS = 10000
+        await this.setupAPI(chain, backfill);
         this.isRelayChain = paraTool.isRelayChain(chainID)
         this.relayChain = chain.relayChain;
         return (chain);
