@@ -37,6 +37,8 @@ const fs = require('fs');
 const path = require("path");
 //const { spawn } = require('child_process');
 
+const maxPeriodBeforeRestart = 25;
+
 module.exports = class CrawlerManager extends Crawler {
     constructor() {
         super("crawler")
@@ -81,6 +83,7 @@ module.exports = class CrawlerManager extends Crawler {
 
     crawlerContext = false
     healthCheckTS = 0;
+    completedPeriodCnt = 0;
 
     resetManagerErrorWarnings() {
         this.xcmNumIndexingErrors = 0
@@ -118,6 +121,10 @@ module.exports = class CrawlerManager extends Crawler {
         let maxAllowedTS = 600
         if (this.healthCheckTS > 0 && this.getCurrentTS() - this.healthCheckTS > maxAllowedTS) {
             console.log(`Manager Stalled for ${maxAllowedTS}, terminating`)
+            process.exit(1);
+        }
+        if (this.completedPeriodCnt >= maxPeriodBeforeRestart){
+            console.log(`Restarting Manager`)
             process.exit(1);
         }
     }
@@ -876,6 +883,7 @@ module.exports = class CrawlerManager extends Crawler {
         this.showManagerTimeUsage(ctx)
         this.showManagerCurrentMemoryUsage(ctx)
         this.resetManagerTimeUsage(ctx)
+        this.completedPeriodCnt ++
         return xcmIndexed
     }
 }

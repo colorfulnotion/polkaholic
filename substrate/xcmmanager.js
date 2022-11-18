@@ -256,7 +256,7 @@ module.exports = class XCMManager extends Query {
         }, sqlDebug);
     }
 
-    async updateHRMPChannelEvents() {
+    async updateHrmpChannelEvents() {
         let msgs = await this.poolREADONLY.query("select msgHash, sentAt, sourceTS, from_unixtime(sourceTS) as messageDT, chainID, chainIDDest, msgStr from xcmmessages where ((incoming = 0 and matched = 0) or ( incoming = 1 and matched = 1 )) and msgStr like '%hrmp%' limit 200000;");
         let openRequests = [];
         let accepts = [];
