@@ -823,27 +823,27 @@ from chain where chainID = '${chainID}' limit 1`);
         return (chain.WSEndpoint);
     }
 
-    getExitOnDisconnect(){
+    getExitOnDisconnect() {
         let exitOnDisconnect = this.exitOnDisconnect
         return exitOnDisconnect
     }
 
-    setExitOnDisconnect(exitOnDisconnect){
+    setExitOnDisconnect(exitOnDisconnect) {
         this.exitOnDisconnect = exitOnDisconnect
         //console.log(`*** setting ExitOnDisconnect=${this.exitOnDisconnect}`)
     }
 
-    getDisconnectedCnt(){
+    getDisconnectedCnt() {
         let disconnectedCnt = this.disconnectedCnt
         return disconnectedCnt
     }
 
-    getDisconnected(){
+    getDisconnected() {
         let disconnected = this.isDisconneted
         return disconnected
     }
 
-    getConnected(){
+    getConnected() {
         let connected = this.isConneted
         return connected
     }
@@ -856,18 +856,18 @@ from chain where chainID = '${chainID}' limit 1`);
         this.disconnectedCnt = 0
     }
 
-    setDisconnected(){
+    setDisconnected() {
         this.isConneted = false
         this.isDisconneted = true
         this.disconnectedCnt += 1
     }
 
-    getErrored(){
+    getErrored() {
         let errored = this.isErrored
         return errored
     }
 
-    setErrored(){
+    setErrored() {
         this.isConneted = false
         this.isErrored = true
         this.disconnectedCnt += 1
@@ -895,7 +895,7 @@ from chain where chainID = '${chainID}' limit 1`);
             let disconnectedCnt = this.getDisconnectedCnt()
             console.log(`*CHAIN API DISCONNECTED [exitOnDisconnect=${exitOnDisconnect}]  [disconnected=${isDisconneted}]`, chain.chainID);
             if (exitOnDisconnect) process.exit(1);
-            if (disconnectedCnt >= 10){
+            if (disconnectedCnt >= 10) {
                 console.log(`*CHAIN API DISCONNECTED max fail reached!`, chain.chainID);
                 return false
             }

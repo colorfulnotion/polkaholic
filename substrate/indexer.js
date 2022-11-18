@@ -211,7 +211,7 @@ module.exports = class Indexer extends AssetManager {
         this.context = ctx;
     }
 
-    setMarkForExit(){
+    setMarkForExit() {
         this.isMarkedForExit = 'errored'
     }
 
@@ -239,7 +239,7 @@ module.exports = class Indexer extends AssetManager {
         this.logger.warn(obj);
     }
 
-    resetErrorWarnings(){
+    resetErrorWarnings() {
         this.numIndexingErrors = 0
         this.numIndexingWarns = 0
     }
@@ -1400,10 +1400,10 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
-    sendManagerStat(numIndexingErrors, numIndexingWarns, elapsedSeconds){
+    sendManagerStat(numIndexingErrors, numIndexingWarns, elapsedSeconds) {
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`sendManagerStat numIndexingErrors=${numIndexingErrors}, numIndexingWarns=${numIndexingWarns}, elapsedSeconds=${elapsedSeconds}`)
         if (!this.parentManager) return
-        if (numIndexingErrors >= 0 && numIndexingWarns >= 0){
+        if (numIndexingErrors >= 0 && numIndexingWarns >= 0) {
             let m = {
                 blockHash: this.chainParser.parserBlockHash,
                 blockTS: this.chainParser.parserTS,
@@ -7656,7 +7656,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     async index_block(chain, blockNumber, blockHash = null) {
         this.resetErrorWarnings()
         let elapsedStartTS = new Date().getTime();
-        if (blockHash == undefined){
+        if (blockHash == undefined) {
             //need to fetch it..
             blockHash = await this.getBlockHashFinalized(chain.chainID, blockNumber)
         }
@@ -8382,7 +8382,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let indexed = (numIndexingErrors == 0) ? 1 : 0;
         // mark relaychain period's xcmIndexed = 0 and xcmReadyForIndexing = 1 if indexing is successful and without errors.
         // this signals that the record is reeady for indexReindexXcm
-        let xcmReadyForIndexing = (this.isRelayChain && indexed)? 1 : 0;
+        let xcmReadyForIndexing = (this.isRelayChain && indexed) ? 1 : 0;
         let numIndexingWarns = this.numIndexingWarns;
         let elapsedSeconds = (new Date().getTime() - indexStartTS) / 1000
         await this.upsertSQL({

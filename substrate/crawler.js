@@ -85,11 +85,11 @@ module.exports = class Crawler extends Indexer {
         let disconnectedCnt = self.getDisconnectedCnt()
         // If the condition below is true the timer finishes
         let apiInitStatus = 'pending'
-        if (disconnectedCnt >= maxDisconnectedCnt){
+        if (disconnectedCnt >= maxDisconnectedCnt) {
             console.log(`${chainID} checkAPIStatus MaxDisconnectedCnt(${maxDisconnectedCnt}) reached`)
             apiInitStatus = 'terminate'
         }
-        if (connected){
+        if (connected) {
             console.log(`${chainID} checkAPIStatus connected!`)
             apiInitStatus = 'done'
         }
@@ -108,9 +108,10 @@ module.exports = class Crawler extends Indexer {
                     clearInterval(interval);
                     //setTimeout(() => reject(new Error(`TERMINATING ${chainID} checkAPIStatus maxDisconnectedCnt reached!!!`)), 10);
                     return reject(new Error(`TERMINATING ${chainID} checkAPIStatus maxDisconnectedCnt reached!!!`))
-                }else if (apiInitStatus == "done"){
+                } else if (apiInitStatus == "done") {
                     clearInterval(interval);
-                } if (iteration >= maxInteration){
+                }
+                if (iteration >= maxInteration) {
                     clearInterval(interval);
                 }
                 iteration++;
@@ -119,12 +120,12 @@ module.exports = class Crawler extends Indexer {
     }
 
     wait(maxTimeMS) {
-       return new Promise((_, reject) => {
-          setTimeout(() => reject(new Error(`TIMEOUT in ${maxTimeMS/1000}s`)), maxTimeMS);
-       });
+        return new Promise((_, reject) => {
+            setTimeout(() => reject(new Error(`TIMEOUT in ${maxTimeMS/1000}s`)), maxTimeMS);
+        });
     }
 
-    async validateApi(){
+    async validateApi() {
         //TODO
         if (this.debugLevel > paraTool.debugVerbose) console.log(`[chainID=${this.chainID}], connected=${this.getConnected()}, exitOnDisconnect=${this.getExitOnDisconnect()}`)
     }
@@ -140,20 +141,20 @@ module.exports = class Crawler extends Indexer {
 
         //race: {maxTimeMS reached, maxDisconnectedCnt reached, successfully initiated} whichever comes first
         try {
-          await Promise.race([this.wait(maxTimeMS), resolve, this.waitMaxAPIRetry(this.checkAPIStatus, this, chainID, maxDisconnectedCnt)]);
-        } catch(err) {
-          if (this.debugLevel > paraTool.debugInfo) console.log(`race error cauth`, err);
+            await Promise.race([this.wait(maxTimeMS), resolve, this.waitMaxAPIRetry(this.checkAPIStatus, this, chainID, maxDisconnectedCnt)]);
+        } catch (err) {
+            if (this.debugLevel > paraTool.debugInfo) console.log(`race error cauth`, err);
         }
 
         let resolve2 = this.validateApi();
         await new Promise((resolve2, reject) => {
-          setTimeout(() => {
-             if (this.getConnected()){
-                 resolve2();
-             }else{
-                 return reject(new Error(`${chainID} setupChainAndAPI Errored`));
-             }
-         }, 10);
+            setTimeout(() => {
+                if (this.getConnected()) {
+                    resolve2();
+                } else {
+                    return reject(new Error(`${chainID} setupChainAndAPI Errored`));
+                }
+            }, 10);
         });
         return (chain);
     }
