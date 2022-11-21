@@ -196,17 +196,18 @@ module.exports = class Crawler extends Indexer {
                 console.log("NO data", traceData);
                 return false;
             }
+
             let eventsRaw = traceData.result.blockTrace.events;
             if (!eventsRaw || eventsRaw.length == 0) {
                 console.log("eventsRaw empty");
                 return [];
             }
-            let events = eventsRaw.map((e) => {
-                let sv = e.data.stringValues;
-                return ({
-                    k: sv.key,
-                    v: sv.value_encoded
-                });
+            let events = [];
+	    eventsRaw.forEach((e) => {
+                let sv = this.canonicalize_trace_stringValues(e.data.stringValues);
+		if ( sv ) {
+		    events.push(sv);
+		}
             });
             return (events);
         } catch (error) {
@@ -218,7 +219,22 @@ module.exports = class Crawler extends Indexer {
         }
         return false;
     }
-
+    
+    canonicalize_trace_stringValues(x) {
+	let k = "0x" + x.key;
+	let v = "";
+	if ( x.value ) {
+	    let value = x.value
+	    if ( value.includes("Some(") ) {
+		v = "01" + value.replace("Some(", "").replace(")", "")
+	    } else if ( x.value == "None" ) {
+		v = "00";
+	    }
+	    return { k, v: "0x" + v }
+	}
+	return null;
+    }
+    
     async crawlEvmTrace(chain, blockNumber, timeoutMS = 20000) {
         if (!chain.RPCBackfill) {
             return (false);
@@ -2112,15 +2128,40 @@ create table talismanEndpoint (
                         "chainID": chainID
                     }
 
+
                     // get trace from block
-                    let trace = await this.dedupChanges(results.changes);
+		    let trace = [];
+		    let traceType = "subscribeStorage";
+		    if ( chain.WSEndpointSelfHosted == 1 ) {
+			let traceBlock = await this.api.rpc.state.traceBlock(blockHash, "state", "", "Put");
+			if ( traceBlock ) {
+			    let traceBlockJSON = traceBlock.toJSON();
+			    if ( traceBlockJSON.blockTrace && traceBlockJSON.blockTrace.events ) {
+				let events = []
+				let changes = traceBlockJSON.blockTrace.events.forEach( (e) => {
+				    let x = this.canonicalize_trace_stringValues(e.data.stringValues);
+				    if ( x ) {
+					events.push(x);
+				    }
+				})
+				if ( events.length > 0 ) {
+				    traceType = "state_traceBlock"
+				    console.log("trace", trace);
+				    trace = events;
+				}
+			    }
+			}
+		    } else {
+			trace = await this.dedupChanges(results.changes);
+		    }
+
                     if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
                     let evmBlock = false
                     let evmReceipts = false
                     let evmTrace = false
 
                     // write { blockraw:blockHash => block, trace:blockHash => trace, events:blockHash => events } to bigtable
-                    let success = await this.save_block_trace(chainID, block, blockHash, events, trace, false, "subscribeStorage")
+                    let success = await this.save_block_trace(chainID, block, blockHash, events, trace, false, traceType);
                     if (success) {
                         // write to mysql
                         let blockTS = block.blockTS;
@@ -2130,7 +2171,7 @@ create table talismanEndpoint (
                             signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
                             //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
                             // IMPORTANT NOTE: we only need to do this for evm chains... (review)
-                            let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, "subscribeStorage", this.api);
+                            let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api);
                             let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces); // autotrace, finalized, write_bq_log are all false
 
                             await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
@@ -2168,9 +2209,6 @@ create table talismanEndpoint (
                                 "data": [out],
                                 "replace": vals
                             });
-                            /*
-                            {"name":"polkaholic","hostname":"kusama","pid":684112,"level":50,"op":"update_batchedSQL","sql":"insert into blockunfinalized (chainID,blockNumber,numExtrinsics,numSignedExtrinsics,numTransfers,numEvents,valueTransfersUSD,fees,lastTraceDT,blockHashEVM,parentHashEVM,numTransactionsEVM,numTransactionsInternalEVM,numReceiptsEVM,gasUsed,gasLimit) VALUES ('2004', '1868555', '0x1cf7a3838a8dcf9087251521e070023b9cd633c9d6a1dc777a4a5866822e1bc4', '15', '0', '2', '138', '26.831085319352944', from_unixtime(1663191949) , '', '', '0', '0', '0', '0', '0' ) on duplicate key update numExtrinsics=VALUES(numExtrinsics),numSignedExtrinsics=VALUES(numSignedExtrinsics),numTransfers=VALUES(numTransfers),numEvents=VALUES(numEvents),valueTransfersUSD=VALUES(valueTransfersUSD),fees=VALUES(fees),lastTraceDT=VALUES(lastTraceDT),blockHashEVM=VALUES(blockHashEVM),parentHashEVM=VALUES(parentHashEVM),numTransactionsEVM=VALUES(numTransactionsEVM),numTransactionsInternalEVM=VALUES(numTransactionsInternalEVM),numReceiptsEVM=VALUES(numReceiptsEVM),gasUsed=VALUES(gasUsed),gasLimit=VALUES(gasLimit)","len":981,"try":1,"err":{"code":"ER_WARN_DATA_TRUNCATED","errno":1265,"sqlState":"01000","sqlMessage":"Data truncated for column 'numExtrinsics' at row 1"
-                            */
                             //store unfinalized blockHashes in a single table shared across chains
                             let outunf = `('${chainID}', '${blockNumber}', '${blockHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
                             let vals2 = [...vals]; // same as other insert, but with
