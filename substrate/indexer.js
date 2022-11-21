@@ -1462,6 +1462,7 @@ module.exports = class Indexer extends AssetManager {
             source: this.hostname,
             commit: this.indexerInfo,
         }
+	
         const endpoint = "ws://kusama-internal.polkaholic.io:9101"
         try {
             const ws = new WebSocket(endpoint);
@@ -1472,6 +1473,25 @@ module.exports = class Indexer extends AssetManager {
         } catch (err) {
 
         }
+
+	if ( this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL ) {
+	    // TODO: only send this once, using a ws bigtable entry for the hash of the wrapper
+	    let cmd = `curl -X POST ${this.EXTERNAL_WS_PROVIDER_URL} -u "${this.EXTERNAL_WS_PROVIDER_KEY}" -H "Content-Type: application/json" --data '{"name": "xcminfo","data":"${JSON.stringify(wrapper)}"}'`
+	    try {
+		console.log(cmd);
+		const {
+                    stdout,
+                    stderr
+		} = exec(cmd, {
+                    maxBuffer: 1024 * 64000
+		});
+	    } catch (err) {
+		console.log(err);
+		this.logger.error({"op": "sendWSMessage",
+				   err})
+	    }
+	}
+	
     }
 
     //this is the xcmmessages table
@@ -3023,7 +3043,7 @@ module.exports = class Indexer extends AssetManager {
         try {
             let valueType = (queryMeta.type.isMap) ? queryMeta.type.asMap.value.toJSON() : queryMeta.type.asPlain.toJSON();
             let valueTypeDef = api.registry.metadata.lookup.getTypeDef(valueType).type;
-            let v = (val.length >= 2) ? val.substr(2).slice() : "";
+            let v = (val.length >= 2) ? val.substr(2).slice() : ""; // assume 01 "Some" prefix exists 
             if (valueTypeDef == "u128" || valueTypeDef == "u64" || valueTypeDef == "u32" || valueTypeDef == "u64" || valueTypeDef == "Balance") {
                 parsev = hexToBn(v, {
                     isLe: true
@@ -3032,9 +3052,9 @@ module.exports = class Indexer extends AssetManager {
                 switch (traceType) {
                     case "state_traceBlock":
                         if (api.createType != undefined) {
-                            parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // assume 01 "Some"/"None" is
+                            parsev = api.createType(valueTypeDef, "0x" + v).toString(); 
                         } else if (api.registry != undefined && this.apiAt.registry.createType != undefined) {
-                            parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                            parsev = api.registry.createType(valueTypeDef, "0x" + v).toString();
                         }
                         break;
                     case "subscribeStorage":
@@ -3102,7 +3122,7 @@ module.exports = class Indexer extends AssetManager {
             }
         } catch (err) {
             //MK: temporary silent this. will revisit again
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${o.traceID}] SOURCE: pv`, err);
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${o.traceID}] SOURCE: pv`, traceType, k, val, err);
             this.numIndexingWarns++;
         }
         let paddedK = (kk.substr(0, 2) == '0x') ? kk : '0x' + kk
