@@ -50,14 +50,19 @@ async function main() {
             lastUpdateTS = manager.getCurrentTS()
             await manager.assetManagerInit();
             let lastGeneralUpdateTSAgo = manager.getCurrentTS() - lastGeneralUpdateTS
-	    if ( lastGeneralUpdateTSAgo > 3600 ) {
-		await manager.update_xcmlogs(1);
-		await manager.updateXcAssetContractAddr()
-		await manager.updateXcmTransferRoute();
-		await manager.updateHrmpChannelEvents();
-		lastGeneralUpdateTS = manager.getCurrentTS();
-	    }
-	}
+            if ( lastGeneralUpdateTSAgo > 3600 ) {
+                console.log(`[${manager.getCurrentTS()}] update_xcmlogs ...`)
+                await manager.update_xcmlogs(1);
+                console.log(`[${manager.getCurrentTS()}] updateXcAssetContractAddr ...`)
+                await manager.updateXcAssetContractAddr()
+                console.log(`[${manager.getCurrentTS()}] updateXcmTransferRoute ...`)
+                await manager.updateXcmTransferRoute();
+                console.log(`[${manager.getCurrentTS()}] updateHrmpChannelEvents ...`)
+                await manager.updateHrmpChannelEvents();
+                lastGeneralUpdateTS = manager.getCurrentTS();
+                console.log(`[${manager.getCurrentTS()}] update DONE`)
+            }
+        }
     } while (true);
 }
 
