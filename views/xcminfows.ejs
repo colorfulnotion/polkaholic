@@ -1,0 +1,81 @@
+<html>
+<header>
+<script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+</header>
+<body>
+<h2>Polkaholic.io XCM Info Channel</h2>
+
+The Polkaholic.io XCM Info Channel service, powered by polkaholic.io XCM indexing of <a href='/xcmtransfers?xcmtype=xcmtransfer'>XCM Transfers</a> + <a href='/xcmtransfers?xcmtype=xcmtransact'>Remote Executions</a>, pipes real-time "XCM Info" JSON objects coming through a Web Socket Channel.  Polkadot dapps can subscribe to "xcm info" streams in real-time by:
+<ul>
+  <li>chain (e.g. "moonbeam") ( both as origin or destination )</li>
+  <li>extrinsic hash or transaction hash (e.g. "0xc636bb048e6bdb0b9e13fd3d6b4433256076ff97a64ecb9fb8088c016c45445e")</li>
+</ul>
+You need an API key from <a href="http://ably.com">Ably</a> to subscribe to this "xcminfo" channel, and to pick a chain/hash to subscribe to.<br/>
+
+<h5>Demonstration</h5>
+<p>
+  Use "View Console" and "View source" to see xcminfo data in real-time, where "xcm info" messages are sent on the key events:
+  <ul>
+    <li>Origin chain Unfinalized</li>
+    <li>Origin chain Finalized</li>
+    <li>Destination chain Finalized</li>
+  </ul>
+  In the event of any failure to send from the origination chain, nothing is sent concerning the destination chain.  The last message is shown below.  
+</p>
+
+<h5>Last Message</h5>
+
+<div><b>Name:</b></div>
+<div id="name">waiting...</div>
+
+<div><b>Data:</b></div>
+<textarea id="data" style="width: 100%; height: 300px">
+  waiting...
+</textarea>
+
+<h5>How to Use: Browser XCMInfo Subscription</h5>
+
+
+<code>
+  // setup ably realtime <br/>
+  &lt;script src="https://cdn.ably.com/lib/ably.min-1.js"&gt;&lt;/script&gt;<br/>
+  <p>
+    // setup client and channel -- use your own API key here from ably <br/>
+    var client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");
+    var channel = client.channels.get("xcminfo");
+  <p>
+    // setup subscription <br/>
+  channel.subscribe(function (message) {<br/>
+    console.log(message);<br/>
+    // show feedback in app, send to analytics log, ...<br/>
+  });<br/>
+</code>
+
+
+<script>
+  function show_message(message, ctx) {
+      console.log(ctx, message.name, message.data);
+      document.getElementById("name").innerHTML = message.name;
+      document.getElementById("data").innerHTML = JSON.stringify(message.data);
+  }
+  // use your own API key here from ably
+  var client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");
+  var channel = client.channels.get("xcminfo");
+  channel.subscribe(function (message) {
+      show_message(message, "all");
+  });
+  
+  // to subscribe to a specific chain:
+  let chain = "moonbeam";
+  channel.subscribe(chain, function (message) {
+      show_message(message, chain);
+  });
+
+  // to subscribe to a specific tx/extrinsic hash
+  let hash = "0xc636bb048e6bdb0b9e13fd3d6b4433256076ff97a64ecb9fb8088c016c45445e";
+  channel.subscribe(hash, function (message) {
+      show_message(message);
+  });
+</script>
+</body>
+</html>
