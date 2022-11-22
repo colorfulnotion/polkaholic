@@ -256,7 +256,7 @@ module.exports = class XCMManager extends Query {
         }, sqlDebug);
     }
 
-    async updateHRMPChannelEvents() {
+    async updateHrmpChannelEvents() {
         let msgs = await this.poolREADONLY.query("select msgHash, sentAt, sourceTS, from_unixtime(sourceTS) as messageDT, chainID, chainIDDest, msgStr from xcmmessages where ((incoming = 0 and matched = 0) or ( incoming = 1 and matched = 1 )) and msgStr like '%hrmp%' limit 200000;");
         let openRequests = [];
         let accepts = [];
@@ -1049,6 +1049,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
+			    this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
                             console.log(`!!!!buildSuccessXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo, 'e', e)
                             continue
@@ -1547,6 +1548,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord)
+			    this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
                             console.log(`!!!!buildFailedXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
                             continue

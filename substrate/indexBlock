@@ -20,7 +20,6 @@ async function main() {
     });
     let crawler = new Crawler();
     crawler.setDebugLevel(paraTool.debugTracing)
-    crawler.exitOnDisconnect = true;
     let chain = await crawler.getChain(chainID);
     await crawler.setupAPI(chain);
     await crawler.assetManagerInit();

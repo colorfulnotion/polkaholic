@@ -20,10 +20,11 @@ const {
     Bigtable
 } = require("@google-cloud/bigtable");
 const stream = require("stream");
-const util = require("util");
 const paraTool = require("./paraTool.js");
 const mysql = require("mysql2");
 const bunyan = require('bunyan');
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const os = require("os");
 
@@ -34,7 +35,11 @@ const {
 
 module.exports = class PolkaholicDB {
     finished = util.promisify(stream.finished);
-    exitOnDisconnect = false;
+    exitOnDisconnect = true;
+    isDisconneted = false;
+    isConneted = false;
+    disconnectedCnt = 0;
+    isErrored = false;
     // general purpose sql batches
     // Creates a Bunyan Cloud Logging client
     logger = false;
@@ -62,6 +67,11 @@ module.exports = class PolkaholicDB {
 
     POLKAHOLIC_EMAIL_USER = "";
     POLKAHOLIC_EMAIL_PASSWORD = "";
+
+    EXTERNAL_WS_PROVIDER_URL = null;
+    EXTERNAL_WS_PROVIDER_KEY = null;
+
+    WSProviderQueue = [];
 
     constructor(serviceName = "polkaholic") {
 
@@ -103,6 +113,11 @@ module.exports = class PolkaholicDB {
                 this.GC_STORAGE_BUCKET = dbconfig.gc.storageBucket;
                 this.GC_BIGQUERY_DATASET = dbconfig.gc.bigqueryDataset;
             }
+            if (dbconfig.ws != undefined) {
+                this.EXTERNAL_WS_PROVIDER_KEY = dbconfig.ws.key;
+                this.EXTERNAL_WS_PROVIDER_URL = dbconfig.ws.url;
+            }
+
             this.pool = mysql.createPool(this.convert_dbconfig(dbconfig.client));
             // Ping WRITABLE database to check for common exception errors.
             this.pool.getConnection((err, connection) => {
@@ -784,6 +799,8 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async setupAPI(chain, backfill = false) {
+        this.chainID = chain.chainID;
+        this.chainName = chain.chainName;
         if (backfill) {
             chain.WSEndpoint = chain.WSBackfill
             console.log("API using backfill endpoint", chain.WSEndpoint);
@@ -797,8 +814,6 @@ from chain where chainID = '${chainID}' limit 1`);
                 this.contractABIs = await this.getContractABI();
             }
         }
-        this.chainID = chain.chainID;
-        this.chainName = chain.chainName;
     }
 
     async get_chain_hostname_endpoint(chain, useWSBackfill) {
@@ -819,6 +834,56 @@ from chain where chainID = '${chainID}' limit 1`);
         return (chain.WSEndpoint);
     }
 
+    getExitOnDisconnect() {
+        let exitOnDisconnect = this.exitOnDisconnect
+        return exitOnDisconnect
+    }
+
+    setExitOnDisconnect(exitOnDisconnect) {
+        this.exitOnDisconnect = exitOnDisconnect
+        //console.log(`*** setting ExitOnDisconnect=${this.exitOnDisconnect}`)
+    }
+
+    getDisconnectedCnt() {
+        let disconnectedCnt = this.disconnectedCnt
+        return disconnectedCnt
+    }
+
+    getDisconnected() {
+        let disconnected = this.isDisconneted
+        return disconnected
+    }
+
+    getConnected() {
+        let connected = this.isConneted
+        return connected
+    }
+
+    setConnected() {
+        //successful connection will overwrite its previous error state
+        this.isConneted = true
+        this.isDisconneted = false
+        this.isErrored = false
+        this.disconnectedCnt = 0
+    }
+
+    setDisconnected() {
+        this.isConneted = false
+        this.isDisconneted = true
+        this.disconnectedCnt += 1
+    }
+
+    getErrored() {
+        let errored = this.isErrored
+        return errored
+    }
+
+    setErrored() {
+        this.isConneted = false
+        this.isErrored = true
+        this.disconnectedCnt += 1
+    }
+
     async get_api(chain, useWSBackfill = false) {
         const chainID = chain.chainID;
         const {
@@ -833,12 +898,31 @@ from chain where chainID = '${chainID}' limit 1`);
         } = require('@polkadot/types');
         let endpoint = await this.get_chain_hostname_endpoint(chain, useWSBackfill);
         const provider = new WsProvider(endpoint);
+        //let crawls2 = this
         provider.on('disconnected', () => {
-            console.log('CHAIN API DISCONNECTED', chain.chainID);
-            if (this.exitOnDisconnect) process.exit(1);
+            this.setDisconnected()
+            let isDisconneted = this.getDisconnected()
+            let exitOnDisconnect = this.getExitOnDisconnect()
+            let disconnectedCnt = this.getDisconnectedCnt()
+            console.log(`*CHAIN API DISCONNECTED [exitOnDisconnect=${exitOnDisconnect}]  [disconnected=${isDisconneted}]`, chain.chainID);
+            if (exitOnDisconnect) process.exit(1);
+            if (disconnectedCnt >= 10) {
+                console.log(`*CHAIN API DISCONNECTED max fail reached!`, chain.chainID);
+                return false
+            }
+
         });
-        provider.on('connected', () => console.log('chain API connected', chain.chainID));
-        provider.on('error', (error) => console.log('chain API error', chain.chainID));
+        provider.on('connected', () => {
+            this.setConnected()
+            let exitOnDisconnect = this.getExitOnDisconnect()
+            console.log(`*CHAIN API connected [exitOnDisconnect=${exitOnDisconnect}]`, chain.chainID)
+        });
+        provider.on('error', (error) => {
+            this.setErrored()
+            let isErrored = this.getErrored()
+            let exitOnDisconnect = this.getExitOnDisconnect()
+            console.log(`CHAIN API error [exitOnDisconnect=${exitOnDisconnect}] [errored=${isErrored}]`, chain.chainID)
+        });
 
         var api = false;
         // https://polkadot.js.org/docs/api/start/types.extend/
@@ -989,11 +1073,19 @@ from chain where chainID = '${chainID}' limit 1`);
         }
 
         api.on('disconnected', () => {
+            this.setDisconnected()
             console.log('CHAIN API DISCONNECTED', chain.chainID);
             if (this.exitOnDisconnect) process.exit(1);
         });
-        api.on('connected', () => console.log('chain API connected', chain.chainID));
-        api.on('error', (error) => console.log('chain API error', chain.chainID, error));
+        api.on('connected', () => {
+            this.setConnected()
+            console.log('CHAIN API connected', chain.chainID)
+
+        });
+        api.on('error', (error) => {
+            this.setErrored()
+            console.log('CHAIN API error', chain.chainID, error)
+        });
         return api;
     }
 
@@ -1249,5 +1341,39 @@ from chain where chainID = '${chainID}' limit 1`);
 
     capitalizeFirstLetter(string) {
         return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    sendExternalWSProvider(name, msg) {
+	if ( this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL ) {
+	    this.WSProviderQueue.push(msg);
+	}
+    }
+
+    async flushWSProviderQueue(name = "xcminfo") {
+	if ( this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL ) {
+	    for ( let i = 0; i < this.WSProviderQueue.length; i++) {
+		let msg = this.WSProviderQueue[i];
+		// TODO: only send this once, using a ws bigtable entry for the hash of the wrapper
+		let x = {"name": name, "data": msg}
+		let cmd = `curl -X POST ${this.EXTERNAL_WS_PROVIDER_URL} -u "${this.EXTERNAL_WS_PROVIDER_KEY}" --max-time 5 -H "Content-Type: application/json" --data '${JSON.stringify(x)}'`
+		try {
+		    const {
+			stdout,
+			stderr
+		    } = await exec(cmd, {
+			maxBuffer: 1024 * 64000
+		    });
+		    this.logger.info({"op": "flushWSProviderQueue",
+				      cmd})
+		} catch (err) {
+		    console.log(err);
+		    this.logger.error({"op": "flushWSProviderQueue",
+				       err})
+		}
+	    }
+	    this.WSProviderQueue = [];
+	} else {
+	    console.log("-----WSPROVIDER", this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL);
+	}
     }
 }

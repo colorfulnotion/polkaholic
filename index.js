@@ -2154,7 +2154,7 @@ app.get('/error', async (req, res) => {
 
 app.get('/features', async (req, res) => {
     res.render('features', {
-        chainInfo: query.getChainInfo()
+       
     });
 })
 

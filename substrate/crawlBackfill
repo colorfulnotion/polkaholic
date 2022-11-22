@@ -20,7 +20,6 @@ async function main() {
 
     var crawler = new Crawler();
     await crawler.assetManagerInit();
-    crawler.exitOnDisconnect = true;
     var chain = await crawler.getChain(chainID);
     await crawler.crawlBackfill(chain, ["mod", n, nmax], true);
     await crawler.release();

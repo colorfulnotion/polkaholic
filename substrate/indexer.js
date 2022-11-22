@@ -93,6 +93,7 @@ module.exports = class Indexer extends AssetManager {
 
     xcmMetaMap = {};
     isRelayChain = false;
+    isMarkedForExit = false;
 
     wasmContractMap = {};
 
@@ -210,6 +211,10 @@ module.exports = class Indexer extends AssetManager {
         this.context = ctx;
     }
 
+    setMarkForExit() {
+        this.isMarkedForExit = 'errored'
+    }
+
     log_indexing_error(err, op, obj = {}, showOnConsole = true) {
         this.numIndexingErrors++;
         if (showOnConsole) {
@@ -234,7 +239,7 @@ module.exports = class Indexer extends AssetManager {
         this.logger.warn(obj);
     }
 
-    resetErrorWarnings(){
+    resetErrorWarnings() {
         this.numIndexingErrors = 0
         this.numIndexingWarns = 0
     }
@@ -734,6 +739,7 @@ module.exports = class Indexer extends AssetManager {
         }
         this.showCurrentMemoryUsage()
 
+	await this.flushWSProviderQueue();
         let immediateFlushStartTS = new Date().getTime();
         await this.immediateFlushBlockAndAddressExtrinsics(isTip)
         let immediateFlushTS = (new Date().getTime() - immediateFlushStartTS) / 1000
@@ -1395,10 +1401,10 @@ module.exports = class Indexer extends AssetManager {
         this.xcmmsgSentAtUnknownMap = {}
     }
 
-    sendManagerStat(numIndexingErrors, numIndexingWarns, elapsedSeconds){
+    sendManagerStat(numIndexingErrors, numIndexingWarns, elapsedSeconds) {
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`sendManagerStat numIndexingErrors=${numIndexingErrors}, numIndexingWarns=${numIndexingWarns}, elapsedSeconds=${elapsedSeconds}`)
         if (!this.parentManager) return
-        if (numIndexingErrors >= 0 && numIndexingWarns >= 0){
+        if (numIndexingErrors >= 0 && numIndexingWarns >= 0) {
             let m = {
                 blockHash: this.chainParser.parserBlockHash,
                 blockTS: this.chainParser.parserTS,
@@ -1457,6 +1463,7 @@ module.exports = class Indexer extends AssetManager {
             source: this.hostname,
             commit: this.indexerInfo,
         }
+
         const endpoint = "ws://kusama-internal.polkaholic.io:9101"
         try {
             const ws = new WebSocket(endpoint);
@@ -1464,9 +1471,13 @@ module.exports = class Indexer extends AssetManager {
             ws.on('open', function open() {
                 ws.send(JSON.stringify(wrapper));
             });
+	    if ( msgType == "xcmtransfer" && m.xcmInfo )  {
+		this.sendExternalWSProvider("xcminfo", m.xcmInfo);
+	    }
         } catch (err) {
 
         }
+
     }
 
     //this is the xcmmessages table
@@ -3018,7 +3029,7 @@ module.exports = class Indexer extends AssetManager {
         try {
             let valueType = (queryMeta.type.isMap) ? queryMeta.type.asMap.value.toJSON() : queryMeta.type.asPlain.toJSON();
             let valueTypeDef = api.registry.metadata.lookup.getTypeDef(valueType).type;
-            let v = (val.length >= 2) ? val.substr(2).slice() : "";
+            let v = (val.length >= 2) ? val.substr(2).slice() : ""; // assume 01 "Some" prefix exists
             if (valueTypeDef == "u128" || valueTypeDef == "u64" || valueTypeDef == "u32" || valueTypeDef == "u64" || valueTypeDef == "Balance") {
                 parsev = hexToBn(v, {
                     isLe: true
@@ -3027,9 +3038,9 @@ module.exports = class Indexer extends AssetManager {
                 switch (traceType) {
                     case "state_traceBlock":
                         if (api.createType != undefined) {
-                            parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // assume 01 "Some"/"None" is
+                            parsev = api.createType(valueTypeDef, hexToU8a("0x" + v)).toString();
                         } else if (api.registry != undefined && this.apiAt.registry.createType != undefined) {
-                            parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                            parsev = api.registry.createType(valueTypeDef, hexToU8a("0x" + v)).toString();
                         }
                         break;
                     case "subscribeStorage":
@@ -3097,7 +3108,7 @@ module.exports = class Indexer extends AssetManager {
             }
         } catch (err) {
             //MK: temporary silent this. will revisit again
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${o.traceID}] SOURCE: pv`, err);
+            if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${o.traceID}] SOURCE: pv`, traceType, k, val, err);
             this.numIndexingWarns++;
         }
         let paddedK = (kk.substr(0, 2) == '0x') ? kk : '0x' + kk
@@ -7611,7 +7622,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let processBlockEventsStartTS = new Date().getTime()
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
             let tracesPresent = (r.trace) ? true : false;
-            let [blockStats, xcmMeta] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, true, write_bq_log, isTip, tracesPresent);
+            let isFinalized = true
+            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false)
+            let [blockStats, xcmMeta] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, isFinalized, write_bq_log, isTip, tracesPresent);
             r.blockStats = blockStats
             r.xcmMeta = xcmMeta
 
@@ -7651,7 +7664,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     async index_block(chain, blockNumber, blockHash = null) {
         this.resetErrorWarnings()
         let elapsedStartTS = new Date().getTime();
-        if (blockHash == undefined){
+        if (blockHash == undefined) {
             //need to fetch it..
             blockHash = await this.getBlockHashFinalized(chain.chainID, blockNumber)
         }
@@ -8377,7 +8390,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let indexed = (numIndexingErrors == 0) ? 1 : 0;
         // mark relaychain period's xcmIndexed = 0 and xcmReadyForIndexing = 1 if indexing is successful and without errors.
         // this signals that the record is reeady for indexReindexXcm
-        let xcmReadyForIndexing = (this.isRelayChain && indexed)? 1 : 0;
+        let xcmReadyForIndexing = (this.isRelayChain && indexed) ? 1 : 0;
         let numIndexingWarns = this.numIndexingWarns;
         let elapsedSeconds = (new Date().getTime() - indexStartTS) / 1000
         await this.upsertSQL({

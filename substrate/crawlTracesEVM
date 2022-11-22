@@ -7,7 +7,6 @@ async function main() {
     var crawler = new Crawler();
     let n = 0;
     let nmax = 1;
-    crawler.exitOnDisconnect = true;
     await crawler.assetManagerInit();
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {

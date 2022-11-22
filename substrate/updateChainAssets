@@ -14,14 +14,13 @@ async function main() {
         }
     });
 
-    
+
     if ( chainID >= 0 ) {
        let crawler = new Crawler();
-	crawler.exitOnDisconnect = true;
-	let chain = await crawler.getChain(chainID);
-	await crawler.assetManagerInit();
-	await crawler.updateChainAssetHoldersBalances(chain); 
-	await crawler.updateChainAssets(chainID, daysago);
+       let chain = await crawler.getChain(chainID);
+       await crawler.assetManagerInit();
+       await crawler.updateChainAssetHoldersBalances(chain);
+       await crawler.updateChainAssets(chainID, daysago);
     }
 }
 

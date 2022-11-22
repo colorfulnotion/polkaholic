@@ -80,11 +80,88 @@ module.exports = class Crawler extends Indexer {
         super("crawler")
     }
 
+    checkAPIStatus(self, chainID, maxDisconnectedCnt) {
+        let connected = self.getConnected()
+        let disconnectedCnt = self.getDisconnectedCnt()
+        // If the condition below is true the timer finishes
+        let apiInitStatus = 'pending'
+        if (disconnectedCnt >= maxDisconnectedCnt) {
+            console.log(`${chainID} checkAPIStatus MaxDisconnectedCnt(${maxDisconnectedCnt}) reached`)
+            apiInitStatus = 'terminate'
+        }
+        if (connected) {
+            console.log(`${chainID} checkAPIStatus connected!`)
+            apiInitStatus = 'done'
+        }
+        return apiInitStatus
+    }
+
+    waitMaxAPIRetry(callback, self, chainID, maxDisconnectedCnt) {
+        let checkIntervalMS = 500
+        let maxInteration = 30
+        return new Promise((_, reject) => {
+            let iteration = 0;
+            const interval = setInterval(async () => {
+                let apiInitStatus = await callback(self, chainID, maxDisconnectedCnt, interval)
+                if (apiInitStatus == 'terminate') {
+                    //console.log(`waitInterval`, callback)
+                    clearInterval(interval);
+                    //setTimeout(() => reject(new Error(`TERMINATING ${chainID} checkAPIStatus maxDisconnectedCnt reached!!!`)), 10);
+                    return reject(new Error(`TERMINATING ${chainID} checkAPIStatus maxDisconnectedCnt reached!!!`))
+                } else if (apiInitStatus == "done") {
+                    clearInterval(interval);
+                }
+                if (iteration >= maxInteration) {
+                    clearInterval(interval);
+                }
+                iteration++;
+            }, checkIntervalMS);
+        });
+    }
+
+    wait(maxTimeMS) {
+        return new Promise((_, reject) => {
+            setTimeout(() => reject(new Error(`TIMEOUT in ${maxTimeMS/1000}s`)), maxTimeMS);
+        });
+    }
+
+    async validateApi() {
+        //TODO
+        if (this.debugLevel > paraTool.debugVerbose) console.log(`[chainID=${this.chainID}], connected=${this.getConnected()}, exitOnDisconnect=${this.getExitOnDisconnect()}`)
+    }
+
+    async setupParaCrawlerChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
+        let maxTimeMS = 30000
+        let maxDisconnectedCnt = 3
+
+        let chain = await this.getChain(chainID, withSpecVersions);
+        let resolve = this.setupAPI(chain, backfill);
+        this.isRelayChain = paraTool.isRelayChain(chainID)
+        this.relayChain = chain.relayChain;
+
+        //race: {maxTimeMS reached, maxDisconnectedCnt reached, successfully initiated} whichever comes first
+        try {
+            await Promise.race([this.wait(maxTimeMS), resolve, this.waitMaxAPIRetry(this.checkAPIStatus, this, chainID, maxDisconnectedCnt)]);
+        } catch (err) {
+            if (this.debugLevel > paraTool.debugInfo) console.log(`race error cauth`, err);
+        }
+
+        let resolve2 = this.validateApi();
+        await new Promise((resolve2, reject) => {
+            setTimeout(() => {
+                if (this.getConnected()) {
+                    resolve2();
+                } else {
+                    return reject(new Error(`${chainID} setupChainAndAPI Errored`));
+                }
+            }, 10);
+        });
+        return (chain);
+    }
+
     async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
         let chain = await this.getChain(chainID, withSpecVersions);
-
         await this.setupAPI(chain, backfill);
-
         this.isRelayChain = paraTool.isRelayChain(chainID)
         this.relayChain = chain.relayChain;
         return (chain);
@@ -119,17 +196,18 @@ module.exports = class Crawler extends Indexer {
                 console.log("NO data", traceData);
                 return false;
             }
+
             let eventsRaw = traceData.result.blockTrace.events;
             if (!eventsRaw || eventsRaw.length == 0) {
                 console.log("eventsRaw empty");
                 return [];
             }
-            let events = eventsRaw.map((e) => {
-                let sv = e.data.stringValues;
-                return ({
-                    k: sv.key,
-                    v: sv.value_encoded
-                });
+            let events = [];
+            eventsRaw.forEach((e) => {
+                let sv = this.canonicalize_trace_stringValues(e.data.stringValues);
+                if (sv) {
+                    events.push(sv);
+                }
             });
             return (events);
         } catch (error) {
@@ -140,6 +218,24 @@ module.exports = class Crawler extends Indexer {
             })
         }
         return false;
+    }
+
+    canonicalize_trace_stringValues(x) {
+        let k = "0x" + x.key;
+        let v = "";
+        if (x.value) {
+            let value = x.value
+            if (value.includes("Some(")) {
+                v = "01" + value.replace("Some(", "").replace(")", "")
+            } else if (x.value == "None") {
+                v = "00";
+            }
+            return {
+                k,
+                v: "0x" + v
+            }
+        }
+        return null;
     }
 
     async crawlEvmTrace(chain, blockNumber, timeoutMS = 20000) {
@@ -1800,7 +1896,12 @@ create table talismanEndpoint (
                     if (evmReceipts) crawlReceiptsEVM = 0;
                     if (evmTrace) crawlTraceEVM = 0;
                 }
-                let r = await this.index_chain_block_row(rRow, false, false, false, true); // signedBlock is false, write_bq_log = false, isTip = TRUE
+                let isSignedBlock = false
+                let isWritebqlog = false
+                let refreshAPI = false
+                let isTip = true
+                //index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false)
+                let r = await this.index_chain_block_row(rRow, isSignedBlock, isWritebqlog, refreshAPI, isTip);
                 blockStats = r.blockStats;
                 // IMMEDIATELY flush all address feed + hashes (txs + blockhashes)
                 await this.flush(block.blockTS, bn, false, isTip); //ts, bn, isFullPeriod, isTip
@@ -2035,15 +2136,39 @@ create table talismanEndpoint (
                         "chainID": chainID
                     }
 
+
                     // get trace from block
-                    let trace = await this.dedupChanges(results.changes);
+                    let trace = [];
+                    let traceType = "subscribeStorage";
+                    if (chain.WSEndpointSelfHosted == 1) {
+                        let traceBlock = await this.api.rpc.state.traceBlock(blockHash, "state", "", "Put");
+                        if (traceBlock) {
+                            let traceBlockJSON = traceBlock.toJSON();
+                            if (traceBlockJSON.blockTrace && traceBlockJSON.blockTrace.events) {
+                                let events = []
+                                let changes = traceBlockJSON.blockTrace.events.forEach((e) => {
+                                    let x = this.canonicalize_trace_stringValues(e.data.stringValues);
+                                    if (x) {
+                                        events.push(x);
+                                    }
+                                })
+                                if (events.length > 0) {
+                                    traceType = "state_traceBlock"
+                                    trace = events;
+                                }
+                            }
+                        }
+                    } else {
+                        trace = await this.dedupChanges(results.changes);
+                    }
+
                     if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
                     let evmBlock = false
                     let evmReceipts = false
                     let evmTrace = false
 
                     // write { blockraw:blockHash => block, trace:blockHash => trace, events:blockHash => events } to bigtable
-                    let success = await this.save_block_trace(chainID, block, blockHash, events, trace, false, "subscribeStorage")
+                    let success = await this.save_block_trace(chainID, block, blockHash, events, trace, false, traceType);
                     if (success) {
                         // write to mysql
                         let blockTS = block.blockTS;
@@ -2051,10 +2176,14 @@ create table talismanEndpoint (
                             this.apiAt = this.api //set here for opaqueCall  // TODO: what if metadata changes?
                             let signedExtrinsicBlock = block
                             signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
-                            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
                             // IMPORTANT NOTE: we only need to do this for evm chains... (review)
-                            let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, "subscribeStorage", this.api);
-                            let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces); // autotrace, finalized, write_bq_log are all false
+                            let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api);
+                            let isFinalized = false
+                            let isWrite_bqlog = false
+                            let isTip = true
+                            let isTracesPresent = success // true here
+                            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false)
+                            let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces, isFinalized, isWrite_bqlog, isTip, isTracesPresent);
 
                             await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
                             if (blockNumber > this.blocksCovered) {
@@ -2091,9 +2220,6 @@ create table talismanEndpoint (
                                 "data": [out],
                                 "replace": vals
                             });
-                            /*
-                            {"name":"polkaholic","hostname":"kusama","pid":684112,"level":50,"op":"update_batchedSQL","sql":"insert into blockunfinalized (chainID,blockNumber,numExtrinsics,numSignedExtrinsics,numTransfers,numEvents,valueTransfersUSD,fees,lastTraceDT,blockHashEVM,parentHashEVM,numTransactionsEVM,numTransactionsInternalEVM,numReceiptsEVM,gasUsed,gasLimit) VALUES ('2004', '1868555', '0x1cf7a3838a8dcf9087251521e070023b9cd633c9d6a1dc777a4a5866822e1bc4', '15', '0', '2', '138', '26.831085319352944', from_unixtime(1663191949) , '', '', '0', '0', '0', '0', '0' ) on duplicate key update numExtrinsics=VALUES(numExtrinsics),numSignedExtrinsics=VALUES(numSignedExtrinsics),numTransfers=VALUES(numTransfers),numEvents=VALUES(numEvents),valueTransfersUSD=VALUES(valueTransfersUSD),fees=VALUES(fees),lastTraceDT=VALUES(lastTraceDT),blockHashEVM=VALUES(blockHashEVM),parentHashEVM=VALUES(parentHashEVM),numTransactionsEVM=VALUES(numTransactionsEVM),numTransactionsInternalEVM=VALUES(numTransactionsInternalEVM),numReceiptsEVM=VALUES(numReceiptsEVM),gasUsed=VALUES(gasUsed),gasLimit=VALUES(gasLimit)","len":981,"try":1,"err":{"code":"ER_WARN_DATA_TRUNCATED","errno":1265,"sqlState":"01000","sqlMessage":"Data truncated for column 'numExtrinsics' at row 1"
-                            */
                             //store unfinalized blockHashes in a single table shared across chains
                             let outunf = `('${chainID}', '${blockNumber}', '${blockHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
                             let vals2 = [...vals]; // same as other insert, but with
