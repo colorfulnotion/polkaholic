@@ -5090,8 +5090,12 @@ module.exports = class Indexer extends AssetManager {
                 }
 
                 let p = await this.computePriceUSD(inp);
-
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD p`, p)
+                if (this.debugLevel >= paraTool.debugTracing) {
+                    console.log(`symbolRelayChain=${symbolRelayChain}, assetInfo`, assetInfo)
+                    console.log(`symbolRelayChain=${symbolRelayChain}, inp`, inp)
+                    console.log(`symbolRelayChain=${symbolRelayChain} p`, p)
+                    console.log(`computePriceUSD p`, p)
+                }
                 if (p) {
                     x.amountSentUSD = p.valUSD;
                     x.priceUSD = p.priceUSD;
@@ -5221,7 +5225,7 @@ module.exports = class Indexer extends AssetManager {
                     status: false,
                 }
             }
-            //console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)
+            if (this.debugLevel > paraTool.debugInfo) console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)
             return xcmInfo
         } catch (e) {
             console.log(`buildPendingXcmInfo [${x.extrinsicID}]  [${x.extrinsicHash}] err`, e)

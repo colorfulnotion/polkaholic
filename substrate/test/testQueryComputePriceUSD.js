@@ -182,18 +182,23 @@ async function main() {
         },
         'USDT': {
             assetChain: '{"Token":"102"}~2012'
-        }
+        },
+	'DOT-symbolRelayChain': {
+             symbol: 'DOT',
+             relayChain: 'polkadot',
+         },
     }
-    let ts = query.currentTS();
+    //let ts = query.currentTS();
+    let ts = null
     for (const testcaseName of Object.keys(assets)) {
         let q = assets[testcaseName];
         console.log("INPUT", q, `(testcaseName=${testcaseName})`);
         q.ts = ts;
         let res = await query.computePriceUSD(q);
-        if (res) {
-            console.log("OUTPUT", ts, res.priceUSD);
+        if (res && res.priceUSD != undefined) {
+            console.log("OUTPUT", `ts=${ts}`, `price=${res.priceUSD}`);
         } else {
-            console.log("OUTPUT", ts, res);
+            console.log("OUTPUT", `ts=${ts}`, `res`, res);
         }
     }
 }
