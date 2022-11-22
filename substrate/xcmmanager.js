@@ -501,7 +501,8 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            version: 'V3'
+            xcmFinalized: true,
+            version: 'V4'
         }
         xcmInfo.relayChain = {
             relayChain: xcm.relayChain,
@@ -528,7 +529,8 @@ module.exports = class XCMManager extends Query {
             msgHash: xcm.msgHash,
             sentAt: xcm.sentAt,
             ts: xcm.sourceTS,
-            complete: true,
+            isMsgSent: true,
+            originationFinalized: true,
         }
         //if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
@@ -547,6 +549,7 @@ module.exports = class XCMManager extends Query {
             blockNumber: xcm.blockNumberDest,
             extrinsicID: xcm.destExtrinsicID,
             eventID: xcm.destEventID,
+            destinationFinalized: true,
             ts: xcm.destTS,
             status: true,
         }
@@ -652,7 +655,8 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            version: (isNewFormat) ? 'V2' : 'V1'
+            xcmFinalized: true,
+            version: 'V4'
         }
         xcmInfo.relayChain = {
             relayChain: xcm.relayChain,
@@ -679,7 +683,9 @@ module.exports = class XCMManager extends Query {
             msgHash: xcm.msgHash,
             sentAt: xcm.sentAt,
             ts: xcm.sourceTS,
-            complete: true,
+            //complete: true,
+            isMsgSent: true,
+            originationFinalized: true,
         }
         if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
@@ -697,6 +703,7 @@ module.exports = class XCMManager extends Query {
             extrinsicID: xcm.destExtrinsicID,
             eventID: xcm.destEventID,
             ts: xcm.destTS,
+            destinationFinalized: true,
             status: true,
         }
         return [xcmInfo, xcm] //TODO: drop xcm format
@@ -770,12 +777,15 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            version: (isNewFormat) ? 'V2' : 'V1'
+            xcmFinalized: true,
+            version: 'V4'
         }
         xcmInfo.relayChain = {
             relayChain: xcm.relayChain,
             relayAt: (xcm.failureType == 'failedOrigination') ? null : xcm.sentAt, // failedOrigination are not relayed
         }
+
+        let isMsgSent = (xcm.failureType == 'failedOrigination')? true: false
 
         xcmInfo.origination = {
             chainName: xcm.chainName,
@@ -797,7 +807,9 @@ module.exports = class XCMManager extends Query {
             msgHash: xcm.msgHash,
             sentAt: xcm.sentAt,
             ts: xcm.sourceTS,
-            complete: (xcm.failureType == 'failedOrigination') ? false : true,
+            //complete: (xcm.failureType == 'failedOrigination') ? false : true,
+            isMsgSent: isMsgSent,
+            originationFinalized: true,
         }
         if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
@@ -815,12 +827,14 @@ module.exports = class XCMManager extends Query {
             extrinsicID: null,
             eventID: xcm.executedEventID,
             ts: xcm.destTS,
+            destinationFinalized: true,
             status: false,
             error: {},
         }
         if (xcm.failureType == 'failedDestination') {
             xcmInfo.destination.error = this.getXcmErrorDescription(xcm.errorDesc)
         } else {
+            xcmInfo.destination.destinationFinalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
             xcmInfo.destination.extrinsicID = null
             xcmInfo.destination.error = {
                 errorCode: `NA`,

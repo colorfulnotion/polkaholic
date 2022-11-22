@@ -1276,6 +1276,11 @@ module.exports = class Query extends AssetManager {
                     priceUSDCurrent: x.priceUSDCurrent,
                 }
                 if (parsedXcmInfo) {
+                    if (parsedXcmInfo != undefined && parsedXcmInfo.origination != undefined){
+                        let isMsgSent = parsedXcmInfo.origination.complete
+                        parsedXcmInfo.origination.isMsgSent = isMsgSent
+                        //delete parsedXcmInfo.origination.complete
+                    }
                     r.xcmInfo = parsedXcmInfo
                 }
                 /*
