@@ -1896,7 +1896,12 @@ create table talismanEndpoint (
                     if (evmReceipts) crawlReceiptsEVM = 0;
                     if (evmTrace) crawlTraceEVM = 0;
                 }
-                let r = await this.index_chain_block_row(rRow, false, false, false, true); // signedBlock is false, write_bq_log = false, isTip = TRUE
+                let isSignedBlock = false
+                let isWritebqlog = false
+                let refreshAPI = false
+                let isTip = true
+                //index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false)
+                let r = await this.index_chain_block_row(rRow, isSignedBlock, isWritebqlog, refreshAPI, isTip);
                 blockStats = r.blockStats;
                 // IMMEDIATELY flush all address feed + hashes (txs + blockhashes)
                 await this.flush(block.blockTS, bn, false, isTip); //ts, bn, isFullPeriod, isTip
@@ -2171,10 +2176,14 @@ create table talismanEndpoint (
                             this.apiAt = this.api //set here for opaqueCall  // TODO: what if metadata changes?
                             let signedExtrinsicBlock = block
                             signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
-                            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, autoTraces = false, finalized = false, write_bqlog = false)
                             // IMPORTANT NOTE: we only need to do this for evm chains... (review)
                             let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api);
-                            let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces); // autotrace, finalized, write_bq_log are all false
+                            let isFinalized = false
+                            let isWrite_bqlog = false
+                            let isTip = true
+                            let isTracesPresent = success // true here
+                            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false)
+                            let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces, isFinalized, isWrite_bqlog, isTip, isTracesPresent);
 
                             await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
                             if (blockNumber > this.blocksCovered) {

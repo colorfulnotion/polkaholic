@@ -3045,7 +3045,7 @@ module.exports = class Indexer extends AssetManager {
         try {
             let valueType = (queryMeta.type.isMap) ? queryMeta.type.asMap.value.toJSON() : queryMeta.type.asPlain.toJSON();
             let valueTypeDef = api.registry.metadata.lookup.getTypeDef(valueType).type;
-            let v = (val.length >= 2) ? val.substr(2).slice() : ""; // assume 01 "Some" prefix exists 
+            let v = (val.length >= 2) ? val.substr(2).slice() : ""; // assume 01 "Some" prefix exists
             if (valueTypeDef == "u128" || valueTypeDef == "u64" || valueTypeDef == "u32" || valueTypeDef == "u64" || valueTypeDef == "Balance") {
                 parsev = hexToBn(v, {
                     isLe: true
@@ -7638,7 +7638,9 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             let processBlockEventsStartTS = new Date().getTime()
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
             let tracesPresent = (r.trace) ? true : false;
-            let [blockStats, xcmMeta] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, true, write_bq_log, isTip, tracesPresent);
+            let isFinalized = true
+            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false)
+            let [blockStats, xcmMeta] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, isFinalized, write_bq_log, isTip, tracesPresent);
             r.blockStats = blockStats
             r.xcmMeta = xcmMeta
 
