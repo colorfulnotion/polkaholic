@@ -203,11 +203,11 @@ module.exports = class Crawler extends Indexer {
                 return [];
             }
             let events = [];
-	    eventsRaw.forEach((e) => {
+            eventsRaw.forEach((e) => {
                 let sv = this.canonicalize_trace_stringValues(e.data.stringValues);
-		if ( sv ) {
-		    events.push(sv);
-		}
+                if (sv) {
+                    events.push(sv);
+                }
             });
             return (events);
         } catch (error) {
@@ -219,22 +219,25 @@ module.exports = class Crawler extends Indexer {
         }
         return false;
     }
-    
+
     canonicalize_trace_stringValues(x) {
-	let k = "0x" + x.key;
-	let v = "";
-	if ( x.value ) {
-	    let value = x.value
-	    if ( value.includes("Some(") ) {
-		v = "01" + value.replace("Some(", "").replace(")", "")
-	    } else if ( x.value == "None" ) {
-		v = "00";
-	    }
-	    return { k, v: "0x" + v }
-	}
-	return null;
+        let k = "0x" + x.key;
+        let v = "";
+        if (x.value) {
+            let value = x.value
+            if (value.includes("Some(")) {
+                v = "01" + value.replace("Some(", "").replace(")", "")
+            } else if (x.value == "None") {
+                v = "00";
+            }
+            return {
+                k,
+                v: "0x" + v
+            }
+        }
+        return null;
     }
-    
+
     async crawlEvmTrace(chain, blockNumber, timeoutMS = 20000) {
         if (!chain.RPCBackfill) {
             return (false);
@@ -2130,29 +2133,29 @@ create table talismanEndpoint (
 
 
                     // get trace from block
-		    let trace = [];
-		    let traceType = "subscribeStorage";
-		    if ( chain.WSEndpointSelfHosted == 1 ) {
-			let traceBlock = await this.api.rpc.state.traceBlock(blockHash, "state", "", "Put");
-			if ( traceBlock ) {
-			    let traceBlockJSON = traceBlock.toJSON();
-			    if ( traceBlockJSON.blockTrace && traceBlockJSON.blockTrace.events ) {
-				let events = []
-				let changes = traceBlockJSON.blockTrace.events.forEach( (e) => {
-				    let x = this.canonicalize_trace_stringValues(e.data.stringValues);
-				    if ( x ) {
-					events.push(x);
-				    }
-				})
-				if ( events.length > 0 ) {
-				    traceType = "state_traceBlock"
-				    trace = events;
-				}
-			    }
-			}
-		    } else {
-			trace = await this.dedupChanges(results.changes);
-		    }
+                    let trace = [];
+                    let traceType = "subscribeStorage";
+                    if (chain.WSEndpointSelfHosted == 1) {
+                        let traceBlock = await this.api.rpc.state.traceBlock(blockHash, "state", "", "Put");
+                        if (traceBlock) {
+                            let traceBlockJSON = traceBlock.toJSON();
+                            if (traceBlockJSON.blockTrace && traceBlockJSON.blockTrace.events) {
+                                let events = []
+                                let changes = traceBlockJSON.blockTrace.events.forEach((e) => {
+                                    let x = this.canonicalize_trace_stringValues(e.data.stringValues);
+                                    if (x) {
+                                        events.push(x);
+                                    }
+                                })
+                                if (events.length > 0) {
+                                    traceType = "state_traceBlock"
+                                    trace = events;
+                                }
+                            }
+                        }
+                    } else {
+                        trace = await this.dedupChanges(results.changes);
+                    }
 
                     if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
                     let evmBlock = false

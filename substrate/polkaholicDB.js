@@ -110,11 +110,11 @@ module.exports = class PolkaholicDB {
                 this.GC_STORAGE_BUCKET = dbconfig.gc.storageBucket;
                 this.GC_BIGQUERY_DATASET = dbconfig.gc.bigqueryDataset;
             }
-	    if (dbconfig.ws != undefined) {
+            if (dbconfig.ws != undefined) {
                 this.EXTERNAL_WS_PROVIDER_KEY = dbconfig.ws.key;
                 this.EXTERNAL_WS_PROVIDER_URL = dbconfig.ws.url;
             }
-	    
+
             this.pool = mysql.createPool(this.convert_dbconfig(dbconfig.client));
             // Ping WRITABLE database to check for common exception errors.
             this.pool.getConnection((err, connection) => {

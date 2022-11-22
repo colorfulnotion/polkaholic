@@ -1462,7 +1462,7 @@ module.exports = class Indexer extends AssetManager {
             source: this.hostname,
             commit: this.indexerInfo,
         }
-	
+
         const endpoint = "ws://kusama-internal.polkaholic.io:9101"
         try {
             const ws = new WebSocket(endpoint);
@@ -1474,24 +1474,26 @@ module.exports = class Indexer extends AssetManager {
 
         }
 
-	if ( this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL ) {
-	    // TODO: only send this once, using a ws bigtable entry for the hash of the wrapper
-	    let cmd = `curl -X POST ${this.EXTERNAL_WS_PROVIDER_URL} -u "${this.EXTERNAL_WS_PROVIDER_KEY}" -H "Content-Type: application/json" --data '{"name": "xcminfo","data":"${JSON.stringify(wrapper)}"}'`
-	    try {
-		console.log(cmd);
-		const {
+        if (this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL) {
+            // TODO: only send this once, using a ws bigtable entry for the hash of the wrapper
+            let cmd = `curl -X POST ${this.EXTERNAL_WS_PROVIDER_URL} -u "${this.EXTERNAL_WS_PROVIDER_KEY}" -H "Content-Type: application/json" --data '{"name": "xcminfo","data":"${JSON.stringify(wrapper)}"}'`
+            try {
+                console.log(cmd);
+                const {
                     stdout,
                     stderr
-		} = exec(cmd, {
+                } = exec(cmd, {
                     maxBuffer: 1024 * 64000
-		});
-	    } catch (err) {
-		console.log(err);
-		this.logger.error({"op": "sendWSMessage",
-				   err})
-	    }
-	}
-	
+                });
+            } catch (err) {
+                console.log(err);
+                this.logger.error({
+                    "op": "sendWSMessage",
+                    err
+                })
+            }
+        }
+
     }
 
     //this is the xcmmessages table
@@ -3052,7 +3054,7 @@ module.exports = class Indexer extends AssetManager {
                 switch (traceType) {
                     case "state_traceBlock":
                         if (api.createType != undefined) {
-                            parsev = api.createType(valueTypeDef, "0x" + v).toString(); 
+                            parsev = api.createType(valueTypeDef, "0x" + v).toString();
                         } else if (api.registry != undefined && this.apiAt.registry.createType != undefined) {
                             parsev = api.registry.createType(valueTypeDef, "0x" + v).toString();
                         }

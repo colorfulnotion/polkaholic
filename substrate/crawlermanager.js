@@ -123,7 +123,7 @@ module.exports = class CrawlerManager extends Crawler {
             console.log(`Manager Stalled for ${maxAllowedTS}, terminating`)
             process.exit(1);
         }
-        if (this.completedPeriodCnt >= maxPeriodBeforeRestart){
+        if (this.completedPeriodCnt >= maxPeriodBeforeRestart) {
             console.log(`Restarting Manager`)
             process.exit(1);
         }
@@ -883,7 +883,7 @@ module.exports = class CrawlerManager extends Crawler {
         this.showManagerTimeUsage(ctx)
         this.showManagerCurrentMemoryUsage(ctx)
         this.resetManagerTimeUsage(ctx)
-        this.completedPeriodCnt ++
+        this.completedPeriodCnt++
         return xcmIndexed
     }
 }
