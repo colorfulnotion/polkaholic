@@ -739,7 +739,7 @@ module.exports = class Indexer extends AssetManager {
         }
         this.showCurrentMemoryUsage()
 
-	await this.flushWSProviderQueue();
+        await this.flushWSProviderQueue();
         let immediateFlushStartTS = new Date().getTime();
         await this.immediateFlushBlockAndAddressExtrinsics(isTip)
         let immediateFlushTS = (new Date().getTime() - immediateFlushStartTS) / 1000
@@ -1471,9 +1471,9 @@ module.exports = class Indexer extends AssetManager {
             ws.on('open', function open() {
                 ws.send(JSON.stringify(wrapper));
             });
-	    if ( msgType == "xcmtransfer" && m.xcmInfo )  {
-		this.sendExternalWSProvider("xcminfo", m.xcmInfo);
-	    }
+            if (msgType == "xcmtransfer" && m.xcmInfo) {
+                this.sendExternalWSProvider("xcminfo", m.xcmInfo);
+            }
         } catch (err) {
 
         }
