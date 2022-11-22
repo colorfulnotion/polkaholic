@@ -1344,36 +1344,75 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     sendExternalWSProvider(name, msg) {
-	if ( this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL ) {
-	    this.WSProviderQueue.push(msg);
-	}
+        if (this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL) {
+            this.WSProviderQueue.push(msg);
+        }
     }
 
-    async flushWSProviderQueue(name = "xcminfo") {
-	if ( this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL ) {
-	    for ( let i = 0; i < this.WSProviderQueue.length; i++) {
-		let msg = this.WSProviderQueue[i];
-		// TODO: only send this once, using a ws bigtable entry for the hash of the wrapper
-		let x = {"name": name, "data": msg}
-		let cmd = `curl -X POST ${this.EXTERNAL_WS_PROVIDER_URL} -u "${this.EXTERNAL_WS_PROVIDER_KEY}" --max-time 5 -H "Content-Type: application/json" --data '${JSON.stringify(x)}'`
-		try {
-		    const {
-			stdout,
-			stderr
-		    } = await exec(cmd, {
-			maxBuffer: 1024 * 64000
-		    });
-		    this.logger.info({"op": "flushWSProviderQueue",
-				      cmd})
-		} catch (err) {
-		    console.log(err);
-		    this.logger.error({"op": "flushWSProviderQueue",
-				       err})
-		}
-	    }
-	    this.WSProviderQueue = [];
-	} else {
-	    console.log("-----WSPROVIDER", this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL);
-	}
+    async flushWSProviderQueue() {
+        if (this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL) {
+            for (let i = 0; i < this.WSProviderQueue.length; i++) {
+                let msg = this.WSProviderQueue[i];
+                let names = [];
+                if (msg.origination) {
+                    if (msg.origination.transactionHash) {
+                        names.push(msg.origination.transactionHash);
+                    }
+                    if (msg.origination.extrinsicHash) {
+                        names.push(msg.origination.extrinsicHash);
+                    }
+                    if (msg.origination.id) {
+                        names.push(msg.origination.id);
+                    }
+                }
+                if (msg.destination) {
+                    if (msg.destination.id && !names.includes(msg.destination.id)) {
+                        names.push(msg.destination.id);
+                    }
+                }
+                for (const name of names) {
+                    let xcminfoHash = paraTool.twox_128(name + JSON.stringify(msg));
+                    // only send one topic, using sql table xcminfoqueue to ensure only one msg sent to EXTERNAL_WS_PROVIDER_URL; not perfect but good enough for now
+                    // create table xcminfoqueue ( xcminfoHash varchar(64), queueDT datetime, primary key (xcminfoHash) );
+                    let xcminfoqueue = await this.poolREADONLY.query(`select xcminfoHash from xcminfoqueue where xcminfoHash = '${xcminfoHash}' and queueDT > date_sub(Now(), interval 60 second)`)
+                    if (xcminfoqueue.length > 0) {
+                        // skip, someone else sent this in the last 60s
+                    } else {
+                        let x = {
+                            "name": name,
+                            "data": msg
+                        }
+                        let cmd = `curl -X POST ${this.EXTERNAL_WS_PROVIDER_URL} -u "${this.EXTERNAL_WS_PROVIDER_KEY}" --max-time 5 -H "Content-Type: application/json" --data '${JSON.stringify(x)}'`
+                        try {
+                            const {
+                                stdout,
+                                stderr
+                            } = await exec(cmd, {
+                                maxBuffer: 1024 * 64000
+                            });
+                            this.logger.info({
+                                "op": "flushWSProviderQueue",
+                                cmd
+                            })
+                            await this.upsertSQL({
+                                "table": "xcminfoqueue",
+                                "keys": ["xcminfoHash"],
+                                "vals": ["queueDT"],
+                                "data": [`( '${xcminfoHash}', Now() )`],
+                                "replace": ["queueDT"],
+                            });
+                        } catch (err) {
+                            console.log(err);
+                            this.logger.error({
+                                "op": "flushWSProviderQueue",
+                                err
+                            })
+                        }
+
+                    }
+                }
+            }
+            this.WSProviderQueue = [];
+        }
     }
 }

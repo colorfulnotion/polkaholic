@@ -1049,7 +1049,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
-			    this.sendExternalWSProvider("xcminfo", xcmInfo);
+                            this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
                             console.log(`!!!!buildSuccessXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo, 'e', e)
                             continue
@@ -1548,7 +1548,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord)
-			    this.sendExternalWSProvider("xcminfo", xcmInfo);
+                            this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
                             console.log(`!!!!buildFailedXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
                             continue

@@ -2152,9 +2152,9 @@ app.get('/error', async (req, res) => {
     });
 })
 
-app.get('/features', async (req, res) => {
-    res.render('features', {
-       
+app.get('/xcminfows', async (req, res) => {
+    res.render('xcminfows', {
+
     });
 })
 
