@@ -1132,6 +1132,176 @@ module.exports = class Query extends AssetManager {
         return s;
     }
 
+    async getXCMTransfersUI(filters = {}, limit = 10, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        let chainList = filters.chainList ? filters.chainList : [];
+        let blockNumber = filters.blockNumber ? parseInt(filters.blockNumber, 10) : null;
+        let address = filters.address ? filters.address : null;
+        let xcmType = filters.xcmType ? filters.xcmType : null;
+        let symbols = filters.symbol ? filters.symbol.split(',') : [];
+        let startTS = filters.startTS ? filters.startTS : null;
+        let endTS = filters.endTS ? filters.endTS : null;
+        //console.log(`filters`, filters)
+        let patchedXcms = [] // we will update the missing xcmInfo once instead of rebuilding it over and over again
+        let out = [];
+        try {
+            let w = [];
+            if (address) {
+                w.push(`(fromAddress='${address}' or destAddress='${address}')`);
+            }
+            if (blockNumber) {
+                w.push(`(blockNumber='${parseInt(blockNumber, 10)}')`)
+            }
+            if (xcmType) {
+                w.push(`(xcmType='${xcmType}')`)
+            }
+            if (symbols.length > 0) {
+                w.push(`( symbol in ( '${symbols.join("','")}'))`)
+            }
+            if (!isNaN(startTS) && !isNaN(endTS) && startTS && endTS) {
+                w.push(`( sourceTS >= ${startTS} && sourceTS < ${endTS})`)
+            }
+            let chainListFilter = "";
+            if (chainList.length > 0) {
+                w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest in (${chainList.join(",")}) )`)
+            }
+            let wstr = (w.length > 0) ? " where " + w.join(" and ") : "";
+            let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo, convert(pendingXcmInfo using utf8) as pendingXcmInfo, traceID from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
+            let xcmtransfers = await this.poolREADONLY.query(sql);
+            //console.log(filters, sql);
+            for (let i = 0; i < xcmtransfers.length; i++) {
+                let x = xcmtransfers[i];
+                x.chainName = this.getChainName(x.chainID);
+                [x.chainID, x.id] = this.convertChainID(x.chainID)
+                x.paraID = paraTool.getParaIDfromChainID(x.chainID)
+
+                // looks up assetInfo
+                let symbolRelayChain = paraTool.makeAssetChain(x.symbol, x.relayChain);
+                let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
+                if (assetInfo) {
+                    x.decimals = assetInfo.decimals;
+                    x.amountSent = x.amountSent / 10 ** x.decimals;
+                    x.amountReceived = x.amountReceived / 10 ** x.decimals;
+                    x.xcmFee = x.amountSent - x.amountReceived
+                    let chainIDOriginationInfo = this.chainInfos[x.chainID]
+                    if (chainIDOriginationInfo != undefined && chainIDOriginationInfo.ss58Format != undefined) {
+                        if (x.fromAddress != undefined) {
+                            if (x.fromAddress.length == 42) x.sender = x.fromAddress
+                            if (x.fromAddress.length == 66) x.sender = paraTool.getAddress(x.fromAddress, chainIDOriginationInfo.ss58Format)
+                        }
+                    }
+
+                    x.symbol = assetInfo.symbol;
+                    //if (assetInfo.localSymbol) x.localSymbol = assetInfo.localSymbol;
+                } else {
+                    console.log(`[${x.extrinsicHash}] [${x.extrinsicID}] MISSING x.asset`, x.asset, x.chainID);
+                }
+                let section = null,
+                    method = null;
+                if (x.chainIDDest != undefined) {
+                    let chainIDDestInfo = this.chainInfos[x.chainIDDest]
+                    if (chainIDDestInfo != undefined && chainIDDestInfo.ss58Format != undefined) {
+                        if (x.destAddress != undefined) {
+                            if (x.destAddress.length == 42) x.beneficiary = x.destAddress
+                            if (x.destAddress.length == 66) x.beneficiary = paraTool.getAddress(x.destAddress, chainIDDestInfo.ss58Format)
+                        }
+                    }
+                    let [_, idDest] = this.convertChainID(x.chainIDDest)
+                    //[x.chainIDDest, x.idDest] = this.convertChainID(x.chainIDDest)
+                    x.idDest = (idDest == false) ? null : idDest
+                    x.chainDestName = this.getChainName(x.chainIDDest);
+                    x.paraIDDest = paraTool.getParaIDfromChainID(x.chainIDDest)
+                    let sectionPieces = x.sectionMethod.split(':')
+                    if (sectionPieces.length == 2) {
+                        section = sectionPieces[0];
+                        method = sectionPieces[1];
+                    }
+                }
+                let parsedXcmInfo;
+                try {
+                    parsedXcmInfo = (x.xcmInfo != undefined) ? JSON.parse(`${x.xcmInfo}`) : JSON.parse(`${x.pendingXcmInfo}`) //use xcmInfo, if not available, fallback to pendingXcmInfo
+                    if (parsedXcmInfo.origination) {
+                        x.amountSent = parsedXcmInfo.origination.amountSent;
+                        x.amountSentUSD = parsedXcmInfo.origination.amountSentUSD;
+                    }
+                    if (parsedXcmInfo.destination) {
+                        x.amountReceivedUSD = parsedXcmInfo.destination.amountReceivedUSD;
+                        x.amountReceived = parsedXcmInfo.destination.amountReceived;
+                    }
+                } catch (e) {
+                    parsedXcmInfo = false
+                }
+                let r = {
+                    extrinsicHash: x.extrinsicHash,
+                    extrinsicID: x.extrinsicID,
+                    incomplete: x.incomplete,
+                    status: x.status,
+
+                    section: section,
+                    method: method,
+
+                    // relayChain
+                    relayChain: x.relayChain,
+
+                    //source section
+                    sender: x.sender, //AccountKey20 or SS58
+                    fromAddress: x.fromAddress,
+                    id: x.id,
+                    chainID: x.chainID,
+                    chainName: x.chainName,
+                    blockNumber: x.blockNumber,
+                    sourceTS: x.sourceTS,
+
+                    //dest section
+                    beneficiary: (x.beneficiary != undefined) ? x.beneficiary : null, //AccountKey20 or SS58
+                    destAddress: (x.destAddress != undefined) ? x.destAddress : null,
+                    idDest: x.idDest,
+                    chainIDDest: x.chainIDDest,
+                    chainDestName: x.chainDestName,
+                    blockNumberDest: x.blockNumberDest,
+                    destTS: x.destTS,
+
+                    symbol: x.symbol,
+                    //localSymbol: x.localSymbol,
+                    currencyID: x.currencyID,
+                    traceID: x.traceID,
+                    amountSent: x.amountSent,
+                    amountSentUSD: x.amountSentUSD,
+                    amountReceived: x.amountReceived,
+                    amountReceivedUSD: x.amountReceivedUSD,
+                    xcmFee: x.xcmFee,
+                    xcmFeeUSD: x.xcmFeeUSD,
+                    priceUSD: x.priceUSD,
+                    priceUSDCurrent: x.priceUSDCurrent,
+                }
+                if (parsedXcmInfo) {
+                    if (parsedXcmInfo != undefined && parsedXcmInfo.origination != undefined){
+                        let isMsgSent = parsedXcmInfo.origination.complete
+                        parsedXcmInfo.origination.isMsgSent = isMsgSent
+                        //delete parsedXcmInfo.origination.complete
+                    }
+                    r.xcmInfo = parsedXcmInfo
+                }
+                /*
+                if (decorate) {
+                    this.decorateAddress(r, "fromAddress", decorateAddr, decorateRelated)
+                    this.decorateAddress(r, "destAddress", decorateAddr, decorateRelated)
+                }
+                */
+                out.push(this.clean_extrinsic_object(r));
+            }
+
+        } catch (err) {
+            console.log(`getXCMTransfers err`, err)
+            this.logger.error({
+                "op": "query.getXCMTransfers",
+                address,
+                err
+            });
+        }
+        return out;
+    }
+
     async getXCMTransfers(filters = {}, limit = 10, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
 
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -1281,6 +1451,7 @@ module.exports = class Query extends AssetManager {
                         parsedXcmInfo.origination.isMsgSent = isMsgSent
                         //delete parsedXcmInfo.origination.complete
                     }
+                    r = {}
                     r.xcmInfo = parsedXcmInfo
                 }
                 /*
