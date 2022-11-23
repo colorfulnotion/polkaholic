@@ -5031,7 +5031,7 @@ module.exports = class Indexer extends AssetManager {
         let x = xcmtransfer // need deep clone?
         //build systhetic xcmInfo here when xcmInfo is not set yet
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
-        //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
         try {
             let sectionPieces = x.sectionMethod.split(':')
             let xSection = null,
@@ -5040,7 +5040,10 @@ module.exports = class Indexer extends AssetManager {
                 xSection = sectionPieces[0];
                 xMethod = sectionPieces[1];
             }
-
+            let evmTransactionHash = null
+            if (extrinsic.evm != undefined && extrinsic.evm.transactionHash != undefined){
+                evmTransactionHash = extrinsic.evm.transactionHash
+            }
             /*
             let substrateTxHash = x.extrinsicHash
             let substratetx;
@@ -5098,10 +5101,10 @@ module.exports = class Indexer extends AssetManager {
 
                 let p = await this.computePriceUSD(inp);
                 if (this.debugLevel >= paraTool.debugTracing) {
-                    console.log(`symbolRelayChain=${symbolRelayChain}, assetInfo`, assetInfo)
-                    console.log(`symbolRelayChain=${symbolRelayChain}, inp`, inp)
-                    console.log(`symbolRelayChain=${symbolRelayChain} p`, p)
-                    console.log(`computePriceUSD p`, p)
+                    //console.log(`symbolRelayChain=${symbolRelayChain}, assetInfo`, assetInfo)
+                    //console.log(`symbolRelayChain=${symbolRelayChain}, inp`, inp)
+                    //console.log(`symbolRelayChain=${symbolRelayChain} p`, p)
+                    //console.log(`computePriceUSD p`, p)
                 }
                 if (p) {
                     x.amountSentUSD = p.valUSD;
@@ -5184,7 +5187,7 @@ module.exports = class Indexer extends AssetManager {
                 method: xMethod,
                 extrinsicID: x.extrinsicID,
                 extrinsicHash: x.extrinsicHash,
-                //transactionHash: evmTransactionHash,
+                transactionHash: evmTransactionHash,
                 msgHash: x.msgHash,
                 sentAt: x.sentAt,
                 ts: x.sourceTS,
@@ -5192,7 +5195,7 @@ module.exports = class Indexer extends AssetManager {
                 isMsgSent: isMsgSent,
                 originationFinalized: originationFinalized,
             }
-            //if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
+            if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
             if (failureType != undefined) {
                 xcmInfo.destination = {
                     chainName: x.chainDestName,
