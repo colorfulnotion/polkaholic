@@ -48,7 +48,8 @@ async function main() {
             // this polls every like 1s for a new xcmmessage after startTS, and returns with the timestamp of the first message seen, which is used to start the next process
             await manager.waitForNewXCMMessage(startTS);
         } else {
-	    await manager.flushExternalWSProvider();
+            console.log(`xcmTransfers=[${numRecs}]`)
+            await manager.flushWSProviderQueue();
             await manager.sleep(1000);
         }
 
