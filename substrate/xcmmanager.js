@@ -1063,9 +1063,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
-                            if (this.debugLevel > paraTool.debugInfo){
-                                console.log(`buildSuccessXcmInfo sendExternalWSProvider`, xcmInfo)
-                            }
+                            if (this.debugLevel > paraTool.debugTracing) console.log(`buildSuccessXcmInfo sendExternalWSProvider`, xcmInfo)
                             this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
                             console.log(`!!!!buildSuccessXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo, 'e', e)
@@ -1321,9 +1319,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildSuccessXcmTransactInfo(substratetx, remoteEvmTx, match)
-                            if (this.debugLevel > paraTool.debugInfo){
-                                console.log(`TODO: buildSuccessXcmTransactInfo sendExternalWSProvider`, xcmInfo)
-                            }
+                            //if (this.debugLevel > paraTool.debugTracing) console.log(`TODO: buildSuccessXcmTransactInfo sendExternalWSProvider`, xcmInfo)
                         } catch (e) {
                             console.log(`!!!!buildSuccessXcmTransactInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
                             continue
@@ -1568,9 +1564,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord)
-                            if (this.debugLevel > paraTool.debugInfo){
-                                console.log(`buildFailedXcmInfo sendExternalWSProvider`, xcmInfo)
-                            }
+                            if (this.debugLevel > paraTool.debugTracing) console.log(`buildFailedXcmInfo sendExternalWSProvider`, xcmInfo)
                             this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
                             console.log(`!!!!buildFailedXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
