@@ -5163,7 +5163,7 @@ module.exports = class Indexer extends AssetManager {
                 relayChain: null,
                 origination: null,
                 destination: null,
-                xcmFinalized: isExpectedFinalized, //this is technically unknown by simply looking origination. we will mark old xcmInfo to finalized for now
+                //xcmFinalized: isExpectedFinalized, //this is technically unknown by simply looking origination. we will mark old xcmInfo to finalized for now
                 version: 'V4',
             }
             xcmInfo.relayChain = {
@@ -5193,7 +5193,7 @@ module.exports = class Indexer extends AssetManager {
                 ts: x.sourceTS,
                 //complete: (x.incomplete) ? false : true,
                 isMsgSent: isMsgSent,
-                originationFinalized: originationFinalized,
+                finalized: originationFinalized,
             }
             if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
             if (failureType != undefined) {
@@ -5212,14 +5212,14 @@ module.exports = class Indexer extends AssetManager {
                     extrinsicID: null,
                     eventID: null,
                     ts: null,
-                    destinationFinalized: false,
-                    status: false,
+                    finalized: true,
+                    executionStatus: "failed",
                     error: {},
                 }
                 if (failureType == 'failedDestination') {
                     //xcmInfo.destination.error = this.getXcmErrorDescription(x.errorDesc) TODO..
-                    xcmInfo.destination.destinationFinalized = true // msg is not emmited in this case, mark as true anyway
-                    xcmInfo.destination.destinationFinalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
+                    xcmInfo.destination.finalized = true // msg is not emmited in this case, mark as true anyway
+                    xcmInfo.destination.finalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
                 } else if (failureType == 'failedOrigination') {
                     // failedOrigination has no destination struct
                     xcmInfo.destination.extrinsicID = null
@@ -5245,7 +5245,8 @@ module.exports = class Indexer extends AssetManager {
                     //extrinsicID: x.destExtrinsicID,
                     eventID: null,
                     ts: null,
-                    status: false,
+                    finalized: false,
+                    executionStatus: "pending",
                 }
             }
             if (this.debugLevel > paraTool.debugInfo) console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)

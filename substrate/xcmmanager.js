@@ -501,7 +501,7 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            xcmFinalized: true,
+            //xcmFinalized: true,
             version: 'V4'
         }
         xcmInfo.relayChain = {
@@ -530,7 +530,7 @@ module.exports = class XCMManager extends Query {
             sentAt: xcm.sentAt,
             ts: xcm.sourceTS,
             isMsgSent: true,
-            originationFinalized: true,
+            finalized: true,
         }
         //if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
@@ -549,9 +549,9 @@ module.exports = class XCMManager extends Query {
             blockNumber: xcm.blockNumberDest,
             extrinsicID: xcm.destExtrinsicID,
             eventID: xcm.destEventID,
-            destinationFinalized: true,
+            finalized: true,
             ts: xcm.destTS,
-            status: true,
+            executionStatus: "success",
         }
         return [xcmInfo, xcm] //TODO: drop xcm format
     }
@@ -655,7 +655,7 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            xcmFinalized: true,
+            //xcmFinalized: true,
             version: 'V4'
         }
         xcmInfo.relayChain = {
@@ -685,7 +685,7 @@ module.exports = class XCMManager extends Query {
             ts: xcm.sourceTS,
             //complete: true,
             isMsgSent: true,
-            originationFinalized: true,
+            finalized: true,
         }
         if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
@@ -703,8 +703,8 @@ module.exports = class XCMManager extends Query {
             extrinsicID: xcm.destExtrinsicID,
             eventID: xcm.destEventID,
             ts: xcm.destTS,
-            destinationFinalized: true,
-            status: true,
+            finalized: true,
+            executionStatus: "success",
         }
         return [xcmInfo, xcm] //TODO: drop xcm format
     }
@@ -777,7 +777,7 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            xcmFinalized: true,
+            //xcmFinalized: true,
             version: 'V4'
         }
         xcmInfo.relayChain = {
@@ -809,7 +809,7 @@ module.exports = class XCMManager extends Query {
             ts: xcm.sourceTS,
             //complete: (xcm.failureType == 'failedOrigination') ? false : true,
             isMsgSent: isMsgSent,
-            originationFinalized: true,
+            finalized: true,
         }
         if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
@@ -827,14 +827,14 @@ module.exports = class XCMManager extends Query {
             extrinsicID: null,
             eventID: xcm.executedEventID,
             ts: xcm.destTS,
-            destinationFinalized: true,
-            status: false,
+            finalized: true,
+            executionStatus: "failed",
             error: {},
         }
         if (xcm.failureType == 'failedDestination') {
             xcmInfo.destination.error = this.getXcmErrorDescription(xcm.errorDesc)
         } else {
-            xcmInfo.destination.destinationFinalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
+            xcmInfo.destination.finalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
             xcmInfo.destination.extrinsicID = null
             xcmInfo.destination.error = {
                 errorCode: `NA`,
@@ -1552,7 +1552,7 @@ module.exports = class XCMManager extends Query {
                         destEventID: d.eventID,
                         sourceTS: d.sourceTS,
                         destTS: d.destTS,
-                        destStatus: d.destStatus,
+                        success: d.destStatus,
                         errorDesc: d.errorDesc,
                         executedEventID: d.executedEventID,
                     }
