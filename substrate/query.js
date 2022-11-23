@@ -1132,6 +1132,23 @@ module.exports = class Query extends AssetManager {
         return s;
     }
 
+    async getPendingXCMInfo(extrinsicHash){
+        let pendingXCMInfo = {}
+        let sql = `select extrinsicHash, extrinsicID, convert(pendingXcmInfo using utf8) as pendingXcmInfo, traceID from xcmtransfer where extrinsicHash = '${extrinsicHash}' order by isFeeItem, sourceTS desc limit 1`
+        let xcmtransfers = await this.poolREADONLY.query(sql);
+        if (xcmtransfers.length > 0){
+            let xcmtransfer = xcmtransfers[0]
+            if (xcmtransfer.pendingXcmInfo != undefined){
+                try {
+                    pendingXCMInfo = JSON.parse(xcmtransfer.pendingXcmInfo)
+                } catch(e){
+
+                }
+            }
+        }
+        return pendingXCMInfo
+    }
+
     async getXCMTransfersUI(filters = {}, limit = 10, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let chainList = filters.chainList ? filters.chainList : [];
@@ -1715,6 +1732,7 @@ module.exports = class Query extends AssetManager {
                     return c;
                 }
 
+                let isExtrinsicXcm = this.detectExtrinsicXcm(c)
                 //c.params = JSON.stringify(c.params)
                 let d = await this.decorateExtrinsic(c, c.chainID, status, decorate, decorateExtra)
 
@@ -1746,6 +1764,10 @@ module.exports = class Query extends AssetManager {
                             d.xcmInfo.destination.amountReceivedUSD = d.xcmInfo.priceUSD * d.xcmInfo.destination.amountReceived
                         }
                         return d;
+                    }else if (isExtrinsicXcm){
+                        console.log(`${txHash} is extrinsicXcm!`)
+                        let xcmInfo = await this.getPendingXCMInfo(txHash)
+                        d.xcmInfo = xcmInfo
                     }
                     return d;
                 } catch (err) {
@@ -4836,6 +4858,21 @@ module.exports = class Query extends AssetManager {
             });
 
         }
+    }
+
+    detectExtrinsicXcm(extrinsic){
+        let events = extrinsic.events
+        let knownXcmEventList = ['xcmpallet:Attempted', 'polkadotXcm:Attempted', 'xcmpQueue:XcmpMessageSent']
+        if (events) {
+            for (const evt of events) {
+                let [pallet, method] = paraTool.parseSectionMethod(evt)
+                let pallet_method = `${pallet}:${method}`
+                if (knownXcmEventList.includes(pallet_method)){
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {

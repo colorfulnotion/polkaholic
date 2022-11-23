@@ -563,11 +563,14 @@ module.exports = class XCMTracer extends AssetManager {
                     traceID = await this.submitleg(e.extrinsicID, this.extrinsic[extrinsicID], e.msgHash, dest.eventID)
                     // 123 extrinsic+xcm+dest span 3001855-2 0x80436201761cb8f6df1714deb2ba1156881911a24ed42a07b2d6859ba55b365e 22092-1816245-1-8 https://xcmscan.polkaholic.io/trace/1c530049b0f7892c?uiEmbed=v0
                     console.log("123 extrinsic+xcm+dest leg", e.extrinsicID, e.msgHash, dest.eventID, `https://xcmscan.polkaholic.io/trace/${traceID}?uiEmbed=v0`);
+		    if ( dest.finalized == false ) {
+			// send unfinalized xcminfo; finalized xcminfo at dest is done in xcmmatch service
+			this.build_send_xcminfo(this.extrinsic[extrinsicID], dest);
+		    }
                 } else {
                     // don't really need dest anymore.
                     console.log("12 extrinsic+xcm span only, no dest", e.extrinsicID, e.msgHash);
                     traceID = await this.submitleg(e.extrinsicID, this.extrinsic[extrinsicID], e.msgHash, null)
-
                 }
             } else {
                 // no messagehash in extrinsic, find dest by
@@ -576,7 +579,10 @@ module.exports = class XCMTracer extends AssetManager {
                     e.msgHash = dest.msgHash;
                     traceID = await this.submitleg(e.extrinsicID, this.extrinsic[extrinsicID], e.msgHash, dest.eventID)
                     console.log("123 extrinsic+xcm+dest leg (without ext msgHash)", e.extrinsicID, dest.msgHash, dest.eventID, `https://xcmscan.polkaholic.io/trace/${traceID}?uiEmbed=v0`);
-
+		    if ( dest.finalized == false ) {
+			// send unfinalized xcminfo; finalized xcminfo at dest is done in xcmmatch service
+			this.build_send_xcminfo(this.extrinsic[extrinsicID], dest);
+		    }
                 } else {
                     //console.log("extrinsic sentAt / beneficiaries dest match required");
                 }
@@ -604,9 +610,22 @@ module.exports = class XCMTracer extends AssetManager {
                 console.log("INCOMPLETE");
             }
         }
-
+	await this.flushWSProviderQueue()
     }
 
+    build_send_xcminfo(ext, dest) {
+	let xcmInfo = ext.xcmInfo;
+        let d = xcmInfo.destination;
+	if ( d && dest && dest.finalized == false && ( dest.destTS > this.getCurrentTS() - 120 ) ) {
+	    if ( dest.amountReceived ) d.amountReceived =  dest.amountReceived;
+            if ( dest.amountReceivedUSD ) d.amountReceivedUSD = dest.amountReceivedUSD;
+            if ( dest.blockNumberDest ) d.blockNumber = dest.blockNumberDest;
+            if ( dest.destTS ) d.ts = dest.destTS;
+            d.finalized = false;
+	    this.sendExternalWSProvider("name", xcmInfo);
+	}		
+    }
+    
     decodeXcmVersionedXcms(api, xcm) {
         var o = this.api.registry.createType('XcmVersionedXcm', xcm.msgHex)
         return;

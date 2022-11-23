@@ -84,7 +84,9 @@
       <p class="text-muted mb-2 fw-bold"><%- uiTool.presentTS(xcm.destination.ts) %></p>
       <% } %>
       <p class="mb-2">
+       <% if ( xcm.destination.amountreceived ) { %>
        <%- include("tooltip", {k: "amountreceived"}) %><B>Received</B>: <span class="fw-bold"><%- uiTool.presentFloat(xcm.destination.amountReceived) %></span> <%= xcm.symbol; %> (<%= uiTool.currencyFormat(xcm.destination.amountReceivedUSD)%>)<br/>
+       <% } %>
       </p>
       <p class="text-muted">
        <% if ( xcm.destination.blockNumber ) { %>
@@ -114,13 +116,20 @@
 
 
       <%- include("tooltip", {k: "executionstatus"}) %><B>Execution Status:</B>
-       <% if ( xcm.destination.status ) { %>
+       <% if ( xcm.destination.status ||  (xcm.destination.executionStatus != undefined && xcm.destination.executionStatus == 'success') ) { %>
 	    <button type="button" class="btn btn-success text-capitalize">Success</button>
        <% } else { %>
          <% if ( xcm.destination.error ) { %>
 	    <button type="button" class="btn btn-danger text-capitalize"><%= xcm.destination.error.errorType %></button><br/>
             <%= xcm.destination.error.errorDesc; %><br/>
-	 <% } %>
+	  <% } else {
+          let xcmDestStatus = 'Unknown'
+          let xcmAge = 400;
+          if (xcm.origination.ts) xcmAge =  Math.floor(new Date().getTime() / 1000) -  xcm.origination.ts;
+          if (xcmAge <= 300) xcmDestStatus = 'Pending'
+       %>
+            <%= `${xcmDestStatus}` %>
+          <% } %>
        <% } %>
 	 <br/>
 	 <% if ( xcm.destination.eventID ) { %>
@@ -128,10 +137,12 @@
 	 <%- include("eventaccordion", {eventID: xcm.destination.eventID}); %>
 	 <% } %>
 	 <br/>
-       <% if ( xcm.destination.teleportFee ) { %>
+       <% if ( xcm.destination.teleportFee ) {
+           let  teleportFeeSymbol = (xcm.destination.teleportFeeSymbol != undefined)? xcm.destination.teleportFeeSymbol : xcm.destination.teleportFeeChainSymbol
+       %>
       <p class="text-muted">
       <%- include("tooltip", {k: "teleportfees"}) %><B>Teleport Fees:</B>
-      <%- uiTool.presentFloat(xcm.destination.teleportFee, 10) %> <%= xcm.destination.teleportFeeChainSymbol %> (<%- uiTool.currencyFormat(xcm.destination.teleportFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)
+      <%- uiTool.presentFloat(xcm.destination.teleportFee, 10) %> <%= teleportFeeSymbol %> (<%- uiTool.currencyFormat(xcm.destination.teleportFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)
       </p>
        <% } %>
     </li>
