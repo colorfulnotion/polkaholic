@@ -1349,6 +1349,10 @@ from chain where chainID = '${chainID}' limit 1`);
         }
     }
 
+    getWSProviderQueueLen(){
+        return this.WSProviderQueue.length
+    }
+
     async flushWSProviderQueue() {
         if (this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL) {
             for (let i = 0; i < this.WSProviderQueue.length; i++) {
