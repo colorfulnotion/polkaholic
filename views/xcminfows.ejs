@@ -1,81 +1,90 @@
-<html>
-<header>
+<%- include('header', {chainInfo: {}, title: `Polkaholic.io XCM Info Channel`}); %>
 <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
-</header>
-<body>
-<h2>Polkaholic.io XCM Info Channel</h2>
+<script src="/xcminfows.js"></script>
+<h5>Polkaholic.io XCM Info Channel</h5>
 
-The Polkaholic.io XCM Info Channel service, powered by polkaholic.io XCM indexing of <a href='/xcmtransfers?xcmtype=xcmtransfer'>XCM Transfers</a> + <a href='/xcmtransfers?xcmtype=xcmtransact'>Remote Executions</a>, pipes real-time "XCM Info" JSON objects coming through a Web Socket Channel.  Polkadot dapps can subscribe to "xcm info" streams in real-time by:
-<ul>
-  <li>chain (e.g. "moonbeam") ( both as origin or destination )</li>
-  <li>extrinsic hash or transaction hash (e.g. "0xc636bb048e6bdb0b9e13fd3d6b4433256076ff97a64ecb9fb8088c016c45445e")</li>
-</ul>
+The Polkaholic.io XCM Info Channel service, powered by polkaholic.io XCM indexing of <a href='/xcmtransfers?xcmtype=xcmtransfer'>XCM Transfers</a> + <a href='/xcmtransfers?xcmtype=xcmtransact'>Remote Executions</a>,
+pipes real-time "XCM Info" JSON objects coming through a Web Socket Channel.  Polkadot dapps can subscribe to XCM Info streams in real-time by chain (e.g. "moonbeam" or "interlay") (both as origin or destination),
+extrinsic hash or transaction hash (e.g. "0xc636bb048e6bdb0b9e13fd3d6b4433256076ff97a64ecb9fb8088c016c45445e").
+
+<div><b>Last XCM Info Received:</b></div>
+
+<table>
+  <tr>
+    <td>
+<div style='padding-left: 30px; width:500px; margin-left: 30px; border: 1px solid block;'>
+  <ul class="timeline-with-icons">
+    <!-- Section: Origination -->
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-paper-plane text-primary fa-sm fa-fw"></i>
+      </span>
+      <div id="origination">...</div>
+    </li>
+    <!-- Section: RelayChain -->
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-spinner text-primary fa-sm fa-fw"></i>
+      </span>
+      <div id="relayed">...</div>
+    </li>
+    <!-- Section: Destination Chain -->
+    <li class="timeline-item mb-5">
+      <span class="timeline-icon">
+        <i class="fas fa-hand-holding-usd text-primary fa-sm fa-fw"></i>
+      </span>
+      <div id="destination">...</div>
+    </li>
+  </ul>
+</div>
+   <td valign=top>
+     <div><b>XCM Info:</b></div>
+     <textarea id="xcminfo" style="width: 600px; height: 500px; font-size:10px; font-family: Courier New;">waiting...</textarea>
+   </td>
+  </tr>
+  </table>
+
+<h5>How to Use XCMInfo Service</h5>
+
 You need an API key from <a href="http://ably.com">Ably</a> to subscribe to this "xcminfo" channel, and to pick a chain/hash to subscribe to.<br/>
 
-<h5>Demonstration</h5>
-<p>
-  Use "View Console" and "View source" to see xcminfo data in real-time, where "xcm info" messages are sent on the key events:
-  <ul>
-    <li>Origin chain Unfinalized</li>
-    <li>Origin chain Finalized</li>
-    <li>Destination chain Finalized</li>
-  </ul>
-  In the event of any failure to send from the origination chain, nothing is sent concerning the destination chain.  The last message is shown below.  
-</p>
-
-<h5>Last Message</h5>
-
-<div><b>Name:</b></div>
-<div id="name">waiting...</div>
-
-<div><b>Data:</b></div>
-<textarea id="data" style="width: 100%; height: 300px">
-  waiting...
-</textarea>
-
-<h5>How to Use: Browser XCMInfo Subscription</h5>
-
-
-<code>
-  // setup ably realtime <br/>
+To subscribe to XCM Info messages via the browser:<br>
+  <div style='padding:5px'>
+<code style='font-size:8pt'>
+  // setup ably realtime client and channel -- use your own API key here from ably <br/>
   &lt;script src="https://cdn.ably.com/lib/ably.min-1.js"&gt;&lt;/script&gt;<br/>
+  var client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");<br/>
+  var channel = client.channels.get("xcminfo");<br/>
   <p>
-    // setup client and channel -- use your own API key here from ably <br/>
-    var client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");
-    var channel = client.channels.get("xcminfo");
-  <p>
-    // setup subscription <br/>
-  channel.subscribe(function (message) {<br/>
-    console.log(message);<br/>
+  // subscribe to a specific chain: <br/>
+  let chain = "moonbeam"; <br/>
+  channel.subscribe(chain, function (message) { <br/>
+    console.log(message.data);<br/>
     // show feedback in app, send to analytics log, ...<br/>
-  });<br/>
+  }); <br/>
+
+  // OR, to subscribe to a specific tx/extrinsic hash <br/>
+  let hash = "0xc636bb048e6bdb0b9e13fd3d6b4433256076ff97a64ecb9fb8088c016c45445e"; <br/>
+  channel.subscribe(hash, function (message) { <br/>
+    console.log(message.data);<br/>
+    // show feedback in app, send to analytics log, ...<br/>
+  }); <br/>
 </code>
+</div>
 
-
+Notes:<br/>
+ <ul>
+   <li>Both origination and destination contain a <code>finalized</code> attribute (true or false).   Typical normal XCM Transfers will have 3 key events: Origin chain Unfinalized, Origin chain Finalized, Destination chain Finalized</li>
+   <li>If the origination chain cannot send the XCM Message, then <code>origination.isMsgSent</code> is <code>false</code></li>
+   <li>If the destination chain cannot process the message, then <ode>destination.status</code> is <code>false</code> and details are provided in <code>destination.error</code>.</li>
+ <ul>
+ 
 <script>
-  function show_message(message, ctx) {
-      console.log(ctx, message.name, message.data);
-      document.getElementById("name").innerHTML = message.name;
-      document.getElementById("data").innerHTML = JSON.stringify(message.data);
-  }
   // use your own API key here from ably
   var client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");
-  var channel = client.channels.get("xcminfo");
+  var channel = client.channels.get("xcminfo", { params: {rewind: '1m'} });
   channel.subscribe(function (message) {
-      show_message(message, "all");
-  });
-  
-  // to subscribe to a specific chain:
-  let chain = "moonbeam";
-  channel.subscribe(chain, function (message) {
-      show_message(message, chain);
-  });
-
-  // to subscribe to a specific tx/extrinsic hash
-  let hash = "0xc636bb048e6bdb0b9e13fd3d6b4433256076ff97a64ecb9fb8088c016c45445e";
-  channel.subscribe(hash, function (message) {
-      show_message(message);
+      document.getElementById("xcminfo").innerHTML = JSON.stringify(message.data, null, 4);
+      showxcminfo(message.data);
   });
 </script>
-</body>
-</html>
