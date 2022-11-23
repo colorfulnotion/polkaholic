@@ -1346,6 +1346,8 @@ from chain where chainID = '${chainID}' limit 1`);
     sendExternalWSProvider(name, msg) {
         if (this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL) {
             this.WSProviderQueue.push(msg);
+        }else{
+            console.log(`${name} EXTERNAL_WS_PROVIDER_KEY/EXTERNAL_WS_PROVIDER_URL not set! EXTERNAL_WS_PROVIDER_KEY=${this.EXTERNAL_WS_PROVIDER_KEY}, EXTERNAL_WS_PROVIDER_URL=${this.EXTERNAL_WS_PROVIDER_URL}`)
         }
     }
 

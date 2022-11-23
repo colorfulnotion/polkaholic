@@ -32,6 +32,8 @@ async function main() {
 
     if (lookbackDays > 0) {
         await manager.xcmanalytics(chain, lookbackDays, forceRematch)
+        let wsQueueLen = manager.getWSProviderQueueLen()
+        console.log(`**** wsQueueLen=${wsQueueLen}`)
         process.exit(0);
     }
 
