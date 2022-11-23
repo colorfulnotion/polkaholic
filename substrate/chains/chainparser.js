@@ -4921,7 +4921,7 @@ module.exports = class ChainParser {
         let amountReceived = paraTool.dechexToInt(d[1]);
 
         //let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
-        if (paraTool.validAmount(amountReceived) && finalized) {
+        if (paraTool.validAmount(amountReceived)) {
             let caller = `generic processIncomingAssetSignal balances:Deposit`
             candidate = {
                 chainIDDest: indexer.chainID,
@@ -4962,7 +4962,7 @@ module.exports = class ChainParser {
 
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
-        if (paraTool.validAmount(amountReceived) && finalized) {
+        if (paraTool.validAmount(amountReceived)) {
             let caller = `generic processIncomingAssetSignal currencies:Deposited`
             candidate = {
                 chainIDDest: indexer.chainID,
@@ -5003,7 +5003,7 @@ module.exports = class ChainParser {
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
         //console.log(`[${fromAddress}] ${assetString}`, amountReceived, `finalized=${finalized}`)
-        if (paraTool.validAmount(amountReceived) && finalized) {
+        if (paraTool.validAmount(amountReceived)) {
             let caller = `generic processIncomingAssetSignal tokens:Deposited`
             candidate = {
                 chainIDDest: indexer.chainID,
@@ -5076,7 +5076,7 @@ module.exports = class ChainParser {
             */
             let eventIndex = e.eventID.split('-')[3]
             //if (this.debugLevel >= paraTool.debugTracing) console.log(`processAssetIssued`, fromAddress, amountReceived, targetedSymbol)
-            if (paraTool.validAmount(amountReceived) && finalized) {
+            if (paraTool.validAmount(amountReceived)) {
                 let caller = `generic processIncomingAssetSignal assets:Issued`
                 candidate = {
                     chainIDDest: indexer.chainID,

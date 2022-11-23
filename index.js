@@ -2106,14 +2106,11 @@ app.post('/uploadcontract/:address', async (req, res) => {
 
 })
 
-app.get('/xcmexecutor/:src?/:idx?', async (req, res) => {
-    let src = req.params["src"] ? req.params["src"] : "moonbase-xtokens_transfer-1000-888";
-    let idx = req.params["idx"] ? parseInt(req.params["idx"]) : 0;
-    res.render('xcmexecutor', {
-        chainInfo: query.getChainInfo(),
-        src: src,
-        idx: idx,
-        apiUrl: req.path,
+app.get('/xcminfows/:name?', async (req, res) => {
+    let name = req.params["name"] ? req.params["name"] : "xcminfo";
+    res.render('xcminfows', {
+        name: name,
+        apiUrl: '/xcmtransfers'
     });
 })
 
@@ -2152,11 +2149,6 @@ app.get('/error', async (req, res) => {
     });
 })
 
-app.get('/xcminfows', async (req, res) => {
-    res.render('xcminfows', {
-
-    });
-})
 
 app.use(function(err, req, res, next) {
     res.status(500);

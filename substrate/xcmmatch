@@ -32,23 +32,26 @@ async function main() {
 
     if (lookbackDays > 0) {
         await manager.xcmanalytics(chain, lookbackDays, forceRematch)
+        let wsQueueLen = manager.getWSProviderQueueLen()
+        console.log(`**** wsQueueLen=${wsQueueLen}`)
         process.exit(0);
     }
 
-    let startTS = manager.currentTS() - 3600;
+    let startTS = manager.currentTS() - 600;
     const lookbackSeconds = 120;
     let numRecs = 0;
     let lastGeneralUpdateTS = manager.getCurrentTS();
     do {
         // startTS that comes back is the last message unix timestamp
-        [numRecs, startTS] = await manager.xcmanalytics_period(chain, startTS - 600);
-
-        console.log("***** numRecs ", numRecs, "startTS = ", startTS)
-        if (numRecs == 0) {
+        [numRecs, startTS] = await manager.xcmanalytics_period(chain, startTS - 120);
+        let wsQueueLen = manager.getWSProviderQueueLen()
+        console.log("***** numRecs ", numRecs, `startTS = ${startTS}`, `wsQueueLen=${wsQueueLen}`)
+        if (numRecs == 0 && wsQueueLen == 0) {
             // this polls every like 1s for a new xcmmessage after startTS, and returns with the timestamp of the first message seen, which is used to start the next process
             await manager.waitForNewXCMMessage(startTS);
         } else {
-	    await manager.flushExternalWSProvider();
+            console.log(`xcmTransfers=[${numRecs}],wsQueueLen=${wsQueueLen}`)
+            //await manager.flushWSProviderQueue();
             await manager.sleep(1000);
         }
 

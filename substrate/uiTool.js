@@ -532,6 +532,12 @@ module.exports = {
     presentTrace: function(chainID, bn, blockHash) {
         return `<a href='/trace/${chainID}/${bn}/${blockHash}'>Trace ${bn}</a>`
     },
+    presentXCMScanTrace: function(traceID) {
+        if (traceID) {
+            return `<a class='btn btn-sm' href='https://xcmscan.polkaholic.io/trace/${traceID}?uiEmbed=v0'>XCM Timeline</a>`
+        }
+        return ""
+    },
     presentSecondsAgoTS: function(ts) {
         let now = Math.floor(new Date().getTime() / 1000);
         let secondsago = now - ts;

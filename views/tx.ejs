@@ -56,7 +56,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
         <% } %>
         <tr>
           <td><%- include("tooltip", {k: "xcmtimeline"}) %>XCM Timeline</td>
-          <td><%- include("xcminfo", {xcm: f.xcmInfo}); %></td>
+          <td><%- include("xcminfo", {xcm: f.xcmInfo, traceID: f.traceID}); %></td>
         </tr>
     <% } %>
 

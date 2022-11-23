@@ -1346,14 +1346,20 @@ from chain where chainID = '${chainID}' limit 1`);
     sendExternalWSProvider(name, msg) {
         if (this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL) {
             this.WSProviderQueue.push(msg);
+        } else {
+            console.log(`${name} EXTERNAL_WS_PROVIDER_KEY/EXTERNAL_WS_PROVIDER_URL not set! EXTERNAL_WS_PROVIDER_KEY=${this.EXTERNAL_WS_PROVIDER_KEY}, EXTERNAL_WS_PROVIDER_URL=${this.EXTERNAL_WS_PROVIDER_URL}`)
         }
     }
 
-    async flushWSProviderQueue() {
+    getWSProviderQueueLen() {
+        return this.WSProviderQueue.length
+    }
+
+    async flushWSProviderQueue(debug = false) {
         if (this.EXTERNAL_WS_PROVIDER_KEY && this.EXTERNAL_WS_PROVIDER_URL) {
             for (let i = 0; i < this.WSProviderQueue.length; i++) {
                 let msg = this.WSProviderQueue[i];
-                let names = [];
+                let names = ["xcminfo"];
                 if (msg.origination) {
                     if (msg.origination.transactionHash) {
                         names.push(msg.origination.transactionHash);
@@ -1382,7 +1388,8 @@ from chain where chainID = '${chainID}' limit 1`);
                             "name": name,
                             "data": msg
                         }
-                        let cmd = `curl -X POST ${this.EXTERNAL_WS_PROVIDER_URL} -u "${this.EXTERNAL_WS_PROVIDER_KEY}" --max-time 5 -H "Content-Type: application/json" --data '${JSON.stringify(x)}'`
+                        let EXTERNAL_WS_PROVIDER_URL = this.EXTERNAL_WS_PROVIDER_URL.replace("xcminfo", name)
+                        let cmd = `curl -X POST ${EXTERNAL_WS_PROVIDER_URL} -u "${this.EXTERNAL_WS_PROVIDER_KEY}" --max-time 5 -H "Content-Type: application/json" --data '${JSON.stringify(x)}'`
                         try {
                             const {
                                 stdout,
@@ -1390,10 +1397,12 @@ from chain where chainID = '${chainID}' limit 1`);
                             } = await exec(cmd, {
                                 maxBuffer: 1024 * 64000
                             });
-                            this.logger.info({
-                                "op": "flushWSProviderQueue",
-                                cmd
-                            })
+                            if (debug) {
+                                this.logger.info({
+                                    "op": "flushWSProviderQueue",
+                                    cmd
+                                })
+                            }
                             await this.upsertSQL({
                                 "table": "xcminfoqueue",
                                 "keys": ["xcminfoHash"],
