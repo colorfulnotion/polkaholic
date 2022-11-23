@@ -5031,7 +5031,7 @@ module.exports = class Indexer extends AssetManager {
         let x = xcmtransfer // need deep clone?
         //build systhetic xcmInfo here when xcmInfo is not set yet
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
-        if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
         try {
             let sectionPieces = x.sectionMethod.split(':')
             let xSection = null,
