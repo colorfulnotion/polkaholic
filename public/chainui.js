@@ -423,9 +423,8 @@ async function showxcmtransfers(filter = {}) {
                             let pendingStr = `<button type="button" class="btn btn-info text-capitalize">Pending</button>`
                             let str = `<button type="button" class="btn btn-warning text-capitalize">Unknown</button>`
                             let unk = true;
-			    //console.log(`status:${row.xcmInfo.destination.status}, executionStatus=${row.xcmInfo.destination.executionStatus}`)
-                            if ( row.xcmInfo && row.xcmInfo.destination &&  row.xcmInfo.destination.executionStatus != undefined ) {
-                                if ( row.xcmInfo.destination.executionStatus == 'success' ) {
+                            if ( row.xcmInfo && ((row.xcmInfo.status == undefined) || row.xcmInfo.destination && row.xcmInfo.destination.executionStatus != undefined )) {
+                                if ( row.xcmInfo.status == true || row.xcmInfo.destination.executionStatus == 'success' ) {
                                     str = `<button type="button" class="btn btn-success text-capitalize">Success</button>`
                                     unk = false;
                                 } else if (row.xcmInfo.destination.error) {

@@ -1134,10 +1134,14 @@ module.exports = class Query extends AssetManager {
 
     async getPendingXCMInfo(extrinsicHash){
         let pendingXCMInfo = {}
+        let traceID = null
         let sql = `select extrinsicHash, extrinsicID, convert(pendingXcmInfo using utf8) as pendingXcmInfo, traceID from xcmtransfer where extrinsicHash = '${extrinsicHash}' order by isFeeItem, sourceTS desc limit 1`
         let xcmtransfers = await this.poolREADONLY.query(sql);
         if (xcmtransfers.length > 0){
             let xcmtransfer = xcmtransfers[0]
+            if (xcmtransfer.traceID != undefined){
+                traceID = xcmtransfer.traceID
+            }
             if (xcmtransfer.pendingXcmInfo != undefined){
                 try {
                     pendingXCMInfo = JSON.parse(xcmtransfer.pendingXcmInfo)
@@ -1146,7 +1150,7 @@ module.exports = class Query extends AssetManager {
                 }
             }
         }
-        return pendingXCMInfo
+        return [pendingXCMInfo, traceID]
     }
 
     async getXCMTransfersUI(filters = {}, limit = 10, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
@@ -1751,6 +1755,8 @@ module.exports = class Query extends AssetManager {
                 }
 
                 try {
+                    let pendingXcmInfo = null
+                    let traceID = null
                     if (feedXCMInfoData) {
                         for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
                             const cell = feedXCMInfoData[extrinsicHashEventID][0];
@@ -1763,11 +1769,15 @@ module.exports = class Query extends AssetManager {
                         if (d.xcmInfo && d.xcmInfo.priceUSD != undefined && d.xcmInfo.destination != undefined && d.xcmInfo.destination.amountReceived != undefined) {
                             d.xcmInfo.destination.amountReceivedUSD = d.xcmInfo.priceUSD * d.xcmInfo.destination.amountReceived
                         }
+                        let [_, traceID] = await this.getPendingXCMInfo(txHash)
+                        if (traceID != undefined) d.traceID = traceID
+
                         return d;
                     }else if (isExtrinsicXcm){
-                        console.log(`${txHash} is extrinsicXcm!`)
-                        let xcmInfo = await this.getPendingXCMInfo(txHash)
-                        d.xcmInfo = xcmInfo
+                        let [pendingXcmInfo, traceID] = await this.getPendingXCMInfo(txHash)
+                        if (traceID != undefined) d.traceID = traceID
+                        if (pendingXcmInfo != undefined) d.xcmInfo = pendingXcmInfo
+                        console.log(`${txHash} is extrinsicXcm! traceID=${traceID}`)
                     }
                     return d;
                 } catch (err) {
