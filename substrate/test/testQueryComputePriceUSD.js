@@ -183,10 +183,10 @@ async function main() {
         'USDT': {
             assetChain: '{"Token":"102"}~2012'
         },
-	'DOT-symbolRelayChain': {
-             symbol: 'DOT',
-             relayChain: 'polkadot',
-         },
+        'DOT-symbolRelayChain': {
+            symbol: 'DOT',
+            relayChain: 'polkadot',
+        },
     }
     //let ts = query.currentTS();
     let ts = null

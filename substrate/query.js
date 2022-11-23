@@ -1132,6 +1132,27 @@ module.exports = class Query extends AssetManager {
         return s;
     }
 
+    async getPendingXCMInfo(extrinsicHash) {
+        let pendingXCMInfo = {}
+        let traceID = null
+        let sql = `select extrinsicHash, extrinsicID, convert(pendingXcmInfo using utf8) as pendingXcmInfo, traceID from xcmtransfer where extrinsicHash = '${extrinsicHash}' order by isFeeItem, sourceTS desc limit 1`
+        let xcmtransfers = await this.poolREADONLY.query(sql);
+        if (xcmtransfers.length > 0) {
+            let xcmtransfer = xcmtransfers[0]
+            if (xcmtransfer.traceID != undefined) {
+                traceID = xcmtransfer.traceID
+            }
+            if (xcmtransfer.pendingXcmInfo != undefined) {
+                try {
+                    pendingXCMInfo = JSON.parse(xcmtransfer.pendingXcmInfo)
+                } catch (e) {
+
+                }
+            }
+        }
+        return [pendingXCMInfo, traceID]
+    }
+
     async getXCMTransfersUI(filters = {}, limit = 10, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let chainList = filters.chainList ? filters.chainList : [];
@@ -1275,7 +1296,7 @@ module.exports = class Query extends AssetManager {
                     priceUSDCurrent: x.priceUSDCurrent,
                 }
                 if (parsedXcmInfo) {
-                    if (parsedXcmInfo != undefined && parsedXcmInfo.origination != undefined){
+                    if (parsedXcmInfo != undefined && parsedXcmInfo.origination != undefined) {
                         let isMsgSent = parsedXcmInfo.origination.complete
                         parsedXcmInfo.origination.isMsgSent = isMsgSent
                         //delete parsedXcmInfo.origination.complete
@@ -1446,7 +1467,7 @@ module.exports = class Query extends AssetManager {
                     priceUSDCurrent: x.priceUSDCurrent,
                 }
                 if (parsedXcmInfo) {
-                    if (parsedXcmInfo != undefined && parsedXcmInfo.origination != undefined){
+                    if (parsedXcmInfo != undefined && parsedXcmInfo.origination != undefined) {
                         let isMsgSent = parsedXcmInfo.origination.complete
                         parsedXcmInfo.origination.isMsgSent = isMsgSent
                         //delete parsedXcmInfo.origination.complete
@@ -1715,6 +1736,7 @@ module.exports = class Query extends AssetManager {
                     return c;
                 }
 
+                let isExtrinsicXcm = this.detectExtrinsicXcm(c)
                 //c.params = JSON.stringify(c.params)
                 let d = await this.decorateExtrinsic(c, c.chainID, status, decorate, decorateExtra)
 
@@ -1733,6 +1755,8 @@ module.exports = class Query extends AssetManager {
                 }
 
                 try {
+                    let pendingXcmInfo = null
+                    let traceID = null
                     if (feedXCMInfoData) {
                         for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
                             const cell = feedXCMInfoData[extrinsicHashEventID][0];
@@ -1745,7 +1769,14 @@ module.exports = class Query extends AssetManager {
                         if (d.xcmInfo && d.xcmInfo.priceUSD != undefined && d.xcmInfo.destination != undefined && d.xcmInfo.destination.amountReceived != undefined) {
                             d.xcmInfo.destination.amountReceivedUSD = d.xcmInfo.priceUSD * d.xcmInfo.destination.amountReceived
                         }
+                        let [_, traceID] = await this.getPendingXCMInfo(txHash)
+                        if (traceID != undefined) d.traceID = traceID
                         return d;
+                    } else if (isExtrinsicXcm) {
+                        let [pendingXcmInfo, traceID] = await this.getPendingXCMInfo(txHash)
+                        if (traceID != undefined) d.traceID = traceID
+                        if (pendingXcmInfo != undefined) d.xcmInfo = pendingXcmInfo
+                        console.log(`${txHash} is extrinsicXcm! traceID=${traceID}`)
                     }
                     return d;
                 } catch (err) {
@@ -4132,7 +4163,8 @@ module.exports = class Query extends AssetManager {
                 chainList,
                 address
             };
-            return await this.getXCMTransfers(filters, maxRows, decorate, decorateExtra);
+            //return await this.getXCMTransfers(filters, maxRows, decorate, decorateExtra);
+            return await this.getXCMTransfersUI(filters, maxRows, decorate, decorateExtra);
         }
         // xcmtransfers comes from mysql "xcmtransfer" table
         if (accountGroup == "feed") {
@@ -4836,6 +4868,21 @@ module.exports = class Query extends AssetManager {
             });
 
         }
+    }
+
+    detectExtrinsicXcm(extrinsic) {
+        let events = extrinsic.events
+        let knownXcmEventList = ['xcmpallet:Attempted', 'polkadotXcm:Attempted', 'xcmpQueue:XcmpMessageSent']
+        if (events) {
+            for (const evt of events) {
+                let [pallet, method] = paraTool.parseSectionMethod(evt)
+                let pallet_method = `${pallet}:${method}`
+                if (knownXcmEventList.includes(pallet_method)) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
@@ -7030,6 +7077,23 @@ module.exports = class Query extends AssetManager {
             }
         }
         return multiLocations
+    }
+
+    async getXCMInfoLatest(chainID_or_chainName) {
+        let [chainID, id] = this.convertChainID(chainID_or_chainName)
+        if (chainID_or_chainName == "xcminfo") chainID = null;
+        try {
+            let w = (chainID) ? ` and chainID = '${chainID}' ` : ""
+            let sql = `select convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where  sourceTS > unix_timestamp(date_sub(Now(), interval 3 day)) ${w} order by sourceTS desc limit 1`
+            let xcminfos = await this.poolREADONLY.query(sql);
+            if (xcminfos.length > 0) {
+                let xcminfo = JSON.parse(xcminfos[0].xcmInfo)
+                return xcminfo;
+            }
+        } catch (e) {
+            console.log(e);
+        }
+        return null;
     }
 
     async getXCMInfo(hash) {

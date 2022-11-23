@@ -486,7 +486,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 let v = xcmAssets[i];
                 let xcmInteriorKey = v.xcmInteriorKey;
                 let priceUSD = v.priceUSD
-                if (xcmInteriorKey != undefined && priceUSD){
+                if (xcmInteriorKey != undefined && priceUSD) {
                     xcmPriceInfo[xcmInteriorKey] = priceUSD
                 }
             }
@@ -541,7 +541,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     xcContractAddress: {},
                     xcCurrencyID: {},
                     assetType: "Token",
-                    priceUSD: (xcmPriceInfo[xcmInteriorKey] != undefined)? xcmPriceInfo[xcmInteriorKey] : null
+                    priceUSD: (xcmPriceInfo[xcmInteriorKey] != undefined) ? xcmPriceInfo[xcmInteriorKey] : null
                 }
                 if (decimals != undefined && symbol != undefined) {
                     a.isUSD = isUSD
@@ -566,7 +566,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 let v = xcmAssets[i];
                 let paraID = null
                 let chainID = v.xcmchainID
-                if (chainID != undefined){
+                if (chainID != undefined) {
                     paraID = paraTool.getParaIDfromChainID(chainID)
                 }
                 let xcmInteriorKey = v.xcmInteriorKey;
@@ -602,7 +602,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                         xcCurrencyID: {},
                         nativeAssetChain: nativeAssetChain, //probably unknown without indexing the native chain
                         assetType: "Token",
-                        priceUSD: (v.priceUSD > 0)? v.priceUSD: null
+                        priceUSD: (v.priceUSD > 0) ? v.priceUSD : null
                     }
                     xcmConceptInfo[v.xcmInteriorKey] = a;
                 }

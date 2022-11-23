@@ -1757,20 +1757,22 @@ module.exports = class Indexer extends AssetManager {
     // this is send in real time (both unfinalized/finalized)
     updateXCMTransferDestCandidate(candidate, caller = false, isTip = false, finalized = false) {
         //potentially add sentAt here, but it's 2-4
-        let eventID = candidate.eventID
-        let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
-        if (this.xcmtransferdestcandidate[k] == undefined) {
-            this.xcmtransferdestcandidate[k] = candidate
-            if (caller) {
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} candidate`, this.xcmtransferdestcandidate[k]);
+        if (finalized) {
+            let eventID = candidate.eventID
+            let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
+            if (this.xcmtransferdestcandidate[k] == undefined) {
+                this.xcmtransferdestcandidate[k] = candidate
+                if (caller) {
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} candidate`, this.xcmtransferdestcandidate[k]);
+                }
+            } else {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
             }
-        } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
         }
         //MK: send xcmtransfer here
         this.sendManagerMessage(candidate, "xcmtransferdestcandidate", finalized);
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}, finalized=${finalized}`)
         if (isTip) {
-            //console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(candidate, "xcmtransferdestcandidate", finalized);
         }
     }
@@ -4848,8 +4850,8 @@ module.exports = class Indexer extends AssetManager {
                         if (this.debugLevel >= paraTool.debugInfo && !finalized) console.log(`safeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length}`)
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
-                            xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0)? 1: 0
-                            xcmtransfer.finalized = ! xcmtransfer.finalized
+                            xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0) ? 1 : 0
+                            xcmtransfer.finalized = !xcmtransfer.finalized
                             if (xcmtransfer.msgHash == undefined || xcmtransfer.msgHash.length != 66) {
                                 let msgHashCandidate;
                                 if (xcmtransfer.innerCall != undefined) {
@@ -4873,8 +4875,8 @@ module.exports = class Indexer extends AssetManager {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length} - skip`)
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
-                            xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0)? 1: 0
-                            xcmtransfer.finalized = ! xcmtransfer.finalized
+                            xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0) ? 1 : 0
+                            xcmtransfer.finalized = !xcmtransfer.finalized
                             let unsafeXcmtransfer = xcmtransfer
                             if (unsafeXcmtransfer.msgHash == undefined || unsafeXcmtransfer.msgHash.length != 66) {
                                 let msgHashCandidate;
@@ -5041,7 +5043,7 @@ module.exports = class Indexer extends AssetManager {
                 xMethod = sectionPieces[1];
             }
             let evmTransactionHash = null
-            if (extrinsic.evm != undefined && extrinsic.evm.transactionHash != undefined){
+            if (extrinsic.evm != undefined && extrinsic.evm.transactionHash != undefined) {
                 evmTransactionHash = extrinsic.evm.transactionHash
             }
             /*
@@ -5078,9 +5080,9 @@ module.exports = class Indexer extends AssetManager {
                     ts: x.sourceTS
                 }
                 let p = await this.computePriceUSD(inp);
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD fee`, p)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD fee`, p)
                 if (p) {
-                    x.sourceTxFeeUSD = p.valUSD;
+                    sourceTxFeeUSD = p.valUSD;
                 }
             }
 
@@ -5156,14 +5158,14 @@ module.exports = class Indexer extends AssetManager {
                 isMsgSent = false
             }
             let timeDiff = this.currentTS() - x.sourceTS
-            let isExpectedFinalized = (timeDiff > 300)? true: false
+            let isExpectedFinalized = (timeDiff > 300) ? true : false
             let xcmInfo = {
                 symbol: x.symbol,
                 priceUSD: (x.priceUSD != undefined) ? x.priceUSD : null,
                 relayChain: null,
                 origination: null,
                 destination: null,
-                xcmFinalized: isExpectedFinalized, //this is technically unknown by simply looking origination. we will mark old xcmInfo to finalized for now
+                //xcmFinalized: isExpectedFinalized, //this is technically unknown by simply looking origination. we will mark old xcmInfo to finalized for now
                 version: 'V4',
             }
             xcmInfo.relayChain = {
@@ -5191,9 +5193,9 @@ module.exports = class Indexer extends AssetManager {
                 msgHash: x.msgHash,
                 sentAt: x.sentAt,
                 ts: x.sourceTS,
-                //complete: (x.incomplete) ? false : true,
+                decimals: x.decimals,
                 isMsgSent: isMsgSent,
-                originationFinalized: originationFinalized,
+                finalized: originationFinalized,
             }
             if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
             if (failureType != undefined) {
@@ -5212,14 +5214,14 @@ module.exports = class Indexer extends AssetManager {
                     extrinsicID: null,
                     eventID: null,
                     ts: null,
-                    destinationFinalized: false,
-                    status: false,
+                    finalized: true,
+                    executionStatus: "failed",
                     error: {},
                 }
                 if (failureType == 'failedDestination') {
                     //xcmInfo.destination.error = this.getXcmErrorDescription(x.errorDesc) TODO..
-                    xcmInfo.destination.destinationFinalized = true // msg is not emmited in this case, mark as true anyway
-                    xcmInfo.destination.destinationFinalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
+                    xcmInfo.destination.finalized = true // msg is not emmited in this case, mark as true anyway
+                    xcmInfo.destination.finalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
                 } else if (failureType == 'failedOrigination') {
                     // failedOrigination has no destination struct
                     xcmInfo.destination.extrinsicID = null
@@ -5245,7 +5247,8 @@ module.exports = class Indexer extends AssetManager {
                     //extrinsicID: x.destExtrinsicID,
                     eventID: null,
                     ts: null,
-                    status: false,
+                    finalized: false,
+                    executionStatus: "pending",
                 }
             }
             if (this.debugLevel > paraTool.debugInfo) console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)

@@ -23,7 +23,7 @@ async function main() {
                 let line = data.toString();
                 console.log(line);
                 fs.appendFileSync("/root/xcmscan.log", line + "\n")
-                tracer.receiveMsg(JSON.parse(line), 300);
+                tracer.receiveMsg(JSON.parse(line), 120);
                 await tracer.match()
             } catch (err) {
                 console.log(err);

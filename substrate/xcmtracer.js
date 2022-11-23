@@ -16,6 +16,7 @@ module.exports = class XCMTracer extends AssetManager {
     spans = {};
     remoteexecution = {};
     covered = {};
+    lastMatchTS = 0;
     idhash(id) {
         return paraTool.twox_128("cn" + id).substring(0, 16);
     }
@@ -549,7 +550,14 @@ module.exports = class XCMTracer extends AssetManager {
     }
 
     async match() {
+        if (this.getCurrentTS() - this.lastMatchTS < 2) {
+            //console.log("skipping");
+            //return;
+        }
+        this.lastMatchTS = this.getCurrentTS();
+
         // for all the extrinsics that have msgHash
+        let gc = false;
         for (const extrinsicID of Object.keys(this.extrinsic)) {
             let e = this.extrinsic[extrinsicID];
             let traceID = null;
@@ -562,21 +570,24 @@ module.exports = class XCMTracer extends AssetManager {
                 if (dest) {
                     traceID = await this.submitleg(e.extrinsicID, this.extrinsic[extrinsicID], e.msgHash, dest.eventID)
                     // 123 extrinsic+xcm+dest span 3001855-2 0x80436201761cb8f6df1714deb2ba1156881911a24ed42a07b2d6859ba55b365e 22092-1816245-1-8 https://xcmscan.polkaholic.io/trace/1c530049b0f7892c?uiEmbed=v0
-                    console.log("123 extrinsic+xcm+dest leg", e.extrinsicID, e.msgHash, dest.eventID, `https://xcmscan.polkaholic.io/trace/${traceID}?uiEmbed=v0`);
+                    console.log("123 extrinsic+xcm+dest leg", e.extrinsicID, e.msgHash);
+                    // send unfinalized/finalized xcminfo
+                    this.build_send_xcminfo(this.extrinsic[extrinsicID], dest);
                 } else {
                     // don't really need dest anymore.
                     console.log("12 extrinsic+xcm span only, no dest", e.extrinsicID, e.msgHash);
                     traceID = await this.submitleg(e.extrinsicID, this.extrinsic[extrinsicID], e.msgHash, null)
-
                 }
             } else {
                 // no messagehash in extrinsic, find dest by
                 let dest = this.find_dest_extrinsic(e);
+
                 if (dest && this.xcm[dest.msgHash] != undefined) {
                     e.msgHash = dest.msgHash;
                     traceID = await this.submitleg(e.extrinsicID, this.extrinsic[extrinsicID], e.msgHash, dest.eventID)
-                    console.log("123 extrinsic+xcm+dest leg (without ext msgHash)", e.extrinsicID, dest.msgHash, dest.eventID, `https://xcmscan.polkaholic.io/trace/${traceID}?uiEmbed=v0`);
-
+                    console.log("123 extrinsic+xcm+dest leg (without ext msgHash)");
+                    // send xcminfo 
+                    this.build_send_xcminfo(this.extrinsic[extrinsicID], dest);
                 } else {
                     //console.log("extrinsic sentAt / beneficiaries dest match required");
                 }
@@ -594,8 +605,11 @@ module.exports = class XCMTracer extends AssetManager {
                         maxBuffer: 1024 * 64000
                     });
                     if (traceID) {
-                        this.batchedSQL.push(`update xcmtransfer set traceID = '${traceID}' where extrinsicID='${extrinsicID}'`)
-                        this.update_batchedSQL();
+                        if (this.covered[traceID] == undefined) {
+                            this.batchedSQL.push(`update xcmtransfer set traceID = '${traceID}' where extrinsicID='${extrinsicID}'`)
+                            this.update_batchedSQL();
+                            this.covered[traceID] = true;
+                        }
                     }
                 } else {
                     console.log("NO SPANS");
@@ -603,8 +617,63 @@ module.exports = class XCMTracer extends AssetManager {
             } else {
                 console.log("INCOMPLETE");
             }
+            if (e.origination && e.origination.ts && (this.getCurrentTS() - e.origination.ts > 120)) {
+                delete this.extrinsic[extrinsicID];
+                gc = true;
+            }
         }
+        await this.flushWSProviderQueue()
+        gc = true;
+        if (gc) {
+            this.clean();
+        }
+    }
 
+    clean(lookbackSeconds = 300) {
+        let startTS = this.getCurrentTS() - lookbackSeconds;
+        for (const eventID of Object.keys(this.dest)) {
+            if (this.dest[eventID].destTS < startTS) {
+                console.log("CLEAN dest", eventID);
+                delete this.dest[eventID];
+            }
+        }
+        for (const msgHash of Object.keys(this.xcm)) {
+            if (this.xcm[msgHash].blockTS < startTS) {
+                console.log("CLEAN xcm", msgHash);
+                delete this.xcm[msgHash];
+            }
+        }
+    }
+    build_send_xcminfo(ext, dest) {
+        try {
+            let xcmInfo = ext.xcmInfo;
+            let o = xcmInfo.origination;
+            let d = xcmInfo.destination;
+            let xcminfoHash = paraTool.twox_128(`${dest.eventID}${dest.finalized}`);
+            if (o && d && dest && (dest.destTS > this.getCurrentTS() - 120) && (this.covered[xcminfoHash] == undefined)) {
+                if (dest.amountReceived && o.decimals != undefined) {
+                    d.amountReceived = dest.amountReceived / (10 ** o.decimals);
+                    d.teleportFee = o.amountSent - d.amountReceived;
+                    if (xcmInfo.priceUSD) {
+                        d.amountReceivedUSD = d.amountReceived * xcmInfo.priceUSD;
+                        d.teleportFeeUSD = d.teleportFee * xcmInfo.priceUSD;
+                    }
+                    // d.teleportFeeChainSymbol already set
+                }
+                if (dest.eventID) d.eventID = dest.eventID;
+                if (dest.blockNumberDest) d.blockNumber = dest.blockNumberDest;
+                if (dest.destTS) d.ts = dest.destTS;
+                d.finalized = dest.finalized;
+                if (d.finalized && d.executionStatus == "pending") {
+                    d.executionStatus = "success";
+                }
+                console.log("build_send_xcminfo -> sendExternalWSProvider", dest.eventID, dest.finalized, JSON.stringify(xcmInfo, null, 4))
+                this.sendExternalWSProvider("name", xcmInfo);
+                this.covered[xcminfoHash] = true;
+            }
+        } catch (err) {
+            console.log("build_send_xcminfo", err);
+        }
     }
 
     decodeXcmVersionedXcms(api, xcm) {
@@ -639,7 +708,7 @@ module.exports = class XCMTracer extends AssetManager {
         }
     }
 
-    receiveMsg(msg, lookbackSeconds = 3600) {
+    receiveMsg(msg, lookbackSeconds = 120) {
         let recursiveInstructions = [
             ["isTransferReserveAsset", "asTransferReserveAsset"],
             ["isDepositReserveAsset", "asDepositReserveAsset"],
@@ -652,7 +721,7 @@ module.exports = class XCMTracer extends AssetManager {
             case "xcmtransfer":
                 let ext = msg.msg;
                 let extrinsicID = ext.extrinsicID;
-                if (this.extrinsic[extrinsicID] || (ext.sourceTS < startTS)) return;
+                //if (this.extrinsic[extrinsicID] || (ext.sourceTS < startTS)) return;
                 this.extrinsic[extrinsicID] = ext;
                 break;
             case "xcmmessage":
@@ -711,7 +780,8 @@ module.exports = class XCMTracer extends AssetManager {
                 break;
             case "xcmtransferdestcandidate":
                 let dest = msg.msg;
-                if (this.dest[dest.eventID] || (dest.destTS < startTS)) return;
+                if (dest.destTS && (dest.destTS < startTS)) return;
+                if (msg.finalized != undefined) dest.finalized = msg.finalized;
                 this.dest[dest.eventID] = dest
                 break;
             case "remoteExecution":

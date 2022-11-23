@@ -501,7 +501,7 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            xcmFinalized: true,
+            //xcmFinalized: true,
             version: 'V4'
         }
         xcmInfo.relayChain = {
@@ -530,7 +530,7 @@ module.exports = class XCMManager extends Query {
             sentAt: xcm.sentAt,
             ts: xcm.sourceTS,
             isMsgSent: true,
-            originationFinalized: true,
+            finalized: true,
         }
         //if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
@@ -549,9 +549,9 @@ module.exports = class XCMManager extends Query {
             blockNumber: xcm.blockNumberDest,
             extrinsicID: xcm.destExtrinsicID,
             eventID: xcm.destEventID,
-            destinationFinalized: true,
+            finalized: true,
             ts: xcm.destTS,
-            status: true,
+            executionStatus: "success",
         }
         return [xcmInfo, xcm] //TODO: drop xcm format
     }
@@ -655,7 +655,7 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            xcmFinalized: true,
+            //xcmFinalized: true,
             version: 'V4'
         }
         xcmInfo.relayChain = {
@@ -685,7 +685,7 @@ module.exports = class XCMManager extends Query {
             ts: xcm.sourceTS,
             //complete: true,
             isMsgSent: true,
-            originationFinalized: true,
+            finalized: true,
         }
         if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
@@ -703,8 +703,8 @@ module.exports = class XCMManager extends Query {
             extrinsicID: xcm.destExtrinsicID,
             eventID: xcm.destEventID,
             ts: xcm.destTS,
-            destinationFinalized: true,
-            status: true,
+            finalized: true,
+            executionStatus: "success",
         }
         return [xcmInfo, xcm] //TODO: drop xcm format
     }
@@ -777,7 +777,7 @@ module.exports = class XCMManager extends Query {
             relayChain: null,
             origination: null,
             destination: null,
-            xcmFinalized: true,
+            //xcmFinalized: true,
             version: 'V4'
         }
         xcmInfo.relayChain = {
@@ -785,7 +785,7 @@ module.exports = class XCMManager extends Query {
             relayAt: (xcm.failureType == 'failedOrigination') ? null : xcm.sentAt, // failedOrigination are not relayed
         }
 
-        let isMsgSent = (xcm.failureType == 'failedOrigination')? true: false
+        let isMsgSent = (xcm.failureType == 'failedOrigination') ? true : false
 
         xcmInfo.origination = {
             chainName: xcm.chainName,
@@ -809,7 +809,7 @@ module.exports = class XCMManager extends Query {
             ts: xcm.sourceTS,
             //complete: (xcm.failureType == 'failedOrigination') ? false : true,
             isMsgSent: isMsgSent,
-            originationFinalized: true,
+            finalized: true,
         }
         if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
         xcmInfo.destination = {
@@ -827,14 +827,14 @@ module.exports = class XCMManager extends Query {
             extrinsicID: null,
             eventID: xcm.executedEventID,
             ts: xcm.destTS,
-            destinationFinalized: true,
-            status: false,
+            finalized: true,
+            executionStatus: "failed",
             error: {},
         }
         if (xcm.failureType == 'failedDestination') {
             xcmInfo.destination.error = this.getXcmErrorDescription(xcm.errorDesc)
         } else {
-            xcmInfo.destination.destinationFinalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
+            xcmInfo.destination.finalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
             xcmInfo.destination.extrinsicID = null
             xcmInfo.destination.error = {
                 errorCode: `NA`,
@@ -1063,7 +1063,8 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
-                            this.sendExternalWSProvider("xcminfo", xcmInfo);
+                            if (this.debugLevel > paraTool.debugTracing) console.log(`buildSuccessXcmInfo sendExternalWSProvider`, xcmInfo)
+                            //this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
                             console.log(`!!!!buildSuccessXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo, 'e', e)
                             continue
@@ -1318,6 +1319,7 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildSuccessXcmTransactInfo(substratetx, remoteEvmTx, match)
+                            //if (this.debugLevel > paraTool.debugTracing) console.log(`TODO: buildSuccessXcmTransactInfo sendExternalWSProvider`, xcmInfo)
                         } catch (e) {
                             console.log(`!!!!buildSuccessXcmTransactInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
                             continue
@@ -1552,7 +1554,7 @@ module.exports = class XCMManager extends Query {
                         destEventID: d.eventID,
                         sourceTS: d.sourceTS,
                         destTS: d.destTS,
-                        destStatus: d.destStatus,
+                        success: d.destStatus,
                         errorDesc: d.errorDesc,
                         executedEventID: d.executedEventID,
                     }
@@ -1562,7 +1564,8 @@ module.exports = class XCMManager extends Query {
                     if (substratetx != undefined) {
                         try {
                             [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord)
-                            this.sendExternalWSProvider("xcminfo", xcmInfo);
+                            if (this.debugLevel > paraTool.debugTracing) console.log(`buildFailedXcmInfo sendExternalWSProvider`, xcmInfo)
+                            //this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
                             console.log(`!!!!buildFailedXcmInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
                             continue
