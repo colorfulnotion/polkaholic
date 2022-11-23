@@ -1771,7 +1771,6 @@ module.exports = class Query extends AssetManager {
                         }
                         let [_, traceID] = await this.getPendingXCMInfo(txHash)
                         if (traceID != undefined) d.traceID = traceID
-
                         return d;
                     }else if (isExtrinsicXcm){
                         let [pendingXcmInfo, traceID] = await this.getPendingXCMInfo(txHash)

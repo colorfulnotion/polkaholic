@@ -1769,8 +1769,8 @@ module.exports = class Indexer extends AssetManager {
         }
         //MK: send xcmtransfer here
         this.sendManagerMessage(candidate, "xcmtransferdestcandidate", finalized);
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}, finalized=${finalized}`)
         if (isTip) {
-            //console.log(`[Delay=${this.chainParser.parserBlockNumber - candidate.blockNumberDest}] send xcmtransferdestcandidate [${candidate.eventID}] (msgHash:${candidate.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(candidate, "xcmtransferdestcandidate", finalized);
         }
     }
@@ -5078,7 +5078,7 @@ module.exports = class Indexer extends AssetManager {
                     ts: x.sourceTS
                 }
                 let p = await this.computePriceUSD(inp);
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD fee`, p)
+                //if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD fee`, p)
                 if (p) {
                     x.sourceTxFeeUSD = p.valUSD;
                 }
