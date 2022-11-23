@@ -116,13 +116,20 @@
 
 
       <%- include("tooltip", {k: "executionstatus"}) %><B>Execution Status:</B>
-       <% if ( xcm.destination.status ||  xcm.destination.success) { %>
+       <% if ( xcm.destination.status ||  (xcm.destination.executionStatus != undefined && xcm.destination.executionStatus == 'success') ) { %>
 	    <button type="button" class="btn btn-success text-capitalize">Success</button>
        <% } else { %>
          <% if ( xcm.destination.error ) { %>
 	    <button type="button" class="btn btn-danger text-capitalize"><%= xcm.destination.error.errorType %></button><br/>
             <%= xcm.destination.error.errorDesc; %><br/>
-	 <% } %>
+	  <% } else {
+          let xcmDestStatus = 'Unknown'
+          let xcmAge = 400;
+          if (xcm.origination.ts) xcmAge =  Math.floor(new Date().getTime() / 1000) -  xcm.origination.ts;
+          if (xcmAge <= 300) xcmDestStatus = 'Pending'
+       %>
+            <%= `${xcmDestStatus}` %>
+          <% } %>
        <% } %>
 	 <br/>
 	 <% if ( xcm.destination.eventID ) { %>
