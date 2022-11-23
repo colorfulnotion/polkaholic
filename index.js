@@ -1200,7 +1200,7 @@ app.get('/xcmtransfers/:chainIDorChainName?', async (req, res) => {
             filters.endTS = req.query.endTS;
         }
         const maxRows = 1000;
-        let xcmtransfers = await query.getXCMTransfers(filters, maxRows);
+        let xcmtransfers = await query.getXCMTransfersUI(filters, maxRows);
         res.render('xcmtransfers', {
             chainID: chainID,
             id: id,

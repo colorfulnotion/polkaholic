@@ -451,7 +451,9 @@ async function showxcmtransfers(filter = {}) {
                         }
                     } else {
                         try {
-                            if ((row.incomplete !== undefined && row.incomplete > 0)) {
+                            if ((row.isMsgSent !== undefined && row.isMsgSent == false)) {
+                                return row.idDest + " Incomplete"
+                            } else if ((row.incomplete !== undefined && row.incomplete > 0)) {
                                 return row.idDest + " Incomplete"
                             } else {
                                 return row.idDest + " " + row.blockNumberDest;

@@ -4848,6 +4848,8 @@ module.exports = class Indexer extends AssetManager {
                         if (this.debugLevel >= paraTool.debugInfo && !finalized) console.log(`safeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length}`)
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
+                            xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0)? 1: 0
+                            xcmtransfer.finalized = ! xcmtransfer.finalized
                             if (xcmtransfer.msgHash == undefined || xcmtransfer.msgHash.length != 66) {
                                 let msgHashCandidate;
                                 if (xcmtransfer.innerCall != undefined) {
@@ -4862,7 +4864,7 @@ module.exports = class Indexer extends AssetManager {
                             this.updateAddressExtrinsicStorage(fromAddress, extrinsicID, extrinsicHash, "feedxcm", xcmtransfer, blockTS, block.finalized); //not sure about bt write here..
 
                             // build pendingXCMInfo here
-                            let pendingXcmInfo = await this.buildPendingXcmInfo(xcmtransfer, rExtrinsic)
+                            let pendingXcmInfo = await this.buildPendingXcmInfo(xcmtransfer, rExtrinsic, finalized)
                             if (this.debugLevel >= paraTool.debugInfo) console.log(`pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, pendingXcmInfo)
                             xcmtransfer.xcmInfo = pendingXcmInfo
                             this.updateXCMTransferStorage(xcmtransfer, isTip, finalized); // store, flushed in flushXCM
@@ -4871,6 +4873,8 @@ module.exports = class Indexer extends AssetManager {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length} - skip`)
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
+                            xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0)? 1: 0
+                            xcmtransfer.finalized = ! xcmtransfer.finalized
                             let unsafeXcmtransfer = xcmtransfer
                             if (unsafeXcmtransfer.msgHash == undefined || unsafeXcmtransfer.msgHash.length != 66) {
                                 let msgHashCandidate;
@@ -4882,7 +4886,10 @@ module.exports = class Indexer extends AssetManager {
                                 if (msgHashCandidate) unsafeXcmtransfer.msgHash = msgHashCandidate
                             }
                             //for unsafeXcmtransfer. we will send xcmtransfer that may eventually got dropped
-                            this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
+                            let unsafePendingXcmInfo = await this.buildPendingXcmInfo(unsafeXcmtransfer, rExtrinsic, finalized)
+                            unsafePendingXcmInfo.xcmInfo = pendingXcmInfo
+                            if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafe pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, pendingXcmInfo)
+                            this.sendWSMessage(unsafePendingXcmInfo, "xcmtransfer", finalized);
                         }
                     }
                     delete rExtrinsic.xcms
@@ -5020,7 +5027,7 @@ module.exports = class Indexer extends AssetManager {
         return (rExtrinsic);
     }
 
-    async buildPendingXcmInfo(xcmtransfer, extrinsic) {
+    async buildPendingXcmInfo(xcmtransfer, extrinsic, originationFinalized) {
         let x = xcmtransfer // need deep clone?
         //build systhetic xcmInfo here when xcmInfo is not set yet
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
@@ -5090,8 +5097,12 @@ module.exports = class Indexer extends AssetManager {
                 }
 
                 let p = await this.computePriceUSD(inp);
-
-                if (this.debugLevel >= paraTool.debugTracing) console.log(`computePriceUSD p`, p)
+                if (this.debugLevel >= paraTool.debugTracing) {
+                    console.log(`symbolRelayChain=${symbolRelayChain}, assetInfo`, assetInfo)
+                    console.log(`symbolRelayChain=${symbolRelayChain}, inp`, inp)
+                    console.log(`symbolRelayChain=${symbolRelayChain} p`, p)
+                    console.log(`computePriceUSD p`, p)
+                }
                 if (p) {
                     x.amountSentUSD = p.valUSD;
                     x.priceUSD = p.priceUSD;
@@ -5135,15 +5146,22 @@ module.exports = class Indexer extends AssetManager {
 
             //(xcmtransfer.destStatus = 0 and xcmtransfer.incomplete = 0) or xcmtransfer.incomplete = 1)
             let failureType = null
+            let isMsgSent = true
             //if (x.destStatus == 0 && x.incomplete == 0) failureType = 'failedDestination'
-            if (x.incomplete == 1) failureType = 'failedOrigination'
+            if (x.incomplete == 1 || x.isMsgSent == 0) {
+                failureType = 'failedOrigination'
+                isMsgSent = false
+            }
+            let timeDiff = this.currentTS() - x.sourceTS
+            let isExpectedFinalized = (timeDiff > 300)? true: false
             let xcmInfo = {
                 symbol: x.symbol,
                 priceUSD: (x.priceUSD != undefined) ? x.priceUSD : null,
                 relayChain: null,
                 origination: null,
                 destination: null,
-                version: 'V2',
+                xcmFinalized: isExpectedFinalized, //this is technically unknown by simply looking origination. we will mark old xcmInfo to finalized for now
+                version: 'V4',
             }
             xcmInfo.relayChain = {
                 relayChain: this.relayChain,
@@ -5170,7 +5188,9 @@ module.exports = class Indexer extends AssetManager {
                 msgHash: x.msgHash,
                 sentAt: x.sentAt,
                 ts: x.sourceTS,
-                complete: (x.incomplete) ? false : true,
+                //complete: (x.incomplete) ? false : true,
+                isMsgSent: isMsgSent,
+                originationFinalized: originationFinalized,
             }
             //if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
             if (failureType != undefined) {
@@ -5189,12 +5209,16 @@ module.exports = class Indexer extends AssetManager {
                     extrinsicID: null,
                     eventID: null,
                     ts: null,
+                    destinationFinalized: false,
                     status: false,
                     error: {},
                 }
                 if (failureType == 'failedDestination') {
                     //xcmInfo.destination.error = this.getXcmErrorDescription(x.errorDesc) TODO..
-                } else {
+                    xcmInfo.destination.destinationFinalized = true // msg is not emmited in this case, mark as true anyway
+                    xcmInfo.destination.destinationFinalizedDesc = 'Xcm is terminated at origination. Msg is not relayed to nor received by destination chain'
+                } else if (failureType == 'failedOrigination') {
+                    // failedOrigination has no destination struct
                     xcmInfo.destination.extrinsicID = null
                     xcmInfo.destination.error = {
                         errorCode: `NA`,
@@ -5221,7 +5245,7 @@ module.exports = class Indexer extends AssetManager {
                     status: false,
                 }
             }
-            //console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)
+            if (this.debugLevel > paraTool.debugInfo) console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)
             return xcmInfo
         } catch (e) {
             console.log(`buildPendingXcmInfo [${x.extrinsicID}]  [${x.extrinsicHash}] err`, e)

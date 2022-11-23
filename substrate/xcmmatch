@@ -1,6 +1,13 @@
 #!/usr/bin/env node
  // Usage:  xcmmatch [lookbackDays] [rematch]
 var XCMManager = require("./xcmmanager");
+var paraTool = require("./paraTool");
+let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
+var debugLevel = paraTool.debugErrorOnly
+if (isDevelopment){
+    debugLevel = paraTool.debugTracing
+    console.log(`[isDevelopment:${isDevelopment}] debugLevel: ${debugLevel}`)
+}
 
 async function main() {
     let lookbackDays = 0;
@@ -16,6 +23,7 @@ async function main() {
 
     let lastUpdateTS = 0;
     var manager = new XCMManager();
+    manager.setDebugLevel(debugLevel)
     manager.init_xcm_error_map();
     await manager.xcm_init()
     await manager.assetManagerInit();
