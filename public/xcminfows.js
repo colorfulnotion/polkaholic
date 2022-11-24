@@ -12,7 +12,7 @@ function showxcminfo(xcmInfo) {
 	console.log("rc ERR", err);
     }
     try {
-	document.getElementById("destination").innerHTML = showDestination(xcmInfo.destination)
+	document.getElementById("destination").innerHTML = showDestination(xcmInfo.destination, xcmInfo.symbol)
     } catch (err) {
 	console.log("dest ERR", err);
     }
@@ -42,14 +42,17 @@ function show_remoteEVMTx_destination(tx, id) {
 
 function showOrigination(origination, symbol) {
 
-    let out = `<h6 class="fw-bold">Origination: ${origination.id} [Para ID: ${origination.paraID}]</h6>`;
-    let finalized = origination.finalized || origination.originationFinalized ? true : false;
+    let out = `<h6 class="fw-bold">Origination: ${origination.id}`
+    if ( origination.paraID > 0 ) out += `[Para ID: ${origination.paraID}]`;
+    out += `</h6>`;
+    let finalized = origination.finalized ? true : false;
     let id = origination.id;
     let fin = finalized ? `<b>Finalized:</b> ${presentFinalized(finalized)}` : `<i>Unfinalized</i>  ${presentFinalized(finalized)}`
     let cls = finalized ? 'finalized' : 'unfinalized';
     let txHash = origination.transactionHash ? "<b>Transaction Hash:</b> ${presentTxHash(origination.transactionHash)}<br/>": ""
     out += `<div class='${cls}'>
-<i>${timeConverter(origination.ts)}</i> ${fin}<br/>
+<i>${timeConverter(origination.ts)}</i><br/>
+${fin}<br/>
 <b>Extrinsic ID:</b> ${presentExtrinsicIDHash(origination.extrinsicID, origination.extrinsicHash)}<br/> 
 <b>Block:</b> ${presentBlockNumber(id, id, origination.blockNumber)} <br/>
 <button type="button" class="btn btn-outline-primary text-capitalize">${origination.section}:${origination.method}</button><br>
@@ -89,23 +92,27 @@ function showRelayed(relayChain) {
     let finalized = ( relayChain.finalized ) ? true : false;
     let fin = finalized ? `<b>Finalized:</b> ${presentFinalized(finalized)}` : `<i>Unfinalized</i> ${presentFinalized(finalized)}`
     let cls = finalized ? 'finalized' : 'unfinalized';
-    out += `<B>Sent At:</B> ${relayChain.relayChain}` 
+    out += `<B>Sent At:</B> ` + presentBlockNumber(relayChain.relayChain, relayChain.relayChain, relayChain.relayAt);
     return out;
 }
 
-function showDestination(destination)
+function showDestination(destination, symbol)
 {
     if ( destination == undefined ) {
 	return "unknown";
     }
     let finalized = destination.finalized || destination.unfinalized ? true : false;
-    let out = `<h6 class="fw-bold">Destination: ${destination.id} [Para ID: ${destination.paraID}]</h6>`;
-
-    let fin = finalized ? `<b>Finalized:</b> ${presentFinalized(finalized)} Block ${o.blockNumber}` : `<i>Unfinalized</i>`
+    let out = `<h6 class="fw-bold">Destination: ${destination.id}`;
+    if ( destination.paraID > 0 ) out += `[Para ID: ${destination.paraID}]`;
+    out += `</h6>`
+    
+    let fin = finalized ? `<b>Finalized:</b> ${presentFinalized(finalized)} Block ` + presentBlockNumber(destination.id, destination.id, destination.blockNumber) : `<i>Unfinalized</i>`
     let cls = finalized ? 'finalized' : 'unfinalized';
+    out += `<div class='${cls}'>`
     if ( destination.ts ) {
-	out += `<div class='${cls}'><i>${timeConverter(destination.ts)}</i> ${fin}<br/>`
+	out += `<i>${timeConverter(destination.ts)}</i><br/>`
     }
+    out += `${fin}<br/>`
     if ( destination.beneficiary ) {
 	out += `<div><b>Beneficiary:</b> ${presentAddress(destination.beneficiary)}</div>`
 	out += presentAddress();
