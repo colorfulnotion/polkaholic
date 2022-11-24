@@ -1757,15 +1757,17 @@ module.exports = class Indexer extends AssetManager {
     // this is send in real time (both unfinalized/finalized)
     updateXCMTransferDestCandidate(candidate, caller = false, isTip = false, finalized = false) {
         //potentially add sentAt here, but it's 2-4
-        let eventID = candidate.eventID
-        let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
-        if (this.xcmtransferdestcandidate[k] == undefined) {
-            this.xcmtransferdestcandidate[k] = candidate
-            if (caller) {
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} candidate`, this.xcmtransferdestcandidate[k]);
+        if (finalized){
+            let eventID = candidate.eventID
+            let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
+            if (this.xcmtransferdestcandidate[k] == undefined) {
+                this.xcmtransferdestcandidate[k] = candidate
+                if (caller) {
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} candidate`, this.xcmtransferdestcandidate[k]);
+                }
+            } else {
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
             }
-        } else {
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`${caller} skip duplicate candidate ${eventID}`, );
         }
         //MK: send xcmtransfer here
         this.sendManagerMessage(candidate, "xcmtransferdestcandidate", finalized);
