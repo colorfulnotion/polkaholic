@@ -4163,7 +4163,8 @@ module.exports = class Query extends AssetManager {
                 chainList,
                 address
             };
-            return await this.getXCMTransfers(filters, maxRows, decorate, decorateExtra);
+            //return await this.getXCMTransfers(filters, maxRows, decorate, decorateExtra);
+            return await this.getXCMTransfersUI(filters, maxRows, decorate, decorateExtra);
         }
         // xcmtransfers comes from mysql "xcmtransfer" table
         if (accountGroup == "feed") {
