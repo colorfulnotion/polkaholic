@@ -63,7 +63,7 @@ To subscribe to XCM Info messages via the browser:<br>
   var channel = client.channels.get("xcminfo");
   channel.subscribe(function (message) {
     // filter on message.name (transaction hash or extrinsic hash), show feedback in app ...
-  }); 
+  });
 </code>
 </pre>
 </div>
@@ -90,9 +90,9 @@ To subscribe to XCM Info messages via node.js server side, use `npm install ably
  <ul>
    <li>Both origination and destination contain a <code>finalized</code> attribute (true or false).   Typical normal XCM Transfers will have 3 key events: Origin chain Unfinalized, Origin chain Finalized, Destination chain Finalized</li>
    <li>If the origination chain cannot send the XCM Message, then <code>origination.isMsgSent</code> is <code>false</code></li>
-   <li>If the destination chain cannot process the message, then <ode>destination.status</code> is <code>false</code> and details are provided in <code>destination.error</code>.</li>
+   <li>If the destination chain cannot process the message, then <code>destination.executionStatus</code> is <code>false</code> and error details are provided in <code>destination.error</code>.</li>
  <ul>
- 
+
 <script>
 let xcminfo = <%- JSON.stringify(xcmInfo) %>;
   $(document).ready(function() {
