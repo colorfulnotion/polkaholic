@@ -1728,6 +1728,9 @@ module.exports = class Query extends AssetManager {
                                 if (substratetx.xcmInfo != undefined) {
                                     c.xcmInfo = substratetx.xcmInfo;
                                 }
+                                if (substratetx.traceID != undefined){
+                                    c.traceID = substratetx.traceID
+                                }
                             } catch (errS) {
                                 console.log("FETCH XCMTRANSFER ERR", errS);
                             }
