@@ -40,12 +40,16 @@ extrinsic hash or transaction hash (e.g. "0xc636bb048e6bdb0b9e13fd3d6b4433256076
   </ul>
   <div id='flighttime'></div>
 </div>
+   </td>
    <td valign=top>
      <div><b>XCM Info:</b></div>
      <textarea id="xcminfo" style="width: 600px; height: 800px; font-size:10px; font-family: Courier New;">waiting...</textarea>
    </td>
   </tr>
-  </table>
+</table>
+
+<div id="trace" style='width:100%;'>
+</div>
 
 <h5>How To Subscribe to XCM Info Channel</h5>
 
@@ -63,26 +67,35 @@ To subscribe to XCM Info messages via the browser:<br>
   var channel = client.channels.get("xcminfo");
   channel.subscribe(function (message) {
     // filter on message.name (transaction hash or extrinsic hash), show feedback in app ...
-  }); 
+  });
 </code>
 </pre>
 </div>
 
 <h6>Node.js</h6>
-To subscribe to XCM Info messages via node.js server side, use `npm install ably`: (see <a href='https://ably.com/download'>this</a> for other libraries)
+To subscribe to XCM Info messages via node.js: (see <a href='https://ably.com/download'>this</a> for other libraries)
 
 <div style='padding:5px'>
 <pre>
 <code style='font-size:8pt'>
+async function main() {
+  const Ably = require('ably');  // setup with "npm install ably"
   // setup ably realtime client and channel -- use your own API key here
-  const Ably = require('ably');
   var client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");
-  await ably.connection.once('connected');
+  await client.connection.once('connected');
   // channel name: "xcminfo" can be replaced with "moonbeam", "astar", "interlay", etc.
   var channel = client.channels.get("xcminfo");
   await channel.subscribe(function (message) {
       console.log('Received xcminfo: ', message);
   });
+}
+main()
+    .then(() => {
+    })
+    .catch((e) => {
+        console.error('ERROR', e);  
+        process.exit(1);  
+    });
 </code>
 </pre>
 
@@ -90,20 +103,21 @@ To subscribe to XCM Info messages via node.js server side, use `npm install ably
  <ul>
    <li>Both origination and destination contain a <code>finalized</code> attribute (true or false).   Typical normal XCM Transfers will have 3 key events: Origin chain Unfinalized, Origin chain Finalized, Destination chain Finalized</li>
    <li>If the origination chain cannot send the XCM Message, then <code>origination.isMsgSent</code> is <code>false</code></li>
-   <li>If the destination chain cannot process the message, then <ode>destination.status</code> is <code>false</code> and details are provided in <code>destination.error</code>.</li>
+   <li>If the destination chain cannot process the message, then <code>destination.executionStatus</code> is <code>false</code> and error details are provided in <code>destination.error</code>.</li>
  <ul>
- 
+
 <script>
-let xcminfo = <%- JSON.stringify(xcmInfo) %>;
+let xcmInfo = <%- JSON.stringify(xcmInfo) %>;
   $(document).ready(function() {
-     const intervalID = setInterval(showxcminfo, 1000,xcminfo);
+     showxcminfo(true);
+     const intervalID = setInterval(showxcminfo, 1000, false);
   });
   // use your own API key here from ably
   var client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");
   var channel = client.channels.get("[?rewind=1]<%= name %>");
   channel.subscribe(function (message) {
-      xcminfo = message.data;
-      showxcminfo(xcminfo);
+      xcmInfo = message.data;
+      showxcminfo(true);
       console.log(message.name, message.data);
   });
 </script>

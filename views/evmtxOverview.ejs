@@ -45,7 +45,7 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
     <% } %>
     <tr>
       <td><%- include("tooltip", {k: "xcmtimeline"}) %>XCM Timeline</td>
-      <td><%- include("xcminfo", {xcm: f.xcmInfo}); %></td>
+      <td><%- include("xcminfo", {xcm: f.xcmInfo, traceID: f.traceID}); %></td>
     </tr>
 <% } %>
     <tr>

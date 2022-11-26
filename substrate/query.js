@@ -1728,6 +1728,9 @@ module.exports = class Query extends AssetManager {
                                 if (substratetx.xcmInfo != undefined) {
                                     c.xcmInfo = substratetx.xcmInfo;
                                 }
+                                if (substratetx.traceID != undefined) {
+                                    c.traceID = substratetx.traceID
+                                }
                             } catch (errS) {
                                 console.log("FETCH XCMTRANSFER ERR", errS);
                             }
@@ -7082,12 +7085,16 @@ module.exports = class Query extends AssetManager {
     async getXCMInfoLatest(chainID_or_chainName) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         if (chainID_or_chainName == "xcminfo") chainID = null;
+        let w = (chainID) ? ` and chainID = '${chainID}'  ` : ""
+        if (typeof chainID_or_chainName == "string" && (chainID_or_chainName.includes("0x"))) {
+            w = " and extrinsicHash = '${chainID_or_chainName}' "
+        }
+        let sql = `select traceID, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where  sourceTS > unix_timestamp(date_sub(Now(), interval 3 day)) and xcmInfo is not null ${w} order by sourceTS desc limit 1`
         try {
-            let w = (chainID) ? ` and chainID = '${chainID}' ` : ""
-            let sql = `select convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where  sourceTS > unix_timestamp(date_sub(Now(), interval 3 day)) ${w} order by sourceTS desc limit 1`
             let xcminfos = await this.poolREADONLY.query(sql);
             if (xcminfos.length > 0) {
                 let xcminfo = JSON.parse(xcminfos[0].xcmInfo)
+                xcminfo.traceID = xcminfos[0].traceID;
                 return xcminfo;
             }
         } catch (e) {

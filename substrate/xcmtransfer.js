@@ -664,7 +664,6 @@ module.exports = class XCMTransfer extends XCMTransact {
     }
     get_encoded_xcmTransaction(contract, input, gasLimit = 600000) {
         let api = this.apis["origination"].api;
-        // ***** TODO: get ethereum call from ethers contract ABI, estimate gasLimit
         const xcmTransaction = {
             V1: {
                 gasLimit,
@@ -758,7 +757,6 @@ module.exports = class XCMTransfer extends XCMTransact {
         var xcmTransactorContractAbi = this.get_xcmtransactor_abi();
         var xcmTransactorContractAddress = '0x000000000000000000000000000000000000080d' //this is the precompiled interface
         var xcmTransactorContract = new this.web3Api.eth.Contract(xcmTransactorContractAbi, xcmTransactorContractAddress);
-        let weight = 6000000000
         let relayChain = paraTool.getRelayChainByChainID(chainIDRelay)
         let dest = []
         dest.push(1) // parents: 1
@@ -767,20 +765,12 @@ module.exports = class XCMTransfer extends XCMTransact {
             parachainHex = ['0x' + parachainHex.padStart(10, '0')]
             dest.push(parachainHex)
         }
-
         let encodedCall = this.get_encoded_xcmTransaction(contract, input)
-        // encodedCall = this.get_encoded_transfer(contract, input);
-        let transactRequiredWeightAtMost = "8000000000"; // uint64
-        let feeAmount = "30000000000000000"; // uint256
-        let overallWeight = "15000000000"; // uint64
-
+        let transactRequiredWeightAtMost = "16000000000"; // uint64
+        let feeAmount = "30000000000000000"; //	uint256
+        let overallWeight = "35000000000"; // uint64
+        feeLocationAddress = "0xffffffff1ab2b146c526d4154905ff12e6e57675";
         var data = xcmTransactorContract.methods.transactThroughSigned(dest, feeLocationAddress, transactRequiredWeightAtMost, encodedCall, feeAmount, overallWeight).encodeABI()
-        if (useMultilocation) {
-            // TODO: compute feeLocation
-            let feeLocation = []
-            // transactThroughSignedMultilocation(Multilocation memory dest, tuple feeLocation, uint64 transactRequiredWeightAtMost, bytes memory call, uint256 feeAmount, uint64 overallWeight)
-            var data = xcmTransactorContract.methods.transactThroughSignedMultilocation(dest, feeLocation, transactRequiredWeightAtMost, encodedCall, feeAmount, overallWeight).encodeABI()
-        }
         let txStruct = {
             to: xcmTransactorContractAddress,
             value: '0',

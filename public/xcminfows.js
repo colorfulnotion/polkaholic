@@ -1,26 +1,35 @@
 
-function showxcminfo(xcmInfo, nm = "") {
-    if ( xcmInfo == null ) return;
 
+function showxcminfo(newobj = false) {
+    if ( xcmInfo == null ) return;
     document.getElementById("xcminfo").innerHTML = JSON.stringify(xcmInfo, null, 4);
     try {
-	document.getElementById("origination").innerHTML = showOrigination(xcmInfo.origination, xcmInfo.symbol)
+	if ( xcmInfo.origination ) {
+	    document.getElementById("origination").innerHTML = showOrigination(xcmInfo.origination, xcmInfo.symbol)
+	}
     } catch (err) {
 	console.log("orig ERR", err);
     }
     try {
-	document.getElementById("relayed").innerHTML = showRelayed(xcmInfo.relayChain)
+	if ( xcmInfo.relayChain ) {
+	    document.getElementById("relayed").innerHTML = showRelayed(xcmInfo.relayChain)
+	}
     } catch (err) {
 	console.log("rc ERR", err);
     }
     try {
-	document.getElementById("destination").innerHTML = showDestination(xcmInfo.destination, xcmInfo.symbol)
-	let diff = xcmInfo.destination.ts && xcmInfo.origination.ts ? (  xcmInfo.destination.ts  - xcmInfo.origination.ts ) : null;
-	if ( diff != null ) {
-	    document.getElementById("flighttime").innerHTML = `<i>Flight time:</i> ${diff} seconds`
+	if ( xcmInfo.destination ) {
+	    document.getElementById("destination").innerHTML = showDestination(xcmInfo.destination, xcmInfo.symbol)
+	    let diff = xcmInfo.destination.ts && xcmInfo.origination.ts ? (  xcmInfo.destination.ts  - xcmInfo.origination.ts ) : null;
+	    if ( diff != null ) {
+		document.getElementById("flighttime").innerHTML = `<i>Flight time:</i> ${diff} seconds`
+	    }
 	}
     } catch (err) {
 	console.log("dest ERR", err);
+    }
+    if ( newobj ) {
+	document.getElementById("trace").innerHTML = xcmInfo.traceID ? `<iframe src="https://xcmscan.polkaholic.io/trace/${xcmInfo.traceID}?uiEmbed=v0" width="100%" height="500"></iframe>` : "Not available"
     }
 }
 
@@ -129,7 +138,7 @@ function showDestination(destination, symbol)
     if ( destination.ts ) {
 	out += `<i>${timeConverter(destination.ts)}</i> <span style='float:right'>${presentTS(destination.ts)}</span><br/>`
     }
-    let fin = finalized ? `<b>Finalized:</b> ${presentFinalized(finalized)}<br/>` : `<i>Unfinalized</i>`
+    let fin = finalized ? `<b>Finalized:</b> ${presentFinalized(finalized)}<br/>` : `<i>Unfinalized</i><br/>`
     out += `${fin}`
     if ( destination.blockNumber ) {
 	out += `<b>Received At Block:</b> ` + presentBlockNumber(destination.id, destination.id, destination.blockNumber) 

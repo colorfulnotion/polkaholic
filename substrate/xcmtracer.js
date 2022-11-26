@@ -8,6 +8,7 @@ const readline = require('readline');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const xcmInstructions = require("./xcmInstructions");
+const Mutex = require('async-mutex').Mutex;
 
 module.exports = class XCMTracer extends AssetManager {
     xcm = {};
@@ -20,7 +21,11 @@ module.exports = class XCMTracer extends AssetManager {
     idhash(id) {
         return paraTool.twox_128("cn" + id).substring(0, 16);
     }
-
+    mutex = null;
+    constructor() {
+        super("crawler")
+        this.mutex = new Mutex();
+    }
     // maps dest like "{ parents: 0, interior: { x1: { parachain: 2000 } } }" into just "2000"
     dest_to_chainID(dest, relayChain = "polkadot") {
         if (dest && dest.interior && dest.interior.x1 && dest.interior.x1.parachain) {
@@ -107,6 +112,7 @@ module.exports = class XCMTracer extends AssetManager {
                         case "chainID":
                         case "chainIDDest":
                         case "incomplete":
+                        case "xcmInfo":
                         case "isFeeItem":
                         case "msgHash":
                         case "relayChain":
@@ -139,6 +145,7 @@ module.exports = class XCMTracer extends AssetManager {
                             break;
                         case "sectionMethod":
                             sectionMethod = v.toString();
+                            sectionMethod += (ext.finalized) ? ":FIN" : ":UNF";
                             break;
                         default:
                             exttags[k.toString()] = v.toString();
@@ -400,7 +407,6 @@ module.exports = class XCMTracer extends AssetManager {
 
                 }
             }
-
         } else {
             console.log("Missing", msgHash);
         }
@@ -453,18 +459,21 @@ module.exports = class XCMTracer extends AssetManager {
                 }
             }
             let dest_eventName = `${dest.pallet}:${dest.method}`;
-            this.push_span(extrinsicID, {
-                id: destid,
-                parentId: prevspanid,
-                traceId: traceId,
-                timestamp: dest.destTS * 1000000,
-                duration: 1000000,
-                name: dest_eventName,
-                tags: desttags,
-                localEndpoint: {
-                    serviceName: idDest
-                }
-            })
+            dest_eventName += (dest.finalized) ? ":FIN" : ":UNF";
+            if (dest.finalized) {
+                this.push_span(extrinsicID, {
+                    id: destid,
+                    parentId: prevspanid,
+                    traceId: traceId,
+                    timestamp: dest.destTS * 1000000,
+                    duration: 1000000,
+                    name: dest_eventName,
+                    tags: desttags,
+                    localEndpoint: {
+                        serviceName: idDest
+                    }
+                })
+            }
         }
         return traceId;
     }
@@ -572,7 +581,7 @@ module.exports = class XCMTracer extends AssetManager {
                     // 123 extrinsic+xcm+dest span 3001855-2 0x80436201761cb8f6df1714deb2ba1156881911a24ed42a07b2d6859ba55b365e 22092-1816245-1-8 https://xcmscan.polkaholic.io/trace/1c530049b0f7892c?uiEmbed=v0
                     console.log("123 extrinsic+xcm+dest leg", e.extrinsicID, e.msgHash);
                     // send unfinalized/finalized xcminfo
-                    this.build_send_xcminfo(this.extrinsic[extrinsicID], dest);
+                    this.build_send_xcminfo(this.extrinsic[extrinsicID], dest, traceID);
                 } else {
                     // don't really need dest anymore.
                     console.log("12 extrinsic+xcm span only, no dest", e.extrinsicID, e.msgHash);
@@ -587,7 +596,7 @@ module.exports = class XCMTracer extends AssetManager {
                     traceID = await this.submitleg(e.extrinsicID, this.extrinsic[extrinsicID], e.msgHash, dest.eventID)
                     console.log("123 extrinsic+xcm+dest leg (without ext msgHash)");
                     // send xcminfo 
-                    this.build_send_xcminfo(this.extrinsic[extrinsicID], dest);
+                    this.build_send_xcminfo(this.extrinsic[extrinsicID], dest, traceID);
                 } else {
                     //console.log("extrinsic sentAt / beneficiaries dest match required");
                 }
@@ -622,11 +631,13 @@ module.exports = class XCMTracer extends AssetManager {
                 gc = true;
             }
         }
-        await this.flushWSProviderQueue()
-        gc = true;
-        if (gc) {
-            this.clean();
-        }
+        await this.mutex.runExclusive(async () => {
+            await this.flushWSProviderQueue()
+            gc = true;
+            if (gc) {
+                this.clean();
+            }
+        });
     }
 
     clean(lookbackSeconds = 300) {
@@ -644,7 +655,7 @@ module.exports = class XCMTracer extends AssetManager {
             }
         }
     }
-    build_send_xcminfo(ext, dest) {
+    build_send_xcminfo(ext, dest, traceID) {
         try {
             let xcmInfo = ext.xcmInfo;
             let o = xcmInfo.origination;
@@ -667,7 +678,8 @@ module.exports = class XCMTracer extends AssetManager {
                 if (d.finalized && d.executionStatus == "pending") {
                     d.executionStatus = "success";
                 }
-                console.log("build_send_xcminfo -> sendExternalWSProvider", dest.eventID, dest.finalized, JSON.stringify(xcmInfo, null, 4))
+                xcmInfo.traceID = traceID;
+                console.log("build_send_xcminfo -> sendExternalWSProvider", dest.eventID, dest.finalized, JSON.stringify(xcmInfo, null, 4), traceID)
                 this.sendExternalWSProvider("name", xcmInfo);
                 this.covered[xcminfoHash] = true;
             }
@@ -708,7 +720,7 @@ module.exports = class XCMTracer extends AssetManager {
         }
     }
 
-    receiveMsg(msg, lookbackSeconds = 120) {
+    receiveMsg(msg, lookbackSeconds = 600) {
         let recursiveInstructions = [
             ["isTransferReserveAsset", "asTransferReserveAsset"],
             ["isDepositReserveAsset", "asDepositReserveAsset"],

@@ -8,7 +8,7 @@ const readline = require('readline');
 
 async function main() {
     let tracefn = "/root/xcmscan.log";
-    let lookbackSeconds = 300;
+    let lookbackSeconds = 600;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             tracefn = val;

@@ -65,7 +65,7 @@ async function main() {
     let execute = true;
     let isEVMTx = true;
     let useMultilocation = false;
-    let echo = true;
+    let echo = false;
     if ( echo ) {
       // remote execution cause remote execution test case:
       // 1000 => 888 with a xcmTransactor_transactThroughSigned remote execution on beta ( (0xdcb4651b5bbd105cda8d3ba5740b6c4f02b9256d is the sender on alpha, 0x02931229f6fcc2b02ada8638143fe0dfd0b313ae is the derivative account on beta) which will then result in
@@ -83,7 +83,7 @@ async function main() {
           console.log(`signedTX result=`, result)
       }
     }
-    process.exit(0);
+
     if (isEVMTx){
         let [web3Api, txStruct] = await xcmtransact.evm_xcmTransactor_transactThroughSigned(address, paraID, paraIDDest, feePaymentAddress, contract, input, chainIDRelay, useMultilocation);
         var signedTx = await ethTool.signEvmTx(web3Api, txStruct, xcmtransact.evmpair)
