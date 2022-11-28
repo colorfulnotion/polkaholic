@@ -1282,7 +1282,12 @@ module.exports = class Indexer extends AssetManager {
                     let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
                         `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey, innerCall, xcmType, pendingXcmInfoBlob
                     ].join(",") + ")";
-                    xcmtransfers.push(t);
+                    if (r.msgHash == "0x" && !r.finalized){
+                        //msgHash is missing... we will
+                        console.log(`[${r.extrinsicHash} [${r.extrinsicID}] [finzlied=${r.finalized}] msgHash missing!`)
+                    }else{
+                        xcmtransfers.push(t);
+                    }
                     if (numXCMTransfersOut[r.blockNumber] == undefined) {
                         numXCMTransfersOut[r.blockNumber] = 1;
                     } else {
@@ -1290,7 +1295,7 @@ module.exports = class Indexer extends AssetManager {
                     }
                 }
             }
-            let sqlDebug = false
+            let sqlDebug = true
             this.xcmtransfer = {};
             await this.upsertSQL({
                 "table": "xcmtransfer",
@@ -4851,7 +4856,7 @@ module.exports = class Indexer extends AssetManager {
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
                             xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0) ? 1 : 0
-                            xcmtransfer.finalized = !xcmtransfer.finalized
+                            xcmtransfer.finalized = finalized
                             if (xcmtransfer.msgHash == undefined || xcmtransfer.msgHash.length != 66) {
                                 let msgHashCandidate;
                                 if (xcmtransfer.innerCall != undefined) {
@@ -4876,7 +4881,7 @@ module.exports = class Indexer extends AssetManager {
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
                             xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0) ? 1 : 0
-                            xcmtransfer.finalized = !xcmtransfer.finalized
+                            xcmtransfer.finalized = finalized
                             let unsafeXcmtransfer = xcmtransfer
                             if (unsafeXcmtransfer.msgHash == undefined || unsafeXcmtransfer.msgHash.length != 66) {
                                 let msgHashCandidate;
