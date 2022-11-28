@@ -1282,7 +1282,12 @@ module.exports = class Indexer extends AssetManager {
                     let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
                         `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey, innerCall, xcmType, pendingXcmInfoBlob
                     ].join(",") + ")";
-                    xcmtransfers.push(t);
+                    if (r.msgHash == "0x" && !r.finalized){
+                        //msgHash is missing... we will
+                        console.log(`[${r.extrinsicHash} [${r.extrinsicID}] [finzlied=${r.finalized}] msgHash missing!`)
+                    }else{
+                        xcmtransfers.push(t);
+                    }
                     if (numXCMTransfersOut[r.blockNumber] == undefined) {
                         numXCMTransfersOut[r.blockNumber] = 1;
                     } else {
@@ -1290,7 +1295,7 @@ module.exports = class Indexer extends AssetManager {
                     }
                 }
             }
-            let sqlDebug = false
+            let sqlDebug = true
             this.xcmtransfer = {};
             await this.upsertSQL({
                 "table": "xcmtransfer",
@@ -3053,17 +3058,17 @@ module.exports = class Indexer extends AssetManager {
                                 let el0 = (b0 >> 2) & 63;
                                 if (el0 == (val.substr(2).length) / 2) {
                                     if (api.createType != undefined) {
-                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
+                                        parsev = api.createType(valueTypeDef, hexToU8a("0x" + val.substr(2))).toString(); // 1 byte
                                     } else if (api.registry != undefined && api.registry.createType != undefined) {
-                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // 1 byte
+                                        parsev = api.registry.createType(valueTypeDef, hexToU8a("0x" + val.substr(2))).toString(); // 1 byte
                                     }
                                 } else {
                                     // MYSTERY: why should this work?
                                     // console.log("0 BYTE FAIL - el0", el0, "!=", (val.substr(2).length) / 2);
                                     if (api.createType != undefined) {
-                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                        parsev = api.createType(valueTypeDef, hexToU8a("0x" + val.substr(2))).toString();
                                     } else if (api.registry != undefined && api.registry.createType != undefined) {
-                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                        parsev = api.registry.createType(valueTypeDef, hexToU8a("0x" + val.substr(2))).toString();
                                     }
                                 }
                                 break;
@@ -3072,9 +3077,9 @@ module.exports = class Indexer extends AssetManager {
                                 var el1 = ((b0 >> 2) & 63) + (b1 << 6);
                                 if (el1 == (val.substr(2).length - 2) / 2) {
                                     if (api.createType != undefined) {
-                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
+                                        parsev = api.createType(valueTypeDef, hexToU8a("0x" + val.substr(4))).toString(); // 2 bytes
                                     } else if (api.registry != undefined && api.registry.createType != undefined) {
-                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(4)).toString(); // 2 bytes
+                                        parsev = api.registry.createType(valueTypeDef, hexToU8a("0x" + val.substr(4))).toString(); // 2 bytes
                                     }
                                 } else {
                                     // MYSTERY: why should this work?
@@ -3082,7 +3087,7 @@ module.exports = class Indexer extends AssetManager {
                                     if (this.apiAt.createType != undefined) {
                                         parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
                                     } else if (api.registry != undefined && api.registry.createType != undefined) {
-                                        parsev = api.registry.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + hexToU8a(val.substr(2))).toString();
                                     }
                                 }
                                 break;
@@ -4851,7 +4856,7 @@ module.exports = class Indexer extends AssetManager {
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
                             xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0) ? 1 : 0
-                            xcmtransfer.finalized = !xcmtransfer.finalized
+                            xcmtransfer.finalized = finalized
                             if (xcmtransfer.msgHash == undefined || xcmtransfer.msgHash.length != 66) {
                                 let msgHashCandidate;
                                 if (xcmtransfer.innerCall != undefined) {
@@ -4876,7 +4881,7 @@ module.exports = class Indexer extends AssetManager {
                         for (const xcmtransfer of rExtrinsic.xcms) {
                             //Look up msgHash
                             xcmtransfer.isMsgSent = (xcmtransfer.incomplete == 0) ? 1 : 0
-                            xcmtransfer.finalized = !xcmtransfer.finalized
+                            xcmtransfer.finalized = finalized
                             let unsafeXcmtransfer = xcmtransfer
                             if (unsafeXcmtransfer.msgHash == undefined || unsafeXcmtransfer.msgHash.length != 66) {
                                 let msgHashCandidate;
@@ -4888,10 +4893,18 @@ module.exports = class Indexer extends AssetManager {
                                 if (msgHashCandidate) unsafeXcmtransfer.msgHash = msgHashCandidate
                             }
                             //for unsafeXcmtransfer. we will send xcmtransfer that may eventually got dropped
-                            let unsafePendingXcmInfo = await this.buildPendingXcmInfo(unsafeXcmtransfer, rExtrinsic, finalized)
-                            unsafePendingXcmInfo.xcmInfo = pendingXcmInfo
-                            if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafe pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, pendingXcmInfo)
-                            this.sendWSMessage(unsafePendingXcmInfo, "xcmtransfer", finalized);
+			    try {
+				let unsafePendingXcmInfo = await this.buildPendingXcmInfo(unsafeXcmtransfer, rExtrinsic, finalized)
+				unsafeXcmtransfer.xcmInfo = unsafePendingXcmInfo
+				if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafe pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, unsafePendingXcmInfo)
+				this.sendWSMessage(unsafePendingXcmInfo, "xcmtransfer", finalized);
+			    } catch (err0) {
+			    	this.logger.error({
+				    "op": "buildPendingXcmInfo",
+				    "xcms": rExtrinsic.xcms,
+				    "err": err0
+				});
+			    }
                         }
                     }
                     delete rExtrinsic.xcms

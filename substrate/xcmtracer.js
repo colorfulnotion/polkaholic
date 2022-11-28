@@ -601,12 +601,12 @@ module.exports = class XCMTracer extends AssetManager {
                     //console.log("extrinsic sentAt / beneficiaries dest match required");
                 }
             }
-            if (e.incomplete == 0) {
+            if (e.incomplete != 1 ) {
                 let spans = this.spans[extrinsicID];
                 let endpoint = "http://efinity-internal.polkaholic.io:9411"
                 let cmd = `curl -X POST ${endpoint} -H 'Content-Type: application/json' -d '${JSON.stringify(spans, null, 4)}'`
                 if (spans) {
-                    //console.log(cmd);
+                    console.log(cmd);
                     const {
                         stdout,
                         stderr
@@ -624,7 +624,7 @@ module.exports = class XCMTracer extends AssetManager {
                     console.log("NO SPANS");
                 }
             } else {
-                console.log("INCOMPLETE");
+                console.log("INCOMPLETE", e.incomplete);
             }
             if (e.origination && e.origination.ts && (this.getCurrentTS() - e.origination.ts > 120)) {
                 delete this.extrinsic[extrinsicID];
