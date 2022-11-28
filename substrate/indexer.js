@@ -4888,10 +4888,18 @@ module.exports = class Indexer extends AssetManager {
                                 if (msgHashCandidate) unsafeXcmtransfer.msgHash = msgHashCandidate
                             }
                             //for unsafeXcmtransfer. we will send xcmtransfer that may eventually got dropped
-                            let unsafePendingXcmInfo = await this.buildPendingXcmInfo(unsafeXcmtransfer, rExtrinsic, finalized)
-                            unsafePendingXcmInfo.xcmInfo = pendingXcmInfo
-                            if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafe pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, pendingXcmInfo)
-                            this.sendWSMessage(unsafePendingXcmInfo, "xcmtransfer", finalized);
+			    try {
+				let unsafePendingXcmInfo = await this.buildPendingXcmInfo(unsafeXcmtransfer, rExtrinsic, finalized)
+				unsafeXcmtransfer.xcmInfo = unsafePendingXcmInfo
+				if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafe pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, unsafePendingXcmInfo)
+				this.sendWSMessage(unsafePendingXcmInfo, "xcmtransfer", finalized);
+			    } catch (err0) {
+			    	this.logger.error({
+				    "op": "buildPendingXcmInfo",
+				    "xcms": rExtrinsic.xcms,
+				    "err": err0
+				});
+			    }
                         }
                     }
                     delete rExtrinsic.xcms
