@@ -2247,6 +2247,7 @@ module.exports = class ChainParser {
             //let module_section = extrinsic.section;
             //let module_method = extrinsic.method;
             //let section_method = `${module_section}:${module_method}`
+            //handle token2 case for bifrost tokens:Transfer
             if (section_method == "xTokens:transfer" || section_method == "xTokens:transferMulticurrencies" || section_method == "xTokens:transferMultiasset") {
                 // see https://github.com/open-web3-stack/open-runtime-module-library/tree/master/xtokens
                 // test case: indexPeriods 8 2022-03-30 21
@@ -4701,9 +4702,17 @@ module.exports = class ChainParser {
     }
 
     processXcmGenericCurrencyID(indexer, currency_id) {
-        if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
+        if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala) {
             //assetregistry
             return this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
+        } else if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
+            // token2 format
+            let assetString = this.processXcmDecHexCurrencyID(indexer, currency_id)
+            if (!assetString){
+                //original format
+                assetString = this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
+            }
+            return assetString
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
         } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
@@ -4725,6 +4734,8 @@ module.exports = class ChainParser {
                     rawAssetID = currency_id.foreignAsset
                 } else if (currency_id.localAssetReserve != undefined) {
                     rawAssetID = currency_id.localAssetReserve
+                } else if (currency_id.token2 != undefined) {
+                    rawAssetID = currency_id.token2
                 } else if (currency_id.selfReserve === null) {
                     // return native asset
                     let nativeSymbol = indexer.getNativeSymbol()
@@ -4738,7 +4749,6 @@ module.exports = class ChainParser {
                 rawAssetID = currency_id
             }
         }
-
         if (rawAssetID) {
             let assetIDWithComma = paraTool.toNumWithComma(paraTool.dechexAssetID(rawAssetID))
             let assetID = this.cleanedAssetID(assetIDWithComma)

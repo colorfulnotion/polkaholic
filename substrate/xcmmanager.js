@@ -2295,8 +2295,8 @@ module.exports = class XCMManager extends Query {
                  xcmtransfer.sourceTS >= ${startTS} and
                  abs(xcmmessages.sentAt - xcmtransfer.sentAt) <= 4 ${endWhere}`
         this.batchedSQL.push(sqlA1);
-        //console.log(`xcmmatch2_matcher (A1)`)
-        //console.log(paraTool.removeNewLine(sqlA1))
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`xcmmatch2_matcher (A1)`)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(paraTool.removeNewLine(sqlA1))
         await this.update_batchedSQL();
 
         // update xcmmessages of children
