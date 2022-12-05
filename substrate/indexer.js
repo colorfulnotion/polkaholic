@@ -1336,7 +1336,7 @@ module.exports = class Indexer extends AssetManager {
                 if ((r.xcmSymbol) && this.validXCMSymbol(r.xcmSymbol, r.chainIDDest, "xcmtransfer", r)) {
                     xcmtransferdestcandidates.push(t);
                 } else {
-                    console.log("--INVALID dest candidate", r);
+                    console.log(`--INVALID dest candidate xcmSymbol=${r.xcmSymbol}, chainIDDest=${r.chainIDDest}`, r);
                 }
             }
             this.xcmtransferdestcandidate = {};

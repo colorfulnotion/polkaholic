@@ -4727,7 +4727,7 @@ module.exports = class ChainParser {
     //moonbeam/parallel/astar/statemine
     processXcmDecHexCurrencyID(indexer, currency_id) {
         let assetString = false
-        let rawAssetID = false
+        let rawAssetID = null
         if (currency_id != undefined) {
             if (this.isObject(currency_id)) {
                 if (currency_id.foreignAsset != undefined) {
@@ -4749,13 +4749,15 @@ module.exports = class ChainParser {
                 rawAssetID = currency_id
             }
         }
-        if (rawAssetID) {
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`rawAssetID=${rawAssetID}, currency_id`, currency_id)
+        if (rawAssetID != undefined) {
             let assetIDWithComma = paraTool.toNumWithComma(paraTool.dechexAssetID(rawAssetID))
             let assetID = this.cleanedAssetID(assetIDWithComma)
             let parsedAsset = {
                 Token: assetID
             }
             let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`rawAssetID=${rawAssetID}, assetInfo`, assetInfo)
             if (assetInfo != undefined && assetInfo.symbol != undefined && assetInfo.isXCAsset) {
                 let xcmAssetSymbol = assetInfo.symbol
                 //if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> xcmAssetSymbol ${xcmAssetSymbol}`)
