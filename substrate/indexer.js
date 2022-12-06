@@ -7582,7 +7582,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
             if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta ||
                 this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
-                this.chainID == paraTool.chainIDCrustShadow) {
+                this.chainID == paraTool.chainIDCrustShadow ||
+                this.chainID == paraTool.chainIDBasilisk ) {
                 console.log(`fetch assetManager:assetIdType`)
                 await this.chainParser.fetchXCMAssetIdType(this)
             }

@@ -4123,9 +4123,10 @@ module.exports = class ChainParser {
     }
 
 
-    //moonbeam/heiko
+    //moonbeam/heiko/basilisk
     //assetManager:assetIdType
     //assetRegistry:assetIdType
+    //assetRegistry.assetLocations
     async fetchXCMAssetIdType(indexer) {
         if (!indexer.api) {
             //console.log(`[fetchXCMAssetIdType] Fatal indexer.api not initiated`)
@@ -4141,6 +4142,8 @@ module.exports = class ChainParser {
             var a = await indexer.api.query.assetManager.assetIdType.entries()
         } else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
             var a = await indexer.api.query.assetRegistry.assetIdType.entries()
+        } else if (indexer.chainID == paraTool.chainIDBasilisk){
+            var a = await indexer.api.query.assetRegistry.assetLocations.entries()
         }
         if (!a) return
         let assetList = {}
@@ -4161,8 +4164,8 @@ module.exports = class ChainParser {
                 //console.log(`cached AssetInfo found`, cachedAssetInfo)
                 let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol.replace('xc', '') : ''
                 let nativeSymbol = symbol
-
-                let xcmAsset = val.toJSON().xcm
+                let xcmAssetJSON = val.toJSON()
+                let xcmAsset = (xcmAssetJSON.xcm != undefined)? xcmAssetJSON.xcm : xcmAssetJSON
                 let parents = xcmAsset.parents
                 let interior = xcmAsset.interior
                 //x1/x2/x3 refers to the number to params
@@ -4231,7 +4234,7 @@ module.exports = class ChainParser {
                     nativeAssetChain: nativeAssetChain,
                     source: indexer.chainID,
                 }
-                //console.log(`xcmAssetInfo`, xcmAssetInfo)
+                console.log(`xcmAssetInfo`, xcmAssetInfo)
                 if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdType');
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
@@ -4240,7 +4243,7 @@ module.exports = class ChainParser {
     }
 
 
-    //shiden/astar//calamari
+    //shiden/astar//calamari//
     //xcAssetConfig.assetIdToLocation
     //assetManager.assetIdToLocation
     async fetchXCMAssetIdToLocation(indexer) {
@@ -4297,7 +4300,7 @@ module.exports = class ChainParser {
 
                 //console.log(`${interiork} interiorVRawV`, interiorVRawV)
                 let interiorVStr0 = JSON.stringify(interiorVRaw)
-                interiorVStr0.replace('Parachain', 'parachain').replace('Parachain', 'parachain').replace('PalletInstance', 'palletInstance').replace('GeneralIndex', 'generalIndex').replace('GeneralKey', 'generalKey')
+                interiorVStr0.replace('Parachain', 'parachain').replace('PalletInstance', 'palletInstance').replace('GeneralIndex', 'generalIndex').replace('GeneralKey', 'generalKey')
                 //hack: lower first char
                 let interiorV = JSON.parse(interiorVStr0)
 
@@ -4367,7 +4370,7 @@ module.exports = class ChainParser {
                     nativeAssetChain: nativeAssetChain,
                     source: indexer.chainID,
                 }
-                //console.log(`xcmAssetInfo`, xcmAssetInfo)
+                console.log(`xcmAssetInfo`, xcmAssetInfo)
                 if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdToLocation');
 
                 //["asset", "chainID"] + ["xcmInteriorKey"]
