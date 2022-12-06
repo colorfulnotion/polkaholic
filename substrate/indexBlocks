@@ -21,7 +21,7 @@ async function main() {
     await crawler.setupAPI(chain);
     await crawler.assetManagerInit();
     await crawler.setupChainAndAPI(chainID);
-    let chainFilter = (chainFilterSet)? `and chainID = '${chainID}' ` : ' '
+    let chainFilter = (chainFilterSet)? `and (chainID = '${chainID}' or chainIDDest = '${chainID}')` : ' '
     //let targetSQL = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber from xcmtransfer where xcminteriorkey is null ${chainFilter} order by blockNumber`;
     let targetSQL = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber from xcmtransfer where pendingXcmInfo is not null and xcmInfo is null ${chainFilter} order by blockNumber`;
     console.log(`targetSQL`, targetSQL)

@@ -1336,7 +1336,7 @@ module.exports = class Indexer extends AssetManager {
                 if ((r.xcmSymbol) && this.validXCMSymbol(r.xcmSymbol, r.chainIDDest, "xcmtransfer", r)) {
                     xcmtransferdestcandidates.push(t);
                 } else {
-                    console.log("--INVALID dest candidate", r);
+                    console.log(`--INVALID dest candidate xcmSymbol=${r.xcmSymbol}, chainIDDest=${r.chainIDDest}`, r);
                 }
             }
             this.xcmtransferdestcandidate = {};
@@ -3457,7 +3457,7 @@ module.exports = class Indexer extends AssetManager {
                 "vals": vals,
                 "data": rows,
                 "replace": vals
-            });
+            }, true);
             this.recentXcmMsgs = []
 
             /*
@@ -7547,7 +7547,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let assetMetaChain = [paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDHeiko, paraTool.chainIDParallel]
         if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala ||
             this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
-            //TODO: chainIDBifrostDOT does not support assetRegistry yet
             if (this.chainID == paraTool.chainIDKarura || this.chainID == paraTool.chainIDAcala) {
                 console.log(`Fetch assetRegistry:assetMetadatas`)
                 await this.chainParser.fetchAssetRegistry(this)
@@ -7557,7 +7556,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
             if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
                 //console.log(`Fetch assetRegistry:currencyMetadatas`)
-                //await this.chainParser.fetchAssetRegistryCurrencyMetadatas(this)
+                //await this.chainParser.fetchAssetRegistry(this)
+                await this.chainParser.fetchAssetRegistryCurrencyMetadatas(this)
                 console.log(`Fetch assetRegistry:currencyIdToLocations`)
                 await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
@@ -7582,7 +7582,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             }
             if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta ||
                 this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
-                this.chainID == paraTool.chainIDCrustShadow) {
+                this.chainID == paraTool.chainIDCrustShadow ||
+                this.chainID == paraTool.chainIDBasilisk ) {
                 console.log(`fetch assetManager:assetIdType`)
                 await this.chainParser.fetchXCMAssetIdType(this)
             }

@@ -30,20 +30,39 @@ module.exports = class BifrostParser extends ChainParser {
             let key = a[i][0];
             let val = a[i][1];
             let assetMetadata = val.toHuman()
+
             let parsedAsset = {}
-            let assetKeyWithID = key.args.map((k) => k.toHuman())[0] //{"ForeignAssetId":"0"}
-            let assetKey = Object.keys(assetKeyWithID)[0] // ForeignAssetId
-            let assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetKey]) // "123,456" or {"Token":"XXX"}
+            let assetKeyWithID = key.args.map((k) => k.toHuman())[0] //{"Token2":"2"} | LPToken | VSBOND2
+            let assetRawKey = Object.keys(assetKeyWithID)[0]
+            let assetKey = assetRawKey
+            if (assetKey.slice(-1) == 2){
+                assetKey = assetKey.slice(0, -1)
+            }
+            console.log(`assetKey=${assetKey}, assetMetadata=`, assetMetadata)
+            let assetKeyVal = "";
+            if (assetKey == "Token" || assetKey == "VSBond" || assetKey == "VToken" || assetKey == "VSToken"){
+                let assetKey2 = `${assetKey}2`
+                if (assetKeyWithID[assetKey2] != undefined){
+                    assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetKey2]) // "123,456" or {"Token":"XXX"}
+                }else if (assetKeyWithID[assetRawKey] != undefined){
+                    assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetRawKey]) // "123,456" or {"Token":"XXX"}
+                }
+
+            }
             if (assetKey == 'NativeAssetId') {
                 //this is the bifrost case
                 parsedAsset = assetKeyVal
+            } else if (assetKey == "Stable" || assetKey == "Native"){
+                parsedAsset[assetRawKey] = assetKeyWithID[assetRawKey]
             } else {
                 // this is the acala/karura case
                 let assetKeyWithoutID = assetKey.replace('Id', '') //ForeignAsset
                 parsedAsset[assetKeyWithoutID] = assetKeyVal
             }
             var asset = JSON.stringify(parsedAsset);
+            let isToken = asset.includes('"Token"')
             let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
+            console.log(`assetChain=${assetChain}`, asset)
             let cachedAssetInfo = indexer.assetInfo[assetChain]
             if (cachedAssetInfo != undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined && cachedAssetInfo.symbol != 'false') {
                 //cached found
@@ -66,13 +85,15 @@ module.exports = class BifrostParser extends ChainParser {
                         decimals: assetMetadata.decimals,
                         assetType: paraTool.assetTypeToken
                     };
+                    console.log(`assetInfo=${assetChain}`, assetInfo)
                     assetList[assetChain] = assetInfo
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
-                    //await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAssetRegistry');
+                    await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAssetRegistryCurrencyMetadatas');
                 } else {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
                 }
             }
+
         }
         if (this.debugLevel >= paraTool.debugVerbose) console.log(assetList);
     }

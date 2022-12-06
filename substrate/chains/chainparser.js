@@ -2247,6 +2247,7 @@ module.exports = class ChainParser {
             //let module_section = extrinsic.section;
             //let module_method = extrinsic.method;
             //let section_method = `${module_section}:${module_method}`
+            //handle token2 case for bifrost tokens:Transfer
             if (section_method == "xTokens:transfer" || section_method == "xTokens:transferMulticurrencies" || section_method == "xTokens:transferMultiasset") {
                 // see https://github.com/open-web3-stack/open-runtime-module-library/tree/master/xtokens
                 // test case: indexPeriods 8 2022-03-30 21
@@ -4122,9 +4123,10 @@ module.exports = class ChainParser {
     }
 
 
-    //moonbeam/heiko
+    //moonbeam/heiko/basilisk
     //assetManager:assetIdType
     //assetRegistry:assetIdType
+    //assetRegistry.assetLocations
     async fetchXCMAssetIdType(indexer) {
         if (!indexer.api) {
             //console.log(`[fetchXCMAssetIdType] Fatal indexer.api not initiated`)
@@ -4140,6 +4142,8 @@ module.exports = class ChainParser {
             var a = await indexer.api.query.assetManager.assetIdType.entries()
         } else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
             var a = await indexer.api.query.assetRegistry.assetIdType.entries()
+        } else if (indexer.chainID == paraTool.chainIDBasilisk){
+            var a = await indexer.api.query.assetRegistry.assetLocations.entries()
         }
         if (!a) return
         let assetList = {}
@@ -4160,8 +4164,8 @@ module.exports = class ChainParser {
                 //console.log(`cached AssetInfo found`, cachedAssetInfo)
                 let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol.replace('xc', '') : ''
                 let nativeSymbol = symbol
-
-                let xcmAsset = val.toJSON().xcm
+                let xcmAssetJSON = val.toJSON()
+                let xcmAsset = (xcmAssetJSON.xcm != undefined)? xcmAssetJSON.xcm : xcmAssetJSON
                 let parents = xcmAsset.parents
                 let interior = xcmAsset.interior
                 //x1/x2/x3 refers to the number to params
@@ -4230,7 +4234,7 @@ module.exports = class ChainParser {
                     nativeAssetChain: nativeAssetChain,
                     source: indexer.chainID,
                 }
-                //console.log(`xcmAssetInfo`, xcmAssetInfo)
+                console.log(`xcmAssetInfo`, xcmAssetInfo)
                 if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdType');
             } else {
                 if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`AssetInfo unknown -- skip`, assetChain)
@@ -4239,7 +4243,7 @@ module.exports = class ChainParser {
     }
 
 
-    //shiden/astar//calamari
+    //shiden/astar//calamari//
     //xcAssetConfig.assetIdToLocation
     //assetManager.assetIdToLocation
     async fetchXCMAssetIdToLocation(indexer) {
@@ -4296,7 +4300,7 @@ module.exports = class ChainParser {
 
                 //console.log(`${interiork} interiorVRawV`, interiorVRawV)
                 let interiorVStr0 = JSON.stringify(interiorVRaw)
-                interiorVStr0.replace('Parachain', 'parachain').replace('Parachain', 'parachain').replace('PalletInstance', 'palletInstance').replace('GeneralIndex', 'generalIndex').replace('GeneralKey', 'generalKey')
+                interiorVStr0.replace('Parachain', 'parachain').replace('PalletInstance', 'palletInstance').replace('GeneralIndex', 'generalIndex').replace('GeneralKey', 'generalKey')
                 //hack: lower first char
                 let interiorV = JSON.parse(interiorVStr0)
 
@@ -4366,7 +4370,7 @@ module.exports = class ChainParser {
                     nativeAssetChain: nativeAssetChain,
                     source: indexer.chainID,
                 }
-                //console.log(`xcmAssetInfo`, xcmAssetInfo)
+                console.log(`xcmAssetInfo`, xcmAssetInfo)
                 if (updateXcmConcept) await indexer.addXcmAssetInfo(xcmAssetInfo, 'fetchXCMAssetIdToLocation');
 
                 //["asset", "chainID"] + ["xcmInteriorKey"]
@@ -4701,9 +4705,17 @@ module.exports = class ChainParser {
     }
 
     processXcmGenericCurrencyID(indexer, currency_id) {
-        if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala || indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
+        if (indexer.chainID == paraTool.chainIDKarura || indexer.chainID == paraTool.chainIDAcala) {
             //assetregistry
             return this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
+        } else if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
+            // token2 format
+            let assetString = this.processXcmDecHexCurrencyID(indexer, currency_id)
+            if (!assetString){
+                //original format
+                assetString = this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
+            }
+            return assetString
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
             return this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
         } else if (indexer.chainID == paraTool.chainIDMoonbeam || indexer.chainID == paraTool.chainIDMoonriver || indexer.chainID == paraTool.chainIDMoonbaseAlpha || indexer.chainID == paraTool.chainIDMoonbaseBeta) {
@@ -4718,13 +4730,15 @@ module.exports = class ChainParser {
     //moonbeam/parallel/astar/statemine
     processXcmDecHexCurrencyID(indexer, currency_id) {
         let assetString = false
-        let rawAssetID = false
+        let rawAssetID = null
         if (currency_id != undefined) {
             if (this.isObject(currency_id)) {
                 if (currency_id.foreignAsset != undefined) {
                     rawAssetID = currency_id.foreignAsset
                 } else if (currency_id.localAssetReserve != undefined) {
                     rawAssetID = currency_id.localAssetReserve
+                } else if (currency_id.token2 != undefined) {
+                    rawAssetID = currency_id.token2
                 } else if (currency_id.selfReserve === null) {
                     // return native asset
                     let nativeSymbol = indexer.getNativeSymbol()
@@ -4738,14 +4752,15 @@ module.exports = class ChainParser {
                 rawAssetID = currency_id
             }
         }
-
-        if (rawAssetID) {
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`rawAssetID=${rawAssetID}, currency_id`, currency_id)
+        if (rawAssetID != undefined) {
             let assetIDWithComma = paraTool.toNumWithComma(paraTool.dechexAssetID(rawAssetID))
             let assetID = this.cleanedAssetID(assetIDWithComma)
             let parsedAsset = {
                 Token: assetID
             }
             let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`rawAssetID=${rawAssetID}, assetInfo`, assetInfo)
             if (assetInfo != undefined && assetInfo.symbol != undefined && assetInfo.isXCAsset) {
                 let xcmAssetSymbol = assetInfo.symbol
                 //if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> xcmAssetSymbol ${xcmAssetSymbol}`)
