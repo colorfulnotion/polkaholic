@@ -2,7 +2,7 @@
 <h4>Transaction #<%=`${tx.extrinsicID}`%></h4>
 <%
 let f = tx;
-let xcmInfoFound = ( f.xcmInfo != undefined)? true : false
+let xcmInfoFound = ( f.xcmInfo != undefined && f.xcmInfo.origination != undefined && f.xcmInfo.destination != undefined && f.xcmInfo.relayChain != undefined)? true : false
 let assetTransferFound = (  tx.transfers && tx.transfers.length > 0 )? true : false
 let txResult = (f.result != undefined)? f.result == 1: true //by default tx result is true (until we back fill it)
 let errStr = (f.result != undefined)? f.err: false //by default tx result is true (until we back fill it)
