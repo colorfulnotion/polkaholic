@@ -688,6 +688,11 @@ function getRelayChainID(relaychain = 'polkadot') {
     }
 }
 
+// return parachain's sovereign account on relayChain
+function getRelaySovereign(chainID){
+    
+}
+
 function getChainIDFromParaIDAndRelayChain(paraID, relayChain = 'polkadot') {
     let relayChainID = getRelayChainID(relayChain)
     let paraIDExtra = getParaIDExtra(relayChain)

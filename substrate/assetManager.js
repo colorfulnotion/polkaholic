@@ -829,6 +829,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         if (this.symbolRelayChainAsset[symbolRelayChain]) {
             return true;
         }
+        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`validXCMSymbol: symbolRelayChain=${symbolRelayChain} not found!`)
         return false;
     }
 

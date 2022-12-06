@@ -1160,10 +1160,10 @@ module.exports = class Indexer extends AssetManager {
         return (inp.substring(0, maxLen));
     }
 
-    validXcmSymbol(xcmSymbol, chainID, ctx, o) {
+    validXcmAssetSymbol(xcmSymbol, chainID, ctx, o) {
         if (xcmSymbol == false || (typeof xcmSymbol == "string" && xcmSymbol.includes("0x") && (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala))) {
-            let err = `InvalidAsset ${assetKey}`
-            this.log_indexing_error(err, "validXCMSymbol", {
+            let err = `validXcmAssetSymbol ${xcmSymbol}`
+            this.log_indexing_error(err, "validXcmAssetSymbol", {
                 "ctx": ctx,
                 "o": o
             })
@@ -1267,7 +1267,7 @@ module.exports = class Indexer extends AssetManager {
             let numXCMTransfersOut = {}
             for (let i = 0; i < xcmtransferKeys.length; i++) {
                 let r = this.xcmtransfer[xcmtransferKeys[i]];
-                if (r.innerCall == undefined && (r.xcmSymbol && !this.validXcmSymbol(r.xcmSymbol, r.chainID, "xcmtransfer", r))) {
+                if (r.innerCall == undefined && (r.xcmSymbol && !this.validXcmAssetSymbol(r.xcmSymbol, r.chainID, "xcmtransfer", r))) {
                     console.log(`invalid asset`, r.xcmSymbol, r.chainID, "xcmtransfer", r)
                 } else {
                     let innerCall = (r.innerCall) ? `'${r.innerCall}'` : `NULL`
