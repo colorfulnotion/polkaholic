@@ -5138,7 +5138,7 @@ module.exports = class Indexer extends AssetManager {
                 //[x.chainIDDest, x.idDest] = this.convertChainID(x.chainIDDest)
                 x.id = (id == false) ? null : id
                 x.chainName = this.getChainName(x.chainID);
-                x.paraIDDest = paraTool.getParaIDfromChainID(x.chainID)
+                x.paraID = paraTool.getParaIDfromChainID(x.chainID)
                 let chainIDOriginationInfo = this.chainInfos[x.chainID]
                 if (chainIDOriginationInfo != undefined && chainIDOriginationInfo.ss58Format != undefined) {
                     if (x.fromAddress != undefined) {
