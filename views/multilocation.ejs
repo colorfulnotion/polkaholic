@@ -1,10 +1,10 @@
 <%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Chain`}); %>
 
 <div class="alert" role="alert" data-mdb-color="warning">
-This tool is to support XCM Transfers and Remote Executions on Moonbase Alpha/Beta (active) and Moonriver + Moonbeam (planned) only (<a target="_new" href="https://docs.moonbeam.network/builders/xcm/xcm-transactor/">learn more ...</a>)
+This page is moving to a stand-alone, open-source repo. (<a target="_new" href="https://github.com/colorfulnotion/xcm-global-registry/">learn more</a>)
 </div>
 
-<h5>Multilocation Tool</h5>
+<h5>Multilocation Tool / Global Asset Registry</h5>
 
 <div class="btn-group">
   <a href="javascript:showmultilocation(0, 'polkadot');" class="btn btn-primary">Polkadot</a>
@@ -13,11 +13,11 @@ This tool is to support XCM Transfers and Remote Executions on Moonbase Alpha/Be
 </div>
 
 <div>
-Given a symbol on a network, this shows:
+This tool is built around XcmInteriorKey/XCMV1Multilocation:
 <ul>
- <li>(v1) Multilocation and EVM Multi Location Bytes, which can be used for submitting Substrate extrinsics (e.g. xTokens:Transfer) and EVM Transactions (e.g. interacting with <a href='/address/0x000000000000000000000000000000000000080d'>XCMTransactorV2 System Contract</a></li>
- <li>XC20 Contract Addresses on EVM Chains, which behave like ERC20s and can be used to pay for XCM fees (<a href='https://docs.moonbeam.network/builders/xcm/xc20/overview/'> learn more ...</a>)</li>
- <li>CurrencyIDs on EVM + Substrate Chains, which are required inputs to XCM Transfer (e.g. <a href='https://docs.moonbeam.network/builders/xcm/xc20/xtokens/'>xTokens:transfer</a>) </li>
+ <li>Multilocation - A relative identifier that it can only be used to define the relative path between two locations, and cannot generally be used to refer to a location universally (<a target="_new" href="https://wiki.polkadot.network/docs/learn-xcm">learn more ...</a>)</li>
+ <li>XcmInteriorKey - A flattened XCMV1Multilocation struct with the relative path starting from relayChain. Polkaholic uses xcmInteriorKeys to uniquely identify xcAssets across parachains</li>
+
 </div>
 
 <div>
@@ -41,7 +41,7 @@ Given a symbol on a network, this shows:
       </p>
     </div>
    </div>
-  
+
    <div class="card">
     <div class="card-body">
       <h5 class="card-title"><%- include("tooltip", {k: "xc20contractaddress"}) %>XC20 Contract Addresses</h5>
@@ -71,4 +71,3 @@ $(document).ready(function() {
 })
 </script>
 <%- include('footer', {apiUrl: apiUrl}); %>
-

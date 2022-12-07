@@ -141,7 +141,7 @@
            let  teleportFeeSymbol = (xcm.destination.teleportFeeSymbol != undefined)? xcm.destination.teleportFeeSymbol : xcm.destination.teleportFeeChainSymbol
        %>
       <p class="text-muted">
-      <%- include("tooltip", {k: "teleportfees"}) %><B>Teleport Fees:</B>
+      <%- include("tooltip", {k: "xcmfees"}) %><B>XCM Fees:</B>
       <%- uiTool.presentFloat(xcm.destination.teleportFee, 10) %> <%= teleportFeeSymbol %> (<%- uiTool.currencyFormat(xcm.destination.teleportFeeUSD, xcm.priceUSD, xcm.priceUSDCurrent) %>)
       </p>
        <% } %>

@@ -75,7 +75,7 @@ ${fin}<br/>`
     }
 
     out += `${txHash}
-<b>Extrinsic Hash:</b> ${getShortHash(origination.extrinsicHash)}<br/> 
+<b>Extrinsic Hash:</b> ${getShortHash(origination.extrinsicHash)}<br/>
 <b>Extrinsic ID:</b> ${presentExtrinsicIDHash(origination.extrinsicID, origination.extrinsicHash)}<br/>`
     if ( origination.sender ) {
 	out += `<div><b>Sender:</b> ${presentAddress(origination.sender)}</div>`
@@ -90,7 +90,7 @@ out += `<B>Module:</B> <button type="button" class="btn btn-outline-primary text
 	out += `<div><b>Transaction Fee Paid:</b> ${origination.txFee} ${origination.txFeeSymbol}</div>`
     }
     if ( origination.remoteEVMTx ) {
-	out += show_remoteEVMTx_origination(origination.remoteEVMTx, origination.id) 
+	out += show_remoteEVMTx_origination(origination.remoteEVMTx, origination.id)
     }
     return out
 }
@@ -131,7 +131,7 @@ function showDestination(destination, symbol)
     if ( destination.paraID > 0 ) out += ` [Para ID: ${destination.paraID}]`;
     out += ` ${destination.chainName}`
     out += `</h6>`
-    
+
     let cls = finalized ? 'finalized' : 'unfinalized';
     out += `<div class='${cls}'>`
 
@@ -141,7 +141,7 @@ function showDestination(destination, symbol)
     let fin = finalized ? `<b>Finalized:</b> ${presentFinalized(finalized)}<br/>` : `<i>Unfinalized</i><br/>`
     out += `${fin}`
     if ( destination.blockNumber ) {
-	out += `<b>Received At Block:</b> ` + presentBlockNumber(destination.id, destination.id, destination.blockNumber) 
+	out += `<b>Received At Block:</b> ` + presentBlockNumber(destination.id, destination.id, destination.blockNumber)
     }
     if ( destination.beneficiary ) {
 	out += `<div><b>Beneficiary:</b> ${presentAddress(destination.beneficiary)}</div>`
@@ -158,7 +158,7 @@ function showDestination(destination, symbol)
     }
     if ( destination.teleportFee ) {
 	let usd = ( destination.teleportFeeUSD ) ? currency_format(destination.teleportFeeUSD) : "";
-	out += `<div><b>Teleport Fees:</b> ${destination.teleportFee} ${destination.teleportFeeChainSymbol} ${usd}</div>`
+	out += `<div><b>XCM Fees:</b> ${destination.teleportFee} ${destination.teleportFeeChainSymbol} ${usd}</div>`
     }
     if ( destination.executionStatus ) {
 	out += show_executionStatus(destination.executionStatus)

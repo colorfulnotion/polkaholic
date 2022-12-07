@@ -648,7 +648,7 @@ let chains = [
   let baseiconUrl = "/browser_icon.png";
   let iconUrl = "/browser_icon.png";
   if ( site ) {
-    baseiconUrl = site.baseiconUrl; 
+    baseiconUrl = site.baseiconUrl;
   }
   if (req.cookies && req.cookies.selchain) {
     selchain = req.cookies.selchain;
@@ -662,7 +662,7 @@ let chains = [
     for (const c of chains ) {
       if ( c.id == selchain) {
        sel = c;
-       
+
       }
     }
   }
@@ -804,11 +804,12 @@ let chains = [
             <li>
               <a class="dropdown-item" href="/xcmtransfers?xcmType=xcmtransfer">XCM Transfers</a>
             </li>
-	    <% if ( sel && sel.isEVM ) { %>
+            <% if ( sel && sel.isEVM ) { %>
+                <li>
+                  <a class="dropdown-item" href="/xcmtransfers?xcmType=xcmtransact">XCM Remote Executions</a>
+                </li>
+            <% } %>
             <li>
-              <a class="dropdown-item" href="/xcmtransfers?xcmType=xcmtransact">Remote Executions</a>
-            </li>
-	    <% } %>
             <li>
               <a class="dropdown-item" href="/xcmmessages">XCM Messages</a>
             </li>
@@ -817,6 +818,9 @@ let chains = [
               <a class="dropdown-item" href="/channels">XCM Channels</a>
             </li>
 	    <% } %>
+
+          <a class="dropdown-item" href="/xcminfows/<%= selid %>">XCM WebSocket</a>
+        </li>
           </ul>
         </li>
         <li class="nav-item dropdown">
@@ -833,9 +837,6 @@ let chains = [
              </li>
              <li>
                <a class="dropdown-item" href="/remoteexecution">Remote Execution Tool</a>
-             </li>
-             <li>
-               <a class="dropdown-item" href="/xcminfows/<%= selid %>">XCM Info Channel</a>
              </li>
 	     <% if ( false ) { %>
              <li>

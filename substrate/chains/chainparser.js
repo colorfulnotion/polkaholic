@@ -1744,6 +1744,7 @@ module.exports = class ChainParser {
             paraIDDest = x1.parachain
             chainIDDest = paraIDDest + paraIDExtra
         }
+        if (paraIDDest == 0) chainIDDest = relayChainID
         let destObj = {
             paraIDDest: 0,
             chainIDDest: -1,
@@ -1776,6 +1777,7 @@ module.exports = class ChainParser {
             } else {
                 //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processX2 unknown x2_1`, x2)
             }
+            if (paraIDDest == 0) chainIDDest = relayChainID
             //let accKey = x2[1]
             destAddress = this.processAccountKey(x2[1], decorate, indexer)
         }
