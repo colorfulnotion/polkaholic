@@ -393,8 +393,15 @@ app.get('/specversions/:chainID_or_chainName', async (req, res) => {
 // Usage: https://api.polkaholic.io/chainlog/acala
 app.get('/chainlog/:chainID_or_chainName', async (req, res) => {
     try {
+        let hardLimit = 365*2;
+        let queryLimit = (req.query.limit != undefined) ? parseInt(req.query.limit, 10) : 90;
+        if (queryLimit > hardLimit) {
+            return res.status(400).json({
+                error: `Search: 'limit' parameter must be less or equal to than ${hardLimit}`
+            });
+        }
         let chainID_or_chainName = req.params["chainID_or_chainName"]
-        let chainlog = await query.getChainLog(chainID_or_chainName);
+        let chainlog = await query.getChainLog(chainID_or_chainName, queryLimit);
         if (chainlog) {
             res.write(JSON.stringify(chainlog));
             await query.tallyAPIKey(getapikey(req));
