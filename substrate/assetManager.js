@@ -330,10 +330,12 @@ module.exports = class AssetManager extends PolkaholicDB {
                     p.parentNickname = parentIdentity.nickname
                 }
                 */
-                parentIdentity.child.push({
-                    subAddress: subAddress,
-                    subName: p.subName
-                })
+                if (parentIdentity.child != undefined){
+                    parentIdentity.child.push({
+                        subAddress: subAddress,
+                        subName: p.subName
+                    })
+                }
             }
             accountsMap[subAddress] = p
             accountsMap[parentAddress] = parentIdentity
