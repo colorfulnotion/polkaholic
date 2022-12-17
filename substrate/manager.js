@@ -49,6 +49,14 @@ module.exports = class Manager extends AssetManager {
     xcmAddress = null;
     parachainID = null;
 
+    async mapChains(f) {
+        let chains = await this.getChains();
+        for (var i = 0; i < chains.length; i++) {
+            let c = chains[i];
+            f(c)
+        }
+    }
+
     async getFinalizedBlockInfo(chainID, api) {
         let done = false;
         let finalizedBlockHash = null;

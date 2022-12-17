@@ -393,7 +393,7 @@ app.get('/specversions/:chainID_or_chainName', async (req, res) => {
 // Usage: https://api.polkaholic.io/chainlog/acala
 app.get('/chainlog/:chainID_or_chainName', async (req, res) => {
     try {
-        let hardLimit = (isDevelopment)? 365*2 : 30;
+        let hardLimit = (isDevelopment) ? 365 * 2 : 30;
         let queryLimit = (req.query.limit != undefined) ? parseInt(req.query.limit, 10) : 7;
         if (queryLimit > hardLimit) {
             return res.status(400).json({

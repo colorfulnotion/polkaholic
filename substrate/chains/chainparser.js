@@ -4144,7 +4144,7 @@ module.exports = class ChainParser {
             var a = await indexer.api.query.assetManager.assetIdType.entries()
         } else if (indexer.chainID == paraTool.chainIDParallel || indexer.chainID == paraTool.chainIDHeiko) {
             var a = await indexer.api.query.assetRegistry.assetIdType.entries()
-        } else if (indexer.chainID == paraTool.chainIDBasilisk){
+        } else if (indexer.chainID == paraTool.chainIDBasilisk) {
             var a = await indexer.api.query.assetRegistry.assetLocations.entries()
         }
         if (!a) return
@@ -4167,7 +4167,7 @@ module.exports = class ChainParser {
                 let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol.replace('xc', '') : ''
                 let nativeSymbol = symbol
                 let xcmAssetJSON = val.toJSON()
-                let xcmAsset = (xcmAssetJSON.xcm != undefined)? xcmAssetJSON.xcm : xcmAssetJSON
+                let xcmAsset = (xcmAssetJSON.xcm != undefined) ? xcmAssetJSON.xcm : xcmAssetJSON
                 let parents = xcmAsset.parents
                 let interior = xcmAsset.interior
                 //x1/x2/x3 refers to the number to params
@@ -4713,7 +4713,7 @@ module.exports = class ChainParser {
         } else if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
             // token2 format
             let assetString = this.processXcmDecHexCurrencyID(indexer, currency_id)
-            if (!assetString){
+            if (!assetString) {
                 //original format
                 assetString = this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
             }

@@ -7,8 +7,7 @@ async function main() {
     var manager = new Manager();
     await manager.mapChains((c) => {
         let chainID = c.chainID;
-        console.log(`./auditChain ${chainID};`)
-        console.log(`./crawlBackfill ${chainID};`)
+        console.log(`./updateChainAssets ${chainID};`)
     });
 }
 
