@@ -127,7 +127,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async dump_chains(relayChain = "polkadot") {
-        let sql = `select id, chainName, paraID, symbol, ss58Format from chain where crawling = 1 and relayChain = 'polkadot' order by paraID`
+        let sql = `select id, chainName, paraID, symbol, ss58Format from chain where crawling = 1 and relayChain = '${relayChain}' order by paraID`
         let chainsRecs = await this.poolREADONLY.query(sql)
         let tbl = "chains";
         // 2. setup directories for tbls on date
@@ -146,8 +146,19 @@ module.exports = class SubstrateETL extends AssetManager {
             }
         });
         let NL = "\r\n";
-        chains.forEach((e) => {
-            fs.writeSync(f, JSON.stringify(e) + NL);
+	let project = "substrate-etl";
+	let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "traces", "specversions"];
+	console.log("|chain|blocks|extrinsics|events|transfers|logs|traces|specversions");
+        console.log("|-----|------|----------|------|---------|----|------|------------");
+        chains.forEach((c) => {
+            fs.writeSync(f, JSON.stringify(c) + NL);
+	    let sa = [];
+	    sa.push(`${c.para_id} - ${c.id}|`)
+	    for (const tbl of tbls) {
+		let fulltbl = `${project}:${relayChain}.${tbl}${c.para_id}`;
+		sa.push(`${fulltbl}|`)
+	    }
+	    console.log(sa.join(""));
         });
         let cmd = `bq load --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/${tbl}.json`;
         console.log(cmd);
