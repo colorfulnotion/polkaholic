@@ -6405,8 +6405,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         for (const t of traces) {
             if (t.p == "ParaInclusion" && (t.s == "PendingAvailabilityCommitments")) {
                 try {
-                    let commitments = t.pv ? JSON.parse(t.pv) : null; // pv: '{"upwardMessages":[],"horizontalMessages":[],"newValidationCode":null,"headData":"0x8b479dbeef314a22bc8589a38b2b25a6396d5d0fa0a3caa906faee3aaf8188f7b2e47b001e8988caae6861bdfe076f0390770be196c146a30b5e86b03b397a628d79c985e34268e121c9cc333487d904bc10a0f7d1b58e978d0ae3a41e6c27bd03e5203d08066175726120e64446080000000005617572610101ccb39d04d868d3585bb68c0fcbfa1146dc3009422d36933841d2c086d24e5475824fe6428de54c00a9284665b016ec92039db793374b19fe78404e433d5c4780","processedDownwardMessages":0,"hrmpWatermark":12497248}'
-                    if (commitments && (commitments.upwardMessages.length > 0 || commitments.horizontalMessages.length > 0)) {
+                    let commitments = t.pv ? JSON.parse(t.pv) : null;
+                    if (commitments && commitments.upwardMessages && (commitments.upwardMessages.length > 0 || commitments.horizontalMessages.length > 0)) {
                         let k = JSON.parse(t.pkExtra)
                         let paraID = parseInt(paraTool.toNumWithoutComma(k[0]), 10)
                         let backed = backedMap[paraID]
@@ -6490,7 +6490,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                         "trace": JSON.stringify(t),
                         "err": err
                     })
-                    console.log(err);
+                    console.log(err, t.pv);
                 }
             } else if ((t.p == "Dmp") && (t.s == "DownwardMessageQueues")) {
                 try {
@@ -7855,31 +7855,60 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (chainID == 0) {
                 await this.update_xcm_count(daysago);
             }
-            let eflds = ", numTransactionsEVM, numReceiptsEVM, gasUsed, gasLimit, numEVMBlocks";
-            let evals = ", 0, 0, 0, 0, 0";
-            let eupds = ", numTransactionsEVM = values(numTransactionsEVM), numReceiptsEVM = values(numReceiptsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit), numEVMBlocks = values(numEVMBlocks)";
+
+            // optimization: bound this better?
+            let sqltmp = `select floor(unix_timestamp(blockDT)/3600)*3600 as f from block${chainID} where blockDT >= date(date_sub(Now(), interval ${daysago} DAY)) and blockDT < date_sub(Now(), INTERVAL 2 HOUR) group by f`
+            console.log(sqltmp);
+            let blocklog = await this.poolREADONLY.query(sqltmp)
+            let out = [];
+            for (const s of blocklog) {
+                let [logDT0, hr0] = paraTool.ts_to_logDT_hr(s.f);
+                out.push(`('${chainID}', '${s.f}', '${logDT0}', '${hr0}', 1)`)
+            }
+            let valstmp = ["indexTS", "logDT", "hr", "readyForIndexing"]
+            await this.upsertSQL({
+                "table": "indexlog",
+                "keys": ["chainID"],
+                "vals": valstmp,
+                "data": out,
+                "replace": valstmp
+            });
+
+            let evals = (chain.isEVM) ? ", sum(numTransactionsEVM) as numTransactionsEVM, sum(numReceiptsEVM) as numReceiptsEVM, sum(gasUsed) as gasUsed, sum(gasLimit) as gasLimit, sum(if(blockHashEVM is Null, 0, 1)) as numEVMBlocks" : ""
+            sqltmp = `select floor(unix_timestamp(blockDT)/86400)*86400 as indexTS, min(blockNumber) as startBN, max(blockNumber) as endBN, sum(if(crawlTrace=0, 1, 0)) as numTraces, sum(numExtrinsics) as numExtrinsics, sum(numEvents) as numEvents, sum(numTransfers) as numTransfers, sum(numSignedExtrinsics) as numSignedExtrinsics, sum(valueTransfersUSD) as valueTransfersUSD, sum(if(fees is null, 0, fees)) as fees ${evals} from block${chainID} where blockDT is Not Null and blockDT >= date(date_sub(now(), INTERVAL ${daysago} DAY))  group by indexTS`;
+            blocklog = await this.poolREADONLY.query(sqltmp)
+            out = [];
+            valstmp = ["startBN", "endBN", "numTraces", "numExtrinsics", "numEvents", "numTransfers", "numSignedExtrinsics", "valueTransfersUSD", "fees"];
             if (chain.isEVM) {
-                evals = ", sum(numTransactionsEVM), sum(numReceiptsEVM), sum(gasUsed), sum(gasLimit), sum(if(blockHashEVM is Null, 0, 1))";
+                valstmp.push("numTransactionsEVM", "numReceiptsEVM", "gasUsed", "gasLimit", "numEVMBlocks");
             }
-
-            let sql = `insert into blocklog (chainID, logDT, startBN, endBN, numTraces, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD, fees ${eflds} ) (select ${chainID} as chainID, date(blockDT) as logDT, min(blockNumber), max(blockNumber), sum(if(crawlTrace=0, 1, 0)), sum(numExtrinsics), sum(numEvents), sum(numTransfers), sum(numSignedExtrinsics), sum(valueTransfersUSD), sum(fees) ${evals} from block${chainID} where blockDT is Not Null and blockDT >= date(date_sub(now(), INTERVAL ${daysago} DAY))  group by chainID, logDT) on duplicate key update startBN = values(startBN), endBN = values(endBN), numExtrinsics = values(numExtrinsics), numEvents = values(numEvents), numTransfers = values(numTransfers), numSignedExtrinsics = values(numSignedExtrinsics), valueTransfersUSD = values(valueTransfersUSD), numTraces = values(numTraces), fees = values(fees) ` + eupds;
-            console.log(sql);
-            this.batchedSQL.push(sql);
-            await this.update_batchedSQL(10.0);
-
-            var tbl = `assetholder${chainID}`;
-            this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree, totalReserved, totalMiscFrozen, totalFrozen) (select asset, chainID, count(*) numHolders, sum(free) as totalFree, sum(reserved) as totalReserved, sum(miscFrozen) as totalMiscFrozen, sum(frozen) as totalFrozen from ${tbl} where chainID = '${chainID}' and free > 0 group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree), totalReserved = values(totalReserved), totalMiscFrozen = values(totalMiscFrozen), totalFrozen = values(totalFrozen)`)
-
-            var tbls = [];
-            if (chain.isEVM) {
-                tbls.push("tokenholder");
-                tbls.push("token1155holder")
+            for (const s of blocklog) {
+                let [logDT0, hr0] = paraTool.ts_to_logDT_hr(s.indexTS);
+                let eflds = (chain.isEVM) ? `, '${s.numTransactionsEVM}', '${s.numReceiptsEVM}', '${s.gasUsed}', '${s.gasLimit}', '${s.numEVMBlocks}'` : "";
+                out.push(`('${chainID}', '${logDT0}', '${s.startBN}', '${s.endBN}', '${s.numTraces}', '${s.numExtrinsics}',  '${s.numEvents}', '${s.numTransfers}', '${s.numSignedExtrinsics}', '${s.valueTransfersUSD}', '${s.fees}' ${eflds})`)
             }
-            for (const tbl of tbls) {
-                this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree) (select asset, chainID, count(*) numHolders, sum(free) as totalFree from ${tbl} where chainID = '${chainID}' group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree)`)
-                await this.update_batchedSQL();
-            }
+            await this.upsertSQL({
+                "table": "blocklog",
+                "keys": ["chainID", "logDT"],
+                "vals": valstmp,
+                "data": out,
+                "replace": valstmp
+            });
 
+            if (false) {
+                var tbl = `assetholder${chainID}`;
+                this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree, totalReserved, totalMiscFrozen, totalFrozen) (select asset, chainID, count(*) numHolders, sum(free) as totalFree, sum(reserved) as totalReserved, sum(miscFrozen) as totalMiscFrozen, sum(frozen) as totalFrozen from ${tbl} where chainID = '${chainID}' and free > 0 group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree), totalReserved = values(totalReserved), totalMiscFrozen = values(totalMiscFrozen), totalFrozen = values(totalFrozen)`)
+
+                var tbls = [];
+                if (chain.isEVM) {
+                    tbls.push("tokenholder");
+                    tbls.push("token1155holder")
+                }
+                for (const tbl of tbls) {
+                    this.batchedSQL.push(`insert into asset (asset, chainID, numHolders, totalFree) (select asset, chainID, count(*) numHolders, sum(free) as totalFree from ${tbl} where chainID = '${chainID}' group by asset, chainID) on duplicate key update numHolders = values(numHolders), totalFree = values(totalFree)`)
+                    await this.update_batchedSQL();
+                }
+            }
             var ranges = [7, 30, 99999];
             for (const range of ranges) {
                 let f = (range > 9999) ? "" : `${range}d`;
@@ -7887,9 +7916,11 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let stats = await this.poolREADONLY.query(sql0)
                 let out = [];
                 for (const s of stats) {
+                    let numXCMTransferIncoming = s.numXCMTransferIncoming ? s.numXCMTransferIncoming : 0;
+                    let numXCMTransferOutgoing = s.numXCMTransferOutgoing ? s.numXCMTransferOutgoing : 0;
                     let valIncoming = s.valXCMTransferIncomingUSD ? s.valXCMTransferIncomingUSD : 0;
                     let valOutgoing = s.valXCMTransferOutgoingUSD ? s.valXCMTransferOutgoingUSD : 0;
-                    out.push([`('${chain.chainID}', ${s.numTraces}, ${s.numExtrinsics}, ${s.numEvents}, ${s.numTransfers}, ${s.numSignedExtrinsics}, ${s.valueTransfersUSD}, ${s.numTransactionsEVM}, ${s.numReceiptsEVM}, ${s.gasUsed}, ${s.gasLimit}, ${s.numEVMBlocks}, ${s.numAccountsActive}, '${s.numXCMTransferIncoming}', '${valIncoming}', '${s.numXCMTransferOutgoing}', '${valOutgoing}')`])
+                    out.push([`('${chain.chainID}', ${s.numTraces}, ${s.numExtrinsics}, ${s.numEvents}, ${s.numTransfers}, ${s.numSignedExtrinsics}, ${s.valueTransfersUSD}, ${s.numTransactionsEVM}, ${s.numReceiptsEVM}, ${s.gasUsed}, ${s.gasLimit}, ${s.numEVMBlocks}, ${s.numAccountsActive}, '${numXCMTransferIncoming}', '${valIncoming}', '${numXCMTransferOutgoing}', '${valOutgoing}')`])
                 }
                 let vals = [`numTraces${f}`, `numExtrinsics${f}`, `numEvents${f}`, `numTransfers${f}`, `numSignedExtrinsics${f}`, `valueTransfersUSD${f}`, `numTransactionsEVM${f}`, `numReceiptsEVM${f}`, `gasUsed${f}`, `gasLimit${f}`, `numEVMBlocks${f}`, `numAccountsActive${f}`, `numXCMTransferIncoming${f}`, `valXCMTransferIncomingUSD${f}`, `numXCMTransferOutgoing${f}`, `valXCMTransferOutgoingUSD${f}`]
                 await this.upsertSQL({
