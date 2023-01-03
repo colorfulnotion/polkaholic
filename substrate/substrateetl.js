@@ -166,7 +166,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async dump_xcmtransfers(logDT = "2022-12-29", relayChain = "polkadot") {
-        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' order by sourceTS;`
+        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' and incomplete = 0 order by sourceTS;`
 
         let xcmtransferRecs = await this.poolREADONLY.query(sql)
         let tbl = "xcmtransfers";
@@ -211,7 +211,7 @@ module.exports = class SubstrateETL extends AssetManager {
             fs.writeSync(f, JSON.stringify(e) + NL);
         });
         // 4. load into bq
-        let cmd = `bq load --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+        let cmd = `bq load --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
         console.log(cmd);
         await exec(cmd);
     }
