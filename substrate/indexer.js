@@ -1283,10 +1283,10 @@ module.exports = class Indexer extends AssetManager {
                     let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
                         `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey, innerCall, xcmType, pendingXcmInfoBlob
                     ].join(",") + ")";
-                    if (r.msgHash == "0x" && !r.finalized){
+                    if (r.msgHash == "0x" && !r.finalized) {
                         //msgHash is missing... we will
                         console.log(`[${r.extrinsicHash} [${r.extrinsicID}] [finzlied=${r.finalized}] msgHash missing!`)
-                    }else{
+                    } else {
                         xcmtransfers.push(t);
                     }
                     if (numXCMTransfersOut[r.blockNumber] == undefined) {
@@ -4894,18 +4894,18 @@ module.exports = class Indexer extends AssetManager {
                                 if (msgHashCandidate) unsafeXcmtransfer.msgHash = msgHashCandidate
                             }
                             //for unsafeXcmtransfer. we will send xcmtransfer that may eventually got dropped
-			    try {
-				let unsafePendingXcmInfo = await this.buildPendingXcmInfo(unsafeXcmtransfer, rExtrinsic, finalized)
-				unsafeXcmtransfer.xcmInfo = unsafePendingXcmInfo
-				if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafe pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, unsafePendingXcmInfo)
-				this.sendWSMessage(unsafePendingXcmInfo, "xcmtransfer", finalized);
-			    } catch (err0) {
-			    	this.logger.error({
-				    "op": "buildPendingXcmInfo",
-				    "xcms": rExtrinsic.xcms,
-				    "err": err0
-				});
-			    }
+                            try {
+                                let unsafePendingXcmInfo = await this.buildPendingXcmInfo(unsafeXcmtransfer, rExtrinsic, finalized)
+                                unsafeXcmtransfer.xcmInfo = unsafePendingXcmInfo
+                                if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafe pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, unsafePendingXcmInfo)
+                                this.sendWSMessage(unsafePendingXcmInfo, "xcmtransfer", finalized);
+                            } catch (err0) {
+                                this.logger.error({
+                                    "op": "buildPendingXcmInfo",
+                                    "xcms": rExtrinsic.xcms,
+                                    "err": err0
+                                });
+                            }
                         }
                     }
                     delete rExtrinsic.xcms
@@ -7584,7 +7584,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta ||
                 this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel ||
                 this.chainID == paraTool.chainIDCrustShadow ||
-                this.chainID == paraTool.chainIDBasilisk ) {
+                this.chainID == paraTool.chainIDBasilisk) {
                 console.log(`fetch assetManager:assetIdType`)
                 await this.chainParser.fetchXCMAssetIdType(this)
             }

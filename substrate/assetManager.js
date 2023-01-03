@@ -118,7 +118,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         if (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala) {
             this.chainParser = new AcalaParser();
         } else if (chainID == paraTool.chainIDBifrostDOT || chainID == paraTool.chainIDBifrostKSM) {
-                this.chainParser = new BifrostParser();
+            this.chainParser = new BifrostParser();
         } else if (chainID == paraTool.chainIDAstar || chainID == paraTool.chainIDShiden || chainID == paraTool.chainIDShibuya) {
             this.chainParser = new AstarParser();
         } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
@@ -330,7 +330,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     p.parentNickname = parentIdentity.nickname
                 }
                 */
-                if (parentIdentity.child != undefined){
+                if (parentIdentity.child != undefined) {
                     parentIdentity.child.push({
                         subAddress: subAddress,
                         subName: p.subName

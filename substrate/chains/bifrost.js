@@ -35,16 +35,16 @@ module.exports = class BifrostParser extends ChainParser {
             let assetKeyWithID = key.args.map((k) => k.toHuman())[0] //{"Token2":"2"} | LPToken | VSBOND2
             let assetRawKey = Object.keys(assetKeyWithID)[0]
             let assetKey = assetRawKey
-            if (assetKey.slice(-1) == 2){
+            if (assetKey.slice(-1) == 2) {
                 assetKey = assetKey.slice(0, -1)
             }
             console.log(`assetKey=${assetKey}, assetMetadata=`, assetMetadata)
             let assetKeyVal = "";
-            if (assetKey == "Token" || assetKey == "VSBond" || assetKey == "VToken" || assetKey == "VSToken"){
+            if (assetKey == "Token" || assetKey == "VSBond" || assetKey == "VToken" || assetKey == "VSToken") {
                 let assetKey2 = `${assetKey}2`
-                if (assetKeyWithID[assetKey2] != undefined){
+                if (assetKeyWithID[assetKey2] != undefined) {
                     assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetKey2]) // "123,456" or {"Token":"XXX"}
-                }else if (assetKeyWithID[assetRawKey] != undefined){
+                } else if (assetKeyWithID[assetRawKey] != undefined) {
                     assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetRawKey]) // "123,456" or {"Token":"XXX"}
                 }
 
@@ -52,7 +52,7 @@ module.exports = class BifrostParser extends ChainParser {
             if (assetKey == 'NativeAssetId') {
                 //this is the bifrost case
                 parsedAsset = assetKeyVal
-            } else if (assetKey == "Stable" || assetKey == "Native"){
+            } else if (assetKey == "Stable" || assetKey == "Native") {
                 parsedAsset[assetRawKey] = assetKeyWithID[assetRawKey]
             } else {
                 // this is the acala/karura case
