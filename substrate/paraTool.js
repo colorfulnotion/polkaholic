@@ -787,7 +787,7 @@ function makeAssetChainFromXcContractAddress(xcAssetAddress, chainID = 99) {
 
 function is_public_endpoint(wss) {
     if (wss == undefined) return true
-    if (wss.includes("polkaholic.io") || wss.includes("g.moonbase")) {
+    if (wss.includes("polkaholic.io") || wss.includes("g.moonbase") || wss.includes("ws?apikey=")) {
         return false
     }
     return true
