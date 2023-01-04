@@ -9,3 +9,7 @@ bq mk --schema=transfers.json --time_partitioning_field block_time --time_partit
 bq mk --schema=logs.json --time_partitioning_field block_time --time_partitioning_type DAY   --table $DATASET.logs$PARAID
 bq mk --schema=traces.json --time_partitioning_field block_time --time_partitioning_type DAY   --table $DATASET.traces$PARAID
 bq mk --schema=specversions.json  --table $DATASET.specversions$PARAID
+
+
+
+

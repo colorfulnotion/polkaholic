@@ -80,6 +80,7 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const tbl of tbls) {
                 let p = (this.partitioned_table(tbl)) ? "--time_partitioning_field block_time --time_partitioning_type DAY" : "";
                 let cmd = `bq mk --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
+ 
                 try {
                     console.log(cmd);
                     await exec(cmd);
@@ -90,8 +91,11 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
-    // fill with: insert into substrateetllog ( logDT, chainID, loaded ) (select distinct logDT, chainID, 0 as loaded from indexlog where logDT >= '2022-09-01' and chainID < 40000 and indexed = 1) on duplicate key update loaded = values(loaded);
     async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null) {
+        let sql0 = `insert into substrateetllog ( logDT, chainID, loaded ) (select distinct logDT, chainID, 0 as loaded from indexlog where logDT >= date_sub(Now(), interval 3 day) and chainID < 40000 and indexed = 1 and readyForIndexing = 1) on duplicate key update chainID = values(chainID)`
+        this.batchedSQL.push(sql0);
+        await this.update_batchedSQL();
+
         let w = "";
         if (paraID >= 0 && relayChain) {
             let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
@@ -127,7 +131,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async dump_chains(relayChain = "polkadot") {
-        let sql = `select id, chainName, paraID, symbol, ss58Format from chain where crawling = 1 and relayChain = 'polkadot' order by paraID`
+        let sql = `select id, chainName, paraID, symbol, ss58Format from chain where crawling = 1 and relayChain = '${relayChain}' order by paraID`
         let chainsRecs = await this.poolREADONLY.query(sql)
         let tbl = "chains";
         // 2. setup directories for tbls on date
@@ -146,16 +150,27 @@ module.exports = class SubstrateETL extends AssetManager {
             }
         });
         let NL = "\r\n";
-        chains.forEach((e) => {
-            fs.writeSync(f, JSON.stringify(e) + NL);
+        let project = "substrate-etl";
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "traces", "specversions"];
+        console.log("|chain|blocks|extrinsics|events|transfers|logs|traces|specversions");
+        console.log("|-----|------|----------|------|---------|----|------|------------");
+        chains.forEach((c) => {
+            fs.writeSync(f, JSON.stringify(c) + NL);
+            let sa = [];
+            sa.push(`${c.para_id} - ${c.id}|`)
+            for (const tbl of tbls) {
+                let fulltbl = `${project}:${relayChain}.${tbl}${c.para_id}`;
+                sa.push(`${fulltbl}|`)
+            }
+            console.log(sa.join(""));
         });
-        let cmd = `bq load --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/${tbl}.json`;
+        let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/${tbl}.json`;
         console.log(cmd);
         await exec(cmd);
     }
 
     async dump_xcmtransfers(logDT = "2022-12-29", relayChain = "polkadot") {
-        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' order by sourceTS;`
+        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' and incomplete = 0 order by sourceTS;`
 
         let xcmtransferRecs = await this.poolREADONLY.query(sql)
         let tbl = "xcmtransfers";
@@ -172,7 +187,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let teleportFeeUSD = null
             try {
                 xcmInfo = JSON.parse(r.xcmInfo)
-                if (xcmInfo.destination != undefined && xcmInfo.destination.teleportFeeUSD != undefined){
+                if (xcmInfo.destination != undefined && xcmInfo.destination.teleportFeeUSD != undefined) {
                     teleportFeeUSD = xcmInfo.destination.teleportFeeUSD
                 }
             } catch (e) {
@@ -200,7 +215,7 @@ module.exports = class SubstrateETL extends AssetManager {
             fs.writeSync(f, JSON.stringify(e) + NL);
         });
         // 4. load into bq
-        let cmd = `bq load --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+        let cmd = `bq load --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
         console.log(cmd);
         await exec(cmd);
     }
@@ -264,6 +279,10 @@ module.exports = class SubstrateETL extends AssetManager {
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
                 let hdr = b.header;
+                if (!hdr || hdr.number == undefined) {
+                    console.log("ERROR: MISSING hdr", row.id);
+                    continue;
+                }
                 let spec_version = this.getSpecVersionForBlockNumber(chainID, hdr.number);
 
                 // map the above into the arrays below
@@ -416,14 +435,13 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const tbl of tbls) {
                 fs.closeSync(f[tbl]);
                 let logDTp = logDT.replaceAll("-", "")
-                let cmd = `bq load --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
+                let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 if (tbl == "specversions") {
-                    cmd = `bq load --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
+                    cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 }
                 console.log(cmd);
                 await exec(cmd);
             }
-            // create table substrateetllog ( logDT date, chainID int, bnStart int, bnEnd int, numBlocks int, loadDT datetime, primary key (logDT, chainID) )
             let sql = `insert into substrateetllog (logDT, chainID, bnStart, bnEnd, numBlocks, loadDT, loaded, attempted) values ('${logDT}', '${chainID}', '${bnStart}', '${bnEnd}', '${block_count}', Now(), 1, 1) on duplicate key update loadDT = values(loadDT), bnStart = values(bnStart), bnEnd = values(bnEnd), numBlocks = values(numBlocks), loaded = values(loaded), attempted = attempted + values(attempted)`
             console.log(sql);
             this.batchedSQL.push(sql);
