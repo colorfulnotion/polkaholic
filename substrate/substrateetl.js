@@ -165,6 +165,12 @@ module.exports = class SubstrateETL extends AssetManager {
         let f = fs.openSync(fn, 'w', 0o666);
         let bqDataset = relayChain
         let logDTp = logDT.replaceAll("-", "")
+        let xcmInfo = null
+        try {
+            xcmInfo = JSON.parse(r.xcmInfo)
+        } catch (e){
+            xcmInfo = {}
+        }
         // 3. map into canonical form
         let xcmtransfers = xcmtransferRecs.map((r) => {
             return {
@@ -179,7 +185,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 price_usd: r.priceUSD,
                 amount_sent_usd: r.amountSentUSD,
                 amount_received_usd: r.amountReceivedUSD,
-                xcm_info: r.xcmInfo
+                xcm_info: xcmInfo
             }
         });
         let NL = "\r\n";
