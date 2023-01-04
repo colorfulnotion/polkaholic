@@ -93,11 +93,20 @@ module.exports = class AcalaParser extends ChainParser {
         pub type DebitExchangeRate<T: Config> = StorageMap<_, Twox64Concat, CurrencyId, ExchangeRate, OptionQuery>;
         */
         //[{"Token":"KSM"}]
-        let k = JSON.parse(decoratedKey)
         var out = {};
-        out.asset = k[0]; //currencyID
-        let assetString = JSON.stringify(k[0])
-        out.decimals = this.getCachedAssetDecimal(indexer, assetString)
+        let k = JSON.parse(decoratedKey)
+        let k0 = k[0]
+        if (k0.length == 1 && typeof k0 === 'string') {
+            return out
+        }
+        //console.log(`getDebitExchangeRateKey decoratedKey=${decoratedKey}`)
+        if (k0.Endowed != undefined && k0.Endowed.currencyId != undefined) {
+            k0 = k0.Endowed.currencyId
+        }
+        //console.log(`getDebitExchangeRateKey decoratedKey=${decoratedKey}`, k0)
+        out.asset = k0; //currencyID
+        let assetString = JSON.stringify(k0)
+        out.decimals = this.getCachedAssetDecimal(indexer, assetString, `getDebitExchangeRateKey ${assetString}`)
         //console.log(`getDebitExchangeRateKey`, out)
         return out
     }
@@ -136,13 +145,21 @@ module.exports = class AcalaParser extends ChainParser {
     }
 
 
+    //skip loan for now
     getBalanceVal(p, s, val, decoratedVal) {
-        //console.log(`${p}:${s}`, decoratedVal)
-        let v = JSON.parse(decoratedVal)
         let res = {}
         let extraField = []
-        for (let f in v) {
-            extraField[f] = paraTool.dechexToInt(v[f])
+        let decoratedValBlackList = ["VestingBalance", "AveragePriceAlreadyEnabled"]
+        let shouldSkip = decoratedValBlackList.includes(decoratedVal)
+        try {
+            if (!shouldSkip) { //0x00?
+                let v = JSON.parse(decoratedVal)
+                for (let f in v) {
+                    extraField[f] = paraTool.dechexToInt(v[f])
+                }
+            }
+        } catch (e) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`p:s=${p}:${s}, [${val}, ${decoratedVal}] getBalanceVal error`, e)
         }
         res["pv"] = ''
         res["extra"] = extraField
@@ -523,8 +540,31 @@ module.exports = class AcalaParser extends ChainParser {
     async processTokensTotalIssuance(indexer, e2) {
         //get issuance here (if changed)
         let parsedAsset = JSON.parse(e2.asset)
-        // Not sure if you will ever get here..
-        if (Array.isArray(parsedAsset) && parsedAsset.length == 2) { // parsedAsset['DexShare'] != undefined)
+        if (parsedAsset.Endowed != undefined && parsedAsset.Endowed.currencyId != undefined) {
+            /*
+            {
+                "Endowed": {
+                    "currencyId": {
+                        "DexShare": [
+                            {
+                                "Token": "ACA"
+                            },
+                            {
+                                "Token": "ACA"
+                            }
+                        ]
+                    },
+                    "who": "zsbavR2qukGZb3e4KoEn1fFTrRwYqJCtQYK9qS1dYwspQF3",
+                    "amount": "0"
+                }
+            }
+            */
+            parsedAsset = parsedAsset.Endowed.currencyId
+            e2.asset = JSON.stringify(parsedAsset)
+        }
+        if (e2.asset != undefined && e2.asset == '{"DexShare":[{"Token":"ACA"},{"Token":"ACA"}]}') {
+            // Not sure what is this.... skip for now
+        } else if (Array.isArray(parsedAsset) && parsedAsset.length == 2) { // parsedAsset['DexShare'] != undefined)
             //let pair = parsedAsset['DexShare']
             let decimals0 = await this.getAssetDecimal(indexer, JSON.stringify(parsedAsset[0]), "processTokensTotalIssuance");
             if (decimals0) {
@@ -728,7 +768,9 @@ module.exports = class AcalaParser extends ChainParser {
         //console.log(`acala parseStorageVal ${pallet_section}`)
         if (pallet_section == "dex:liquidityPool") {
             return this.getLiquidityPoolVal(val, decoratedVal)
-        } else if ((pallet_section == "tokens:accounts") || (pallet_section == "loans:positions")) {
+        } else if (pallet_section == "tokens:accounts") {
+            return this.getBalanceVal(p, s, val, decoratedVal)
+        } else if (pallet_section == "loans:positions") {
             return this.getBalanceVal(p, s, val, decoratedVal)
         } else if (pallet_section == "tokens:totalIssuance") {
             //include asset
@@ -767,6 +809,11 @@ module.exports = class AcalaParser extends ChainParser {
     }
 
     async getAssetDecimal(indexer, asset, ctx) {
+        /*
+	if (asset.includes('Endowed')){
+            asset = this.stripEndowedCurrencyID(asset)
+        }
+	*/
         let res = indexer.getAssetDecimal(asset, indexer.chainID, ctx);
         if (res) {
             return (res);
@@ -780,13 +827,17 @@ module.exports = class AcalaParser extends ChainParser {
         return (false);
     }
 
-    getCachedAssetDecimal(indexer, asset, ctx) {
+    getCachedAssetDecimal(indexer, endowedAsset, ctx) {
         //console.log(`getCachedAssetDecimal ${asset}`)
-        let res = indexer.getAssetDecimal(asset, indexer.chainID, ctx);
+        let v = endowedAsset
+        if (endowedAsset.includes('Endowed')) {
+            v = this.stripEndowedCurrencyID(endowedAsset)
+        }
+        let res = indexer.getAssetDecimal(v, indexer.chainID, ctx);
         if (res) {
             return (res);
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getCachedAssetDecimal ${asset} not found`)
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getCachedAssetDecimal ${endowedAsset} not found`, ctx)
             return (12);
         }
     }
@@ -934,6 +985,7 @@ module.exports = class AcalaParser extends ChainParser {
         let [asset, _] = paraTool.parseAssetChain(rAssetkey)
         let decimals = await this.getAssetDecimal(indexer, asset, "processTokensAccounts");
         // for ALL the evaluatable attributes in e2, copy them in
+        console.log(`fromAddress=${fromAddress}. rAssetkey=${rAssetkey}, e2`, e2)
         if (decimals) {
             flds.forEach((fld) => {
                 aa[fld] = e2[fld] / 10 ** decimals;
@@ -1037,9 +1089,29 @@ processOrmlNFTClasses {
         return;
     }
 
+    stripEndowedCurrencyID(pallet_section, asset) {
+        let v = asset
+        try {
+            if (asset != undefined && asset.includes('Endowed')) {
+                let parsedAsset = JSON.parse(asset)
+                if (parsedAsset.Endowed != undefined && parsedAsset.Endowed.currencyId != undefined) {
+                    v = JSON.stringify(parsedAsset.Endowed.currencyId)
+                    //console.log(`*** ${pallet_section} Endowed! asset`, asset, `{v}`)
+                }
+            }
+        } catch (err) {
+            console.log(`*** stripEndowedCurrencyID! ${pallet_section} asset`, asset, `err`, err)
+        }
+        //console.log(`stripEndowedCurrencyID returned`, v)
+        return v
+    }
+
     async processAsset(indexer, p, s, e2) {
         let pallet_section = `${p}:${s}`
         //console.log(`acala processAsset ${pallet_section}`)
+        if (e2.asset != undefined) {
+            e2.asset = this.stripEndowedCurrencyID(pallet_section, e2.asset)
+        }
         if (pallet_section == "Tokens:TotalIssuance") {
             await this.processTokensTotalIssuance(indexer, e2);
         } else if (pallet_section == "CdpEngine:DebitExchangeRate") {

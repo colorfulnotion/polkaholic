@@ -484,11 +484,22 @@ module.exports = class ChainParser {
         }
     }
 
+
     getHrmpOutboundMessagesVal(indexer, decoratedVal, mpType = false) {
         //ParachainSystem:HrmpOutboundMessages
         let res = {}
         let extraField = []
         /*
+        2000-2055685-28
+        {
+            "dmqMqcHead": "0x04d40700003101000210010400010200411f06080000000b4730a152e40d0a13",
+            "relayDispatchQueueSize": [
+                131328,
+                134618945
+            ],
+            "ingressChannels": [],
+            "egressChannels": []
+        }
         {
           recipient: 2004,
           data: '0x000210010400010200411f06080001000b00901ec4bc160a1300010200411f06080001000b00901ec4bc16010300286bee0d010004000103005745b1538d345fe51c4e8c2859c9c09a5e544f99'
@@ -500,43 +511,45 @@ module.exports = class ChainParser {
             extraField['mpIsSet'] = 1
             let hrmps = []
             let hrmpRaws = []
-            for (const hrmp of hrmpOutboundMsgs) {
-                if (hrmp.data != undefined) {
-                    let relayChain = indexer.relayChain
-                    let relayChainID = paraTool.getRelayChainID(relayChain)
-                    let paraIDExtra = paraTool.getParaIDExtra(relayChain)
-                    let data = '0x' + hrmp.data.slice(4)
-                    var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `HrmpOutboundMessagesVal`)
-                    if (xcmFragments) {
-                        for (const xcm of xcmFragments) {
-                            var msgHash = xcm.msgHash
-                            var hrmpMsg = xcm.msg
-                            var msg0 = xcm.msg
-                            var msgHex = xcm.hex
-                            let beneficiaries = this.getBeneficiary(msg0)
-                            //console.log(`[Trace] Outgoing HrmpOutboundMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
-                            let p = this.getInstructionPath(hrmpMsg)
-                            let hrmpDecoded = {
-                                msg: JSON.stringify(hrmpMsg),
+            if (Array.isArray(hrmpOutboundMsgs)) {
+                for (const hrmp of hrmpOutboundMsgs) {
+                    if (hrmp.data != undefined) {
+                        let relayChain = indexer.relayChain
+                        let relayChainID = paraTool.getRelayChainID(relayChain)
+                        let paraIDExtra = paraTool.getParaIDExtra(relayChain)
+                        let data = '0x' + hrmp.data.slice(4)
+                        var xcmFragments = this.decodeXcmVersionedXcms(indexer, data, `HrmpOutboundMessagesVal`)
+                        if (xcmFragments) {
+                            for (const xcm of xcmFragments) {
+                                var msgHash = xcm.msgHash
+                                var hrmpMsg = xcm.msg
+                                var msg0 = xcm.msg
+                                var msgHex = xcm.hex
+                                let beneficiaries = this.getBeneficiary(msg0)
+                                //console.log(`[Trace] Outgoing HrmpOutboundMessagesVal [${msgHash}] beneficiaries=${beneficiaries}`)
+                                let p = this.getInstructionPath(hrmpMsg)
+                                let hrmpDecoded = {
+                                    msg: JSON.stringify(hrmpMsg),
+                                }
+                                let hrmpRaw = {
+                                    mpType: mpType,
+                                    msgHash: msgHash,
+                                    msgHex: msgHex,
+                                    msgStr: JSON.stringify(hrmpMsg),
+                                    //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
+                                    sentAt: 0,
+                                    chainID: indexer.chainID,
+                                    chainIDDest: hrmp.recipient + paraIDExtra,
+                                    relayChain: relayChain,
+                                    beneficiaries: beneficiaries,
+                                }
+                                if (p) {
+                                    hrmpRaw.version = p.version
+                                    hrmpRaw.path = p.path
+                                }
+                                hrmps.push(hrmpDecoded)
+                                hrmpRaws.push(hrmpRaw)
                             }
-                            let hrmpRaw = {
-                                mpType: mpType,
-                                msgHash: msgHash,
-                                msgHex: msgHex,
-                                msgStr: JSON.stringify(hrmpMsg),
-                                //sentAt: this.parserWatermark, //this is potentially off by 2-4 blocks
-                                sentAt: 0,
-                                chainID: indexer.chainID,
-                                chainIDDest: hrmp.recipient + paraIDExtra,
-                                relayChain: relayChain,
-                                beneficiaries: beneficiaries,
-                            }
-                            if (p) {
-                                hrmpRaw.version = p.version
-                                hrmpRaw.path = p.path
-                            }
-                            hrmps.push(hrmpDecoded)
-                            hrmpRaws.push(hrmpRaw)
                         }
                     }
                 }
@@ -2447,6 +2460,9 @@ module.exports = class ChainParser {
                 return incomplete;
             } else if (sectionMethod == 'xTokens(TransferFailed)') {
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
+                incomplete = 1
+                return incomplete;
+            } else if (sectionMethod == 'utility(BatchInterrupted)') {
                 incomplete = 1
                 return incomplete;
             } else if ((e.section == "xcmPallet" || e.section == "polkadotXcm") && e.method == "Attempted") {

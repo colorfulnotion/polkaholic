@@ -1174,7 +1174,8 @@ module.exports = class Indexer extends AssetManager {
     }
 
     validAsset(assetKey, chainID, ctx, o) {
-        if (typeof assetKey == "string" && assetKey.includes("0x") && (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala)) {
+        //TODO: acala now has valid "Erc20\":\"0x0000000000000000000000000000000000000000\"?
+        if (typeof assetKey == "string" && assetKey.includes("0x") && (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala) && false) {
             let err = `InvalidAsset ${assetKey}`
             this.log_indexing_error(err, "validAsset", {
                 "ctx": ctx,
