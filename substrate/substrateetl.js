@@ -169,10 +169,15 @@ module.exports = class SubstrateETL extends AssetManager {
         // 3. map into canonical form
         let xcmtransfers = xcmtransferRecs.map((r) => {
             let xcmInfo = null
+            let teleportFeeUSD = null
             try {
                 xcmInfo = JSON.parse(r.xcmInfo)
+                if (xcmInfo.destination != undefined && xcmInfo.destination.teleportFeeUSD != undefined){
+                    teleportFeeUSD = xcmInfo.destination.teleportFeeUSD
+                }
             } catch (e) {
                 xcmInfo = {}
+                teleportFeeUSD = null
             }
             return {
                 extrinsic_hash: r.extrinsicHash,
@@ -186,6 +191,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 price_usd: r.priceUSD,
                 amount_sent_usd: r.amountSentUSD,
                 amount_received_usd: r.amountReceivedUSD,
+                teleport_fee_usd: teleportFeeUSD,
                 xcm_info: xcmInfo
             }
         });

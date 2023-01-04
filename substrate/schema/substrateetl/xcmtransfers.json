@@ -55,7 +55,12 @@
     "type": "FLOAT"
   },
   {
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
+    "name": "teleport_fee_usd",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "xcm_info",
     "type": "JSON"
   }
