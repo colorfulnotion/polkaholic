@@ -1,26 +1,18 @@
 #!/usr/bin/env node
- // Usage: while true; do ./indexChain 10; done
-var Crawler = require("./crawler");
+ // Usage:  updateSpecVersions [chainID]
+const endpoints = require("./summary/endpoints");
 
+var Crawler = require("./crawler");
 async function main() {
     let chainID = -1;
-    let daysago = 3;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = val;
         }
-        if (index == 3 && val.length > 0) {
-            daysago = val;
-        }
     });
-
-
-    if ( chainID >= 0 ) {
-       let crawler = new Crawler();
-       let chain = await crawler.getChain(chainID);
-       await crawler.assetManagerInit();
-       await crawler.updateChainAssetHoldersBalances(chain);
-       await crawler.updateChainAssets(chainID, daysago);
+    if (chainID >= 0) {
+        var crawler = new Crawler();
+        await crawler.updateChainAssets(chainID, 100);
     }
 }
 
