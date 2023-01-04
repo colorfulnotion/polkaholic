@@ -562,8 +562,10 @@ module.exports = class AcalaParser extends ChainParser {
             parsedAsset = parsedAsset.Endowed.currencyId
             e2.asset = JSON.stringify(parsedAsset)
         }
-        // Not sure if you will ever get here..
-        if (Array.isArray(parsedAsset) && parsedAsset.length == 2) { // parsedAsset['DexShare'] != undefined)
+        if (e2.asset != undefined && e2.asset == '{"DexShare":[{"Token":"ACA"},{"Token":"ACA"}]}'){
+        // Not sure what is this.... skip for now
+
+        } else if (Array.isArray(parsedAsset) && parsedAsset.length == 2) { // parsedAsset['DexShare'] != undefined)
             //let pair = parsedAsset['DexShare']
             let decimals0 = await this.getAssetDecimal(indexer, JSON.stringify(parsedAsset[0]), "processTokensTotalIssuance");
             if (decimals0) {
