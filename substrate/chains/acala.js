@@ -103,10 +103,10 @@ module.exports = class AcalaParser extends ChainParser {
         if (k0.Endowed != undefined && k0.Endowed.currencyId != undefined) {
             k0 = k0.Endowed.currencyId
         }
-        //console.log(`getDebitExchangeRateKey decoratedKey=${decoratedKey}`, k0)
+        console.log(`getDebitExchangeRateKey decoratedKey=${decoratedKey}`, k0)
         out.asset = k0; //currencyID
         let assetString = JSON.stringify(k0)
-        out.decimals = this.getCachedAssetDecimal(indexer, assetString)
+        out.decimals = this.getCachedAssetDecimal(indexer, assetString, `getDebitExchangeRateKey`)
         //console.log(`getDebitExchangeRateKey`, out)
         return out
     }
@@ -564,7 +564,7 @@ module.exports = class AcalaParser extends ChainParser {
         }
         if (e2.asset != undefined && e2.asset == '{"DexShare":[{"Token":"ACA"},{"Token":"ACA"}]}'){
         // Not sure what is this.... skip for now
-
+        console.log(`imhere++++`)
         } else if (Array.isArray(parsedAsset) && parsedAsset.length == 2) { // parsedAsset['DexShare'] != undefined)
             //let pair = parsedAsset['DexShare']
             let decimals0 = await this.getAssetDecimal(indexer, JSON.stringify(parsedAsset[0]), "processTokensTotalIssuance");
