@@ -80,7 +80,7 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const tbl of tbls) {
                 let p = (this.partitioned_table(tbl)) ? "--time_partitioning_field block_time --time_partitioning_type DAY" : "";
                 let cmd = `bq mk --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
- 
+
                 try {
                     console.log(cmd);
                     await exec(cmd);
@@ -188,10 +188,10 @@ module.exports = class SubstrateETL extends AssetManager {
             try {
                 xcmInfo = JSON.parse(r.xcmInfo)
                 if (xcmInfo.destination != undefined && xcmInfo.destination.teleportFeeUSD != undefined) {
-                    teleportFeeUSD = xcmInfo.destination.teleportFeeUSD
+                    if (xcmInfo.destination.teleportFeeUSD > 0 && xcmInfo.destination.teleportFeeUSD < 2) teleportFeeUSD = xcmInfo.destination.teleportFeeUSD
                 }
             } catch (e) {
-                xcmInfo = {}
+                xcmInfo = null
                 teleportFeeUSD = null
             }
             return {
