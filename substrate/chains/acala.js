@@ -562,8 +562,8 @@ module.exports = class AcalaParser extends ChainParser {
             parsedAsset = parsedAsset.Endowed.currencyId
             e2.asset = JSON.stringify(parsedAsset)
         }
-        if (e2.asset != undefined && e2.asset == '{"DexShare":[{"Token":"ACA"},{"Token":"ACA"}]}'){
-        // Not sure what is this.... skip for now
+        if (e2.asset != undefined && e2.asset == '{"DexShare":[{"Token":"ACA"},{"Token":"ACA"}]}') {
+            // Not sure what is this.... skip for now
         } else if (Array.isArray(parsedAsset) && parsedAsset.length == 2) { // parsedAsset['DexShare'] != undefined)
             //let pair = parsedAsset['DexShare']
             let decimals0 = await this.getAssetDecimal(indexer, JSON.stringify(parsedAsset[0]), "processTokensTotalIssuance");
@@ -985,6 +985,7 @@ module.exports = class AcalaParser extends ChainParser {
         let [asset, _] = paraTool.parseAssetChain(rAssetkey)
         let decimals = await this.getAssetDecimal(indexer, asset, "processTokensAccounts");
         // for ALL the evaluatable attributes in e2, copy them in
+        console.log(`fromAddress=${fromAddress}. rAssetkey=${rAssetkey}, e2`, e2)
         if (decimals) {
             flds.forEach((fld) => {
                 aa[fld] = e2[fld] / 10 ** decimals;

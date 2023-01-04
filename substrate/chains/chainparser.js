@@ -2462,7 +2462,7 @@ module.exports = class ChainParser {
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsicID}] ${sectionMethod} Failed`)
                 incomplete = 1
                 return incomplete;
-            } else if (sectionMethod == 'utility(BatchInterrupted)'){
+            } else if (sectionMethod == 'utility(BatchInterrupted)') {
                 incomplete = 1
                 return incomplete;
             } else if ((e.section == "xcmPallet" || e.section == "polkadotXcm") && e.method == "Attempted") {

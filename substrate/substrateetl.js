@@ -171,7 +171,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let xcmInfo = null
             try {
                 xcmInfo = JSON.parse(r.xcmInfo)
-            } catch (e){
+            } catch (e) {
                 xcmInfo = {}
             }
             return {
