@@ -284,7 +284,7 @@ module.exports = class SubstrateETL extends AssetManager {
                             block_hash: block.hash,
                             section: e.section,
                             method: e.method,
-                            data: JSON.stringify(e.data)
+                            data: e.data
                         });
                         block.event_count++;
                     });
