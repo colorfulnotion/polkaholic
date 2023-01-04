@@ -40,6 +40,7 @@ module.exports = class XCMManager extends Query {
 
     xcmErrorMap = {}
     lastupdateTS = 0
+    irregularFeeUSDThreshold = 5 //consider feeUSD above this threshold "Irregular" -  historically feeUSD should be lower than the ED
 
     init_xcm_error_map() {
         this.loadXCMErrorDescription()
@@ -631,7 +632,7 @@ module.exports = class XCMManager extends Query {
                 console.log(`extrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceived}, fee=${fee}, p=${estPrice}, feeUSD=${estFeeUSD}, feeSymbol=${xcm.symbol}`)
             }
             xcm.fee = fee
-            if (estFeeUSD > 0 && estFeeUSD < 1) {
+            if (estFeeUSD > 0 && estFeeUSD < this.irregularFeeUSDThreshold) {
                 xcm.feeUSD = estFeeUSD
             } else {
                 console.log(`Irregular FeeUSD xtrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceived}, fee=${fee}, p=${estPrice}, feeUSD=${estFeeUSD}, feeSymbol=${xcm.symbol}`)
@@ -645,7 +646,7 @@ module.exports = class XCMManager extends Query {
               xcm.amountReceivedUSD = xcm.priceUSD * xcm.amountReceived;
             }
             */
-            if (xcm.amountSentUSD > xcm.amountReceivedUSD && xcm.amountReceivedUSD == 0 && xcm.amountSentUSD - xcm.amountReceivedUSD < 1){
+            if (xcm.amountSentUSD > xcm.amountReceivedUSD && xcm.amountReceivedUSD == 0 && xcm.amountSentUSD - xcm.amountReceivedUSD < this.irregularFeeUSDThreshold){
                 xcm.amountReceivedUSD = xcm.amountSentUSD - xcm.amountReceivedUSD
             }
             let p = await this.computePriceUSD({
@@ -659,8 +660,8 @@ module.exports = class XCMManager extends Query {
                 xcm.amountSentUSD = p.valUSD;
                 xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
                 xcm.feeUSD = p.priceUSD * xcm.fee
-                if (xcm.feeUSD > 1){
-                    console.log(`Irregular FeeUSD  feeUSD extrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceived}`)
+                if (xcm.feeUSD > this.irregularFeeUSDThreshold){
+                    console.log(`Irregular FeeUSD  feeUSD extrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceivedUSD}, feeUSD=${estFeeUSD}`)
                     xcm.feeUSD = 0
                 }
                 xcm.priceUSD = p.priceUSD;

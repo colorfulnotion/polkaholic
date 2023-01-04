@@ -42,6 +42,8 @@ module.exports = class SubstrateETL extends AssetManager {
         super("manager")
     }
 
+    irregularFeeUSDThreshold = 5 //consider feeUSD above this threshold "Irregular" -  historically feeUSD should be lower than the ED
+
     // all bigquery tables are date-partitioned except 2 for now: chains and specversions
     partitioned_table(tbl) {
         switch (tbl) {
@@ -188,7 +190,7 @@ module.exports = class SubstrateETL extends AssetManager {
             try {
                 xcmInfo = JSON.parse(r.xcmInfo)
                 if (xcmInfo.destination != undefined && xcmInfo.destination.teleportFeeUSD != undefined) {
-                    if (xcmInfo.destination.teleportFeeUSD > 0 && xcmInfo.destination.teleportFeeUSD < 2) teleportFeeUSD = xcmInfo.destination.teleportFeeUSD
+                    if (xcmInfo.destination.teleportFeeUSD > 0 && xcmInfo.destination.teleportFeeUSD < this.irregularFeeUSDThreshold) teleportFeeUSD = xcmInfo.destination.teleportFeeUSD
                 }
             } catch (e) {
                 xcmInfo = null
