@@ -1586,7 +1586,7 @@ module.exports = class Query extends AssetManager {
         //console.log(`getTransaction txHash=${txHash} decorateData=${decorateData} decorateAddr=${decorateAddr} decorateUSD=${decorateUSD} decorateRelated=${decorateRelated}`)
         const filter = {
             column: {
-                cellLimit: 2
+                cellLimit: 1
             },
         };
         if (!this.validAddress(txHash)) {
@@ -1721,7 +1721,6 @@ module.exports = class Query extends AssetManager {
                                 let cell = cells[0]
                                 let xcmInfo = JSON.parse(cell.value);
                                 c.xcmInfo = xcmInfo;
-                                //break;
                             }
                         } else if (this.is_evm_xcmtransfer_input(c.input)) {
                             //  fetch xcmInfo from substrate extrinsicHash
@@ -1775,7 +1774,6 @@ module.exports = class Query extends AssetManager {
                             let xcmInfo = JSON.parse(cell.value);
                             if (extrinsicHashEventIDs.length > 1) console.log(`feedXCMInfoData[${extrinsicHashEventID}] xcmInfo`, xcmInfo)
                             c.xcmInfo = xcmInfo; //use last one
-                            //break;
                         }
                         d.xcmInfo = c.xcmInfo
                         // TEMP:
@@ -7116,7 +7114,7 @@ module.exports = class Query extends AssetManager {
     async getXCMInfo(hash) {
         const filter = {
             column: {
-                cellLimit: 2
+                cellLimit: 1
             },
         };
         if (!this.validAddress(hash)) {
