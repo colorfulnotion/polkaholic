@@ -165,14 +165,15 @@ module.exports = class SubstrateETL extends AssetManager {
         let f = fs.openSync(fn, 'w', 0o666);
         let bqDataset = relayChain
         let logDTp = logDT.replaceAll("-", "")
-        let xcmInfo = null
-        try {
-            xcmInfo = JSON.parse(r.xcmInfo)
-        } catch (e){
-            xcmInfo = {}
-        }
+
         // 3. map into canonical form
         let xcmtransfers = xcmtransferRecs.map((r) => {
+            let xcmInfo = null
+            try {
+                xcmInfo = JSON.parse(r.xcmInfo)
+            } catch (e){
+                xcmInfo = {}
+            }
             return {
                 extrinsic_hash: r.extrinsicHash,
                 extrinsic_id: r.extrinsicID,
