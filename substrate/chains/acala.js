@@ -96,13 +96,6 @@ module.exports = class AcalaParser extends ChainParser {
         var out = {};
         let k = JSON.parse(decoratedKey)
         let k0 = k[0]
-        if (k0.length == 1 && typeof k0 === 'string') {
-            return out
-        }
-        //console.log(`getDebitExchangeRateKey decoratedKey=${decoratedKey}`)
-        if (k0.Endowed != undefined && k0.Endowed.currencyId != undefined) {
-            k0 = k0.Endowed.currencyId
-        }
         //console.log(`getDebitExchangeRateKey decoratedKey=${decoratedKey}`, k0)
         out.asset = k0; //currencyID
         let assetString = JSON.stringify(k0)
@@ -540,31 +533,7 @@ module.exports = class AcalaParser extends ChainParser {
     async processTokensTotalIssuance(indexer, e2) {
         //get issuance here (if changed)
         let parsedAsset = JSON.parse(e2.asset)
-        if (parsedAsset.Endowed != undefined && parsedAsset.Endowed.currencyId != undefined) {
-            /*
-            {
-                "Endowed": {
-                    "currencyId": {
-                        "DexShare": [
-                            {
-                                "Token": "ACA"
-                            },
-                            {
-                                "Token": "ACA"
-                            }
-                        ]
-                    },
-                    "who": "zsbavR2qukGZb3e4KoEn1fFTrRwYqJCtQYK9qS1dYwspQF3",
-                    "amount": "0"
-                }
-            }
-            */
-            parsedAsset = parsedAsset.Endowed.currencyId
-            e2.asset = JSON.stringify(parsedAsset)
-        }
-        if (e2.asset != undefined && e2.asset == '{"DexShare":[{"Token":"ACA"},{"Token":"ACA"}]}') {
-            // Not sure what is this.... skip for now
-        } else if (Array.isArray(parsedAsset) && parsedAsset.length == 2) { // parsedAsset['DexShare'] != undefined)
+        if (Array.isArray(parsedAsset) && parsedAsset.length == 2) { // parsedAsset['DexShare'] != undefined)
             //let pair = parsedAsset['DexShare']
             let decimals0 = await this.getAssetDecimal(indexer, JSON.stringify(parsedAsset[0]), "processTokensTotalIssuance");
             if (decimals0) {
@@ -809,11 +778,6 @@ module.exports = class AcalaParser extends ChainParser {
     }
 
     async getAssetDecimal(indexer, asset, ctx) {
-        /*
-	if (asset.includes('Endowed')){
-            asset = this.stripEndowedCurrencyID(asset)
-        }
-	*/
         let res = indexer.getAssetDecimal(asset, indexer.chainID, ctx);
         if (res) {
             return (res);
@@ -827,17 +791,14 @@ module.exports = class AcalaParser extends ChainParser {
         return (false);
     }
 
-    getCachedAssetDecimal(indexer, endowedAsset, ctx) {
+    getCachedAssetDecimal(indexer, asset, ctx) {
         //console.log(`getCachedAssetDecimal ${asset}`)
-        let v = endowedAsset
-        if (endowedAsset.includes('Endowed')) {
-            v = this.stripEndowedCurrencyID(endowedAsset)
-        }
+        let v = asset
         let res = indexer.getAssetDecimal(v, indexer.chainID, ctx);
         if (res) {
             return (res);
         } else {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getCachedAssetDecimal ${endowedAsset} not found`, ctx)
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getCachedAssetDecimal ${asset} not found`, ctx)
             return (12);
         }
     }
@@ -1109,9 +1070,6 @@ processOrmlNFTClasses {
     async processAsset(indexer, p, s, e2) {
         let pallet_section = `${p}:${s}`
         //console.log(`acala processAsset ${pallet_section}`)
-        if (e2.asset != undefined) {
-            e2.asset = this.stripEndowedCurrencyID(pallet_section, e2.asset)
-        }
         if (pallet_section == "Tokens:TotalIssuance") {
             await this.processTokensTotalIssuance(indexer, e2);
         } else if (pallet_section == "CdpEngine:DebitExchangeRate") {

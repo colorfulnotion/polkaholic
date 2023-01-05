@@ -1174,7 +1174,7 @@ module.exports = class Crawler extends Indexer {
     async indexChainRandom(lookbackBackfillDays = 60, audit = true, backfill = true, write_bq_log = true, update_chain_assets = true) {
         // pick a chainID that the node is also crawling
         let hostname = this.hostname;
-        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 and attempted < 10 and chainID in ( select chainID from chainhostnameendpoint where hostname = '${hostname}' ) group by chainID having count(*) < 200 order by rand() desc`;
+        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 and attempted < 3 and chainID in ( select chainID from chainhostnameendpoint where hostname = '${hostname}' ) group by chainID having count(*) < 200 order by rand() desc`;
 
         var chains = await this.poolREADONLY.query(sql);
 
@@ -1235,11 +1235,13 @@ module.exports = class Crawler extends Indexer {
         if (techniqueParams[0] == "mod") {
             let n = techniqueParams[1];
             let nmax = techniqueParams[2];
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber % ${nmax} = ${n} and blockNumber <= ${chain.blocksCovered} and attempted < 10 order by attempted, rand() limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber % ${nmax} = ${n} and blockNumber <= ${chain.blocksCovered} and attempted < 3 order by attempted, rand() limit 10000`
+	    console.log("X", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
             let endBN = techniqueParams[2];
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 10 order by attempted, blockNumber desc limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 3 order by attempted, blockNumber desc limit 10000`
+	    console.log("Y", sql);
         }
         let tasks = await this.poolREADONLY.query(sql);
         if (tasks.length == 0) return (false);
@@ -1365,14 +1367,14 @@ module.exports = class Crawler extends Indexer {
             let startingBlock = parseInt(syncState.startingBlock.toString(), 10);
             //console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
-            let startBN = chain.blocksFinalized - 150000 // dont do  a full table scan for chain 0/2 anymore 150000*6=10 days should be enough...
-            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and attempted < ${maxTraceAttempts} and blockNumber > ${startBN} limit 1000`
+            let startBN = chain.blocksFinalized - 7000000 // dont do  a full table scan for chain 0/2 anymore 150000*6=10 days should be enough...
+            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and attempted < ${maxTraceAttempts} and blockNumber > ${startBN} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} limit 5000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
                 let endBN = techniqueParams[2];
                 sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < ${maxTraceAttempts} order by rand() limit 1000`
             }
-
+	    console.log(sql);
             let tasks = await this.poolREADONLY.query(sql);
             let jmp = 1;
             for (var i = 0; i < tasks.length; i += jmp) {
@@ -1387,6 +1389,7 @@ module.exports = class Crawler extends Indexer {
                         blockTS: t1.blockTS, // could be null
                         attempted: t1.attempted // should be
                     };
+		console.log(t2)
                     if (t1.crawlBlock) {
                         return this.crawl_block_trace(chain, t2)
                     } else {

@@ -687,6 +687,9 @@ module.exports = class Query extends AssetManager {
             if (blockNumber) {
                 // send users to eg /block/0/9963670?blockhash=0xcf10b0c43f5c87de7cb9b3c0be6187097bd936bde19bd937516482ac01a8d46f
                 res.push({
+                    type: "block",
+                    blockNumber: blockNumber,
+                    chainID: chainID,
                     link: `/block/${chainID}/${blockNumber}?blockhash=${hash}`,
                     text: `chain: ${chainID} blockNumber: ${blockNumber} hash: ${hash}`,
                     description: this.getChainName(chainID) + " Block " + blockNumber + " : " + hash
@@ -705,6 +708,9 @@ module.exports = class Query extends AssetManager {
             if (blockNumber) {
                 // send users to eg /block/0/9963670?blockhash=0xcf10b0c43f5c87de7cb9b3c0be6187097bd936bde19bd937516482ac01a8d46f
                 res.push({
+                    type: "stateroot",
+                    chainID: chainID,
+                    blockNumber: blockNumber,
                     link: `/block/${chainID}/${blockNumber}?blockhash=${blockHash}`,
                     text: `chain: ${chainID} blockNumber: ${blockNumber} hash: ${blockHash}`,
                     description: this.getChainName(chainID) + " Block " + blockNumber + " : " + blockHash
@@ -719,6 +725,9 @@ module.exports = class Query extends AssetManager {
         let m = JSON.parse(cell.value);
         if (m && m.msgHash) {
             res.push({
+                type: "xcmmessage",
+                chainID: m.chainID,
+                blockNumber: m.blockNumber,
                 link: `/xcmmessage/${m.msgHash}/${m.sentAt}`,
                 text: `hash: ${m.msgHash} sentAt: ${m.sentAt} relay chain: ${m.relayChain}`,
                 description: this.getChainName(m.chainID) + " Block " + m.blockNumber + ` : block time: ${m.blockTS} `
@@ -761,6 +770,8 @@ module.exports = class Query extends AssetManager {
         let c = JSON.parse(cell.value);
         if (c && c.codeHash) {
             res.push({
+                type: "codehash",
+                chainID: c.chainID,
                 link: `/wasmcode/${c.codeHash}/${c.chainID}`,
                 text: "WASM Code: " + c.codeHash,
                 description: `ChainID: ${c.chainID} Storer: ${c.storer}`
@@ -835,6 +846,9 @@ module.exports = class Query extends AssetManager {
             let blockNumber = feed.blockNumber;
             let addr = feed.addr;
             res.push({
+                type: "tx",
+                chainID: chainID,
+                blockNumber: blockNumber,
                 link: "/tx/" + hash,
                 text: `chain: ${chainID} blockNumber: ${blockNumber} address: ${addr}`,
                 description: "tx"
@@ -1714,11 +1728,13 @@ module.exports = class Query extends AssetManager {
                     //console.log(`[${rowDataKeys}] feedXCMInfoData`, feedXCMInfoData, `isRecursive=${isRecursive}, is_evm_xcmtransfer_input=${this.is_evm_xcmtransfer_input(c.input)}, c.substrate(undefined)=${c.substrate != undefined}`)
                     if (c.substrate != undefined && isRecursive) {
                         if (feedXCMInfoData) {
-                            for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
-                                const cell = feedXCMInfoData[extrinsicHashEventID][0];
+                            let extrinsicHashEventIDs = Object.keys(feedXCMInfoData)
+                            if (extrinsicHashEventIDs.length > 1) console.log(`multiAsset case! extrinsicHashEventIDs *`, extrinsicHashEventIDs)
+                            for (const extrinsicHashEventID of extrinsicHashEventIDs) {
+                                let cells = feedXCMInfoData[extrinsicHashEventID];
+                                let cell = cells[0]
                                 let xcmInfo = JSON.parse(cell.value);
                                 c.xcmInfo = xcmInfo;
-                                break;
                             }
                         } else if (this.is_evm_xcmtransfer_input(c.input)) {
                             //  fetch xcmInfo from substrate extrinsicHash
@@ -1761,11 +1777,17 @@ module.exports = class Query extends AssetManager {
                     let pendingXcmInfo = null
                     let traceID = null
                     if (feedXCMInfoData) {
-                        for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
-                            const cell = feedXCMInfoData[extrinsicHashEventID][0];
+                        let extrinsicHashEventIDs = Object.keys(feedXCMInfoData)
+                        if (extrinsicHashEventIDs.length > 1) console.log(`multiAsset case! extrinsicHashEventIDs **`, extrinsicHashEventIDs)
+                        let fee = 0;
+                        for (const extrinsicHashEventID of extrinsicHashEventIDs) {
+                            let cells = feedXCMInfoData[extrinsicHashEventID];
+                            let cell = cells[0]
+                            //console.log(`feedXCMInfoData[${extrinsicHashEventID}] cells=`, cells)
+                            //console.log(`feedXCMInfoData[${extrinsicHashEventID}] cell=${cell.value}`)
                             let xcmInfo = JSON.parse(cell.value);
-                            c.xcmInfo = xcmInfo;
-                            break;
+                            if (extrinsicHashEventIDs.length > 1) console.log(`feedXCMInfoData[${extrinsicHashEventID}] xcmInfo`, xcmInfo)
+                            c.xcmInfo = xcmInfo; //use last one
                         }
                         d.xcmInfo = c.xcmInfo
                         // TEMP:

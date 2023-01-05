@@ -683,6 +683,19 @@ app.post('/suggest/:address', async (req, res) => {
     res.write(JSON.stringify(result));
 })
 
+app.get('/q/:q', async (req, res) => {
+    try {
+        let search = req.params["q"].trim();
+        let results = await query.getSearchResults(search);
+        res.write(JSON.stringify(results));
+        res.end();
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 // curl -X POST -H "Content-Type: application/json" -d '{"chainID":"acala", "startDate": "2022-06-21", "endDate": "2022-06-24"}'  http://api.polkaholic.io/search/events?limit=10000
 app.post('/search/:table', async (req, res) => {
     try {

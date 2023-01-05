@@ -8479,6 +8479,14 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"]
         });
 
+	await this.upsertSQL({
+            "table": "substrateetllog",
+            "keys": ["chainID", "logDT"],
+            "vals": ["loaded", "audited"],
+            "data": [`('${chainID}', '${logDT}', '0', 'Unknown')`],
+            "replace": ["loaded", "audited"]
+        });
+
         await this.update_batchedSQL();
         this.logger.info({
             op: "index_blocks_period",

@@ -40,6 +40,7 @@ module.exports = class XCMManager extends Query {
 
     xcmErrorMap = {}
     lastupdateTS = 0
+    irregularFeeUSDThreshold = 5 //consider feeUSD above this threshold "Irregular" -  historically feeUSD should be lower than the ED
 
     init_xcm_error_map() {
         this.loadXCMErrorDescription()
@@ -475,7 +476,8 @@ module.exports = class XCMManager extends Query {
         // those number doesn't make sense...
         if (decimals !== false) {
             xcm.fee = xcm.amountSent - xcm.amountReceived
-            xcm.feeUSD = xcm.fee * (xcm.amountSentUSD / xcm.amountReceived) // temp hack
+            //xcm.feeUSD = xcm.fee * (xcm.amountSentUSD / xcm.amountReceived) // temp hack
+            xcm.feeUSD = 0
             xcm.sourceTxFee = sourceTxFee
             xcm.sourceTxFeeUSD = sourceTxFeeUSD
             xcm.sourceChainSymbol = sourceChainSymbol
@@ -623,17 +625,30 @@ module.exports = class XCMManager extends Query {
 
         //fee -> initiation + teleport fee
         if (decimals !== false) {
-            xcm.fee = xcm.amountSent - xcm.amountReceived
-            xcm.feeUSD = xcm.fee * (xcm.amountSentUSD / xcm.amountReceived) // temp hack
+            let fee = xcm.amountSent - xcm.amountReceived
+            let estPrice = xcm.amountSentUSD / xcm.amountReceived
+            let estFeeUSD = estPrice * fee // temp hack
+            if (xcm.xcmMethod == 'transferMulticurrencies') {
+                console.log(`extrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceived}, fee=${fee}, p=${estPrice}, feeUSD=${estFeeUSD}, feeSymbol=${xcm.symbol}`)
+            }
+            xcm.fee = fee
+            if (estFeeUSD > 0 && estFeeUSD < this.irregularFeeUSDThreshold) {
+                xcm.feeUSD = estFeeUSD
+            } else {
+                console.log(`Irregular FeeUSD xtrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceived}, fee=${fee}, p=${estPrice}, feeUSD=${estFeeUSD}, feeSymbol=${xcm.symbol}`)
+                xcm.feeUSD = 0
+            }
             xcm.sourceTxFee = sourceTxFee
             xcm.sourceTxFeeUSD = sourceTxFeeUSD
             xcm.sourceChainSymbol = sourceChainSymbol
-
             /*await this.decorateUSD(xcm, "amountSent", xcm.asset, xcm.chainID, xcm.destTS, decorateUSD)
             if (decorateUSD){
               xcm.amountReceivedUSD = xcm.priceUSD * xcm.amountReceived;
             }
             */
+            if (xcm.amountSentUSD > xcm.amountReceivedUSD && xcm.amountReceivedUSD > 0 && xcm.amountSentUSD - xcm.amountReceivedUSD < this.irregularFeeUSDThreshold) {
+                xcm.feeUSD = xcm.amountSentUSD - xcm.amountReceivedUSD
+            }
             let p = await this.computePriceUSD({
                 val: xcm.amountSent,
                 asset: xcm.asset,
@@ -645,6 +660,10 @@ module.exports = class XCMManager extends Query {
                 xcm.amountSentUSD = p.valUSD;
                 xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
                 xcm.feeUSD = p.priceUSD * xcm.fee
+                if (xcm.feeUSD > this.irregularFeeUSDThreshold) {
+                    console.log(`Irregular FeeUSD  feeUSD extrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceivedUSD}, feeUSD=${estFeeUSD}`)
+                    xcm.feeUSD = 0
+                }
                 xcm.priceUSD = p.priceUSD;
                 xcm.priceUSDCurrent = p.priceUSDCurrent;
             }
@@ -706,6 +725,7 @@ module.exports = class XCMManager extends Query {
             finalized: true,
             executionStatus: "success",
         }
+        if (xcm.xcmMethod == 'transferMulticurrencies') console.log(`*** xcmInfo`, xcmInfo)
         return [xcmInfo, xcm] //TODO: drop xcm format
     }
 
