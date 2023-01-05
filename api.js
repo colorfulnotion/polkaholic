@@ -924,6 +924,23 @@ app.get('/event/:eventID', async (req, res) => {
     }
 })
 
+app.get('/gar/', async (req, res) => {
+    try {
+        let ev = await query.getGARSupportedList();
+        if (ev) {
+            res.write(JSON.stringify(ev));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 app.use(function(err, req, res, next) {
     var http_code = err.http_code ? err.http_code : 500;
     var errString = err.toString();

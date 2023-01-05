@@ -1070,6 +1070,32 @@ module.exports = class Query extends AssetManager {
         }
     }
 
+    //return a lint of parachains where we have endpoint access
+    async getGARSupportedList(relaychain = 'polkadot') {
+        let supportedListMap = {}
+        try {
+            let sql = `select id, chainId, paraId, relaychain from chain where crawling = 1 and relaychain in ('kusama', 'polkadot')`;
+            let chains = await this.poolREADONLY.query(sql);
+            for (const c of chains){
+                let k = `${c.relaychain}-${c.paraId}`
+                let s = {
+                    id: c.id,
+                    chainID: c.chainId,
+                    paraID: c.chainId,
+                    relaychain: c.relaychain,
+                }
+                supportedListMap[k] = s
+            }
+            return supportedListMap
+        } catch (err) {
+            this.logger.error({
+                "op": "query.getGARSupportedList",
+                relaychain,
+                err
+            });
+        }
+    }
+
     //WARNING: This call is exposed externally. should not include any non-public ws
     async getChain(chainID_or_chainName, isExternal = false) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)

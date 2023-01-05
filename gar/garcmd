@@ -1,0 +1,32 @@
+#!/usr/bin/env node
+// Usage:
+
+var GlobalAssetRegistry = require("./globalassetregistry");
+const endpoints = require("./endpoints");
+
+async function main() {
+    var gar = new GlobalAssetRegistry();
+    let [polkadotEndpoints, unsupportedPolkadotEndpoints] = endpoints.getEndpointsByRelaychain('polkadot');
+    console.log(`polkadot endpoints[${Object.keys(polkadotEndpoints).length}]`, Object.keys(polkadotEndpoints))
+    console.log(`unsuppored polkadot endpoints[${Object.keys(unsupportedPolkadotEndpoints).length}]`, Object.keys(unsupportedPolkadotEndpoints))
+    let [kusamaEndpoints, unsupportedKusamaEndpoints] = endpoints.getEndpointsByRelaychain('kusama');
+    console.log(`kusama endpoints[${Object.keys(kusamaEndpoints).length}]`, Object.keys(kusamaEndpoints))
+    console.log(`unsuppored kusama endpoints[${Object.keys(unsupportedKusamaEndpoints).length}]`, Object.keys(unsupportedKusamaEndpoints))
+
+    await gar.writeJSONFn('polkadot', 'publicEndpoints', polkadotEndpoints)
+    await gar.writeJSONFn('kusama', 'publicEndpoints', polkadotEndpoints)
+    //await gar.open_log('polkadot', 'publicEndpoints')
+    //await gar.write_json(polkadotEndpoints)
+    let r = gar.readJSONFn('kusama', 'publicEndpoints')
+    console.log(`r**`, r)
+}
+
+main()
+    .then(() => {
+        console.log("finishing...")
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
