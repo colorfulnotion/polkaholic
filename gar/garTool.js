@@ -14,7 +14,34 @@
 // You should have received a copy of the GNU General Public License
 // along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
 
+
+const Web3 = require("web3");
+const web3 = new Web3();
+
 const assetChainSeparator = "~"
+
+const {
+    bnToBn,
+    bnToHex,
+    bnToU8a,
+    hexToBn,
+    hexToU8a,
+    isHex,
+    stringToU8a,
+    u8aToHex,
+    u8aConcat,
+    hexToString,
+    stringToHex
+} = require("@polkadot/util");
+
+function dechexAssetID(number) {
+    if ((number.length > 2) && number.substring(0, 2) == "0x") {
+        let n = hexToBn(number)
+        return n.toString()
+    } else {
+        return `${parseInt(number)}`;
+    }
+}
 
 //100150022 -> 100,150,022
 function toNumWithComma(numb) {
@@ -33,6 +60,51 @@ function toNumWithoutComma(numb) {
     } else {
         return res
     }
+}
+
+
+//(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
+// 340282366920938463463374607431768211455 -> 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF
+// 42259045809535163221576417993425387648  -> 0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080
+function xcAssetIDToContractAddr(xcAssetID) {
+    let xcAssetAddress = '0x'
+    try {
+        let h = bnToHex(`${xcAssetID}`)
+        let assetAddress = "0xFFFFFFFF" + h.substr(2).padStart(32, '0')
+        xcAssetAddress = web3.utils.toChecksumAddress(assetAddress)
+    } catch (err) {
+        console.log(`xcAssetIDToContractAddr error=${err.toString()}`)
+    }
+    return xcAssetAddress
+}
+
+// 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF -> 340282366920938463463374607431768211455
+// 0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080 -> 42259045809535163221576417993425387648
+function contractAddrToXcAssetID(xcAssetAddress) {
+    let xcAssetID = false
+    try {
+        let rawAssetID = '0x' + xcAssetAddress.substr(10)
+        xcAssetID = dechexAssetID(rawAssetID)
+    } catch (err) {
+        console.log(`contractAddrToXcAssetID error=${err.toString()}`)
+    }
+    return xcAssetID
+}
+
+// (0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF, polkadot-2004) -> {"Token":"42259045809535163221576417993425387648"}~polkadot-2004
+function makeAssetChainFromXcContractAddress(xcAssetAddress, chainkey = 'polkadot-2004') {
+    let xcAssetID = false
+    let asset = {
+        Token: null,
+    }
+    if (xcAssetAddress != undefined) {
+        if (xcAssetAddress.length = 42 && xcAssetAddress.substr(0, 2) == "0x") {
+            xcAssetID = contractAddrToXcAssetID(xcAssetAddress)
+            asset.Token = xcAssetID
+            return (JSON.stringify(asset) + assetChainSeparator + chainkey);
+        }
+    }
+    return false
 }
 
 module.exports = {
@@ -232,12 +304,50 @@ module.exports = {
     assetTypeContract: "Contract",
     assetTypeXCAsset: "XCAsset",
     assetTypeXCMTransfer: "XCMTransfer",
-    
+
     makeAssetChain: function(asset, k = 'relaychain-paraID') {
+        //return (asset + assetChainSeparator + k);
         return (asset + assetChainSeparator + k);
     },
 
+    /*
+    parseAssetChain: function(assetChainkey) {
+        let pieces = assetChain.split(assetChainSeparator);
+        let assetUnparsed = pieces[0];
+        let chainID = (pieces.length > 1) ? parseInt(pieces[1], 10) : undefined;
+        return [assetUnparsed, chainID];
+    },
+    */
+
+    makeXcmInteriorKey: function(interior, relayChain = 'kusama') {
+        return (relayChain + assetChainSeparator + interior);
+        //return (interior + assetChainSeparator + relayChain);
+    },
+    parseXcmInteriorKey: function(xcmInteriorKey = 'kusama~[{"parachain":2023},{"palletInstance":10}]') {
+        let pieces = xcmInteriorKey.split(assetChainSeparator);
+        let relayChain = pieces[1];
+        let assetUnparsed = (pieces.length > 1) ? pieces[1] : undefined;
+        return [relayChain, assetUnparsed];
+    },
     cleanedAssetID: function(assetID) {
         return toNumWithoutComma(assetID);
+    },
+    firstCharLowerCase: function(inp) {
+        if (inp.toUpperCase() == inp) { // if the whole thing is uppercase, then return all lowercase
+            return inp.toLowerCase();
+        }
+        return inp.substr(0, 1).toLowerCase() + inp.substr(1)
+    },
+    firstCharUpperCase: function(inp) {
+        return inp.substr(0, 1).toUpperCase() + inp.substr(1)
+    },
+    xcAssetIDToContractAddr: function(xcAssetID) {
+        return xcAssetIDToContractAddr(xcAssetID)
+    },
+    contractAddrToXcAssetID: function(xcAssetAddress) {
+        return contractAddrToXcAssetID(xcAssetAddress)
+    },
+    makeAssetChainFromXcContractAddress: function(xcContractAddress, chainkey) {
+        return makeAssetChainFromXcContractAddress(xcContractAddress, chainkey);
     },
 };

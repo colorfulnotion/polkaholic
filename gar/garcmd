@@ -28,6 +28,8 @@ async function main() {
         }
     }
     console.log(`AssetMap`, gar.getchainAssetMap())
+
+    console.log(`XcmAssetMap`, gar.getXcmAssetMap())
 }
 
 main()

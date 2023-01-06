@@ -17,6 +17,7 @@ module.exports = class GlobalAssetRegistry {
     chainAPIs = {}
 
     assetMap = {}; // ex: {"Token":"DOT"}~polkadot-0-> { assetType: 'Token', name: 'DOT', symbol: 'DOT', decimals: 10 }
+    xcmAssetMap = {};
     relaychain = false;
     debugLevel;
 
@@ -372,7 +373,7 @@ module.exports = class GlobalAssetRegistry {
                     'kusama-2012|shadow'
                 ])) {
                 console.log(`[${chainkey}] fetch assetManager:assetIdType`)
-                //await this.chainParser.fetchXCMAssetIdType(this)
+                await this.fetchXCMAssetIdType(api, chainkey)
             }
             if (this.isMatched(chainkey, ['polkadot-2006|astar', 'kusama-2007|shiden',
                     'kusama-2084|calamari'
@@ -390,9 +391,45 @@ module.exports = class GlobalAssetRegistry {
         this.assetMap[assetChainkey] = assetInfo
     }
 
-    getchainAsset(assetChainkey){
+    getChainAsset(assetChainkey){
         if (this.assetMap[assetChainkey] != undefined){
             return this.assetMap[assetChainkey]
+        }else{
+            return false
+        }
+    }
+
+    getXcmAssetMap(){
+        return this.xcmAssetMap
+    }
+
+    setXcmAsset(xcmInteriorKey, xcmAssetInfo){
+        if (this.xcmAssetMap[xcmInteriorKey] == undefined){
+            console.log(`add new xcm Asset ${xcmInteriorKey}`)
+            this.xcmAssetMap[xcmInteriorKey] = xcmAssetInfo
+        }
+    }
+
+    addXcmAssetLocalCurrencyID(xcmInteriorKey, localParaID, localCurrencyID){
+        let xcmAsset = this.xcmAssetMap[xcmInteriorKey]
+        if (xcmAsset != undefined){
+            console.log(`add LocalCurrencyID ${xcmInteriorKey}`)
+            this.xcmAssetMap[xcmInteriorKey]['xcCurrencyID'][localParaID] = localCurrencyID
+        }
+    }
+
+    addXcmAssetLocalxcContractAddress(xcmInteriorKey, localParaID, localCurrencyID){
+        let xcmAsset = this.xcmAssetMap[xcmInteriorKey]
+        if (xcmAsset != undefined){
+            let xcContractAddress = garTool.xcAssetIDToContractAddr(localCurrencyID)
+            console.log(`add xcContractAddress ${xcContractAddress}`)
+            this.xcmAssetMap[xcmInteriorKey]['xcContractAddress'][localParaID] = xcContractAddress
+        }
+    }
+
+    getXcmAsset(xcmInteriorKey){
+        if (this.xcmAssetMap[xcmInteriorKey] != undefined){
+            return this.xcmAssetMap[xcmInteriorKey]
         }else{
             return false
         }
@@ -425,32 +462,8 @@ module.exports = class GlobalAssetRegistry {
                 let assetChainkey = garTool.makeAssetChain(asset, chainkey);
                 console.log(`[${chainkey}] assetChainkey=${assetChainkey}`, assetInfo)
                 this.setChainAsset(assetChainkey, assetInfo)
-                /*
-                let cachedAssetInfo = indexer.assetInfo[assetChain]
-                //console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)
-                if (cachedAssetInfo !== undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
-                    //cached assetInfo
-                } else {
-                    await indexer.addAssetInfo(asset, chainID, assetInfo, 'getSystemProperties');
-                    // if chain does not have a "asset" specified, it will get one
-                    if (!chain.asset && (i == 0)) {
-                        let newAsset = JSON.stringify({
-                            Token: symbol
-                        })
-                        //console.log("adding NEW asset to chain", newAsset)
-                        indexer.batchedSQL.push(`update chain set asset = '${newAsset}' where chainID = '${chainID}'`);
-                    }
-                }
-                */
             }
-            //await indexer.update_batchedSQL(true);
         }
-        /*
-        // this is important for new assets that show up
-        if (indexer.reloadChainInfo) {
-            await indexer.assetManagerInit();
-        }
-        */
     }
 
 
@@ -479,7 +492,7 @@ module.exports = class GlobalAssetRegistry {
     //assetsInfo:assetsInfo
     async fetchAssetPallet(api, chainkey) {
         if (!api) {
-            console.log(`[fetchAssetPallet] Fatal api not initiated`)
+            console.log(`[fetchAssetPallet] Fatal: ${chainkey} api not initiated`)
             return
         }
         var a;
@@ -537,4 +550,134 @@ module.exports = class GlobalAssetRegistry {
         console.log(`[${chainkey}] onchain GAR:`, assetList);
     }
 
+
+    //moonbeam/heiko/basilisk
+    //assetManager:assetIdType
+    //assetRegistry:assetIdType
+    //assetRegistry.assetLocations
+    async fetchXCMAssetIdType(api, chainkey) {
+        if (!api) {
+            console.log(`[fetchXCMAssetIdType] Fatal: ${chainkey} api not initiated`)
+            return
+        }
+        let pieces = chainkey.split('-')
+        let relayChain = pieces[0]
+        let paraIDSoure = pieces[1]
+        //let relayChainID = paraTool.getRelayChainID(relayChain)
+        //let paraIDExtra = paraTool.getParaIDExtra(relayChain)
+
+        var a;
+        if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver', 'kusama-2012|shadow'])) {
+            var a = await api.query.assetManager.assetIdType.entries()
+        } else if (this.isMatched(chainkey, ['polkadot-2012|parallel', 'kusama-2007|heiko'])) {
+            var a = await api.query.assetRegistry.assetIdType.entries()
+        } else if (this.isMatched(chainkey, ['polkadot-2034|hydra', 'kusama-2090|basilisk'])) {
+            var a = await api.query.assetRegistry.assetLocations.entries()
+        }
+        if (!a) return
+        let assetList = {}
+        for (let i = 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
+            let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let parsedAsset = {
+                Token: assetID
+            }
+            let paraID = 0
+            let chainID = -1
+            var asset = JSON.stringify(parsedAsset);
+            let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+            let cachedAssetInfo = this.getChainAsset(assetChainkey)
+            if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
+                //cached found
+                console.log(`cached AssetInfo found`, cachedAssetInfo)
+                let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol.replace('xc', '') : ''
+                let nativeSymbol = symbol
+                let xcmAssetJSON = val.toJSON()
+                let xcmAsset = (xcmAssetJSON.xcm != undefined) ? xcmAssetJSON.xcm : xcmAssetJSON
+                let parents = xcmAsset.parents
+                let interior = xcmAsset.interior
+                //x1/x2/x3 refers to the number to params
+                let interiorK = Object.keys(interior)[0]
+                let interiork = garTool.firstCharLowerCase(interiorK)
+                let interiorV = interior[interiorK]
+                let interiorVStr = JSON.stringify(interiorV)
+                if (((interiorK == 'here') || (interiork == "here")) && interior[interiorK] == null) {
+                    interiorVStr = 'here'
+                    //chainID = relayChainID
+                }
+                let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, relayChain)
+                let updateXcmConcept = true
+                /*
+                let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`known asset ${xcmInteriorKey} (assetChain) - skip update`, cachedXcmAssetInfo)
+                    updateXcmConcept = false
+                    //already cached
+                }
+                */
+
+                if ((typeof interiorK == "string") && (interiorK.toLowerCase() == 'here')) {
+                    //relaychain case
+                    //chainID = relayChainID
+                } else if (interiorK == 'x1') {
+                    paraID = interiorV['parachain']
+                    //chainID = paraID + paraIDExtra
+                } else {
+                    let generalIndex = -1
+                    for (const v of interiorV) {
+                        if (v.parachain != undefined) {
+                            paraID = v.parachain
+                            //chainID = paraID + paraIDExtra
+                        } else if (v.generalIndex != undefined) {
+                            generalIndex = v.generalIndex
+                        }
+                    }
+                    //over-write statemine asset with assetID
+                    if (paraID == 1000) {
+                        nativeSymbol = `${generalIndex}`
+                    }
+                }
+
+                // standarizing ausd -> to kusd on kusama;
+                if (symbol == 'AUSD') {
+                    nativeSymbol = 'KUSD'
+                } else if (symbol == 'aUSD') {
+                    nativeSymbol = 'AUSD'
+                }
+                let nativeParsedAsset = {
+                    Token: nativeSymbol
+                }
+                var nativeAsset = JSON.stringify(nativeParsedAsset);
+
+                console.log(`'${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
+                //if (this.debugLevel >= paraTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
+                let nativechainKey = `${relayChain}-${paraID}`
+                let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, nativechainKey);
+                let xcmAssetInfo = {
+                    //chainID: chainID,
+                    xcmConcept: interiorVStr, //interior
+                    asset: nativeAsset,
+                    paraID: paraID,
+                    relayChain: relayChain,
+                    parents: parents,
+                    interiorType: interiorK,
+                    xcmInteriorKey: xcmInteriorKey,
+                    nativeAssetChainkey: nativeAssetChainkey,
+                    xcContractAddress: {},
+                    xcCurrencyID: {},
+                    source: chainkey,
+                }
+                console.log(`xcmAssetInfo ${xcmInteriorKey}`, xcmAssetInfo)
+                this.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
+                this.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
+                if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver'])){
+                    //For isEVMChain, compute the extra xcContractAddress
+                    this.addXcmAssetLocalxcContractAddress(xcmInteriorKey, paraIDSoure, assetID)
+                }
+            } else {
+                console.log(`[${chainkey}] AssetInfo unknown -- skip`, assetChainkey)
+            }
+        }
+    }
 }
