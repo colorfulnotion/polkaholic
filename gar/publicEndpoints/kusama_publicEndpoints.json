@@ -1,5 +1,6 @@
 {
     "kusama-0": {
+        "chainkey": "kusama-0",
         "name": "Kusama",
         "id": "kusama",
         "paraID": 0,
@@ -18,6 +19,7 @@
         "relaychain": "kusama"
     },
     "kusama-1000": {
+        "chainkey": "kusama-1000",
         "name": "Statemine",
         "id": "statemine",
         "paraID": 1000,
@@ -33,6 +35,7 @@
         "relaychain": "kusama"
     },
     "kusama-2000": {
+        "chainkey": "kusama-2000",
         "name": "Karura",
         "id": "karura",
         "paraID": 2000,
@@ -49,6 +52,7 @@
         "relaychain": "kusama"
     },
     "kusama-2001": {
+        "chainkey": "kusama-2001",
         "name": "Bifrost",
         "id": "bifrost",
         "paraID": 2001,
@@ -61,6 +65,7 @@
         "relaychain": "kusama"
     },
     "kusama-2004": {
+        "chainkey": "kusama-2004",
         "name": "Khala Network",
         "id": "khala",
         "paraID": 2004,
@@ -74,6 +79,7 @@
         "relaychain": "kusama"
     },
     "kusama-2007": {
+        "chainkey": "kusama-2007",
         "name": "Shiden",
         "id": "shiden",
         "paraID": 2007,
@@ -89,6 +95,7 @@
         "relaychain": "kusama"
     },
     "kusama-2011": {
+        "chainkey": "kusama-2011",
         "name": "SORA",
         "id": "sora_ksm",
         "paraID": 2011,
@@ -99,6 +106,7 @@
         "relaychain": "kusama"
     },
     "kusama-2012": {
+        "chainkey": "kusama-2012",
         "name": "Crust Shadow",
         "id": "shadow",
         "paraID": 2012,
@@ -109,6 +117,7 @@
         "relaychain": "kusama"
     },
     "kusama-2015": {
+        "chainkey": "kusama-2015",
         "name": "Integritee Network",
         "id": "integritee",
         "paraID": 2015,
@@ -120,6 +129,7 @@
         "relaychain": "kusama"
     },
     "kusama-2023": {
+        "chainkey": "kusama-2023",
         "name": "Moonriver",
         "id": "moonriver",
         "paraID": 2023,
@@ -134,6 +144,7 @@
         "relaychain": "kusama"
     },
     "kusama-2024": {
+        "chainkey": "kusama-2024",
         "name": "Genshiro",
         "id": "genshiro",
         "paraID": 2024,
@@ -145,6 +156,7 @@
         "relaychain": "kusama"
     },
     "kusama-2048": {
+        "chainkey": "kusama-2048",
         "name": "Robonomics",
         "id": "robonomics",
         "paraID": 2048,
@@ -158,6 +170,7 @@
         "relaychain": "kusama"
     },
     "kusama-2084": {
+        "chainkey": "kusama-2084",
         "name": "Calamari",
         "id": "calamari",
         "paraID": 2084,
@@ -168,6 +181,7 @@
         "relaychain": "kusama"
     },
     "kusama-2085": {
+        "chainkey": "kusama-2085",
         "name": "Parallel Heiko",
         "id": "heiko",
         "paraID": 2085,
@@ -178,6 +192,7 @@
         "relaychain": "kusama"
     },
     "kusama-2087": {
+        "chainkey": "kusama-2087",
         "name": "Picasso",
         "id": "picasso",
         "paraID": 2087,
@@ -188,6 +203,7 @@
         "relaychain": "kusama"
     },
     "kusama-2088": {
+        "chainkey": "kusama-2088",
         "name": "Altair",
         "id": "altair",
         "paraID": 2088,
@@ -199,6 +215,7 @@
         "relaychain": "kusama"
     },
     "kusama-2090": {
+        "chainkey": "kusama-2090",
         "name": "Basilisk",
         "id": "basilisk",
         "paraID": 2090,
@@ -210,6 +227,7 @@
         "relaychain": "kusama"
     },
     "kusama-2092": {
+        "chainkey": "kusama-2092",
         "name": "Kintsugi BTC",
         "id": "kintsugi",
         "paraID": 2092,
@@ -221,6 +239,7 @@
         "relaychain": "kusama"
     },
     "kusama-2095": {
+        "chainkey": "kusama-2095",
         "name": "QUARTZ by UNIQUE",
         "id": "quartz",
         "paraID": 2095,
@@ -233,6 +252,7 @@
         "relaychain": "kusama"
     },
     "kusama-2096": {
+        "chainkey": "kusama-2096",
         "name": "Bit.Country Pioneer",
         "id": "bitcountryPioneer",
         "paraID": 2096,
@@ -243,6 +263,7 @@
         "relaychain": "kusama"
     },
     "kusama-2100": {
+        "chainkey": "kusama-2100",
         "name": "SubsocialX",
         "id": "subsocialX",
         "paraID": 2100,
@@ -254,6 +275,7 @@
         "relaychain": "kusama"
     },
     "kusama-2101": {
+        "chainkey": "kusama-2101",
         "name": "Zeitgeist",
         "id": "zeitgeist",
         "paraID": 2101,
@@ -265,6 +287,7 @@
         "relaychain": "kusama"
     },
     "kusama-2102": {
+        "chainkey": "kusama-2102",
         "name": "Pichiu",
         "id": "pichiu",
         "paraID": 2102,
@@ -276,6 +299,7 @@
         "relaychain": "kusama"
     },
     "kusama-2105": {
+        "chainkey": "kusama-2105",
         "name": "Darwinia Crab",
         "id": "crab",
         "paraID": 2105,
@@ -286,6 +310,7 @@
         "relaychain": "kusama"
     },
     "kusama-2106": {
+        "chainkey": "kusama-2106",
         "name": "Litmus",
         "id": "litmus",
         "paraID": 2106,
@@ -297,6 +322,7 @@
         "relaychain": "kusama"
     },
     "kusama-2110": {
+        "chainkey": "kusama-2110",
         "name": "Mangata",
         "id": "mangata",
         "paraID": 2110,
@@ -308,6 +334,7 @@
         "relaychain": "kusama"
     },
     "kusama-2113": {
+        "chainkey": "kusama-2113",
         "name": "Kabocha",
         "id": "kabocha",
         "paraID": 2113,
@@ -318,6 +345,7 @@
         "relaychain": "kusama"
     },
     "kusama-2114": {
+        "chainkey": "kusama-2114",
         "name": "Turing Network",
         "id": "turing",
         "paraID": 2114,
@@ -329,6 +357,7 @@
         "relaychain": "kusama"
     },
     "kusama-2115": {
+        "chainkey": "kusama-2115",
         "name": "Dora Factory",
         "id": "dorafactory",
         "paraID": 2115,
@@ -339,6 +368,7 @@
         "relaychain": "kusama"
     },
     "kusama-2118": {
+        "chainkey": "kusama-2118",
         "name": "Listen Network",
         "id": "listen",
         "paraID": 2118,
@@ -350,6 +380,7 @@
         "relaychain": "kusama"
     },
     "kusama-2119": {
+        "chainkey": "kusama-2119",
         "name": "Bajun Network",
         "id": "bajun",
         "paraID": 2119,
@@ -362,6 +393,7 @@
         "relaychain": "kusama"
     },
     "kusama-2121": {
+        "chainkey": "kusama-2121",
         "name": "Imbue Network",
         "id": "imbue",
         "paraID": 2121,
@@ -372,6 +404,7 @@
         "relaychain": "kusama"
     },
     "kusama-2222": {
+        "chainkey": "kusama-2222",
         "name": "DAO IPCI",
         "id": "ipci",
         "paraID": 2222,

@@ -16,6 +16,7 @@ module.exports = class GlobalAssetRegistry {
     publicEndpointsMap = {};
     chainAPIs = {}
 
+    assetMap = {}; // ex: {"Token":"DOT"}~polkadot-0-> { assetType: 'Token', name: 'DOT', symbol: 'DOT', decimals: 10 }
     relaychain = false;
     debugLevel;
 
@@ -167,7 +168,49 @@ module.exports = class GlobalAssetRegistry {
         return h
     }
 
-    async initAPI(wsEndpoint) {
+    async batchApiInit(supportedChainKeys = ['polkadot-0','polkadot-2000', 'polkadot-2004']) {
+        let batchApiInitStartTS = new Date().getTime();
+        let initChainkeys = []
+        for (const chainkey of supportedChainKeys) {
+            initChainkeys.push(chainkey)
+        }
+        let apiInitPromise = await initChainkeys.map(async (initChainkey) => {
+            try {
+                return this.initAPI(initChainkey)
+            } catch (err) {
+                console.log(`batch ApiInit ${initChainkey}`, err)
+                return false
+            }
+        });
+
+        // parallel init..
+        let apiInitStates;
+        try {
+            apiInitStates = await Promise.allSettled(apiInitPromise);
+            //{ status: 'fulfilled', value: ... },
+            //{ status: 'rejected', reason: Error: '.....'}
+        } catch (e) {
+            console.log(`apiInitPromise error`, e, apiInitStates)
+        }
+        let failedChainkeys = []
+        for (let i = 0; i < apiInitPromise.length; i += 1) {
+            let initChainkey = initChainkeys[i]
+            let apiInitState = apiInitStates[i]
+            if (apiInitState.status != undefined && apiInitState.status == "fulfilled") {
+                //console.log(`api Init ${initChainkey} Init Completed DONE`)
+            } else {
+                this.crawlUsageMap[initChainkey].initStatus = `Failed`
+                console.log(`api Init ${initChainkey} state`, apiInitState)
+                console.log(`api Init ${initChainkey} Failed! reason=${apiInitState['reason']}`)
+                failedChainkeys.push(initChainkey)
+            }
+        }
+        let batchApiInitTS = (new Date().getTime() - batchApiInitStartTS) / 1000
+        console.log(`batchApiInit Completed in ${batchApiInitTS}s`)
+        return failedChainkeys
+    }
+
+    async init_api(wsEndpoint) {
         const provider = new WsProvider(wsEndpoint);
         const api = await ApiPromise.create({
             provider
@@ -176,20 +219,29 @@ module.exports = class GlobalAssetRegistry {
         return api
     }
 
-    async getAPI(key = 'kusama-0') {
-        if (this.chainAPIs[key] != undefined) {
-            console.log(`${key} already initiated`)
-            return this.chainAPIs[key]
+    async initAPI(chainkey = 'kusama-0') {
+        if (this.chainAPIs[chainkey] != undefined) {
+            //console.log(`${chainkey} already initiated`)
+            return this.chainAPIs[chainkey]
         }
-        let ep = this.getEndpointsBykey(key)
+        let ep = this.getEndpointsBykey(chainkey)
         if (ep) {
             let wsEndpoint = ep.WSEndpoints[0]
-            let api = await this.initAPI(wsEndpoint)
-            this.chainAPIs[key] = api
-            console.log(`[${key}] endpoint:${wsEndpoint} ready`)
-            return this.chainAPIs[key]
+            let api = await this.init_api(wsEndpoint)
+            this.chainAPIs[chainkey] = api
+            console.log(`[${chainkey}] endpoint:${wsEndpoint} ready`)
+            return this.chainAPIs[chainkey]
         } else {
-            console.log(`${key} not supported`)
+            console.log(`${chainkey} not supported`)
+            return false
+        }
+    }
+
+    async getAPI(chainkey = 'kusama-0') {
+        if (this.chainAPIs[chainkey] != undefined) {
+            console.log(`${chainkey} already initiated`)
+            return this.chainAPIs[chainkey]
+        }else{
             return false
         }
     }
@@ -256,33 +308,33 @@ module.exports = class GlobalAssetRegistry {
       'kusama-2222|ipci'
     ]
     */
-    isMatched(k, chainFilters = ['kusama-1000|statemine', 'kusama-2023|moonriver']) {
-        let i = chainFilters.findIndex(e => e.includes(k))
-        return chainFilters.findIndex(e => e.includes(k)) != -1
+    isMatched(chainkey, chainFilters = ['kusama-1000|statemine', 'kusama-2023|moonriver']) {
+        let i = chainFilters.findIndex(e => e.includes(chainkey))
+        return chainFilters.findIndex(e => e.includes(chainkey)) != -1
     }
 
-    async setupRegistryParser(api, k){
-        console.log(`[${k}] setupRegistryParser`)
+    async setupRegistryParser(api, chainkey){
+        console.log(`**** [${chainkey}] RegistryParser START ****`)
         // step0: load native token of the chain
-        await this.getSystemProperties(api, k);
-        if (this.isMatched(k, ['polkadot-2000|acala', 'kusama-2000|karura',
+        await this.getSystemProperties(api, chainkey);
+        if (this.isMatched(chainkey, ['polkadot-2000|acala', 'kusama-2000|karura',
                 'polkadot-2030|bifrost', 'kusama-2001|bifrost'
             ])) {
-            if (this.isMatched(k, ['polkadot-2000|acala', 'kusama-2000|karura'])) {
-                console.log(`[${k}] Fetch assetRegistry:assetMetadatas`)
+            if (this.isMatched(chainkey, ['polkadot-2000|acala', 'kusama-2000|karura'])) {
+                console.log(`[${chainkey}] Fetch assetRegistry:assetMetadatas`)
                 //await this.chainParser.fetchAssetRegistry(this)
-                console.log(`[${k}] Fetch assetRegistry:foreignAssetLocations`)
+                console.log(`[${chainkey}] Fetch assetRegistry:foreignAssetLocations`)
                 //await this.chainParser.fetchXCMAssetRegistryLocations(this)
                 //await this.chainParser.updateLiquidityInfo(this)
             }
-            if (this.isMatched(k, ['polkadot-2030|bifrost', 'kusama-2001|bifrost'])) {
-                console.log(`[${k}] Fetch assetRegistry:currencyMetadatas`)
+            if (this.isMatched(chainkey, ['polkadot-2030|bifrost', 'kusama-2001|bifrost'])) {
+                console.log(`[${chainkey}] Fetch assetRegistry:currencyMetadatas`)
                 //await this.chainParser.fetchAssetRegistry(this)
                 //await this.chainParser.fetchAssetRegistryCurrencyMetadatas(this)
-                console.log(`[${k}] Fetch assetRegistry:currencyIdToLocations`)
+                console.log(`[${chainkey}] Fetch assetRegistry:currencyIdToLocations`)
                 //await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
-        } else if (this.isMatched(k, ['polkadot-2006|astar', 'kusama-2007|shiden',
+        } else if (this.isMatched(chainkey, ['polkadot-2006|astar', 'kusama-2007|shiden',
                 'polkadot-2004|moonbeam', 'kusama-2023|moonriver',
                 'polkadot-2012|parallel', 'kusama-2007|heiko',
                 'polkadot-1000|statemint', 'kusama-1000|statemine',
@@ -294,36 +346,53 @@ module.exports = class GlobalAssetRegistry {
                 'kusama-2118|listen',
                 'kusama-2012|shadow'
             ])) {
-            console.log(`[${k}] fetch asset pallet`)
+            console.log(`[${chainkey}] fetch asset pallet`)
             //await this.chainParser.fetchAsset(this)
-            if (this.isMatched(k, ['polkadot-2012|parallel', 'kusama-2007|heiko'])) {
+            if (this.isMatched(chainkey, ['polkadot-2012|parallel', 'kusama-2007|heiko'])) {
                 //await this.chainParser.fetchAsset(this)
                 //await this.chainParser.updateLiquidityInfo(this)
             }
-            if (this.isMatched(k, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver'])) {
-                console.log(`[${k}] fetch LocalAsset?`)
+            if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver'])) {
+                console.log(`[${chainkey}] fetch LocalAsset?`)
                 //await this.chainParser.fetchLocalAsset(this)
             }
-            if (this.isMatched(k, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver',
+            if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver',
                     'polkadot-2012|parallel', 'kusama-2007|heiko',
                     'polkadot-2034|hydra', 'kusama-2090|basilisk',
                     'kusama-2012|shadow'
                 ])) {
-                console.log(`[${k}] fetch assetManager:assetIdType`)
+                console.log(`[${chainkey}] fetch assetManager:assetIdType`)
                 //await this.chainParser.fetchXCMAssetIdType(this)
             }
-            if (this.isMatched(k, ['polkadot-2006|astar', 'kusama-2007|shiden',
+            if (this.isMatched(chainkey, ['polkadot-2006|astar', 'kusama-2007|shiden',
                     'kusama-2084|calamari'
                 ])) {
-                console.log(`[${k}] fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
+                console.log(`[${chainkey}] fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
                 //await this.chainParser.fetchXCMAssetIdToLocation(this)
             }
         } else {
-            console.log(`${k} not covered`)
+            console.log(`WARN @ ${chainkey} parser not selected/covered!`)
+        }
+        console.log(`**** [${chainkey}] RegistryParser DONE ****`)
+    }
+
+    setChainAsset(assetChainkey, assetInfo){
+        this.assetMap[assetChainkey] = assetInfo
+    }
+
+    getchainAsset(assetChainkey){
+        if (this.assetMap[assetChainkey] != undefined){
+            return this.assetMap[assetChainkey]
+        }else{
+            return false
         }
     }
 
-    async getSystemProperties(api, k) {
+    getchainAssetMap(){
+        return this.assetMap
+    }
+
+    async getSystemProperties(api, chainkey) {
         //let chainID = chain.chainID;
         let propsNative = await api.rpc.system.properties();
         let props = JSON.parse(propsNative.toString());
@@ -341,11 +410,11 @@ module.exports = class GlobalAssetRegistry {
                     assetType: "Token",
                     name: symbol,
                     symbol: symbol,
-                    decimals: decimals,
-                    isNativeChain: 0
+                    decimals: decimals
                 };
-                let assetChain = garTool.makeAssetChain(asset, k);
-                console.log(`[${k}] assetChain=${assetChain}`, assetInfo)
+                let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+                console.log(`[${chainkey}] assetChainkey=${assetChainkey}`, assetInfo)
+                this.setChainAsset(assetChainkey, assetInfo)
                 /*
                 let cachedAssetInfo = indexer.assetInfo[assetChain]
                 //console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)

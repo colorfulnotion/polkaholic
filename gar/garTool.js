@@ -195,6 +195,6 @@ module.exports = {
     chainIDKusama: 2,
 
     makeAssetChain: function(asset, k = 'relaychain-paraID') {
-        return (asset + assetChainSeparator + chainID);
+        return (asset + assetChainSeparator + k);
     },
 };

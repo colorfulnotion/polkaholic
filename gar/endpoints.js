@@ -1445,6 +1445,7 @@ function prepareEndpoints(relaychain = 'polkadot') {
             chainID = ep.paraId + 20000
         }
         let endpoint = {
+            chainkey: k,
             name: ep.text,
             id: ep.info,
             paraID: ep.paraId,
