@@ -24,12 +24,14 @@ async function main() {
     for (chainkey of supportedChainKeys){
         let api = await gar.getAPI(chainkey)
         if (api){
-            await gar.setupRegistryParser(api, chainkey)
+            await gar.crawlRegistry(api, chainkey)
         }
     }
-    console.log(`AssetMap`, gar.getchainAssetMap())
-
-    console.log(`XcmAssetMap`, gar.getXcmAssetMap())
+    let chainAssetMap = gar.getchainAssetMap()
+    let xcmAssetMap = gar.getXcmAssetMap()
+    console.log(`AssetMap`, chainAssetMap)
+    console.log(`XcmAssetMap`, xcmAssetMap)
+    await gar.updateXcmConcept()
 }
 
 main()

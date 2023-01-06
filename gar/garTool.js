@@ -107,6 +107,64 @@ function makeAssetChainFromXcContractAddress(xcAssetAddress, chainkey = 'polkado
     return false
 }
 
+function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = 'polkadot~[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]', isUppercase = false) {
+    try {
+        let pieces = xcmInteriorKey.split(assetChainSeparator);
+        let relayChain = pieces[1];
+        let assetUnparsed = (pieces.length > 1) ? pieces[1] : undefined;
+        // always use parent as reference
+        let xcmVersionedMultiLocation = {}
+        let xcmV1MultiLocation = {
+            parents: 1,
+            interior: {}
+        }
+        if (assetUnparsed == 'here') {
+            xcmV1MultiLocation.interior = {
+                here: null
+            }
+        } else {
+            let interior = JSON.parse(assetUnparsed)
+            let interiorN = interior.length
+            if (interiorN == undefined) {
+                interiorN = 1
+                interior = [interior]
+            }
+            //console.log(`assetUnparsed ${assetUnparsed} interiorN=${interiorN},interior`, interior)
+            let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
+            if (interiorN == 1) {
+                xcmV1MultiLocation.interior[interiorType] = interior[0]
+            } else {
+                let interiorValArr = []
+                for (const inter of interior) {
+                    interiorValArr.push(inter)
+                }
+                xcmV1MultiLocation.interior[interiorType] = interiorValArr
+            }
+        }
+        let versionType = (isUppercase) ? `V1` : `v1`
+        xcmVersionedMultiLocation[versionType] = xcmV1MultiLocation
+        return xcmVersionedMultiLocation
+    } catch (e) {
+        console.log(`convert_xcmInteriorKey_to_xcmV1MultiLocation err`, e)
+        return false
+    }
+}
+
+function convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation, api = false) {
+    if (!api) return null;
+    let multilocationStruct = {}
+    if (xcmV1MultiLocation.v1 != undefined) multilocationStruct = xcmV1MultiLocation.v1
+    if (xcmV1MultiLocation.V1 != undefined) multilocationStruct = xcmV1MultiLocation.V1
+    let multiLocationHex = false
+    try {
+        let multilocation = api.createType('XcmV1MultiLocation', multilocationStruct)
+        multiLocationHex = u8aToHex(multilocation.toU8a())
+    } catch (e) {
+        console.log(`xcmV1MultiLocation_to_byte error`, e)
+    }
+    return multiLocationHex
+}
+
 module.exports = {
 
     // DebugLevel
@@ -305,6 +363,10 @@ module.exports = {
     assetTypeXCAsset: "XCAsset",
     assetTypeXCMTransfer: "XCMTransfer",
 
+    stringToHex: function(x) {
+        return stringToHex(x)
+    },
+    
     makeAssetChain: function(asset, k = 'relaychain-paraID') {
         //return (asset + assetChainSeparator + k);
         return (asset + assetChainSeparator + k);
@@ -349,5 +411,12 @@ module.exports = {
     },
     makeAssetChainFromXcContractAddress: function(xcContractAddress, chainkey) {
         return makeAssetChainFromXcContractAddress(xcContractAddress, chainkey);
+    },
+    convertXcmInteriorKeyToXcmV1MultiLocation: function(xcmInteriorKey, isUppercase = false) {
+        return convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey, isUppercase)
+    },
+    convertXcmV1MultiLocationToByte: function(xcmV1MultiLocation, api = false) {
+        //return false
+        return convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation, api)
     },
 };
