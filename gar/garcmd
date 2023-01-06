@@ -5,20 +5,26 @@ var GlobalAssetRegistry = require("./globalassetregistry");
 const endpoints = require("./endpoints");
 
 async function main() {
+    var targetedRelaychain = 'polkadot'
     var gar = new GlobalAssetRegistry();
-    let [polkadotEndpoints, unsupportedPolkadotEndpoints] = endpoints.getEndpointsByRelaychain('polkadot');
-    console.log(`polkadot endpoints[${Object.keys(polkadotEndpoints).length}]`, Object.keys(polkadotEndpoints))
-    console.log(`unsuppored polkadot endpoints[${Object.keys(unsupportedPolkadotEndpoints).length}]`, Object.keys(unsupportedPolkadotEndpoints))
-    let [kusamaEndpoints, unsupportedKusamaEndpoints] = endpoints.getEndpointsByRelaychain('kusama');
-    console.log(`kusama endpoints[${Object.keys(kusamaEndpoints).length}]`, Object.keys(kusamaEndpoints))
-    console.log(`unsuppored kusama endpoints[${Object.keys(unsupportedKusamaEndpoints).length}]`, Object.keys(unsupportedKusamaEndpoints))
-
-    await gar.writeJSONFn('polkadot', 'publicEndpoints', polkadotEndpoints)
-    await gar.writeJSONFn('kusama', 'publicEndpoints', polkadotEndpoints)
-    //await gar.open_log('polkadot', 'publicEndpoints')
-    //await gar.write_json(polkadotEndpoints)
-    let r = gar.readJSONFn('kusama', 'publicEndpoints')
-    console.log(`r**`, r)
+    await gar.initPublicEndpointsMap(targetedRelaychain)
+    let supportedChains = gar.getSupportedChains()
+    let supportedChainKeys = Object.keys(supportedChains)
+    let supportedChainHelper = gar.printChainhelper()
+    console.log(`[${targetedRelaychain}] SupportedChains`, supportedChainHelper)
+    for (k of supportedChainKeys){
+        //let ep = gar.getEndpointsBykey(k)
+        //console.log(`${k}`, ep)
+        let api = await gar.getAPI(k)
+        if (api){
+            //ready for fetching registry
+        }else{
+            console.log(`skip`)
+        }
+    }
+    for (k of supportedChainKeys){
+        await gar.setupRegistryParser(k)
+    }
 }
 
 main()
