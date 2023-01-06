@@ -589,7 +589,6 @@ module.exports = class GlobalAssetRegistry {
             let assetChainkey = garTool.makeAssetChain(asset, chainkey);
             let cachedAssetInfo = this.getChainAsset(assetChainkey)
             if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
-                //cached found
                 console.log(`cached AssetInfo found`, cachedAssetInfo)
                 let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol.replace('xc', '') : ''
                 let nativeSymbol = symbol
@@ -668,6 +667,11 @@ module.exports = class GlobalAssetRegistry {
                     xcCurrencyID: {},
                     source: chainkey,
                 }
+
+                //For cached found case: let's write xcmInteriorKey back to the cachedAssetInfo
+                cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
+                this.setChainAsset(assetChainkey, cachedAssetInfo)
+
                 console.log(`xcmAssetInfo ${xcmInteriorKey}`, xcmAssetInfo)
                 this.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
                 this.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
