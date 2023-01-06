@@ -16,6 +16,25 @@
 
 const assetChainSeparator = "~"
 
+//100150022 -> 100,150,022
+function toNumWithComma(numb) {
+    var str = numb.toString().split(".");
+    str[0] = str[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return str.join(".");
+}
+
+//100,150,022 -> 100150022
+function toNumWithoutComma(numb) {
+    var str = numb.toString().split(".");
+    str[0] = str[0].replace(/,/g, '')
+    let res = str.join(".");
+    if (isNaN(res)) {
+        return numb
+    } else {
+        return res
+    }
+}
+
 module.exports = {
 
     // DebugLevel
@@ -194,7 +213,31 @@ module.exports = {
     chainIDPolkadot: 0,
     chainIDKusama: 2,
 
+
+    // assetType
+    assetTypeLoan: "Loan",
+    assetTypeCDP: "CDP",
+    assetTypeCDPSupply: "CDP_Supply",
+    assetTypeCDPBorrow: "CDP_Borrow",
+    assetTypeToken: "Token",
+    assetTypeNFT: "NFT",
+    assetTypeNFTToken: "NFTToken",
+    assetTypeLiquidityPair: "LiquidityPair",
+    assetTypeERC20LiquidityPair: "ERC20LP",
+    assetTypeERC20: "ERC20",
+    assetTypeERC721: "ERC721",
+    assetTypeERC721Token: "ERC721Token",
+    assetTypeERC1155: "ERC1155",
+    assetTypeERC1155Token: "ERC1155Token",
+    assetTypeContract: "Contract",
+    assetTypeXCAsset: "XCAsset",
+    assetTypeXCMTransfer: "XCMTransfer",
+    
     makeAssetChain: function(asset, k = 'relaychain-paraID') {
         return (asset + assetChainSeparator + k);
+    },
+
+    cleanedAssetID: function(assetID) {
+        return toNumWithoutComma(assetID);
     },
 };

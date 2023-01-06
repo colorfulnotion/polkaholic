@@ -308,6 +308,16 @@ module.exports = class GlobalAssetRegistry {
       'kusama-2222|ipci'
     ]
     */
+
+    /*
+    isMatched matches parachain's identifier(i.e statemine, moonriver), chainkey(i.e kusama-1000, kusama-2023), fullchainkey(i.e kusama-1000|statemine, kusama-2023|moonriver) to a specific parser group.
+    For ex, all the following are true:
+     isMatched('kusama-1000',['kusama-1000|statemine'])
+     isMatched('acala',['kusama-1000|acala'])
+     isMatched('kusama-1000|moonriver',['kusama-1000|moonriver'])
+
+     parachain team are encouraged to use chainfilter like 'relaychain-paraID|networkIdentifier' to take advantage of existing parser
+    */
     isMatched(chainkey, chainFilters = ['kusama-1000|statemine', 'kusama-2023|moonriver']) {
         let i = chainFilters.findIndex(e => e.includes(chainkey))
         return chainFilters.findIndex(e => e.includes(chainkey)) != -1
@@ -347,7 +357,7 @@ module.exports = class GlobalAssetRegistry {
                 'kusama-2012|shadow'
             ])) {
             console.log(`[${chainkey}] fetch asset pallet`)
-            //await this.chainParser.fetchAsset(this)
+            await this.fetchAssetPallet(api, chainkey)
             if (this.isMatched(chainkey, ['polkadot-2012|parallel', 'kusama-2007|heiko'])) {
                 //await this.chainParser.fetchAsset(this)
                 //await this.chainParser.updateLiquidityInfo(this)
@@ -442,4 +452,89 @@ module.exports = class GlobalAssetRegistry {
         }
         */
     }
+
+
+
+    /*
+    Fetch asset registry for parachain that use generic asset pallet, currently
+    covering the following chains:
+
+    [
+    'polkadot-2006|astar', 'kusama-2007|shiden',
+    'polkadot-2004|moonbeam', 'kusama-2023|moonriver',
+    'polkadot-2012|parallel', 'kusama-2007|heiko',
+    'polkadot-1000|statemint', 'kusama-1000|statemine',
+    'polkadot-2035|phala', 'kusama-2004|khala',
+    'polkadot-2034|hydra', 'kusama-2090|basilisk',
+    'kusama-2084|calamari',
+    'kusama-2048|robonomics',
+    'kusama-2110|mangata',
+    'kusama-2118|listen',
+    'kusama-2012|shadow'
+    ]
+    */
+    //moonbeam/parallel/astar
+    //asset:metadata
+    //assetRegistry:assetMetadataMap
+    //assetsInfo:assetsInfo
+    async fetchAssetPallet(api, chainkey) {
+        if (!api) {
+            console.log(`[fetchAssetPallet] Fatal api not initiated`)
+            return
+        }
+        var a;
+        // each parachain team may have slightly different pallet:section name that uses the same/similar logic. In this case, redirect parser to the proper section
+        if (this.isMatched(chainkey, ['kusama-2118|listen'])){
+            console.log(`[${chainkey}] GAR - currencies:listenAssetsInfo`)
+            a = await api.query.currencies.listenAssetsInfo.entries()
+        }else if (this.isMatched(chainkey, ['kusama-2110|mangata'])){
+            console.log(`[${chainkey}] GAR - assetsInfo:assetsInfo TODO`)
+            //a = await api.query.assetsInfo.assetsInfo.entries()
+        }else if (this.isMatched(chainkey, ['polkadot-2034|hydra', 'kusama-2090|basilisk'])){
+            console.log(`[${chainkey}] GAR - assetRegistry:assetMetadataMap`)
+            a = await api.query.assetRegistry.assetMetadataMap.entries()
+        }else{
+            console.log(`[${chainkey}] GAR - asset:metadata`)
+            a = await api.query.assets.metadata.entries()
+        }
+        if (!a) {
+            console.log(`[${chainkey}] onchain GAR not found - returned`)
+            return
+        }
+        let assetList = {}
+        for (let i = 0; i < a.length; i++) {
+            let key = a[i][0];
+            let val = a[i][1];
+            let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let assetMetadata = val.toHuman()
+            let parsedAsset = {
+                Token: assetID
+            }
+            var asset = JSON.stringify(parsedAsset);
+            let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+            if  (this.isMatched(chainkey, ['kusama-2118|listen'])) assetMetadata = assetMetadata.metadata
+            if (assetMetadata.decimals !== false && assetMetadata.symbol) {
+                let name = (assetMetadata.name != undefined) ? assetMetadata.name : `${assetMetadata.symbol}` //kusama-2090|basilisk doens't have assetName, use symbol in this case
+                let assetInfo = {
+                    name: name,
+                    symbol: assetMetadata.symbol,
+                    decimals: assetMetadata.decimals,
+                    assetType: garTool.assetTypeToken,
+                    currencyID: assetID
+                };
+                if (this.isMatched(chainkey, ['polkadot-2012|parallel', 'kusama-2007|heiko'])) {
+                    if (assetInfo.symbol.includes('LP-')) assetInfo.assetType = garTool.assetTypeLiquidityPair
+                    //console.log('im here fetchAssetPallet assetInfo', assetInfo)
+                }
+                assetList[assetChainkey] = assetInfo
+                this.setChainAsset(assetChainkey, assetInfo)
+                //if (this.debugLevel >= garTool.debugInfo) console.log(`addAssetInfo [${asset}]`, assetInfo)
+                //await indexer.addAssetInfo(asset, indexer.chainID, assetInfo, 'fetchAsset');
+            } else {
+                //if (this.debugLevel >= garTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+            }
+        }
+        console.log(`[${chainkey}] onchain GAR:`, assetList);
+    }
+
 }
