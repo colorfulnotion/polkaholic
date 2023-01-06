@@ -23,7 +23,10 @@ async function main() {
         }
     }
     for (k of supportedChainKeys){
-        await gar.setupRegistryParser(k)
+        let api = await gar.getAPI(k)
+        if (api){
+            await gar.setupRegistryParser(api, k)
+        }
     }
 }
 

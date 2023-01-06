@@ -13,6 +13,9 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
+
+const assetChainSeparator = "~"
+
 module.exports = {
 
     // DebugLevel
@@ -190,4 +193,8 @@ module.exports = {
     // polkadot/kusama
     chainIDPolkadot: 0,
     chainIDKusama: 2,
+
+    makeAssetChain: function(asset, k = 'relaychain-paraID') {
+        return (asset + assetChainSeparator + chainID);
+    },
 };

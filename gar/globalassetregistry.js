@@ -1,4 +1,4 @@
-//const paraTool = require("./paraTool");
+const garTool = require("./garTool");
 const endpoints = require("./endpoints");
 
 const {
@@ -261,23 +261,25 @@ module.exports = class GlobalAssetRegistry {
         return chainFilters.findIndex(e => e.includes(k)) != -1
     }
 
-    async setupRegistryParser(k){
-        console.log(`setupRegistryParser ${k}`)
+    async setupRegistryParser(api, k){
+        console.log(`[${k}] setupRegistryParser`)
+        // step0: load native token of the chain
+        await this.getSystemProperties(api, k);
         if (this.isMatched(k, ['polkadot-2000|acala', 'kusama-2000|karura',
                 'polkadot-2030|bifrost', 'kusama-2001|bifrost'
             ])) {
             if (this.isMatched(k, ['polkadot-2000|acala', 'kusama-2000|karura'])) {
-                console.log(`Fetch assetRegistry:assetMetadatas`)
+                console.log(`[${k}] Fetch assetRegistry:assetMetadatas`)
                 //await this.chainParser.fetchAssetRegistry(this)
-                console.log(`Fetch assetRegistry:foreignAssetLocations`)
+                console.log(`[${k}] Fetch assetRegistry:foreignAssetLocations`)
                 //await this.chainParser.fetchXCMAssetRegistryLocations(this)
                 //await this.chainParser.updateLiquidityInfo(this)
             }
             if (this.isMatched(k, ['polkadot-2030|bifrost', 'kusama-2001|bifrost'])) {
-                console.log(`Fetch assetRegistry:currencyMetadatas`)
+                console.log(`[${k}] Fetch assetRegistry:currencyMetadatas`)
                 //await this.chainParser.fetchAssetRegistry(this)
                 //await this.chainParser.fetchAssetRegistryCurrencyMetadatas(this)
-                console.log(`Fetch assetRegistry:currencyIdToLocations`)
+                console.log(`[${k}] Fetch assetRegistry:currencyIdToLocations`)
                 //await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
         } else if (this.isMatched(k, ['polkadot-2006|astar', 'kusama-2007|shiden',
@@ -292,14 +294,14 @@ module.exports = class GlobalAssetRegistry {
                 'kusama-2118|listen',
                 'kusama-2012|shadow'
             ])) {
-            console.log(`fetch asset pallet`)
+            console.log(`[${k}] fetch asset pallet`)
             //await this.chainParser.fetchAsset(this)
             if (this.isMatched(k, ['polkadot-2012|parallel', 'kusama-2007|heiko'])) {
                 //await this.chainParser.fetchAsset(this)
                 //await this.chainParser.updateLiquidityInfo(this)
             }
             if (this.isMatched(k, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver'])) {
-                console.log(`fetch LocalAsset?`)
+                console.log(`[${k}] fetch LocalAsset?`)
                 //await this.chainParser.fetchLocalAsset(this)
             }
             if (this.isMatched(k, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver',
@@ -307,19 +309,68 @@ module.exports = class GlobalAssetRegistry {
                     'polkadot-2034|hydra', 'kusama-2090|basilisk',
                     'kusama-2012|shadow'
                 ])) {
-                console.log(`fetch assetManager:assetIdType`)
+                console.log(`[${k}] fetch assetManager:assetIdType`)
                 //await this.chainParser.fetchXCMAssetIdType(this)
             }
             if (this.isMatched(k, ['polkadot-2006|astar', 'kusama-2007|shiden',
                     'kusama-2084|calamari'
                 ])) {
-                console.log(`fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
+                console.log(`[${k}] fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
                 //await this.chainParser.fetchXCMAssetIdToLocation(this)
             }
         } else {
             console.log(`${k} not covered`)
         }
-        // for any new unknown assets, set them up with names, decimals
-        //await this.chainParser.getSystemProperties(this, chain);
+    }
+
+    async getSystemProperties(api, k) {
+        //let chainID = chain.chainID;
+        let propsNative = await api.rpc.system.properties();
+        let props = JSON.parse(propsNative.toString());
+        // {"ss58Format":10,"tokenDecimals":[12,12,10,10],"tokenSymbol":["ACA","AUSD","DOT","LDOT"]}
+        // NOT MAINTAINED let ss58Format = props.ss58Format;
+        //console.log(propsNative)
+        if (props.tokenSymbol) {
+            for (let i = 0; i < props.tokenSymbol.length; i++) {
+                let symbol = props.tokenSymbol[i];
+                let decimals = props.tokenDecimals[i];
+                let asset = JSON.stringify({
+                    Token: symbol
+                })
+                let assetInfo = {
+                    assetType: "Token",
+                    name: symbol,
+                    symbol: symbol,
+                    decimals: decimals,
+                    isNativeChain: 0
+                };
+                let assetChain = garTool.makeAssetChain(asset, k);
+                console.log(`[${k}] assetChain=${assetChain}`, assetInfo)
+                /*
+                let cachedAssetInfo = indexer.assetInfo[assetChain]
+                //console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)
+                if (cachedAssetInfo !== undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
+                    //cached assetInfo
+                } else {
+                    await indexer.addAssetInfo(asset, chainID, assetInfo, 'getSystemProperties');
+                    // if chain does not have a "asset" specified, it will get one
+                    if (!chain.asset && (i == 0)) {
+                        let newAsset = JSON.stringify({
+                            Token: symbol
+                        })
+                        //console.log("adding NEW asset to chain", newAsset)
+                        indexer.batchedSQL.push(`update chain set asset = '${newAsset}' where chainID = '${chainID}'`);
+                    }
+                }
+                */
+            }
+            //await indexer.update_batchedSQL(true);
+        }
+        /*
+        // this is important for new assets that show up
+        if (indexer.reloadChainInfo) {
+            await indexer.assetManagerInit();
+        }
+        */
     }
 }
