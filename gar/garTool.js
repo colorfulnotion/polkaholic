@@ -107,18 +107,32 @@ function makeAssetChainFromXcContractAddress(xcAssetAddress, chainkey = 'polkado
     return false
 }
 
+//'[{"network":"kusama"},{"parachain":2000},{"generalKey":"0x0080"}]'
+//'[{"network":"kusama"},"here"]'
+//'[{"network":"kusama"},{"parachain":2016}]'
 function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = 'polkadot~[{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]', isUppercase = false) {
     try {
+        /*
         let pieces = xcmInteriorKey.split(assetChainSeparator);
         let relayChain = pieces[1];
         let assetUnparsed = (pieces.length > 1) ? pieces[1] : undefined;
+        */
+        let pieces = JSON.parse(xcmInteriorKey)
+        console.log(`xcmInteriorKey=${xcmInteriorKey}`, pieces)
+        let network = pieces.shift()
+        let assetUnparsed = {}
+        if (pieces.length == 1) {
+            assetUnparsed = JSON.stringify(pieces[0])
+        } else {
+            assetUnparsed = JSON.stringify(pieces)
+        }
         // always use parent as reference
         let xcmVersionedMultiLocation = {}
         let xcmV1MultiLocation = {
             parents: 1,
             interior: {}
         }
-        if (assetUnparsed == 'here') {
+        if (assetUnparsed == '"here"') {
             xcmV1MultiLocation.interior = {
                 here: null
             }
@@ -160,7 +174,7 @@ function convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation, api = false) {
         let multilocation = api.createType('XcmV1MultiLocation', multilocationStruct)
         multiLocationHex = u8aToHex(multilocation.toU8a())
     } catch (e) {
-        console.log(`xcmV1MultiLocation_to_byte error`, e)
+        console.log(`xcmV1MultiLocation_to_byte error`, JSON.stringify(xcmV1MultiLocation, null, 4), e)
     }
     return multiLocationHex
 }
@@ -366,7 +380,7 @@ module.exports = {
     stringToHex: function(x) {
         return stringToHex(x)
     },
-    
+
     makeAssetChain: function(asset, k = 'relaychain-paraID') {
         //return (asset + assetChainSeparator + k);
         return (asset + assetChainSeparator + k);
@@ -381,15 +395,43 @@ module.exports = {
     },
     */
 
-    makeXcmInteriorKey: function(interior, relayChain = 'kusama') {
+    makeXcmInteriorKeyOLD: function(interior, relayChain = 'kusama') {
         return (relayChain + assetChainSeparator + interior);
         //return (interior + assetChainSeparator + relayChain);
     },
+    makeXcmInteriorKey: function(interiorStr, network = {
+        network: 'kusama'
+    }) {
+        let interior = JSON.parse(interiorStr)
+        let globalInterior = [network]
+        if (Array.isArray(interior)) {
+            globalInterior = globalInterior.concat(interior);
+        } else {
+            globalInterior.push(interior)
+        }
+        //return (relayChain + assetChainSeparator + interior);
+        return JSON.stringify(globalInterior)
+    },
     parseXcmInteriorKey: function(xcmInteriorKey = 'kusama~[{"parachain":2023},{"palletInstance":10}]') {
+        /*
         let pieces = xcmInteriorKey.split(assetChainSeparator);
         let relayChain = pieces[1];
         let assetUnparsed = (pieces.length > 1) ? pieces[1] : undefined;
-        return [relayChain, assetUnparsed];
+        */
+        try {
+            let pieces = JSON.parse(xcmInteriorKey)
+            console.log(`xcmInteriorKey=${xcmInteriorKey}`, pieces)
+            let network = pieces.shift()
+            let assetUnparsed = {}
+            if (pieces.length == 1) {
+                assetUnparsed = JSON.stringify(pieces[0])
+            } else {
+                assetUnparsed = JSON.stringify(pieces)
+            }
+            return [network, assetUnparsed];
+        } catch (e) {
+            return [false, false]
+        }
     },
     cleanedAssetID: function(assetID) {
         return toNumWithoutComma(assetID);

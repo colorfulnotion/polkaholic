@@ -1,12 +1,591 @@
 {
-    "kusama~{\"parachain\":2007}": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]": {
+        "xcmConcept": "[{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]",
+        "asset": "{\"Token\":\"BNC\"}",
+        "paraID": 2001,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]",
+        "xcmV1multilocationByte": "0x010200451f06080001",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2001
+                        },
+                        {
+                            "generalKey": "0x0001"
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"BNC\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff0000000000000001000000000000000b",
+            "2023": "0xfffffffff075423be54811ecb478e911f22dde7d"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551627",
+            "2012": "319623561105283008236062145480775032445",
+            "2023": "319623561105283008236062145480775032445"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0404\"}]": {
+        "xcmConcept": "[{\"parachain\":2001},{\"generalKey\":\"0x0404\"}]",
+        "asset": "{\"Token\":\"vsKSM\"}",
+        "paraID": 2001,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0404\"}]",
+        "xcmV1multilocationByte": "0x010200451f06080404",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2001
+                        },
+                        {
+                            "generalKey": "0x0404"
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"vsKSM\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff0000000000000001000000000000000d"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551629"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2024}]": {
+        "xcmConcept": "{\"parachain\":2024}",
+        "asset": "{\"Token\":\"GENS\"}",
+        "paraID": 2024,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x1",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2024}]",
+        "xcmV1multilocationByte": "0x010100a11f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2024
+                    }
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"GENS\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff0000000000000001000000000000000e"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551630"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2016}]": {
+        "xcmConcept": "{\"parachain\":2016}",
+        "asset": "{\"Token\":\"SKU\"}",
+        "paraID": 2016,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x1",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2016}]",
+        "xcmV1multilocationByte": "0x010100811f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2016
+                    }
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"SKU\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff0000000000000001000000000000000a"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551626"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]": {
+        "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]",
+        "asset": "{\"Token\":\"KAR\"}",
+        "paraID": 2000,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]",
+        "xcmV1multilocationByte": "0x010200411f06080080",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2000
+                        },
+                        {
+                            "generalKey": "0x0080"
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"KAR\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff00000000000000010000000000000002",
+            "2023": "0xffffffff08220ad2e6e157f26ed8bd22a336a0a5"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551618",
+            "2012": "10810581592933651521121702237638664357",
+            "2023": "10810581592933651521121702237638664357",
+            "2084": "8",
+            "2085": "107"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},\"here\"]": {
+        "xcmConcept": "\"here\"",
+        "asset": "{\"Token\":\"KSM\"}",
+        "paraID": 0,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "here",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},\"here\"]",
+        "xcmV1multilocationByte": "0x0100",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "here": null
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"KSM\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffffffffffffffffffffffffffffffffffff",
+            "2023": "0xffffffff1fcacbd218edc0eba20fc2308c778080"
+        },
+        "xcCurrencyID": {
+            "2007": "340282366920938463463374607431768211455",
+            "2023": "42259045809535163221576417993425387648",
+            "2084": "12",
+            "2085": "100",
+            "2090": "1"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]": {
+        "xcmConcept": "[{\"parachain\":2023},{\"palletInstance\":10}]",
+        "asset": "{\"Token\":\"MOVR\"}",
+        "paraID": 2023,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]",
+        "xcmV1multilocationByte": "0x0102009d1f040a",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2023
+                        },
+                        {
+                            "palletInstance": 10
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"MOVR\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff00000000000000010000000000000004"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551620",
+            "2012": "232263652204149413431520870009560565298",
+            "2084": "11",
+            "2085": "113"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2024},{\"generalKey\":\"0x657164\"}]": {
+        "xcmConcept": "[{\"parachain\":2024},{\"generalKey\":\"0x657164\"}]",
+        "asset": "{\"Token\":\"EQD\"}",
+        "paraID": 2024,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2024},{\"generalKey\":\"0x657164\"}]",
+        "xcmV1multilocationByte": "0x010200a11f060c657164",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2024
+                        },
+                        {
+                            "generalKey": "0x657164"
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"EQD\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff0000000000000001000000000000000f"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551631"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0083\"}]": {
+        "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x0083\"}]",
+        "asset": "{\"Token\":\"LKSM\"}",
+        "paraID": 2000,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0083\"}]",
+        "xcmV1multilocationByte": "0x010200411f06080083",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2000
+                        },
+                        {
+                            "generalKey": "0x0083"
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"LKSM\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff00000000000000010000000000000003"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551619",
+            "2084": "10",
+            "2085": "109"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2105},{\"palletInstance\":5}]": {
+        "xcmConcept": "[{\"parachain\":2105},{\"palletInstance\":5}]",
+        "asset": "{\"Token\":\"CRAB\"}",
+        "paraID": 2105,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2105},{\"palletInstance\":5}]",
+        "xcmV1multilocationByte": "0x010200e5200405",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2105
+                        },
+                        {
+                            "palletInstance": 5
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"CRAB\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff00000000000000010000000000000009",
+            "2023": "0xffffffff8283448b3cb519ca4732f2dddc6a6165"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551625",
+            "2012": "173481220575862801646329923366065693029",
+            "2023": "173481220575862801646329923366065693029"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]": {
+        "xcmConcept": "[{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]",
+        "asset": "{\"Token\":\"KBTC\"}",
+        "paraID": 2092,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]",
+        "xcmV1multilocationByte": "0x010200b1200608000b",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2092
+                        },
+                        {
+                            "generalKey": "0x000b"
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"KBTC\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff00000000000000010000000000000005",
+            "2023": "0xfffffffff6e528ad57184579beee00c5d5e646f0"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551621",
+            "2023": "328179947973504579459046439826496046832",
+            "2085": "121"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2012}]": {
+        "xcmConcept": "{\"parachain\":2012}",
+        "asset": "{\"Token\":\"CSM\"}",
+        "paraID": 2012,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x1",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2012}]",
+        "xcmV1multilocationByte": "0x010100711f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2012
+                    }
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"CSM\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff00000000000000010000000000000008",
+            "2023": "0xffffffff519811215e05efa24830eebe9c43acd7"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551624",
+            "2023": "108457044225666871745333730479173774551"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]": {
+        "xcmConcept": "[{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]",
+        "asset": "{\"Token\":\"1984\"}",
+        "paraID": 1000,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x3",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]",
+        "xcmV1multilocationByte": "0x010300a10f043205011f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 1000
+                        },
+                        {
+                            "palletInstance": 50
+                        },
+                        {
+                            "generalIndex": 1984
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"1984\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff000000000000000000000001000007c0",
+            "2023": "0xffffffffea09fb06d082fd1275cd48b191cbcd1d"
+        },
+        "xcCurrencyID": {
+            "2007": "4294969280",
+            "2023": "311091173110107856861649819128533077277",
+            "2085": "102",
+            "2090": "14"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]": {
+        "xcmConcept": "[{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]",
+        "asset": "{\"Token\":\"KINT\"}",
+        "paraID": 2092,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]",
+        "xcmV1multilocationByte": "0x010200b1200608000c",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2092
+                        },
+                        {
+                            "generalKey": "0x000c"
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"KINT\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff00000000000000010000000000000006",
+            "2023": "0xffffffff83f4f317d3cbf6ec6250aec3697b3ff2"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551622",
+            "2023": "175400718394635817552109270754364440562",
+            "2085": "119"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2004}]": {
+        "xcmConcept": "{\"parachain\":2004}",
+        "asset": "{\"Token\":\"PHA\"}",
+        "paraID": 2004,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x1",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2004}]",
+        "xcmV1multilocationByte": "0x010100511f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2004
+                    }
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"PHA\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff00000000000000010000000000000007",
+            "2023": "0xffffffff8e6b63d9e447b6d4c45bda8af9dc9603"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551623",
+            "2023": "189307976387032586987344677431204943363",
+            "2084": "13",
+            "2085": "115"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0104\"}]": {
+        "xcmConcept": "[{\"parachain\":2001},{\"generalKey\":\"0x0104\"}]",
+        "asset": "{\"Token\":\"vKSM\"}",
+        "paraID": 2001,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0104\"}]",
+        "xcmV1multilocationByte": "0x010200451f06080104",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2001
+                        },
+                        {
+                            "generalKey": "0x0104"
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"vKSM\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff0000000000000001000000000000000c"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551628"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]": {
+        "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]",
+        "asset": "{\"Token\":\"AUSD\"}",
+        "paraID": 2000,
+        "relayChain": "kusama",
+        "parents": 1,
+        "interiorType": "x2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]",
+        "xcmV1multilocationByte": "0x010200411f06080081",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2000
+                        },
+                        {
+                            "generalKey": "0x0081"
+                        }
+                    ]
+                }
+            }
+        },
+        "nativeAssetChainkey": "{\"Token\":\"AUSD\"}~kusama-2007",
+        "xcContractAddress": {
+            "2007": "0xffffffff00000000000000010000000000000000",
+            "2023": "0xffffffffa1b026a00fbaa67c86d5d1d5bf8d8228"
+        },
+        "xcCurrencyID": {
+            "2007": "18446744073709551616",
+            "2012": "214920334981412447805621250067209749032",
+            "2023": "214920334981412447805621250067209749032",
+            "2084": "9",
+            "2090": "2"
+        },
+        "source": "kusama-2007"
+    },
+    "[{\"network\":\"kusama\"},{\"parachain\":2007}]": {
         "xcmConcept": "{\"parachain\":2007}",
         "asset": "{\"Token\":\"SDN\"}",
         "paraID": 2007,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x1",
-        "xcmInteriorKey": "kusama~{\"parachain\":2007}",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2007}]",
         "xcmV1multilocationByte": "0x0101005d1f",
         "xcmV1MultiLocation": {
             "v1": {
@@ -28,14 +607,14 @@
         },
         "source": "kusama-2012"
     },
-    "kusama~{\"parachain\":2048}": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2048}]": {
         "xcmConcept": "{\"parachain\":2048}",
         "asset": "{\"Token\":\"XRT\"}",
         "paraID": 2048,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x1",
-        "xcmInteriorKey": "kusama~{\"parachain\":2048}",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2048}]",
         "xcmV1multilocationByte": "0x0101000120",
         "xcmV1MultiLocation": {
             "v1": {
@@ -57,212 +636,14 @@
         },
         "source": "kusama-2012"
     },
-    "kusama~[{\"parachain\":2105},{\"palletInstance\":5}]": {
-        "xcmConcept": "[{\"parachain\":2105},{\"palletInstance\":5}]",
-        "asset": "{\"Token\":\"CRAB\"}",
-        "paraID": 2105,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2105},{\"palletInstance\":5}]",
-        "xcmV1multilocationByte": "0x010200e5200405",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x2": [
-                        {
-                            "parachain": 2105
-                        },
-                        {
-                            "palletInstance": 5
-                        }
-                    ]
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"CRAB\"}~kusama-2105",
-        "xcContractAddress": {
-            "2023": "0xffffffff8283448b3cb519ca4732f2dddc6a6165"
-        },
-        "xcCurrencyID": {
-            "2012": "173481220575862801646329923366065693029",
-            "2023": "173481220575862801646329923366065693029"
-        },
-        "source": "kusama-2012"
-    },
-    "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]": {
-        "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]",
-        "asset": "{\"Token\":\"KUSD\"}",
-        "paraID": 2000,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]",
-        "xcmV1multilocationByte": "0x010200411f06080081",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x2": [
-                        {
-                            "parachain": 2000
-                        },
-                        {
-                            "generalKey": "0x0081"
-                        }
-                    ]
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"KUSD\"}~kusama-2000",
-        "xcContractAddress": {
-            "2023": "0xffffffffa1b026a00fbaa67c86d5d1d5bf8d8228"
-        },
-        "xcCurrencyID": {
-            "2012": "214920334981412447805621250067209749032",
-            "2023": "214920334981412447805621250067209749032",
-            "2090": "2"
-        },
-        "source": "kusama-2012"
-    },
-    "kusama~[{\"parachain\":2023},{\"palletInstance\":10}]": {
-        "xcmConcept": "[{\"parachain\":2023},{\"palletInstance\":10}]",
-        "asset": "{\"Token\":\"MOVR\"}",
-        "paraID": 2023,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2023},{\"palletInstance\":10}]",
-        "xcmV1multilocationByte": "0x0102009d1f040a",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x2": [
-                        {
-                            "parachain": 2023
-                        },
-                        {
-                            "palletInstance": 10
-                        }
-                    ]
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"MOVR\"}~kusama-2023",
-        "xcContractAddress": {},
-        "xcCurrencyID": {
-            "2012": "232263652204149413431520870009560565298",
-            "2085": "113"
-        },
-        "source": "kusama-2012"
-    },
-    "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]": {
-        "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]",
-        "asset": "{\"Token\":\"KAR\"}",
-        "paraID": 2000,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]",
-        "xcmV1multilocationByte": "0x010200411f06080080",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x2": [
-                        {
-                            "parachain": 2000
-                        },
-                        {
-                            "generalKey": "0x0080"
-                        }
-                    ]
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"KAR\"}~kusama-2000",
-        "xcContractAddress": {
-            "2023": "0xffffffff08220ad2e6e157f26ed8bd22a336a0a5"
-        },
-        "xcCurrencyID": {
-            "2012": "10810581592933651521121702237638664357",
-            "2023": "10810581592933651521121702237638664357",
-            "2085": "107"
-        },
-        "source": "kusama-2012"
-    },
-    "kusama~[{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]": {
-        "xcmConcept": "[{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]",
-        "asset": "{\"Token\":\"BNC\"}",
-        "paraID": 2001,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]",
-        "xcmV1multilocationByte": "0x010200451f06080001",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x2": [
-                        {
-                            "parachain": 2001
-                        },
-                        {
-                            "generalKey": "0x0001"
-                        }
-                    ]
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"BNC\"}~kusama-2001",
-        "xcContractAddress": {
-            "2023": "0xfffffffff075423be54811ecb478e911f22dde7d"
-        },
-        "xcCurrencyID": {
-            "2012": "319623561105283008236062145480775032445",
-            "2023": "319623561105283008236062145480775032445"
-        },
-        "source": "kusama-2012"
-    },
-    "kusama~{\"parachain\":2012}": {
-        "xcmConcept": "{\"parachain\":2012}",
-        "asset": "{\"Token\":\"CSM\"}",
-        "paraID": 2012,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x1",
-        "xcmInteriorKey": "kusama~{\"parachain\":2012}",
-        "xcmV1multilocationByte": "0x010100711f",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x1": {
-                        "parachain": 2012
-                    }
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"CSM\"}~kusama-2012",
-        "xcContractAddress": {
-            "2023": "0xffffffff519811215e05efa24830eebe9c43acd7"
-        },
-        "xcCurrencyID": {
-            "2023": "108457044225666871745333730479173774551"
-        },
-        "source": "kusama-2023"
-    },
-    "kusama~[{\"parachain\":2085},{\"generalKey\":\"0x484b4f\"}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2085},{\"generalKey\":\"0x484b4f\"}]": {
         "xcmConcept": "[{\"parachain\":2085},{\"generalKey\":\"0x484b4f\"}]",
         "asset": "{\"Token\":\"HKO\"}",
         "paraID": 2085,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2085},{\"generalKey\":\"0x484b4f\"}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2085},{\"generalKey\":\"0x484b4f\"}]",
         "xcmV1multilocationByte": "0x0102009520060c484b4f",
         "xcmV1MultiLocation": {
             "v1": {
@@ -288,48 +669,14 @@
         },
         "source": "kusama-2023"
     },
-    "kusama~[{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]": {
-        "xcmConcept": "[{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]",
-        "asset": "{\"Token\":\"KBTC\"}",
-        "paraID": 2092,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]",
-        "xcmV1multilocationByte": "0x010200b1200608000b",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x2": [
-                        {
-                            "parachain": 2092
-                        },
-                        {
-                            "generalKey": "0x000b"
-                        }
-                    ]
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"KBTC\"}~kusama-2092",
-        "xcContractAddress": {
-            "2023": "0xfffffffff6e528ad57184579beee00c5d5e646f0"
-        },
-        "xcCurrencyID": {
-            "2023": "328179947973504579459046439826496046832",
-            "2085": "121"
-        },
-        "source": "kusama-2023"
-    },
-    "kusama~{\"parachain\":2084}": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2084}]": {
         "xcmConcept": "{\"parachain\":2084}",
         "asset": "{\"Token\":\"KMA\"}",
         "paraID": 2084,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x1",
-        "xcmInteriorKey": "kusama~{\"parachain\":2084}",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2084}]",
         "xcmV1multilocationByte": "0x0101009120",
         "xcmV1MultiLocation": {
             "v1": {
@@ -350,14 +697,14 @@
         },
         "source": "kusama-2023"
     },
-    "kusama~[{\"parachain\":2106},{\"palletInstance\":10}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2106},{\"palletInstance\":10}]": {
         "xcmConcept": "[{\"parachain\":2106},{\"palletInstance\":10}]",
         "asset": "{\"Token\":\"LIT\"}",
         "paraID": 2106,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2106},{\"palletInstance\":10}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2106},{\"palletInstance\":10}]",
         "xcmV1multilocationByte": "0x010200e920040a",
         "xcmV1MultiLocation": {
             "v1": {
@@ -383,77 +730,14 @@
         },
         "source": "kusama-2023"
     },
-    "kusama~{\"parachain\":2004}": {
-        "xcmConcept": "{\"parachain\":2004}",
-        "asset": "{\"Token\":\"PHA\"}",
-        "paraID": 2004,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x1",
-        "xcmInteriorKey": "kusama~{\"parachain\":2004}",
-        "xcmV1multilocationByte": "0x010100511f",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x1": {
-                        "parachain": 2004
-                    }
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"PHA\"}~kusama-2004",
-        "xcContractAddress": {
-            "2023": "0xffffffff8e6b63d9e447b6d4c45bda8af9dc9603"
-        },
-        "xcCurrencyID": {
-            "2023": "189307976387032586987344677431204943363",
-            "2085": "115"
-        },
-        "source": "kusama-2023"
-    },
-    "kusama~[{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]": {
-        "xcmConcept": "[{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]",
-        "asset": "{\"Token\":\"KINT\"}",
-        "paraID": 2092,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]",
-        "xcmV1multilocationByte": "0x010200b1200608000c",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x2": [
-                        {
-                            "parachain": 2092
-                        },
-                        {
-                            "generalKey": "0x000c"
-                        }
-                    ]
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"KINT\"}~kusama-2092",
-        "xcContractAddress": {
-            "2023": "0xffffffff83f4f317d3cbf6ec6250aec3697b3ff2"
-        },
-        "xcCurrencyID": {
-            "2023": "175400718394635817552109270754364440562",
-            "2085": "119"
-        },
-        "source": "kusama-2023"
-    },
-    "kusama~[{\"parachain\":2015},{\"generalKey\":\"0x54454552\"}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2015},{\"generalKey\":\"0x54454552\"}]": {
         "xcmConcept": "[{\"parachain\":2015},{\"generalKey\":\"0x54454552\"}]",
         "asset": "{\"Token\":\"TEER\"}",
         "paraID": 2015,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2015},{\"generalKey\":\"0x54454552\"}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2015},{\"generalKey\":\"0x54454552\"}]",
         "xcmV1multilocationByte": "0x0102007d1f061054454552",
         "xcmV1MultiLocation": {
             "v1": {
@@ -479,52 +763,14 @@
         },
         "source": "kusama-2023"
     },
-    "kusama~[{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]": {
-        "xcmConcept": "[{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]",
-        "asset": "{\"Token\":\"1984\"}",
-        "paraID": 1000,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x3",
-        "xcmInteriorKey": "kusama~[{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]",
-        "xcmV1multilocationByte": "0x010300a10f043205011f",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x3": [
-                        {
-                            "parachain": 1000
-                        },
-                        {
-                            "palletInstance": 50
-                        },
-                        {
-                            "generalIndex": 1984
-                        }
-                    ]
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"1984\"}~kusama-1000",
-        "xcContractAddress": {
-            "2023": "0xffffffffea09fb06d082fd1275cd48b191cbcd1d"
-        },
-        "xcCurrencyID": {
-            "2023": "311091173110107856861649819128533077277",
-            "2085": "102",
-            "2090": "14"
-        },
-        "source": "kusama-2023"
-    },
-    "kusama~[{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":8}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":8}]": {
         "xcmConcept": "[{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":8}]",
         "asset": "{\"Token\":\"8\"}",
         "paraID": 1000,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x3",
-        "xcmInteriorKey": "kusama~[{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":8}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":8}]",
         "xcmV1multilocationByte": "0x010300a10f04320520",
         "xcmV1MultiLocation": {
             "v1": {
@@ -553,73 +799,14 @@
         },
         "source": "kusama-2023"
     },
-    "kusama~here": {
-        "xcmConcept": "here",
-        "asset": "{\"Token\":\"KSM\"}",
-        "paraID": 0,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "here",
-        "xcmInteriorKey": "kusama~here",
-        "xcmV1multilocationByte": "0x0100",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "here": null
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"KSM\"}~kusama-0",
-        "xcContractAddress": {
-            "2023": "0xffffffff1fcacbd218edc0eba20fc2308c778080"
-        },
-        "xcCurrencyID": {
-            "2023": "42259045809535163221576417993425387648",
-            "2085": "100",
-            "2090": "1"
-        },
-        "source": "kusama-2023"
-    },
-    "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0083\"}]": {
-        "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x0083\"}]",
-        "asset": "{\"Token\":\"LKSM\"}",
-        "paraID": 2000,
-        "relayChain": "kusama",
-        "parents": 1,
-        "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0083\"}]",
-        "xcmV1multilocationByte": "0x010200411f06080083",
-        "xcmV1MultiLocation": {
-            "v1": {
-                "parents": 1,
-                "interior": {
-                    "x2": [
-                        {
-                            "parachain": 2000
-                        },
-                        {
-                            "generalKey": "0x0083"
-                        }
-                    ]
-                }
-            }
-        },
-        "nativeAssetChainkey": "{\"Token\":\"LKSM\"}~kusama-2000",
-        "xcContractAddress": {},
-        "xcCurrencyID": {
-            "2085": "109"
-        },
-        "source": "kusama-2085"
-    },
-    "kusama~[{\"parachain\":2085},{\"generalKey\":\"0x734b534d\"}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2085},{\"generalKey\":\"0x734b534d\"}]": {
         "xcmConcept": "[{\"parachain\":2085},{\"generalKey\":\"0x734b534d\"}]",
         "asset": "{\"Token\":\"sKSM\"}",
         "paraID": 2085,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2085},{\"generalKey\":\"0x734b534d\"}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2085},{\"generalKey\":\"0x734b534d\"}]",
         "xcmV1multilocationByte": "0x01020095200610734b534d",
         "xcmV1MultiLocation": {
             "v1": {
@@ -643,14 +830,14 @@
         },
         "source": "kusama-2085"
     },
-    "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x024bb6afb5fa2b07a5d1c499e1c3ddb5a15e709a70\"}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x024bb6afb5fa2b07a5d1c499e1c3ddb5a15e709a70\"}]": {
         "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x024bb6afb5fa2b07a5d1c499e1c3ddb5a15e709a70\"}]",
         "asset": "{\"Token\":\"DAI\"}",
         "paraID": 2000,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x024bb6afb5fa2b07a5d1c499e1c3ddb5a15e709a70\"}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x024bb6afb5fa2b07a5d1c499e1c3ddb5a15e709a70\"}]",
         "xcmV1multilocationByte": "0x010200411f0654024bb6afb5fa2b07a5d1c499e1c3ddb5a15e709a70",
         "xcmV1MultiLocation": {
             "v1": {
@@ -674,14 +861,14 @@
         },
         "source": "kusama-2090"
     },
-    "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x021f3a10587a20114ea25ba1b388ee2dd4a337ce27\"}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x021f3a10587a20114ea25ba1b388ee2dd4a337ce27\"}]": {
         "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x021f3a10587a20114ea25ba1b388ee2dd4a337ce27\"}]",
         "asset": "{\"Token\":\"USDCet\"}",
         "paraID": 2000,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x021f3a10587a20114ea25ba1b388ee2dd4a337ce27\"}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x021f3a10587a20114ea25ba1b388ee2dd4a337ce27\"}]",
         "xcmV1multilocationByte": "0x010200411f0654021f3a10587a20114ea25ba1b388ee2dd4a337ce27",
         "xcmV1MultiLocation": {
             "v1": {
@@ -705,14 +892,14 @@
         },
         "source": "kusama-2090"
     },
-    "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x02ece0cc38021e734bef1d5da071b027ac2f71181f\"}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x02ece0cc38021e734bef1d5da071b027ac2f71181f\"}]": {
         "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x02ece0cc38021e734bef1d5da071b027ac2f71181f\"}]",
         "asset": "{\"Token\":\"wETH\"}",
         "paraID": 2000,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x02ece0cc38021e734bef1d5da071b027ac2f71181f\"}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x02ece0cc38021e734bef1d5da071b027ac2f71181f\"}]",
         "xcmV1multilocationByte": "0x010200411f065402ece0cc38021e734bef1d5da071b027ac2f71181f",
         "xcmV1MultiLocation": {
             "v1": {
@@ -736,14 +923,14 @@
         },
         "source": "kusama-2090"
     },
-    "kusama~[{\"parachain\":2125},{\"generalIndex\":0}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2125},{\"generalIndex\":0}]": {
         "xcmConcept": "[{\"parachain\":2125},{\"generalIndex\":0}]",
         "asset": "{\"Token\":\"TNKR\"}",
         "paraID": 2125,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2125},{\"generalIndex\":0}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2125},{\"generalIndex\":0}]",
         "xcmV1multilocationByte": "0x01020035210500",
         "xcmV1MultiLocation": {
             "v1": {
@@ -767,14 +954,14 @@
         },
         "source": "kusama-2090"
     },
-    "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0266291c7d88d2ed9a708147bae4e0814a76705e2f\"}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0266291c7d88d2ed9a708147bae4e0814a76705e2f\"}]": {
         "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x0266291c7d88d2ed9a708147bae4e0814a76705e2f\"}]",
         "asset": "{\"Token\":\"wBTC\"}",
         "paraID": 2000,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0266291c7d88d2ed9a708147bae4e0814a76705e2f\"}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0266291c7d88d2ed9a708147bae4e0814a76705e2f\"}]",
         "xcmV1multilocationByte": "0x010200411f06540266291c7d88d2ed9a708147bae4e0814a76705e2f",
         "xcmV1MultiLocation": {
             "v1": {
@@ -798,14 +985,14 @@
         },
         "source": "kusama-2090"
     },
-    "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0254e183e533fd3c6e72debb2d1cab451d017faf72\"}]": {
+    "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0254e183e533fd3c6e72debb2d1cab451d017faf72\"}]": {
         "xcmConcept": "[{\"parachain\":2000},{\"generalKey\":\"0x0254e183e533fd3c6e72debb2d1cab451d017faf72\"}]",
         "asset": "{\"Token\":\"wUSDT\"}",
         "paraID": 2000,
         "relayChain": "kusama",
         "parents": 1,
         "interiorType": "x2",
-        "xcmInteriorKey": "kusama~[{\"parachain\":2000},{\"generalKey\":\"0x0254e183e533fd3c6e72debb2d1cab451d017faf72\"}]",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0254e183e533fd3c6e72debb2d1cab451d017faf72\"}]",
         "xcmV1multilocationByte": "0x010200411f06540254e183e533fd3c6e72debb2d1cab451d017faf72",
         "xcmV1MultiLocation": {
             "v1": {
