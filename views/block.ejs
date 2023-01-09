@@ -144,12 +144,14 @@ let defHash = "#overview";
       <%- uiTool.presentSpecVersion(id, b.specVersion); %>
     </td>
   </tr>
+<% if ( chain.tracesAvailable && ( b.blockTS > query.getCurrentTS() - 86400*30 ) ) { %>
   <tr>
     <td><%- include("tooltip", {k: "trace"}) %>Trace</td>
     <td>
       <%- uiTool.presentTrace(id, blockNumber, b.hash); %>
     </td>
   </tr>
+<% } %>
   <tr>
     <td>Compare to</td>
     <td>

@@ -696,67 +696,6 @@ app.get('/q/:q', async (req, res) => {
     }
 })
 
-// curl -X POST -H "Content-Type: application/json" -d '{"chainID":"acala", "startDate": "2022-06-21", "endDate": "2022-06-24"}'  http://api.polkaholic.io/search/events?limit=10000
-app.post('/search/:table', async (req, res) => {
-    try {
-        let table = req.params["table"];
-        let q = req.body;
-        let chainID_or_chainName = (q.chainID != undefined) ? q.chainID : "all";
-        let maxLimit = 1000;
-        let hardLimit = 100000; // 100x [above this it takes too long] -- users should use date ranges to filter
-        let queryLimit = (req.query.limit != undefined) ? req.query.limit : maxLimit;
-        if (queryLimit > hardLimit) {
-            return res.status(400).json({
-                error: "Search: 'limit' parameter must be less or equal to than 100K"
-            });
-        }
-        let [chainID, id] = query.convertChainID(chainID_or_chainName)
-        let [decorate, decorateExtra] = decorateOpt(req)
-        if (chainID !== undefined || chainID_or_chainName == "all") {
-            var results = [];
-            if (table == "extrinsics") {
-                results = await query.getExtrinsics(q, queryLimit, decorate, decorateExtra);
-            } else if (table == "events") {
-                results = await query.getEvents(q, queryLimit, decorate, decorateExtra);
-            } else if (table == "evmtxs") {
-                results = await query.getEVMTxs(q, queryLimit, decorate, decorateExtra);
-            } else if (table == "transfers") {
-                results = await query.getTransfers(q, queryLimit, decorate, decorateExtra);
-            } else if (table == "xcmmessages") {
-                results = await query.getXCMMessages(q, queryLimit, decorate, decorateExtra);
-            } else if (table == "xcmtransfers") {
-                results = await query.searchXCMTransfers(q, queryLimit, decorate, decorateExtra);
-            } else {
-                // TODO: say the table is unknown
-                return res.sendStatus(404).json();
-            }
-            if (results) {
-                let cnt = 1;
-                if (results.length > maxLimit) {
-                    cnt += results.length / (10 * maxLimit);
-                }
-                // since BigQuery has high "scanning" costs, if the user wastefully asks for a high maxLimit (100K), even we didn't get many rows, tally 1 per 2500
-                let cnt2 = maxLimit / 2500;
-                if (cnt2 > cnt) {
-                    cnt = cnt2;
-                }
-                res.write(JSON.stringify(results));
-                await query.tallyAPIKey(getapikey(req), cnt);
-                return res.end();
-            } else {
-                return res.sendStatus(404).json();
-            }
-        } else {
-            return res.sendStatus(404).json();
-        }
-    } catch (err) {
-        console.log(`error:`, err.toString())
-        return res.status(400).json({
-            error: err.toString()
-        });
-    }
-})
-
 app.get('/xcm/multilocation/:chainID_or_chainName', async (req, res) => {
     try {
         let chainID_or_chainName = req.params["chainID_or_chainName"]

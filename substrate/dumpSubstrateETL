@@ -48,12 +48,11 @@ async function main() {
     } else {
         while (true) {
             let x = await substrateetl.get_random_substrateetl(logDT, paraID, relayChain);
-            logDT = x.logDT;
-            paraID = x.paraID;
-            relayChain = x.relayChain;
-            console.log("READY ", logDT, paraID, relayChain);
-            if (logDT && (paraID >= 0) && relayChain) {
-                await substrateetl.dump_substrateetl(logDT, paraID, relayChain);
+            let _logDT = x.logDT;
+            let _paraID = x.paraID;
+            let _relayChain = x.relayChain;
+            if (_logDT && (_paraID >= 0) && _relayChain) {
+                await substrateetl.dump_substrateetl(_logDT, _paraID, _relayChain);
                 await substrateetl.sleep(1000);
             } else {
                 await substrateetl.sleep(10000);

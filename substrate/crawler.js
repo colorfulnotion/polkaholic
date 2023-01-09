@@ -493,7 +493,9 @@ module.exports = class Crawler extends Indexer {
                 eupds = ", numReceiptsEVM = values(numReceiptsEVM)";
             } else if (evmBlock) {
                 eflds = ", blockHashEVM, parentHashEVM, numTransactionsEVM, numTransactionsInternalEVM, gasUsed, gasLimit";
-                evals = `, '${evmBlock.hash}', '${evmBlock.parentHash}', '${evmBlock.transactions.length}', '${evmBlock.transactionsInternal.length}', '${evmBlock.gasUsed}', '${evmBlock.gasLimit}'`;
+		let tl = evmBlock.transactions && evmBlock.transactions.length ?  evmBlock.transactions.length : 0;
+		let itl = evmBlock.transactionsInternal && evmBlock.transactionsInternal.length ? evmBlock.transactionsInternal.length : 0;
+                evals = `, '${evmBlock.hash}', '${evmBlock.parentHash}', '${tl}', '${itl}', '${evmBlock.gasUsed}', '${evmBlock.gasLimit}'`;
                 eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), numTransactionsInternalEVM = values(numTransactionsInternalEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit)";
             }
             if (trace && finalized) {
@@ -510,6 +512,7 @@ module.exports = class Crawler extends Indexer {
             }
             return (true);
         } catch (err) {
+	    console.log(err);
             this.logger.warn({
                 "op": "save_block_trace",
                 chainID,
@@ -1137,7 +1140,6 @@ module.exports = class Crawler extends Indexer {
                         console.log(`indexChain unhealthy after ${indexPeriodProcessedCnt}`)
                         process.exit(1)
                     }
-                    this.mark_bqlog_dirty(chain.chainID, indexlogs[i].indexTS);
                 } catch (err) {
                     console.log(err);
                 }
@@ -1235,7 +1237,9 @@ module.exports = class Crawler extends Indexer {
         if (techniqueParams[0] == "mod") {
             let n = techniqueParams[1];
             let nmax = techniqueParams[2];
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber % ${nmax} = ${n} and blockNumber <= ${chain.blocksCovered} and attempted < 3 order by attempted, rand() limit 10000`
+	    let w = ( nmax > 1 )  ?  `and blockNumber % ${nmax} = ${n}` : "";
+	    let w2 = ` and blockNumber > ${chain.blocksCovered} - 5000000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 3 order by attempted, rand() limit 10000`
 	    console.log("X", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
@@ -1426,16 +1430,8 @@ module.exports = class Crawler extends Indexer {
         let sql = `update indexlog set indexed = 0 where chainID = '${chainID}' and indexTS = '${indexTS}'`;
         this.lastmarkedTS = indexTS;
         this.batchedSQL.push(sql);
-        this.mark_bqlog_dirty(chainID, indexTS)
     }
 
-    mark_bqlog_dirty(chainID, indexTS) {
-        let [logDT, _] = paraTool.ts_to_logDT_hr(indexTS);
-        if (logDT == this.lastmarkedlogDT) return (false);
-        this.lastmarkedlogDT = logDT;
-        let sql = `update bqlog set loaded = 0 where logDT = '${logDT}'`;
-        this.batchedSQL.push(sql);
-    }
 
     async dedupChanges(changes) {
         let dedupEvents = {};
@@ -1900,11 +1896,11 @@ create table talismanEndpoint (
                     if (evmTrace) crawlTraceEVM = 0;
                 }
                 let isSignedBlock = false
-                let isWritebqlog = false
+
                 let refreshAPI = false
                 let isTip = true
                 //index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false)
-                let r = await this.index_chain_block_row(rRow, isSignedBlock, isWritebqlog, refreshAPI, isTip);
+                let r = await this.index_chain_block_row(rRow, isSignedBlock, false, refreshAPI, isTip);
                 blockStats = r.blockStats;
                 // IMMEDIATELY flush all address feed + hashes (txs + blockhashes)
                 await this.flush(block.blockTS, bn, false, isTip); //ts, bn, isFullPeriod, isTip
@@ -2182,11 +2178,11 @@ create table talismanEndpoint (
                             // IMPORTANT NOTE: we only need to do this for evm chains... (review)
                             let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api);
                             let isFinalized = false
-                            let isWrite_bqlog = false
+
                             let isTip = true
                             let isTracesPresent = success // true here
-                            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false)
-                            let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces, isFinalized, isWrite_bqlog, isTip, isTracesPresent);
+                            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
+                            let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces, isFinalized, false, isTip, isTracesPresent);
 
                             await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
                             if (blockNumber > this.blocksCovered) {

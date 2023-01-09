@@ -26,7 +26,7 @@ Setup of the backend tables:
 * BigQuery: substrate/cbt.sh
 * BigTable: substrate/bq/bq.sh
 
-The PolkaholicDB class manages the connections to the above tables with a `POLKAHOLIC_DB` variable (see 
+The PolkaholicDB class manages the connections to the above tables with a `POLKAHOLIC_DB` variable (see
 also `POLKAHOLIC_DB_REPLICA`, which support multiple replicas in load balanced instance groups in 3+ regions).
 managing "ini" file credentials in one place:
 ```
@@ -109,7 +109,6 @@ mysql> show tables;
 ...
 | blocklog                 |
 | blockunfinalized         |
-| bqlog                    |
 | chain                    |
 | chainEndpoint            |
 | chainPalletStorage       |
@@ -137,7 +136,7 @@ mysql> show tables;
 | rewardslog               |
 | specVersions             |
 | subaccount               |
-| talismanEndpoint         |
+| substrateetllog          |
 | testParseTraces          |
 | token1155holder          |
 | tokenholder              |
@@ -265,7 +264,7 @@ Onfinality does a wonderful job with their "Lightning sync" and maintaining the 
 
 The following script are put in cron jobs:
 ```
-* updateBQLog - hourly -- updates the BigQuery tables
+* dumpSubstrateETL - hourly/daily -- updates the BigQuery tables
 * getPricefeed - 3-5 mins -- fetches the latest prices from the coingecko API
 * updateXCMTransfer - 3-5 mins - fills in some data in the xcmtransfer table
 * updateIdentity0, updateIdentity2 - daily -- fetches new identities from Polkadot and Kusama

@@ -79,13 +79,6 @@ module.exports = class Indexer extends AssetManager {
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
     numXCMMessagesOut = {};
-    // bqlog
-    extrinsicsfn = false;
-    transfersfn = false;
-    eventsfn = false;
-    evmtxsfn = false;
-    xcmfn = false;
-    bqlogindexTS = 0;
     recentExtrinsics = [];
     recentTransfers = [];
 
@@ -6569,9 +6562,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return xcmList
     }
 
-
-
-    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, evmTrace = false, autoTraces = false, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false) {
+    async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, evmTrace = false, autoTraces = false, finalized = false, unused = false, isTip = false, tracesPresent = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
         if (!block) return;
         if (!block.extrinsics) return;
@@ -6703,8 +6694,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             if (autoTraces) {
                 //console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
                 await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain, isTip, finalized);
-            } else {
-                console.log("this.indexRelayChainTrace FAIL", blockNumber, chainID, relayChain);
             }
         }
 
@@ -6960,9 +6949,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 timestamp: blockTS * 1000000 // CHECK: should we use evmBlockTS instead?
             };
 
-            if (write_bqlog) {
-                this.write_bqlog_evmblock(evmFullBlock.transactions, blockNumber, blockTS);
-            }
+
 
             // add evmblockhash pointer for searchability
             let evmBlockhash = evmFullBlock.hash
@@ -6998,9 +6985,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
         }
 
-        if (write_bqlog) {
-            this.write_bqlog_block(block.extrinsics, blockNumber, blockTS);
-        }
         let blockStats = this.getBlockStats(block, eventsRaw, evmBlock, evmReceipts, autoTraces);
 
         this.blockRowsToInsert.push(cres)
@@ -7604,7 +7588,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     }
 
     // given a row r fetched with "fetch_block_row", processes the block, events + trace
-    async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false) {
+    async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false, traceParseTS = 1670544000) {
         /* index_chain_block_row shall process trace(if available) + block + events in orders
         xcm steps:
         (1a) processTrace: parse outgoing xcmmessages from traces
@@ -7631,15 +7615,17 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let forceParseTrace = false
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0) || forceParseTrace) {
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
-                    autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
-                } else {
-                    // SKIP PROCESSING since we covered autotrace generation already
-                    if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
-                    autoTraces = r.autotrace;
+                if ( blockTS >= traceParseTS ) {
+                  if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0) || forceParseTrace) {
+                      if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
+                      autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
+                  } else {
+                      // SKIP PROCESSING since we covered autotrace generation already
+                      if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
+                      autoTraces = r.autotrace;
+                  }
+                  await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // use result from rawtrace to decorate
                 }
-                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // use result from rawtrace to decorate
 
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
                 //console.log(`index_chain_block_row: processTrace`, processTraceTS);
@@ -7668,8 +7654,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             //console.log(`calling processBlockEvents evmBlock=${r.evmBlock.number}`)
             let tracesPresent = (r.trace) ? true : false;
             let isFinalized = true
-            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, write_bqlog = false, isTip = false, tracesPresent = false)
-            let [blockStats, xcmMeta] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, isFinalized, write_bq_log, isTip, tracesPresent);
+            //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, false, isTip = false, tracesPresent = false)
+            let [blockStats, xcmMeta] = await this.processBlockEvents(this.chainID, r.block, r.events, r.evmBlock, r.evmReceipts, r.evmTrace, autoTraces, isFinalized, false, isTip, tracesPresent);
             r.blockStats = blockStats
             r.xcmMeta = xcmMeta
 
@@ -7943,294 +7929,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         }
     }
 
-    // sets up this.extrinsicsfn/eventsfn/evmtxsfn (deleting old version), creating directories as needed
-    async open_bqlog(chain, indexTS) {
-        const bqDir = "/disk1/"
-        let chainID = chain.chainID;
-        let fn = `${chainID}-${indexTS}.json`
-        let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
-        this.bqlogindexTS = indexTS;
-        try {
-            this.xcmeventsMap = {};
-            // create extrinsics directory
-            let extrinsicsdir = path.join(bqDir, "extrinsics", `${logDT}`);
-            if (!fs.existsSync(extrinsicsdir)) {
-                await fs.mkdirSync(extrinsicsdir);
-            }
-            // set up extrinsics log
-            this.extrinsicsfn = path.join(extrinsicsdir, fn);
-            await fs.closeSync(fs.openSync(this.extrinsicsfn, 'w'));
-
-            // create transfers directory
-            let transfersdir = path.join(bqDir, "transfers", `${logDT}`);
-            if (!fs.existsSync(transfersdir)) {
-                await fs.mkdirSync(transfersdir);
-            }
-            // set up transfers log
-            this.transfersfn = path.join(transfersdir, fn);
-            await fs.closeSync(fs.openSync(this.transfersfn, 'w'));
-
-            // create rewards directory
-            let rewardsdir = path.join(bqDir, "rewards", `${logDT}`);
-            if (!fs.existsSync(rewardsdir)) {
-                await fs.mkdirSync(rewardsdir);
-            }
-            // set up rewards log
-            this.rewardsfn = path.join(rewardsdir, fn);
-            await fs.closeSync(fs.openSync(this.rewardsfn, 'w'));
-
-            // create events directory
-            let eventsdir = path.join(bqDir, "events", `${logDT}`);
-            if (!fs.existsSync(eventsdir)) {
-                await fs.mkdirSync(eventsdir);
-            }
-            // set up event log
-            this.eventsfn = path.join(eventsdir, fn);
-            await fs.closeSync(fs.openSync(this.eventsfn, 'w'));
-
-            // create xcm directory
-            let xcmdir = path.join(bqDir, "xcm", `${logDT}`);
-            if (!fs.existsSync(xcmdir)) {
-                await fs.mkdirSync(xcmdir);
-            }
-            // set up xcm log (deleting old file if exists)
-            this.xcmfn = path.join(xcmdir, fn);
-            await fs.closeSync(fs.openSync(this.xcmfn, 'w'));
-
-            if (chain.isEVM > 0) {
-                // create evmtxs directory
-                let evmtxsdir = path.join(bqDir, "evmtxs", `${logDT}`);
-                if (!fs.existsSync(evmtxsdir)) {
-                    await fs.mkdirSync(evmtxsdir);
-                }
-                // set up evmtxs log (deleting old file if exists)
-                this.evmtxsfn = path.join(evmtxsdir, fn);
-                await fs.closeSync(fs.openSync(this.evmtxsfn, 'w'));
-            }
-        } catch (err) {
-            this.log_indexing_error(err, "open_bqlog");
-        }
-    }
-
-    async write_bqlog_evmblock(txs, blockNumber, blockTS) {
-        if (!txs) return;
-        if (!Array.isArray(txs)) return;
-        if (txs.length == 0) return;
-        let evmtxs = [];
-        txs.forEach((tx) => {
-            if (tx !== undefined) {
-                if (tx.creates != null) {
-                    console.log(tx);
-                }
-
-                let section = null;
-                let methodID = null;
-                let result = 0;
-                let from = null
-                let to = null
-                if (tx.from != undefined) {
-                    from = tx.from.toLowerCase();
-                }
-                if (tx.to != undefined) {
-                    to = tx.to.toLowerCase();
-                }
-                if (tx.decodedInput != undefined) {
-                    let inp = tx.decodedInput;
-                    if (inp.signature != undefined) {
-                        let sa = inp.signature.split("(");
-                        if (sa.length > 1 || ((sa.length == 1) && (sa[0] == "nativeTransfer"))) {
-                            section = sa[0];
-                        }
-                    }
-                    if (inp.methodID != undefined) {
-                        methodID = inp.methodID;
-                    }
-                }
-                if (tx.status) {
-                    result = 1
-                }
-                let ltx = {
-                    c: this.chainID,
-                    bn: blockNumber,
-                    ts: blockTS,
-                    h: tx.transactionHash,
-                    f: from,
-                    t: to,
-                    s: section,
-                    m: methodID,
-                    r: result
-                }
-                if (tx.creates != null) {
-                    ltx.cr = tx.creates; // or 1?
-                }
-                if (tx.substrate != undefined) {
-                    ltx.substrate = tx.substrate;
-                }
-                evmtxs.push(JSON.stringify(ltx));
-            }
-        });
-        if (evmtxs.length > 0) {
-            evmtxs.push("");
-            fs.appendFileSync(this.evmtxsfn, evmtxs.join("\n"));
-        }
-    }
-
-    async write_bqlog_block(extrinsics, blockNumber, blockTS) {
-        let outextrinsics = [];
-        let outevents = [];
-        let outtransfers = [];
-        let outrewards = [];
-        let outxcms = [];
-        if (blockTS < this.bqlogindexTS || (blockTS > this.bqlogindexTS + 3600)) {
-            blockTS = this.bqlogindexTS;
-        }
-        for (let i = 0; i < extrinsics.length; i++) {
-            let ex = extrinsics[i];
-            let signed = (ex.signer != undefined && ex.signer != 'NONE') ? 1 : 0;
-            let fromAddress = paraTool.getPubKey(ex.signer)
-            if (fromAddress === false) fromAddress = null;
-            let v = (ex.v != undefined) ? ex.v : 0;
-            let [exp, exm] = this.parseExtrinsicSectionMethod(ex)
-            outextrinsics.push(JSON.stringify({
-                c: this.chainID,
-                id: ex.extrinsicID,
-                h: ex.extrinsicHash,
-                ts: blockTS,
-                bn: blockNumber,
-                f: fromAddress,
-                p: exp,
-                m: exm,
-                r: ex.result,
-                s: signed,
-                v: v
-            }));
-            if (ex.events) {
-                for (const ev of ex.events) {
-                    let eventID = ev.eventID ? ev.eventID : 0;
-                    let [evp, evm] = this.parseEventSectionMethod(ev)
-                    let e = {
-                        c: this.chainID,
-                        id: eventID,
-                        bn: blockNumber,
-                        h: ex.extrinsicHash,
-                        f: fromAddress,
-                        p: evp,
-                        m: evm,
-                        ts: blockTS
-                    }
-                    outevents.push(JSON.stringify(e));
-                }
-            }
-            if (ex.transfers) {
-                for (const t of ex.transfers) {
-                    let fromAddress = paraTool.getPubKey(t.from)
-                    let toAddress = paraTool.getPubKey(t.to)
-                    let e = {
-                        c: this.chainID,
-                        id: ex.extrinsicID,
-                        bn: blockNumber,
-                        h: ex.extrinsicHash,
-                        f: fromAddress,
-                        t: toAddress,
-                        p: t.section,
-                        m: t.method,
-                        //a: t.amount,
-                        //ra: t.rawAmount,
-                        ts: blockTS
-                    }
-                    if (t.asset != null) e.asset = t.asset;
-                    if (t.rawAsset != null) e.rawAsset = t.rawAsset;
-                    if (t.symbol != null) e.symbol = t.symbol;
-                    if (t.decimals != null) e.d = t.decimals;
-                    if (t.priceUSD > 0) e.priceUSD = t.priceUSD;
-                    if (t.amount != null) e.a = t.amount;
-                    if (t.amountUSD > 0) e.v = t.amountUSD;
-                    outtransfers.push(JSON.stringify(e));
-                }
-            }
-            if (ex.rewards) {
-                for (const t of ex.rewards) {
-                    let toAddress = t.accountAddress
-                    let e = {
-                        c: this.chainID,
-                        id: ex.extrinsicID,
-                        bn: blockNumber,
-                        h: ex.extrinsicHash,
-                        t: toAddress,
-                        p: t.section,
-                        m: t.method,
-                        ts: blockTS
-                    }
-                    if (t.asset != null) e.asset = t.asset;
-                    if (t.rawAsset != null) e.rawAsset = t.rawAsset;
-                    if (t.symbol != null) e.symbol = t.symbol;
-                    if (t.decimals != null) e.d = t.decimals;
-                    if (t.priceUSD > 0) e.priceUSD = t.priceUSD;
-                    if (t.amount != null) e.a = t.amount;
-                    if (t.amountUSD > 0) e.v = t.amountUSD;
-                    outrewards.push(JSON.stringify(e));
-                }
-            }
-        }
-        // map xcmevents into outxcms
-        for (const xcmID of Object.keys(this.xcmeventsMap)) {
-            /*
-            //blockNumber[0]-txIdx[1]-mpType[2]-receiverChainID[3]-senderChainID[4]-msgIdx[5]
-            msgIndex: '2007965-1-xcmp-22000-22023-0',
-            sentAt: 12944867,
-            isIncoming: 1,
-            msgHash: '572c1b16ff2bef5ef0a3d4618a175a5f0bb00409bae210b73d4c339626060aa6',
-            msgHex: '0x0210000400000106080081000fb56e4cba873f410a1300000106080081000fb56e4cba873f41010300286bee0d01000400010100ae70debed84304554c2909745a07d44b8ba4b6de8127e0fb08bc92c52797a00b',
-            msgStr: '{"v2":[{"withdrawAsset":[{"id":{"concrete":{"parents":0,"interior":{"x1":{"generalKey":"0x0081"}}}},"fun":{"fungible":"0x000000000000000000413f87ba4c6eb5"}}]},{"clearOrigin":null},{"buyExecution":{"fees":{"id":{"concrete":{"parents":0,"interior":{"x1":{"generalKey":"0x0081"}}}},"fun":{"fungible":"0x000000000000000000413f87ba4c6eb5"}},"weightLimit":{"limited":4000000000}}},{"depositAsset":{"assets":{"wild":{"all":null}},"maxAssets":1,"beneficiary":{"parents":0,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0xae70debed84304554c2909745a07d44b8ba4b6de8127e0fb08bc92c52797a00b"}}}}}}]}'
-            */
-            let mp = this.xcmeventsMap[xcmID]
-            let pieces = mp.msgIndex.split('-')
-            outxcms.push(JSON.stringify({
-                c: this.chainID, // The "receiver" ChainID (xcm chainIDDest)
-                d: pieces[4], // The "sender"   ChainID (xcm chainID)
-                t: pieces[2], // The mptype(Message passing type): xcmp/dmp/ump
-                id: mp.msgIndex, // The identifier: blockNumber-txIdx-mpType-receiverChainID-senderChainID-msgIdx
-                i: mp.isIncoming, // 1:incoming; 2:outgoing
-                h: mp.msgHash, // The blake2_256(msgHex) hash
-                b: mp.msgHex, // The channelmsg byte (xcmp's leading byte is already stripped)
-                s: mp.msgStr, // The decoded channelmsg as XcmVersionedXcm type
-                ts: blockTS,
-                bn: blockNumber,
-                sn: mp.sentAt, // The blockNumber where the channelmsg was received by the relayChain
-                rc: mp.relayChain,
-            }));
-        }
-        this.xcmeventsMap = {};
-
-        //TODO: write the new xcm + clean
-        this.xcmmsgMap = {} // remove here...
-        //this.cleanTrailingXcmMap(blockNumber);
-
-        if (outextrinsics.length > 0) {
-            outextrinsics.push("");
-            await fs.appendFileSync(this.extrinsicsfn, outextrinsics.join("\n"));
-        }
-        if (outevents.length > 0) {
-            outevents.push("");
-            await fs.appendFileSync(this.eventsfn, outevents.join("\n"));
-        }
-        if (outtransfers.length > 0) {
-            outtransfers.push("");
-            await fs.appendFileSync(this.transfersfn, outtransfers.join("\n"));
-        }
-        if (outrewards.length > 0) {
-            outrewards.push("");
-            await fs.appendFileSync(this.rewardsfn, outrewards.join("\n"));
-        }
-        if (outxcms.length > 0) {
-            outxcms.push("");
-            await fs.appendFileSync(this.xcmfn, outxcms.join("\n"));
-        }
-    }
-
-    async close_bqlog() {
-        return (true);
-    }
 
     getSpecVersionAtBlockNumber(chain, bn) {
         if (chain.specVersions == undefined) return (null);
@@ -8277,6 +7975,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return this.specVersion
     }
 
+
     async index_blocks_period(chain, currPeriod = false, jmp = 720) {
         if (currPeriod == false) return
         if (!currPeriod.startBN) return
@@ -8286,6 +7985,8 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
         let indexStartTS = new Date().getTime();
         let specVersion = false
+        let traceParseTS = this.getTraceParseTS()
+
 
         await this.setup_chainParser(chain, this.debugLevel);
         this.resetErrorWarnings()
@@ -8304,7 +8005,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (totalBlkCnt % jmp != 0) totalBatch++
 
         let refreshAPI = false;
-        await this.open_bqlog(chain, indexTS)
+
         for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
             batchN++
             let jmpStartTS = new Date().getTime();
@@ -8390,8 +8091,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     let buildBlockFromRowTS = (new Date().getTime() - buildBlockFromRowStartTS) / 1000
                     this.timeStat.buildBlockFromRowTS += buildBlockFromRowTS
                     this.timeStat.buildBlockFromRow++
-                    let r = await this.index_chain_block_row(rRow, false, true, refreshAPI);
-
+                    let r = await this.index_chain_block_row(rRow, false, true, refreshAPI, false, traceParseTS);
                     let blockNumber = r.blockNumber
                     let blockHash = r.blockHash
                     let parentHash = r.block.header && r.block.header.parentHash ? r.block.header.parentHash : false;
@@ -8459,7 +8159,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (this.debugLevel >= paraTool.debugVerbose) console.log("index_blocks_period: total flush(a-f)", finalFlushTS);
         this.showTimeUsage()
 
-        await this.close_bqlog();
         // record a record in indexlog
         let numIndexingErrors = this.numIndexingErrors;
         if (this.chainParser) {

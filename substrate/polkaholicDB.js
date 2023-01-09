@@ -62,7 +62,7 @@ module.exports = class PolkaholicDB {
     GC_PROJECT = "";
     GC_BIGTABLE_INSTANCE = "";
     GC_BIGTABLE_CLUSTER = "";
-    GC_BIGQUERY_DATASET = "";
+
     GC_STORAGE_BUCKET = "";
 
     POLKAHOLIC_EMAIL_USER = "";
@@ -110,7 +110,7 @@ module.exports = class PolkaholicDB {
                 this.GC_BIGTABLE_INSTANCE = dbconfig.gc.bigtableInstance;
                 this.GC_BIGTABLE_CLUSTER = dbconfig.gc.bigtableCluster;
                 this.GC_STORAGE_BUCKET = dbconfig.gc.storageBucket;
-                this.GC_BIGQUERY_DATASET = dbconfig.gc.bigqueryDataset;
+
             }
             if (dbconfig.ws != undefined) {
                 this.EXTERNAL_WS_PROVIDER_KEY = dbconfig.ws.key;
@@ -202,12 +202,6 @@ module.exports = class PolkaholicDB {
         this.btAPIKeys = this.instance.table(tableAPIKeys);
     }
 
-
-    getBQTable(tbl) {
-        let projectName = this.GC_PROJECT
-        let bigqueryDataset = this.GC_BIGQUERY_DATASET;
-        return `\`${projectName}.${bigqueryDataset}.${tbl}\``;
-    }
 
     convert_dbconfig(c) {
         return {
@@ -1330,6 +1324,11 @@ from chain where chainID = '${chainID}' limit 1`);
 
     getCurrentTS() {
         return Math.round(new Date().getTime() / 1000);
+    }
+
+    getTraceParseTS(maxDaysAgo=31) {
+      let [logDT, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS()-86400*maxDaysAgo);
+      return(paraTool.logDT_hr_to_ts(logDT, 0));
     }
 
     add_index_metadata(c) {
