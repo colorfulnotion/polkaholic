@@ -6571,7 +6571,8 @@ module.exports = class Query extends AssetManager {
         await this.update_batchedSQL();
     }
 
-    async getMultilocation(chainID_or_chainName) {
+    async getMultilocation(chainID_or_chainName, version = 'v1') {
+        console.log(`chainID_or_chainName=${chainID_or_chainName}, version=${version}`)
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         if (chainID === false) return [];
         let relayChain = paraTool.getRelayChainByChainID(chainID)
@@ -6579,6 +6580,7 @@ module.exports = class Query extends AssetManager {
         let multiLocations = []
         for (const xcmInteriorKey of Object.keys(xcmConceptInfoMap)) {
             let v = xcmConceptInfoMap[xcmInteriorKey]
+            let xcmInteriorKeyV = (version.toLowerCase() == 'v2')? paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey) : xcmInteriorKey
             let m = {
                 chainID: v.chainID,
                 paraID: v.paraID,
@@ -6589,7 +6591,7 @@ module.exports = class Query extends AssetManager {
                 decimals: v.decimals,
                 symbol: v.symbol,
                 //parents: v.parents,
-                xcmInteriorKey: v.xcmInteriorKey,
+                xcmInteriorKey: xcmInteriorKeyV,
                 xcmV1MultiLocationHex: v.xcmV1MultiLocationHex,
                 xcmV1MultiLocation: JSON.parse(v.xcmV1MultiLocation),
                 evmMultiLocation: JSON.parse(v.evmMultiLocation),

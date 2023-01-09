@@ -118,7 +118,7 @@ function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = 'polkadot
         let assetUnparsed = (pieces.length > 1) ? pieces[1] : undefined;
         */
         let pieces = JSON.parse(xcmInteriorKey)
-        console.log(`xcmInteriorKey=${xcmInteriorKey}`, pieces)
+        //console.log(`xcmInteriorKey=${xcmInteriorKey}`, pieces)
         let network = pieces.shift()
         let assetUnparsed = {}
         if (pieces.length == 1) {
@@ -177,6 +177,94 @@ function convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation, api = false) {
         console.log(`xcmV1MultiLocation_to_byte error`, JSON.stringify(xcmV1MultiLocation, null, 4), e)
     }
     return multiLocationHex
+}
+
+function decodeNetwork(network){
+    let relayChain = 'null';
+    if (network.network != undefined) relayChain = network.network
+    if (network.named != undefined) relayChain = hexToString(network.named)
+    return relayChain
+}
+
+function encodeNetwork(relayChain = 'kusama'){
+    let network = {}
+    if (relayChain == 'kusama' || relayChain == 'polkadot') {
+        network = {
+            network: relayChain
+        }
+    } else {
+        network = {
+            named: stringToHex(relayChain)
+        }
+    }
+    return network
+}
+
+//'[{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]~polkadot' -> [{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]
+// polkadot-here -> [{"network":"polkadot"},"here"]
+function convertXcmInteriorKeyV1toV2(xcmInteriorKeyV1 = '[{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]~polkadot'){
+    var [xcmInteriorKey, relayChain] = parseXcmInteriorKeyV1(xcmInteriorKeyV1)
+    let network = encodeNetwork(relayChain)
+    if (xcmInteriorKey == 'here'){
+        xcmInteriorKey = '"here"'
+    }
+    return makeXcmInteriorKeyV2(xcmInteriorKey, network)
+}
+
+//[{"network":"polkadot"},"here"] -> polkadot-here
+function convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2 = '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]'){
+    var [network, xcmInteriorKey] = parseXcmInteriorKeyV2(xcmInteriorKeyV2)
+    let relayChain = decodeNetwork(network)
+    if (xcmInteriorKey == '"here"'){
+        xcmInteriorKey = 'here'
+    }
+    return makeXcmInteriorKeyV1(xcmInteriorKey, relayChain)
+}
+
+function parseXcmInteriorKeyV2(xcmInteriorKey = '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]') {
+    /*
+    let pieces = xcmInteriorKey.split(assetChainSeparator);
+    let relayChain = pieces[1];
+    let assetUnparsed = (pieces.length > 1) ? pieces[1] : undefined;
+    */
+    try {
+        let pieces = JSON.parse(xcmInteriorKey)
+        console.log(`xcmInteriorKey=${xcmInteriorKey}`, pieces)
+        let network = pieces.shift()
+        let assetUnparsed = {}
+        if (pieces.length == 1) {
+            assetUnparsed = JSON.stringify(pieces[0])
+        } else {
+            assetUnparsed = JSON.stringify(pieces)
+        }
+        return [network, assetUnparsed];
+    } catch (e) {
+        return [false, false]
+    }
+}
+
+function makeXcmInteriorKeyV2(interiorStr, network = {
+    network: 'kusama'}) {
+    let interior = JSON.parse(interiorStr)
+    let globalInterior = [network]
+    if (Array.isArray(interior)) {
+        globalInterior = globalInterior.concat(interior);
+    } else {
+        globalInterior.push(interior)
+    }
+    //return (relayChain + assetChainSeparator + interior);
+    return JSON.stringify(globalInterior)
+}
+
+function makeXcmInteriorKeyV1(interior, relayChain = 'kusama') {
+    return (interior + assetChainSeparator + relayChain);
+}
+
+function parseXcmInteriorKeyV1(xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
+    let pieces = xcmInteriorKey.split(assetChainSeparator);
+    let assetUnparsed = pieces[0];
+    let relayChain = (pieces.length > 1) ? pieces[1] : undefined;
+    return [assetUnparsed, relayChain];
 }
 
 module.exports = {
@@ -381,57 +469,47 @@ module.exports = {
         return stringToHex(x)
     },
 
-    makeAssetChain: function(asset, k = 'relaychain-paraID') {
-        //return (asset + assetChainSeparator + k);
-        return (asset + assetChainSeparator + k);
+    makeAssetChain: function(asset, chainkey = 'relaychain-paraID') {
+        return (asset + assetChainSeparator + chainkey);
     },
 
-    /*
     parseAssetChain: function(assetChainkey) {
         let pieces = assetChain.split(assetChainSeparator);
         let assetUnparsed = pieces[0];
-        let chainID = (pieces.length > 1) ? parseInt(pieces[1], 10) : undefined;
-        return [assetUnparsed, chainID];
+        let chainkey = (pieces.length > 1) ? pieces[1] : undefined;
+        return [assetUnparsed, chainkey];
+    },
+
+    /*
+    makeXcmInteriorKeyV1: function(interior, relayChain = 'kusama') {
+        return makeXcmInteriorKeyV1(interior, relayChain)
+    },
+    parseXcmInteriorKeyV1: function (xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
+        return parseXcmInteriorKeyV1(xcmInteriorKey);
+    },
+    makeXcmInteriorKeyV2: function(interior, relayChain = 'kusama') {
+        return makeXcmInteriorKeyV2(interior, relayChain)
+    },
+    parseXcmInteriorKeyV2: function (xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
+        return parseXcmInteriorKeyV2(xcmInteriorKey);
     },
     */
-
-    makeXcmInteriorKeyOLD: function(interior, relayChain = 'kusama') {
-        return (relayChain + assetChainSeparator + interior);
-        //return (interior + assetChainSeparator + relayChain);
-    },
+    /*
+    paraTool uses older XcmInteriorKeyV1 format, whereas garTool uses XcmInteriorKeyV2 format
+    */
     makeXcmInteriorKey: function(interiorStr, network = {
         network: 'kusama'
-    }) {
-        let interior = JSON.parse(interiorStr)
-        let globalInterior = [network]
-        if (Array.isArray(interior)) {
-            globalInterior = globalInterior.concat(interior);
-        } else {
-            globalInterior.push(interior)
-        }
-        //return (relayChain + assetChainSeparator + interior);
-        return JSON.stringify(globalInterior)
+    }){
+        return makeXcmInteriorKeyV2(interiorStr, network)
     },
-    parseXcmInteriorKey: function(xcmInteriorKey = 'kusama~[{"parachain":2023},{"palletInstance":10}]') {
-        /*
-        let pieces = xcmInteriorKey.split(assetChainSeparator);
-        let relayChain = pieces[1];
-        let assetUnparsed = (pieces.length > 1) ? pieces[1] : undefined;
-        */
-        try {
-            let pieces = JSON.parse(xcmInteriorKey)
-            console.log(`xcmInteriorKey=${xcmInteriorKey}`, pieces)
-            let network = pieces.shift()
-            let assetUnparsed = {}
-            if (pieces.length == 1) {
-                assetUnparsed = JSON.stringify(pieces[0])
-            } else {
-                assetUnparsed = JSON.stringify(pieces)
-            }
-            return [network, assetUnparsed];
-        } catch (e) {
-            return [false, false]
-        }
+    parseXcmInteriorKey: function(xcmInteriorKey = '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]') {
+        return parseXcmInteriorKeyV2(xcmInteriorKey)
+    },
+    convertXcmInteriorKeyV1toV2: function(xcmInteriorKeyV1){
+        return convertXcmInteriorKeyV1toV2(xcmInteriorKeyV1)
+    },
+    convertXcmInteriorKeyV2toV1: function(xcmInteriorKeyV2){
+        return convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2)
     },
     cleanedAssetID: function(assetID) {
         return toNumWithoutComma(assetID);

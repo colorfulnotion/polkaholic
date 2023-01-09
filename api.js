@@ -699,7 +699,8 @@ app.get('/q/:q', async (req, res) => {
 app.get('/xcm/multilocation/:chainID_or_chainName', async (req, res) => {
     try {
         let chainID_or_chainName = req.params["chainID_or_chainName"]
-        let mRes = await query.getMultilocation(chainID_or_chainName);
+        let version = req.query['v'] ? req.query['v'] : 'v1';
+        let mRes = await query.getMultilocation(chainID_or_chainName, version);
         if (mRes) {
             res.write(JSON.stringify(mRes));
             await query.tallyAPIKey(getapikey(req));
@@ -924,7 +925,26 @@ app.get('/event/:eventID', async (req, res) => {
     }
 })
 
-app.get('/gar/', async (req, res) => {
+app.get('/gar/:chainID_or_chainName', async (req, res) => {
+    try {
+        let chainID_or_chainName = req.params["chainID_or_chainName"]
+        let version = req.query['v'] ? req.query['v'] : 'v2';
+        let mRes = await query.getMultilocation(chainID_or_chainName, version);
+        if (mRes) {
+            res.write(JSON.stringify(mRes));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+app.get('/garendpoints/', async (req, res) => {
     try {
         let ev = await query.getGARSupportedList();
         if (ev) {

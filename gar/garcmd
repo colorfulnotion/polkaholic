@@ -6,9 +6,13 @@ const endpoints = require("./endpoints");
 
 async function main() {
     var targetedRelaychain = 'polkadot'
+    var targetedParaID = 'all'
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             targetedRelaychain = val;
+        }
+        if (index == 3 && val.length > 0) {
+            targetedParaID = val;
         }
     });
 
@@ -17,21 +21,27 @@ async function main() {
     let supportedChains = gar.getSupportedChains()
     let supportedChainKeys = Object.keys(supportedChains)
     let supportedChainHelper = gar.printChainhelper()
-    console.log(`[${targetedRelaychain}] SupportedChains`, supportedChainHelper)
 
+    console.log(`[${targetedRelaychain}] SupportedChains`, supportedChainHelper)
+    if(targetedParaID != 'all') {
+        chainkey = `${targetedRelaychain}-${targetedParaID}`
+        supportedChainKeys = [chainkey]
+    }
     let failedChainkeys = await gar.batchApiInit(supportedChainKeys)
     console.log(`failedChainkeys`, failedChainkeys)
     for (chainkey of supportedChainKeys){
-        let api = await gar.getAPI(chainkey)
-        if (api){
-            await gar.crawlRegistry(api, chainkey)
+        let crawler = await gar.getCrawler(chainkey)
+        if (crawler){
+            await gar.crawlRegistry(crawler)
         }
     }
     let chainAssetMap = gar.getchainAssetMap()
     let xcmAssetMap = gar.getXcmAssetMap()
     console.log(`AssetMap`, chainAssetMap)
     console.log(`XcmAssetMap`, xcmAssetMap)
-    await gar.updateXcmConcept()
+    if(targetedParaID == 'all') {
+        await gar.updateXcmConcept()
+    }
 }
 
 main()
