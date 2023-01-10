@@ -3242,24 +3242,6 @@ CREATE TABLE `blockunfinalized` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `bqlog`
---
-
-DROP TABLE IF EXISTS `bqlog`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `bqlog` (
-  `logDT` date NOT NULL,
-  `indexTS` int(11) DEFAULT NULL,
-  `loadDT` datetime DEFAULT NULL,
-  `loaded` tinyint(4) DEFAULT '0',
-  `readyForIndexing` tinyint(4) DEFAULT '0',
-  PRIMARY KEY (`logDT`),
-  UNIQUE KEY `logDT` (`logDT`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `chain`
 --
 
@@ -3724,8 +3706,6 @@ CREATE TABLE `indexlog` (
   `numIndexingWarns` int(11) DEFAULT '0',
   `attempted` int(11) DEFAULT '0',
   `lastAttemptStartDT` datetime DEFAULT NULL,
-  `bqlogExtrinsics` tinyint(4) DEFAULT '0',
-  `bqlogEvents` tinyint(4) DEFAULT '0',
   PRIMARY KEY (`chainID`,`indexTS`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -4234,7 +4214,7 @@ CREATE TABLE `xcmtransferdestcandidate` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- GTID state at the end of the backup 
+-- GTID state at the end of the backup
 --
 
 SET @@GLOBAL.GTID_PURGED='7ce1b1ea-f5c8-11ec-b2f4-42010a000104:1-51214111';

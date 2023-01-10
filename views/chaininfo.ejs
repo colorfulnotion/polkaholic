@@ -20,7 +20,7 @@
     <th scope="col">Public WS Endpoint(s)</th>
     <td>
    <%
-   let traceCoverage = ( chain.blocksFinalized > 0 ) ? 100.0 * chain.numTraces / chain.blocksFinalized : 0;
+
     let endpoints = uiTool.getPublicWSEndpoints(chain);
     let endpointlinks = endpoints.map( (e) => {
        return  `<a href='https://polkadot.js.org/apps/?rpc=${encodeURIComponent(e)}' target='_new'>${e}</a>`
@@ -28,9 +28,6 @@
    %>
    <%- endpointlinks.join(" | ") %>
     </td>
-   </tr>
-   <tr>
-    <th scope="col">Trace Coverage</th><td><%= chain.numTraces %> traces (<%= traceCoverage; %>%)</td>
    </tr>
    <tr>
     <th scope="col">SS58 Prefix</th><td><%= chain.ss58Format %></td>

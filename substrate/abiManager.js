@@ -15,9 +15,6 @@ const ethTool = require("./ethTool");
 // [3]:  00000000000000000000000000000000000000000000000000000000617c5b7d
 const Web3 = require('web3')
 const web3 = new Web3();
-const {
-    BigQuery
-} = require('@google-cloud/bigquery');
 
 function generateMethodOutput(methodString) {
     var methodInputs = [];
