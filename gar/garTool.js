@@ -34,6 +34,13 @@ const {
     stringToHex
 } = require("@polkadot/util");
 
+function dechexToInt(number) {
+    if (number && typeof number == "string" && (number.length > 2) && number.substring(0, 2) == "0x") {
+        return parseInt(number);
+    }
+    return parseInt(number)
+}
+
 function dechexAssetID(number) {
     if ((number.length > 2) && number.substring(0, 2) == "0x") {
         let n = hexToBn(number)
@@ -179,14 +186,14 @@ function convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation, api = false) {
     return multiLocationHex
 }
 
-function decodeNetwork(network){
+function decodeNetwork(network) {
     let relayChain = 'null';
     if (network.network != undefined) relayChain = network.network
     if (network.named != undefined) relayChain = hexToString(network.named)
     return relayChain
 }
 
-function encodeNetwork(relayChain = 'kusama'){
+function encodeNetwork(relayChain = 'kusama') {
     let network = {}
     if (relayChain == 'kusama' || relayChain == 'polkadot') {
         network = {
@@ -202,20 +209,20 @@ function encodeNetwork(relayChain = 'kusama'){
 
 //'[{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]~polkadot' -> [{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]
 // polkadot-here -> [{"network":"polkadot"},"here"]
-function convertXcmInteriorKeyV1toV2(xcmInteriorKeyV1 = '[{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]~polkadot'){
+function convertXcmInteriorKeyV1toV2(xcmInteriorKeyV1 = '[{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]~polkadot') {
     var [xcmInteriorKey, relayChain] = parseXcmInteriorKeyV1(xcmInteriorKeyV1)
     let network = encodeNetwork(relayChain)
-    if (xcmInteriorKey == 'here'){
+    if (xcmInteriorKey == 'here') {
         xcmInteriorKey = '"here"'
     }
     return makeXcmInteriorKeyV2(xcmInteriorKey, network)
 }
 
 //[{"network":"polkadot"},"here"] -> polkadot-here
-function convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2 = '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]'){
+function convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2 = '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]') {
     var [network, xcmInteriorKey] = parseXcmInteriorKeyV2(xcmInteriorKeyV2)
     let relayChain = decodeNetwork(network)
-    if (xcmInteriorKey == '"here"'){
+    if (xcmInteriorKey == '"here"') {
         xcmInteriorKey = 'here'
     }
     return makeXcmInteriorKeyV1(xcmInteriorKey, relayChain)
@@ -244,7 +251,8 @@ function parseXcmInteriorKeyV2(xcmInteriorKey = '[{"network":"polkadot"},{"parac
 }
 
 function makeXcmInteriorKeyV2(interiorStr, network = {
-    network: 'kusama'}) {
+    network: 'kusama'
+}) {
     let interior = JSON.parse(interiorStr)
     let globalInterior = [network]
     if (Array.isArray(interior)) {
@@ -469,6 +477,13 @@ module.exports = {
         return stringToHex(x)
     },
 
+    dechexToInt: function(number) {
+        return dechexToInt(number);
+    },
+    dechexAssetID: function(number) {
+        return dechexAssetID(number);
+    },
+
     makeAssetChain: function(asset, chainkey = 'relaychain-paraID') {
         return (asset + assetChainSeparator + chainkey);
     },
@@ -499,20 +514,23 @@ module.exports = {
     */
     makeXcmInteriorKey: function(interiorStr, network = {
         network: 'kusama'
-    }){
+    }) {
         return makeXcmInteriorKeyV2(interiorStr, network)
     },
     parseXcmInteriorKey: function(xcmInteriorKey = '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]') {
         return parseXcmInteriorKeyV2(xcmInteriorKey)
     },
-    convertXcmInteriorKeyV1toV2: function(xcmInteriorKeyV1){
+    convertXcmInteriorKeyV1toV2: function(xcmInteriorKeyV1) {
         return convertXcmInteriorKeyV1toV2(xcmInteriorKeyV1)
     },
-    convertXcmInteriorKeyV2toV1: function(xcmInteriorKeyV2){
+    convertXcmInteriorKeyV2toV1: function(xcmInteriorKeyV2) {
         return convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2)
     },
     cleanedAssetID: function(assetID) {
         return toNumWithoutComma(assetID);
+    },
+    toNumWithComma: function(tx) {
+        return toNumWithComma(tx)
     },
     firstCharLowerCase: function(inp) {
         if (inp.toUpperCase() == inp) { // if the whole thing is uppercase, then return all lowercase

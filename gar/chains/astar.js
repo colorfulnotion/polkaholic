@@ -11,12 +11,12 @@ module.exports = class AstarParser extends ChainParser {
 
 
     //step 1: parse gar pallet, storage
-    async fetchGar(chainkey){
+    async fetchGar(chainkey) {
         await this.fetchAssetPallet(chainkey)
     }
 
     //step 2: parse xcGar pallet, storage
-    async fetchXcGar(chainkey){
+    async fetchXcGar(chainkey) {
         await this.fetchXCMAssetIdToLocation(chainkey)
     }
 
@@ -27,9 +27,9 @@ module.exports = class AstarParser extends ChainParser {
         that uses the same/similar logic. The parser should redirect itself to
         the proper section
         */
-        if (a){
+        if (a) {
             let assetList = this.processGarAsset(chainkey, a)
-            for (const assetChainkey of Object.keys(assetList)){
+            for (const assetChainkey of Object.keys(assetList)) {
                 let assetInfo = assetList[assetChainkey]
                 this.manager.setChainAsset(assetChainkey, assetInfo)
             }
@@ -43,17 +43,17 @@ module.exports = class AstarParser extends ChainParser {
         let paraIDSoure = pieces[1]
         var a = await super.fetchQuery(chainkey, this.xcGarPallet, this.xcGarStorage, 'xcGAR')
         if (!a) return
-        if (a){
+        if (a) {
             let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXCMAssetIdToLocation(chainkey, a)
             console.log(`Astar custom xcAssetList=${Object.keys(xcAssetList)},updatedAssetList=${Object.keys(updatedAssetList)},unknownAsset=${Object.keys(unknownAsset)}`, xcAssetList)
-            for (const xcmInteriorKey of Object.keys(xcAssetList)){
+            for (const xcmInteriorKey of Object.keys(xcAssetList)) {
                 let xcmAssetInfo = xcAssetList[xcmInteriorKey]
                 let assetID = assetIDList[xcmInteriorKey]
                 this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
                 this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
                 this.manager.addXcmAssetLocalxcContractAddress(xcmInteriorKey, paraIDSoure, assetID)
             }
-            for (const assetChainkey of Object.keys(updatedAssetList)){
+            for (const assetChainkey of Object.keys(updatedAssetList)) {
                 let assetInfo = updatedAssetList[assetChainkey]
                 this.manager.setChainAsset(assetChainkey, assetInfo, true)
             }
