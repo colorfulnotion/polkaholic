@@ -1108,7 +1108,8 @@ module.exports = class XCMManager extends Query {
                 matchedExtrinsicID = '${d.destExtrinsicID}',
                 matchedEventID = '${d.eventID}',
                 xcmInfoAudited = '1',
-                xcmInfo = ${xcmInfoBlob}
+                xcmInfo = ${xcmInfoBlob},
+                xcmInfolastUpdateDT = Now()
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
                     //console.log(`match_xcm (B)`)
                     //console.log(paraTool.removeNewLine(sqlB))
@@ -1359,7 +1360,8 @@ module.exports = class XCMManager extends Query {
                 matchedExtrinsicID = '${d.destExtrinsicID}',
                 matchedEventID = '${d.eventID}',
                 xcmInfoAudited = '1',
-                xcmInfo = ${xcmInfoBlob}
+                xcmInfo = ${xcmInfoBlob},
+                xcmInfolastUpdateDT = Now()
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
                     //console.log(`match_xcmtransact (B)`, paraTool.removeNewLine(sqlB))
                     this.batchedSQL.push(sqlB);
@@ -1611,7 +1613,8 @@ module.exports = class XCMManager extends Query {
                 matchedExtrinsicID = ${matchedExtrinsicID},
                 matchedEventID = ${matchedEventID},
                 xcmInfoAudited = '1',
-                xcmInfo = ${xcmInfoBlob}
+                xcmInfo = ${xcmInfoBlob},
+                xcmInfolastUpdateDT = Now()
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
                     //console.log(`match_xcm_failure (B)`, paraTool.removeNewLine(sqlB))
                     this.batchedSQL.push(sqlB);

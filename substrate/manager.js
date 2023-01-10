@@ -721,7 +721,7 @@ module.exports = class Manager extends AssetManager {
     }
 
     async clean_recent(tbl, minLogDT = '2022-06-12') {
-        
+
     }
 
     async update_xcm_log(lookback = 30) {

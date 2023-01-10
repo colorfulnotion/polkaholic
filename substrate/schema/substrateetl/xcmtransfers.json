@@ -63,5 +63,10 @@
     "mode": "NULLABLE",
     "name": "xcm_info",
     "type": "JSON"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "xcm_info_last_update_time",
+    "type": "TIMESTAMP"
   }
 ]

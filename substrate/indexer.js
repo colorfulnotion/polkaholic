@@ -1291,6 +1291,9 @@ module.exports = class Indexer extends AssetManager {
             }
             let sqlDebug = true
             this.xcmtransfer = {};
+            // TODO: adjust upsertSQL to use existing matched value and finalization -- then xcmInfo in xcmInfo column, not pendingXcmInfo 
+            //  unfinalized (isTip = true) -- do not NOT replace;
+            //  finalized : if matched=1 -- do NOT replace; matched=0 - REPLACE 
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
@@ -7540,11 +7543,10 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 await this.chainParser.updateLiquidityInfo(this)
             }
             if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
-                //console.log(`Fetch assetRegistry:currencyMetadatas`)
-                //await this.chainParser.fetchAssetRegistry(this)
-                await this.chainParser.fetchAssetRegistryCurrencyMetadatas(this)
-                console.log(`Fetch assetRegistry:currencyIdToLocations`)
-                await this.chainParser.fetchXCMAssetRegistryLocations(this)
+                // TODO: use clean GAR model instead of this ...
+                //await this.chainParser.fetchAssetRegistryCurrencyMetadatas(this)
+                //console.log(`Fetch assetRegistry:currencyIdToLocations`)
+                //await this.chainParser.fetchXCMAssetRegistryLocations(this)
             }
         } else if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya ||
             this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta ||
@@ -7615,16 +7617,16 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 let forceParseTrace = false
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
-                if ( blockTS >= traceParseTS ) {
-                  if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0) || forceParseTrace) {
-                      if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
-                      autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
-                  } else {
-                      // SKIP PROCESSING since we covered autotrace generation already
-                      if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
-                      autoTraces = r.autotrace;
-                  }
-                  await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // use result from rawtrace to decorate
+                if (blockTS >= traceParseTS) {
+                    if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0) || forceParseTrace) {
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
+                        autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
+                    } else {
+                        // SKIP PROCESSING since we covered autotrace generation already
+                        if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
+                        autoTraces = r.autotrace;
+                    }
+                    await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // use result from rawtrace to decorate
                 }
 
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
@@ -8178,7 +8180,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"]
         });
 
-	await this.upsertSQL({
+        await this.upsertSQL({
             "table": "substrateetllog",
             "keys": ["chainID", "logDT"],
             "vals": ["loaded", "audited"],
