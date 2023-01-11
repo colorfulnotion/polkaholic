@@ -32,8 +32,27 @@ module.exports = class ChainParser {
         return (typeof val === 'object');
     }
 
+    async detectPalletStorage(chainkey, pallet, storage) {
+        try {
+            let api = this.api
+            if (!api) {
+                console.log(`[fetchAsset] Fatal: ${chainkey} api not initiated`)
+                return false
+            }
+            var a = await api.query[pallet][storage].entries()
+            if (!a) {
+                console.log(`[${chainkey}] detectPalletStorage [${pallet}:${storage}] detected!`)
+                return true
+            }
+        } catch (e) {
+            console.log(`err [${chainkey}] detectPalletStorage [${pallet}:${storage}] not detected!`)
+            return false
+        }
+        console.log(`[${chainkey}] detectPalletStorage [${pallet}:${storage}] not detected!`)
+        return false
+    }
+
     async getSystemProperties(chainkey) {
-        //let chainID = chain.chainID;
         let api = this.api
         if (!api) {
             console.log(`[getSystemProperties] Fatal: ${chainkey} api not initiated`)
@@ -61,13 +80,14 @@ module.exports = class ChainParser {
                 let assetChainkey = garTool.makeAssetChain(asset, chainkey);
                 console.log(`[${chainkey}] assetChainkey=${assetChainkey}`, assetInfo)
                 this.manager.setChainAsset(assetChainkey, assetInfo)
-                if (i == 0){
+                if (i == 0) {
                     this.nativeAsset = assetInfo
                     this.nativeAsset.assetChainkey = assetChainkey
                 }
             }
         }
     }
+
 
     async fetchQuery(chainkey, pallet, storage, queryType = 'GAR') {
         let api = this.api
@@ -84,7 +104,7 @@ module.exports = class ChainParser {
         return a
     }
 
-    processGarAsset(chainkey, a) {
+    processGarAssetPallet(chainkey, a) {
         let assetList = {}
         for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
@@ -96,13 +116,14 @@ module.exports = class ChainParser {
             }
             var asset = JSON.stringify(parsedAsset);
             let assetChainkey = garTool.makeAssetChain(asset, chainkey);
-            if (this.isMatched(chainkey, ['kusama-2118|listen'])) assetMetadata = assetMetadata.metadata
+
+            if (assetMetadata.metadata != undefined) assetMetadata = assetMetadata.metadata //kusama-2118|listen has extra metadata
             if (assetMetadata.decimals !== false && assetMetadata.symbol) {
                 let name = (assetMetadata.name != undefined) ? assetMetadata.name : `${assetMetadata.symbol}` //kusama-2090|basilisk doens't have assetName, use symbol in this case
                 let assetInfo = {
                     name: name,
                     symbol: assetMetadata.symbol,
-                    decimals: assetMetadata.decimals,
+                    decimals: garTool.dechexToInt(assetMetadata.decimals),
                     assetType: garTool.assetTypeToken,
                     currencyID: assetID
                 };
@@ -136,70 +157,19 @@ module.exports = class ChainParser {
     'kusama-2012|shadow'
     ]
     */
-    /*
-    [hydra]assetRegistry:assetMetadataMap
-    [listen]currencies:listenAssetsInfo
-    [generic] asset:metadata
-    */
-    async fetchAssetPallet(chainkey) {
-        let api = this.api
-        if (!api) {
-            console.log(`[fetchAssetPallet] Fatal: ${chainkey} api not initiated`)
-            return
-        }
-        /* each parachain team may have slightly different pallet:storage name
-        that uses the same/similar logic. The parser should redirect itself to
-        the proper section
-        */
-        var pallet, storage; // where GAR is stored (i.e asset:metadata for statemine's GAR)
-        if (this.isMatched(chainkey, ['kusama-2118|listen'])) {
-            pallet = 'currencies'
-            storage = 'listenAssetsInfo'
-        } else if (this.isMatched(chainkey, ['polkadot-2034|hydra', 'kusama-2090|basilisk'])) {
-            pallet = 'assetRegistry'
-            storage = 'assetMetadataMap'
-        } else {
-            pallet = 'assets'
-            storage = 'metadata'
-        }
-        console.log(`[${chainkey}] selected GAR - ${pallet}:${storage}`)
-        var a = await api.query[pallet][storage].entries()
-        if (!a) {
-            console.log(`[${chainkey}] onchain GAR not found - returned`)
-            return
-        }
-        let assetList = {}
-        for (let i = 0; i < a.length; i++) {
-            let key = a[i][0];
-            let val = a[i][1];
-            let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
-            let assetMetadata = val.toHuman()
-            let parsedAsset = {
-                Token: assetID
-            }
-            var asset = JSON.stringify(parsedAsset);
-            let assetChainkey = garTool.makeAssetChain(asset, chainkey);
-            if (this.isMatched(chainkey, ['kusama-2118|listen'])) assetMetadata = assetMetadata.metadata
-            if (assetMetadata.decimals !== false && assetMetadata.symbol) {
-                let name = (assetMetadata.name != undefined) ? assetMetadata.name : `${assetMetadata.symbol}` //kusama-2090|basilisk doens't have assetName, use symbol in this case
-                let assetInfo = {
-                    name: name,
-                    symbol: assetMetadata.symbol,
-                    decimals: assetMetadata.decimals,
-                    assetType: garTool.assetTypeToken,
-                    currencyID: assetID
-                };
-                if (this.isMatched(chainkey, ['polkadot-2012|parallel', 'kusama-2085|heiko'])) {
-                    if (assetInfo.symbol.includes('LP-')) assetInfo.assetType = garTool.assetTypeLiquidityPair
-                    //console.log('im here fetchAssetPallet assetInfo', assetInfo)
-                }
-                assetList[assetChainkey] = assetInfo
+    async processCommonAssetPalletGar(chainkey, garPallet = 'assets', garStorage = 'metadata') {
+        console.log(`[${chainkey}] Generic GAR parser`)
+        //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
+        let a = await this.fetchQuery(chainkey, garPallet, garStorage, 'GAR')
+        if (a) {
+            // step 1: use common Asset pallet parser func available at generic chainparser.
+            let assetList = this.processGarAssetPallet(chainkey, a)
+            // step 2: load up results
+            for (const assetChainkey of Object.keys(assetList)) {
+                let assetInfo = assetList[assetChainkey]
                 this.manager.setChainAsset(assetChainkey, assetInfo)
-            } else {
-                //if (this.debugLevel >= garTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
             }
         }
-        console.log(`[${chainkey}] onchain GAR:`, assetList);
     }
 
     /* Token Pallet Parsing
@@ -210,31 +180,22 @@ module.exports = class ChainParser {
     'polkadot-2030|bifrost', 'kusama-2001|bifrost'
     ]
     */
-    /*
-    [bifrost] assetRegistry:currencyMetadatas - TODO
-    [acala] assetRegistry:assetMetadatas
-    */
-    async fetchTokenPallet(chainkey) {
-        let api = this.api
-        if (!api) {
-            console.log(`[fetchTokenPallet] Fatal: ${chainkey} api not initiated`)
-            return
+    async processCommonTokensPalletGar(chainkey, garPallet = 'assetRegistry', garStorage = 'assetMetadatas') {
+        console.log(`[${chainkey}] Generic GAR parser`)
+        //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
+        let a = await super.fetchQuery(chainkey, garPallet, garStorage, 'GAR')
+        if (a) {
+            // step 1: use common Asset pallet parser func available at generic chainparser.
+            let assetList = this.processGarTokensPallet(chainkey, a)
+            // step 2: load up results
+            for (const assetChainkey of Object.keys(assetList)) {
+                let assetInfo = assetList[assetChainkey]
+                this.manager.setChainAsset(assetChainkey, assetInfo)
+            }
         }
-        /* each parachain team may have slightly different pallet:storage name
-        that uses the same/similar logic. The parser should redirect itself to
-        the proper section
-        */
-        var pallet, storage; // where GAR is stored (i.e assetRegistry:assetMetadatas for acala GAR)
-        if (this.isMatched(chainkey, ['polkadot-2030|bifrost', 'kusama-2001|bifrost'])) {
-            pallet = 'assetRegistry'
-            storage = 'currencyMetadatas'
-        } else if (this.isMatched(chainkey, ['polkadot-2000|acala', 'kusama-2000|karura'])) {
-            pallet = 'assetRegistry'
-            storage = 'assetMetadatas'
-        }
-        console.log(`[${chainkey}] selected GAR - ${pallet}:${storage}`)
-        var a = await api.query[pallet][storage].entries()
-        if (!a) return
+    }
+
+    processGarTokensPallet(chainkey, a) {
         let assetList = {}
         // ForeignAssetId/{"NativeAssetId":{"Token":"XXX"}}/{"Erc20":"0x1f3a10587a20114ea25ba1b388ee2dd4a337ce27"}/{"StableAssetId":"0"}
         // remove the Id prefix here
@@ -269,184 +230,29 @@ module.exports = class ChainParser {
                 let assetInfo = {
                     name: name,
                     symbol: symbol,
-                    decimals: assetMetadata.decimals,
+                    decimals: garTool.dechexToInt(assetMetadata.decimals),
                     assetType: garTool.assetTypeToken
                 };
                 assetList[assetChainkey] = assetInfo
                 console.log(`addAssetInfo [${asset}]`, assetInfo)
-                this.manager.setChainAsset(assetChainkey, assetInfo)
+                //this.manager.setChainAsset(assetChainkey, assetInfo)
             } else {
                 //if (this.debugLevel >= garTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
             }
         }
         console.log(`[${chainkey}] onchain GAR:`, assetList);
+        return assetList
     }
 
-
-    /* Asset Pallet Parsing
-    Fetch xcm asset registry for parachain that uses similar assetRegistry pallet, currently
-    covering the following chains:
+    /* XC Registry Parsing
+    Format Key - AssetID Val - {assetIdType}
+    Fetch xcm asset registry for parachain that uses similar assetRegistry pallet,
+    currently covering the following chains:
     [
-    'polkadot-2004|moonbeam', 'kusama-2023|moonriver',
-    'polkadot-2012|parallel', 'kusama-2085|heiko'
-    'polkadot-2034|hydra', 'kusama-2090|basilisk'
-    'kusama-2012|shadow'
+    'polkadot-2006|astar', 'kusama-2007|shiden', 'kusama-2012|shadow', 'kusama-2084|calamari'
     ]
     */
-    /*
-    [Moonbeam/Shadow] assetManager:assetIdType
-    [Parallel] assetRegistry:assetIdType
-    [Hydra] assetRegistry.assetLocations
-    */
-    async fetchXCMAssetIdType(chainkey) {
-        let api = this.api
-        if (!api) {
-            console.log(`[fetchXCMAssetIdType] Fatal: ${chainkey} api not initiated`)
-            return
-        }
-        let pieces = chainkey.split('-')
-        let relayChain = pieces[0]
-        let paraIDSoure = pieces[1]
-        //let relayChainID = garTool.getRelayChainID(relayChain)
-        //let paraIDExtra = garTool.getParaIDExtra(relayChain)
-
-        var pallet, storage; // where xcGAR is stored (i.e xcAssetConfig:assetIdToLocation)
-        if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver', 'kusama-2012|shadow'])) {
-            pallet = 'assetManager'
-            storage = 'assetIdType'
-        } else if (this.isMatched(chainkey, ['polkadot-2012|parallel', 'kusama-2085|heiko'])) {
-            pallet = 'assetRegistry'
-            storage = 'assetIdType'
-        } else if (this.isMatched(chainkey, ['polkadot-2034|hydra', 'kusama-2090|basilisk'])) {
-            pallet = 'assetRegistry'
-            storage = 'assetLocations'
-        }
-        console.log(`[${chainkey}] selected xcGAR - ${pallet}:${storage}`)
-        var a = await api.query[pallet][storage].entries()
-        if (!a) return
-        let assetList = {}
-        for (let i = 0; i < a.length; i++) {
-            let key = a[i][0];
-            let val = a[i][1];
-            let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
-            let parsedAsset = {
-                Token: assetID
-            }
-            let paraID = 0
-            let chainID = -1
-            var asset = JSON.stringify(parsedAsset);
-            let assetChainkey = garTool.makeAssetChain(asset, chainkey);
-            let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
-            if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
-                console.log(`cached AssetInfo found`, cachedAssetInfo)
-                let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol.replace('xc', '') : ''
-                let nativeSymbol = symbol
-                let xcmAssetJSON = val.toJSON()
-                let xcmAsset = (xcmAssetJSON.xcm != undefined) ? xcmAssetJSON.xcm : xcmAssetJSON
-                let parents = xcmAsset.parents
-                let interior = xcmAsset.interior
-                //x1/x2/x3 refers to the number to params
-                let interiorK = Object.keys(interior)[0]
-                let interiork = garTool.firstCharLowerCase(interiorK)
-                let interiorV = interior[interiorK]
-                let interiorVStr = JSON.stringify(interiorV)
-                /*
-                //old xcmInteriorKey format
-                if (((interiorK == 'here') || (interiork == "here")) && interior[interiorK] == null) {
-                    interiorVStr = 'here'
-                    //chainID = relayChainID
-                }
-                let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, relayChain)
-                */
-                let network = {}
-                if (relayChain == 'kusama' || relayChain == 'polkadot') {
-                    network = {
-                        network: relayChain
-                    }
-                } else {
-                    network = {
-                        named: garTool.stringToHex(relayChain)
-                    }
-                }
-                if ((interiork == 'here' || interiork == 'Here') && interior[interiorK] == null) {
-                    interiorVStr = '"here"'
-                }
-                let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
-                let xcmV1MultiLocation = garTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                let xcmV1MultilocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
-                if ((typeof interiorK == "string") && (interiorK.toLowerCase() == 'here')) {
-                    //relaychain case
-                    //chainID = relayChainID
-                } else if (interiorK == 'x1') {
-                    paraID = interiorV['parachain']
-                    //chainID = paraID + paraIDExtra
-                } else {
-                    let generalIndex = -1
-                    for (const v of interiorV) {
-                        if (v.parachain != undefined) {
-                            paraID = v.parachain
-                            //chainID = paraID + paraIDExtra
-                        } else if (v.generalIndex != undefined) {
-                            generalIndex = v.generalIndex
-                        }
-                    }
-                    //over-write statemine asset with assetID
-                    if (paraID == 1000) {
-                        nativeSymbol = `${generalIndex}`
-                    }
-                }
-
-                // standarizing ausd -> to kusd on kusama;
-                if (symbol == 'AUSD') {
-                    nativeSymbol = 'KUSD'
-                } else if (symbol == 'aUSD') {
-                    nativeSymbol = 'AUSD'
-                }
-                let nativeParsedAsset = {
-                    Token: nativeSymbol
-                }
-                var nativeAsset = JSON.stringify(nativeParsedAsset);
-
-                console.log(`'${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
-                //if (this.debugLevel >= garTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
-                let nativechainKey = `${relayChain}-${paraID}`
-                let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, nativechainKey);
-
-                let xcmAssetInfo = {
-                    //chainID: chainID,
-                    xcmConcept: interiorVStr, //interior
-                    asset: nativeAsset,
-                    paraID: paraID,
-                    relayChain: relayChain,
-                    parents: parents,
-                    interiorType: interiorK,
-                    xcmInteriorKey: xcmInteriorKey,
-                    xcmV1multilocationByte: xcmV1MultilocationByte,
-                    xcmV1MultiLocation: xcmV1MultiLocation,
-                    nativeAssetChainkey: nativeAssetChainkey,
-                    xcContractAddress: {},
-                    xcCurrencyID: {},
-                    source: chainkey,
-                }
-
-                //For cached found case: let's write xcmInteriorKey back to the cachedAssetInfo
-                cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
-                this.manager.setChainAsset(assetChainkey, cachedAssetInfo, true)
-
-                console.log(`xcmAssetInfo ${xcmInteriorKey}`, xcmAssetInfo)
-                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
-                if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver'])) {
-                    //For isEVMChain, compute the extra xcContractAddress
-                    this.manager.addXcmAssetLocalxcContractAddress(xcmInteriorKey, paraIDSoure, assetID)
-                }
-            } else {
-                console.log(`[${chainkey}] AssetInfo unknown -- skip`, assetChainkey)
-            }
-        }
-    }
-
-    async processXCMAssetIdToLocation(chainkey, a) {
+    async processXcmAssetIdToLocation(chainkey, a) {
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
         let paraIDSoure = pieces[1]
@@ -475,6 +281,7 @@ module.exports = class ChainParser {
                 //console.log(`cached AssetInfo found`, cachedAssetInfo)
                 let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol : ''
                 let nativeSymbol = symbol
+                let decimals = cachedAssetInfo.decimals
 
                 let xcmAssetType = val.toJSON()
                 // type V0/V1/...
@@ -519,13 +326,17 @@ module.exports = class ChainParser {
                     }
                     //over-write statemine asset with assetID
                     if (paraID == 1000) {
-                        nativeSymbol = `${generalIndex}`
+                        //nativeSymbol = `${generalIndex}`
+                        nativeSymbol = symbol
                     }
                 }
-                if (symbol == 'AUSD') {
-                    nativeSymbol = 'KUSD'
-                } else if (symbol == 'aUSD') {
-                    nativeSymbol = 'AUSD'
+                // standardizing Acala's stablecoin to AUSD on polkadot; karura's stablecoin to KUSD on kusama
+                if (symbol.toUpperCase == 'AUSD' || symbol.toUpperCase == 'KUSD') {
+                    if (relayChain == 'polkadot') {
+                        nativeSymbol = 'AUSD'
+                    } else if (relayChain == 'kusama') {
+                        nativeSymbol = 'KUSD'
+                    }
                 }
                 let nativeParsedAsset = {
                     Token: nativeSymbol
@@ -546,41 +357,32 @@ module.exports = class ChainParser {
                     interiorVStr = '"here"'
                 }
                 let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+                let xcmStandardized = JSON.parse(xcmInteriorKey)
                 let xcmV1MultiLocation = garTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                let xcmV1MultilocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
+                let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
                 let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, chainkey);
 
                 let xcmAssetInfo = {
-                    //chainID: chainID,
-                    xcmConcept: interiorVStr, //interior
-                    asset: nativeAsset,
+                    //interior: interiorVStr, //interior
                     paraID: paraID,
                     relayChain: relayChain,
-                    parents: parents,
-                    interiorType: interiorK,
-                    xcmInteriorKey: xcmInteriorKey,
-                    xcmV1multilocationByte: xcmV1MultilocationByte,
+                    symbol: nativeSymbol,
+                    decimals: decimals,
+                    interiorType: interiork,
+                    //xcmInteriorKey: xcmInteriorKey,
+                    xcmStandardized: xcmStandardized,
+                    xcmV1MultiLocationByte: xcmV1MultiLocationByte,
                     xcmV1MultiLocation: xcmV1MultiLocation,
-                    nativeAssetChainkey: nativeAssetChainkey,
                     xcContractAddress: {},
                     xcCurrencyID: {},
-                    source: chainkey,
+                    confidence: 1,
+                    source: [paraIDSoure],
                 }
                 //For cached found case: let's write xcmInteriorKey back to the cachedAssetInfo
                 cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
                 xcAssetList[xcmInteriorKey] = xcmAssetInfo
                 assetIDList[xcmInteriorKey] = assetID
                 updatedAssetList[assetChainkey] = cachedAssetInfo
-                /*
-                this.manager.setChainAsset(assetChainkey, cachedAssetInfo, true)
-                console.log(`xcmAssetInfo`, xcmAssetInfo)
-                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
-                if (this.isMatched(chainkey, ['polkadot-2006|astar', 'kusama-2007|shiden'])) {
-                    //For isEVMChain, compute the extra xcContractAddress
-                    this.manager.addXcmAssetLocalxcContractAddress(xcmInteriorKey, paraIDSoure, assetID)
-                }
-                */
             } else {
                 console.log(`[${chainkey}] AssetInfo unknown -- skip`, assetChainkey)
                 unknownAsset[assetChainkey] = 1
@@ -589,16 +391,29 @@ module.exports = class ChainParser {
         return [xcAssetList, assetIDList, updatedAssetList, unknownAsset]
     }
 
-    async processXCMAssetIdType(chainkey, a) {
+    /* XC Registry Parsing
+    Format Key - AssetID Val - {assetIdType}
+    Fetch xcm asset registry for parachain that uses similar assetRegistry pallet,
+    currently covering the following chains:
+    [
+    'polkadot-2004|moonbeam', 'kusama-2023|moonriver',
+    'polkadot-2012|parallel', 'kusama-2085|heiko'
+    'polkadot-2034|hydra', 'kusama-2090|basilisk'
+    'kusama-2012|shadow'
+    ]
+    */
+    async processXcmAssetIdType(chainkey, a) {
+
+        //console.log(`processXcmAssetIdType [${chainkey}]`, a)
+        let pieces = chainkey.split('-')
+        let relayChain = pieces[0]
+        let paraIDSoure = pieces[1]
+
         let api = this.api
         let xcAssetList = {}
         let assetIDList = {}
         let updatedAssetList = {}
         let unknownAsset = {}
-        //console.log(`processXCMAssetIdType [${chainkey}]`, a)
-        let pieces = chainkey.split('-')
-        let relayChain = pieces[0]
-        let paraIDSoure = pieces[1]
 
         try {
             //return [xcAssetList, xcAssetList, xcAssetList, xcAssetList]
@@ -608,8 +423,6 @@ module.exports = class ChainParser {
             for (let i = 0; i < a.length; i++) {
                 let key = a[i][0];
                 let val = a[i][1];
-                //console.log(`processXCMAssetIdType key`, key)
-                //console.log(`processXCMAssetIdType val`, val)
                 let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
                 let parsedAsset = {
                     Token: assetID
@@ -623,6 +436,7 @@ module.exports = class ChainParser {
                     console.log(`cached AssetInfo found`, cachedAssetInfo)
                     let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol.replace('xc', '') : ''
                     let nativeSymbol = symbol
+                    let decimals = cachedAssetInfo.decimals
                     let xcmAssetJSON = val.toJSON()
                     let xcmAsset = (xcmAssetJSON.xcm != undefined) ? xcmAssetJSON.xcm : xcmAssetJSON
                     let parents = xcmAsset.parents
@@ -631,6 +445,35 @@ module.exports = class ChainParser {
                     let interiorK = Object.keys(interior)[0]
                     let interiork = garTool.firstCharLowerCase(interiorK)
                     let interiorV = interior[interiorK]
+
+                    // need to expand if xc registry use parents=0
+                    if (parents == 1) {
+                        // easy case: no expansion
+                    } else if (parents == 0) {
+                        // standardizing to relaychain's perspective
+                        let new_interiorV = []
+                        let expandedParachainPiece = {
+                            parachain: paraIDSoure
+                        }
+                        let new_interiork = interiork
+                        new_interiorV.push(expandedParachainPiece)
+                        if (interiork == 'here') {
+                            new_interiork = 'x1'
+                        } else if (interiork == 'x1') {
+                            new_interiorV.push(interiorV)
+                            new_interiork = 'x2'
+                        } else if (Array.isArray(interiorV)) {
+                            let xTypeInt = garTool.dechexToInt(z.substr(1)) + 1
+                            new_interiork = `x${xTypeInt}`
+                            //x2/x3...
+                            for (const v of interiorV) {
+                                new_interiorV.push(v)
+                            }
+                        }
+                        interiorV = new_interiorV
+                        interiork = new_interiork
+                    }
+
                     let interiorVStr = JSON.stringify(interiorV)
                     let network = {}
                     if (relayChain == 'kusama' || relayChain == 'polkadot') {
@@ -646,8 +489,9 @@ module.exports = class ChainParser {
                         interiorVStr = '"here"'
                     }
                     let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+                    let xcmStandardized = JSON.parse(xcmInteriorKey)
                     let xcmV1MultiLocation = garTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                    let xcmV1MultilocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
+                    let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
                     if ((typeof interiorK == "string") && (interiorK.toLowerCase() == 'here')) {
                         //relaychain case
                         //chainID = relayChainID
@@ -666,15 +510,18 @@ module.exports = class ChainParser {
                         }
                         //over-write statemine asset with assetID
                         if (paraID == 1000) {
-                            nativeSymbol = `${generalIndex}`
+                            //nativeSymbol = `${generalIndex}`
+                            nativeSymbol = symbol
                         }
                     }
 
-                    // standarizing ausd -> to kusd on kusama;
-                    if (symbol == 'AUSD') {
-                        nativeSymbol = 'KUSD'
-                    } else if (symbol == 'aUSD') {
-                        nativeSymbol = 'AUSD'
+                    // standardizing Acala's stablecoin to AUSD on polkadot; karura's stablecoin to KUSD on kusama
+                    if (symbol.toUpperCase == 'AUSD' || symbol.toUpperCase == 'KUSD') {
+                        if (relayChain == 'polkadot') {
+                            nativeSymbol = 'AUSD'
+                        } else if (relayChain == 'kusama') {
+                            nativeSymbol = 'KUSD'
+                        }
                     }
                     let nativeParsedAsset = {
                         Token: nativeSymbol
@@ -687,20 +534,20 @@ module.exports = class ChainParser {
                     let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, nativechainKey);
 
                     let xcmAssetInfo = {
-                        //chainID: chainID,
-                        xcmConcept: interiorVStr, //interior
-                        asset: nativeAsset,
+                        //interior: interiorVStr, //interior
                         paraID: paraID,
                         relayChain: relayChain,
-                        parents: parents,
-                        interiorType: interiorK,
-                        xcmInteriorKey: xcmInteriorKey,
-                        xcmV1multilocationByte: xcmV1MultilocationByte,
+                        symbol: nativeSymbol,
+                        decimals: decimals,
+                        interiorType: interiork,
+                        //xcmInteriorKey: xcmInteriorKey,
+                        xcmStandardized: xcmStandardized,
+                        xcmV1MultiLocationByte: xcmV1MultiLocationByte,
                         xcmV1MultiLocation: xcmV1MultiLocation,
-                        nativeAssetChainkey: nativeAssetChainkey,
                         xcContractAddress: {},
                         xcCurrencyID: {},
-                        source: chainkey,
+                        confidence: 1,
+                        source: [paraIDSoure],
                     }
 
                     //For cached found case: let's write xcmInteriorKey back to the cachedAssetInfo
@@ -716,50 +563,34 @@ module.exports = class ChainParser {
                 }
             }
         } catch (e) {
-            console.log(`processXCMAssetIdType error`, e)
+            console.log(`processXcmAssetIdType error`, e)
         }
 
         return [xcAssetList, assetIDList, updatedAssetList, unknownAsset]
     }
 
-    /*
-    Fetch xcm asset registry for parachain that uses similar foreignAssetLocations pallet, currently
-    covering the following chains:
+    /* XC Registry Parsing
+    Format Key - [KeyStruct] Val - {assetIdType}
+    Fetch xcm asset registry for parachain that uses similar assetRegistry pallet,
+    currently covering the following chains:
     [
     'polkadot-2000|acala', 'kusama-2000|karura'
     polkadot-2030|bifrost, 'kusama-2001|bifrost'
     ]
     */
-    /*
-    [acala] assetRegistry:foreignAssetLocations
-    [bifrost] assetRegistry:currencyIdToLocations
-    */
-    async fetchXCMAssetRegistryLocations(chainkey) {
-        let api = this.api
-        if (!api) {
-            console.log(`[fetchXCMAssetRegistryLocations] Fatal: ${chainkey} api not initiated`)
-            return
-        }
+    async processXcmForeignAssetLocations(chainkey, a, useForeignAssetPrefix = false) {
 
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
         let paraIDSoure = pieces[1]
 
-        var pallet, storage; // where xcGAR is stored (i.e xcAssetConfig:assetIdToLocation for astar)
-        var useForeignAssetPrefix = false // acala uses foreignAsset to specify the external xcm asset
-        if (this.isMatched(chainkey, ['polkadot-2000|acala', 'kusama-2000|karura'])) {
-            pallet = 'assetRegistry'
-            storage = 'foreignAssetLocations'
-            useForeignAssetPrefix = true
-        } else if (this.isMatched(chainkey, ['polkadot-2030|bifrost', 'kusama-2001|bifrost'])) {
-            pallet = 'assetRegistry'
-            storage = 'currencyIdToLocations'
-        }
+        //let assetList = {}
+        let api = this.api
+        let xcAssetList = {}
+        let assetIDList = {}
+        let updatedAssetList = {}
+        let unknownAsset = {}
 
-        console.log(`[${chainkey}] selected xcGAR - ${pallet}:${storage}`)
-        var a = await api.query[pallet][storage].entries()
-        if (!a) return
-        let assetList = {}
         for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
@@ -767,6 +598,9 @@ module.exports = class ChainParser {
             let parsedAsset = {};
             if (useForeignAssetPrefix) {
                 parsedAsset.ForeignAsset = assetID
+                assetID = {
+                    ForeignAsset: assetID
+                }
             } else {
                 parsedAsset = assetID
             }
@@ -781,7 +615,7 @@ module.exports = class ChainParser {
                 //console.log(`cached AssetInfo found`, cachedAssetInfo)
                 let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol : ''
                 let nativeSymbol = symbol
-
+                let decimals = cachedAssetInfo.decimals
                 let xcmAsset = val.toJSON()
                 let parents = xcmAsset.parents
                 let interior = xcmAsset.interior
@@ -797,6 +631,33 @@ module.exports = class ChainParser {
                 //hack: lower first char
                 let interiorV = JSON.parse(interiorVStr0)
 
+                // need to expand if xc registry use parents=0
+                if (parents == 1) {
+                    // easy case: no expansion
+                } else if (parents == 0) {
+                    // standardizing to relaychain's perspective
+                    let new_interiorV = []
+                    let expandedParachainPiece = {
+                        parachain: paraIDSoure
+                    }
+                    let new_interiork = interiork
+                    new_interiorV.push(expandedParachainPiece)
+                    if (interiork == 'here') {
+                        new_interiork = 'x1'
+                    } else if (interiork == 'x1') {
+                        new_interiorV.push(interiorV)
+                        new_interiork = 'x2'
+                    } else if (Array.isArray(interiorV)) {
+                        let xTypeInt = garTool.dechexToInt(z.substr(1)) + 1
+                        new_interiork = `x${xTypeInt}`
+                        //x2/x3...
+                        for (const v of interiorV) {
+                            new_interiorV.push(v)
+                        }
+                    }
+                    interiorV = new_interiorV
+                    interiork = new_interiork
+                }
                 if (interiork == 'here') {
                     //relaychain case
                     //chainID = relayChainID
@@ -822,13 +683,17 @@ module.exports = class ChainParser {
                     }
                     //over-write statemine asset with assetID
                     if (paraID == 1000) {
-                        nativeSymbol = `${generalIndex}`
+                        //nativeSymbol = `${generalIndex}`
+                        nativeSymbol = symbol
                     }
                 }
-                if (symbol == 'AUSD') {
-                    nativeSymbol = 'KUSD'
-                } else if (symbol == 'aUSD') {
-                    nativeSymbol = 'AUSD'
+                // standardizing Acala's stablecoin to AUSD on polkadot; karura's stablecoin to KUSD on kusama
+                if (symbol.toUpperCase == 'AUSD' || symbol.toUpperCase == 'KUSD') {
+                    if (relayChain == 'polkadot') {
+                        nativeSymbol = 'AUSD'
+                    } else if (relayChain == 'kusama') {
+                        nativeSymbol = 'KUSD'
+                    }
                 }
                 let nativeParsedAsset = {
                     Token: nativeSymbol
@@ -850,43 +715,45 @@ module.exports = class ChainParser {
                     interiorVStr = '"here"'
                 }
                 let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+                let xcmStandardized = JSON.parse(xcmInteriorKey)
                 let xcmV1MultiLocation = garTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                let xcmV1MultilocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
+                let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
 
                 //console.log(`${chainID} '${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
                 //if (this.debugLevel >= garTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
-                let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, chainID);
+                let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, chainkey);
                 let xcmAssetInfo = {
-                    //chainID: chainID,
-                    xcmConcept: interiorVStr, //interior
-                    asset: nativeAsset,
+                    //interior: interiorVStr, //interior
                     paraID: paraID,
                     relayChain: relayChain,
-                    parents: parents,
-                    interiorType: interiorK,
-                    xcmInteriorKey: xcmInteriorKey,
-                    xcmV1multilocationByte: xcmV1MultilocationByte,
+                    symbol: nativeSymbol,
+                    decimals: decimals,
+                    interiorType: interiork,
+                    //xcmInteriorKey: xcmInteriorKey,
+                    xcmStandardized: xcmStandardized,
+                    xcmV1MultiLocationByte: xcmV1MultiLocationByte,
                     xcmV1MultiLocation: xcmV1MultiLocation,
-                    nativeAssetChainkey: nativeAssetChainkey,
                     xcContractAddress: {},
                     xcCurrencyID: {},
-                    source: chainkey,
+                    confidence: 1,
+                    source: [paraIDSoure],
                 }
 
                 //For cached found case: let's write xcmInteriorKey back to the cachedAssetInfo
                 cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
-                this.manager.setChainAsset(assetChainkey, cachedAssetInfo, true)
-
-                console.log(`xcmAssetInfo ${xcmInteriorKey}`, xcmAssetInfo)
-                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
-                //this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
+                xcAssetList[xcmInteriorKey] = xcmAssetInfo
+                assetIDList[xcmInteriorKey] = assetID
+                updatedAssetList[assetChainkey] = cachedAssetInfo
 
             } else {
                 console.log(`[${chainkey}] AssetInfo unknown -- skip`, assetChainkey)
+                unknownAsset[assetChainkey] = 1
             }
         }
+        return [xcAssetList, assetIDList, updatedAssetList, unknownAsset]
     }
 
+    //decode extrinsic to the format used by polkaholic
     decode_extrinsic(extrinsic, blockNumber, idx, apiAt) {
         let exos = JSON.parse(extrinsic.toString());
         let extrinsicHash = extrinsic.hash.toHex()
@@ -977,6 +844,7 @@ module.exports = class ChainParser {
         return (rExtrinsic)
     }
 
+    //tranform evnet to the format used by polkaholic
     parseEvent(evt, eventID, api = false) {
         if (!api) return (false);
         if (!api.events) return (false);
@@ -1031,7 +899,7 @@ module.exports = class ChainParser {
         return dEvent
     }
 
-    // processEvents organizes events by its corresponding index
+    //processEvents organizes events by its corresponding index
     processEvents(chainkey, apiAt, eventsRaw, numExtrinsics, blockNumber) {
         var events = [];
         for (let i = 0; i < numExtrinsics; i++) {
@@ -1059,6 +927,7 @@ module.exports = class ChainParser {
         return events;
     }
 
+    //fetch extrinsic in the format used by polkaholic, including events
     async fetchExtrinsic(chainkey, extrinsicID = '118722-2') {
         let api = this.api
         let dEx;
@@ -1080,7 +949,7 @@ module.exports = class ChainParser {
                 out.event.method['method'] = eh.method;
                 return out
             });
-            console.log(`#${blockNumber},  ${blockHash.toString()}`)
+            //console.log(`#${blockNumber} blkHash=${blockHash.toString()}`)
             var block = await api.rpc.chain.getBlock(blockHash);
             var sn = JSON.parse(JSON.stringify(block.toJSON()));
             var apiAt = await api.at(blockHash)
@@ -1095,8 +964,28 @@ module.exports = class ChainParser {
         return dEx
     }
 
+    //fetch a list of extrinsic in the format used by polkaholic, including the events
+    async fetchAugmentedExtrincics(chainkey, recs) {
+        //let recs = this.augment[chainkey]
+        let augmentedExtrinsics = []
+        console.log(`[${chainkey}] fetchAugmentedExtrincics`, 'recs', recs)
+        if (recs != undefined && Array.isArray(recs)) {
+            for (const r of recs) {
+                for (const extrinsicID of r.extrinsicIDs) {
+                    console.log(`fetchAugmentedExtrincics [${extrinsicID}]`)
+                    let dEx = await this.fetchExtrinsic(chainkey, extrinsicID)
+                    console.log(`[${extrinsicID}]`, JSON.stringify(dEx))
+                    augmentedExtrinsics.push(dEx)
+                }
+            }
+        } else {
+            console.log(`No augmentation found`)
+        }
+        return augmentedExtrinsics
+    }
+
     async fetchAugments(chainkey) {
-        console.log(`[${chainkey}] [Default Skip]`)
+        console.log(`[${chainkey}] [fetchAugments Default Skip]`)
     }
 
     xTokensFilter(palletMethod) {
@@ -1107,6 +996,7 @@ module.exports = class ChainParser {
         }
     }
 
+    // Auto Inferring xcmInteriorKey <=> AssetID linkage given XTokens extrinsic. only support: [xTokens:transfer, xTokens:transferMulticurrencies]
     processOutgoingXTokens(chainkey, extrinsic) {
         //xTokens:TransferredMultiAssets
         /*
@@ -1133,7 +1023,7 @@ module.exports = class ChainParser {
         let xTokensEvents = extrinsic.events.filter((ev) => {
             return this.xTokensFilter(`${ev.section}(${ev.method})`);
         })
-        if (xTokensEvents.length != 1){
+        if (xTokensEvents.length != 1) {
             console.log(`Skip xTokensEvents > 1 (cnt=${xTokensEvents.length})`)
             return
         }
@@ -1147,8 +1037,11 @@ module.exports = class ChainParser {
                 //single transfer
                 case "xTokens:transfer":
                     let [assetID, assetChainkey] = this.processXcmGenericCurrencyID(chainkey, a.currency_id) //inferred approach
-                    if (assetID){
-                        localXcAssetArr.push({assetID: assetID, assetChainkey: assetChainkey})
+                    if (assetID) {
+                        localXcAssetArr.push({
+                            assetID: assetID,
+                            assetChainkey: assetChainkey
+                        })
                     }
                     break;
                 case "xTokens:transfer":
@@ -1156,10 +1049,16 @@ module.exports = class ChainParser {
                     for (const c of currencies) {
                         let [assetID, assetChainkey] = this.processXcmGenericCurrencyID(indexer, c[0]) //inferred approach
                         let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", `processOutgoingXTokensTransfer ${section_method}`, c[0])
-                        if (assetID){
-                            localXcAssetArr.push({assetID: assetID, assetChainkey: assetChainkey})
-                        }else{
-                            localXcAssetArr.push({assetID: false, assetChainkey: false})
+                        if (assetID) {
+                            localXcAssetArr.push({
+                                assetID: assetID,
+                                assetChainkey: assetChainkey
+                            })
+                        } else {
+                            localXcAssetArr.push({
+                                assetID: false,
+                                assetChainkey: false
+                            })
                         }
                     }
                     break;
@@ -1180,9 +1079,9 @@ module.exports = class ChainParser {
                 // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                 if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                     let [targetSymbol, relayChain, targetXcmInteriorKey] = this.processV1ConcreteFungible(chainkey, asset)
-                    if (targetXcmInteriorKey != undefined){
+                    if (targetXcmInteriorKey != undefined) {
                         xcmInteriorKeyArr.push(targetXcmInteriorKey)
-                    }else{
+                    } else {
                         xcmInteriorKeyArr.push(false)
                     }
                 } else {
@@ -1195,157 +1094,24 @@ module.exports = class ChainParser {
         }
         //console.log(`xcmInteriorKeyArr`, xcmInteriorKeyArr)
         //console.log(`localXcAssets`, localXcAssetArr)
-        let augmentedMap = {}
-        for (let i = 0; i < xcmInteriorKeyArr.length; i++){
+        let augmentedXcMap = {}
+        for (let i = 0; i < xcmInteriorKeyArr.length; i++) {
             let xcmInteriorKey = xcmInteriorKeyArr[i]
-            let localXcAsset =  localXcAssetArr[i]
-            if (xcmInteriorKey && localXcAsset.assetID && localXcAsset.assetChainkey){
-                augmentedMap[xcmInteriorKey] = {
-                    xcmInteriorKey: localXcAsset.assetID,
+            let localXcAsset = localXcAssetArr[i]
+            if (xcmInteriorKey && localXcAsset.assetID && localXcAsset.assetChainkey) {
+                augmentedXcMap[xcmInteriorKey] = {
+                    xcmInteriorKey: xcmInteriorKey,
                     assetID: localXcAsset.assetID,
                     assetChainkey: localXcAsset.assetChainkey,
                 }
             }
         }
-        console.log(`augmentedMap`, augmentedMap)
-        return augmentedMap
+        console.log(`augmentedXcMap`, augmentedXcMap)
+        return augmentedXcMap
     }
 
-
-    getNativeSymbol(){
-        if (this.nativeAsset != undefined && this.nativeAsset.assetChainkey != undefined){
-            let assetChainkey = this.nativeAsset.assetChainkey
-            return this.nativeAsset.assetChainkey
-        }else{
-            return false
-        }
-    }
-
-    getRelayChainXcmInteriorKey(relayChain='polkadot'){
-        //assume it's parachain asset has "here"
-        let network = {}
-        if (relayChain == 'kusama' || relayChain == 'polkadot') {
-            network = {
-                network: relayChain
-            }
-        } else {
-            network = {
-                named: garTool.stringToHex(relayChain)
-            }
-        }
-        let interiorVStr = '"here"'
-        let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
-        return xcmInteriorKey
-    }
-
-    processXcmGenericCurrencyID(chainkey, currency_id) {
-        //only handle assetpallet for now
-        return this.processXcmDecHexCurrencyID(chainkey, currency_id)
-    }
-
-    processXcmDecHexCurrencyID(chainkey, currency_id) {
-        let assetString = false
-        let assetID = false
-        let rawAssetID = null
-        if (currency_id != undefined) {
-            if (this.isObject(currency_id)) {
-                if (currency_id.foreignAsset != undefined) {
-                    rawAssetID = currency_id.foreignAsset
-                } else if (currency_id.localAssetReserve != undefined) {
-                    rawAssetID = currency_id.localAssetReserve
-                } else if (currency_id.token2 != undefined) {
-                    rawAssetID = currency_id.token2
-                } else if (currency_id.selfReserve === null) {
-                    // return native asset
-                    let nativeSymbol = indexer.getNativeSymbol()
-                    return nativeSymbol
-                } else {
-                    //if (this.debugLevel >= paraTool.debugInfo) console.log(`processDecHexCurrencyID currency_id unknown struct`, currency_id)
-                    //TODO..
-                }
-            } else {
-                // numbers
-                rawAssetID = currency_id
-            }
-        }
-        //if (this.debugLevel >= paraTool.debugTracing) console.log(`rawAssetID=${rawAssetID}, currency_id`, currency_id)
-        if (rawAssetID != undefined) {
-            let assetIDWithComma = garTool.toNumWithComma(garTool.dechexAssetID(rawAssetID))
-            assetID = garTool.cleanedAssetID(assetIDWithComma)
-            let parsedAsset = {
-                Token: assetID
-            }
-            assetString = JSON.stringify(parsedAsset);
-        }
-        if (assetString) assetString = garTool.makeAssetChain(assetString, chainkey)
-        return [assetID, assetString]
-    }
-
-
+    // Auto Inferring xcmInteriorKey convert XcmmultiAsset to polkaholic format
     processV1ConcreteFungible(chainkey, fungibleAsset) {
-        //v1
-        // only parse the currency_id here
-        /*
-        "assets": {
-            "v1": [
-            {
-              "id": {
-                "concrete": {
-                  "parents": 0,
-                  "interior": {
-                  "here": null
-                }
-              }
-            },
-            "fun": {
-                "fungible": 102000000000
-              }
-            }
-          ]
-        },
-        "fee_asset_item": 0
-        */
-        /*
-        "assets": {
-          "v1": [
-            {
-              "id": {
-                "concrete": {
-                  "parents": 0,
-                  "interior": {
-                    "x2": [
-                      {
-                        "palletInstance": 50
-                      },
-                      {
-                        "generalIndex": 8
-                      }
-                    ]
-                  }
-                }
-              },
-              "fun": {
-                "fungible": 300000000000
-              }
-            }
-          ]
-        }
-        "asset": {
-          "v1": {
-            "id": {
-              "concrete": {
-                "parents": 1,
-                "interior": {
-                  "here": null
-                }
-              }
-            },
-            "fun": {
-              "fungible": 20469417452
-            }
-          }
-        },
-        */
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
         let paraIDSoure = pieces[1]
@@ -1378,7 +1144,7 @@ module.exports = class ChainParser {
                         //if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:0, here`, targetSymbol)
                     } else if (v1_id_concrete_parents != undefined && v1_id_concrete_parents == 1) {
                         //ump
-                        targetXcmInteriorKey = this.getRelayChainXcmInteriorKey()
+                        targetXcmInteriorKey = this.getRelayChainXcmInteriorKey(relayChain)
                         //targetedAsset = indexer.getRelayChainAsset()
                         //rawTargetedAsset = indexer.getRelayChainAsset()
                         //if (this.debugLevel >= paraTool.debugInfo) console.log(`processV1ConcreteFungible targetedAsset parents:1, here`, targetSymbol)
@@ -1390,6 +1156,7 @@ module.exports = class ChainParser {
                     let xType = Object.keys(v1_id_concrete_interior)[0]
                     let v1_id_concrete_interiorVal = v1_id_concrete_interior[xType]
                     if (v1_id_concrete_parents == 1) {
+
                         // easy case: no expansion
                     } else {
                         // expand the key
@@ -1449,6 +1216,79 @@ module.exports = class ChainParser {
         }
         return [targetSymbol, relayChain, targetXcmInteriorKey]
         //return [targetedAsset, rawTargetedAsset]
+    }
+
+    // Auto Inferring xcmInteriorKey - Unhandled case, skip
+    getNativeSymbol() {
+        if (this.nativeAsset != undefined && this.nativeAsset.assetChainkey != undefined) {
+            let assetChainkey = this.nativeAsset.assetChainkey
+            return this.nativeAsset.assetChainkey
+        } else {
+            return false
+        }
+    }
+
+    // Auto Inferring xcmInteriorKey - hardcoded for Relaychain xcAsset
+    getRelayChainXcmInteriorKey(relayChain = 'polkadot') {
+        //assume it's parachain asset has "here"
+        let network = {}
+        if (relayChain == 'kusama' || relayChain == 'polkadot') {
+            network = {
+                network: relayChain
+            }
+        } else {
+            network = {
+                named: garTool.stringToHex(relayChain)
+            }
+        }
+        let interiorVStr = '"here"'
+        let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+        return xcmInteriorKey
+    }
+
+    // Auto Inferring xcmInteriorKey - only support assetID conversion for now
+    processXcmGenericCurrencyID(chainkey, currency_id) {
+        //only handle assetpallet for now
+        return this.processXcmDecHexCurrencyID(chainkey, currency_id)
+    }
+
+    // extract assetID form extrinsic args
+    processXcmDecHexCurrencyID(chainkey, currency_id) {
+        let assetString = false
+        let assetID = false
+        let rawAssetID = null
+        if (currency_id != undefined) {
+            if (this.isObject(currency_id)) {
+                if (currency_id.foreignAsset != undefined) {
+                    rawAssetID = currency_id.foreignAsset
+                } else if (currency_id.localAssetReserve != undefined) {
+                    rawAssetID = currency_id.localAssetReserve
+                } else if (currency_id.token2 != undefined) {
+                    rawAssetID = currency_id.token2
+                } else if (currency_id.selfReserve === null) {
+                    // return native asset
+                    let nativeSymbol = indexer.getNativeSymbol()
+                    return nativeSymbol
+                } else {
+                    //if (this.debugLevel >= paraTool.debugInfo) console.log(`processDecHexCurrencyID currency_id unknown struct`, currency_id)
+                    //TODO..
+                }
+            } else {
+                // numbers
+                rawAssetID = currency_id
+            }
+        }
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`rawAssetID=${rawAssetID}, currency_id`, currency_id)
+        if (rawAssetID != undefined) {
+            let assetIDWithComma = garTool.toNumWithComma(garTool.dechexAssetID(rawAssetID))
+            assetID = garTool.cleanedAssetID(assetIDWithComma)
+            let parsedAsset = {
+                Token: assetID
+            }
+            assetString = JSON.stringify(parsedAsset);
+        }
+        if (assetString) assetString = garTool.makeAssetChain(assetString, chainkey)
+        return [assetID, assetString]
     }
 
 }

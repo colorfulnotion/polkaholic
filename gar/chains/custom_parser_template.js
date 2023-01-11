@@ -5,35 +5,44 @@ const ChainParser = require("./common_chainparser");
 Fork this template to create new custom parser
 
 Support chains
-kusama-2118|listen
+[relaychain-paraID|projectName]
 */
 
+module.exports = class SampleParser extends ChainParser {
 
-module.exports = class ListenParser extends ChainParser {
-
-    parserName = 'Listen';
+    parserName = 'ChangeToProjectName';
 
     //change [garPallet:garPallet] to the location where the asset registry is located.  ex: [assets:metadata]
-    garPallet = 'currencies'
-    garStorage = 'listenAssetsInfo'
+    garPallet = 'assets';
+    garStorage = 'metadata';
 
     //change [xcGarPallet:xcGarStorage] to the location where the xc registry is located.  ex: [assetManager:assetIdType]
-    xcGarPallet = 'currencies'
-    xcGarStorage = 'assetLocations'
+    xcGarPallet = 'assetManager'
+    xcGarStorage = 'assetIdType'
+
+    /*
+    Not every parachain has published its xc Asset registry. But we
+    can still augment xcAsset registry by inferring.
+
+    To augment the xcAsset by parsing, please provide an array of xcm extrinsicIDs
+    containing the xcAsset asset you try to cover:
 
     augment = {
-        'kusama-2118': [{
-            paraID: 2118,
-            extrinsicIDs: ['118722-2']
+        'relaychain-paraID': [{
+            paraID: 'paraID',
+            extrinsicIDs: ['extrinsicID']
         }]
     }
+    */
 
-    isXcRegistryAvailable = false; //NOTE: listen team has NOT updated the xcRegistry yet
+    augment = {}
+
+    isXcRegistryAvailable = true
 
     //step 1: parse gar pallet, storage for parachain's asset registry
     async fetchGar(chainkey) {
         // implement your gar parsing function here.
-        await this.processListenGar(chainkey)
+        await this.processSampleGar(chainkey)
     }
 
     //step 2: parse xcGar pallet, storage for parachain's xc asset registry
@@ -44,18 +53,18 @@ module.exports = class ListenParser extends ChainParser {
             return
         }
         // implement your xcGar parsing function here.
-        await this.processListenXcGar(chainkey)
+        await this.processSampleXcGar(chainkey)
     }
 
     //step 3: Optional augmentation by providing a list xcm extrinsicIDs
     async fetchAugments(chainkey) {
         // implement your augment parsing function here.
-        await this.processListenAugment(chainkey)
+        await this.processSampleAugment(chainkey)
 
     }
 
-    // Implement listen gar parsing function here
-    async processListenGar(chainkey) {
+    // Implement gar parsing function here. Here's an example of how moonbeam gar Parser is implemented
+    async processSampleGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
         let a = await super.fetchQuery(chainkey, this.garPallet, this.garStorage, 'GAR')
@@ -70,8 +79,8 @@ module.exports = class ListenParser extends ChainParser {
         }
     }
 
-    // Implement listen xc gar parsing function here [currently has not entry]
-    async processListenXcGar(chainkey) {
+    // Implement gar parsing function here: Here's an example of how moonbeam xcGar Parser is implemented
+    async processSampleXcGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
@@ -98,7 +107,7 @@ module.exports = class ListenParser extends ChainParser {
         }
     }
 
-    async processListenAugment(chainkey) {
+    async processSampleAugment(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom augmentation`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]

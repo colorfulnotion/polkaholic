@@ -1,34 +1,64 @@
 const garTool = require("../garTool");
-const ChainParser = require("./chainparser");
+const ChainParser = require("./common_chainparser");
+
+/*
+Fork this template to create new custom parser
+
+Support chains
+polkadot-2004|moonbeam
+kusama-2023|moonriver
+*/
+
 
 module.exports = class MoonbeamParser extends ChainParser {
 
-    garPallet = 'assets'
-    garStorage = 'metadata'
+    parserName = 'Moonbeam';
 
+    //change [garPallet:garPallet] to the location where the asset registry is located.  ex: [assets:metadata]
+    garPallet = 'assets';
+    garStorage = 'metadata';
+
+    //change [xcGarPallet:xcGarStorage] to the location where the xc registry is located.  ex: [assetManager:assetIdType]
     xcGarPallet = 'assetManager'
     xcGarStorage = 'assetIdType'
 
+    augment = {}
 
-    //step 1: parse gar pallet, storage
+    isXcRegistryAvailable = true
+
+    //step 1: parse gar pallet, storage for parachain's asset registry
     async fetchGar(chainkey) {
-        await this.fetchAssetPallet(chainkey)
+        // implement your gar parsing function here.
+        await this.processMoonbeamGar(chainkey)
     }
 
-    //step 2: parse xcGar pallet, storage
+    //step 2: parse xcGar pallet, storage for parachain's xc asset registry
     async fetchXcGar(chainkey) {
-        await this.fetchXCMAssetIdType(chainkey)
+        if (!this.isXcRegistryAvailable) {
+            // skip if xcGar parser is unavailable
+            console.log(`[${chainkey}] ${this.parserName} xcGar NOT IMPLEMENTED - SKIP`)
+            return
+        }
+        // implement your xcGar parsing function here.
+        await this.processMoonbeamXcGar(chainkey)
     }
 
-    async fetchAssetPallet(chainkey) {
-        console.log(`Moonbeam custom fetchAssetPallet`)
+    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    async fetchAugments(chainkey) {
+        // implement your augment parsing function here.
+        await this.processMoonbeamAugment(chainkey)
+
+    }
+
+    // Implement gar parsing function here. Here's an example of how moonbeam gar Parser is implemented
+    async processMoonbeamGar(chainkey) {
+        console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
+        //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
         let a = await super.fetchQuery(chainkey, this.garPallet, this.garStorage, 'GAR')
-        /* each parachain team may have slightly different pallet:storage name
-        that uses the same/similar logic. The parser should redirect itself to
-        the proper section
-        */
         if (a) {
-            let assetList = this.processGarAsset(chainkey, a)
+            // step 1: use common Asset pallet parser func available at generic chainparser.
+            let assetList = this.processGarAssetPallet(chainkey, a)
+            // step 2: load up results
             for (const assetChainkey of Object.keys(assetList)) {
                 let assetInfo = assetList[assetChainkey]
                 this.manager.setChainAsset(assetChainkey, assetInfo)
@@ -36,22 +66,27 @@ module.exports = class MoonbeamParser extends ChainParser {
         }
     }
 
-    async fetchXCMAssetIdType(chainkey) {
-        console.log(`Moonbeam custom fetchXCMAssetIdType`)
+    // Implement gar parsing function here: Here's an example of how moonbeam xcGar Parser is implemented
+    async processMoonbeamXcGar(chainkey) {
+        console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
         let paraIDSoure = pieces[1]
-
+        //step 0: use fetchQuery to retrieve xc registry at the location [assetManager:assetIdType]
         var a = await super.fetchQuery(chainkey, this.xcGarPallet, this.xcGarStorage, 'xcGAR')
         if (!a) return
         if (a) {
-            let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXCMAssetIdType(chainkey, a)
-            console.log(`Moonbeam custom xcAssetList=${Object.keys(xcAssetList)},updatedAssetList=${Object.keys(updatedAssetList)},unknownAsset=${Object.keys(unknownAsset)}`, xcAssetList)
+            // step 1: use common XcmAssetIdType parser func available at generic chainparser.
+            let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXcmAssetIdType(chainkey, a)
+            console.log(`custom xcAssetList=[${Object.keys(xcAssetList)}], updatedAssetList=[${Object.keys(updatedAssetList)}], unknownAsset=[${Object.keys(unknownAsset)}], assetIDList=[${Object.keys(assetIDList)}]`, xcAssetList)
+            // step 2: load up results
             for (const xcmInteriorKey of Object.keys(xcAssetList)) {
                 let xcmAssetInfo = xcAssetList[xcmInteriorKey]
                 let assetID = assetIDList[xcmInteriorKey]
                 this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
+                // update global xcRegistry to include assetID used by this parachain
                 this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
+                // compute xcContractAddress
                 this.manager.addXcmAssetLocalxcContractAddress(xcmInteriorKey, paraIDSoure, assetID)
             }
             for (const assetChainkey of Object.keys(updatedAssetList)) {
@@ -61,4 +96,7 @@ module.exports = class MoonbeamParser extends ChainParser {
         }
     }
 
+    async processMoonbeamAugment(chainkey) {
+        return
+    }
 }

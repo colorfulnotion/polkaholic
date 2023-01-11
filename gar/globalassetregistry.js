@@ -1,13 +1,19 @@
 const garTool = require("./garTool");
 const endpoints = require("./endpoints");
 
-const ChainParser = require("./chains/chainparser");
+//const SampleParser = require("./chains/custom_parser_template") // for this file to include new chain parser
+const CommonChainParser = require("./chains/common_chainparser");
+const AcalaParser = require("./chains/acala");
 const MoonbeamParser = require("./chains/moonbeam");
+const ParallelParser = require("./chains/parallel");
 const AstarParser = require("./chains/astar");
 const HydraParser = require("./chains/hydra");
 const ListenParser = require("./chains/listen");
 const CalamariParser = require("./chains/calamari");
-
+const ShadowParser = require("./chains/shadow");
+const StatemintParser = require("./chains/statemint")
+const BifrostParser = require("./chains/bifrost")
+const PhalaParser = require("./chains/phala")
 
 const {
     ApiPromise,
@@ -150,7 +156,7 @@ module.exports = class GlobalAssetRegistry {
         let publicEndpoints = this.readJSONFn(relaychain, 'publicEndpoints')
         this.publicEndpointsMap = publicEndpoints
         this.relaychain = relaychain
-        console.log(`[${relaychain}] publicEndpointsMap`, this.publicEndpointsMap)
+        //console.log(`[${relaychain}] publicEndpointsMap`, this.publicEndpointsMap)
     }
 
     //return all supported chains
@@ -374,13 +380,30 @@ module.exports = class GlobalAssetRegistry {
         return chainFilters.findIndex(e => e.includes(chainkey)) != -1
     }
 
+
+    /*
+    chainParserInit returns generic chainParser by default. If a custom
+    chainParser implemented, use it instead.
+    */
     chainParserInit(chainkey, api, manager) {
         console.log(`chainParserInit start`)
         let chainParser;
-        if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver'])) {
+        if (this.isMatched(chainkey, ['polkadot-2000|acala', 'kusama-2000|karura'])) {
+            chainParser = new AcalaParser(api, manager, false)
+        } else if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver'])) {
             chainParser = new MoonbeamParser(api, manager, false)
+        } else if (this.isMatched(chainkey, ['polkadot-1000|statemint', 'kusama-1000|statemine'])) {
+            chainParser = new StatemintParser(api, manager, false)
+        } else if (this.isMatched(chainkey, ['polkadot-2030|bifrost', 'kusama-2001|bifrost'])) {
+            chainParser = new BifrostParser(api, manager, false)
         } else if (this.isMatched(chainkey, ['polkadot-2034|hydra', 'kusama-2090|basilisk'])) {
             chainParser = new HydraParser(api, manager, false)
+        } else if (this.isMatched(chainkey, ['polkadot-2035|phala', 'kusama-2004|khala'])) {
+            chainParser = new PhalaParser(api, manager, false)
+        } else if (this.isMatched(chainkey, ['kusama-2012|shadow'])) {
+            chainParser = new ShadowParser(api, manager, false)
+        } else if (this.isMatched(chainkey, ['polkadot-2012|parallel', 'kusama-2085|heiko'])) {
+            chainParser = new ParallelParser(api, manager, false)
         } else if (this.isMatched(chainkey, ['polkadot-2006|astar', 'kusama-2007|shiden'])) {
             chainParser = new AstarParser(api, manager, false)
         } else if (this.isMatched(chainkey, ['kusama-2084|calamari'])) {
@@ -388,70 +411,44 @@ module.exports = class GlobalAssetRegistry {
         } else if (this.isMatched(chainkey, ['kusama-2118|listen'])) {
             chainParser = new ListenParser(api, manager, false)
         } else {
-            chainParser = new ChainParser(api, manager)
+            chainParser = new CommonChainParser(api, manager)
         }
         console.log(`chainParserInit end`)
         return chainParser
     }
 
-
     async crawlRegistry(crawler) {
         let chainkey = crawler.chainkey
         let isGenericParser = crawler.chainParser.isGenericParser
         console.log(`**** [${chainkey}] RegistryParser START (generic:${isGenericParser}) ****`)
-        // step0: load native token of the chain
+        // step 0: load native token of the chain
         await crawler.chainParser.getSystemProperties(chainkey);
         if (!isGenericParser) {
             // If custom paser is set, bypass generic parser and use the custom one
+
             // step 1a: process gar pallet, storage
             await crawler.chainParser.fetchGar(chainkey)
             // step 1b: process xcgar pallet, storage
             await crawler.chainParser.fetchXcGar(chainkey)
 
-            //step 1c: optional augment using extrinsicID
+            // step 1c: optional augment using extrinsicID
             await crawler.chainParser.fetchAugments(chainkey)
 
-        } else if (this.isMatched(chainkey, ['polkadot-2000|acala', 'kusama-2000|karura',
-                'polkadot-2030|bifrost', 'kusama-2001|bifrost'
-            ])) {
-            // step 1a: load asset registry
-            await crawler.chainParser.fetchTokenPallet(chainkey)
-            if (this.isMatched(chainkey, ['polkadot-2000|acala', 'kusama-2000|karura'])) {
-                console.log(`[${chainkey}] Fetch assetRegistry:foreignAssetLocations`)
-                await crawler.chainParser.fetchXCMAssetRegistryLocations(chainkey)
-            }
-            if (this.isMatched(chainkey, ['polkadot-2030|bifrost', 'kusama-2001|bifrost'])) {
-                //await this.fetchAssetRegistryCurrencyMetadatas(crawler)
-                console.log(`[${chainkey}] Fetch assetRegistry:currencyIdToLocations`)
-                await crawler.chainParser.fetchXCMAssetRegistryLocations(chainkey)
-            }
-        } else if (this.isMatched(chainkey, ['polkadot-2006|astar', 'kusama-2007|shiden',
-                'polkadot-2004|moonbeam', 'kusama-2023|moonriver',
-                'polkadot-2012|parallel', 'kusama-2085|heiko',
-                'polkadot-1000|statemint', 'kusama-1000|statemine',
-                'polkadot-2035|phala', 'kusama-2004|khala',
-                'polkadot-2034|hydra', 'kusama-2090|basilisk',
-                'kusama-2084|calamari',
-                'kusama-2048|robonomics',
-                'kusama-2118|listen',
-                'kusama-2012|shadow'
-            ])) {
-            // step 1a: load asset registry
-            console.log(`[${chainkey}] fetch asset pallet`)
-            await crawler.chainParser.fetchAssetPallet(chainkey)
-            if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver',
-                    'polkadot-2012|parallel', 'kusama-2085|heiko',
-                    'polkadot-2034|hydra', 'kusama-2090|basilisk',
-                    'kusama-2012|shadow'
-                ])) {
-                // step 1b: load asset registry
-                await crawler.chainParser.fetchXCMAssetIdType(chainkey)
-                //if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver'])) {
-                //    // step 1c: TODO: load local xc asset registry
-                //}
-            }
+        } else if (this.isMatched(chainkey, ['polkadot-2030|bifrost'])) {
+            // step 1a: process asset registry from tokens Pallet
+            await crawler.chainParser.processCommonTokensPalletGar(chainkey, 'assetRegistry', 'assetMetadatas')
+        } else if (this.isMatched(chainkey, ['kusama-2048|robonomics'])) {
+            // step 1a: process asset registry from assets Pallet
+            await crawler.chainParser.processCommonAssetPalletGar(chainkey, 'assets', 'metadata')
         } else {
             console.log(`WARN @ ${chainkey} parser not selected/covered!`)
+            // step 0b: pallet detection: test to see if assets:metadata is available, if yes, try auto parse
+            let isCommonAssetPallet = await crawler.chainParser.detectPalletStorage(chainkey, 'assets', 'metadata')
+            // step 1a: process asset registry from assets Pallet
+            if (isCommonAssetPallet) {
+                console.log(`WARN @ ${chainkey} try parsing GAR`)
+                //await crawler.chainParser.processCommonAssetPalletGar(chainkey, 'assets', 'metadata')
+            }
         }
         console.log(`**** [${chainkey}] RegistryParser DONE ****`)
     }
@@ -474,9 +471,13 @@ module.exports = class GlobalAssetRegistry {
     }
 
     setXcmAsset(xcmInteriorKey, xcmAssetInfo) {
+        let paraIDSoure = xcmAssetInfo.source[0]
         if (this.xcmAssetMap[xcmInteriorKey] == undefined) {
             console.log(`add new xcm Asset ${xcmInteriorKey}`)
             this.xcmAssetMap[xcmInteriorKey] = xcmAssetInfo
+        } else {
+            this.xcmAssetMap[xcmInteriorKey].confidence += 1
+            this.xcmAssetMap[xcmInteriorKey].source.push(paraIDSoure)
         }
     }
 

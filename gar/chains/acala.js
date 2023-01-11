@@ -5,35 +5,30 @@ const ChainParser = require("./common_chainparser");
 Fork this template to create new custom parser
 
 Support chains
-kusama-2118|listen
+polkadot-2000|acala
+kusama-2000|karura
 */
 
+module.exports = class AcalaParser extends ChainParser {
 
-module.exports = class ListenParser extends ChainParser {
-
-    parserName = 'Listen';
+    parserName = 'Acala';
 
     //change [garPallet:garPallet] to the location where the asset registry is located.  ex: [assets:metadata]
-    garPallet = 'currencies'
-    garStorage = 'listenAssetsInfo'
+    garPallet = 'assetRegistry';
+    garStorage = 'assetMetadatas';
 
     //change [xcGarPallet:xcGarStorage] to the location where the xc registry is located.  ex: [assetManager:assetIdType]
-    xcGarPallet = 'currencies'
-    xcGarStorage = 'assetLocations'
+    xcGarPallet = 'assetRegistry'
+    xcGarStorage = 'foreignAssetLocations'
 
-    augment = {
-        'kusama-2118': [{
-            paraID: 2118,
-            extrinsicIDs: ['118722-2']
-        }]
-    }
+    augment = {}
 
-    isXcRegistryAvailable = false; //NOTE: listen team has NOT updated the xcRegistry yet
+    isXcRegistryAvailable = true
 
     //step 1: parse gar pallet, storage for parachain's asset registry
     async fetchGar(chainkey) {
         // implement your gar parsing function here.
-        await this.processListenGar(chainkey)
+        await this.processAcalaGar(chainkey)
     }
 
     //step 2: parse xcGar pallet, storage for parachain's xc asset registry
@@ -44,24 +39,24 @@ module.exports = class ListenParser extends ChainParser {
             return
         }
         // implement your xcGar parsing function here.
-        await this.processListenXcGar(chainkey)
+        await this.processAcalaXcGar(chainkey)
     }
 
     //step 3: Optional augmentation by providing a list xcm extrinsicIDs
     async fetchAugments(chainkey) {
         // implement your augment parsing function here.
-        await this.processListenAugment(chainkey)
+        //await this.processAcalaAugment(chainkey)
 
     }
 
-    // Implement listen gar parsing function here
-    async processListenGar(chainkey) {
+    // Implement gar parsing function here. Here's an example of how moonbeam gar Parser is implemented
+    async processAcalaGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
         let a = await super.fetchQuery(chainkey, this.garPallet, this.garStorage, 'GAR')
         if (a) {
             // step 1: use common Asset pallet parser func available at generic chainparser.
-            let assetList = this.processGarAssetPallet(chainkey, a)
+            let assetList = this.processGarTokensPallet(chainkey, a)
             // step 2: load up results
             for (const assetChainkey of Object.keys(assetList)) {
                 let assetInfo = assetList[assetChainkey]
@@ -70,8 +65,8 @@ module.exports = class ListenParser extends ChainParser {
         }
     }
 
-    // Implement listen xc gar parsing function here [currently has not entry]
-    async processListenXcGar(chainkey) {
+    // Implement gar parsing function here: Here's an example of how moonbeam xcGar Parser is implemented
+    async processAcalaXcGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
@@ -81,7 +76,7 @@ module.exports = class ListenParser extends ChainParser {
         if (!a) return
         if (a) {
             // step 1: use common XcmAssetIdType parser func available at generic chainparser.
-            let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXcmAssetIdType(chainkey, a)
+            let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXcmForeignAssetLocations(chainkey, a, true)
             console.log(`custom xcAssetList=[${Object.keys(xcAssetList)}], updatedAssetList=[${Object.keys(updatedAssetList)}], unknownAsset=[${Object.keys(unknownAsset)}], assetIDList=[${Object.keys(assetIDList)}]`, xcAssetList)
             // step 2: load up results
             for (const xcmInteriorKey of Object.keys(xcAssetList)) {
@@ -98,7 +93,7 @@ module.exports = class ListenParser extends ChainParser {
         }
     }
 
-    async processListenAugment(chainkey) {
+    async processAcalaAugment(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom augmentation`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]

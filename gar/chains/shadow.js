@@ -5,35 +5,29 @@ const ChainParser = require("./common_chainparser");
 Fork this template to create new custom parser
 
 Support chains
-kusama-2118|listen
+kusama-2012|shadow
 */
 
+module.exports = class SampleParser extends ChainParser {
 
-module.exports = class ListenParser extends ChainParser {
-
-    parserName = 'Listen';
+    parserName = 'Shadow';
 
     //change [garPallet:garPallet] to the location where the asset registry is located.  ex: [assets:metadata]
-    garPallet = 'currencies'
-    garStorage = 'listenAssetsInfo'
+    garPallet = 'assets';
+    garStorage = 'metadata';
 
     //change [xcGarPallet:xcGarStorage] to the location where the xc registry is located.  ex: [assetManager:assetIdType]
-    xcGarPallet = 'currencies'
-    xcGarStorage = 'assetLocations'
+    xcGarPallet = 'assetManager'
+    xcGarStorage = 'assetIdType'
 
-    augment = {
-        'kusama-2118': [{
-            paraID: 2118,
-            extrinsicIDs: ['118722-2']
-        }]
-    }
+    augment = {}
 
-    isXcRegistryAvailable = false; //NOTE: listen team has NOT updated the xcRegistry yet
+    isXcRegistryAvailable = true
 
     //step 1: parse gar pallet, storage for parachain's asset registry
     async fetchGar(chainkey) {
         // implement your gar parsing function here.
-        await this.processListenGar(chainkey)
+        await this.processShadowGar(chainkey)
     }
 
     //step 2: parse xcGar pallet, storage for parachain's xc asset registry
@@ -44,18 +38,18 @@ module.exports = class ListenParser extends ChainParser {
             return
         }
         // implement your xcGar parsing function here.
-        await this.processListenXcGar(chainkey)
+        await this.processShadowXcGar(chainkey)
     }
 
     //step 3: Optional augmentation by providing a list xcm extrinsicIDs
     async fetchAugments(chainkey) {
         // implement your augment parsing function here.
-        await this.processListenAugment(chainkey)
+        await this.processShadowAugment(chainkey)
 
     }
 
-    // Implement listen gar parsing function here
-    async processListenGar(chainkey) {
+    // Implement gar parsing function here. Here's an example of how moonbeam gar Parser is implemented
+    async processShadowGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
         let a = await super.fetchQuery(chainkey, this.garPallet, this.garStorage, 'GAR')
@@ -70,8 +64,8 @@ module.exports = class ListenParser extends ChainParser {
         }
     }
 
-    // Implement listen xc gar parsing function here [currently has not entry]
-    async processListenXcGar(chainkey) {
+    // Implement gar parsing function here: Here's an example of how moonbeam xcGar Parser is implemented
+    async processShadowXcGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
@@ -98,30 +92,7 @@ module.exports = class ListenParser extends ChainParser {
         }
     }
 
-    async processListenAugment(chainkey) {
-        console.log(`[${chainkey}] ${this.parserName} custom augmentation`)
-        let pieces = chainkey.split('-')
-        let relayChain = pieces[0]
-        let paraIDSoure = pieces[1]
-        let recs = this.augment[chainkey]
-        // step 0: fetch specified extrinsics
-        let augmentedExtrinsics = await this.fetchAugmentedExtrincics(chainkey, recs)
-        for (const augmentedExtrinsic of augmentedExtrinsics) {
-            console.log(`augmentedExtrinsic`, augmentedExtrinsic)
-            // step 1: use common xTokens parser func available at generic chainparser.
-            let augmentedMap = this.processOutgoingXTokens(chainkey, augmentedExtrinsic)
-            // step 2: load up results
-            for (const xcmInteriorKey of Object.keys(augmentedMap)) {
-                let augmentedInfo = augmentedMap[xcmInteriorKey]
-                let assetID = augmentedInfo.assetID
-                let assetChainkey = augmentedInfo.assetChainkey
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
-                let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
-                if (cachedAssetInfo) {
-                    cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
-                    this.manager.setChainAsset(assetChainkey, cachedAssetInfo)
-                }
-            }
-        }
+    async processShadowAugment(chainkey) {
+        return
     }
 }

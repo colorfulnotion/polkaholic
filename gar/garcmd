@@ -1,5 +1,11 @@
 #!/usr/bin/env node
-// Usage: ./garcmd [relayChain]
+// Usage: ./garcmd [relayChain] [targetedParaID]
+
+// EX: parse all supported registry on polkadot
+// Usage: ./garcmd polkadot all
+
+// EX: test a specific parser
+// Usage: ./garcmd polkadot 2004
 
 var GlobalAssetRegistry = require("./globalassetregistry");
 const endpoints = require("./endpoints");
