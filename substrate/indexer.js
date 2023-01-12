@@ -1291,9 +1291,9 @@ module.exports = class Indexer extends AssetManager {
             }
             let sqlDebug = true
             this.xcmtransfer = {};
-            // TODO: adjust upsertSQL to use existing matched value and finalization -- then xcmInfo in xcmInfo column, not pendingXcmInfo 
+            // TODO: adjust upsertSQL to use existing matched value and finalization -- then xcmInfo in xcmInfo column, not pendingXcmInfo
             //  unfinalized (isTip = true) -- do not NOT replace;
-            //  finalized : if matched=1 -- do NOT replace; matched=0 - REPLACE 
+            //  finalized : if matched=1 -- do NOT replace; matched=0 - REPLACE
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
@@ -4835,8 +4835,12 @@ module.exports = class Indexer extends AssetManager {
                     //destAddress is missing from events
                     if (fallbackRequired) {
                         delete rExtrinsic.xcms
+                        rExtrinsic.xcmIndex = 0
                         this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
                     }
+                }
+                if (rExtrinsic.xcmIndex != undefined){
+                    delete rExtrinsic.xcmIndex
                 }
 
                 // signed Extrinsic are guranteed to be consistent, regardless of proposer

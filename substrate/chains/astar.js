@@ -477,6 +477,11 @@ module.exports = class AstarParser extends ChainParser {
 
     processOutgoingEthereumAssetWithdraw(indexer, extrinsic, feed, fromAddress, section_method, a) {
         // need additional processing for currency_id part
+        if (extrinsic.xcmIndex == undefined){
+            extrinsic.xcmIndex = 0
+        }else{
+            extrinsic.xcmIndex += 1
+        }
         try {
             //if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingEthereumAssetWithdraw start`)
             let params = a.params
@@ -517,7 +522,6 @@ module.exports = class AstarParser extends ChainParser {
             //if (this.debugLevel >= paraTool.debugVerbose) console.log(assetAndAmountSents)
             let outgoingEtherumXCM = []
             if (extrinsic.xcms == undefined) extrinsic.xcms = []
-            let xcmIndex = extrinsic.xcms.length
             let destAddress = '0x' //unknown
             let relayChain = indexer.relayChain
             let paraIDExtra = paraTool.getParaIDExtra(relayChain)
@@ -569,7 +573,7 @@ module.exports = class AstarParser extends ChainParser {
                 let isFeeItem = assetAndAmountSent.isFeeItem
                 if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent)) {
                     if (extrinsic.xcms == undefined) extrinsic.xcms = []
-                    let xcmIndex = extrinsic.xcms.length
+                    let xcmIndex = extrinsic.xcmIndex
                     let r = {
                         sectionMethod: evmMethod,
                         extrinsicHash: feed.extrinsicHash,
@@ -609,8 +613,14 @@ module.exports = class AstarParser extends ChainParser {
         }
     }
 
+
     processOutgoingEthereumRemoteExecution(indexer, extrinsic, feed, fromAddress, section_method, a) {
         // need additional processing for currency_id part
+        if (extrinsic.xcmIndex == undefined){
+            extrinsic.xcmIndex = 0
+        }else{
+            extrinsic.xcmIndex += 1
+        }
         let outgoingEtherumXCM = []
         if (extrinsic.xcms == undefined) extrinsic.xcms = []
         try {
@@ -622,7 +632,7 @@ module.exports = class AstarParser extends ChainParser {
             if (a.fromAddress != undefined) fromAddress = a.fromAddress
             //console.log(`a`, a)
             //console.log(`params`, params)
-            let xcmIndex = extrinsic.xcms.length
+            let xcmIndex = extrinsic.xcmIndex
             let destAddress = '0x' //unknown
             let isFeeItem = 1 // irrelevant?
             let transferIndex = 0
