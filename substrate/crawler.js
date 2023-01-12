@@ -493,8 +493,8 @@ module.exports = class Crawler extends Indexer {
                 eupds = ", numReceiptsEVM = values(numReceiptsEVM)";
             } else if (evmBlock) {
                 eflds = ", blockHashEVM, parentHashEVM, numTransactionsEVM, numTransactionsInternalEVM, gasUsed, gasLimit";
-		let tl = evmBlock.transactions && evmBlock.transactions.length ?  evmBlock.transactions.length : 0;
-		let itl = evmBlock.transactionsInternal && evmBlock.transactionsInternal.length ? evmBlock.transactionsInternal.length : 0;
+                let tl = evmBlock.transactions && evmBlock.transactions.length ? evmBlock.transactions.length : 0;
+                let itl = evmBlock.transactionsInternal && evmBlock.transactionsInternal.length ? evmBlock.transactionsInternal.length : 0;
                 evals = `, '${evmBlock.hash}', '${evmBlock.parentHash}', '${tl}', '${itl}', '${evmBlock.gasUsed}', '${evmBlock.gasLimit}'`;
                 eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), numTransactionsInternalEVM = values(numTransactionsInternalEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit)";
             }
@@ -512,7 +512,7 @@ module.exports = class Crawler extends Indexer {
             }
             return (true);
         } catch (err) {
-	    console.log(err);
+            console.log(err);
             this.logger.warn({
                 "op": "save_block_trace",
                 chainID,
@@ -1237,15 +1237,15 @@ module.exports = class Crawler extends Indexer {
         if (techniqueParams[0] == "mod") {
             let n = techniqueParams[1];
             let nmax = techniqueParams[2];
-	    let w = ( nmax > 1 )  ?  `and blockNumber % ${nmax} = ${n}` : "";
-	    let w2 = ` and blockNumber > ${chain.blocksCovered} - 5000000`
+            let w = (nmax > 1) ? `and blockNumber % ${nmax} = ${n}` : "";
+            let w2 = ` and blockNumber > ${chain.blocksCovered} - 5000000`
             sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 3 order by attempted, rand() limit 10000`
-	    console.log("X", sql);
+            console.log("X", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
             let endBN = techniqueParams[2];
             sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 3 order by attempted, blockNumber desc limit 10000`
-	    console.log("Y", sql);
+            console.log("Y", sql);
         }
         let tasks = await this.poolREADONLY.query(sql);
         if (tasks.length == 0) return (false);
@@ -1378,7 +1378,7 @@ module.exports = class Crawler extends Indexer {
                 let endBN = techniqueParams[2];
                 sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < ${maxTraceAttempts} order by rand() limit 1000`
             }
-	    console.log(sql);
+            console.log(sql);
             let tasks = await this.poolREADONLY.query(sql);
             let jmp = 1;
             for (var i = 0; i < tasks.length; i += jmp) {
@@ -1393,7 +1393,7 @@ module.exports = class Crawler extends Indexer {
                         blockTS: t1.blockTS, // could be null
                         attempted: t1.attempted // should be
                     };
-		console.log(t2)
+                    console.log(t2)
                     if (t1.crawlBlock) {
                         return this.crawl_block_trace(chain, t2)
                     } else {

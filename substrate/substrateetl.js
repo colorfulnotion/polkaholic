@@ -127,22 +127,22 @@ module.exports = class SubstrateETL extends AssetManager {
         let sql = `select UNIX_TIMESTAMP(logDT) indexTS, chainID from substrateetllog where loaded = 1 and audited = 'Unknown' and logDT < date_sub(Now(), interval 1 day) order by rand() limit 100`
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
-	for (const r of recs) {
+        for (const r of recs) {
             let {
-		indexTS,
-		chainID
+                indexTS,
+                chainID
             } = r;
             let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
-	    await this.audit_substrateetl(logDT, paraID, relayChain);
-	}
+            await this.audit_substrateetl(logDT, paraID, relayChain);
+        }
     }
 
     project = "substrate-etl";
 
     async execute_bqJob(sqlQuery, fn = false) {
-	// run bigquery job with suitable credentials
+        // run bigquery job with suitable credentials
         const bigqueryClient = new BigQuery();
         const options = {
             query: sqlQuery,
@@ -150,16 +150,16 @@ module.exports = class SubstrateETL extends AssetManager {
         };
 
         try {
-	    let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
+            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
             const response = await bigqueryClient.createQueryJob(options);
-	    const job = response[0];
-	    const [rows] = await job.getQueryResults();
-	    return rows;
+            const job = response[0];
+            const [rows] = await job.getQueryResults();
+            return rows;
         } catch (err) {
-	    console.log(err);
+            console.log(err);
             throw new Error(`An error has occurred.`);
         }
-	return [];
+        return [];
     }
 
     async audit_substrateetl(logDT = null, paraID = -1, relayChain = null) {
@@ -168,15 +168,15 @@ module.exports = class SubstrateETL extends AssetManager {
         if (paraID >= 0 && relayChain) {
             let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
             w.push(`chainID = ${chainID}`)
-	    if ( logDT ) {
-		w.push(`logDT = '${logDT}'`)
-	    }
+            if (logDT) {
+                w.push(`logDT = '${logDT}'`)
+            }
         } else {
-	    w.push(`audited in ('Unknown')`);
-	}
-	let wstr = w.join(' and ');
-	
-	let audit_traces = ( this.daysago(logDT) < 31 );
+            w.push(`audited in ('Unknown')`);
+        }
+        let wstr = w.join(' and ');
+
+        let audit_traces = (this.daysago(logDT) < 31);
 
         let sql = `select UNIX_TIMESTAMP(logDT) indexTS, chainID from substrateetllog where ${wstr} order by rand() limit 1`
         let recs = await this.poolREADONLY.query(sql);
@@ -190,92 +190,94 @@ module.exports = class SubstrateETL extends AssetManager {
         paraID = paraTool.getParaIDfromChainID(chainID);
         relayChain = paraTool.getRelayChainByChainID(chainID);
         console.log(logDT, paraID, relayChain);
-	let errors = [];
-	let startDT = `${logDT} 00:00:00`
-	let endDT = `${logDT} 23:59:59`
-	let rangeRecs = await this.poolREADONLY.query(`select min(blockNumber) bn0, max(blockNumber) bn1, max(blockNumber)-min(blockNumber)+1 as cnt, count(*) nrecs from block${chainID} where blockDT >= '${startDT}' and blockDT <= '${endDT}'`);
-	let cnt = 0, nrecs = 0;
-	let bn0 = 0, bn1 = 0;
-	if ( rangeRecs.length == 1 ) {
-	    let r = rangeRecs[0];
-	    cnt = r.cnt;
-	    nrecs = r.nrecs;
-	    bn0 = r.bn0;
-	    bn1 = r.bn1;
-	    let audited = "Success";
-	    if ( cnt != nrecs ) {
-		errors.push(`source record count incorrect: Expected ${cnt} (${bn1}-${bn0}+1)> ${nrecs}`);
-	    } else {
-		let tbls = ["blocks", "extrinsics", "events"];
-		if ( audit_traces ) {
-		    tbls.push("traces");
-		}
-		for (const tbl of tbls) {
-		    let bsql = `SELECT distinct block_number, block_time FROM \`substrate-etl.${relayChain}.${tbl}${paraID}\` where date(block_time) = '${logDT}' order by block_number`;
-		    let fld = "block_number";
-		    if ( tbl == "blocks" ) {
-			bsql = `SELECT distinct number, block_time FROM \`substrate-etl.${relayChain}.${tbl}${paraID}\` where date(block_time) = '${logDT}' order by number`;
-			fld = "number";
-		    }
-		    console.log(bsql, `Expecting range ${bn0} through ${bn1} with ${nrecs}`)
-		    let found = {}
-		    let rows = await this.execute_bqJob(bsql);
-		    for (let bn = bn0; bn <= bn1; bn++ ) {
-			found[bn] = false;
-		    }
-		    rows.forEach( (r) => {
-			let bn = r[fld]
-			found[bn] = true;
-		    } );
-		    let missing = [];
-		    let nmissing = 0;
-		    for (let bn = bn0; bn <= bn1; bn++ ) {
-			if ( found[bn] == false ) {
-			    nmissing++;
-			    missing.push(bn);
-			}
-		    }
-		    if ( nmissing > 0 ) {
-			let out = {}
-			out[tbl] = nmissing;
-			if ( nmissing < 30 ) {
-			    out[tbl + "_missing"] = missing;
-			} else {
-			    let s0 = missing.slice(0, 5);
-			    let s1 = missing.slice(nmissing - 5, nmissing);
-			    out[tbl + "_missing_sample"] = s0.concat(s1);
-			}
-			if ( tbl == "traces" && audit_traces ) {
-			    let sql_fix = `update block${chainID} set crawlTrace = 1 where blockNumber in (${missing.join(",")}) and attempted < 127`
-			    console.log(sql_fix);
-			    this.batchedSQL.push(sql_fix);
-			} else {
-			    let sql_fix = `update block${chainID} set crawlBlock = 1 where blockNumber in (${missing.join(",")}) and attempted < 127`
-			    console.log(sql_fix);
-			    this.batchedSQL.push(sql_fix);
-			}
-			   
-			errors.push(out);
-			audited = "Failed";
-			console.log(out);
-		    }
-		}
-	    }
-	    if ( errors.length > 0 ) {
-		let outsql = `update substrateetllog set auditDT = Now(), audited = '${audited}', auditResult = '${JSON.stringify(errors)}' where chainID='${chainID}' and logDT = '${logDT}'`
-		console.log(outsql);
-		this.batchedSQL.push(outsql);
-		await this.update_batchedSQL();
-	    } else {
-		let outsql = `update substrateetllog set auditDT = Now(), audited = '${audited}', auditResult = '' where chainID='${chainID}' and logDT = '${logDT}'`
-		this.batchedSQL.push(outsql);
-		console.log(outsql);
-		await this.update_batchedSQL();
-		
-	    }
-	}
+        let errors = [];
+        let startDT = `${logDT} 00:00:00`
+        let endDT = `${logDT} 23:59:59`
+        let rangeRecs = await this.poolREADONLY.query(`select min(blockNumber) bn0, max(blockNumber) bn1, max(blockNumber)-min(blockNumber)+1 as cnt, count(*) nrecs from block${chainID} where blockDT >= '${startDT}' and blockDT <= '${endDT}'`);
+        let cnt = 0,
+            nrecs = 0;
+        let bn0 = 0,
+            bn1 = 0;
+        if (rangeRecs.length == 1) {
+            let r = rangeRecs[0];
+            cnt = r.cnt;
+            nrecs = r.nrecs;
+            bn0 = r.bn0;
+            bn1 = r.bn1;
+            let audited = "Success";
+            if (cnt != nrecs) {
+                errors.push(`source record count incorrect: Expected ${cnt} (${bn1}-${bn0}+1)> ${nrecs}`);
+            } else {
+                let tbls = ["blocks", "extrinsics", "events"];
+                if (audit_traces) {
+                    tbls.push("traces");
+                }
+                for (const tbl of tbls) {
+                    let bsql = `SELECT distinct block_number, block_time FROM \`substrate-etl.${relayChain}.${tbl}${paraID}\` where date(block_time) = '${logDT}' order by block_number`;
+                    let fld = "block_number";
+                    if (tbl == "blocks") {
+                        bsql = `SELECT distinct number, block_time FROM \`substrate-etl.${relayChain}.${tbl}${paraID}\` where date(block_time) = '${logDT}' order by number`;
+                        fld = "number";
+                    }
+                    console.log(bsql, `Expecting range ${bn0} through ${bn1} with ${nrecs}`)
+                    let found = {}
+                    let rows = await this.execute_bqJob(bsql);
+                    for (let bn = bn0; bn <= bn1; bn++) {
+                        found[bn] = false;
+                    }
+                    rows.forEach((r) => {
+                        let bn = r[fld]
+                        found[bn] = true;
+                    });
+                    let missing = [];
+                    let nmissing = 0;
+                    for (let bn = bn0; bn <= bn1; bn++) {
+                        if (found[bn] == false) {
+                            nmissing++;
+                            missing.push(bn);
+                        }
+                    }
+                    if (nmissing > 0) {
+                        let out = {}
+                        out[tbl] = nmissing;
+                        if (nmissing < 30) {
+                            out[tbl + "_missing"] = missing;
+                        } else {
+                            let s0 = missing.slice(0, 5);
+                            let s1 = missing.slice(nmissing - 5, nmissing);
+                            out[tbl + "_missing_sample"] = s0.concat(s1);
+                        }
+                        if (tbl == "traces" && audit_traces) {
+                            let sql_fix = `update block${chainID} set crawlTrace = 1 where blockNumber in (${missing.join(",")}) and attempted < 127`
+                            console.log(sql_fix);
+                            this.batchedSQL.push(sql_fix);
+                        } else {
+                            let sql_fix = `update block${chainID} set crawlBlock = 1 where blockNumber in (${missing.join(",")}) and attempted < 127`
+                            console.log(sql_fix);
+                            this.batchedSQL.push(sql_fix);
+                        }
 
-	
+                        errors.push(out);
+                        audited = "Failed";
+                        console.log(out);
+                    }
+                }
+            }
+            if (errors.length > 0) {
+                let outsql = `update substrateetllog set auditDT = Now(), audited = '${audited}', auditResult = '${JSON.stringify(errors)}' where chainID='${chainID}' and logDT = '${logDT}'`
+                console.log(outsql);
+                this.batchedSQL.push(outsql);
+                await this.update_batchedSQL();
+            } else {
+                let outsql = `update substrateetllog set auditDT = Now(), audited = '${audited}', auditResult = '' where chainID='${chainID}' and logDT = '${logDT}'`
+                this.batchedSQL.push(outsql);
+                console.log(outsql);
+                await this.update_batchedSQL();
+
+            }
+        }
+
+
     }
 
     async dump_xcmtransfers_range(relayChain = "polkadot", range_days_ago = 365) {
@@ -327,7 +329,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async dump_xcmtransfers(logDT = "2022-12-29", relayChain = "polkadot") {
-        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' and incomplete = 0 order by sourceTS;`
+        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol, UNIX_TIMESTAMP(xcmInfolastUpdateDT) as lastUpdateTS from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' and incomplete = 0 order by sourceTS;`
 
         let xcmtransferRecs = await this.poolREADONLY.query(sql)
         let tbl = "xcmtransfers";
@@ -364,7 +366,8 @@ module.exports = class SubstrateETL extends AssetManager {
                 amount_sent_usd: r.amountSentUSD,
                 amount_received_usd: r.amountReceivedUSD,
                 teleport_fee_usd: teleportFeeUSD,
-                xcm_info: xcmInfo
+                xcm_info: xcmInfo,
+                xcm_info_last_update_time: r.lastUpdateTS
             }
         });
         let NL = "\r\n";
@@ -378,26 +381,26 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     daysago(logDT) {
-	let indexTS = paraTool.logDT_hr_to_ts(logDT, 0);
-	let currentTS = this.getCurrentTS();
-	let daysago = Math.floor((currentTS - indexTS)/86400)
-	return(daysago);
+        let indexTS = paraTool.logDT_hr_to_ts(logDT, 0);
+        let currentTS = this.getCurrentTS();
+        let daysago = Math.floor((currentTS - indexTS) / 86400)
+        return (daysago);
     }
-    
+
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "specversions"]
-	let dump_traces = false;
-	if ( this.daysago(logDT) < 31 ) {
-	    tbls.push("traces");
-	    dump_traces  =true;
-	    console.log("DUMP_TRACES TRUE");
-	}
-	
+        let dump_traces = false;
+        if (this.daysago(logDT) < 31) {
+            tbls.push("traces");
+            dump_traces = true;
+            console.log("DUMP_TRACES TRUE");
+        }
+
         // 1. get bnStart, bnEnd for logDT
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let minLogDT = `${logDT} 00:00:00`;
         let maxLogDT = `${logDT} 23:59:59`;
-	let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}'`
+        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}'`
         let bnRanges = await this.poolREADONLY.query(sql1)
         console.log(bnRanges, sql1);
         let {
@@ -449,18 +452,18 @@ module.exports = class SubstrateETL extends AssetManager {
                 let b = r.feed;
                 let hdr = b.header;
                 if (!hdr || hdr.number == undefined) {
-		    let bn = parseInt(row.id.substr(2), 16);
-		    let sql0 = `update block${chainID} set crawlBlock = 1 where blockNumber = ${bn} and attempted < 127`
+                    let bn = parseInt(row.id.substr(2), 16);
+                    let sql0 = `update block${chainID} set crawlBlock = 1 where blockNumber = ${bn} and attempted < 127`
                     console.log("ERROR: MISSING hdr", row.id, sql0);
-		    this.batchedSQL.push(sql0);
-		    await this.update_batchedSQL()
+                    this.batchedSQL.push(sql0);
+                    await this.update_batchedSQL()
                     continue;
                 }
-		let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
-		if ( logDT !=  logDT0 ) {
-		    console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
-		    continue;
-		}
+                let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
+                if (logDT != logDT0) {
+                    console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
+                    continue;
+                }
 
                 let spec_version = this.getSpecVersionForBlockNumber(chainID, hdr.number);
 
@@ -592,7 +595,7 @@ module.exports = class SubstrateETL extends AssetManager {
                     });
                 }
                 //console.log("traces", traces);
-                if (block.trace_count > 0 && dump_traces ) {
+                if (block.trace_count > 0 && dump_traces) {
                     traces.forEach((t) => {
                         fs.writeSync(f["traces"], JSON.stringify(t) + NL);
                     });

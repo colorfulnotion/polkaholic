@@ -1326,9 +1326,9 @@ from chain where chainID = '${chainID}' limit 1`);
         return Math.round(new Date().getTime() / 1000);
     }
 
-    getTraceParseTS(maxDaysAgo=31) {
-      let [logDT, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS()-86400*maxDaysAgo);
-      return(paraTool.logDT_hr_to_ts(logDT, 0));
+    getTraceParseTS(maxDaysAgo = 31) {
+        let [logDT, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS() - 86400 * maxDaysAgo);
+        return (paraTool.logDT_hr_to_ts(logDT, 0));
     }
 
     add_index_metadata(c) {
