@@ -14,6 +14,7 @@ const ShadowParser = require("./chains/shadow");
 const StatemintParser = require("./chains/statemint")
 const BifrostParser = require("./chains/bifrost")
 const PhalaParser = require("./chains/phala")
+const InterlayParser = require("./chains/interlay")
 
 const {
     ApiPromise,
@@ -410,6 +411,8 @@ module.exports = class GlobalAssetRegistry {
             chainParser = new CalamariParser(api, manager, false)
         } else if (this.isMatched(chainkey, ['kusama-2118|listen'])) {
             chainParser = new ListenParser(api, manager, false)
+        } else if (this.isMatched(chainkey, ['polkadot-2032|interlay', 'kusama-2092|kintsugi'])) {
+            chainParser = new InterlayParser(api, manager, false)
         } else {
             chainParser = new CommonChainParser(api, manager)
         }

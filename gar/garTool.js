@@ -557,4 +557,7 @@ module.exports = {
         //return false
         return convert_xcmV1MultiLocation_to_byte(xcmV1MultiLocation, api)
     },
+    encodeNetwork: function(relayChain = 'polkadot') {
+        return encodeNetwork(relayChain)
+    }
 };

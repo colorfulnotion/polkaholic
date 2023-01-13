@@ -221,8 +221,8 @@
         "paraID": 2090,
         "chainID": 22090,
         "WSEndpoints": [
-            "wss://rpc.basilisk.cloud",
-            "wss://basilisk-rpc.dwellir.com"
+            "wss://basilisk-rpc.dwellir.com",
+            "wss://rpc.basilisk.cloud"
         ],
         "relaychain": "kusama"
     },
