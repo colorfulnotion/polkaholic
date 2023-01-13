@@ -1880,6 +1880,12 @@ module.exports = class ChainParser {
 
 
     processOutgoingXTokensEvent(indexer, extrinsic, feed, event, msgHashCandidate = false) {
+        if (extrinsic.xcmIndex == undefined){
+            extrinsic.xcmIndex = 0
+        }else{
+            extrinsic.xcmIndex += 1
+        }
+        //xcmIndex refers to the nth xcmmsg sent by the extrinsic
         //xTokens:TransferredMultiAssets
         /*
         [
@@ -1950,7 +1956,7 @@ module.exports = class ChainParser {
         let section_method = `${extrinsic.section}:${extrinsic.method}`
         let evetnData = event.data
         let transferIndex = 0;
-        let xcmIndex = extrinsic.xcms.length
+        //let xcmIndex = extrinsic.xcmIndex
 
         let fromAddress = paraTool.getPubKey(evetnData[0])
         let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
@@ -1968,6 +1974,15 @@ module.exports = class ChainParser {
             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
             return
         }
+
+        let feePayingXcmInteriorkey = false
+        let feeAsset = evetnData[2]
+        if (feeAsset.fun !== undefined && feeAsset.fun.fungible !== undefined) {
+            let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, feeAsset)
+            //console.log(`processOutgoingXTokensEvent asset targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}`, asset)
+            feePayingXcmInteriorkey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTokensEvent ${section_method}`, feeAsset)
+        }
+        console.log(`feePayingXcmInteriorkey=${feePayingXcmInteriorkey}`)
 
         let aAsset = evetnData[1] //Vec<XcmV1MultiAsset>
         if (aAsset != undefined && Array.isArray(aAsset)) {
@@ -1995,7 +2010,7 @@ module.exports = class ChainParser {
                         xcmSymbol: targetedSymbol,
                         amountSent: paraTool.dechexToInt(asset.fun.fungible),
                         transferIndex: transferIndex,
-                        isFeeItem: 1,
+                        isFeeItem: (targetedXcmInteriorKey == feePayingXcmInteriorkey && targetedXcmInteriorKey !== false) ? 1 : 0,
                     }
                     assetAndAmountSents.push(aa)
                 } else {
@@ -2016,7 +2031,7 @@ module.exports = class ChainParser {
             let isFeeItem = assetAndAmountSent.isFeeItem
             if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent)) {
                 if (extrinsic.xcms == undefined) extrinsic.xcms = []
-                let xcmIndex = extrinsic.xcms.length
+                let xcmIndex = extrinsic.xcmIndex
                 let r = {
                     sectionMethod: section_method,
                     extrinsicHash: feed.extrinsicHash,
@@ -2050,7 +2065,6 @@ module.exports = class ChainParser {
                 //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTokens xTokens unknown asset/amountSent`);
             }
         }
-
     }
 
     processDest(dest, relayChain) {
@@ -2114,6 +2128,11 @@ module.exports = class ChainParser {
 
     processOutgoingXTransfer(indexer, extrinsic, feed, fromAddress, section_method, args) {
         //return
+        if (extrinsic.xcmIndex == undefined){
+            extrinsic.xcmIndex = 0
+        }else{
+            extrinsic.xcmIndex += 1
+        }
         let outgoingXTransfer = []
         try {
             if (section_method == "xTransfer:transfer") {
@@ -2207,7 +2226,7 @@ module.exports = class ChainParser {
                     if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent)) {
                         let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                         if (extrinsic.xcms == undefined) extrinsic.xcms = []
-                        let xcmIndex = extrinsic.xcms.length
+                        let xcmIndex = extrinsic.xcmIndex
                         let r = {
                             sectionMethod: section_method,
                             extrinsicHash: feed.extrinsicHash,
@@ -2257,6 +2276,11 @@ module.exports = class ChainParser {
 
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
         //return
+        if (extrinsic.xcmIndex == undefined){
+            extrinsic.xcmIndex = 0
+        }else{
+            extrinsic.xcmIndex += 1
+        }
         let outgoingXTokens = []
         try {
             //let module_section = extrinsic.section;
@@ -2404,7 +2428,7 @@ module.exports = class ChainParser {
                     if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent)) {
                         let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                         if (extrinsic.xcms == undefined) extrinsic.xcms = []
-                        let xcmIndex = extrinsic.xcms.length
+                        let xcmIndex = extrinsic.xcmIndex
                         let r = {
                             sectionMethod: section_method,
                             extrinsicHash: feed.extrinsicHash,
@@ -2878,6 +2902,11 @@ module.exports = class ChainParser {
     }
 
     processOutgoingPolkadotXcm(indexer, extrinsic, feed, fromAddress, section_method, args) {
+        if (extrinsic.xcmIndex == undefined){
+            extrinsic.xcmIndex = 0
+        }else{
+            extrinsic.xcmIndex += 1
+        }
         let outgoingXcmPallet = []
         try {
             //let module_section = extrinsic.section;
@@ -3058,7 +3087,7 @@ module.exports = class ChainParser {
                         let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                         if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent) && chainIDDest) {
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
-                            let xcmIndex = extrinsic.xcms.length
+                            let xcmIndex = extrinsic.xcmIndex
                             let r = {
                                 sectionMethod: section_method,
                                 extrinsicHash: feed.extrinsicHash,
@@ -3091,7 +3120,7 @@ module.exports = class ChainParser {
                             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer incomplete `, `module:${section_method}`, a);
                             // TODO: tally error
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
-                            let xcmIndex = extrinsic.xcms.length
+                            let xcmIndex = extrinsic.xcmIndex
                             let r = {
                                 sectionMethod: section_method,
                                 extrinsicHash: feed.extrinsicHash,
@@ -3134,6 +3163,11 @@ module.exports = class ChainParser {
     }
 
     processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args) {
+        if (extrinsic.xcmIndex == undefined){
+            extrinsic.xcmIndex = 0
+        }else{
+            extrinsic.xcmIndex += 1
+        }
         let outgoingXcmPallet = []
         try {
             //let module_section = extrinsic.section;
@@ -3324,7 +3358,7 @@ module.exports = class ChainParser {
                         if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent) && chainIDDest) {
                             let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
-                            let xcmIndex = extrinsic.xcms.length
+                            let xcmIndex = extrinsic.xcmIndex
                             let r = {
                                 sectionMethod: section_method,
                                 extrinsicHash: feed.extrinsicHash,

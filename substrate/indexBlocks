@@ -7,24 +7,23 @@ const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 
 async function main() {
-    let chainID = paraTool.chainIDAstar;
-    let chainFilterSet = false
+    let chainIDs = "";
+
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
-            chainID = val;
-            chainFilterSet = true
+            chainIDs = val;
         }
     });
     let crawler = new Crawler();
     crawler.setDebugLevel(paraTool.debugTracing)
+
+    let chainID = 2000;
     let chain = await crawler.getChain(chainID);
     await crawler.setupAPI(chain);
     await crawler.assetManagerInit();
     await crawler.setupChainAndAPI(chainID);
-    let chainFilter = (chainFilterSet)? `and (chainID = '${chainID}' or chainIDDest = '${chainID}')` : ' '
-    //let targetSQL = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber from xcmtransfer where xcminteriorkey is null ${chainFilter} order by blockNumber`;
-    let targetSQL = `select extrinsicHash, extrinsicID, chainID, chainIDDest, blockNumber from xcmtransfer where pendingXcmInfo is not null and xcmInfo is null ${chainFilter} order by blockNumber`;
-    console.log(`targetSQL`, targetSQL)
+    let w = chainIDs ? ` and chainID in (${chainIDs})` : "";
+    let targetSQL = `select extrinsicHash, extrinsicID, chainID, blockNumber from xcmtransferbackup where (xcmInfoAudited < -5) ${w} order by blockNumber`;
     let recs = await crawler.poolREADONLY.query(targetSQL);
     let targetMap = {}
     for (let i = 0; i < recs.length; i++) {
@@ -34,18 +33,6 @@ async function main() {
         let extrinsicHash = m.extrinsicHash
         let blockNumber = m.blockNumber
         let blockHash = await crawler.getBlockHashFinalized(chainID, blockNumber)
-        let t2 = null
-        /*{
-    	   chainID,
-           blockNumber,
-           crawlTrace: 1,
-           crawlBlockEVM: 1,
-           crawlReceiptsEVM: 1,
-           crawlTraceEVM: 1
-        }; */
-        if ( t2 ) {
-            await crawler.crawl_block_trace(chain, t2)
-        }
         let r = {
             blockNumber: blockNumber,
             blockHash: blockHash,
@@ -70,6 +57,9 @@ async function main() {
             let b = blocks[i]
             console.log(`[chainID:${chainID}] [${i+1}/${blocks.length}] indexBlocks [${b.extrinsicID}] [${b.extrinsicHash}] blkHash=${b.blockHash}`)
             await ccrawler.index_block(chain, b.blockNumber, b.blockHash);
+	    let sql = `update xcmtransferbackup set xcmInfoAudited = -4 where extrinsicHash = '${b.extrinsicHash}' and blockNumber = '${b.blockNumber}'`
+	    ccrawler.batchedSQL.push(sql);
+	    await ccrawler.update_batchedSQL();
         }
     }
 }
