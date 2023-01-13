@@ -91,8 +91,10 @@ module.exports = class XCMCleaner extends Query {
                 });
             }
         } else {
-            if (chainID == 22000 || chainID == 2000 || chainID == 2030 || chainID == 22001) {
-                currencies.push(JSON.parse(asset.asset)); // TODO: currencies.push(JSON.parse(asset.currencyID));
+	    if ( chainID == 2030 || chainID == 22001 ) {
+		currencies.push(JSON.parse(asset.currencyID));
+	    } else if (chainID == 22000 || chainID == 2000 ) {
+                currencies.push(JSON.parse(asset.asset)); 
             } else {
                 currencies.push(asset.currencyID);
             }

@@ -545,7 +545,7 @@ module.exports = class XCMManager extends Query {
             remoteEVMResult: remoteEVMTxResult,
             amountReceived: 0,
             amountReceivedUSD: 0,
-            teleportFee: xcm.fee,
+            teleportFee: xcm.fee, // HOW IS THIS Computed
             teleportFeeUSD: xcm.feeUSD,
             teleportFeeChainSymbol: xcm.symbol,
             blockNumber: xcm.blockNumberDest,
@@ -625,6 +625,7 @@ module.exports = class XCMManager extends Query {
 
         //fee -> initiation + teleport fee
         if (decimals !== false) {
+	    // TODO --- IDEA: if we know feeSymbol and get fee priceUSD then we should compute estfeeUSD with that instead of this
             let fee = xcm.amountSent - xcm.amountReceived
             let estPrice = xcm.amountSentUSD / xcm.amountReceived
             let estFeeUSD = estPrice * fee // temp hack
@@ -715,7 +716,7 @@ module.exports = class XCMManager extends Query {
             beneficiary: xcm.destAddress,
             amountReceived: xcm.amountReceived,
             amountReceivedUSD: xcm.amountReceivedUSD,
-            teleportFee: xcm.fee,
+            teleportFee: xcm.fee, // how is this computed!!!
             teleportFeeUSD: xcm.feeUSD,
             teleportFeeChainSymbol: xcm.symbol,
             blockNumber: xcm.blockNumberDest,
