@@ -1,7 +1,7 @@
 const garTool = require("./garTool");
 const endpoints = require("./endpoints");
 
-//const SampleParser = require("./chains/custom_parser_template") // for this file to include new chain parser
+//const SampleParser = require("./chains/custom_parser_template") // fork this file to include new chain parser
 const CommonChainParser = require("./chains/common_chainparser");
 const AcalaParser = require("./chains/acala");
 const MoonbeamParser = require("./chains/moonbeam");
@@ -15,6 +15,7 @@ const StatemintParser = require("./chains/statemint")
 const BifrostParser = require("./chains/bifrost")
 const PhalaParser = require("./chains/phala")
 const InterlayParser = require("./chains/interlay")
+const MagataxParser = require("./chains/magatax")
 
 const {
     ApiPromise,
@@ -390,31 +391,33 @@ module.exports = class GlobalAssetRegistry {
         console.log(`chainParserInit start`)
         let chainParser;
         if (this.isMatched(chainkey, ['polkadot-2000|acala', 'kusama-2000|karura'])) {
-            chainParser = new AcalaParser(api, manager, false)
+            chainParser = new AcalaParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2004|moonbeam', 'kusama-2023|moonriver'])) {
-            chainParser = new MoonbeamParser(api, manager, false)
+            chainParser = new MoonbeamParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-1000|statemint', 'kusama-1000|statemine'])) {
-            chainParser = new StatemintParser(api, manager, false)
+            chainParser = new StatemintParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2030|bifrost', 'kusama-2001|bifrost'])) {
-            chainParser = new BifrostParser(api, manager, false)
+            chainParser = new BifrostParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2034|hydra', 'kusama-2090|basilisk'])) {
-            chainParser = new HydraParser(api, manager, false)
+            chainParser = new HydraParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2035|phala', 'kusama-2004|khala'])) {
-            chainParser = new PhalaParser(api, manager, false)
+            chainParser = new PhalaParser(api, manager)
         } else if (this.isMatched(chainkey, ['kusama-2012|shadow'])) {
-            chainParser = new ShadowParser(api, manager, false)
+            chainParser = new ShadowParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2012|parallel', 'kusama-2085|heiko'])) {
-            chainParser = new ParallelParser(api, manager, false)
+            chainParser = new ParallelParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2006|astar', 'kusama-2007|shiden'])) {
-            chainParser = new AstarParser(api, manager, false)
+            chainParser = new AstarParser(api, manager)
         } else if (this.isMatched(chainkey, ['kusama-2084|calamari'])) {
-            chainParser = new CalamariParser(api, manager, false)
+            chainParser = new CalamariParser(api, manager)
         } else if (this.isMatched(chainkey, ['kusama-2118|listen'])) {
-            chainParser = new ListenParser(api, manager, false)
+            chainParser = new ListenParser(api, manager)
+        } else if (this.isMatched(chainkey, ['kusama-2110|magatax'])) {
+            chainParser = new MagataxParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2032|interlay', 'kusama-2092|kintsugi'])) {
-            chainParser = new InterlayParser(api, manager, false)
+            chainParser = new InterlayParser(api, manager)
         } else {
-            chainParser = new CommonChainParser(api, manager)
+            chainParser = new CommonChainParser(api, manager, false) // set isCustomParser to false
         }
         console.log(`chainParserInit end`)
         return chainParser
@@ -422,11 +425,11 @@ module.exports = class GlobalAssetRegistry {
 
     async crawlRegistry(crawler) {
         let chainkey = crawler.chainkey
-        let isGenericParser = crawler.chainParser.isGenericParser
-        console.log(`**** [${chainkey}] RegistryParser START (generic:${isGenericParser}) ****`)
+        let isCustomParser = crawler.chainParser.isCustomParser
+        console.log(`**** [${chainkey}] RegistryParser START (custom:${isCustomParser}) ****`)
         // step 0: load native token of the chain
         await crawler.chainParser.getSystemProperties(chainkey);
-        if (!isGenericParser) {
+        if (isCustomParser) {
             // If custom paser is set, bypass generic parser and use the custom one
 
             // step 1a: process gar pallet, storage
@@ -457,6 +460,7 @@ module.exports = class GlobalAssetRegistry {
     }
 
     setChainAsset(assetChainkey, assetInfo, isUpdate = false) {
+        if (assetInfo.xcmInteriorKey != undefined) assetInfo.xcmInteriorKeyV1 = garTool.convertXcmInteriorKeyV2toV1(assetInfo.xcmInteriorKey)
         this.assetMap[assetChainkey] = assetInfo
         if (isUpdate) console.log(`UPDATED ${assetChainkey}`, assetInfo)
     }

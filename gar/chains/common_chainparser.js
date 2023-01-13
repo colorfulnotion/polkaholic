@@ -10,13 +10,13 @@ module.exports = class ChainParser {
 
     api;
     manager;
-    isGenericParser = true;
+    isCustomParser = false;
     nativeAsset = false;
 
-    constructor(api, manager, isGenericParser = true) {
+    constructor(api, manager, isCustomParser = true) {
         this.api = api
         this.manager = manager
-        this.isGenericParser = isGenericParser
+        this.isCustomParser = isCustomParser
     }
 
     setDebugLevel(debugLevel = garTool.debugNoLog) {
