@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+// Usage: ./garcmd [relayChain] [targetedParaID]
+
+// EX: parse all supported registry on polkadot
+// Usage: ./garcmd polkadot all
+
+// EX: test a specific parser
+// Usage: ./garcmd polkadot 2004
+
+var GarManager = require("./garmanager");
+
+async function main() {
+    var targetedRelaychain = 'polkadot'
+    var targetedParaID = 'all'
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            targetedRelaychain = val;
+        }
+    });
+
+    var garManager = new GarManager();
+    //let polkadotXcRegistry = garManager.readJSONFn('polkadot', 'xcmConcept')
+    //let kusamaXcRegistry = garManager.readJSONFn('kusama', 'xcmConcept')
+    //console.log(`polkadotXcRegistry`, polkadotXcRegistry)
+    //console.log(`kusamaXcRegistry`, kusamaXcRegistry)
+
+    let xcRegistryRaw = garManager.readJSONFn(targetedRelaychain, 'xcmConcept')
+    let xcRegistryNew = garManager.transformXcGarRegistry(xcRegistryRaw)
+    //console.log(`xcRegistryNew`, xcRegistryNew)
+
+    let xcRegistryOld = await garManager.init_xcm_asset_old(targetedRelaychain)
+    //console.log(`xcRegistryOld`, xcRegistryOld)
+
+    let [xcRegistryNewOnly, xcRegistryOldOnly, identicalXcRegsitry, diffXcRefistry] = garManager.compareXcRegistry(xcRegistryNew, xcRegistryOld)
+}
+
+main()
+    .then(() => {
+        console.log("finishing...")
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
