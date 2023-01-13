@@ -478,7 +478,7 @@ module.exports = class GlobalAssetRegistry {
     }
 
     setXcmAsset(xcmInteriorKey, xcmAssetInfo) {
-        let paraIDSoure = xcmAssetInfo.source[0]
+        let paraIDSoure = garTool.dechexToInt(xcmAssetInfo.source[0])
         if (this.xcmAssetMap[xcmInteriorKey] == undefined) {
             console.log(`add new xcm Asset ${xcmInteriorKey}`)
             this.xcmAssetMap[xcmInteriorKey] = xcmAssetInfo

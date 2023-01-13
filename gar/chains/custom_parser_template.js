@@ -2,7 +2,8 @@ const garTool = require("../garTool");
 const ChainParser = require("./common_chainparser");
 
 /*
-Fork this template to create new custom parser
+Fork this template to create new custom parser. And replace all [Sample] in this
+file with para name
 
 Support chains
 [relaychain-paraID|projectName]
@@ -63,7 +64,7 @@ module.exports = class SampleParser extends ChainParser {
 
     }
 
-    // Implement gar parsing function here
+    // Implement Sample gar parsing function here
     async processSampleGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
@@ -79,7 +80,7 @@ module.exports = class SampleParser extends ChainParser {
         }
     }
 
-    // Implement gar parsing function here
+    // Implement Sample xcgar parsing function here
     async processSampleXcGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')

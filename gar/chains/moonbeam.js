@@ -50,7 +50,7 @@ module.exports = class MoonbeamParser extends ChainParser {
 
     }
 
-    // Implement gar parsing function here. Here's an example of how moonbeam gar Parser is implemented
+    // Implement moonbeam gar parsing function here
     async processMoonbeamGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
@@ -66,7 +66,7 @@ module.exports = class MoonbeamParser extends ChainParser {
         }
     }
 
-    // Implement gar parsing function here: Here's an example of how moonbeam xcGar Parser is implemented
+    // Implement moonbeam xcGar parsing function here
     async processMoonbeamXcGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')

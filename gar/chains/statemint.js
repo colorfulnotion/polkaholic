@@ -48,7 +48,7 @@ module.exports = class StatemintParser extends ChainParser {
 
     }
 
-    // Implement gar parsing function here. Here's an example of how moonbeam gar Parser is implemented
+    // Implement statemint gar parsing function here
     async processStatemintGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
@@ -64,7 +64,7 @@ module.exports = class StatemintParser extends ChainParser {
         }
     }
 
-    // Implement gar parsing function here: Here's an example of how moonbeam xcGar Parser is implemented
+    // Implement statemint xcGar parsing function here
     async processStatemintXcGar(chainkey) {
         //TODO
     }
