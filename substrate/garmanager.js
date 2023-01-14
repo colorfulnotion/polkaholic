@@ -74,8 +74,13 @@ module.exports = class GarManager extends AssetManager {
       source: [ 2006, 2012, 2032, 2035 ]
     */
 
+    isObject(val) {
+        return (typeof val === 'object');
+    }
+
     transformXcGarRegistry(xcGarMap){
         let polkaholicXcGar = {}
+        let assetGar = []
         for (const xcmInteriorKeyV2 of Object.keys(xcGarMap)){
             let xcmAsset = xcGarMap[xcmInteriorKeyV2]
             let xcmInteriorKeyV1 = paraTool.convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2)
@@ -85,13 +90,29 @@ module.exports = class GarManager extends AssetManager {
             let symbol = xcmAsset.symbol
             let relayChain = xcmAsset.relayChain
             let paraID = xcmAsset.paraID
-            let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, xcmAsset.relayChain)
+            let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
             //nativeAssetChain are different for statemine asset (i.e USDt)
             let parsedAsset = {
                 Token: symbol
             }
             var assetString = JSON.stringify(parsedAsset);
             let nativeAssetChain = paraTool.makeAssetChain(assetString, chainID)
+            let xcCurrencyIDMap = {}
+            for (const paraIDSource of Object.keys(xcmAsset.xcCurrencyID)){
+                let chainIDsource = paraTool.getChainIDFromParaIDAndRelayChain(garTool.dechexToInt(paraIDSource), xcmAsset.relayChain)
+                let currencyID = xcmAsset.xcCurrencyID[paraIDSource]
+                let assetString = '';
+                if (this.isObject(currencyID)){
+                    assetString = JSON.stringify(currencyID)
+                }else{
+                    let parsedAsset = {
+                        Token: currencyID
+                    }
+                    assetString = JSON.stringify(parsedAsset)
+                }
+                xcCurrencyIDMap[chainIDsource] = assetString
+                console.log(`*** ${xcmInteriorKeyV1} [${chainIDsource}] asset=${assetString}, paraIDSource=${paraIDSource}, relayChain=${xcmAsset.relayChain}`)
+            }
 
             let transformedXcmAsset = {
                 xcmchainID: chainID,
@@ -102,7 +123,8 @@ module.exports = class GarManager extends AssetManager {
                 isUSD: 0,
                 decimals: decimals,
                 priceUSD: null,
-                parents: 1
+                parents: 1,
+                xcCurrencyID: xcCurrencyIDMap,
             }
             polkaholicXcGar[xcmInteriorKeyV1] = transformedXcmAsset
             //polkaholicXcGar[xcmInteriorKeyV1] = xcmAsset
@@ -242,7 +264,35 @@ module.exports = class GarManager extends AssetManager {
                 "data": xcmAssets,
                 "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent"]
             }, sqlDebug);
-            await this.update_batchedSQL()
+        }
+    }
+
+    async flushAssetGar(xcRegistryNew) {
+        // flush new xc Registry into
+        let xcmtransferKeys = Object.keys(xcRegistryNew)
+        if (xcmtransferKeys.length > 0) {
+            let assets = []
+            for (let i = 0; i < xcmtransferKeys.length; i++) {
+                let r = xcRegistryNew[xcmtransferKeys[i]];
+                //["asset", "chainID",]
+                //[ "assetType", "xcmInteriorKey", "decimals", "symbol"]
+                for (const chainID of Object.keys(r.xcCurrencyID)){
+                    let assetString = r.xcCurrencyID[chainID]
+                    let a = "(" + [`'${assetString}'`, `'${chainID}'`,
+                        `'${paraTool.assetTypeToken}'`, `'${r.xcmInteriorKey}'`, `'${r.decimals}'`, `'${r.symbol}'`].join(",") + ")";
+                    assets.push(a)
+                }
+            }
+            console.log(`sql`, assets)
+            let sqlDebug = true
+            await this.upsertSQL({
+                "table": "assetgar",
+                "keys": ["asset", "chainID",],
+                "vals": [ "assetType", "xcmInteriorKey", "decimals", "symbol"],
+                "data": assets,
+                "replace": [ "assetType", "xcmInteriorKey", "decimals", "symbol"]
+            }, sqlDebug);
+            //await this.update_batchedSQL()
         }
     }
 }
