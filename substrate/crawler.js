@@ -1787,16 +1787,22 @@ create table talismanEndpoint (
             });
         } catch (err) {
             if (err.code == 404) {
-                await this.crawl_block_trace(chain, {
-                    blockNumber: bn
-                });
-                [row] = await tableChain.row(paraTool.blockNumberToHex(bn)).get({
-                    filter
-                });
+                row = null;
+            } else {
+                console.log(err);
             }
         }
         if (row == null) {
-            return (false);
+            await this.crawl_block_trace(chain, {
+                blockNumber: bn
+            });
+            [row] = await tableChain.row(paraTool.blockNumberToHex(bn)).get({
+                filter
+            });
+            if (row == null) {
+                console.log("no row", bn);
+                return (false);
+            }
         }
         try {
 
@@ -1831,6 +1837,7 @@ create table talismanEndpoint (
                     }
                 }
             }
+
             if (evmBlockData) {
                 for (const blockHash of Object.keys(evmBlockData)) {
                     if (blockHash != finalizedHash) {
@@ -1868,7 +1875,6 @@ create table talismanEndpoint (
                     }
                 }
             }
-
             if (cols.length > 0) {
                 await row.deleteCells(cols);
             }
@@ -1914,6 +1920,7 @@ create table talismanEndpoint (
                 err
             })
         }
+        console.log("m");
         // write to BigTable
         try {
             let cres = {

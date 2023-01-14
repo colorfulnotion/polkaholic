@@ -1231,6 +1231,95 @@ function getXCMTransactList(msgHash, msgStr) {
     }
 }
 
+function decodeNetwork(network) {
+    let relayChain = 'null';
+    if (network.network != undefined) relayChain = network.network
+    if (network.named != undefined) relayChain = hexToString(network.named)
+    return relayChain
+}
+
+function encodeNetwork(relayChain = 'kusama') {
+    let network = {}
+    if (relayChain == 'kusama' || relayChain == 'polkadot') {
+        network = {
+            network: relayChain
+        }
+    } else {
+        network = {
+            named: stringToHex(relayChain)
+        }
+    }
+    return network
+}
+
+//'[{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]~polkadot' -> [{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]
+// polkadot-here -> [{"network":"polkadot"},"here"]
+function convertXcmInteriorKeyV1toV2(xcmInteriorKeyV1 = '[{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]~polkadot') {
+    var [xcmInteriorKey, relayChain] = parseXcmInteriorKeyV1(xcmInteriorKeyV1)
+    let network = encodeNetwork(relayChain)
+    if (xcmInteriorKey == 'here') {
+        xcmInteriorKey = '"here"'
+    }
+    return makeXcmInteriorKeyV2(xcmInteriorKey, network)
+}
+
+//[{"network":"polkadot"},"here"] -> polkadot-here
+function convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2 = '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]') {
+    var [network, xcmInteriorKey] = parseXcmInteriorKeyV2(xcmInteriorKeyV2)
+    let relayChain = decodeNetwork(network)
+    if (xcmInteriorKey == '"here"') {
+        xcmInteriorKey = 'here'
+    }
+    return makeXcmInteriorKeyV1(xcmInteriorKey, relayChain)
+}
+
+function parseXcmInteriorKeyV2(xcmInteriorKey = '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]') {
+    /*
+    let pieces = xcmInteriorKey.split(assetChainSeparator);
+    let relayChain = pieces[1];
+    let assetUnparsed = (pieces.length > 1) ? pieces[1] : undefined;
+    */
+    try {
+        let pieces = JSON.parse(xcmInteriorKey)
+        //console.log(`xcmInteriorKey=${xcmInteriorKey}`, pieces)
+        let network = pieces.shift()
+        let assetUnparsed = {}
+        if (pieces.length == 1) {
+            assetUnparsed = JSON.stringify(pieces[0])
+        } else {
+            assetUnparsed = JSON.stringify(pieces)
+        }
+        return [network, assetUnparsed];
+    } catch (e) {
+        return [false, false]
+    }
+}
+
+function makeXcmInteriorKeyV2(interiorStr, network = {
+    network: 'kusama'
+}) {
+    let interior = JSON.parse(interiorStr)
+    let globalInterior = [network]
+    if (Array.isArray(interior)) {
+        globalInterior = globalInterior.concat(interior);
+    } else {
+        globalInterior.push(interior)
+    }
+    //return (relayChain + assetChainSeparator + interior);
+    return JSON.stringify(globalInterior)
+}
+
+function makeXcmInteriorKeyV1(interior, relayChain = 'kusama') {
+    return (interior + assetChainSeparator + relayChain);
+}
+
+function parseXcmInteriorKeyV1(xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
+    let pieces = xcmInteriorKey.split(assetChainSeparator);
+    let assetUnparsed = pieces[0];
+    let relayChain = (pieces.length > 1) ? pieces[1] : undefined;
+    return [assetUnparsed, relayChain];
+}
+
 class NotFoundError extends Error {
     constructor(message) {
         // Needs to pass both `message` and `options` to install the "cause" property.
@@ -1740,14 +1829,34 @@ module.exports = {
         }
         return [isXcAsset, assetChain, rawAssetChain]
     },
-    makeXcmInteriorKey: function(interior, relayChain = 'kusama') {
-        return (interior + assetChainSeparator + relayChain);
+    /*
+    makeXcmInteriorKeyV1: function(interior, relayChain = 'kusama') {
+        return makeXcmInteriorKeyV1(interior, relayChain)
     },
-    parseXcmInteriorKey: function(xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
-        let pieces = xcmInteriorKey.split(assetChainSeparator);
-        let assetUnparsed = pieces[0];
-        let relayChain = (pieces.length > 1) ? pieces[1] : undefined;
-        return [assetUnparsed, relayChain];
+    parseXcmInteriorKeyV1: function (xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
+        return parseXcmInteriorKeyV1(xcmInteriorKey);
+    },
+    makeXcmInteriorKeyV2: function(interior, relayChain = 'kusama') {
+        return makeXcmInteriorKeyV2(interior, relayChain)
+    },
+    parseXcmInteriorKeyV2: function (xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
+        return parseXcmInteriorKeyV2(xcmInteriorKey);
+    },
+    */
+    /*
+    paraTool uses older XcmInteriorKeyV1 format, whereas garTool uses XcmInteriorKeyV1 format
+    */
+    makeXcmInteriorKey: function(interior, relayChain) {
+        return makeXcmInteriorKeyV1(interior, relayChain)
+    },
+    parseXcmInteriorKey: function(xcmInteriorKey) {
+        return parseXcmInteriorKeyV1(xcmInteriorKey)
+    },
+    convertXcmInteriorKeyV1toV2: function(xcmInteriorKeyV1) {
+        return convertXcmInteriorKeyV1toV2(xcmInteriorKeyV1)
+    },
+    convertXcmInteriorKeyV2toV1: function(xcmInteriorKeyV2) {
+        return convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2)
     },
     inverted_ts_key: function(ts) {
         return inverted_ts_key(ts);

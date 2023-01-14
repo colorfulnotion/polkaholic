@@ -1,0 +1,61 @@
+#!/usr/bin/env node
+// Usage: ./garcmd [relayChain] [targetedParaID]
+
+// EX: parse all supported registry on polkadot
+// Usage: ./garcmd polkadot all
+
+// EX: test a specific parser
+// Usage: ./garcmd polkadot 2004
+
+var GlobalAssetRegistry = require("./globalassetregistry");
+const endpoints = require("./endpoints");
+
+async function main() {
+    var targetedRelaychain = 'polkadot'
+    var targetedParaID = 'all'
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            targetedRelaychain = val;
+        }
+        if (index == 3 && val.length > 0) {
+            targetedParaID = val;
+        }
+    });
+
+    var gar = new GlobalAssetRegistry();
+    await gar.initPublicEndpointsMap(targetedRelaychain)
+    let supportedChains = gar.getSupportedChains()
+    let supportedChainKeys = Object.keys(supportedChains)
+    let supportedChainHelper = gar.printChainhelper()
+
+    console.log(`[${targetedRelaychain}] SupportedChains`, supportedChainHelper)
+    if(targetedParaID != 'all') {
+        chainkey = `${targetedRelaychain}-${targetedParaID}`
+        supportedChainKeys = [chainkey]
+    }
+    let failedChainkeys = await gar.batchApiInit(supportedChainKeys)
+    console.log(`failedChainkeys`, failedChainkeys)
+    for (chainkey of supportedChainKeys){
+        let crawler = await gar.getCrawler(chainkey)
+        if (crawler){
+            await gar.crawlRegistry(crawler)
+        }
+    }
+    let chainAssetMap = gar.getchainAssetMap()
+    let xcmAssetMap = gar.getXcmAssetMap()
+    console.log(`AssetMap`, chainAssetMap)
+    console.log(`XcmAssetMap`, xcmAssetMap)
+    if(targetedParaID == 'all') {
+        await gar.updateXcmConcept()
+    }
+}
+
+main()
+    .then(() => {
+        console.log("finishing...")
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

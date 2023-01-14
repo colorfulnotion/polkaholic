@@ -791,6 +791,7 @@ module.exports = class Indexer extends AssetManager {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`unhandledTraceMap`, this.unhandledTraceMap)
             this.unhandledTraceMap = {}
         }
+        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(h): done")
         //removes address state after flushing
         this.resetAddressStats()
     }
@@ -4839,7 +4840,7 @@ module.exports = class Indexer extends AssetManager {
                         this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
                     }
                 }
-                if (rExtrinsic.xcmIndex != undefined){
+                if (rExtrinsic.xcmIndex != undefined) {
                     delete rExtrinsic.xcmIndex
                 }
 

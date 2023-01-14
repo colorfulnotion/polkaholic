@@ -477,9 +477,9 @@ module.exports = class AstarParser extends ChainParser {
 
     processOutgoingEthereumAssetWithdraw(indexer, extrinsic, feed, fromAddress, section_method, a) {
         // need additional processing for currency_id part
-        if (extrinsic.xcmIndex == undefined){
+        if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
-        }else{
+        } else {
             extrinsic.xcmIndex += 1
         }
         try {
@@ -616,9 +616,9 @@ module.exports = class AstarParser extends ChainParser {
 
     processOutgoingEthereumRemoteExecution(indexer, extrinsic, feed, fromAddress, section_method, a) {
         // need additional processing for currency_id part
-        if (extrinsic.xcmIndex == undefined){
+        if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
-        }else{
+        } else {
             extrinsic.xcmIndex += 1
         }
         let outgoingEtherumXCM = []

@@ -23,7 +23,7 @@ async function main() {
     await crawler.assetManagerInit();
     await crawler.setupChainAndAPI(chainID);
     let w = chainIDs ? ` and chainID in (${chainIDs})` : "";
-    let targetSQL = `select extrinsicHash, extrinsicID, chainID, blockNumber from xcmtransferbackup where (xcmInfoAudited < -5) ${w} order by blockNumber`;
+    let targetSQL = `select sectionMethod, extrinsicHash, symbol, chainID, chainIDDest, from_unixtime(sourceTS), errorDesc, blockNumber from xcmtransfer where xcmInfoAudited = -1 order by sourceTS;`;
     let recs = await crawler.poolREADONLY.query(targetSQL);
     let targetMap = {}
     for (let i = 0; i < recs.length; i++) {
@@ -57,7 +57,7 @@ async function main() {
             let b = blocks[i]
             console.log(`[chainID:${chainID}] [${i+1}/${blocks.length}] indexBlocks [${b.extrinsicID}] [${b.extrinsicHash}] blkHash=${b.blockHash}`)
             await ccrawler.index_block(chain, b.blockNumber, b.blockHash);
-	    let sql = `update xcmtransferbackup set xcmInfoAudited = -4 where extrinsicHash = '${b.extrinsicHash}' and blockNumber = '${b.blockNumber}'`
+	    let sql = `update xcmtransfer set xcmInfoAudited = -3 where extrinsicHash = '${b.extrinsicHash}' and blockNumber = '${b.blockNumber}'`
 	    ccrawler.batchedSQL.push(sql);
 	    await ccrawler.update_batchedSQL();
         }

@@ -1880,9 +1880,9 @@ module.exports = class ChainParser {
 
 
     processOutgoingXTokensEvent(indexer, extrinsic, feed, event, msgHashCandidate = false) {
-        if (extrinsic.xcmIndex == undefined){
+        if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
-        }else{
+        } else {
             extrinsic.xcmIndex += 1
         }
         //xcmIndex refers to the nth xcmmsg sent by the extrinsic
@@ -2128,9 +2128,9 @@ module.exports = class ChainParser {
 
     processOutgoingXTransfer(indexer, extrinsic, feed, fromAddress, section_method, args) {
         //return
-        if (extrinsic.xcmIndex == undefined){
+        if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
-        }else{
+        } else {
             extrinsic.xcmIndex += 1
         }
         let outgoingXTransfer = []
@@ -2276,9 +2276,9 @@ module.exports = class ChainParser {
 
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
         //return
-        if (extrinsic.xcmIndex == undefined){
+        if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
-        }else{
+        } else {
             extrinsic.xcmIndex += 1
         }
         let outgoingXTokens = []
@@ -2902,9 +2902,9 @@ module.exports = class ChainParser {
     }
 
     processOutgoingPolkadotXcm(indexer, extrinsic, feed, fromAddress, section_method, args) {
-        if (extrinsic.xcmIndex == undefined){
+        if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
-        }else{
+        } else {
             extrinsic.xcmIndex += 1
         }
         let outgoingXcmPallet = []
@@ -3163,9 +3163,9 @@ module.exports = class ChainParser {
     }
 
     processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args) {
-        if (extrinsic.xcmIndex == undefined){
+        if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
-        }else{
+        } else {
             extrinsic.xcmIndex += 1
         }
         let outgoingXcmPallet = []

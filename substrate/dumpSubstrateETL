@@ -1,6 +1,6 @@
 #!/usr/bin/env node
  // Usage: 
-//  setup tables:                       dumpSubstrateETL polkadot setup
+//  setup tables:                       dumpSubstrateETL polkadot setup paraID
 //    sets up dataset for all known paraIDs using substateetllog table
 //  dump all chains:                    dumpSubstrateETL polkadot chains
 //  dump random paraID for a day:       dumpSubstrateETL
@@ -34,7 +34,7 @@ async function main() {
 
     var substrateetl = new SubstrateETL();
     if (paraID == "setup" && relayChain) {
-        await substrateetl.setup_tables(relayChain);
+        await substrateetl.setup_tables(relayChain, logDT);
     } else if (paraID == "xcmtransfers" && relayChain) {
         if (logDT) {
             await substrateetl.dump_xcmtransfers(logDT, relayChain);

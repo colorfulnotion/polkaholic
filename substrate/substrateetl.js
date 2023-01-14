@@ -56,7 +56,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     // sets up system tables (independent of paraID) and paraID specific tables
-    async setup_tables(relayChain) {
+    async setup_tables(relayChain, chainID = null) {
         // setup "system" tables across all paraIDs
         let systemtbls = ["xcmtransfers", "chains"];
         for (const tbl of systemtbls) {
@@ -72,7 +72,8 @@ module.exports = class SubstrateETL extends AssetManager {
 
         // setup paraID specific tables, including paraID=0 for the relay chain
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "traces", "specversions"]
-        let sql = `select distinct chainID from substrateetllog order by chainID`
+        let p = (chainID) ? ` where chainID = ${chainID} ` : ""
+        let sql = `select chainID from chain ${p} order by chainID`
         let recs = await this.poolREADONLY.query(sql);
         for (const rec of recs) {
             let chainID = parseInt(rec.chainID, 10);

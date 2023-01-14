@@ -22,7 +22,11 @@ async function main() {
     if ( extrinsicHash.length > 10 ) {
 	await manager.cleanXCMInfo(extrinsicHash, transferIndex, xcmIndex);
     } else {
-	await manager.bulk_cleanXCMInfo(extrinsicHash)
+	if ( xcmIndex == 0 && transferIndex == 0 ) {
+	    xcmIndex = 0;
+	    transferIndex = 1;
+	}
+	await manager.bulk_cleanXCMInfo(extrinsicHash, transferIndex, xcmIndex)
     }
 }
 

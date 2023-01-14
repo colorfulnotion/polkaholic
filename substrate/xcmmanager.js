@@ -625,7 +625,7 @@ module.exports = class XCMManager extends Query {
 
         //fee -> initiation + teleport fee
         if (decimals !== false) {
-	    // TODO --- IDEA: if we know feeSymbol and get fee priceUSD then we should compute estfeeUSD with that instead of this
+            // TODO --- IDEA: if we know feeSymbol and get fee priceUSD then we should compute estfeeUSD with that instead of this
             let fee = xcm.amountSent - xcm.amountReceived
             let estPrice = xcm.amountSentUSD / xcm.amountReceived
             let estFeeUSD = estPrice * fee // temp hack
@@ -2749,6 +2749,23 @@ order by chainID, extrinsicHash`
     }
 
     async xcmReanalytics(lookbackDays) {
+        let sql = `select chainID, symbol from chain where crawling = 1`
+        let symbols = await this.poolREADONLY.query(sql);
+        for (const cs of symbols) {
+            let symbol = cs.symbol;
+            let chainID = cs.chainID;
+            let tok = JSON.stringify({
+                "Token": symbol
+            })
+            let sql2 = `select asset, currencyID, symbol, chainID from asset where chainID = ${chainID} and  (asset = '${tok}' or symbol = '${symbol}' or currencyID = '${symbol}' or currencyID = '${tok}')`
+            let checkrecs = await this.poolREADONLY.query(sql2);
+            if (checkrecs.length > 1) {
+                console.log(chainID, symbol, "has ", checkrecs.length, " records: ", sql2);
+            }
+        }
+        return;
+
+
         let endTS = this.currentTS();
         let startTS = endTS - lookbackDays * 86400;
         for (let ts = startTS; ts < endTS; ts += 86400) {

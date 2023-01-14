@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+// Usage:
+
+var GlobalAssetRegistry = require("./globalassetregistry");
+
+async function main() {
+    var gar = new GlobalAssetRegistry();
+    let relaychains = ['polkadot', 'kusama']
+    await gar.updatePublicEndpoints(relaychains)
+}
+
+main()
+    .then(() => {
+        console.log("DONE")
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

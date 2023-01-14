@@ -454,9 +454,9 @@ module.exports = class MoonbeamParser extends ChainParser {
 
     processOutgoingEthereum(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // need additional processing for currency_id part
-        if (extrinsic.xcmIndex == undefined){
+        if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
-        }else{
+        } else {
             extrinsic.xcmIndex += 1
         }
         let outgoingEtherumXCM = []
@@ -629,9 +629,9 @@ module.exports = class MoonbeamParser extends ChainParser {
     }
 
     processOutgoingXCMTransactor(indexer, extrinsic, feed, fromAddress, section_method, args) {
-        if (extrinsic.xcmIndex == undefined){
+        if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
-        }else{
+        } else {
             extrinsic.xcmIndex += 1
         }
         let outgoingXcmPallet = []
