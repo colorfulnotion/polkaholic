@@ -19,10 +19,6 @@ async function main() {
     });
 
     var garManager = new GarManager();
-    //let polkadotXcRegistry = garManager.readJSONFn('polkadot', 'xcmConcept')
-    //let kusamaXcRegistry = garManager.readJSONFn('kusama', 'xcmConcept')
-    //console.log(`polkadotXcRegistry`, polkadotXcRegistry)
-    //console.log(`kusamaXcRegistry`, kusamaXcRegistry)
 
     let xcRegistryRaw = garManager.readJSONFn(targetedRelaychain, 'xcmConcept')
     let xcRegistryNew = garManager.transformXcGarRegistry(xcRegistryRaw)
@@ -32,6 +28,8 @@ async function main() {
     //console.log(`xcRegistryOld`, xcRegistryOld)
 
     let [xcRegistryNewOnly, xcRegistryOldOnly, identicalXcRegsitry, diffXcRefistry] = garManager.compareXcRegistry(xcRegistryNew, xcRegistryOld)
+
+    await garManager.flushXcmAssetGar(xcRegistryNew)
 }
 
 main()
