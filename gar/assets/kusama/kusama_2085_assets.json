@@ -1,14 +1,6 @@
 [
     {
         "asset": {
-            "Token": "HKO"
-        },
-        "name": "HKO",
-        "symbol": "HKO",
-        "decimals": 12
-    },
-    {
-        "asset": {
             "Token": "100"
         },
         "name": "KSM",
@@ -19,31 +11,31 @@
     },
     {
         "asset": {
-            "Token": "123"
+            "Token": "1000"
         },
-        "name": "GENS",
-        "symbol": "GENS",
-        "decimals": 9,
-        "currencyID": "123"
-    },
-    {
-        "asset": {
-            "Token": "121"
-        },
-        "name": "KBTC",
-        "symbol": "KBTC",
-        "decimals": 8,
-        "currencyID": "121",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]"
-    },
-    {
-        "asset": {
-            "Token": "5007"
-        },
-        "name": "LP-USDT/HKO",
-        "symbol": "LP-USDT/HKO",
+        "name": "sKSM",
+        "symbol": "sKSM",
         "decimals": 12,
-        "currencyID": "5007"
+        "currencyID": "1000",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2085},{\"generalKey\":\"0x734b534d\"}]"
+    },
+    {
+        "asset": {
+            "Token": "100150022"
+        },
+        "name": "cKSM-15/22",
+        "symbol": "cKSM-15/22",
+        "decimals": 12,
+        "currencyID": "100150022"
+    },
+    {
+        "asset": {
+            "Token": "100200027"
+        },
+        "name": "cKSM-20/27",
+        "symbol": "cKSM-20/27",
+        "decimals": 12,
+        "currencyID": "100200027"
     },
     {
         "asset": {
@@ -56,21 +48,31 @@
     },
     {
         "asset": {
-            "Token": "125"
+            "Token": "100220029"
         },
-        "name": "TUR",
-        "symbol": "TUR",
-        "decimals": 10,
-        "currencyID": "125"
+        "name": "cKSM-22/29",
+        "symbol": "cKSM-22/29",
+        "decimals": 12,
+        "currencyID": "100220029"
     },
     {
         "asset": {
-            "Token": "5002"
+            "Token": "100230030"
         },
-        "name": "LP-KSM/HKO",
-        "symbol": "LP-KSM/HKO",
+        "name": "cKSM-23/30",
+        "symbol": "cKSM-23/30",
         "decimals": 12,
-        "currencyID": "5002"
+        "currencyID": "100230030"
+    },
+    {
+        "asset": {
+            "Token": "102"
+        },
+        "name": "USDT",
+        "symbol": "USDT",
+        "decimals": 6,
+        "currencyID": "102",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
     },
     {
         "asset": {
@@ -80,6 +82,16 @@
         "symbol": "AUSD",
         "decimals": 12,
         "currencyID": "103"
+    },
+    {
+        "asset": {
+            "Token": "107"
+        },
+        "name": "KAR",
+        "symbol": "KAR",
+        "decimals": 12,
+        "currencyID": "107",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]"
     },
     {
         "asset": {
@@ -99,99 +111,6 @@
         "symbol": "SDN",
         "decimals": 18,
         "currencyID": "111"
-    },
-    {
-        "asset": {
-            "Token": "5005"
-        },
-        "name": "LP-MOVR/HKO",
-        "symbol": "LP-MOVR/HKO",
-        "decimals": 12,
-        "currencyID": "5005"
-    },
-    {
-        "asset": {
-            "Token": "119"
-        },
-        "name": "KINT",
-        "symbol": "KINT",
-        "decimals": 12,
-        "currencyID": "119",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]"
-    },
-    {
-        "asset": {
-            "Token": "100150022"
-        },
-        "name": "cKSM-15/22",
-        "symbol": "cKSM-15/22",
-        "decimals": 12,
-        "currencyID": "100150022"
-    },
-    {
-        "asset": {
-            "Token": "5004"
-        },
-        "name": "LP-KSM/cKSM-20/27",
-        "symbol": "LP-KSM/cKSM-20/27",
-        "decimals": 12,
-        "currencyID": "5004"
-    },
-    {
-        "asset": {
-            "Token": "102"
-        },
-        "name": "USDT",
-        "symbol": "USDT",
-        "decimals": 6,
-        "currencyID": "102",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
-    },
-    {
-        "asset": {
-            "Token": "100230030"
-        },
-        "name": "cKSM-23/30",
-        "symbol": "cKSM-23/30",
-        "decimals": 12,
-        "currencyID": "100230030"
-    },
-    {
-        "asset": {
-            "Token": "5006"
-        },
-        "name": "LP-PHA/HKO",
-        "symbol": "LP-PHA/HKO",
-        "decimals": 12,
-        "currencyID": "5006"
-    },
-    {
-        "asset": {
-            "Token": "5011"
-        },
-        "name": "LP-KBTC/HKO",
-        "symbol": "LP-KBTC/HKO",
-        "decimals": 12,
-        "currencyID": "5011"
-    },
-    {
-        "asset": {
-            "Token": "4294957295"
-        },
-        "name": "KSM_U",
-        "symbol": "KSM_U",
-        "decimals": 12,
-        "currencyID": "4294957295"
-    },
-    {
-        "asset": {
-            "Token": "1000"
-        },
-        "name": "sKSM",
-        "symbol": "sKSM",
-        "decimals": 12,
-        "currencyID": "1000",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2085},{\"generalKey\":\"0x734b534d\"}]"
     },
     {
         "asset": {
@@ -215,6 +134,62 @@
     },
     {
         "asset": {
+            "Token": "119"
+        },
+        "name": "KINT",
+        "symbol": "KINT",
+        "decimals": 12,
+        "currencyID": "119",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]"
+    },
+    {
+        "asset": {
+            "Token": "121"
+        },
+        "name": "KBTC",
+        "symbol": "KBTC",
+        "decimals": 8,
+        "currencyID": "121",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]"
+    },
+    {
+        "asset": {
+            "Token": "123"
+        },
+        "name": "GENS",
+        "symbol": "GENS",
+        "decimals": 9,
+        "currencyID": "123"
+    },
+    {
+        "asset": {
+            "Token": "125"
+        },
+        "name": "TUR",
+        "symbol": "TUR",
+        "decimals": 10,
+        "currencyID": "125"
+    },
+    {
+        "asset": {
+            "Token": "4294957295"
+        },
+        "name": "KSM_U",
+        "symbol": "KSM_U",
+        "decimals": 12,
+        "currencyID": "4294957295"
+    },
+    {
+        "asset": {
+            "Token": "5002"
+        },
+        "name": "LP-KSM/HKO",
+        "symbol": "LP-KSM/HKO",
+        "decimals": 12,
+        "currencyID": "5002"
+    },
+    {
+        "asset": {
             "Token": "5003"
         },
         "name": "LP-KSM/sKSM",
@@ -224,22 +199,39 @@
     },
     {
         "asset": {
-            "Token": "100220029"
+            "Token": "5004"
         },
-        "name": "cKSM-22/29",
-        "symbol": "cKSM-22/29",
+        "name": "LP-KSM/cKSM-20/27",
+        "symbol": "LP-KSM/cKSM-20/27",
         "decimals": 12,
-        "currencyID": "100220029"
+        "currencyID": "5004"
     },
     {
         "asset": {
-            "Token": "107"
+            "Token": "5005"
         },
-        "name": "KAR",
-        "symbol": "KAR",
+        "name": "LP-MOVR/HKO",
+        "symbol": "LP-MOVR/HKO",
         "decimals": 12,
-        "currencyID": "107",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]"
+        "currencyID": "5005"
+    },
+    {
+        "asset": {
+            "Token": "5006"
+        },
+        "name": "LP-PHA/HKO",
+        "symbol": "LP-PHA/HKO",
+        "decimals": 12,
+        "currencyID": "5006"
+    },
+    {
+        "asset": {
+            "Token": "5007"
+        },
+        "name": "LP-USDT/HKO",
+        "symbol": "LP-USDT/HKO",
+        "decimals": 12,
+        "currencyID": "5007"
     },
     {
         "asset": {
@@ -270,11 +262,19 @@
     },
     {
         "asset": {
-            "Token": "100200027"
+            "Token": "5011"
         },
-        "name": "cKSM-20/27",
-        "symbol": "cKSM-20/27",
+        "name": "LP-KBTC/HKO",
+        "symbol": "LP-KBTC/HKO",
         "decimals": 12,
-        "currencyID": "100200027"
+        "currencyID": "5011"
+    },
+    {
+        "asset": {
+            "Token": "HKO"
+        },
+        "name": "HKO",
+        "symbol": "HKO",
+        "decimals": 12
     }
 ]

@@ -1,11 +1,23 @@
 [
     {
         "asset": {
-            "Token": "CSM"
+            "Token": "108036400430056508975016746969135344601"
         },
-        "name": "CSM",
-        "symbol": "CSM",
-        "decimals": 12
+        "name": "Robonomics Token",
+        "symbol": "XRT",
+        "decimals": 9,
+        "currencyID": "108036400430056508975016746969135344601",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2048}]"
+    },
+    {
+        "asset": {
+            "Token": "10810581592933651521121702237638664357"
+        },
+        "name": "Karura",
+        "symbol": "KAR",
+        "decimals": 12,
+        "currencyID": "10810581592933651521121702237638664357",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]"
     },
     {
         "asset": {
@@ -16,16 +28,6 @@
         "decimals": 18,
         "currencyID": "16797826370226091782818345603793389938",
         "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2007}]"
-    },
-    {
-        "asset": {
-            "Token": "108036400430056508975016746969135344601"
-        },
-        "name": "Robonomics Token",
-        "symbol": "XRT",
-        "decimals": 9,
-        "currencyID": "108036400430056508975016746969135344601",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2048}]"
     },
     {
         "asset": {
@@ -59,16 +61,6 @@
     },
     {
         "asset": {
-            "Token": "10810581592933651521121702237638664357"
-        },
-        "name": "Karura",
-        "symbol": "KAR",
-        "decimals": 12,
-        "currencyID": "10810581592933651521121702237638664357",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]"
-    },
-    {
-        "asset": {
             "Token": "319623561105283008236062145480775032445"
         },
         "name": "Bifrost Native Coin",
@@ -76,5 +68,13 @@
         "decimals": 12,
         "currencyID": "319623561105283008236062145480775032445",
         "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]"
+    },
+    {
+        "asset": {
+            "Token": "CSM"
+        },
+        "name": "CSM",
+        "symbol": "CSM",
+        "decimals": 12
     }
 ]

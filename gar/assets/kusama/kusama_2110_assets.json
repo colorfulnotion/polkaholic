@@ -1,48 +1,12 @@
 [
     {
         "asset": {
-            "Token": "MGX"
+            "Token": "0"
         },
-        "name": "MGX",
+        "name": "Mangata",
         "symbol": "MGX",
-        "decimals": 18
-    },
-    {
-        "asset": {
-            "Token": "7"
-        },
-        "name": "Turing native token",
-        "symbol": "TUR",
-        "decimals": 10,
-        "currencyID": "7",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2114}]"
-    },
-    {
-        "asset": {
-            "Token": "13"
-        },
-        "name": "LiquidityPoolToken0x0000000D",
-        "symbol": "TKN0x0000000B-TKN0x00000004",
         "decimals": 18,
-        "currencyID": "13"
-    },
-    {
-        "asset": {
-            "Token": "5"
-        },
-        "name": "LiquidityPoolToken0x00000005",
-        "symbol": "TKN0x00000004-TKN0x00000000",
-        "decimals": 18,
-        "currencyID": "5"
-    },
-    {
-        "asset": {
-            "Token": "8"
-        },
-        "name": "LiquidityPoolToken0x00000008",
-        "symbol": "TKN0x00000000-TKN0x00000007",
-        "decimals": 18,
-        "currencyID": "8"
+        "currencyID": "0"
     },
     {
         "asset": {
@@ -55,22 +19,40 @@
     },
     {
         "asset": {
-            "Token": "9"
+            "Token": "10"
         },
-        "name": "LiquidityPoolToken0x00000009",
-        "symbol": "TKN0x00000004-TKN0x00000007",
+        "name": "LiquidityPoolToken0x0000000A",
+        "symbol": "TKN0x00000005-TKN0x00000000",
         "decimals": 18,
-        "currencyID": "9"
+        "currencyID": "10"
     },
     {
         "asset": {
-            "Token": "16"
+            "Token": "11"
         },
-        "name": "Voucher Slot KSM",
-        "symbol": "vsKSM",
+        "name": "Imbue",
+        "symbol": "IMBU",
         "decimals": 12,
-        "currencyID": "16",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0404\"}]"
+        "currencyID": "11",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2121},{\"generalKey\":\"0x0096\"}]"
+    },
+    {
+        "asset": {
+            "Token": "12"
+        },
+        "name": "LiquidityPoolToken0x0000000C",
+        "symbol": "TKN0x00000000-TKN0x0000000B",
+        "decimals": 18,
+        "currencyID": "12"
+    },
+    {
+        "asset": {
+            "Token": "13"
+        },
+        "name": "LiquidityPoolToken0x0000000D",
+        "symbol": "TKN0x0000000B-TKN0x00000004",
+        "decimals": 18,
+        "currencyID": "13"
     },
     {
         "asset": {
@@ -94,49 +76,13 @@
     },
     {
         "asset": {
-            "Token": "10"
+            "Token": "16"
         },
-        "name": "LiquidityPoolToken0x0000000A",
-        "symbol": "TKN0x00000005-TKN0x00000000",
-        "decimals": 18,
-        "currencyID": "10"
-    },
-    {
-        "asset": {
-            "Token": "0"
-        },
-        "name": "Mangata",
-        "symbol": "MGX",
-        "decimals": 18,
-        "currencyID": "0"
-    },
-    {
-        "asset": {
-            "Token": "6"
-        },
-        "name": "Karura",
-        "symbol": "KAR",
+        "name": "Voucher Slot KSM",
+        "symbol": "vsKSM",
         "decimals": 12,
-        "currencyID": "6"
-    },
-    {
-        "asset": {
-            "Token": "11"
-        },
-        "name": "Imbue",
-        "symbol": "IMBU",
-        "decimals": 12,
-        "currencyID": "11",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2121},{\"generalKey\":\"0x0096\"}]"
-    },
-    {
-        "asset": {
-            "Token": "3"
-        },
-        "name": "LiquidityPoolToken0x00000003",
-        "symbol": "TKN0x00000000-TKN0x00000002",
-        "decimals": 18,
-        "currencyID": "3"
+        "currencyID": "16",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0404\"}]"
     },
     {
         "asset": {
@@ -149,6 +95,15 @@
     },
     {
         "asset": {
+            "Token": "3"
+        },
+        "name": "LiquidityPoolToken0x00000003",
+        "symbol": "TKN0x00000000-TKN0x00000002",
+        "decimals": 18,
+        "currencyID": "3"
+    },
+    {
+        "asset": {
             "Token": "4"
         },
         "name": "Kusama Native",
@@ -158,11 +113,56 @@
     },
     {
         "asset": {
-            "Token": "12"
+            "Token": "5"
         },
-        "name": "LiquidityPoolToken0x0000000C",
-        "symbol": "TKN0x00000000-TKN0x0000000B",
+        "name": "LiquidityPoolToken0x00000005",
+        "symbol": "TKN0x00000004-TKN0x00000000",
         "decimals": 18,
-        "currencyID": "12"
+        "currencyID": "5"
+    },
+    {
+        "asset": {
+            "Token": "6"
+        },
+        "name": "Karura",
+        "symbol": "KAR",
+        "decimals": 12,
+        "currencyID": "6"
+    },
+    {
+        "asset": {
+            "Token": "7"
+        },
+        "name": "Turing native token",
+        "symbol": "TUR",
+        "decimals": 10,
+        "currencyID": "7",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2114}]"
+    },
+    {
+        "asset": {
+            "Token": "8"
+        },
+        "name": "LiquidityPoolToken0x00000008",
+        "symbol": "TKN0x00000000-TKN0x00000007",
+        "decimals": 18,
+        "currencyID": "8"
+    },
+    {
+        "asset": {
+            "Token": "9"
+        },
+        "name": "LiquidityPoolToken0x00000009",
+        "symbol": "TKN0x00000004-TKN0x00000007",
+        "decimals": 18,
+        "currencyID": "9"
+    },
+    {
+        "asset": {
+            "Token": "MGX"
+        },
+        "name": "MGX",
+        "symbol": "MGX",
+        "decimals": 18
     }
 ]

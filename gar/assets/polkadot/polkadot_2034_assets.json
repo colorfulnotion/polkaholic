@@ -1,34 +1,6 @@
 [
     {
         "asset": {
-            "Token": "HDX"
-        },
-        "name": "HDX",
-        "symbol": "HDX",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "Token": "7"
-        },
-        "name": "USDC",
-        "symbol": "USDC",
-        "decimals": 6,
-        "currencyID": "7",
-        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0207df96d1341a7d16ba1ad431e2c847d978bc2bce\"}]"
-    },
-    {
-        "asset": {
-            "Token": "5"
-        },
-        "name": "DOT",
-        "symbol": "DOT",
-        "decimals": 10,
-        "currencyID": "5",
-        "xcmInteriorKey": "[{\"network\":\"polkadot\"},\"here\"]"
-    },
-    {
-        "asset": {
             "Token": "1"
         },
         "name": "LRNA",
@@ -45,16 +17,6 @@
         "decimals": 18,
         "currencyID": "2",
         "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0254a37a01cd75b616d63e0ab665bffdb0143c52ae\"}]"
-    },
-    {
-        "asset": {
-            "Token": "6"
-        },
-        "name": "APE",
-        "symbol": "APE",
-        "decimals": 18,
-        "currencyID": "6",
-        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x02f4c723e61709d90f89939c1852f516e373d418a8\"}]"
     },
     {
         "asset": {
@@ -75,5 +37,43 @@
         "decimals": 18,
         "currencyID": "4",
         "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x025a4d6acdc4e3e5ab15717f407afe957f7a242578\"}]"
+    },
+    {
+        "asset": {
+            "Token": "5"
+        },
+        "name": "DOT",
+        "symbol": "DOT",
+        "decimals": 10,
+        "currencyID": "5",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},\"here\"]"
+    },
+    {
+        "asset": {
+            "Token": "6"
+        },
+        "name": "APE",
+        "symbol": "APE",
+        "decimals": 18,
+        "currencyID": "6",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x02f4c723e61709d90f89939c1852f516e373d418a8\"}]"
+    },
+    {
+        "asset": {
+            "Token": "7"
+        },
+        "name": "USDC",
+        "symbol": "USDC",
+        "decimals": 6,
+        "currencyID": "7",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0207df96d1341a7d16ba1ad431e2c847d978bc2bce\"}]"
+    },
+    {
+        "asset": {
+            "Token": "HDX"
+        },
+        "name": "HDX",
+        "symbol": "HDX",
+        "decimals": 12
     }
 ]

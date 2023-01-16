@@ -1,18 +1,28 @@
 [
     {
         "asset": {
+            "Native": "BNC"
+        },
+        "name": "Bifrost",
+        "symbol": "BNC",
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]"
+    },
+    {
+        "asset": {
+            "Stable": "KUSD"
+        },
+        "name": "Karura Dollar",
+        "symbol": "KUSD",
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]"
+    },
+    {
+        "asset": {
             "Token": "BNC"
         },
         "name": "BNC",
         "symbol": "BNC",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "Token": "KUSD"
-        },
-        "name": "KUSD",
-        "symbol": "KUSD",
         "decimals": 12
     },
     {
@@ -25,15 +35,6 @@
     },
     {
         "asset": {
-            "Token": "KSM"
-        },
-        "name": "Kusama",
-        "symbol": "KSM",
-        "decimals": 12,
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},\"here\"]"
-    },
-    {
-        "asset": {
             "Token": "KAR"
         },
         "name": "Karura",
@@ -43,12 +44,29 @@
     },
     {
         "asset": {
-            "Token": "ZLK"
+            "Token": "KSM"
         },
-        "name": "Zenlink Network Token",
-        "symbol": "ZLK",
+        "name": "Kusama",
+        "symbol": "KSM",
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},\"here\"]"
+    },
+    {
+        "asset": {
+            "Token": "KUSD"
+        },
+        "name": "KUSD",
+        "symbol": "KUSD",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "Token": "MOVR"
+        },
+        "name": "Moonriver Native Token",
+        "symbol": "MOVR",
         "decimals": 18,
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0207\"}]"
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]"
     },
     {
         "asset": {
@@ -70,134 +88,12 @@
     },
     {
         "asset": {
-            "Token": "MOVR"
+            "Token": "ZLK"
         },
-        "name": "Moonriver Native Token",
-        "symbol": "MOVR",
+        "name": "Zenlink Network Token",
+        "symbol": "ZLK",
         "decimals": 18,
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]"
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,102",
-                "19",
-                "26"
-            ]
-        },
-        "name": "vsBOND-KSM-2102-19-26",
-        "symbol": "vsBOND-KSM-2102-19-26",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "Stable": "KUSD"
-        },
-        "name": "Karura Dollar",
-        "symbol": "KUSD",
-        "decimals": 12,
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]"
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,092",
-                "15",
-                "22"
-            ]
-        },
-        "name": "vsBOND-KSM-2092-15-22",
-        "symbol": "vsBOND-KSM-2092-15-22",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,121",
-                "22",
-                "29"
-            ]
-        },
-        "name": "vsBOND-KSM-2121-22-29",
-        "symbol": "vsBOND-KSM-2121-22-29",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,102",
-                "21",
-                "28"
-            ]
-        },
-        "name": "vsBOND-KSM-2102-21-28",
-        "symbol": "vsBOND-KSM-2102-21-28",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,096",
-                "17",
-                "24"
-            ]
-        },
-        "name": "vsBOND-KSM-2096-17-24",
-        "symbol": "vsBOND-KSM-2096-17-24",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "Token2": "2"
-        },
-        "name": "kintsugiBTC",
-        "symbol": "KBTC",
-        "decimals": 8,
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]"
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,102",
-                "20",
-                "27"
-            ]
-        },
-        "name": "vsBOND-KSM-2102-20-27",
-        "symbol": "vsBOND-KSM-2102-20-27",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,100",
-                "18",
-                "25"
-            ]
-        },
-        "name": "vsBOND-KSM-2100-18-25",
-        "symbol": "vsBOND-KSM-2100-18-25",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,087",
-                "17",
-                "24"
-            ]
-        },
-        "name": "vsBOND-KSM-2087-17-24",
-        "symbol": "vsBOND-KSM-2087-17-24",
-        "decimals": 12
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0207\"}]"
     },
     {
         "asset": {
@@ -210,32 +106,6 @@
     },
     {
         "asset": {
-            "VSBond": [
-                "KSM",
-                "2,088",
-                "15",
-                "22"
-            ]
-        },
-        "name": "vsBOND-KSM-2088-15-22",
-        "symbol": "vsBOND-KSM-2088-15-22",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,095",
-                "17",
-                "24"
-            ]
-        },
-        "name": "vsBOND-KSM-2095-17-24",
-        "symbol": "vsBOND-KSM-2095-17-24",
-        "decimals": 12
-    },
-    {
-        "asset": {
             "Token2": "1"
         },
         "name": "Kintsugi",
@@ -245,93 +115,21 @@
     },
     {
         "asset": {
-            "VSBond": [
-                "KSM",
-                "2,011",
-                "19",
-                "26"
-            ]
+            "Token2": "2"
         },
-        "name": "vsBOND-KSM-2011-19-26",
-        "symbol": "vsBOND-KSM-2011-19-26",
-        "decimals": 12
+        "name": "kintsugiBTC",
+        "symbol": "KBTC",
+        "decimals": 8,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]"
     },
     {
         "asset": {
-            "VToken": "BNC"
+            "Token2": "3"
         },
-        "name": "Voucher BNC",
-        "symbol": "vBNC",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,127",
-                "23",
-                "30"
-            ]
-        },
-        "name": "vsBOND-KSM-2127-23-30",
-        "symbol": "vsBOND-KSM-2127-23-30",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VToken": "MOVR"
-        },
-        "name": "Voucher MOVR",
-        "symbol": "vMOVR",
-        "decimals": 18
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,125",
-                "23",
-                "30"
-            ]
-        },
-        "name": "vsBOND-KSM-2125-23-30",
-        "symbol": "vsBOND-KSM-2125-23-30",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VToken": "KSM"
-        },
-        "name": "Voucher KSM",
-        "symbol": "vKSM",
-        "decimals": 12,
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0104\"}]"
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,090",
-                "15",
-                "22"
-            ]
-        },
-        "name": "vsBOND-KSM-2090-15-22",
-        "symbol": "vsBOND-KSM-2090-15-22",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,114",
-                "20",
-                "27"
-            ]
-        },
-        "name": "vsBOND-KSM-2114-20-27",
-        "symbol": "vsBOND-KSM-2114-20-27",
-        "decimals": 12
+        "name": "Shiden",
+        "symbol": "SDN",
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2007}]"
     },
     {
         "asset": {
@@ -345,27 +143,27 @@
     {
         "asset": {
             "VSBond": [
-                "KSM",
-                "2,101",
-                "18",
-                "25"
+                "BNC",
+                "2,001",
+                "13",
+                "20"
             ]
         },
-        "name": "vsBOND-KSM-2101-18-25",
-        "symbol": "vsBOND-KSM-2101-18-25",
+        "name": "vsBOND-BNC-2001-13-20",
+        "symbol": "vsBOND-BNC-2001-13-20",
         "decimals": 12
     },
     {
         "asset": {
             "VSBond": [
                 "KSM",
-                "2,106",
+                "2,011",
                 "19",
                 "26"
             ]
         },
-        "name": "vsBOND-KSM-2106-19-26",
-        "symbol": "vsBOND-KSM-2106-19-26",
+        "name": "vsBOND-KSM-2011-19-26",
+        "symbol": "vsBOND-KSM-2011-19-26",
         "decimals": 12
     },
     {
@@ -385,6 +183,175 @@
         "asset": {
             "VSBond": [
                 "KSM",
+                "2,087",
+                "17",
+                "24"
+            ]
+        },
+        "name": "vsBOND-KSM-2087-17-24",
+        "symbol": "vsBOND-KSM-2087-17-24",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,088",
+                "15",
+                "22"
+            ]
+        },
+        "name": "vsBOND-KSM-2088-15-22",
+        "symbol": "vsBOND-KSM-2088-15-22",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,090",
+                "15",
+                "22"
+            ]
+        },
+        "name": "vsBOND-KSM-2090-15-22",
+        "symbol": "vsBOND-KSM-2090-15-22",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,092",
+                "15",
+                "22"
+            ]
+        },
+        "name": "vsBOND-KSM-2092-15-22",
+        "symbol": "vsBOND-KSM-2092-15-22",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,095",
+                "17",
+                "24"
+            ]
+        },
+        "name": "vsBOND-KSM-2095-17-24",
+        "symbol": "vsBOND-KSM-2095-17-24",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,096",
+                "17",
+                "24"
+            ]
+        },
+        "name": "vsBOND-KSM-2096-17-24",
+        "symbol": "vsBOND-KSM-2096-17-24",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,100",
+                "18",
+                "25"
+            ]
+        },
+        "name": "vsBOND-KSM-2100-18-25",
+        "symbol": "vsBOND-KSM-2100-18-25",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,101",
+                "18",
+                "25"
+            ]
+        },
+        "name": "vsBOND-KSM-2101-18-25",
+        "symbol": "vsBOND-KSM-2101-18-25",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,102",
+                "19",
+                "26"
+            ]
+        },
+        "name": "vsBOND-KSM-2102-19-26",
+        "symbol": "vsBOND-KSM-2102-19-26",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,102",
+                "20",
+                "27"
+            ]
+        },
+        "name": "vsBOND-KSM-2102-20-27",
+        "symbol": "vsBOND-KSM-2102-20-27",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,102",
+                "21",
+                "28"
+            ]
+        },
+        "name": "vsBOND-KSM-2102-21-28",
+        "symbol": "vsBOND-KSM-2102-21-28",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,106",
+                "19",
+                "26"
+            ]
+        },
+        "name": "vsBOND-KSM-2106-19-26",
+        "symbol": "vsBOND-KSM-2106-19-26",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,114",
+                "20",
+                "27"
+            ]
+        },
+        "name": "vsBOND-KSM-2114-20-27",
+        "symbol": "vsBOND-KSM-2114-20-27",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
                 "2,118",
                 "22",
                 "29"
@@ -392,19 +359,6 @@
         },
         "name": "vsBOND-KSM-2118-22-29",
         "symbol": "vsBOND-KSM-2118-22-29",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "VSBond": [
-                "KSM",
-                "2,129",
-                "24",
-                "31"
-            ]
-        },
-        "name": "vsBOND-KSM-2129-24-31",
-        "symbol": "vsBOND-KSM-2129-24-31",
         "decimals": 12
     },
     {
@@ -422,21 +376,16 @@
     },
     {
         "asset": {
-            "VSToken": "KSM"
+            "VSBond": [
+                "KSM",
+                "2,121",
+                "22",
+                "29"
+            ]
         },
-        "name": "Bifrost Voucher Slot Voucher Slot KSM",
-        "symbol": "VSvsKSM",
-        "decimals": 12,
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0404\"}]"
-    },
-    {
-        "asset": {
-            "Native": "BNC"
-        },
-        "name": "Bifrost",
-        "symbol": "BNC",
-        "decimals": 12,
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]"
+        "name": "vsBOND-KSM-2121-22-29",
+        "symbol": "vsBOND-KSM-2121-22-29",
+        "decimals": 12
     },
     {
         "asset": {
@@ -454,23 +403,74 @@
     {
         "asset": {
             "VSBond": [
-                "BNC",
-                "2,001",
-                "13",
-                "20"
+                "KSM",
+                "2,125",
+                "23",
+                "30"
             ]
         },
-        "name": "vsBOND-BNC-2001-13-20",
-        "symbol": "vsBOND-BNC-2001-13-20",
+        "name": "vsBOND-KSM-2125-23-30",
+        "symbol": "vsBOND-KSM-2125-23-30",
         "decimals": 12
     },
     {
         "asset": {
-            "Token2": "3"
+            "VSBond": [
+                "KSM",
+                "2,127",
+                "23",
+                "30"
+            ]
         },
-        "name": "Shiden",
-        "symbol": "SDN",
-        "decimals": 18,
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2007}]"
+        "name": "vsBOND-KSM-2127-23-30",
+        "symbol": "vsBOND-KSM-2127-23-30",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSBond": [
+                "KSM",
+                "2,129",
+                "24",
+                "31"
+            ]
+        },
+        "name": "vsBOND-KSM-2129-24-31",
+        "symbol": "vsBOND-KSM-2129-24-31",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VSToken": "KSM"
+        },
+        "name": "Bifrost Voucher Slot Voucher Slot KSM",
+        "symbol": "VSvsKSM",
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0404\"}]"
+    },
+    {
+        "asset": {
+            "VToken": "BNC"
+        },
+        "name": "Voucher BNC",
+        "symbol": "vBNC",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "VToken": "KSM"
+        },
+        "name": "Voucher KSM",
+        "symbol": "vKSM",
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0104\"}]"
+    },
+    {
+        "asset": {
+            "VToken": "MOVR"
+        },
+        "name": "Voucher MOVR",
+        "symbol": "vMOVR",
+        "decimals": 18
     }
 ]

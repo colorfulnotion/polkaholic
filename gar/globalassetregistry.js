@@ -15,7 +15,7 @@ const StatemintParser = require("./chains/statemint")
 const BifrostParser = require("./chains/bifrost")
 const PhalaParser = require("./chains/phala")
 const InterlayParser = require("./chains/interlay")
-const MagataxParser = require("./chains/magatax")
+const MangataxParser = require("./chains/mangatax")
 
 const {
     ApiPromise,
@@ -198,7 +198,9 @@ module.exports = class GlobalAssetRegistry {
             let paraIDSoure = pieces[1]
             let localAssetMap = chainAssetMap[chainkey]
             let localAssetList = []
-            for (const localAssetChainkey of Object.keys(localAssetMap)) {
+            let localAssetChainkeys =  Object.keys(localAssetMap)
+            localAssetChainkeys.sort()
+            for (const localAssetChainkey of localAssetChainkeys) {
                 let localAsset = localAssetMap[localAssetChainkey]
                 //delete localAsset.xcmInteriorKeyV1;
                 let [parseAssetChain, _] = garTool.parseAssetChain(localAssetChainkey)
@@ -476,8 +478,8 @@ module.exports = class GlobalAssetRegistry {
             chainParser = new CalamariParser(api, manager)
         } else if (this.isMatched(chainkey, ['kusama-2118|listen'])) {
             chainParser = new ListenParser(api, manager)
-        } else if (this.isMatched(chainkey, ['kusama-2110|magatax'])) {
-            chainParser = new MagataxParser(api, manager)
+        } else if (this.isMatched(chainkey, ['kusama-2110|mangatax'])) {
+            chainParser = new MangataxParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2032|interlay', 'kusama-2092|kintsugi'])) {
             chainParser = new InterlayParser(api, manager)
         } else {

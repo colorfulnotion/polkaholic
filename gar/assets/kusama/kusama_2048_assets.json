@@ -1,11 +1,12 @@
 [
     {
         "asset": {
-            "Token": "XRT"
+            "Token": "4294967291"
         },
-        "name": "XRT",
-        "symbol": "XRT",
-        "decimals": 9
+        "name": "Crust Shadow Native Token",
+        "symbol": "CSM",
+        "decimals": 12,
+        "currencyID": "4294967291"
     },
     {
         "asset": {
@@ -15,24 +16,6 @@
         "symbol": "KAR",
         "decimals": 12,
         "currencyID": "4294967292"
-    },
-    {
-        "asset": {
-            "Token": "4294967295"
-        },
-        "name": "Kusama",
-        "symbol": "KSM",
-        "decimals": 12,
-        "currencyID": "4294967295"
-    },
-    {
-        "asset": {
-            "Token": "4294967291"
-        },
-        "name": "Crust Shadow Native Token",
-        "symbol": "CSM",
-        "decimals": 12,
-        "currencyID": "4294967291"
     },
     {
         "asset": {
@@ -51,5 +34,22 @@
         "symbol": "AUSD",
         "decimals": 12,
         "currencyID": "4294967294"
+    },
+    {
+        "asset": {
+            "Token": "4294967295"
+        },
+        "name": "Kusama",
+        "symbol": "KSM",
+        "decimals": 12,
+        "currencyID": "4294967295"
+    },
+    {
+        "asset": {
+            "Token": "XRT"
+        },
+        "name": "XRT",
+        "symbol": "XRT",
+        "decimals": 9
     }
 ]

@@ -1,54 +1,6 @@
 [
     {
         "asset": {
-            "Token": "KINT"
-        },
-        "name": "KINT",
-        "symbol": "KINT",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "Token": "KBTC"
-        },
-        "name": "KBTC",
-        "symbol": "KBTC",
-        "decimals": 8
-    },
-    {
-        "asset": {
-            "Token": "KSM"
-        },
-        "name": "KSM",
-        "symbol": "KSM",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "Token": "INTR"
-        },
-        "name": "INTR",
-        "symbol": "INTR",
-        "decimals": 10
-    },
-    {
-        "asset": {
-            "Token": "IBTC"
-        },
-        "name": "IBTC",
-        "symbol": "IBTC",
-        "decimals": 8
-    },
-    {
-        "asset": {
-            "Token": "DOT"
-        },
-        "name": "DOT",
-        "symbol": "DOT",
-        "decimals": 10
-    },
-    {
-        "asset": {
             "Token": "1"
         },
         "name": "Acala Dollar",
@@ -76,5 +28,53 @@
         "decimals": 6,
         "currencyID": "3",
         "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
+    },
+    {
+        "asset": {
+            "Token": "DOT"
+        },
+        "name": "DOT",
+        "symbol": "DOT",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "Token": "IBTC"
+        },
+        "name": "IBTC",
+        "symbol": "IBTC",
+        "decimals": 8
+    },
+    {
+        "asset": {
+            "Token": "INTR"
+        },
+        "name": "INTR",
+        "symbol": "INTR",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "Token": "KBTC"
+        },
+        "name": "KBTC",
+        "symbol": "KBTC",
+        "decimals": 8
+    },
+    {
+        "asset": {
+            "Token": "KINT"
+        },
+        "name": "KINT",
+        "symbol": "KINT",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "Token": "KSM"
+        },
+        "name": "KSM",
+        "symbol": "KSM",
+        "decimals": 12
     }
 ]

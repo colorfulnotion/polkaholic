@@ -1,110 +1,21 @@
 [
     {
         "asset": {
-            "Token": "KSM"
-        },
-        "name": "KSM",
-        "symbol": "KSM",
-        "decimals": 12
-    },
-    {
-        "asset": {
-            "Token": "9999"
-        },
-        "name": "BTC",
-        "symbol": "BTC",
-        "decimals": 20,
-        "currencyID": "9999"
-    },
-    {
-        "asset": {
-            "Token": "100"
-        },
-        "name": "Chralt",
-        "symbol": "Chralt",
-        "decimals": 0,
-        "currencyID": "100"
-    },
-    {
-        "asset": {
-            "Token": "123"
-        },
-        "name": "NFT",
-        "symbol": "NFT",
-        "decimals": 20,
-        "currencyID": "123"
-    },
-    {
-        "asset": {
-            "Token": "9000"
-        },
-        "name": "KPOTS",
-        "symbol": "KPOTS",
-        "decimals": 6,
-        "currencyID": "9000"
-    },
-    {
-        "asset": {
-            "Token": "1155"
-        },
-        "name": "WitekCoin",
-        "symbol": "WITEK",
-        "decimals": 18,
-        "currencyID": "1155"
-    },
-    {
-        "asset": {
-            "Token": "69420"
-        },
-        "name": "Chaos",
-        "symbol": "CHAOS",
-        "decimals": 10,
-        "currencyID": "69420"
-    },
-    {
-        "asset": {
-            "Token": "47"
-        },
-        "name": "Euro",
-        "symbol": "EUR",
-        "decimals": 12,
-        "currencyID": "47"
-    },
-    {
-        "asset": {
-            "Token": "6789"
-        },
-        "name": "drhuongtx",
-        "symbol": "VHM",
-        "decimals": 16,
-        "currencyID": "6789"
-    },
-    {
-        "asset": {
-            "Token": "50"
-        },
-        "name": "PromoTeam",
-        "symbol": "PROMO",
-        "decimals": 18,
-        "currencyID": "50"
-    },
-    {
-        "asset": {
-            "Token": "420"
-        },
-        "name": "BLAZE",
-        "symbol": "BLAZE",
-        "decimals": 10,
-        "currencyID": "420"
-    },
-    {
-        "asset": {
             "Token": "0"
         },
         "name": "Polkadog",
         "symbol": "DOG",
         "decimals": 6,
         "currencyID": "0"
+    },
+    {
+        "asset": {
+            "Token": "1"
+        },
+        "name": "Listen Token",
+        "symbol": "L T",
+        "decimals": 14,
+        "currencyID": "1"
     },
     {
         "asset": {
@@ -117,129 +28,21 @@
     },
     {
         "asset": {
-            "Token": "1111"
+            "Token": "100"
         },
-        "name": "Mantiev Token",
-        "symbol": "MTVD",
-        "decimals": 20,
-        "currencyID": "1111"
-    },
-    {
-        "asset": {
-            "Token": "300"
-        },
-        "name": "PolkaWarriors",
-        "symbol": "PWS",
-        "decimals": 18,
-        "currencyID": "300"
-    },
-    {
-        "asset": {
-            "Token": "4"
-        },
-        "name": "Happy",
-        "symbol": "HAPPY",
-        "decimals": 10,
-        "currencyID": "4"
-    },
-    {
-        "asset": {
-            "Token": "21"
-        },
-        "name": "ELEVATE_DAO",
-        "symbol": "ELEV",
-        "decimals": 10,
-        "currencyID": "21"
-    },
-    {
-        "asset": {
-            "Token": "333"
-        },
-        "name": "Token",
-        "symbol": "Token",
-        "decimals": 20,
-        "currencyID": "333"
-    },
-    {
-        "asset": {
-            "Token": "28"
-        },
-        "name": "Ladycoin",
-        "symbol": "LAC",
-        "decimals": 7,
-        "currencyID": "28"
-    },
-    {
-        "asset": {
-            "Token": "20"
-        },
-        "name": "0x4265726c696e20464b4b205061726164697365f09f988e",
-        "symbol": "BFKK",
-        "decimals": 20,
-        "currencyID": "20"
-    },
-    {
-        "asset": {
-            "Token": "2048"
-        },
-        "name": "Robonomics web Services",
-        "symbol": "RWS",
-        "decimals": 8,
-        "currencyID": "2048"
-    },
-    {
-        "asset": {
-            "Token": "377"
-        },
-        "name": "KAA test",
-        "symbol": "KAA",
-        "decimals": 2,
-        "currencyID": "377"
-    },
-    {
-        "asset": {
-            "Token": "95834"
-        },
-        "name": "TEST123231",
-        "symbol": "LUL",
-        "decimals": 12,
-        "currencyID": "95834"
-    },
-    {
-        "asset": {
-            "Token": "999"
-        },
-        "name": "CBDC",
-        "symbol": "CBDC",
-        "decimals": 10,
-        "currencyID": "999"
-    },
-    {
-        "asset": {
-            "Token": "30"
-        },
-        "name": "Fucho",
-        "symbol": "GOL",
-        "decimals": 8,
-        "currencyID": "30"
-    },
-    {
-        "asset": {
-            "Token": "677"
-        },
-        "name": "GEAR BONUS",
-        "symbol": "GRB",
+        "name": "Chralt",
+        "symbol": "Chralt",
         "decimals": 0,
-        "currencyID": "677"
+        "currencyID": "100"
     },
     {
         "asset": {
-            "Token": "39"
+            "Token": "1000"
         },
-        "name": "DotScanner.com",
-        "symbol": "DSCAN",
-        "decimals": 8,
-        "currencyID": "39"
+        "name": "SPARK TOKEN",
+        "symbol": "SPARK",
+        "decimals": 10,
+        "currencyID": "1000"
     },
     {
         "asset": {
@@ -252,75 +55,12 @@
     },
     {
         "asset": {
-            "Token": "38"
+            "Token": "102"
         },
-        "name": "Entropy",
-        "symbol": "ENT",
+        "name": "DREx distributed renewable ",
+        "symbol": "DRX",
         "decimals": 0,
-        "currencyID": "38"
-    },
-    {
-        "asset": {
-            "Token": "46"
-        },
-        "name": "FANARIA",
-        "symbol": "FAN",
-        "decimals": 10,
-        "currencyID": "46"
-    },
-    {
-        "asset": {
-            "Token": "99"
-        },
-        "name": "BITCOIN",
-        "symbol": "BITCOIN",
-        "decimals": 20,
-        "currencyID": "99"
-    },
-    {
-        "asset": {
-            "Token": "34"
-        },
-        "name": "PLX",
-        "symbol": "PLX",
-        "decimals": 9,
-        "currencyID": "34"
-    },
-    {
-        "asset": {
-            "Token": "7777"
-        },
-        "name": "lucky7",
-        "symbol": "lucky7",
-        "decimals": 20,
-        "currencyID": "7777"
-    },
-    {
-        "asset": {
-            "Token": "168"
-        },
-        "name": "Tokens",
-        "symbol": "Tokens",
-        "decimals": 20,
-        "currencyID": "168"
-    },
-    {
-        "asset": {
-            "Token": "2077"
-        },
-        "name": "Robonomics",
-        "symbol": "XRT",
-        "decimals": 8,
-        "currencyID": "2077"
-    },
-    {
-        "asset": {
-            "Token": "16"
-        },
-        "name": "PolarisDAO",
-        "symbol": "ARIS",
-        "decimals": 8,
-        "currencyID": "16"
+        "currencyID": "102"
     },
     {
         "asset": {
@@ -333,30 +73,12 @@
     },
     {
         "asset": {
-            "Token": "224"
+            "Token": "1107"
         },
-        "name": "SikCoin",
-        "symbol": "SIK",
-        "decimals": 8,
-        "currencyID": "224"
-    },
-    {
-        "asset": {
-            "Token": "138"
-        },
-        "name": "Abc",
-        "symbol": "Abc",
-        "decimals": 20,
-        "currencyID": "138"
-    },
-    {
-        "asset": {
-            "Token": "75"
-        },
-        "name": "ohzomdmrkyc.gybvn",
-        "symbol": "cipher",
-        "decimals": 10,
-        "currencyID": "75"
+        "name": "polkaholic.io Token",
+        "symbol": "HOLIC",
+        "decimals": 12,
+        "currencyID": "1107"
     },
     {
         "asset": {
@@ -369,12 +91,120 @@
     },
     {
         "asset": {
-            "Token": "66"
+            "Token": "1111"
         },
-        "name": "DAI",
-        "symbol": "DAI",
+        "name": "Mantiev Token",
+        "symbol": "MTVD",
         "decimals": 20,
-        "currencyID": "66"
+        "currencyID": "1111"
+    },
+    {
+        "asset": {
+            "Token": "11111"
+        },
+        "name": "1KV.CLUB",
+        "symbol": "KVC",
+        "decimals": 12,
+        "currencyID": "11111"
+    },
+    {
+        "asset": {
+            "Token": "1123"
+        },
+        "name": "XEntropy",
+        "symbol": "XEN",
+        "decimals": 10,
+        "currencyID": "1123"
+    },
+    {
+        "asset": {
+            "Token": "1155"
+        },
+        "name": "WitekCoin",
+        "symbol": "WITEK",
+        "decimals": 18,
+        "currencyID": "1155"
+    },
+    {
+        "asset": {
+            "Token": "117"
+        },
+        "name": "InvArch Tinkernet",
+        "symbol": "TNKR",
+        "decimals": 10,
+        "currencyID": "117"
+    },
+    {
+        "asset": {
+            "Token": "12"
+        },
+        "name": "BUSD",
+        "symbol": "BUSD",
+        "decimals": 4,
+        "currencyID": "12"
+    },
+    {
+        "asset": {
+            "Token": "1225"
+        },
+        "name": "GOD",
+        "symbol": "GOD",
+        "decimals": 20,
+        "currencyID": "1225"
+    },
+    {
+        "asset": {
+            "Token": "123"
+        },
+        "name": "NFT",
+        "symbol": "NFT",
+        "decimals": 20,
+        "currencyID": "123"
+    },
+    {
+        "asset": {
+            "Token": "1234"
+        },
+        "name": "Kusama",
+        "symbol": "KSM",
+        "decimals": 10,
+        "currencyID": "1234"
+    },
+    {
+        "asset": {
+            "Token": "12345"
+        },
+        "name": "Drexall",
+        "symbol": "DREX",
+        "decimals": 10,
+        "currencyID": "12345"
+    },
+    {
+        "asset": {
+            "Token": "13"
+        },
+        "name": "LuckyNumber",
+        "symbol": "LN",
+        "decimals": 13,
+        "currencyID": "13"
+    },
+    {
+        "asset": {
+            "Token": "1337"
+        },
+        "name": "Test In Prod",
+        "symbol": "TIP",
+        "decimals": 10,
+        "currencyID": "1337"
+    },
+    {
+        "asset": {
+            "Token": "138"
+        },
+        "name": "Abc",
+        "symbol": "Abc",
+        "decimals": 20,
+        "currencyID": "138"
     },
     {
         "asset": {
@@ -387,30 +217,39 @@
     },
     {
         "asset": {
-            "Token": "360"
+            "Token": "1420"
         },
-        "name": "uni",
-        "symbol": "uni",
-        "decimals": 20,
-        "currencyID": "360"
-    },
-    {
-        "asset": {
-            "Token": "6"
-        },
-        "name": "ZKP DAO",
-        "symbol": "ZKPD",
+        "name": "Hydrogen line",
+        "symbol": "HYDR",
         "decimals": 10,
-        "currencyID": "6"
+        "currencyID": "1420"
     },
     {
         "asset": {
-            "Token": "19"
+            "Token": "1441"
         },
-        "name": "Shot",
-        "symbol": "SHOT",
-        "decimals": 12,
-        "currencyID": "19"
+        "name": "Spot access token",
+        "symbol": "SPOT",
+        "decimals": 0,
+        "currencyID": "1441"
+    },
+    {
+        "asset": {
+            "Token": "15"
+        },
+        "name": "Web3",
+        "symbol": "Web3",
+        "decimals": 20,
+        "currencyID": "15"
+    },
+    {
+        "asset": {
+            "Token": "16"
+        },
+        "name": "PolarisDAO",
+        "symbol": "ARIS",
+        "decimals": 8,
+        "currencyID": "16"
     },
     {
         "asset": {
@@ -423,39 +262,102 @@
     },
     {
         "asset": {
-            "Token": "383"
+            "Token": "168"
         },
-        "name": "KODA",
-        "symbol": "KODA",
-        "decimals": 12,
-        "currencyID": "383"
+        "name": "Tokens",
+        "symbol": "Tokens",
+        "decimals": 20,
+        "currencyID": "168"
     },
     {
         "asset": {
-            "Token": "42069"
+            "Token": "1688"
         },
-        "name": "0xf09f91b6e2989520696e7465726e20636f696e20f09fa5b6f09f8c9d",
-        "symbol": "INTRN",
+        "name": "ali",
+        "symbol": "ali",
+        "decimals": 20,
+        "currencyID": "1688"
+    },
+    {
+        "asset": {
+            "Token": "17"
+        },
+        "name": "MEME",
+        "symbol": "MEME",
         "decimals": 18,
-        "currencyID": "42069"
+        "currencyID": "17"
     },
     {
         "asset": {
-            "Token": "88888"
+            "Token": "18"
         },
-        "name": "SHIBATALES",
-        "symbol": "BAILEGO",
-        "decimals": 0,
-        "currencyID": "88888"
-    },
-    {
-        "asset": {
-            "Token": "4206969"
-        },
-        "name": "Polka SHIBA INU",
-        "symbol": "SHIB",
+        "name": "HEIHEI",
+        "symbol": "HEI",
         "decimals": 10,
-        "currencyID": "4206969"
+        "currencyID": "18"
+    },
+    {
+        "asset": {
+            "Token": "188"
+        },
+        "name": "Zenlink Network Token",
+        "symbol": "ZLK",
+        "decimals": 12,
+        "currencyID": "188"
+    },
+    {
+        "asset": {
+            "Token": "19"
+        },
+        "name": "Shot",
+        "symbol": "SHOT",
+        "decimals": 12,
+        "currencyID": "19"
+    },
+    {
+        "asset": {
+            "Token": "1984"
+        },
+        "name": "Tether USD",
+        "symbol": "USDt",
+        "decimals": 6,
+        "currencyID": "1984"
+    },
+    {
+        "asset": {
+            "Token": "19840"
+        },
+        "name": "Tether USD",
+        "symbol": "USDt",
+        "decimals": 3,
+        "currencyID": "19840"
+    },
+    {
+        "asset": {
+            "Token": "1999"
+        },
+        "name": "Fanaria - Most Advanced NFT",
+        "symbol": "ADVERT2",
+        "decimals": 10,
+        "currencyID": "1999"
+    },
+    {
+        "asset": {
+            "Token": "2"
+        },
+        "name": "Polkanuannuan",
+        "symbol": "PNN",
+        "decimals": 10,
+        "currencyID": "2"
+    },
+    {
+        "asset": {
+            "Token": "20"
+        },
+        "name": "0x4265726c696e20464b4b205061726164697365f09f988e",
+        "symbol": "BFKK",
+        "decimals": 20,
+        "currencyID": "20"
     },
     {
         "asset": {
@@ -468,21 +370,246 @@
     },
     {
         "asset": {
-            "Token": "1107"
+            "Token": "2048"
         },
-        "name": "polkaholic.io Token",
-        "symbol": "HOLIC",
-        "decimals": 12,
-        "currencyID": "1107"
+        "name": "Robonomics web Services",
+        "symbol": "RWS",
+        "decimals": 8,
+        "currencyID": "2048"
     },
     {
         "asset": {
-            "Token": "77"
+            "Token": "2049"
         },
-        "name": "Crypto",
-        "symbol": "Crypto",
+        "name": "DoAndroidsDreamOfElectricSheep?",
+        "symbol": "Android",
+        "decimals": 0,
+        "currencyID": "2049"
+    },
+    {
+        "asset": {
+            "Token": "2050"
+        },
+        "name": "Carbon Unit Token",
+        "symbol": "CUT",
+        "decimals": 9,
+        "currencyID": "2050"
+    },
+    {
+        "asset": {
+            "Token": "2077"
+        },
+        "name": "Robonomics",
+        "symbol": "XRT",
+        "decimals": 8,
+        "currencyID": "2077"
+    },
+    {
+        "asset": {
+            "Token": "21"
+        },
+        "name": "ELEVATE_DAO",
+        "symbol": "ELEV",
+        "decimals": 10,
+        "currencyID": "21"
+    },
+    {
+        "asset": {
+            "Token": "214"
+        },
+        "name": "LOVE",
+        "symbol": "LOVE",
         "decimals": 20,
-        "currencyID": "77"
+        "currencyID": "214"
+    },
+    {
+        "asset": {
+            "Token": "22"
+        },
+        "name": "Smoothie",
+        "symbol": "STH",
+        "decimals": 6,
+        "currencyID": "22"
+    },
+    {
+        "asset": {
+            "Token": "223"
+        },
+        "name": "BILLCOIN",
+        "symbol": "BILL",
+        "decimals": 8,
+        "currencyID": "223"
+    },
+    {
+        "asset": {
+            "Token": "224"
+        },
+        "name": "SikCoin",
+        "symbol": "SIK",
+        "decimals": 8,
+        "currencyID": "224"
+    },
+    {
+        "asset": {
+            "Token": "23"
+        },
+        "name": "DLTKOJO",
+        "symbol": "KOJO",
+        "decimals": 3,
+        "currencyID": "23"
+    },
+    {
+        "asset": {
+            "Token": "24"
+        },
+        "name": "PolkaTest",
+        "symbol": "test",
+        "decimals": 1,
+        "currencyID": "24"
+    },
+    {
+        "asset": {
+            "Token": "25"
+        },
+        "name": "Polkababes",
+        "symbol": "BABE",
+        "decimals": 10,
+        "currencyID": "25"
+    },
+    {
+        "asset": {
+            "Token": "26"
+        },
+        "name": "BUNGA BUNGA",
+        "symbol": "BUNGA",
+        "decimals": 8,
+        "currencyID": "26"
+    },
+    {
+        "asset": {
+            "Token": "27"
+        },
+        "name": "Valhello.app",
+        "symbol": "RUNE",
+        "decimals": 10,
+        "currencyID": "27"
+    },
+    {
+        "asset": {
+            "Token": "28"
+        },
+        "name": "Ladycoin",
+        "symbol": "LAC",
+        "decimals": 7,
+        "currencyID": "28"
+    },
+    {
+        "asset": {
+            "Token": "29"
+        },
+        "name": "COUPONS",
+        "symbol": "CODES",
+        "decimals": 10,
+        "currencyID": "29"
+    },
+    {
+        "asset": {
+            "Token": "3"
+        },
+        "name": "Catsama",
+        "symbol": "Meow",
+        "decimals": 6,
+        "currencyID": "3"
+    },
+    {
+        "asset": {
+            "Token": "30"
+        },
+        "name": "Fucho",
+        "symbol": "GOL",
+        "decimals": 8,
+        "currencyID": "30"
+    },
+    {
+        "asset": {
+            "Token": "300"
+        },
+        "name": "PolkaWarriors",
+        "symbol": "PWS",
+        "decimals": 18,
+        "currencyID": "300"
+    },
+    {
+        "asset": {
+            "Token": "3077"
+        },
+        "name": "AutomatedCoffeeToken",
+        "symbol": "ACT",
+        "decimals": 0,
+        "currencyID": "3077"
+    },
+    {
+        "asset": {
+            "Token": "31"
+        },
+        "name": "Genki",
+        "symbol": "ki",
+        "decimals": 18,
+        "currencyID": "31"
+    },
+    {
+        "asset": {
+            "Token": "314159"
+        },
+        "name": "Retreat",
+        "symbol": "RTT",
+        "decimals": 2,
+        "currencyID": "314159"
+    },
+    {
+        "asset": {
+            "Token": "32"
+        },
+        "name": "Favor",
+        "symbol": "FAV",
+        "decimals": 0,
+        "currencyID": "32"
+    },
+    {
+        "asset": {
+            "Token": "33"
+        },
+        "name": "Ladyboi",
+        "symbol": "BUSSY",
+        "decimals": 10,
+        "currencyID": "33"
+    },
+    {
+        "asset": {
+            "Token": "333"
+        },
+        "name": "Token",
+        "symbol": "Token",
+        "decimals": 20,
+        "currencyID": "333"
+    },
+    {
+        "asset": {
+            "Token": "34"
+        },
+        "name": "PLX",
+        "symbol": "PLX",
+        "decimals": 9,
+        "currencyID": "34"
+    },
+    {
+        "asset": {
+            "Token": "345"
+        },
+        "name": "345",
+        "symbol": "345",
+        "decimals": 20,
+        "currencyID": "345"
     },
     {
         "asset": {
@@ -504,66 +631,30 @@
     },
     {
         "asset": {
-            "Token": "31"
+            "Token": "360"
         },
-        "name": "Genki",
-        "symbol": "ki",
-        "decimals": 18,
-        "currencyID": "31"
-    },
-    {
-        "asset": {
-            "Token": "33"
-        },
-        "name": "Ladyboi",
-        "symbol": "BUSSY",
-        "decimals": 10,
-        "currencyID": "33"
-    },
-    {
-        "asset": {
-            "Token": "41"
-        },
-        "name": "GooseCoin",
-        "symbol": "GOOSE",
-        "decimals": 12,
-        "currencyID": "41"
-    },
-    {
-        "asset": {
-            "Token": "71"
-        },
-        "name": "OAK Network Token",
-        "symbol": "OAK",
-        "decimals": 10,
-        "currencyID": "71"
-    },
-    {
-        "asset": {
-            "Token": "44"
-        },
-        "name": "Most Advanced Coin",
-        "symbol": "ADVNCE",
-        "decimals": 10,
-        "currencyID": "44"
-    },
-    {
-        "asset": {
-            "Token": "11111"
-        },
-        "name": "1KV.CLUB",
-        "symbol": "KVC",
-        "decimals": 12,
-        "currencyID": "11111"
-    },
-    {
-        "asset": {
-            "Token": "15"
-        },
-        "name": "Web3",
-        "symbol": "Web3",
+        "name": "uni",
+        "symbol": "uni",
         "decimals": 20,
-        "currencyID": "15"
+        "currencyID": "360"
+    },
+    {
+        "asset": {
+            "Token": "365"
+        },
+        "name": "time",
+        "symbol": "time",
+        "decimals": 20,
+        "currencyID": "365"
+    },
+    {
+        "asset": {
+            "Token": "37"
+        },
+        "name": "Munchkin",
+        "symbol": "MNCH",
+        "decimals": 18,
+        "currencyID": "37"
     },
     {
         "asset": {
@@ -585,102 +676,39 @@
     },
     {
         "asset": {
-            "Token": "40"
+            "Token": "377"
         },
-        "name": "Eric",
-        "symbol": "ERIC",
-        "decimals": 10,
-        "currencyID": "40"
+        "name": "KAA test",
+        "symbol": "KAA",
+        "decimals": 2,
+        "currencyID": "377"
     },
     {
         "asset": {
-            "Token": "2"
+            "Token": "38"
         },
-        "name": "Polkanuannuan",
-        "symbol": "PNN",
-        "decimals": 10,
-        "currencyID": "2"
-    },
-    {
-        "asset": {
-            "Token": "117"
-        },
-        "name": "InvArch Tinkernet",
-        "symbol": "TNKR",
-        "decimals": 10,
-        "currencyID": "117"
-    },
-    {
-        "asset": {
-            "Token": "70"
-        },
-        "name": "MarLira",
-        "symbol": "MAR",
-        "decimals": 5,
-        "currencyID": "70"
-    },
-    {
-        "asset": {
-            "Token": "13"
-        },
-        "name": "LuckyNumber",
-        "symbol": "LN",
-        "decimals": 13,
-        "currencyID": "13"
-    },
-    {
-        "asset": {
-            "Token": "2049"
-        },
-        "name": "DoAndroidsDreamOfElectricSheep?",
-        "symbol": "Android",
+        "name": "Entropy",
+        "symbol": "ENT",
         "decimals": 0,
-        "currencyID": "2049"
+        "currencyID": "38"
     },
     {
         "asset": {
-            "Token": "32"
+            "Token": "383"
         },
-        "name": "Favor",
-        "symbol": "FAV",
-        "decimals": 0,
-        "currencyID": "32"
-    },
-    {
-        "asset": {
-            "Token": "188"
-        },
-        "name": "Zenlink Network Token",
-        "symbol": "ZLK",
+        "name": "KODA",
+        "symbol": "KODA",
         "decimals": 12,
-        "currencyID": "188"
+        "currencyID": "383"
     },
     {
         "asset": {
-            "Token": "27"
+            "Token": "39"
         },
-        "name": "Valhello.app",
-        "symbol": "RUNE",
-        "decimals": 10,
-        "currencyID": "27"
-    },
-    {
-        "asset": {
-            "Token": "49"
-        },
-        "name": "ENDIANNESS",
-        "symbol": "DIAN",
-        "decimals": 10,
-        "currencyID": "49"
-    },
-    {
-        "asset": {
-            "Token": "1999"
-        },
-        "name": "Fanaria - Most Advanced NFT",
-        "symbol": "ADVERT2",
-        "decimals": 10,
-        "currencyID": "1999"
+        "name": "DotScanner.com",
+        "symbol": "DSCAN",
+        "decimals": 8,
+        "currencyID": "39"
     },
     {
         "asset": {
@@ -693,21 +721,30 @@
     },
     {
         "asset": {
-            "Token": "314159"
+            "Token": "4"
         },
-        "name": "Retreat",
-        "symbol": "RTT",
-        "decimals": 2,
-        "currencyID": "314159"
+        "name": "Happy",
+        "symbol": "HAPPY",
+        "decimals": 10,
+        "currencyID": "4"
     },
     {
         "asset": {
-            "Token": "29"
+            "Token": "40"
         },
-        "name": "COUPONS",
-        "symbol": "CODES",
+        "name": "Eric",
+        "symbol": "ERIC",
         "decimals": 10,
-        "currencyID": "29"
+        "currencyID": "40"
+    },
+    {
+        "asset": {
+            "Token": "41"
+        },
+        "name": "GooseCoin",
+        "symbol": "GOOSE",
+        "decimals": 12,
+        "currencyID": "41"
     },
     {
         "asset": {
@@ -720,147 +757,30 @@
     },
     {
         "asset": {
-            "Token": "102"
+            "Token": "420"
         },
-        "name": "DREx distributed renewable ",
-        "symbol": "DRX",
-        "decimals": 0,
-        "currencyID": "102"
-    },
-    {
-        "asset": {
-            "Token": "80815"
-        },
-        "name": "Kusama File Coin",
-        "symbol": "KSMFS",
+        "name": "BLAZE",
+        "symbol": "BLAZE",
         "decimals": 10,
-        "currencyID": "80815"
+        "currencyID": "420"
     },
     {
         "asset": {
-            "Token": "43"
+            "Token": "42069"
         },
-        "name": "Tricky-NFT.art Treasure Token",
-        "symbol": "TTT",
-        "decimals": 2,
-        "currencyID": "43"
+        "name": "0xf09f91b6e2989520696e7465726e20636f696e20f09fa5b6f09f8c9d",
+        "symbol": "INTRN",
+        "decimals": 18,
+        "currencyID": "42069"
     },
     {
         "asset": {
-            "Token": "7777777"
+            "Token": "4206969"
         },
-        "name": "king",
-        "symbol": "king",
-        "decimals": 20,
-        "currencyID": "7777777"
-    },
-    {
-        "asset": {
-            "Token": "365"
-        },
-        "name": "time",
-        "symbol": "time",
-        "decimals": 20,
-        "currencyID": "365"
-    },
-    {
-        "asset": {
-            "Token": "5"
-        },
-        "name": "BeerCoin",
-        "symbol": "BEER",
-        "decimals": 12,
-        "currencyID": "5"
-    },
-    {
-        "asset": {
-            "Token": "18"
-        },
-        "name": "HEIHEI",
-        "symbol": "HEI",
+        "name": "Polka SHIBA INU",
+        "symbol": "SHIB",
         "decimals": 10,
-        "currencyID": "18"
-    },
-    {
-        "asset": {
-            "Token": "7"
-        },
-        "name": "DogeSeven",
-        "symbol": "DOS",
-        "decimals": 1,
-        "currencyID": "7"
-    },
-    {
-        "asset": {
-            "Token": "26"
-        },
-        "name": "BUNGA BUNGA",
-        "symbol": "BUNGA",
-        "decimals": 8,
-        "currencyID": "26"
-    },
-    {
-        "asset": {
-            "Token": "8848"
-        },
-        "name": "top",
-        "symbol": "top",
-        "decimals": 20,
-        "currencyID": "8848"
-    },
-    {
-        "asset": {
-            "Token": "3077"
-        },
-        "name": "AutomatedCoffeeToken",
-        "symbol": "ACT",
-        "decimals": 0,
-        "currencyID": "3077"
-    },
-    {
-        "asset": {
-            "Token": "87"
-        },
-        "name": "Xexr",
-        "symbol": "XEXR",
-        "decimals": 6,
-        "currencyID": "87"
-    },
-    {
-        "asset": {
-            "Token": "1984"
-        },
-        "name": "Tether USD",
-        "symbol": "USDt",
-        "decimals": 6,
-        "currencyID": "1984"
-    },
-    {
-        "asset": {
-            "Token": "2050"
-        },
-        "name": "Carbon Unit Token",
-        "symbol": "CUT",
-        "decimals": 9,
-        "currencyID": "2050"
-    },
-    {
-        "asset": {
-            "Token": "1688"
-        },
-        "name": "ali",
-        "symbol": "ali",
-        "decimals": 20,
-        "currencyID": "1688"
-    },
-    {
-        "asset": {
-            "Token": "1123"
-        },
-        "name": "XEntropy",
-        "symbol": "XEN",
-        "decimals": 10,
-        "currencyID": "1123"
+        "currencyID": "4206969"
     },
     {
         "asset": {
@@ -873,84 +793,21 @@
     },
     {
         "asset": {
-            "Token": "777777"
+            "Token": "43"
         },
-        "name": "DeFi The World",
-        "symbol": "DEFI",
-        "decimals": 8,
-        "currencyID": "777777"
+        "name": "Tricky-NFT.art Treasure Token",
+        "symbol": "TTT",
+        "decimals": 2,
+        "currencyID": "43"
     },
     {
         "asset": {
-            "Token": "22"
+            "Token": "44"
         },
-        "name": "Smoothie",
-        "symbol": "STH",
-        "decimals": 6,
-        "currencyID": "22"
-    },
-    {
-        "asset": {
-            "Token": "777"
-        },
-        "name": "Heaven",
-        "symbol": "GOD",
-        "decimals": 0,
-        "currencyID": "777"
-    },
-    {
-        "asset": {
-            "Token": "567"
-        },
-        "name": "Chrawnna Coin",
-        "symbol": "CHRWNA",
+        "name": "Most Advanced Coin",
+        "symbol": "ADVNCE",
         "decimals": 10,
-        "currencyID": "567"
-    },
-    {
-        "asset": {
-            "Token": "68"
-        },
-        "name": "Fanaria on Twitter: @FanariaNFT",
-        "symbol": "ADVERT",
-        "decimals": 10,
-        "currencyID": "68"
-    },
-    {
-        "asset": {
-            "Token": "24"
-        },
-        "name": "PolkaTest",
-        "symbol": "test",
-        "decimals": 1,
-        "currencyID": "24"
-    },
-    {
-        "asset": {
-            "Token": "90"
-        },
-        "name": "Satoshi",
-        "symbol": "SATS",
-        "decimals": 1,
-        "currencyID": "90"
-    },
-    {
-        "asset": {
-            "Token": "80"
-        },
-        "name": "Basically Indivisible Token",
-        "symbol": "BIT",
-        "decimals": 0,
-        "currencyID": "80"
-    },
-    {
-        "asset": {
-            "Token": "8"
-        },
-        "name": "RMRK.app",
-        "symbol": "RMRK",
-        "decimals": 10,
-        "currencyID": "8"
+        "currencyID": "44"
     },
     {
         "asset": {
@@ -963,246 +820,48 @@
     },
     {
         "asset": {
-            "Token": "841"
+            "Token": "46"
         },
-        "name": "YAYOI",
-        "symbol": "YAYOI",
+        "name": "FANARIA",
+        "symbol": "FAN",
         "decimals": 10,
-        "currencyID": "841"
+        "currencyID": "46"
     },
     {
         "asset": {
-            "Token": "5201314"
+            "Token": "47"
         },
-        "name": "belove",
-        "symbol": "belove",
-        "decimals": 20,
-        "currencyID": "5201314"
+        "name": "Euro",
+        "symbol": "EUR",
+        "decimals": 12,
+        "currencyID": "47"
     },
     {
         "asset": {
-            "Token": "1234"
+            "Token": "49"
         },
-        "name": "Kusama",
-        "symbol": "KSM",
+        "name": "ENDIANNESS",
+        "symbol": "DIAN",
         "decimals": 10,
-        "currencyID": "1234"
+        "currencyID": "49"
     },
     {
         "asset": {
-            "Token": "1420"
+            "Token": "5"
         },
-        "name": "Hydrogen line",
-        "symbol": "HYDR",
-        "decimals": 10,
-        "currencyID": "1420"
+        "name": "BeerCoin",
+        "symbol": "BEER",
+        "decimals": 12,
+        "currencyID": "5"
     },
     {
         "asset": {
-            "Token": "1000"
+            "Token": "50"
         },
-        "name": "SPARK TOKEN",
-        "symbol": "SPARK",
-        "decimals": 10,
-        "currencyID": "1000"
-    },
-    {
-        "asset": {
-            "Token": "223"
-        },
-        "name": "BILLCOIN",
-        "symbol": "BILL",
-        "decimals": 8,
-        "currencyID": "223"
-    },
-    {
-        "asset": {
-            "Token": "60"
-        },
-        "name": "GavCoin",
-        "symbol": "GAV",
-        "decimals": 4,
-        "currencyID": "60"
-    },
-    {
-        "asset": {
-            "Token": "80817"
-        },
-        "name": "FRALEY Coin",
-        "symbol": "FRALEY",
-        "decimals": 10,
-        "currencyID": "80817"
-    },
-    {
-        "asset": {
-            "Token": "1"
-        },
-        "name": "Listen Token",
-        "symbol": "L T",
-        "decimals": 14,
-        "currencyID": "1"
-    },
-    {
-        "asset": {
-            "Token": "12"
-        },
-        "name": "BUSD",
-        "symbol": "BUSD",
-        "decimals": 4,
-        "currencyID": "12"
-    },
-    {
-        "asset": {
-            "Token": "12345"
-        },
-        "name": "Drexall",
-        "symbol": "DREX",
-        "decimals": 10,
-        "currencyID": "12345"
-    },
-    {
-        "asset": {
-            "Token": "3"
-        },
-        "name": "Catsama",
-        "symbol": "Meow",
-        "decimals": 6,
-        "currencyID": "3"
-    },
-    {
-        "asset": {
-            "Token": "55"
-        },
-        "name": "DIVING",
-        "symbol": "MTS",
-        "decimals": 8,
-        "currencyID": "55"
-    },
-    {
-        "asset": {
-            "Token": "1337"
-        },
-        "name": "Test In Prod",
-        "symbol": "TIP",
-        "decimals": 10,
-        "currencyID": "1337"
-    },
-    {
-        "asset": {
-            "Token": "666"
-        },
-        "name": "Evil Corp",
-        "symbol": "BAD",
-        "decimals": 10,
-        "currencyID": "666"
-    },
-    {
-        "asset": {
-            "Token": "88"
-        },
-        "name": "BTC",
-        "symbol": "BTC",
-        "decimals": 20,
-        "currencyID": "88"
-    },
-    {
-        "asset": {
-            "Token": "17"
-        },
-        "name": "MEME",
-        "symbol": "MEME",
+        "name": "PromoTeam",
+        "symbol": "PROMO",
         "decimals": 18,
-        "currencyID": "17"
-    },
-    {
-        "asset": {
-            "Token": "598"
-        },
-        "name": "Eren Yilmaz",
-        "symbol": "EREN",
-        "decimals": 10,
-        "currencyID": "598"
-    },
-    {
-        "asset": {
-            "Token": "25"
-        },
-        "name": "Polkababes",
-        "symbol": "BABE",
-        "decimals": 10,
-        "currencyID": "25"
-    },
-    {
-        "asset": {
-            "Token": "69"
-        },
-        "name": "NICE",
-        "symbol": "NICE",
-        "decimals": 10,
-        "currencyID": "69"
-    },
-    {
-        "asset": {
-            "Token": "23"
-        },
-        "name": "DLTKOJO",
-        "symbol": "KOJO",
-        "decimals": 3,
-        "currencyID": "23"
-    },
-    {
-        "asset": {
-            "Token": "19840"
-        },
-        "name": "Tether USD",
-        "symbol": "USDt",
-        "decimals": 3,
-        "currencyID": "19840"
-    },
-    {
-        "asset": {
-            "Token": "37"
-        },
-        "name": "Munchkin",
-        "symbol": "MNCH",
-        "decimals": 18,
-        "currencyID": "37"
-    },
-    {
-        "asset": {
-            "Token": "759"
-        },
-        "name": "bLd",
-        "symbol": "bLd",
-        "decimals": 18,
-        "currencyID": "759"
-    },
-    {
-        "asset": {
-            "Token": "91"
-        },
-        "name": "Tamo Junto",
-        "symbol": "TMJ",
-        "decimals": 8,
-        "currencyID": "91"
-    },
-    {
-        "asset": {
-            "Token": "1225"
-        },
-        "name": "GOD",
-        "symbol": "GOD",
-        "decimals": 20,
-        "currencyID": "1225"
-    },
-    {
-        "asset": {
-            "Token": "64"
-        },
-        "name": "oh!",
-        "symbol": "oh!",
-        "decimals": 4,
-        "currencyID": "64"
+        "currencyID": "50"
     },
     {
         "asset": {
@@ -1215,12 +874,300 @@
     },
     {
         "asset": {
-            "Token": "9"
+            "Token": "5201314"
         },
-        "name": "TakeTime",
-        "symbol": "TOT",
+        "name": "belove",
+        "symbol": "belove",
+        "decimals": 20,
+        "currencyID": "5201314"
+    },
+    {
+        "asset": {
+            "Token": "55"
+        },
+        "name": "DIVING",
+        "symbol": "MTS",
+        "decimals": 8,
+        "currencyID": "55"
+    },
+    {
+        "asset": {
+            "Token": "567"
+        },
+        "name": "Chrawnna Coin",
+        "symbol": "CHRWNA",
+        "decimals": 10,
+        "currencyID": "567"
+    },
+    {
+        "asset": {
+            "Token": "598"
+        },
+        "name": "Eren Yilmaz",
+        "symbol": "EREN",
+        "decimals": 10,
+        "currencyID": "598"
+    },
+    {
+        "asset": {
+            "Token": "6"
+        },
+        "name": "ZKP DAO",
+        "symbol": "ZKPD",
+        "decimals": 10,
+        "currencyID": "6"
+    },
+    {
+        "asset": {
+            "Token": "60"
+        },
+        "name": "GavCoin",
+        "symbol": "GAV",
+        "decimals": 4,
+        "currencyID": "60"
+    },
+    {
+        "asset": {
+            "Token": "64"
+        },
+        "name": "oh!",
+        "symbol": "oh!",
+        "decimals": 4,
+        "currencyID": "64"
+    },
+    {
+        "asset": {
+            "Token": "66"
+        },
+        "name": "DAI",
+        "symbol": "DAI",
+        "decimals": 20,
+        "currencyID": "66"
+    },
+    {
+        "asset": {
+            "Token": "666"
+        },
+        "name": "Evil Corp",
+        "symbol": "BAD",
+        "decimals": 10,
+        "currencyID": "666"
+    },
+    {
+        "asset": {
+            "Token": "677"
+        },
+        "name": "GEAR BONUS",
+        "symbol": "GRB",
+        "decimals": 0,
+        "currencyID": "677"
+    },
+    {
+        "asset": {
+            "Token": "6789"
+        },
+        "name": "drhuongtx",
+        "symbol": "VHM",
+        "decimals": 16,
+        "currencyID": "6789"
+    },
+    {
+        "asset": {
+            "Token": "68"
+        },
+        "name": "Fanaria on Twitter: @FanariaNFT",
+        "symbol": "ADVERT",
+        "decimals": 10,
+        "currencyID": "68"
+    },
+    {
+        "asset": {
+            "Token": "69"
+        },
+        "name": "NICE",
+        "symbol": "NICE",
+        "decimals": 10,
+        "currencyID": "69"
+    },
+    {
+        "asset": {
+            "Token": "69420"
+        },
+        "name": "Chaos",
+        "symbol": "CHAOS",
+        "decimals": 10,
+        "currencyID": "69420"
+    },
+    {
+        "asset": {
+            "Token": "7"
+        },
+        "name": "DogeSeven",
+        "symbol": "DOS",
         "decimals": 1,
-        "currencyID": "9"
+        "currencyID": "7"
+    },
+    {
+        "asset": {
+            "Token": "70"
+        },
+        "name": "MarLira",
+        "symbol": "MAR",
+        "decimals": 5,
+        "currencyID": "70"
+    },
+    {
+        "asset": {
+            "Token": "71"
+        },
+        "name": "OAK Network Token",
+        "symbol": "OAK",
+        "decimals": 10,
+        "currencyID": "71"
+    },
+    {
+        "asset": {
+            "Token": "75"
+        },
+        "name": "ohzomdmrkyc.gybvn",
+        "symbol": "cipher",
+        "decimals": 10,
+        "currencyID": "75"
+    },
+    {
+        "asset": {
+            "Token": "759"
+        },
+        "name": "bLd",
+        "symbol": "bLd",
+        "decimals": 18,
+        "currencyID": "759"
+    },
+    {
+        "asset": {
+            "Token": "77"
+        },
+        "name": "Crypto",
+        "symbol": "Crypto",
+        "decimals": 20,
+        "currencyID": "77"
+    },
+    {
+        "asset": {
+            "Token": "777"
+        },
+        "name": "Heaven",
+        "symbol": "GOD",
+        "decimals": 0,
+        "currencyID": "777"
+    },
+    {
+        "asset": {
+            "Token": "7777"
+        },
+        "name": "lucky7",
+        "symbol": "lucky7",
+        "decimals": 20,
+        "currencyID": "7777"
+    },
+    {
+        "asset": {
+            "Token": "777777"
+        },
+        "name": "DeFi The World",
+        "symbol": "DEFI",
+        "decimals": 8,
+        "currencyID": "777777"
+    },
+    {
+        "asset": {
+            "Token": "7777777"
+        },
+        "name": "king",
+        "symbol": "king",
+        "decimals": 20,
+        "currencyID": "7777777"
+    },
+    {
+        "asset": {
+            "Token": "8"
+        },
+        "name": "RMRK.app",
+        "symbol": "RMRK",
+        "decimals": 10,
+        "currencyID": "8"
+    },
+    {
+        "asset": {
+            "Token": "80"
+        },
+        "name": "Basically Indivisible Token",
+        "symbol": "BIT",
+        "decimals": 0,
+        "currencyID": "80"
+    },
+    {
+        "asset": {
+            "Token": "80815"
+        },
+        "name": "Kusama File Coin",
+        "symbol": "KSMFS",
+        "decimals": 10,
+        "currencyID": "80815"
+    },
+    {
+        "asset": {
+            "Token": "80816"
+        },
+        "name": "RUEPP Coin",
+        "symbol": "RUEPP",
+        "decimals": 10,
+        "currencyID": "80816"
+    },
+    {
+        "asset": {
+            "Token": "80817"
+        },
+        "name": "FRALEY Coin",
+        "symbol": "FRALEY",
+        "decimals": 10,
+        "currencyID": "80817"
+    },
+    {
+        "asset": {
+            "Token": "841"
+        },
+        "name": "YAYOI",
+        "symbol": "YAYOI",
+        "decimals": 10,
+        "currencyID": "841"
+    },
+    {
+        "asset": {
+            "Token": "87"
+        },
+        "name": "Xexr",
+        "symbol": "XEXR",
+        "decimals": 6,
+        "currencyID": "87"
+    },
+    {
+        "asset": {
+            "Token": "88"
+        },
+        "name": "BTC",
+        "symbol": "BTC",
+        "decimals": 20,
+        "currencyID": "88"
+    },
+    {
+        "asset": {
+            "Token": "8848"
+        },
+        "name": "top",
+        "symbol": "top",
+        "decimals": 20,
+        "currencyID": "8848"
     },
     {
         "asset": {
@@ -1233,6 +1180,51 @@
     },
     {
         "asset": {
+            "Token": "88888"
+        },
+        "name": "SHIBATALES",
+        "symbol": "BAILEGO",
+        "decimals": 0,
+        "currencyID": "88888"
+    },
+    {
+        "asset": {
+            "Token": "9"
+        },
+        "name": "TakeTime",
+        "symbol": "TOT",
+        "decimals": 1,
+        "currencyID": "9"
+    },
+    {
+        "asset": {
+            "Token": "90"
+        },
+        "name": "Satoshi",
+        "symbol": "SATS",
+        "decimals": 1,
+        "currencyID": "90"
+    },
+    {
+        "asset": {
+            "Token": "9000"
+        },
+        "name": "KPOTS",
+        "symbol": "KPOTS",
+        "decimals": 6,
+        "currencyID": "9000"
+    },
+    {
+        "asset": {
+            "Token": "91"
+        },
+        "name": "Tamo Junto",
+        "symbol": "TMJ",
+        "decimals": 8,
+        "currencyID": "91"
+    },
+    {
+        "asset": {
             "Token": "911"
         },
         "name": "911",
@@ -1242,38 +1234,46 @@
     },
     {
         "asset": {
-            "Token": "214"
+            "Token": "95834"
         },
-        "name": "LOVE",
-        "symbol": "LOVE",
+        "name": "TEST123231",
+        "symbol": "LUL",
+        "decimals": 12,
+        "currencyID": "95834"
+    },
+    {
+        "asset": {
+            "Token": "99"
+        },
+        "name": "BITCOIN",
+        "symbol": "BITCOIN",
         "decimals": 20,
-        "currencyID": "214"
+        "currencyID": "99"
     },
     {
         "asset": {
-            "Token": "345"
+            "Token": "999"
         },
-        "name": "345",
-        "symbol": "345",
-        "decimals": 20,
-        "currencyID": "345"
-    },
-    {
-        "asset": {
-            "Token": "1441"
-        },
-        "name": "Spot access token",
-        "symbol": "SPOT",
-        "decimals": 0,
-        "currencyID": "1441"
-    },
-    {
-        "asset": {
-            "Token": "80816"
-        },
-        "name": "RUEPP Coin",
-        "symbol": "RUEPP",
+        "name": "CBDC",
+        "symbol": "CBDC",
         "decimals": 10,
-        "currencyID": "80816"
+        "currencyID": "999"
+    },
+    {
+        "asset": {
+            "Token": "9999"
+        },
+        "name": "BTC",
+        "symbol": "BTC",
+        "decimals": 20,
+        "currencyID": "9999"
+    },
+    {
+        "asset": {
+            "Token": "KSM"
+        },
+        "name": "KSM",
+        "symbol": "KSM",
+        "decimals": 12
     }
 ]

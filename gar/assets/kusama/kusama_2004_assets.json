@@ -1,14 +1,6 @@
 [
     {
         "asset": {
-            "Token": "PHA"
-        },
-        "name": "PHA",
-        "symbol": "PHA",
-        "decimals": 12
-    },
-    {
-        "asset": {
             "Token": "0"
         },
         "name": "Kusama",
@@ -16,6 +8,16 @@
         "decimals": 12,
         "currencyID": "0",
         "xcmInteriorKey": "[{\"network\":\"kusama\"},\"here\"]"
+    },
+    {
+        "asset": {
+            "Token": "1"
+        },
+        "name": "Karura",
+        "symbol": "KAR",
+        "decimals": 12,
+        "currencyID": "1",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]"
     },
     {
         "asset": {
@@ -29,13 +31,12 @@
     },
     {
         "asset": {
-            "Token": "4"
+            "Token": "10000"
         },
-        "name": "Acala USD",
-        "symbol": "aUSD",
+        "name": "Wrapped PHA",
+        "symbol": "wPHA",
         "decimals": 12,
-        "currencyID": "4",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]"
+        "currencyID": "10000"
     },
     {
         "asset": {
@@ -49,33 +50,13 @@
     },
     {
         "asset": {
-            "Token": "14"
+            "Token": "12"
         },
-        "name": "Pioneer BIT",
-        "symbol": "BIT",
+        "name": "Shiden",
+        "symbol": "SDN",
         "decimals": 18,
-        "currencyID": "14",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2096},{\"generalKey\":\"0x020000000000000000\"}]"
-    },
-    {
-        "asset": {
-            "Token": "6"
-        },
-        "name": "Moonriver Token",
-        "symbol": "MOVR",
-        "decimals": 18,
-        "currencyID": "6",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]"
-    },
-    {
-        "asset": {
-            "Token": "2"
-        },
-        "name": "Bifrost",
-        "symbol": "BNC",
-        "decimals": 12,
-        "currencyID": "2",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]"
+        "currencyID": "12",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2007}]"
     },
     {
         "asset": {
@@ -89,6 +70,46 @@
     },
     {
         "asset": {
+            "Token": "14"
+        },
+        "name": "Pioneer BIT",
+        "symbol": "BIT",
+        "decimals": 18,
+        "currencyID": "14",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2096},{\"generalKey\":\"0x020000000000000000\"}]"
+    },
+    {
+        "asset": {
+            "Token": "2"
+        },
+        "name": "Bifrost",
+        "symbol": "BNC",
+        "decimals": 12,
+        "currencyID": "2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]"
+    },
+    {
+        "asset": {
+            "Token": "3"
+        },
+        "name": "Zenlink",
+        "symbol": "ZLK",
+        "decimals": 18,
+        "currencyID": "3",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0207\"}]"
+    },
+    {
+        "asset": {
+            "Token": "4"
+        },
+        "name": "Acala USD",
+        "symbol": "aUSD",
+        "decimals": 12,
+        "currencyID": "4",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]"
+    },
+    {
+        "asset": {
             "Token": "5"
         },
         "name": "Basilisk",
@@ -96,6 +117,16 @@
         "decimals": 12,
         "currencyID": "5",
         "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2090},{\"generalKey\":\"0x00000000\"}]"
+    },
+    {
+        "asset": {
+            "Token": "6"
+        },
+        "name": "Moonriver Token",
+        "symbol": "MOVR",
+        "decimals": 18,
+        "currencyID": "6",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]"
     },
     {
         "asset": {
@@ -119,45 +150,6 @@
     },
     {
         "asset": {
-            "Token": "10000"
-        },
-        "name": "Wrapped PHA",
-        "symbol": "wPHA",
-        "decimals": 12,
-        "currencyID": "10000"
-    },
-    {
-        "asset": {
-            "Token": "1"
-        },
-        "name": "Karura",
-        "symbol": "KAR",
-        "decimals": 12,
-        "currencyID": "1",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]"
-    },
-    {
-        "asset": {
-            "Token": "12"
-        },
-        "name": "Shiden",
-        "symbol": "SDN",
-        "decimals": 18,
-        "currencyID": "12",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2007}]"
-    },
-    {
-        "asset": {
-            "Token": "3"
-        },
-        "name": "Zenlink",
-        "symbol": "ZLK",
-        "decimals": 18,
-        "currencyID": "3",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0207\"}]"
-    },
-    {
-        "asset": {
             "Token": "9"
         },
         "name": "Basilisk",
@@ -165,5 +157,13 @@
         "decimals": 12,
         "currencyID": "9",
         "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2090},{\"generalIndex\":0}]"
+    },
+    {
+        "asset": {
+            "Token": "PHA"
+        },
+        "name": "PHA",
+        "symbol": "PHA",
+        "decimals": 12
     }
 ]

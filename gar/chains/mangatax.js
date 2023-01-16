@@ -5,12 +5,12 @@ const ChainParser = require("./common_chainparser");
 Fork this template to create new custom parser
 
 Support chains
-kusama-2110|magatax
+kusama-2110|mangatax
 */
 
-module.exports = class MagataxParser extends ChainParser {
+module.exports = class MangataxParser extends ChainParser {
 
-    parserName = 'Magatax';
+    parserName = 'Mangatax';
 
     //change [garPallet:garPallet] to the location where the asset registry is located.  ex: [assets:metadata]
     garPallet = 'assetRegistry';
@@ -42,7 +42,7 @@ module.exports = class MagataxParser extends ChainParser {
     //step 1: parse gar pallet, storage for parachain's asset registry
     async fetchGar(chainkey) {
         // implement your gar parsing function here.
-        await this.processMagataxGar(chainkey)
+        await this.processMangataxGar(chainkey)
     }
 
     //step 2: parse xcGar pallet, storage for parachain's xc asset registry
@@ -53,18 +53,18 @@ module.exports = class MagataxParser extends ChainParser {
             return
         }
         // implement your xcGar parsing function here.
-        await this.processMagataxXcGar(chainkey)
+        await this.processMangataxXcGar(chainkey)
     }
 
     //step 3: Optional augmentation by providing a list xcm extrinsicIDs
     async fetchAugments(chainkey) {
         // implement your augment parsing function here.
-        await this.processMagataxAugment(chainkey)
+        await this.processMangataxAugment(chainkey)
 
     }
 
-    // Implement magatax gar parsing function here
-    async processMagataxGar(chainkey) {
+    // Implement Mangatax gar parsing function here
+    async processMangataxGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
         let a = await super.fetchQuery(chainkey, this.garPallet, this.garStorage, 'GAR')
@@ -79,8 +79,8 @@ module.exports = class MagataxParser extends ChainParser {
         }
     }
 
-    // Implement magatax xcGar parsing function here
-    async processMagataxXcGar(chainkey) {
+    // Implement Mangatax xcGar parsing function here
+    async processMangataxXcGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
@@ -107,7 +107,7 @@ module.exports = class MagataxParser extends ChainParser {
         }
     }
 
-    async processMagataxAugment(chainkey) {
+    async processMangataxAugment(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom augmentation`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]

@@ -1,14 +1,6 @@
 [
     {
         "asset": {
-            "Token": "PHA"
-        },
-        "name": "PHA",
-        "symbol": "PHA",
-        "decimals": 12
-    },
-    {
-        "asset": {
             "Token": "0"
         },
         "name": "Polkadot Native Token",
@@ -19,23 +11,13 @@
     },
     {
         "asset": {
-            "Token": "4"
+            "Token": "1"
         },
-        "name": "Acala Liquid DOT",
-        "symbol": "LDOT",
-        "decimals": 10,
-        "currencyID": "4",
-        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0003\"}]"
-    },
-    {
-        "asset": {
-            "Token": "6"
-        },
-        "name": "Astar",
-        "symbol": "ASTR",
+        "name": "Glimmer",
+        "symbol": "GLMR",
         "decimals": 18,
-        "currencyID": "6",
-        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2006}]"
+        "currencyID": "1",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":10}]"
     },
     {
         "asset": {
@@ -49,6 +31,26 @@
     },
     {
         "asset": {
+            "Token": "3"
+        },
+        "name": "Acala Dollar",
+        "symbol": "AUSD",
+        "decimals": 12,
+        "currencyID": "3",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0001\"}]"
+    },
+    {
+        "asset": {
+            "Token": "4"
+        },
+        "name": "Acala Liquid DOT",
+        "symbol": "LDOT",
+        "decimals": 10,
+        "currencyID": "4",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0003\"}]"
+    },
+    {
+        "asset": {
             "Token": "5"
         },
         "name": "Acala Native Token",
@@ -56,6 +58,16 @@
         "decimals": 12,
         "currencyID": "5",
         "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0000\"}]"
+    },
+    {
+        "asset": {
+            "Token": "6"
+        },
+        "name": "Astar",
+        "symbol": "ASTR",
+        "decimals": 18,
+        "currencyID": "6",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2006}]"
     },
     {
         "asset": {
@@ -79,22 +91,10 @@
     },
     {
         "asset": {
-            "Token": "1"
+            "Token": "PHA"
         },
-        "name": "Glimmer",
-        "symbol": "GLMR",
-        "decimals": 18,
-        "currencyID": "1",
-        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":10}]"
-    },
-    {
-        "asset": {
-            "Token": "3"
-        },
-        "name": "Acala Dollar",
-        "symbol": "AUSD",
-        "decimals": 12,
-        "currencyID": "3",
-        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0001\"}]"
+        "name": "PHA",
+        "symbol": "PHA",
+        "decimals": 12
     }
 ]

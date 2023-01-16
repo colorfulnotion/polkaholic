@@ -1,14 +1,6 @@
 [
     {
         "asset": {
-            "Token": "KMA"
-        },
-        "name": "KMA",
-        "symbol": "KMA",
-        "decimals": 12
-    },
-    {
-        "asset": {
             "Token": "10"
         },
         "name": "Karura Liquid KSM",
@@ -26,6 +18,16 @@
         "decimals": 18,
         "currencyID": "11",
         "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]"
+    },
+    {
+        "asset": {
+            "Token": "12"
+        },
+        "name": "Kusama",
+        "symbol": "KSM",
+        "decimals": 12,
+        "currencyID": "12",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},\"here\"]"
     },
     {
         "asset": {
@@ -49,16 +51,6 @@
     },
     {
         "asset": {
-            "Token": "12"
-        },
-        "name": "Kusama",
-        "symbol": "KSM",
-        "decimals": 12,
-        "currencyID": "12",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},\"here\"]"
-    },
-    {
-        "asset": {
             "Token": "9"
         },
         "name": "Acala Dollar",
@@ -66,5 +58,13 @@
         "decimals": 12,
         "currencyID": "9",
         "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]"
+    },
+    {
+        "asset": {
+            "Token": "KMA"
+        },
+        "name": "KMA",
+        "symbol": "KMA",
+        "decimals": 12
     }
 ]

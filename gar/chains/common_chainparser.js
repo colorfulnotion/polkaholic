@@ -360,7 +360,7 @@ module.exports = class ChainParser {
     Fetch xcm asset registry for parachain that uses similar assetRegistry pallet,
     currently covering the following chains:
     [
-    'polkadot-2032|interlay', 'kusama-2092|kintsugi', 'kusama-2110|magatax',
+    'polkadot-2032|interlay', 'kusama-2092|kintsugi', 'kusama-2110|mangatax',
     ]
     */
     //OrmlTraitsAssetRegistryAssetMetadata, AssetsRegistryAssetRegistryInfo
