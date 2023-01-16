@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "CFG"
+        },
+        "name": "CFG",
+        "symbol": "CFG",
+        "decimals": 18
+    }
+]

@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "MITO"
+        },
+        "name": "MITO",
+        "symbol": "MITO",
+        "decimals": 12
+    }
+]

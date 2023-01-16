@@ -398,10 +398,10 @@ module.exports = class ChainParser {
                 let xcmAssetSruct = val.toJSON()
                 // type V0/V1/...
                 let xcmAssetTypeV;
-                if (xcmAssetSruct.location != undefined){
+                if (xcmAssetSruct.location != undefined) {
                     console.log(`${assetID}`, `xcmAssetSruct.location`, xcmAssetSruct.location)
-                    xcmAssetTypeV =  Object.keys(xcmAssetSruct.location)[0]
-                }else{
+                    xcmAssetTypeV = Object.keys(xcmAssetSruct.location)[0]
+                } else {
                     console.log(`${chainkey} NOT xcmAsset`, `xcmAssetSruct`, xcmAssetSruct)
                     continue
                 }

@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "QTZ"
+        },
+        "name": "QTZ",
+        "symbol": "QTZ",
+        "decimals": 18
+    }
+]

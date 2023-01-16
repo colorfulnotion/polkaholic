@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "AIR"
+        },
+        "name": "AIR",
+        "symbol": "AIR",
+        "decimals": 18
+    }
+]

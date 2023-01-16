@@ -193,15 +193,15 @@ module.exports = class GlobalAssetRegistry {
     async updateLocalAsset() {
         let relayChain = this.relaychain
         let chainAssetMap = this.getChainAssetMap()
-        for (const chainkey of Object.keys(chainAssetMap)){
+        for (const chainkey of Object.keys(chainAssetMap)) {
             let pieces = chainkey.split('-')
             let paraIDSoure = pieces[1]
             let localAssetMap = chainAssetMap[chainkey]
             let localAssetList = []
-            for (const localAssetChainkey of Object.keys(localAssetMap)){
+            for (const localAssetChainkey of Object.keys(localAssetMap)) {
                 let localAsset = localAssetMap[localAssetChainkey]
                 //delete localAsset.xcmInteriorKeyV1;
-                let [parseAssetChain, _ ] = garTool.parseAssetChain(localAssetChainkey)
+                let [parseAssetChain, _] = garTool.parseAssetChain(localAssetChainkey)
                 let a = {
                     asset: JSON.parse(parseAssetChain),
                     name: localAsset.name,
@@ -212,7 +212,7 @@ module.exports = class GlobalAssetRegistry {
                 }
                 localAssetList.push(a)
             }
-            if (localAssetList.length > 0){
+            if (localAssetList.length > 0) {
                 await this.writeParaJSONFn(relayChain, paraIDSoure, 'assets', localAssetList)
             }
         }

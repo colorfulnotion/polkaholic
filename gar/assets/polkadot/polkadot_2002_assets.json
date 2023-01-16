@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "CLV"
+        },
+        "name": "CLV",
+        "symbol": "CLV",
+        "decimals": 18
+    }
+]
