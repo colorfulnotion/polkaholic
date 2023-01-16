@@ -123,7 +123,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             this.chainParser = new AstarParser();
         } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
             this.chainParser = new ParallelParser();
-            await this.chainParser.addCustomAsset(this); // ????
+            //await this.chainParser.addCustomAsset(this); // This line add psuedo asset HKO/PARA used by dex volume / LP pair / etc .. 
         } else if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta) {
             this.chainParser = new MoonbeamParser();
         } else if (chainID == paraTool.chainIDInterlay || chainID == paraTool.chainIDKintsugi) {
