@@ -41,13 +41,14 @@ async function main() {
             await gar.crawlRegistry(crawler)
         }
     }
-    let chainAssetMap = gar.getchainAssetMap()
+    let chainAssetMap = gar.getChainAssetMap()
     let xcmAssetMap = gar.getXcmAssetMap()
     console.log(`AssetMap`, chainAssetMap)
     console.log(`XcmAssetMap`, xcmAssetMap)
     if(targetedParaID == 'all') {
         await gar.updateXcmConcept()
     }
+    await gar.updateLocalAsset()
 }
 
 main()

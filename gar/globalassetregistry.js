@@ -33,6 +33,7 @@ module.exports = class GlobalAssetRegistry {
     chainAPIs = {} // chainkey -> {crawler, ... }
 
     assetMap = {}; // ex: {"Token":"DOT"}~polkadot-0-> { assetType: 'Token', name: 'DOT', symbol: 'DOT', decimals: 10 }
+    chainAssetMap = {};
     xcmAssetMap = {};
     relaychain = false;
     debugLevel;
@@ -58,6 +59,41 @@ module.exports = class GlobalAssetRegistry {
             return false
         }
         return jsonObj
+    }
+
+    //asset/{relaychain}/{relaychain_paraID_fExt}
+    async writeParaJSONFn(relayChain, paraID, fExt = 'asset', jsonObj = {}) {
+        let jsonStr = JSON.stringify(jsonObj, null, 4)
+        if (jsonObj == undefined) {
+            console.log(`jsonObj missing`)
+            return false
+        }
+        const logDir = "./"
+        let fn = `${relayChain}_${paraID}_${fExt}.json`
+        let fnDirFn = false
+        try {
+            // create fnDir directory
+            let fnDir = path.join(logDir, fExt, relayChain);
+            if (!fs.existsSync(fnDir)) {
+                await fs.mkdirSync(fnDir);
+            }
+            // set up fnDir fn  (deleting old file if exists)
+            try {
+                fnDirFn = path.join(fnDir, fn);
+                console.log("****open_file****", fnDirFn);
+                await fs.closeSync(fs.openSync(fnDirFn, 'w'));
+            } catch (err) {
+                console.log(err);
+            }
+        } catch (err) {
+            console.log(err, "open_file", fn);
+        }
+        try {
+            console.log("***** write_json ***** ", fnDirFn)
+            await fs.appendFileSync(fnDirFn, jsonStr);
+        } catch (err1) {
+            console.log(err1, "write_json", fnDirFn, jsonObj);
+        }
     }
 
     async writeJSONFn(relayChain, fExt = 'endpoint', jsonObj = {}) {
@@ -152,6 +188,34 @@ module.exports = class GlobalAssetRegistry {
     async updateXcmConcept() {
         let relayChain = this.relaychain
         await this.writeJSONFn(relayChain, 'xcmConcept', this.getXcmAssetMap())
+    }
+
+    async updateLocalAsset() {
+        let relayChain = this.relaychain
+        let chainAssetMap = this.getChainAssetMap()
+        for (const chainkey of Object.keys(chainAssetMap)){
+            let pieces = chainkey.split('-')
+            let paraIDSoure = pieces[1]
+            let localAssetMap = chainAssetMap[chainkey]
+            let localAssetList = []
+            for (const localAssetChainkey of Object.keys(localAssetMap)){
+                let localAsset = localAssetMap[localAssetChainkey]
+                //delete localAsset.xcmInteriorKeyV1;
+                let [parseAssetChain, _ ] = garTool.parseAssetChain(localAssetChainkey)
+                let a = {
+                    asset: JSON.parse(parseAssetChain),
+                    name: localAsset.name,
+                    symbol: localAsset.symbol,
+                    decimals: localAsset.decimals,
+                    currencyID: localAsset.currencyID,
+                    xcmInteriorKey: localAsset.xcmInteriorKey,
+                }
+                localAssetList.push(a)
+            }
+            if (localAssetList.length > 0){
+                await this.writeParaJSONFn(relayChain, paraIDSoure, 'assets', localAssetList)
+            }
+        }
     }
 
     async initPublicEndpointsMap(relaychain = 'polkadot') {
@@ -459,10 +523,14 @@ module.exports = class GlobalAssetRegistry {
         console.log(`**** [${chainkey}] RegistryParser DONE ****`)
     }
 
-    setChainAsset(assetChainkey, assetInfo, isUpdate = false) {
+    setChainAsset(chainkey, assetChainkey, assetInfo, isUpdate = false) {
         if (assetInfo.xcmInteriorKey != undefined) assetInfo.xcmInteriorKeyV1 = garTool.convertXcmInteriorKeyV2toV1(assetInfo.xcmInteriorKey)
+
+        if (this.assetMap[assetChainkey] != undefined) console.log(`UPDATED [${chainkey}] ${assetChainkey}`, assetInfo)
         this.assetMap[assetChainkey] = assetInfo
-        if (isUpdate) console.log(`UPDATED ${assetChainkey}`, assetInfo)
+
+        if (this.chainAssetMap[chainkey] == undefined) this.chainAssetMap[chainkey] = {}
+        this.chainAssetMap[chainkey][assetChainkey] = assetInfo
     }
 
     getChainAsset(assetChainkey) {
@@ -521,8 +589,8 @@ module.exports = class GlobalAssetRegistry {
         }
     }
 
-    getchainAssetMap() {
-        return this.assetMap
+    getChainAssetMap() {
+        return this.chainAssetMap
     }
 
 

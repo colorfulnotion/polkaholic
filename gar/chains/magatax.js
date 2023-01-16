@@ -74,7 +74,7 @@ module.exports = class MagataxParser extends ChainParser {
             // step 2: load up results
             for (const assetChainkey of Object.keys(assetList)) {
                 let assetInfo = assetList[assetChainkey]
-                this.manager.setChainAsset(assetChainkey, assetInfo)
+                this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
             }
         }
     }
@@ -102,7 +102,7 @@ module.exports = class MagataxParser extends ChainParser {
             }
             for (const assetChainkey of Object.keys(updatedAssetList)) {
                 let assetInfo = updatedAssetList[assetChainkey]
-                this.manager.setChainAsset(assetChainkey, assetInfo, true)
+                this.manager.setChainAsset(chainkey, assetChainkey, assetInfo, true)
             }
         }
     }
@@ -128,7 +128,7 @@ module.exports = class MagataxParser extends ChainParser {
                 let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
                 if (cachedAssetInfo) {
                     cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
-                    this.manager.setChainAsset(assetChainkey, cachedAssetInfo)
+                    this.manager.setChainAsset(chainkey, assetChainkey, cachedAssetInfo)
                 }
             }
         }

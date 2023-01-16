@@ -79,7 +79,7 @@ module.exports = class ChainParser {
                 };
                 let assetChainkey = garTool.makeAssetChain(asset, chainkey);
                 console.log(`[${chainkey}] assetChainkey=${assetChainkey}`, assetInfo)
-                this.manager.setChainAsset(assetChainkey, assetInfo)
+                this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
                 if (i == 0) {
                     this.nativeAsset = assetInfo
                     this.nativeAsset.assetChainkey = assetChainkey
@@ -132,7 +132,7 @@ module.exports = class ChainParser {
                     //console.log('im here fetchAssetPallet assetInfo', assetInfo)
                 }
                 assetList[assetChainkey] = assetInfo
-                //this.manager.setChainAsset(assetChainkey, assetInfo)
+                //this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
             } else {
                 //if (this.debugLevel >= garTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
             }
@@ -167,7 +167,7 @@ module.exports = class ChainParser {
             // step 2: load up results
             for (const assetChainkey of Object.keys(assetList)) {
                 let assetInfo = assetList[assetChainkey]
-                this.manager.setChainAsset(assetChainkey, assetInfo)
+                this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
             }
         }
     }
@@ -190,7 +190,7 @@ module.exports = class ChainParser {
             // step 2: load up results
             for (const assetChainkey of Object.keys(assetList)) {
                 let assetInfo = assetList[assetChainkey]
-                this.manager.setChainAsset(assetChainkey, assetInfo)
+                this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
             }
         }
     }
@@ -235,7 +235,7 @@ module.exports = class ChainParser {
                 };
                 assetList[assetChainkey] = assetInfo
                 console.log(`addAssetInfo [${asset}]`, assetInfo)
-                //this.manager.setChainAsset(assetChainkey, assetInfo)
+                //this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
             } else {
                 //if (this.debugLevel >= garTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
             }
