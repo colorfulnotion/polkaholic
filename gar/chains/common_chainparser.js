@@ -1029,10 +1029,10 @@ module.exports = class ChainParser {
                     if (cachedAssetInfo != undefined) {
                         cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
                         this.manager.setChainAsset(chainkey, assetChainkey, cachedAssetInfo, true)
-                    }else{
+                    } else {
                         console.log(`[${chainkey}] Asset=${assetString} NOT FOUND Skip`)
                     }
-                } catch (e){
+                } catch (e) {
                     console.log(`processManualRegistry error`, e)
                     continue
                 }

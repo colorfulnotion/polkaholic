@@ -175,6 +175,7 @@
         },
         "name": "MOVR",
         "symbol": "MOVR",
-        "decimals": 18
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]"
     }
 ]

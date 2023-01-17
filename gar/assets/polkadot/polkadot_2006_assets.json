@@ -300,6 +300,7 @@
         },
         "name": "ASTR",
         "symbol": "ASTR",
-        "decimals": 18
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2006}]"
     }
 ]

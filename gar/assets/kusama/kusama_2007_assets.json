@@ -220,6 +220,7 @@
         },
         "name": "SDN",
         "symbol": "SDN",
-        "decimals": 18
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2007}]"
     }
 ]

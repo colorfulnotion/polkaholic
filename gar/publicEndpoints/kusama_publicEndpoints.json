@@ -4,7 +4,6 @@
         "name": "Kusama",
         "id": "kusama",
         "paraID": 0,
-        "chainID": 2,
         "WSEndpoints": [
             "wss://kusama-rpc.polkadot.io",
             "wss://kusama.api.onfinality.io/public-ws",
@@ -23,7 +22,6 @@
         "name": "Statemine",
         "id": "statemine",
         "paraID": 1000,
-        "chainID": 21000,
         "WSEndpoints": [
             "wss://statemine-rpc.polkadot.io",
             "wss://statemine.api.onfinality.io/public-ws",
@@ -39,7 +37,6 @@
         "name": "Karura",
         "id": "karura",
         "paraID": 2000,
-        "chainID": 22000,
         "WSEndpoints": [
             "wss://karura-rpc-0.aca-api.network",
             "wss://karura-rpc-1.aca-api.network",
@@ -56,7 +53,6 @@
         "name": "Bifrost",
         "id": "bifrost",
         "paraID": 2001,
-        "chainID": 22001,
         "WSEndpoints": [
             "wss://bifrost-rpc.liebi.com/ws",
             "wss://bifrost-parachain.api.onfinality.io/public-ws",
@@ -69,7 +65,6 @@
         "name": "Khala Network",
         "id": "khala",
         "paraID": 2004,
-        "chainID": 22004,
         "WSEndpoints": [
             "wss://khala-api.phala.network/ws",
             "wss://khala.api.onfinality.io/public-ws",
@@ -83,7 +78,6 @@
         "name": "Shiden",
         "id": "shiden",
         "paraID": 2007,
-        "chainID": 22007,
         "WSEndpoints": [
             "wss://rpc.shiden.astar.network",
             "wss://shiden.public.blastapi.io",
@@ -99,7 +93,6 @@
         "name": "SORA",
         "id": "sora_ksm",
         "paraID": 2011,
-        "chainID": 22011,
         "WSEndpoints": [
             "wss://ws.parachain-collator-1.c1.sora2.soramitsu.co.jp"
         ],
@@ -110,7 +103,6 @@
         "name": "Crust Shadow",
         "id": "shadow",
         "paraID": 2012,
-        "chainID": 22012,
         "WSEndpoints": [
             "wss://rpc-shadow.crust.network/"
         ],
@@ -121,7 +113,6 @@
         "name": "Integritee Network",
         "id": "integritee",
         "paraID": 2015,
-        "chainID": 22015,
         "WSEndpoints": [
             "wss://kusama.api.integritee.network",
             "wss://integritee-kusama.api.onfinality.io/public-ws"
@@ -133,7 +124,6 @@
         "name": "Moonriver",
         "id": "moonriver",
         "paraID": 2023,
-        "chainID": 22023,
         "WSEndpoints": [
             "wss://wss.api.moonriver.moonbeam.network",
             "wss://moonriver.public.blastapi.io",
@@ -143,24 +133,11 @@
         ],
         "relaychain": "kusama"
     },
-    "kusama-2024": {
-        "chainkey": "kusama-2024",
-        "name": "Genshiro",
-        "id": "genshiro",
-        "paraID": 2024,
-        "chainID": 22024,
-        "isUnreachable": true,
-        "WSEndpoints": [
-            "wss://node.genshiro.io"
-        ],
-        "relaychain": "kusama"
-    },
     "kusama-2048": {
         "chainkey": "kusama-2048",
         "name": "Robonomics",
         "id": "robonomics",
         "paraID": 2048,
-        "chainID": 22048,
         "WSEndpoints": [
             "wss://kusama.rpc.robonomics.network/",
             "wss://robonomics.api.onfinality.io/public-ws",
@@ -174,7 +151,6 @@
         "name": "Calamari",
         "id": "calamari",
         "paraID": 2084,
-        "chainID": 22084,
         "WSEndpoints": [
             "wss://ws.calamari.systems/"
         ],
@@ -185,7 +161,6 @@
         "name": "Parallel Heiko",
         "id": "heiko",
         "paraID": 2085,
-        "chainID": 22085,
         "WSEndpoints": [
             "wss://heiko-rpc.parallel.fi"
         ],
@@ -196,7 +171,6 @@
         "name": "Picasso",
         "id": "picasso",
         "paraID": 2087,
-        "chainID": 22087,
         "WSEndpoints": [
             "wss://rpc.composablenodes.tech"
         ],
@@ -207,7 +181,6 @@
         "name": "Altair",
         "id": "altair",
         "paraID": 2088,
-        "chainID": 22088,
         "WSEndpoints": [
             "wss://fullnode.altair.centrifuge.io",
             "wss://altair.api.onfinality.io/public-ws"
@@ -219,10 +192,9 @@
         "name": "Basilisk",
         "id": "basilisk",
         "paraID": 2090,
-        "chainID": 22090,
         "WSEndpoints": [
-            "wss://basilisk-rpc.dwellir.com",
-            "wss://rpc.basilisk.cloud"
+            "wss://rpc.basilisk.cloud",
+            "wss://basilisk-rpc.dwellir.com"
         ],
         "relaychain": "kusama"
     },
@@ -231,7 +203,6 @@
         "name": "Kintsugi BTC",
         "id": "kintsugi",
         "paraID": 2092,
-        "chainID": 22092,
         "WSEndpoints": [
             "wss://api-kusama.interlay.io/parachain",
             "wss://kintsugi.api.onfinality.io/public-ws"
@@ -243,7 +214,6 @@
         "name": "QUARTZ by UNIQUE",
         "id": "quartz",
         "paraID": 2095,
-        "chainID": 22095,
         "WSEndpoints": [
             "wss://us-ws-quartz.unique.network",
             "wss://asia-ws-quartz.unique.network",
@@ -256,7 +226,6 @@
         "name": "Bit.Country Pioneer",
         "id": "bitcountryPioneer",
         "paraID": 2096,
-        "chainID": 22096,
         "WSEndpoints": [
             "wss://pioneer.api.onfinality.io/public-ws"
         ],
@@ -267,7 +236,6 @@
         "name": "SubsocialX",
         "id": "subsocialX",
         "paraID": 2100,
-        "chainID": 22100,
         "WSEndpoints": [
             "wss://para.f3joule.space",
             "wss://para.subsocial.network"
@@ -279,7 +247,6 @@
         "name": "Zeitgeist",
         "id": "zeitgeist",
         "paraID": 2101,
-        "chainID": 22101,
         "WSEndpoints": [
             "wss://zeitgeist-rpc.dwellir.com",
             "wss://zeitgeist.api.onfinality.io/public-ws"
@@ -291,7 +258,6 @@
         "name": "Pichiu",
         "id": "pichiu",
         "paraID": 2102,
-        "chainID": 22102,
         "WSEndpoints": [
             "wss://kusama.kylin-node.co.uk",
             "wss://pichiu.api.onfinality.io/public-ws"
@@ -303,7 +269,6 @@
         "name": "Darwinia Crab",
         "id": "crab",
         "paraID": 2105,
-        "chainID": 22105,
         "WSEndpoints": [
             "wss://crab-parachain-rpc.darwinia.network/"
         ],
@@ -314,8 +279,6 @@
         "name": "Litmus",
         "id": "litmus",
         "paraID": 2106,
-        "chainID": 22106,
-        "isUnreachable": false,
         "WSEndpoints": [
             "wss://rpc.litmus-parachain.litentry.io"
         ],
@@ -326,7 +289,6 @@
         "name": "Mangata",
         "id": "mangata",
         "paraID": 2110,
-        "chainID": 22110,
         "WSEndpoints": [
             "wss://prod-kusama-collator-01.mangatafinance.cloud",
             "wss://mangata-x.api.onfinality.io/public-ws"
@@ -338,7 +300,6 @@
         "name": "Kabocha",
         "id": "kabocha",
         "paraID": 2113,
-        "chainID": 22113,
         "WSEndpoints": [
             "wss://kabocha.jelliedowl.net"
         ],
@@ -349,7 +310,6 @@
         "name": "Turing Network",
         "id": "turing",
         "paraID": 2114,
-        "chainID": 22114,
         "WSEndpoints": [
             "wss://rpc.turing.oak.tech",
             "wss://turing-rpc.dwellir.com"
@@ -361,7 +321,6 @@
         "name": "Dora Factory",
         "id": "dorafactory",
         "paraID": 2115,
-        "chainID": 22115,
         "WSEndpoints": [
             "wss://kusama.dorafactory.org"
         ],
@@ -372,7 +331,6 @@
         "name": "Listen Network",
         "id": "listen",
         "paraID": 2118,
-        "chainID": 22118,
         "WSEndpoints": [
             "wss://rpc.mainnet.listen.io",
             "wss://wss.mainnet.listen.io"
@@ -384,7 +342,6 @@
         "name": "Bajun Network",
         "id": "bajun",
         "paraID": 2119,
-        "chainID": 22119,
         "WSEndpoints": [
             "wss://rpc-parachain.bajun.network",
             "wss://bajun-rpc.dwellir.com",
@@ -397,7 +354,6 @@
         "name": "Imbue Network",
         "id": "imbue",
         "paraID": 2121,
-        "chainID": 22121,
         "WSEndpoints": [
             "wss://imbue-kusama.imbue.network"
         ],
@@ -408,7 +364,6 @@
         "name": "DAO IPCI",
         "id": "ipci",
         "paraID": 2222,
-        "chainID": 22222,
         "WSEndpoints": [
             "wss://kusama.rpc.ipci.io"
         ],

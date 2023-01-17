@@ -151,7 +151,8 @@
         },
         "name": "Acala",
         "symbol": "ACA",
-        "decimals": 12
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0000\"}]"
     },
     {
         "asset": {

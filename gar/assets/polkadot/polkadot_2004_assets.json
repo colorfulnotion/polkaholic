@@ -135,6 +135,7 @@
         },
         "name": "GLMR",
         "symbol": "GLMR",
-        "decimals": 18
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":10}]"
     }
 ]

@@ -321,7 +321,8 @@
         "name": "Tether USD",
         "symbol": "USDt",
         "decimals": 6,
-        "currencyID": "1984"
+        "currencyID": "1984",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
     },
     {
         "asset": {

@@ -178,12 +178,12 @@ module.exports = class GlobalAssetRegistry {
         }
     }
 
-    async fetchParaIDs(relayEndpoints){
+    async fetchParaIDs(relayEndpoints) {
         let validParachainList = []
-        for (const relayEndpoint of relayEndpoints){
+        for (const relayEndpoint of relayEndpoints) {
             let relay_api = await this.init_api(relayEndpoint.endpoints[0])
             let [validParachains, knownParathreads] = await this.crawl_valid_parachains(relay_api, relayEndpoint.relaychain)
-            if (validParachains.length > 0 ) {
+            if (validParachains.length > 0) {
                 validParachainList = validParachainList.concat(validParachains)
             }
         }
@@ -203,9 +203,9 @@ module.exports = class GlobalAssetRegistry {
             let paraID = allParaIds[x]
             let paraType = allParaTypes[x]
             let chainkey = `${relaychain}-${paraID}`
-            if (paraType == 'Parathread'){
+            if (paraType == 'Parathread') {
                 parathreadList.push(chainkey)
-            }else if (paraType == 'Parachain'){
+            } else if (paraType == 'Parachain') {
                 parachainList.push(chainkey)
             }
         }
@@ -240,7 +240,7 @@ module.exports = class GlobalAssetRegistry {
             let paraIDSoure = pieces[1]
             let localAssetMap = chainAssetMap[chainkey]
             let localAssetList = []
-            let localAssetChainkeys =  Object.keys(localAssetMap)
+            let localAssetChainkeys = Object.keys(localAssetMap)
             localAssetChainkeys.sort()
             for (const localAssetChainkey of localAssetChainkeys) {
                 let localAsset = localAssetMap[localAssetChainkey]
@@ -366,7 +366,7 @@ module.exports = class GlobalAssetRegistry {
                 paraID: ep.paraID,
             }
             this.chainAPIs[chainkey] = crawler
-            if (paraIDSoure == '0'){
+            if (paraIDSoure == '0') {
                 await this.crawl_valid_parachains(api, relayChain)
             }
             console.log(`[${chainkey}] endpoint:${wsEndpoint} ready`)
@@ -647,7 +647,7 @@ module.exports = class GlobalAssetRegistry {
     }
 
     getLocalAssetMap(chainkey) {
-        if (this.chainAssetMap[chainkey] != undefined){
+        if (this.chainAssetMap[chainkey] != undefined) {
             return this.chainAssetMap[chainkey]
         }
         return {}

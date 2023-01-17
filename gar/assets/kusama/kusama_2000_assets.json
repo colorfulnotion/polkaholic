@@ -5,7 +5,8 @@
         },
         "name": "USD Coin (Portal from Ethereum)",
         "symbol": "USDCet",
-        "decimals": 6
+        "decimals": 6,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x021f3a10587a20114ea25ba1b388ee2dd4a337ce27\"}]"
     },
     {
         "asset": {

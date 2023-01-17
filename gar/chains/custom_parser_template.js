@@ -37,7 +37,7 @@ module.exports = class SampleParser extends ChainParser {
     */
 
     /*
-    Parachain usualy does not publish native asset in its own xc registry.
+    Parachain usually does not publish native asset in its own xc registry.
     Allow team to polish xcRegistry using the following format:
 
     manualRegistry = {
