@@ -1089,6 +1089,7 @@ from chain where chainID = '${chainID}' limit 1`);
             return (true);
         } catch (err) {
             let succ = true;
+            console.log(err);
             for (let a = 0; a < rows.length; a++) {
                 try {
                     let r = rows[a];
@@ -1107,7 +1108,6 @@ from chain where chainID = '${chainID}' limit 1`);
                         }
                     }
                     if (tries >= 10) {
-                        this.log_indexing_warn(err, tableName, rows[a]);
                         succ = false;
                     }
                 }

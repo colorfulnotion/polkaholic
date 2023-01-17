@@ -281,9 +281,10 @@ module.exports = class SubstrateETL extends AssetManager {
 
     }
 
-    async dump_xcmtransfers_range(relayChain = "polkadot", range_days_ago = 365) {
+    async dump_xcmtransfers_range(relayChain = "polkadot", range_days_ago = 2) {
         let currTS = this.getCurrentTS();
-        for (let daysago = 0; daysago < range_days_ago; daysago++) {
+	range_days_ago = ( relayChain == "kusama" ) ? 567 : 260;
+        for (let daysago = 90; daysago < range_days_ago; daysago++) {
             let ts = currTS - 86400 * daysago;
             let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
             await this.dump_xcmtransfers(logDT, relayChain);
@@ -330,8 +331,13 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async dump_xcmtransfers(logDT = "2022-12-29", relayChain = "polkadot") {
-        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol, UNIX_TIMESTAMP(xcmInfolastUpdateDT) as lastUpdateTS from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' and incomplete = 0 order by sourceTS;`
 
+        // incomplete = 1: failed on origination chain
+        // incomplete = 0: msgSent!
+        //   destStatus = 1 : success
+        //   destStatus = 0 : error
+        //   destStatus = -1 : failed
+        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol, UNIX_TIMESTAMP(xcmInfolastUpdateDT) as lastUpdateTS, destStatus, isFeeItem from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' and incomplete = 0 and destStatus in (1, -1) and xcmInfo is not null order by sourceTS;`
         let xcmtransferRecs = await this.poolREADONLY.query(sql)
         let tbl = "xcmtransfers";
         // 2. setup directories for tbls on date
@@ -340,35 +346,69 @@ module.exports = class SubstrateETL extends AssetManager {
         let f = fs.openSync(fn, 'w', 0o666);
         let bqDataset = relayChain
         let logDTp = logDT.replaceAll("-", "")
-
+        let xcmtransfers = [];
         // 3. map into canonical form
-        let xcmtransfers = xcmtransferRecs.map((r) => {
-            let xcmInfo = null
-            let teleportFeeUSD = null
+        xcmtransferRecs.forEach((r) => {
+
             try {
-                xcmInfo = JSON.parse(r.xcmInfo)
-                if (xcmInfo.destination != undefined && xcmInfo.destination.teleportFeeUSD != undefined) {
-                    if (xcmInfo.destination.teleportFeeUSD > 0 && xcmInfo.destination.teleportFeeUSD < this.irregularFeeUSDThreshold) teleportFeeUSD = xcmInfo.destination.teleportFeeUSD
+                let xcmInfo = JSON.parse(r.xcmInfo)
+                let o = xcmInfo.origination;
+                let d = xcmInfo.destination;
+                if (o && d) {
+                    let destination_execution_status = (r.destStatus == 1 || (d.executionStatus == "success" || d.amountReceived > 0)) ? "success" : "unknown";
+                    if (destination_execution_status == "unknown") {
+                        console.log("UNKNOWN", r.destStatus, r);
+                    }
+                    xcmtransfers.push({
+                        symbol: r.symbol,
+                        price_usd: r.priceUSD,
+                        origination_transfer_index: r.transferIndex,
+                        origination_xcm_index: r.xcmIndex,
+                        origination_id: o.id,
+                        origination_para_id: o.paraID,
+                        origination_chain_name: o.chainName,
+                        origination_sender_ss58: o.sender,
+                        origination_sender_pub_key: o.sender,
+                        origination_extrinsic_hash: o.extrinsicHash,
+                        origination_extrinsic_id: o.extrinsicID,
+                        origination_transaction_hash: o.transactionHash ? o.transactionHash : null,
+                        origination_msg_hash: o.msgHash ? o.msgHash : null,
+                        origination_is_msg_sent: o.isMsgSent ? true : false,
+                        origination_block_number: o.blockNumber,
+                        origination_section: o.section,
+                        origination_method: o.method,
+                        origination_tx_fee: o.txFee ? o.txFee : 0,
+                        origination_tx_fee_usd: o.txFeeUSD ? o.txFeeUSD : 0,
+                        origination_tx_fee_symbol: r.symbol,
+                        origination_is_fee_item: r.isFeeItem ? true : false,
+                        origination_sent_at: o.sentAt,
+                        origination_extrinsic_hash: o.extrinsicHash,
+                        origination_extrinsic_id: o.extrinsicID,
+                        origination_amount_sent: o.amountSent,
+                        origination_amount_sent_usd: o.amountSentUSD,
+                        origination_ts: o.ts,
+                        destination_id: d.id,
+                        destination_para_id: d.paraID,
+                        destination_amount_received: d.amountReceived,
+                        destination_amount_received_usd: d.amountReceivedUSD,
+                        destination_teleport_fee: d.teleportFee,
+                        destination_teleport_fee_usd: d.teleportFeeUSD,
+                        destination_teleport_fee_symbol: r.symbol, // TODO
+                        destination_chain_name: d.chainName,
+                        destination_beneficiary_ss58: d.beneficiary,
+                        destination_beneficiary_pub_key: paraTool.getPubKey(d.beneficiary),
+                        destination_extrinsic_id: d.extrinsicID,
+                        destination_event_id: d.eventID,
+                        destination_block_number: d.blockNumber,
+                        destination_ts: d.ts,
+                        destination_execution_status: destination_execution_status,
+                        xcm_info: xcmInfo,
+                        xcm_info_last_update_time: r.lastUpdateTS
+                    });
                 }
+
             } catch (e) {
-                xcmInfo = null
-                teleportFeeUSD = null
-            }
-            return {
-                extrinsic_hash: r.extrinsicHash,
-                extrinsic_id: r.extrinsicID,
-                transfer_index: r.transferIndex,
-                xcm_index: r.xcmIndex,
-                block_time: r.sourceTS,
-                para_id: r.paraID,
-                para_id_dest: r.paraIDDest,
-                symbol: r.symbol,
-                price_usd: r.priceUSD,
-                amount_sent_usd: r.amountSentUSD,
-                amount_received_usd: r.amountReceivedUSD,
-                teleport_fee_usd: teleportFeeUSD,
-                xcm_info: xcmInfo,
-                xcm_info_last_update_time: r.lastUpdateTS
+                console.log(e)
             }
         });
         let NL = "\r\n";

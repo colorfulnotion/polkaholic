@@ -932,7 +932,7 @@ module.exports = class Query extends AssetManager {
             chainID: null,
             blockNumber: null,
         };
-        let families = ['feed', 'feedunfinalized', 'feedevmunfinalized', 'feedpending', 'feedxcmdest', 'feedxcminfo'] // 3 columnfamily
+        let families = ['feed', 'feedunfinalized', 'feedevmunfinalized', 'feedpending', 'feedxcmdest', 'xcminfofinalized'] // 3 columnfamily
         try {
             // TODO: use getRow
             let [rows] = await this.btHashes.getRows({
@@ -946,8 +946,8 @@ module.exports = class Query extends AssetManager {
                 let txcells = false;
                 let data = false
 
-                if (rowData["feedxcminfo"]) {
-                    data = rowData["feedxcminfo"]
+                if (rowData["xcminfofinalized"]) {
+                    data = rowData["xcminfofinalized"]
                     res.status = 'finalizeddest'
                 } else if (rowData["feedxcmdest"]) {
                     data = rowData["feedxcmdest"]
@@ -1638,7 +1638,7 @@ module.exports = class Query extends AssetManager {
             let rowData = row.data;
             let feedData = false
             let feedTX = false
-            let feedXCMInfoData = false
+            let XCMInfoData = false
             let status = ""
             let isPending = false
             let isEVMUnfinalized = false
@@ -1660,8 +1660,8 @@ module.exports = class Query extends AssetManager {
             if (feedData && feedData["tx"]) {
                 feedTX = feedData["tx"]
             }
-            if (rowData["feedxcminfo"]) {
-                feedXCMInfoData = rowData["feedxcminfo"]
+            if (rowData["xcminfofinalized"]) {
+                XCMInfoData = rowData["xcminfofinalized"]
                 status = "finalizeddest"
             }
             if (feedTX) {
@@ -1750,13 +1750,13 @@ module.exports = class Query extends AssetManager {
                         }
                     }
                     let rowDataKeys = Object.keys(rowData)
-                    //console.log(`[${rowDataKeys}] feedXCMInfoData`, feedXCMInfoData, `isRecursive=${isRecursive}, is_evm_xcmtransfer_input=${this.is_evm_xcmtransfer_input(c.input)}, c.substrate(undefined)=${c.substrate != undefined}`)
+
                     if (c.substrate != undefined && isRecursive) {
-                        if (feedXCMInfoData) {
-                            let extrinsicHashEventIDs = Object.keys(feedXCMInfoData)
-                            if (extrinsicHashEventIDs.length > 1) console.log(`multiAsset case! extrinsicHashEventIDs *`, extrinsicHashEventIDs)
-                            for (const extrinsicHashEventID of extrinsicHashEventIDs) {
-                                let cells = feedXCMInfoData[extrinsicHashEventID];
+                        if (XCMInfoData) {
+                            let extrinsicIDs = Object.keys(XCMInfoData)
+
+                            for (const extrinsicID of extrinsicIDs) {
+                                let cells = XCMInfoData[extrinsicID];
                                 let cell = cells[0]
                                 let xcmInfo = JSON.parse(cell.value);
                                 c.xcmInfo = xcmInfo;
@@ -1801,26 +1801,16 @@ module.exports = class Query extends AssetManager {
                 try {
                     let pendingXcmInfo = null
                     let traceID = null
-                    if (feedXCMInfoData) {
-                        let extrinsicHashEventIDs = Object.keys(feedXCMInfoData)
-                        if (extrinsicHashEventIDs.length > 1) console.log(`multiAsset case! extrinsicHashEventIDs **`, extrinsicHashEventIDs)
+                    if (XCMInfoData) {
+                        let extrinsicIDs = Object.keys(XCMInfoData)
                         let fee = 0;
-                        for (const extrinsicHashEventID of extrinsicHashEventIDs) {
-                            let cells = feedXCMInfoData[extrinsicHashEventID];
+                        for (const extrinsicID of extrinsicIDs) {
+                            let cells = XCMInfoData[extrinsicID];
                             let cell = cells[0]
-                            //console.log(`feedXCMInfoData[${extrinsicHashEventID}] cells=`, cells)
-                            //console.log(`feedXCMInfoData[${extrinsicHashEventID}] cell=${cell.value}`)
                             let xcmInfo = JSON.parse(cell.value);
-                            if (extrinsicHashEventIDs.length > 1) console.log(`feedXCMInfoData[${extrinsicHashEventID}] xcmInfo`, xcmInfo)
-                            c.xcmInfo = xcmInfo; //use last one
+                            c.xcmInfo = xcmInfo;
                         }
                         d.xcmInfo = c.xcmInfo
-                        // TEMP:
-                        if (d.xcmInfo && d.xcmInfo.priceUSD != undefined && d.xcmInfo.destination != undefined && d.xcmInfo.destination.amountReceived != undefined) {
-                            d.xcmInfo.destination.amountReceivedUSD = d.xcmInfo.priceUSD * d.xcmInfo.destination.amountReceived
-                        }
-                        let [_, traceID] = await this.getPendingXCMInfo(txHash)
-                        if (traceID != undefined) d.traceID = traceID
                         return d;
                     } else if (isExtrinsicXcm) {
                         let [pendingXcmInfo, traceID] = await this.getPendingXCMInfo(txHash)
@@ -6640,13 +6630,13 @@ module.exports = class Query extends AssetManager {
                 filter
             });
             let rowData = row.data;
-            let feedXCMInfoData = false
-            if (rowData["feedxcminfo"]) {
-                feedXCMInfoData = rowData["feedxcminfo"]
+            let XCMInfoData = null;
+            if (rowData["xcminfofinalized"]) {
+                XCMInfoData = rowData["xcminfofinalized"]
             }
-            if (feedXCMInfoData) {
-                for (const extrinsicHashEventID of Object.keys(feedXCMInfoData)) {
-                    const cell = feedXCMInfoData[extrinsicHashEventID][0];
+            if (XCMInfoData) {
+                for (const extrinsicID of Object.keys(XCMInfoData)) {
+                    const cell = XCMInfoData[extrinsicID][0];
                     let xcmInfo = JSON.parse(cell.value);
                     return xcmInfo;
                 }
