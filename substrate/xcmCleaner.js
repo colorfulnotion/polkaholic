@@ -51,6 +51,7 @@ module.exports = class XCMCleaner extends Query {
         if (recs.length == 1) {
             return recs[0]
         }
+        console.log("NO RECORD FOUND", sql)
         return null;
     }
 
@@ -107,7 +108,8 @@ module.exports = class XCMCleaner extends Query {
         let isNative = (this.chainInfos[chainID] != undefined && this.chainInfos[chainID].symbol != undefined) ? symbol == this.chainInfos[chainID].symbol : false;
         // exception so far: Kintsugi and Interlay represent native token in tokens.accounts pallet storage instead of system.account storage
         if (chainID == 22092 && symbol == "KINT" || chainID == 2032 && symbol == "INTR") isNative = false;
-        if (chainID == 21000 && symbol == "KSM" || chainID == 1000 && symbol == "DOT") isNative = false;
+        if (chainID == 21000 && symbol == "KSM") isNative = false;
+        if ((chainID == 1000 || chainID == 1001) && symbol == "DOT") isNative = true;
 
         for (const b of blocks) {
             let bn = b.blockNumber;
@@ -169,16 +171,18 @@ module.exports = class XCMCleaner extends Query {
                 let free = balances[bn];
                 if (prevBN && prevFree != free) {
                     let amountReceived = free - prevFree;
-                    let confidence = (amountReceived > amountSent) ? .1 : amountReceived / amountSent;
-                    changes.push({
-                        currencyID,
-                        bn,
-                        prevFree,
-                        free,
-                        amountReceived,
-                        confidence,
-                        amountSent
-                    });
+                    if (amountReceived > 0 && (amountReceived <= amountSent)) {
+                        let confidence = (amountReceived > amountSent) ? .1 : amountReceived / amountSent;
+                        changes.push({
+                            currencyID,
+                            bn,
+                            prevFree,
+                            free,
+                            amountReceived,
+                            confidence,
+                            amountSent
+                        });
+                    }
                 }
                 prevBN = bn;
                 prevFree = free;
@@ -313,6 +317,8 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         xcmInfo.origination.section = xcmSection;
         xcmInfo.origination.method = xcmMethod;
         try {
+            console.log("xcm.amountSent", xcm.amountSent);
+
             let [balances, blocks] = await this.searchDestinationChainBalances(xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol);
             if (balances) {
                 let best = this.match_balance_adjustment(balances, xcm.amountSent, blocks);
@@ -323,31 +329,36 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                         ts: best.ts
                     };
                     let q = await this.computePriceUSD(inp)
-                    // if symbol is known we can compute this
-                    xcmInfo.destination.blockNumber = parseInt(best.bn, 10);
-                    xcmInfo.origination.amountSent = xcm.amountSent / 10 ** inp.decimals;
-                    xcmInfo.destination.amountReceived = best.amountReceived / 10 ** inp.decimals;
-                    xcmInfo.destination.ts = best.ts;
-                    if (q && q.priceUSD) {
-                        xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
-                        xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
-                        xcmInfo.destination.teleportFee = 0; // TODO: can we improve this?
-                    }
-                    xcmInfo.destination.confidence = best.confidence;
-                    xcmInfo.destination.executionStatus = "success";
-                    console.log("xcmInfo", JSON.stringify(xcmInfo, null, 4));
+                    if (inp.decimals) {
+                        // if symbol is known we can compute this
+                        xcmInfo.destination.blockNumber = parseInt(best.bn, 10);
+                        xcmInfo.origination.amountSent = xcm.amountSent / 10 ** inp.decimals;
+                        xcmInfo.destination.amountReceived = best.amountReceived / 10 ** inp.decimals;
+                        xcmInfo.destination.ts = best.ts;
+                        if (q && q.priceUSD) {
+                            xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
+                            xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
+                            xcmInfo.destination.teleportFee = 0; // TODO: can we improve this?
+                        }
+                        xcmInfo.destination.confidence = best.confidence;
+                        xcmInfo.destination.executionStatus = "success";
+                        console.log("xcmInfo", JSON.stringify(xcmInfo, null, 4));
 
-                    let sql_final = `update xcmtransfer set xcmInfoAudited = 1, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
-                    console.log(sql_final);
-                    this.batchedSQL.push(sql_final);
-                    await this.update_batchedSQL();
-                    return true;
+                        let sql_final = `update xcmtransfer set xcmInfoAudited = 1, amountReceived = '${xcmInfo.destination.amountReceived}', amountReceivedUSD = '${xcmInfo.destination.amountReceivedUSD}', xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+                        console.log(sql_final);
+                        this.batchedSQL.push(sql_final);
+                        await this.update_batchedSQL();
+                        return best.confidence;
+                    } else {
+
+                    }
                 }
             }
+
         } catch (e) {
             console.log(e);
         }
-        let sql_final = `update xcmtransfer set xcmInfoAudited = -2 where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+        let sql_final = `update xcmtransfer set xcmInfoAudited = -1 where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
         this.batchedSQL.push(sql_final);
         await this.update_batchedSQL();
         return (false);
@@ -355,11 +366,23 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
     async bulk_cleanXCMInfo(chainIDDest, n = 0, m = 1) {
         let w = (m > 1) ? ` and sourceTS % ${m} = ${n} ` : "";
-        let sql = `select chainIDDest, extrinsicHash, xcmIndex, transferIndex from xcmtransfer where symbol is not null and xcmInfo is null and xcmInfoAudited  <= 0 and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 1 hour)) and chainIDDest = ${chainIDDest} ${w} order by sourceTS desc limit 10000`
+        let sql = `select chainIDDest, extrinsicHash, xcmIndex, transferIndex from xcmtransfer where symbol is not null and xcmInfoAudited = -4 and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 1 hour)) and chainIDDest = ${chainIDDest} ${w} order by extrinsicHash, xcmIndex, transferIndex limit 100`
+        console.log(sql);
         let extrinsics = await this.pool.query(sql);
+        let results = {};
         for (const e of extrinsics) {
             try {
-                await this.cleanXCMInfo(e.extrinsicHash, e.transferIndex, e.xcmIndex)
+                let confidence = await this.cleanXCMInfo(e.extrinsicHash, e.transferIndex, e.xcmIndex)
+                if (results[e.extrinsicHash] == undefined) {
+                    results[e.extrinsicHash] = confidence;
+                } else {
+                    if (confidence > results[e.extrinsicHash]) {
+                        let sql_final = `update xcmtransfer set confidence = '${confidence}' where extrinsicHash = '${e.extrinsicHash}'`;
+                        this.batchedSQL.push(sql_final);
+                        await this.update_batchedSQL();
+                        results[e.extrinsicHash] = confidence;
+                    }
+                }
             } catch (err) {
                 console.log(err);
             }

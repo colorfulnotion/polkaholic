@@ -4836,7 +4836,7 @@ module.exports = class Indexer extends AssetManager {
                     //destAddress is missing from events
                     if (fallbackRequired) {
                         delete rExtrinsic.xcms
-                        rExtrinsic.xcmIndex = 0
+                        delete rExtrinsic.xcmIndex
                         this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
                     }
                 }

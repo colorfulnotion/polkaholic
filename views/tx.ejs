@@ -2,7 +2,8 @@
 <h4>Transaction #<%=`${tx.extrinsicID}`%></h4>
 <%
 let f = tx;
-let xcmInfoFound = ( f.xcmInfo != undefined && f.xcmInfo.origination != undefined && f.xcmInfo.destination != undefined && f.xcmInfo.relayChain != undefined)? true : false
+let xcmInfoFound = ( f.xcmInfo != undefined &&
+( ( ( typeof f.xcmInfo  === 'object' ) && f.xcmInfo.origination != undefined && f.xcmInfo.destination != undefined && f.xcmInfo.relayChain != undefined ) || Array.isArray(f.xcmInfo) ) ) ? true : false
 let assetTransferFound = (  tx.transfers && tx.transfers.length > 0 )? true : false
 let txResult = (f.result != undefined)? f.result == 1: true //by default tx result is true (until we back fill it)
 let errStr = (f.result != undefined)? f.err: false //by default tx result is true (until we back fill it)
@@ -55,8 +56,16 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
         </tr>
         <% } %>
         <tr>
-          <td><%- include("tooltip", {k: "xcmtimeline"}) %>XCM Timeline</td>
-          <td><%- include("xcminfo", {xcm: f.xcmInfo, traceID: f.traceID}); %></td>
+          <td><%- include("tooltip", {k: "xcmtimeline"}) %>XCM Timeline</td><td>
+	  <% if ( Array.isArray(f.xcmInfo) ) { console.log(f.xcmInfo); %>
+	    <% for (let i = 0 ; i < f.xcmInfo.length; i++) { %>
+            <div>
+	    <%- include("xcminfo", {xcm: f.xcmInfo[i], traceID: null}); %>
+	    </div>
+	    <% } %>
+	  <% } else { %>
+            <%- include("xcminfo", {xcm: f.xcmInfo, traceID: f.traceID}); %>
+	  <% } %>
         </tr>
     <% } %>
 

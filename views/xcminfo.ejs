@@ -84,7 +84,7 @@
       <p class="text-muted mb-2 fw-bold"><%- uiTool.presentTS(xcm.destination.ts) %></p>
       <% } %>
       <p class="mb-2">
-       <% if ( xcm.destination.amountreceived ) { %>
+       <% if ( xcm.destination.amountReceived ) { %>
        <%- include("tooltip", {k: "amountreceived"}) %><B>Received</B>: <span class="fw-bold"><%- uiTool.presentFloat(xcm.destination.amountReceived) %></span> <%= xcm.symbol; %> (<%= uiTool.currencyFormat(xcm.destination.amountReceivedUSD)%>)<br/>
        <% } %>
       </p>
