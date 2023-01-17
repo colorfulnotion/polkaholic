@@ -31,7 +31,12 @@ const {
 const Query = require('./query');
 const mysql = require("mysql2");
 const paraTool = require("./paraTool");
-
+/*
+Setup xcmcleaner to do all writes to the new column family currently done by  xcmmatch work except failure
+Compute teleport fee and teleport usd fee in xcmcleaner correctly
+Cover failure cases in xcmcleaner
+Cover xcmmessages in xcmcleaner if possible
+*/
 module.exports = class XCMCleaner extends Query {
     constructor() {
         super("manager")
@@ -40,6 +45,7 @@ module.exports = class XCMCleaner extends Query {
     async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
         let chain = await this.getChainWithVersion(chainID, withSpecVersions);
         await this.setupAPI(chain, backfill);
+
         this.relayChain = chain.relayChain;
         return (chain);
     }
@@ -57,9 +63,16 @@ module.exports = class XCMCleaner extends Query {
 
     async searchDestinationChainBalances(chainID, sourceTS, destAddress, symbol, amountSent, N = 2) {
         let chain = await this.setupChainAndAPI(chainID)
+        if (this.api == null) {
+            return ([null, null]);
+        }
+
         let destAddressPubkey = paraTool.getPubKey(destAddress);
-        let sqlD = `select blockNumber, blockHash, UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} where blockDT >= FROM_UNIXTIME(${sourceTS}-30) and blockDT <= FROM_UNIXTIME(${sourceTS + N*60}) order by blockNumber limit 1000`
+        let sqlD = `select blockNumber, blockHash, UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} where blockDT >= FROM_UNIXTIME(${sourceTS}-30) and blockDT <= FROM_UNIXTIME(${sourceTS + N*60}) and blockHash is not null order by blockNumber limit 1000`
         let blocks = await this.poolREADONLY.query(sqlD)
+        if (blocks.length == 0) {
+            return ([null, null]);
+        }
         console.log("found ", blocks.length, " blocks", sqlD);
         let asset = await this.getAssetChainFromSymbol(chainID, symbol);
         let balances = {}
@@ -114,47 +127,51 @@ module.exports = class XCMCleaner extends Query {
         for (const b of blocks) {
             let bn = b.blockNumber;
             let blockHash = b.blockHash
-            let apiAt = await this.api.at(blockHash)
-            console.log("checking ", chainID, "blockHash", blockHash, "bn", bn, "symbol", symbol, destAddress, isNative);
+            try {
+                console.log("checking apiAt ", chainID, "blockHash", blockHash, "bn", bn, "symbol", symbol, destAddress, isNative);
+                let apiAt = await this.api.at(blockHash)
 
-            if (isNative) {
-                let query = await apiAt.query.system.account(destAddress);
-                let qR = query.toJSON();
-                if (balances[asset.currencyID] == undefined) {
-                    balances[asset.currencyID] = {}
-                }
-                balances[asset.currencyID][bn] = qR.data.free
-            } else if (apiAt.query.tokens != undefined && apiAt.query.tokens.accounts != undefined) {
-                for (const currencyID of currencies) {
-                    console.log("tokens CHECK", destAddress, currencyID)
-                    let currencyIDString = (typeof currencyID == "string") ? currencyID : JSON.stringify(currencyID);
-                    let query = await apiAt.query.tokens.accounts(destAddress, currencyID);
+                if (isNative) {
+                    let query = await apiAt.query.system.account(destAddress);
                     let qR = query.toJSON();
-                    if (balances[currencyIDString] == undefined) {
-                        balances[currencyIDString] = {}
+                    if (balances[asset.currencyID] == undefined) {
+                        balances[asset.currencyID] = {}
                     }
-                    if (qR && qR.free != undefined) {
-                        balances[currencyIDString][bn] = qR.free
+                    balances[asset.currencyID][bn] = qR.data.free
+                } else if (apiAt.query.tokens != undefined && apiAt.query.tokens.accounts != undefined) {
+                    for (const currencyID of currencies) {
+                        console.log("tokens CHECK", destAddress, currencyID)
+                        let currencyIDString = (typeof currencyID == "string") ? currencyID : JSON.stringify(currencyID);
+                        let query = await apiAt.query.tokens.accounts(destAddress, currencyID);
+                        let qR = query.toJSON();
+                        if (balances[currencyIDString] == undefined) {
+                            balances[currencyIDString] = {}
+                        }
+                        if (qR && qR.free != undefined) {
+                            balances[currencyIDString][bn] = qR.free
+                        }
                     }
+                } else if (apiAt.query.assets != undefined && apiAt.query.assets.account != undefined) {
+                    for (const currencyID of currencies) {
+                        let query = await apiAt.query.assets.account(currencyID, destAddress);
+                        console.log("asset CHECK", destAddress, "currencyID:", currencyID)
+                        let qR = query.toJSON();
+                        let currencyIDString = (typeof currencyID == "string") ? currencyID : JSON.stringify(currencyID);
+                        if (balances[currencyIDString] == undefined) {
+                            balances[currencyIDString] = {}
+                        }
+                        if (qR && qR.balance != undefined) {
+                            console.log("assets SUCC", symbol, currencyID, destAddress, qR);
+                            balances[currencyIDString][bn] = qR.balance
+                        } else {
+                            console.log("assets FAIL", symbol, currencyID, destAddress, qR);
+                        }
+                    }
+                } else {
+                    return [null, blocks];
                 }
-            } else if (apiAt.query.assets != undefined && apiAt.query.assets.account != undefined) {
-                for (const currencyID of currencies) {
-                    let query = await apiAt.query.assets.account(currencyID, destAddress);
-                    console.log("asset CHECK", destAddress, "currencyID:", currencyID)
-                    let qR = query.toJSON();
-                    let currencyIDString = (typeof currencyID == "string") ? currencyID : JSON.stringify(currencyID);
-                    if (balances[currencyIDString] == undefined) {
-                        balances[currencyIDString] = {}
-                    }
-                    if (qR && qR.balance != undefined) {
-                        console.log("assets SUCC", symbol, currencyID, destAddress, qR);
-                        balances[currencyIDString][bn] = qR.balance
-                    } else {
-                        console.log("assets FAIL", symbol, currencyID, destAddress, qR);
-                    }
-                }
-            } else {
-                return [null, blocks];
+            } catch (e) {
+                console.log("block ERROR", e);
             }
         }
 
@@ -212,9 +229,10 @@ module.exports = class XCMCleaner extends Query {
 read a short window of  N minutes from block${chainIDDest} and open up an API connection for ${chainIDDest}.  Query beneficiary for all N minutes for { accounts, tokens } for the asset
 if a jump in balance is found in those N minutes, mark the blockNumber in ${chainIDDest}, and see if we can find an event of any kind with 99.x% of the numeric value of the jump.  If one can be found, use that for the executed eventID
 */
-    async cleanXCMInfo(extrinsicHash, transferIndex = 0, xcmIndex = 0) {
+    async generate_extrinsic_XCMInfo(extrinsicHash, transferIndex = 0, xcmIndex = 0) {
         let sqlA = `select
                 chainID, extrinsicHash, chainIDDest, fromAddress, symbol, relayChain,
+                xcmtransfer.isFeeItem,
                 xcmtransfer.extrinsicID,
                 xcmtransfer.amountSent,
                 xcmtransfer.transferIndex,
@@ -249,7 +267,6 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             xcmSection = sectionMethodPieces[0]
             xcmMethod = sectionMethodPieces[1]
         }
-
         xcm.chainName = this.getChainName(xcm.chainID);
         xcm.chainDestName = this.getChainName(xcm.chainIDDest);
         xcm.id = this.getIDByChainID(xcm.chainID)
@@ -301,9 +318,9 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 beneficiary: xcm.destAddress,
                 amountReceived: 0,
                 amountReceivedUSD: 0,
-                //teleportFee: 0,
-                //teleportFeeUSD: 0,
-                //teleportFeeChainSymbol: xcm.symbol,
+                teleportFee: 0,
+                teleportFeeUSD: 0,
+                teleportFeeChainSymbol: xcm.symbol,
                 blockNumber: xcm.blockNumberDest,
                 //extrinsicID: null,
                 //eventID: xcm.executedEventID,
@@ -334,21 +351,22 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                         xcmInfo.destination.blockNumber = parseInt(best.bn, 10);
                         xcmInfo.origination.amountSent = xcm.amountSent / 10 ** inp.decimals;
                         xcmInfo.destination.amountReceived = best.amountReceived / 10 ** inp.decimals;
+                        xcmInfo.destination.teleportFee = xcmInfo.origination.amountSent - xcmInfo.destination.amountReceived;
                         xcmInfo.destination.ts = best.ts;
                         if (q && q.priceUSD) {
                             xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
                             xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
-                            xcmInfo.destination.teleportFee = 0; // TODO: can we improve this?
+                            xcmInfo.destination.teleportFeeUSD = q.priceUSD * xcmInfo.destination.teleportFee;
                         }
                         xcmInfo.destination.confidence = best.confidence;
                         xcmInfo.destination.executionStatus = "success";
                         console.log("xcmInfo", JSON.stringify(xcmInfo, null, 4));
 
-                        let sql_final = `update xcmtransfer set xcmInfoAudited = 1, amountReceived = '${xcmInfo.destination.amountReceived}', amountReceivedUSD = '${xcmInfo.destination.amountReceivedUSD}', xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+                        let sql_final = `update xcmtransfer set xcmInfoAudited = 2, destStatus = 1, amountReceived = '${xcmInfo.destination.amountReceived}', amountReceivedUSD = '${xcmInfo.destination.amountReceivedUSD}', xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
                         console.log(sql_final);
                         this.batchedSQL.push(sql_final);
                         await this.update_batchedSQL();
-                        return best.confidence;
+                        return xcmInfo;
                     } else {
 
                     }
@@ -364,19 +382,27 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         return (false);
     }
 
-    async bulk_cleanXCMInfo(chainIDDest, n = 0, m = 1) {
-        let w = (m > 1) ? ` and sourceTS % ${m} = ${n} ` : "";
-        let sql = `select chainIDDest, extrinsicHash, xcmIndex, transferIndex from xcmtransfer where symbol is not null and xcmInfoAudited = -4 and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 1 hour)) and chainIDDest = ${chainIDDest} ${w} order by extrinsicHash, xcmIndex, transferIndex limit 100`
+    get_confidence(xcmInfo) {
+        if (xcmInfo.destination && xcmInfo.destination.confidence) {
+            return xcmInfo.destination.confidence
+        }
+        return 0;
+    }
+
+    async bulk_generate_XCMInfo(chainIDDest = null, limit = 1000) {
+        let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
+        let sql = `select extrinsicHash, xcmIndex, transferIndex from xcmtransfer where symbol is not null and xcmInfoAudited = 0 and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 5 MINUTE)) and not chainIDDest in (2011, 22024) ${w} order by sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
         let results = {};
         for (const e of extrinsics) {
             try {
-                let confidence = await this.cleanXCMInfo(e.extrinsicHash, e.transferIndex, e.xcmIndex)
+                let xcmInfo = await this.generate_extrinsic_XCMInfo(e.extrinsicHash, e.transferIndex, e.xcmIndex);
                 if (results[e.extrinsicHash] == undefined) {
-                    results[e.extrinsicHash] = confidence;
+                    results[e.extrinsicHash] = xcmInfo;
                 } else {
-                    if (confidence > results[e.extrinsicHash]) {
+                    let confidence = this.get_confidence(xcmInfo)
+                    if (confidence > this.get_confidence(results[e.extrinsicHash])) {
                         let sql_final = `update xcmtransfer set confidence = '${confidence}' where extrinsicHash = '${e.extrinsicHash}'`;
                         this.batchedSQL.push(sql_final);
                         await this.update_batchedSQL();

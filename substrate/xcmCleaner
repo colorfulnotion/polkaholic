@@ -3,30 +3,24 @@
 var XCMCleaner = require("./xcmCleaner.js");
 
 async function main() {
-    let extrinsicHash = "22110";
-    let xcmIndex = 0;
-    let transferIndex = 0;
+    let extrinsicHash = null;
     process.argv.forEach(function(val, index, array) {
       if (index == 2 && val.length > 0) {
         extrinsicHash = val;
       }
-      if (index == 3 && val.length > 0) {
-        transferIndex = parseInt(val, 10);
-      }
-      if (index == 4 && val.length > 0) {
-        xcmIndex = parseInt(val, 10);
-      }
     });
-    var manager = new XCMCleaner();
-    await manager.assetManagerInit();
-    if ( extrinsicHash.length > 10 ) {
-	await manager.cleanXCMInfo(extrinsicHash, transferIndex, xcmIndex);
-    } else {
-	if ( xcmIndex == 0 && transferIndex == 0 ) {
-	    xcmIndex = 0;
-	    transferIndex = 1;
+    if ( extrinsicHash ) {
+	var manager = new XCMCleaner();
+	await manager.assetManagerInit();
+	if ( extrinsicHash.length > 10 ) {
+	    await manager.cleanXCMInfo(extrinsicHash, transferIndex, xcmIndex);
+	} else {
+	    await manager.bulk_generate_XCMInfo(extrinsicHash, 1000);
 	}
-	await manager.bulk_cleanXCMInfo(extrinsicHash, transferIndex, xcmIndex)
+    } else {
+	var manager = new XCMCleaner();
+	await manager.assetManagerInit();
+	await manager.bulk_generate_XCMInfo(null, 1);
     }
 }
 

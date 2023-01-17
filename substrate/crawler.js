@@ -1239,12 +1239,12 @@ module.exports = class Crawler extends Indexer {
             let nmax = techniqueParams[2];
             let w = (nmax > 1) ? `and blockNumber % ${nmax} = ${n}` : "";
             let w2 = ` and blockNumber > ${chain.blocksCovered} - 5000000`
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 3 order by attempted, rand() limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 3 order by blockNumber desc limit 10000`
             console.log("X", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
             let endBN = techniqueParams[2];
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 3 order by attempted, blockNumber desc limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 3 order by blockNumber desc limit 10000`
             console.log("Y", sql);
         }
         let tasks = await this.poolREADONLY.query(sql);
