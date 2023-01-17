@@ -37,6 +37,7 @@ module.exports = class InterlayParser extends ChainParser {
     */
 
     augment = {}
+    manualRegistry = {}
 
     isXcRegistryAvailable = true
 
@@ -57,7 +58,7 @@ module.exports = class InterlayParser extends ChainParser {
         await this.processInterlayXcGar(chainkey)
     }
 
-    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
         // implement your augment parsing function here.
         await this.processInterlayAugment(chainkey)

@@ -36,7 +36,21 @@ module.exports = class SampleParser extends ChainParser {
     }
     */
 
+    /*
+    Parachain usualy does not publish native asset in its own xc registry.
+    Allow team to polish xcRegistry using the following format:
+
+    manualRegistry = {
+        "relaychain-paraID": [{
+            asset: {
+                "Token": "currencyID"
+            },
+            xcmV1Standardized: [{"network":"relaychain"},{"parachain":paraID},{palletInstance/generalKey/generalIndex...}],
+        }]
+    }
+    */
     augment = {}
+    manualRegistry = {}
 
     isXcRegistryAvailable = true
 
@@ -57,11 +71,12 @@ module.exports = class SampleParser extends ChainParser {
         await this.processSampleXcGar(chainkey)
     }
 
-    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
-        // implement your augment parsing function here.
+        //[Optional A] implement your augment parsing function here.
         await this.processSampleAugment(chainkey)
-
+        //[Optional B ] implement your manual registry here.
+        await this.processSampleManualRegistry(chainkey)
     }
 
     // Implement Sample gar parsing function here
@@ -108,6 +123,17 @@ module.exports = class SampleParser extends ChainParser {
         }
     }
 
+    // Implement Sample manual registry function here
+    async processSampleManualRegistry(chainkey) {
+        console.log(`[${chainkey}] ${this.parserName} manual`)
+        let pieces = chainkey.split('-')
+        let relayChain = pieces[0]
+        let paraIDSoure = pieces[1]
+        let manualRecs = this.manualRegistry[chainkey]
+        this.processManualRegistry(chainkey, manualRecs)
+    }
+
+    // Implement Sample Augment function here
     async processSampleAugment(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom augmentation`)
         let pieces = chainkey.split('-')

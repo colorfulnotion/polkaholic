@@ -22,6 +22,20 @@ module.exports = class AstarParser extends ChainParser {
     xcGarStorage = 'assetIdToLocation'
 
     augment = {}
+    manualRegistry = {
+        "polkadot-2006": [{
+            asset: {
+                "Token": "ASTR"
+            },
+            xcmInteriorKey: '[{"network":"polkadot"},{"parachain":2006}]'
+        }],
+        'kusama-2007': [{
+            asset: {
+                "Token": "SDN"
+            },
+            xcmInteriorKey: '[{"network":"polkadot"},{"parachain":2007}]'
+        }]
+    }
 
     isXcRegistryAvailable = true
 
@@ -42,11 +56,12 @@ module.exports = class AstarParser extends ChainParser {
         await this.processAstarXcGar(chainkey)
     }
 
-    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
-        // implement your augment parsing function here.
+        //[Optional A] implement your augment parsing function here.
         await this.processAstarAugment(chainkey)
-
+        //[Optional B ] implement your manual registry here.
+        await this.processAstarManualRegistry(chainkey)
     }
 
     // Implement astar gar parsing function here
@@ -93,6 +108,16 @@ module.exports = class AstarParser extends ChainParser {
                 this.manager.setChainAsset(chainkey, assetChainkey, assetInfo, true)
             }
         }
+    }
+
+    // Implement Astar manual registry function here
+    async processAstarManualRegistry(chainkey) {
+        console.log(`[${chainkey}] ${this.parserName} manual`)
+        let pieces = chainkey.split('-')
+        let relayChain = pieces[0]
+        let paraIDSoure = pieces[1]
+        let manualRecs = this.manualRegistry[chainkey]
+        this.processManualRegistry(chainkey, manualRecs)
     }
 
     async processAstarAugment(chainkey) {

@@ -22,6 +22,7 @@ module.exports = class BifrostParser extends ChainParser {
     xcGarStorage = 'currencyIdToLocations'
 
     augment = {}
+    manualRegistry = {}
 
     isXcRegistryAvailable = true
 
@@ -42,7 +43,7 @@ module.exports = class BifrostParser extends ChainParser {
         await this.processBifrostXcGar(chainkey)
     }
 
-    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
         // implement your augment parsing function here.
         await this.processBifrostAugment(chainkey)

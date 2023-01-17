@@ -22,6 +22,20 @@ module.exports = class StatemintParser extends ChainParser {
     xcGarStorage = 'unknown'
 
     augment = {}
+    manualRegistry = {
+        "polkadot-1000": [{
+            asset: {
+                "Token": "1984"
+            },
+            xcmInteriorKey: '[{"network":"polkadot"},{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'
+        }],
+        'kusama-1000': [{
+            asset: {
+                "Token": "1984"
+            },
+            xcmInteriorKey: '[{"network":"kusama"},{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'
+        }]
+    }
 
     isXcRegistryAvailable = false
 
@@ -41,10 +55,12 @@ module.exports = class StatemintParser extends ChainParser {
         }
     }
 
-    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
-        // implement your augment parsing function here.
+        //[Optional A] implement your augment parsing function here.
         await this.processStatemintAugment(chainkey)
+        //[Optional B ] implement your manual registry here.
+        await this.processStatemintManualRegistry(chainkey)
 
     }
 
@@ -67,6 +83,16 @@ module.exports = class StatemintParser extends ChainParser {
     // Implement statemint xcGar parsing function here
     async processStatemintXcGar(chainkey) {
         //TODO
+    }
+
+    // Implement Statemint manual registry function here
+    async processStatemintManualRegistry(chainkey) {
+        console.log(`[${chainkey}] ${this.parserName} manual`)
+        let pieces = chainkey.split('-')
+        let relayChain = pieces[0]
+        let paraIDSoure = pieces[1]
+        let manualRecs = this.manualRegistry[chainkey]
+        this.processManualRegistry(chainkey, manualRecs)
     }
 
     async processStatemintAugment(chainkey) {

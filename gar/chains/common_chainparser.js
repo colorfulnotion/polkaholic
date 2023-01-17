@@ -1012,6 +1012,34 @@ module.exports = class ChainParser {
         console.log(`[${chainkey}] [fetchAugments Default Skip]`)
     }
 
+    processManualRegistry(chainkey, manualRecs) {
+        let pieces = chainkey.split('-')
+        let relayChain = pieces[0]
+        let paraIDSoure = pieces[1]
+        if (manualRecs != undefined && Array.isArray(manualRecs)) {
+            // step 0: fetch local asset registry
+            let localAssetMap = this.manager.getLocalAssetMap(chainkey)
+            for (const r of manualRecs) {
+                try {
+                    let assetString = JSON.stringify(r.asset)
+                    let xcmInteriorKey = r.xcmInteriorKey
+                    //let xcmInteriorKey = JSON.stringify(r.xcmV1Standardized)
+                    let assetChainkey = garTool.makeAssetChain(assetString, chainkey)
+                    let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
+                    if (cachedAssetInfo != undefined) {
+                        cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
+                        this.manager.setChainAsset(chainkey, assetChainkey, cachedAssetInfo, true)
+                    }else{
+                        console.log(`[${chainkey}] Asset=${assetString} NOT FOUND Skip`)
+                    }
+                } catch (e){
+                    console.log(`processManualRegistry error`, e)
+                    continue
+                }
+            }
+        }
+    }
+
     xTokensFilter(palletMethod) {
         if (palletMethod == "xTokens(TransferredMultiAssets)") {
             return true

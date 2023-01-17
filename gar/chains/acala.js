@@ -22,6 +22,20 @@ module.exports = class AcalaParser extends ChainParser {
     xcGarStorage = 'foreignAssetLocations'
 
     augment = {}
+    manualRegistry = {
+        "polkadot-2000": [{
+            asset: {
+                "Token": "ACA"
+            },
+            xcmInteriorKey: '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x0000"}]'
+        }],
+        'kusama-2000': [{
+            asset: {
+                "Erc20": "0x1f3a10587a20114ea25ba1b388ee2dd4a337ce27"
+            },
+            xcmInteriorKey: '[{"network":"kusama"},{"parachain":2000},{"generalKey":"0x021f3a10587a20114ea25ba1b388ee2dd4a337ce27"}]'
+        }]
+    }
 
     isXcRegistryAvailable = true
 
@@ -42,11 +56,12 @@ module.exports = class AcalaParser extends ChainParser {
         await this.processAcalaXcGar(chainkey)
     }
 
-    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
-        // implement your augment parsing function here.
+        //[Optional A] implement your augment parsing function here.
         //await this.processAcalaAugment(chainkey)
-
+        //[Optional B ] implement your manual registry here.
+        await this.processAcalaManualRegistry(chainkey)
     }
 
     // Implement acala gar parsing function here
@@ -91,6 +106,15 @@ module.exports = class AcalaParser extends ChainParser {
                 this.manager.setChainAsset(chainkey, assetChainkey, assetInfo, true)
             }
         }
+    }
+
+    async processAcalaManualRegistry(chainkey) {
+        console.log(`[${chainkey}] ${this.parserName} manual`)
+        let pieces = chainkey.split('-')
+        let relayChain = pieces[0]
+        let paraIDSoure = pieces[1]
+        let manualRecs = this.manualRegistry[chainkey]
+        this.processManualRegistry(chainkey, manualRecs)
     }
 
     async processAcalaAugment(chainkey) {

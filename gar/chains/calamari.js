@@ -21,6 +21,7 @@ module.exports = class CalamariParser extends ChainParser {
     xcGarStorage = 'assetIdLocation'
 
     augment = {}
+    manualRegistry = {}
 
     isXcRegistryAvailable = true
 
@@ -41,7 +42,7 @@ module.exports = class CalamariParser extends ChainParser {
         await this.processCalamariXcGar(chainkey)
     }
 
-    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
         // implement your augment parsing function here.
         await this.processCalamariAugment(chainkey)

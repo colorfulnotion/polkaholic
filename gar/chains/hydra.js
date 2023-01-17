@@ -23,6 +23,7 @@ module.exports = class HydraParser extends ChainParser {
     xcGarStorage = 'assetLocations'
 
     augment = {}
+    manualRegistry = {}
 
     isXcRegistryAvailable = true
 
@@ -43,7 +44,7 @@ module.exports = class HydraParser extends ChainParser {
         await this.processHydraXcGar(chainkey)
     }
 
-    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
         // implement your augment parsing function here.
         await this.processHydraAugment(chainkey)

@@ -27,6 +27,7 @@ module.exports = class ListenParser extends ChainParser {
             extrinsicIDs: ['118722-2']
         }]
     }
+    manualRegistry = {}
 
     isXcRegistryAvailable = false; //NOTE: listen team has NOT updated the xcRegistry yet
 
@@ -47,7 +48,7 @@ module.exports = class ListenParser extends ChainParser {
         await this.processListenXcGar(chainkey)
     }
 
-    //step 3: Optional augmentation by providing a list xcm extrinsicIDs
+    //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
         // implement your augment parsing function here.
         await this.processListenAugment(chainkey)

@@ -36,6 +36,7 @@ module.exports = class GlobalAssetRegistry {
     assetMap = {}; // ex: {"Token":"DOT"}~polkadot-0-> { assetType: 'Token', name: 'DOT', symbol: 'DOT', decimals: 10 }
     chainAssetMap = {};
     xcmAssetMap = {};
+    chainXcmAssetMap = {};
     relaychain = false;
     debugLevel;
 
@@ -594,7 +595,7 @@ module.exports = class GlobalAssetRegistry {
         return this.xcmAssetMap
     }
 
-    setXcmAsset(xcmInteriorKey, xcmAssetInfo) {
+    setXcmAsset(xcmInteriorKey, xcmAssetInfo, chainkey) {
         let paraIDSoure = garTool.dechexToInt(xcmAssetInfo.source[0])
         if (this.xcmAssetMap[xcmInteriorKey] == undefined) {
             console.log(`add new xcm Asset ${xcmInteriorKey}`)
@@ -603,6 +604,9 @@ module.exports = class GlobalAssetRegistry {
             this.xcmAssetMap[xcmInteriorKey].confidence += 1
             this.xcmAssetMap[xcmInteriorKey].source.push(paraIDSoure)
         }
+        if (this.chainXcmAssetMap[chainkey] == undefined) this.chainXcmAssetMap[chainkey] = {}
+        if (this.chainXcmAssetMap[chainkey][xcmInteriorKey] == undefined) this.chainXcmAssetMap[chainkey][xcmInteriorKey] = {}
+        this.chainXcmAssetMap[chainkey][xcmInteriorKey] = xcmAssetInfo
     }
 
     getXcmAsset(xcmInteriorKey) {
@@ -642,5 +646,11 @@ module.exports = class GlobalAssetRegistry {
         return this.chainAssetMap
     }
 
+    getLocalAssetMap(chainkey) {
+        if (this.chainAssetMap[chainkey] != undefined){
+            return this.chainAssetMap[chainkey]
+        }
+        return {}
+    }
 
 }
