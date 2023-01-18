@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Usage: ./garcmd [relayChain] [targetedParaID]
+// Usage: ./xcmgarcli [relayChain] [targetedParaID]
 
 // EX: parse all supported registry on polkadot
-// Usage: ./garcmd polkadot all
+// Usage: ./xcmgarcli polkadot all
 
 // EX: test a specific parser
-// Usage: ./garcmd polkadot 2004
+// Usage: ./xcmgarcli polkadot 2004
 
 var XCMGlobalAssetRegistry = require("./xcmgar");
 const endpoints = require("./endpoints");
