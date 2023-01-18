@@ -20,6 +20,7 @@ const OakParser = require("./chains/oak")
 const RobonomicsParser = require("./chains/robonomics")
 const CentrifugeParser = require("./chains/centrifuge")
 const CloverParser = require("./chains/clover")
+const OriginTrailParser = require("./chains/origintrail")
 
 const {
     ApiPromise,
@@ -542,6 +543,8 @@ module.exports = class GlobalAssetRegistry {
             chainParser = new InterlayParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2002|clover'])) {
             chainParser = new CloverParser(api, manager)
+        } else if (this.isMatched(chainkey, ['polkadot-2043|origintrail'])) {
+            chainParser = new OriginTrailParser(api, manager)
         } else {
             chainParser = new CommonChainParser(api, manager, false) // set isCustomParser to false
         }
