@@ -16,6 +16,7 @@ const BifrostParser = require("./chains/bifrost")
 const PhalaParser = require("./chains/phala")
 const InterlayParser = require("./chains/interlay")
 const MangataxParser = require("./chains/mangatax")
+const OakParser = require("./chains/oak")
 
 const {
     ApiPromise,
@@ -528,6 +529,8 @@ module.exports = class GlobalAssetRegistry {
             chainParser = new ListenParser(api, manager)
         } else if (this.isMatched(chainkey, ['kusama-2110|mangatax'])) {
             chainParser = new MangataxParser(api, manager)
+        } else if (this.isMatched(chainkey, ['polkadot-2090|oak', 'kusama-2114|turing'])) {
+            chainParser = new OakParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2032|interlay', 'kusama-2092|kintsugi'])) {
             chainParser = new InterlayParser(api, manager)
         } else {
