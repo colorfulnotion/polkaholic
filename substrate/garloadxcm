@@ -29,8 +29,8 @@ async function main() {
 
     let [xcRegistryNewOnly, xcRegistryOldOnly, identicalXcRegsitry, diffXcRefistry] = garManager.compareXcRegistry(xcRegistryNew, xcRegistryOld)
 
-    //await garManager.flushXcmAssetGar(xcRegistryNew)
-    await garManager.flushAssetGar(xcRegistryNew)
+    await garManager.flushXcmAssetGar(xcRegistryNew)
+    //await garManager.flushAssetGar(xcRegistryNew)
 }
 
 main()
