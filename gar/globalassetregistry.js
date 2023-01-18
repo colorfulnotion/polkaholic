@@ -19,6 +19,7 @@ const MangataxParser = require("./chains/mangatax")
 const OakParser = require("./chains/oak")
 const RobonomicsParser = require("./chains/robonomics")
 const AltairParser = require("./chains/altair")
+const CloverParser = require("./chains/clover")
 
 const {
     ApiPromise,
@@ -539,6 +540,8 @@ module.exports = class GlobalAssetRegistry {
             chainParser = new OakParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2032|interlay', 'kusama-2092|kintsugi'])) {
             chainParser = new InterlayParser(api, manager)
+        } else if (this.isMatched(chainkey, ['polkadot-2002|clover'])) {
+            chainParser = new CloverParser(api, manager)
         } else {
             chainParser = new CommonChainParser(api, manager, false) // set isCustomParser to false
         }
