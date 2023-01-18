@@ -510,7 +510,7 @@ module.exports = {
     },
     */
     /*
-    paraTool uses older XcmInteriorKeyV1 format, whereas garTool uses XcmInteriorKeyV2 format
+    paraTool uses older XcmInteriorKeyV1 format, whereas xcmgarTool uses XcmInteriorKeyV2 format
     */
     makeXcmInteriorKey: function(interiorStr, network = {
         network: 'kusama'

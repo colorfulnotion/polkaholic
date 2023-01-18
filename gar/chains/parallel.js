@@ -1,4 +1,4 @@
-const garTool = require("../garTool");
+const xcmgarTool = require("../xcmgarTool");
 const ChainParser = require("./common_chainparser");
 
 /*

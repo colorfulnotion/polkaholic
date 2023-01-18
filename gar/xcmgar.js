@@ -1,4 +1,4 @@
-const garTool = require("./garTool");
+const xcmgarTool = require("./xcmgarTool");
 const endpoints = require("./endpoints");
 
 //const SampleParser = require("./chains/custom_parser_template") // fork this file to include new chain parser
@@ -250,7 +250,7 @@ module.exports = class XCMGlobalAssetRegistry {
             for (const localAssetChainkey of localAssetChainkeys) {
                 let localAsset = localAssetMap[localAssetChainkey]
                 //delete localAsset.xcmInteriorKeyV1;
-                let [parseAssetChain, _] = garTool.parseAssetChain(localAssetChainkey)
+                let [parseAssetChain, _] = xcmgarTool.parseAssetChain(localAssetChainkey)
                 let a = {
                     asset: JSON.parse(parseAssetChain),
                     name: localAsset.name,
@@ -589,7 +589,7 @@ module.exports = class XCMGlobalAssetRegistry {
     }
 
     setChainAsset(chainkey, assetChainkey, assetInfo, isUpdate = false) {
-        if (assetInfo.xcmInteriorKey != undefined) assetInfo.xcmInteriorKeyV1 = garTool.convertXcmInteriorKeyV2toV1(assetInfo.xcmInteriorKey)
+        if (assetInfo.xcmInteriorKey != undefined) assetInfo.xcmInteriorKeyV1 = xcmgarTool.convertXcmInteriorKeyV2toV1(assetInfo.xcmInteriorKey)
 
         if (this.assetMap[assetChainkey] != undefined) console.log(`UPDATED [${chainkey}] ${assetChainkey}`, assetInfo)
         this.assetMap[assetChainkey] = assetInfo
@@ -611,7 +611,7 @@ module.exports = class XCMGlobalAssetRegistry {
     }
 
     setXcmAsset(xcmInteriorKey, xcmAssetInfo, chainkey) {
-        let paraIDSoure = garTool.dechexToInt(xcmAssetInfo.source[0])
+        let paraIDSoure = xcmgarTool.dechexToInt(xcmAssetInfo.source[0])
         if (this.xcmAssetMap[xcmInteriorKey] == undefined) {
             console.log(`add new xcm Asset ${xcmInteriorKey}`)
             this.xcmAssetMap[xcmInteriorKey] = xcmAssetInfo
@@ -643,7 +643,7 @@ module.exports = class XCMGlobalAssetRegistry {
     addXcmAssetLocalxcContractAddress(xcmInteriorKey, localParaID, localCurrencyID) {
         let xcmAsset = this.xcmAssetMap[xcmInteriorKey]
         if (xcmAsset != undefined) {
-            let xcContractAddress = garTool.xcAssetIDToContractAddr(localCurrencyID)
+            let xcContractAddress = xcmgarTool.xcAssetIDToContractAddr(localCurrencyID)
             console.log(`add xcContractAddress ${xcContractAddress}`)
             this.xcmAssetMap[xcmInteriorKey]['xcContractAddress'][localParaID] = xcContractAddress.toLowerCase()
         }

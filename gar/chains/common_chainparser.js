@@ -1,4 +1,4 @@
-const garTool = require("../garTool");
+const xcmgarTool = require("../xcmgarTool");
 const {
     decodeAddress,
 } = require("@polkadot/keyring");
@@ -19,7 +19,7 @@ module.exports = class ChainParser {
         this.isCustomParser = isCustomParser
     }
 
-    setDebugLevel(debugLevel = garTool.debugNoLog) {
+    setDebugLevel(debugLevel = xcmgarTool.debugNoLog) {
         this.debugLevel = debugLevel
     }
 
@@ -77,7 +77,7 @@ module.exports = class ChainParser {
                     symbol: symbol,
                     decimals: decimals
                 };
-                let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+                let assetChainkey = xcmgarTool.makeAssetChain(asset, chainkey);
                 console.log(`[${chainkey}] assetChainkey=${assetChainkey}`, assetInfo)
                 this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
                 if (i == 0) {
@@ -109,13 +109,13 @@ module.exports = class ChainParser {
         for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
-            let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let assetID = xcmgarTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let assetMetadata = val.toHuman()
             let parsedAsset = {
                 Token: assetID
             }
             var asset = JSON.stringify(parsedAsset);
-            let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+            let assetChainkey = xcmgarTool.makeAssetChain(asset, chainkey);
 
             if (assetMetadata.metadata != undefined) assetMetadata = assetMetadata.metadata //kusama-2118|listen has extra metadata
             if (assetMetadata.decimals !== false && assetMetadata.symbol) {
@@ -123,18 +123,18 @@ module.exports = class ChainParser {
                 let assetInfo = {
                     name: name,
                     symbol: assetMetadata.symbol,
-                    decimals: garTool.dechexToInt(assetMetadata.decimals),
-                    assetType: garTool.assetTypeToken,
+                    decimals: xcmgarTool.dechexToInt(assetMetadata.decimals),
+                    assetType: xcmgarTool.assetTypeToken,
                     currencyID: assetID
                 };
                 if (this.isMatched(chainkey, ['polkadot-2012|parallel', 'kusama-2085|heiko'])) {
-                    if (assetInfo.symbol.includes('LP-')) assetInfo.assetType = garTool.assetTypeLiquidityPair
+                    if (assetInfo.symbol.includes('LP-')) assetInfo.assetType = xcmgarTool.assetTypeLiquidityPair
                     //console.log('im here fetchAssetPallet assetInfo', assetInfo)
                 }
                 assetList[assetChainkey] = assetInfo
                 //this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
             } else {
-                //if (this.debugLevel >= garTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+                //if (this.debugLevel >= xcmgarTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
             }
         }
         console.log(`[${chainkey}] onchain GAR:`, assetList);
@@ -206,7 +206,7 @@ module.exports = class ChainParser {
             let parsedAsset = {}
             let assetKeyWithID = key.args.map((k) => k.toHuman())[0] //{"ForeignAssetId":"0"}
             let assetKey = Object.keys(assetKeyWithID)[0] // ForeignAssetId
-            let assetKeyVal = garTool.cleanedAssetID(assetKeyWithID[assetKey]) // "123,456" or {"Token":"XXX"}
+            let assetKeyVal = xcmgarTool.cleanedAssetID(assetKeyWithID[assetKey]) // "123,456" or {"Token":"XXX"}
             if (assetKey == 'NativeAssetId') {
                 //this is the bifrost case
                 parsedAsset = assetKeyVal
@@ -216,7 +216,7 @@ module.exports = class ChainParser {
                 parsedAsset[assetKeyWithoutID] = assetKeyVal
             }
             var asset = JSON.stringify(parsedAsset);
-            let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+            let assetChainkey = xcmgarTool.makeAssetChain(asset, chainkey);
             if (assetMetadata.decimals !== false && assetMetadata.symbol) {
                 let symbol = assetMetadata.symbol
                 let name = assetMetadata.name
@@ -230,14 +230,14 @@ module.exports = class ChainParser {
                 let assetInfo = {
                     name: name,
                     symbol: symbol,
-                    decimals: garTool.dechexToInt(assetMetadata.decimals),
-                    assetType: garTool.assetTypeToken
+                    decimals: xcmgarTool.dechexToInt(assetMetadata.decimals),
+                    assetType: xcmgarTool.assetTypeToken
                 };
                 assetList[assetChainkey] = assetInfo
                 console.log(`addAssetInfo [${asset}]`, assetInfo)
                 //this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
             } else {
-                //if (this.debugLevel >= garTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
+                //if (this.debugLevel >= xcmgarTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
             }
         }
         console.log(`[${chainkey}] onchain GAR:`, assetList);
@@ -255,7 +255,7 @@ module.exports = class ChainParser {
     async processXcmAssetIdToLocation(chainkey, a) {
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSource = garTool.dechexToInt(pieces[1])
+        let paraIDSource = xcmgarTool.dechexToInt(pieces[1])
 
         let api = this.api
         let xcAssetList = {}
@@ -265,7 +265,7 @@ module.exports = class ChainParser {
         for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
-            let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let assetID = xcmgarTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let parsedAsset = {
                 Token: assetID
             }
@@ -273,7 +273,7 @@ module.exports = class ChainParser {
             let chainID = -1
 
             var asset = JSON.stringify(parsedAsset);
-            let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+            let assetChainkey = xcmgarTool.makeAssetChain(asset, chainkey);
 
             let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
             if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
@@ -292,7 +292,7 @@ module.exports = class ChainParser {
                 //x1/x2/x3 refers to the number to params
 
                 let interiorK = Object.keys(interior)[0]
-                let interiork = garTool.firstCharLowerCase(interiorK)
+                let interiork = xcmgarTool.firstCharLowerCase(interiorK)
                 let interiorVRaw = interior[interiorK]
 
                 //console.log(`${interiork} interiorVRawV`, interiorVRawV)
@@ -316,15 +316,15 @@ module.exports = class ChainParser {
                 }
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
                 let interiorVStr = JSON.stringify(standardizedInteriorV)
-                let network = garTool.encodeNetwork(relayChain)
+                let network = xcmgarTool.encodeNetwork(relayChain)
                 if ((standardizedInteriorK == 'here' || standardizedInteriorK == 'Here') && interior[interiorK] == null) {
                     interiorVStr = '"here"'
                 }
-                let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+                let xcmInteriorKey = xcmgarTool.makeXcmInteriorKey(interiorVStr, network)
                 let xcmV1Standardized = JSON.parse(xcmInteriorKey)
-                let xcmV1MultiLocation = garTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
-                let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, chainkey);
+                let xcmV1MultiLocation = xcmgarTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
+                let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? xcmgarTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
+                let nativeAssetChainkey = xcmgarTool.makeAssetChain(nativeAsset, chainkey);
 
                 let xcmAssetInfo = {
                     //interior: interiorVStr, //interior
@@ -367,7 +367,7 @@ module.exports = class ChainParser {
     async processXcmAssetsRegistryAssetMetadata(chainkey, a) {
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSource = garTool.dechexToInt(pieces[1])
+        let paraIDSource = xcmgarTool.dechexToInt(pieces[1])
 
         let api = this.api
         let xcAssetList = {}
@@ -377,7 +377,7 @@ module.exports = class ChainParser {
         for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
-            let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let assetID = xcmgarTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let parsedAsset = {
                 Token: assetID
             }
@@ -385,7 +385,7 @@ module.exports = class ChainParser {
             let chainID = -1
 
             var asset = JSON.stringify(parsedAsset);
-            let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+            let assetChainkey = xcmgarTool.makeAssetChain(asset, chainkey);
 
             let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
             if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
@@ -414,7 +414,7 @@ module.exports = class ChainParser {
                 let interior = xcmAsset.interior
                 //x1/x2/x3 refers to the number to params
                 let interiorK = Object.keys(interior)[0]
-                let interiork = garTool.firstCharLowerCase(interiorK)
+                let interiork = xcmgarTool.firstCharLowerCase(interiorK)
                 let interiorVRaw = interior[interiorK]
 
                 //console.log(`${interiork} interiorVRawV`, interiorVRawV)
@@ -438,15 +438,15 @@ module.exports = class ChainParser {
                 }
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
                 let interiorVStr = JSON.stringify(standardizedInteriorV)
-                let network = garTool.encodeNetwork(relayChain)
+                let network = xcmgarTool.encodeNetwork(relayChain)
                 if ((standardizedInteriorK == 'here' || standardizedInteriorK == 'Here') && interior[interiorK] == null) {
                     interiorVStr = '"here"'
                 }
-                let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+                let xcmInteriorKey = xcmgarTool.makeXcmInteriorKey(interiorVStr, network)
                 let xcmV1Standardized = JSON.parse(xcmInteriorKey)
-                let xcmV1MultiLocation = garTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
-                let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, chainkey);
+                let xcmV1MultiLocation = xcmgarTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
+                let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? xcmgarTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
+                let nativeAssetChainkey = xcmgarTool.makeAssetChain(nativeAsset, chainkey);
 
                 let xcmAssetInfo = {
                     //interior: interiorVStr, //interior
@@ -497,7 +497,7 @@ module.exports = class ChainParser {
                 new_interiorV.push(interiorV)
                 new_interiork = 'x2'
             } else if (Array.isArray(interiorV)) {
-                let xTypeInt = garTool.dechexToInt(z.substr(1)) + 1
+                let xTypeInt = xcmgarTool.dechexToInt(z.substr(1)) + 1
                 new_interiork = `x${xTypeInt}`
                 //x2/x3...
                 for (const v of interiorV) {
@@ -526,7 +526,7 @@ module.exports = class ChainParser {
                 } else if (v.generalKey != undefined) {
                     let generalKey = v.generalKey
                     if (generalKey.substr(0, 2) != '0x') {
-                        generalKey = garTool.stringToHex(generalKey)
+                        generalKey = xcmgarTool.stringToHex(generalKey)
                         v.generalKey = generalKey
                     }
                 }
@@ -552,7 +552,7 @@ module.exports = class ChainParser {
         //console.log(`processXcmAssetIdType [${chainkey}]`, a)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSource = garTool.dechexToInt(pieces[1])
+        let paraIDSource = xcmgarTool.dechexToInt(pieces[1])
 
         let api = this.api
         let xcAssetList = {}
@@ -562,20 +562,20 @@ module.exports = class ChainParser {
 
         try {
             //return [xcAssetList, xcAssetList, xcAssetList, xcAssetList]
-            //let relayChainID = garTool.getRelayChainID(relayChain)
-            //let paraIDExtra = garTool.getParaIDExtra(relayChain)
+            //let relayChainID = xcmgarTool.getRelayChainID(relayChain)
+            //let paraIDExtra = xcmgarTool.getParaIDExtra(relayChain)
 
             for (let i = 0; i < a.length; i++) {
                 let key = a[i][0];
                 let val = a[i][1];
-                let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+                let assetID = xcmgarTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
                 let parsedAsset = {
                     Token: assetID
                 }
                 let chainID = -1
                 //let paraID = 0
                 var asset = JSON.stringify(parsedAsset);
-                let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+                let assetChainkey = xcmgarTool.makeAssetChain(asset, chainkey);
                 let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
                 if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
                     console.log(`cached AssetInfo found`, cachedAssetInfo)
@@ -588,20 +588,20 @@ module.exports = class ChainParser {
                     let interior = xcmAsset.interior
                     //x1/x2/x3 refers to the number to params
                     let interiorK = Object.keys(interior)[0]
-                    let interiork = garTool.firstCharLowerCase(interiorK)
+                    let interiork = xcmgarTool.firstCharLowerCase(interiorK)
                     let interiorV = interior[interiorK]
 
                     let [paraID, standardizedInteriorK, standardizedInteriorV] = this.standardizeXcmMultilocation(parents, interiork, interiorV, paraIDSource)
                     let interiorVStr = JSON.stringify(standardizedInteriorV)
-                    let network = garTool.encodeNetwork(relayChain)
+                    let network = xcmgarTool.encodeNetwork(relayChain)
 
                     if ((standardizedInteriorK == 'here' || standardizedInteriorK == 'Here') && interior[interiorK] == null) {
                         interiorVStr = '"here"'
                     }
-                    let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+                    let xcmInteriorKey = xcmgarTool.makeXcmInteriorKey(interiorVStr, network)
                     let xcmV1Standardized = JSON.parse(xcmInteriorKey)
-                    let xcmV1MultiLocation = garTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                    let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
+                    let xcmV1MultiLocation = xcmgarTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
+                    let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? xcmgarTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
 
                     // standardizing Acala's stablecoin to AUSD on polkadot; karura's stablecoin to KUSD on kusama
                     if (symbol.toUpperCase == 'AUSD' || symbol.toUpperCase == 'KUSD') {
@@ -617,9 +617,9 @@ module.exports = class ChainParser {
                     var nativeAsset = JSON.stringify(nativeParsedAsset);
 
                     console.log(`'${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
-                    //if (this.debugLevel >= garTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
+                    //if (this.debugLevel >= xcmgarTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
                     let nativechainKey = `${relayChain}-${paraID}`
-                    let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, nativechainKey);
+                    let nativeAssetChainkey = xcmgarTool.makeAssetChain(nativeAsset, nativechainKey);
 
                     let xcmAssetInfo = {
                         //interior: interiorVStr, //interior
@@ -670,7 +670,7 @@ module.exports = class ChainParser {
 
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSource = garTool.dechexToInt(pieces[1])
+        let paraIDSource = xcmgarTool.dechexToInt(pieces[1])
 
         //let assetList = {}
         let api = this.api
@@ -682,7 +682,7 @@ module.exports = class ChainParser {
         for (let i = 0; i < a.length; i++) {
             let key = a[i][0];
             let val = a[i][1];
-            let assetID = garTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
+            let assetID = xcmgarTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
             let parsedAsset = {};
             if (useForeignAssetPrefix) {
                 parsedAsset.ForeignAsset = assetID
@@ -696,7 +696,7 @@ module.exports = class ChainParser {
             let chainID = -1
 
             var asset = JSON.stringify(parsedAsset);
-            let assetChainkey = garTool.makeAssetChain(asset, chainkey);
+            let assetChainkey = xcmgarTool.makeAssetChain(asset, chainkey);
             let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
             if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
                 //cached found
@@ -710,7 +710,7 @@ module.exports = class ChainParser {
                 //x1/x2/x3 refers to the number to params
 
                 let interiorK = Object.keys(interior)[0]
-                let interiork = garTool.firstCharLowerCase(interiorK)
+                let interiork = xcmgarTool.firstCharLowerCase(interiorK)
                 let interiorVRaw = interior[interiorK]
 
                 //console.log(`${interiork} interiorVRaw`, interiorVRaw)
@@ -734,18 +734,18 @@ module.exports = class ChainParser {
                 var nativeAsset = JSON.stringify(nativeParsedAsset);
                 let interiorVStr = JSON.stringify(standardizedInteriorV)
 
-                let network = garTool.encodeNetwork(relayChain)
+                let network = xcmgarTool.encodeNetwork(relayChain)
                 if ((standardizedInteriorK == 'here' || standardizedInteriorK == 'Here') && interior[interiorK] == null) {
                     interiorVStr = '"here"'
                 }
-                let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+                let xcmInteriorKey = xcmgarTool.makeXcmInteriorKey(interiorVStr, network)
                 let xcmV1Standardized = JSON.parse(xcmInteriorKey)
-                let xcmV1MultiLocation = garTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? garTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
+                let xcmV1MultiLocation = xcmgarTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
+                let xcmV1MultiLocationByte = (xcmV1MultiLocation) ? xcmgarTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, api) : null
 
                 //console.log(`${chainID} '${interiorVStr}' ${nativeAsset} [${paraID}] | [${symbol}] [${interiorK}]`)
-                //if (this.debugLevel >= garTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
-                let nativeAssetChainkey = garTool.makeAssetChain(nativeAsset, chainkey);
+                //if (this.debugLevel >= xcmgarTool.debugInfo) console.log(`addXcmAssetInfo [${asset}]`, assetInfo)
+                let nativeAssetChainkey = xcmgarTool.makeAssetChain(nativeAsset, chainkey);
                 let xcmAssetInfo = {
                     //interior: interiorVStr, //interior
                     paraID: paraID,
@@ -1024,7 +1024,7 @@ module.exports = class ChainParser {
                     let assetString = JSON.stringify(r.asset)
                     let xcmInteriorKey = r.xcmInteriorKey
                     //let xcmInteriorKey = JSON.stringify(r.xcmV1Standardized)
-                    let assetChainkey = garTool.makeAssetChain(assetString, chainkey)
+                    let assetChainkey = xcmgarTool.makeAssetChain(assetString, chainkey)
                     let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
                     if (cachedAssetInfo != undefined) {
                         cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
@@ -1166,7 +1166,7 @@ module.exports = class ChainParser {
     processV1ConcreteFungible(chainkey, fungibleAsset) {
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSource = garTool.dechexToInt(pieces[1])
+        let paraIDSource = xcmgarTool.dechexToInt(pieces[1])
 
         //let relayChain = indexer.relayChain
         //let paraIDExtra = paraTool.getParaIDExtra(relayChain)
@@ -1235,12 +1235,12 @@ module.exports = class ChainParser {
                     }
 
                     let interiorVStr = JSON.stringify(v1_id_concrete_interiorVal)
-                    let network = garTool.encodeNetwork(relayChain)
+                    let network = xcmgarTool.encodeNetwork(relayChain)
 
                     if ((interiork == 'here' || interiork == 'Here') && interior[interiorK] == null) {
                         interiorVStr = '"here"'
                     }
-                    targetXcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+                    targetXcmInteriorKey = xcmgarTool.makeXcmInteriorKey(interiorVStr, network)
                     let cachedXcmAssetInfo = this.manager.getXcmAsset(xcmInteriorKey)
                     if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                         console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
@@ -1275,9 +1275,9 @@ module.exports = class ChainParser {
     // Auto Inferring xcmInteriorKey - hardcoded for Relaychain xcAsset
     getRelayChainXcmInteriorKey(relayChain = 'polkadot') {
         //assume it's parachain asset has "here"
-        let network = garTool.encodeNetwork(relayChain)
+        let network = xcmgarTool.encodeNetwork(relayChain)
         let interiorVStr = '"here"'
-        let xcmInteriorKey = garTool.makeXcmInteriorKey(interiorVStr, network)
+        let xcmInteriorKey = xcmgarTool.makeXcmInteriorKey(interiorVStr, network)
         return xcmInteriorKey
     }
 
@@ -1315,14 +1315,14 @@ module.exports = class ChainParser {
         }
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`rawAssetID=${rawAssetID}, currency_id`, currency_id)
         if (rawAssetID != undefined) {
-            let assetIDWithComma = garTool.toNumWithComma(garTool.dechexAssetID(rawAssetID))
-            assetID = garTool.cleanedAssetID(assetIDWithComma)
+            let assetIDWithComma = xcmgarTool.toNumWithComma(xcmgarTool.dechexAssetID(rawAssetID))
+            assetID = xcmgarTool.cleanedAssetID(assetIDWithComma)
             let parsedAsset = {
                 Token: assetID
             }
             assetString = JSON.stringify(parsedAsset);
         }
-        if (assetString) assetString = garTool.makeAssetChain(assetString, chainkey)
+        if (assetString) assetString = xcmgarTool.makeAssetChain(assetString, chainkey)
         return [assetID, assetString]
     }
 
