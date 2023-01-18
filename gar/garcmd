@@ -7,7 +7,7 @@
 // EX: test a specific parser
 // Usage: ./garcmd polkadot 2004
 
-var GlobalAssetRegistry = require("./globalassetregistry");
+var XCMGlobalAssetRegistry = require("./xcmgar");
 const endpoints = require("./endpoints");
 
 async function main() {
@@ -22,33 +22,33 @@ async function main() {
         }
     });
 
-    var gar = new GlobalAssetRegistry();
-    await gar.initPublicEndpointsMap(targetedRelaychain)
-    let supportedChains = gar.getSupportedChains()
+    var xcmgar = new XCMGlobalAssetRegistry();
+    await xcmgar.initPublicEndpointsMap(targetedRelaychain)
+    let supportedChains = xcmgar.getSupportedChains()
     let supportedChainKeys = Object.keys(supportedChains)
-    let supportedChainHelper = gar.printChainhelper()
+    let supportedChainHelper = xcmgar.printChainhelper()
 
     console.log(`[${targetedRelaychain}] SupportedChains`, supportedChainHelper)
     if(targetedParaID != 'all') {
         chainkey = `${targetedRelaychain}-${targetedParaID}`
         supportedChainKeys = [chainkey]
     }
-    let failedChainkeys = await gar.batchApiInit(supportedChainKeys)
+    let failedChainkeys = await xcmgar.batchApiInit(supportedChainKeys)
     console.log(`failedChainkeys`, failedChainkeys)
     for (chainkey of supportedChainKeys){
-        let crawler = await gar.getCrawler(chainkey)
+        let crawler = await xcmgar.getCrawler(chainkey)
         if (crawler){
-            await gar.crawlRegistry(crawler)
+            await xcmgar.crawlRegistry(crawler)
         }
     }
-    let chainAssetMap = gar.getChainAssetMap()
-    let xcmAssetMap = gar.getXcmAssetMap()
+    let chainAssetMap = xcmgar.getChainAssetMap()
+    let xcmAssetMap = xcmgar.getXcmAssetMap()
     console.log(`AssetMap`, chainAssetMap)
     console.log(`XcmAssetMap`, xcmAssetMap)
     if(targetedParaID == 'all') {
-        await gar.updateXcmConcept()
+        await xcmgar.updateXcmGar()
     }
-    await gar.updateLocalAsset()
+    await xcmgar.updateLocalAsset()
 }
 
 main()

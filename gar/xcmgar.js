@@ -30,7 +30,7 @@ const {
 const fs = require('fs');
 const path = require("path");
 
-module.exports = class GlobalAssetRegistry {
+module.exports = class XCMGlobalAssetRegistry {
 
     fnDirFn = {};
 
@@ -232,9 +232,9 @@ module.exports = class GlobalAssetRegistry {
         }
     }
 
-    async updateXcmConcept() {
+    async updateXcmGar() {
         let relayChain = this.relaychain
-        await this.writeJSONFn(relayChain, 'xcmConcept', this.getXcmAssetMap())
+        await this.writeJSONFn(relayChain, 'xcmgar', this.getXcmAssetMap())
     }
 
     async updateLocalAsset() {
