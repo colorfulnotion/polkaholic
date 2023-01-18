@@ -31,6 +31,26 @@
     },
     {
         "asset": {
+            "Token": "4"
+        },
+        "name": "Moonriver Token",
+        "symbol": "MOVR",
+        "decimals": 18,
+        "currencyID": "4",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]"
+    },
+    {
+        "asset": {
+            "Token": "5"
+        },
+        "name": "Voucher KSM",
+        "symbol": "VKSM",
+        "decimals": 12,
+        "currencyID": "5",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0104\"}]"
+    },
+    {
+        "asset": {
             "Token": "DOT"
         },
         "name": "DOT",
