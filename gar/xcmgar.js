@@ -242,7 +242,7 @@ module.exports = class XCMGlobalAssetRegistry {
         let chainAssetMap = this.getChainAssetMap()
         for (const chainkey of Object.keys(chainAssetMap)) {
             let pieces = chainkey.split('-')
-            let paraIDSoure = pieces[1]
+            let paraIDSource = pieces[1]
             let localAssetMap = chainAssetMap[chainkey]
             let localAssetList = []
             let localAssetChainkeys = Object.keys(localAssetMap)
@@ -262,7 +262,7 @@ module.exports = class XCMGlobalAssetRegistry {
                 localAssetList.push(a)
             }
             if (localAssetList.length > 0) {
-                await this.writeParaJSONFn(relayChain, paraIDSoure, 'assets', localAssetList)
+                await this.writeParaJSONFn(relayChain, paraIDSource, 'assets', localAssetList)
             }
         }
     }
@@ -358,7 +358,7 @@ module.exports = class XCMGlobalAssetRegistry {
     async init_api_crawler(chainkey) {
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSoure = pieces[1]
+        let paraIDSource = pieces[1]
         let ep = this.getEndpointsBykey(chainkey)
         if (ep) {
             let wsEndpoint = ep.WSEndpoints[0]
@@ -371,7 +371,7 @@ module.exports = class XCMGlobalAssetRegistry {
                 paraID: ep.paraID,
             }
             this.chainAPIs[chainkey] = crawler
-            if (paraIDSoure == '0') {
+            if (paraIDSource == '0') {
                 await this.crawl_valid_parachains(api, relayChain)
             }
             console.log(`[${chainkey}] endpoint:${wsEndpoint} ready`)
@@ -611,13 +611,13 @@ module.exports = class XCMGlobalAssetRegistry {
     }
 
     setXcmAsset(xcmInteriorKey, xcmAssetInfo, chainkey) {
-        let paraIDSoure = xcmgarTool.dechexToInt(xcmAssetInfo.source[0])
+        let paraIDSource = xcmgarTool.dechexToInt(xcmAssetInfo.source[0])
         if (this.xcmAssetMap[xcmInteriorKey] == undefined) {
             console.log(`add new xcm Asset ${xcmInteriorKey}`)
             this.xcmAssetMap[xcmInteriorKey] = xcmAssetInfo
         } else {
             this.xcmAssetMap[xcmInteriorKey].confidence += 1
-            this.xcmAssetMap[xcmInteriorKey].source.push(paraIDSoure)
+            this.xcmAssetMap[xcmInteriorKey].source.push(paraIDSource)
         }
         if (this.chainXcmAssetMap[chainkey] == undefined) this.chainXcmAssetMap[chainkey] = {}
         if (this.chainXcmAssetMap[chainkey][xcmInteriorKey] == undefined) this.chainXcmAssetMap[chainkey][xcmInteriorKey] = {}

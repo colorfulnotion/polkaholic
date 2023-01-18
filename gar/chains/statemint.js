@@ -90,7 +90,7 @@ module.exports = class StatemintParser extends ChainParser {
         console.log(`[${chainkey}] ${this.parserName} manual`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSoure = pieces[1]
+        let paraIDSource = pieces[1]
         let manualRecs = this.manualRegistry[chainkey]
         this.processManualRegistry(chainkey, manualRecs)
     }
@@ -99,10 +99,10 @@ module.exports = class StatemintParser extends ChainParser {
         console.log(`[${chainkey}] ${this.parserName} custom augmentation`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSoure = pieces[1]
+        let paraIDSource = pieces[1]
         let recs = this.augment[chainkey]
         // step 0: fetch specified extrinsics
-        let augmentedExtrinsics = await this.fetchAugmentedExtrincics(chainkey, recs)
+        let augmentedExtrinsics = await this.fetchAugmentedExtrinsics(chainkey, recs)
         for (const augmentedExtrinsic of augmentedExtrinsics) {
             console.log(`augmentedExtrinsic`, augmentedExtrinsic)
             // step 1: use common xTokens parser func available at generic chainparser.
@@ -112,7 +112,7 @@ module.exports = class StatemintParser extends ChainParser {
                 let augmentedInfo = augmentedMap[xcmInteriorKey]
                 let assetID = augmentedInfo.assetID
                 let assetChainkey = augmentedInfo.assetChainkey
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
+                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID)
                 let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
                 if (cachedAssetInfo) {
                     cachedAssetInfo.xcmInteriorKey = xcmInteriorKey

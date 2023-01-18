@@ -989,14 +989,14 @@ module.exports = class ChainParser {
     }
 
     //fetch a list of extrinsic in the format used by polkaholic, including the events
-    async fetchAugmentedExtrincics(chainkey, recs) {
+    async fetchAugmentedExtrinsics(chainkey, recs) {
         //let recs = this.augment[chainkey]
         let augmentedExtrinsics = []
-        console.log(`[${chainkey}] fetchAugmentedExtrincics`, 'recs', recs)
+        console.log(`[${chainkey}] fetchAugmentedExtrinsics`, 'recs', recs)
         if (recs != undefined && Array.isArray(recs)) {
             for (const r of recs) {
                 for (const extrinsicID of r.extrinsicIDs) {
-                    console.log(`fetchAugmentedExtrincics [${extrinsicID}]`)
+                    console.log(`fetchAugmentedExtrinsics [${extrinsicID}]`)
                     let dEx = await this.fetchExtrinsic(chainkey, extrinsicID)
                     console.log(`[${extrinsicID}]`, JSON.stringify(dEx))
                     augmentedExtrinsics.push(dEx)
@@ -1015,7 +1015,7 @@ module.exports = class ChainParser {
     processManualRegistry(chainkey, manualRecs) {
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSoure = pieces[1]
+        let paraIDSource = pieces[1]
         if (manualRecs != undefined && Array.isArray(manualRecs)) {
             // step 0: fetch local asset registry
             let localAssetMap = this.manager.getLocalAssetMap(chainkey)

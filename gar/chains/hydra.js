@@ -72,7 +72,7 @@ module.exports = class HydraParser extends ChainParser {
         console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
-        let paraIDSoure = pieces[1]
+        let paraIDSource = pieces[1]
         //step 0: use fetchQuery to retrieve xc registry at the location [assetManager:assetIdType]
         var a = await super.fetchQuery(chainkey, this.xcGarPallet, this.xcGarStorage, 'xcGAR')
         if (!a) return
@@ -86,7 +86,7 @@ module.exports = class HydraParser extends ChainParser {
                 let assetID = assetIDList[xcmInteriorKey]
                 this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
                 // update global xcRegistry to include assetID used by this parachain
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSoure, assetID)
+                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID)
             }
             for (const assetChainkey of Object.keys(updatedAssetList)) {
                 let assetInfo = updatedAssetList[assetChainkey]
