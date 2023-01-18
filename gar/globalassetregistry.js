@@ -18,7 +18,7 @@ const InterlayParser = require("./chains/interlay")
 const MangataxParser = require("./chains/mangatax")
 const OakParser = require("./chains/oak")
 const RobonomicsParser = require("./chains/robonomics")
-const AltairParser = require("./chains/altair")
+const CentrifugeParser = require("./chains/centrifuge")
 const CloverParser = require("./chains/clover")
 
 const {
@@ -534,8 +534,8 @@ module.exports = class GlobalAssetRegistry {
             chainParser = new MangataxParser(api, manager)
         } else if (this.isMatched(chainkey, ['kusama-2048|robonomics'])) {
             chainParser = new RobonomicsParser(api, manager)
-        } else if (this.isMatched(chainkey, ['kusama-2088|altair'])) {
-            chainParser = new AltairParser(api, manager)
+        } else if (this.isMatched(chainkey, ['polkadot-2031|centrifuge','kusama-2088|altair'])) {
+            chainParser = new CentrifugeParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2090|oak', 'kusama-2114|turing'])) {
             chainParser = new OakParser(api, manager)
         } else if (this.isMatched(chainkey, ['polkadot-2032|interlay', 'kusama-2092|kintsugi'])) {

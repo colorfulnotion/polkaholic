@@ -2,16 +2,17 @@ const garTool = require("../garTool");
 const ChainParser = require("./common_chainparser");
 
 /*
-Fork this template to create new custom parser. And replace all [Altair] in this
+Fork this template to create new custom parser. And replace all [Centrifuge] in this
 file with para name
 
 Support chains
 kusama-2088|altair
+polkadot-2031|centrifuge
 */
 
-module.exports = class AltairParser extends ChainParser {
+module.exports = class CentrifugeParser extends ChainParser {
 
-    parserName = 'Altair';
+    parserName = 'Centrifuge';
 
     //change [garPallet:garPallet] to the location where the asset registry is located.  ex: [assets:metadata]
     garPallet = 'ormlAssetRegistry';
@@ -57,7 +58,7 @@ module.exports = class AltairParser extends ChainParser {
     //step 1: parse gar pallet, storage for parachain's asset registry
     async fetchGar(chainkey) {
         // implement your gar parsing function here.
-        await this.processAltairGar(chainkey)
+        await this.processCentrifugeGar(chainkey)
     }
 
     //step 2: parse xcGar pallet, storage for parachain's xc asset registry
@@ -68,19 +69,19 @@ module.exports = class AltairParser extends ChainParser {
             return
         }
         // implement your xcGar parsing function here.
-        await this.processAltairXcGar(chainkey)
+        await this.processCentrifugeXcGar(chainkey)
     }
 
     //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
         //[Optional A] implement your augment parsing function here.
-        await this.processAltairAugment(chainkey)
+        await this.processCentrifugeAugment(chainkey)
         //[Optional B ] implement your manual registry here.
-        await this.processAltairManualRegistry(chainkey)
+        await this.processCentrifugeManualRegistry(chainkey)
     }
 
-    // Implement Altair gar parsing function here
-    async processAltairGar(chainkey) {
+    // Implement Centrifuge gar parsing function here
+    async processCentrifugeGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
         let a = await super.fetchQuery(chainkey, this.garPallet, this.garStorage, 'GAR')
@@ -95,8 +96,8 @@ module.exports = class AltairParser extends ChainParser {
         }
     }
 
-    // Implement Altair xcgar parsing function here
-    async processAltairXcGar(chainkey) {
+    // Implement Centrifuge xcgar parsing function here
+    async processCentrifugeXcGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
@@ -123,8 +124,8 @@ module.exports = class AltairParser extends ChainParser {
         }
     }
 
-    // Implement Altair manual registry function here
-    async processAltairManualRegistry(chainkey) {
+    // Implement Centrifuge manual registry function here
+    async processCentrifugeManualRegistry(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} manual`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
@@ -133,8 +134,8 @@ module.exports = class AltairParser extends ChainParser {
         this.processManualRegistry(chainkey, manualRecs)
     }
 
-    // Implement Altair Augment function here
-    async processAltairAugment(chainkey) {
+    // Implement Centrifuge Augment function here
+    async processCentrifugeAugment(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom augmentation`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
