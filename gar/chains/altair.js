@@ -2,24 +2,24 @@ const garTool = require("../garTool");
 const ChainParser = require("./common_chainparser");
 
 /*
-Fork this template to create new custom parser. And replace all [Robonomics] in this
+Fork this template to create new custom parser. And replace all [Altair] in this
 file with para name
 
 Support chains
-kusama-2048|robonomics
+kusama-2088|altair
 */
 
-module.exports = class RobonomicsParser extends ChainParser {
+module.exports = class AltairParser extends ChainParser {
 
-    parserName = 'Robonomics';
+    parserName = 'Altair';
 
     //change [garPallet:garPallet] to the location where the asset registry is located.  ex: [assets:metadata]
-    garPallet = 'assets';
+    garPallet = 'ormlAssetRegistry';
     garStorage = 'metadata';
 
     //change [xcGarPallet:xcGarStorage] to the location where the xc registry is located.  ex: [assetManager:assetIdType]
-    xcGarPallet = ''
-    xcGarStorage = ''
+    xcGarPallet = 'ormlAssetRegistry'
+    xcGarStorage = 'metadata'
 
     /*
     Not every parachain has published its xc Asset registry. But we
@@ -52,12 +52,12 @@ module.exports = class RobonomicsParser extends ChainParser {
     augment = {}
     manualRegistry = {}
 
-    isXcRegistryAvailable = false
+    isXcRegistryAvailable = true
 
     //step 1: parse gar pallet, storage for parachain's asset registry
     async fetchGar(chainkey) {
         // implement your gar parsing function here.
-        await this.processRobonomicsGar(chainkey)
+        await this.processAltairGar(chainkey)
     }
 
     //step 2: parse xcGar pallet, storage for parachain's xc asset registry
@@ -68,19 +68,19 @@ module.exports = class RobonomicsParser extends ChainParser {
             return
         }
         // implement your xcGar parsing function here.
-        await this.processRobonomicsXcGar(chainkey)
+        await this.processAltairXcGar(chainkey)
     }
 
     //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
         //[Optional A] implement your augment parsing function here.
-        await this.processRobonomicsAugment(chainkey)
+        await this.processAltairAugment(chainkey)
         //[Optional B ] implement your manual registry here.
-        await this.processRobonomicsManualRegistry(chainkey)
+        await this.processAltairManualRegistry(chainkey)
     }
 
-    // Implement Robonomics gar parsing function here
-    async processRobonomicsGar(chainkey) {
+    // Implement Altair gar parsing function here
+    async processAltairGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
         let a = await super.fetchQuery(chainkey, this.garPallet, this.garStorage, 'GAR')
@@ -95,8 +95,8 @@ module.exports = class RobonomicsParser extends ChainParser {
         }
     }
 
-    // Implement Robonomics xcgar parsing function here
-    async processRobonomicsXcGar(chainkey) {
+    // Implement Altair xcgar parsing function here
+    async processAltairXcGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
@@ -106,7 +106,7 @@ module.exports = class RobonomicsParser extends ChainParser {
         if (!a) return
         if (a) {
             // step 1: use common XcmAssetIdType parser func available at generic chainparser.
-            let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXcmAssetIdType(chainkey, a)
+            let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXcmAssetsRegistryAssetMetadata(chainkey, a)
             console.log(`custom xcAssetList=[${Object.keys(xcAssetList)}], updatedAssetList=[${Object.keys(updatedAssetList)}], unknownAsset=[${Object.keys(unknownAsset)}], assetIDList=[${Object.keys(assetIDList)}]`, xcAssetList)
             // step 2: load up results
             for (const xcmInteriorKey of Object.keys(xcAssetList)) {
@@ -123,8 +123,8 @@ module.exports = class RobonomicsParser extends ChainParser {
         }
     }
 
-    // Implement Robonomics manual registry function here
-    async processRobonomicsManualRegistry(chainkey) {
+    // Implement Altair manual registry function here
+    async processAltairManualRegistry(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} manual`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
@@ -133,8 +133,8 @@ module.exports = class RobonomicsParser extends ChainParser {
         this.processManualRegistry(chainkey, manualRecs)
     }
 
-    // Implement Robonomics Augment function here
-    async processRobonomicsAugment(chainkey) {
+    // Implement Altair Augment function here
+    async processAltairAugment(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom augmentation`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
