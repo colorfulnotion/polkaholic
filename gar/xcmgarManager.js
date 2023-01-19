@@ -1,26 +1,26 @@
 const xcmgarTool = require("./xcmgarTool");
 const endpoints = require("./endpoints");
 
-//const SampleParser = require("./chains/custom_parser_template") // fork this file to include new chain parser
-const CommonChainParser = require("./chains/common_chainparser");
-const AcalaParser = require("./chains/acala");
-const MoonbeamParser = require("./chains/moonbeam");
-const ParallelParser = require("./chains/parallel");
-const AstarParser = require("./chains/astar");
-const HydraParser = require("./chains/hydra");
-const ListenParser = require("./chains/listen");
-const CalamariParser = require("./chains/calamari");
-const ShadowParser = require("./chains/shadow");
-const StatemintParser = require("./chains/statemint")
-const BifrostParser = require("./chains/bifrost")
-const PhalaParser = require("./chains/phala")
-const InterlayParser = require("./chains/interlay")
-const MangataxParser = require("./chains/mangatax")
-const OakParser = require("./chains/oak")
-const RobonomicsParser = require("./chains/robonomics")
-const CentrifugeParser = require("./chains/centrifuge")
-const CloverParser = require("./chains/clover")
-const OriginTrailParser = require("./chains/origintrail")
+//const SampleParser = require("./chainParsers/custom_parser_template") // fork this file to include new chain parser
+const CommonChainParser = require("./chainParsers/common_chainparser");
+const AcalaParser = require("./chainParsers/acala");
+const MoonbeamParser = require("./chainParsers/moonbeam");
+const ParallelParser = require("./chainParsers/parallel");
+const AstarParser = require("./chainParsers/astar");
+const HydraParser = require("./chainParsers/hydra");
+const ListenParser = require("./chainParsers/listen");
+const CalamariParser = require("./chainParsers/calamari");
+const ShadowParser = require("./chainParsers/shadow");
+const StatemintParser = require("./chainParsers/statemint")
+const BifrostParser = require("./chainParsers/bifrost")
+const PhalaParser = require("./chainParsers/phala")
+const InterlayParser = require("./chainParsers/interlay")
+const MangataxParser = require("./chainParsers/mangatax")
+const OakParser = require("./chainParsers/oak")
+const RobonomicsParser = require("./chainParsers/robonomics")
+const CentrifugeParser = require("./chainParsers/centrifuge")
+const CloverParser = require("./chainParsers/clover")
+const OriginTrailParser = require("./chainParsers/origintrail")
 
 const {
     ApiPromise,
@@ -30,7 +30,7 @@ const {
 const fs = require('fs');
 const path = require("path");
 
-module.exports = class XCMGlobalAssetRegistry {
+module.exports = class XCMGlobalAssetRegistryManager {
 
     fnDirFn = {};
 
@@ -69,7 +69,7 @@ module.exports = class XCMGlobalAssetRegistry {
     }
 
     //asset/{relaychain}/{relaychain_paraID_fExt}
-    async writeParaJSONFn(relayChain, paraID, fExt = 'asset', jsonObj = {}) {
+    async writeParaJSONFn(relayChain, paraID, fExt = 'assets', jsonObj = {}) {
         let jsonStr = JSON.stringify(jsonObj, null, 4)
         if (jsonObj == undefined) {
             console.log(`jsonObj missing`)
@@ -87,23 +87,36 @@ module.exports = class XCMGlobalAssetRegistry {
             // set up fnDir fn  (deleting old file if exists)
             try {
                 fnDirFn = path.join(fnDir, fn);
-                console.log("****open_file****", fnDirFn);
+                //console.log("****open_file****", fnDirFn);
                 await fs.closeSync(fs.openSync(fnDirFn, 'w'));
             } catch (err) {
-                console.log(err);
+                console.log(`❌ Error setting up ${fnDir}`, err);
+                process.exit(0)
             }
-        } catch (err) {
-            console.log(err, "open_file", fn);
+        } catch (err0) {
+            console.log(`❌ Error Opening ${fn}:`, err0);
+            process.exit(0)
         }
         try {
-            console.log("***** write_json ***** ", fnDirFn)
             await fs.appendFileSync(fnDirFn, jsonStr);
         } catch (err1) {
-            console.log(err1, "write_json", fnDirFn, jsonObj);
+            console.log(`❌ Error writing ${fnDirFn}:`, err1);
+            process.exit(0)
+        }
+        switch (fExt) {
+            case 'assets':
+                let assetCnt = jsonObj.length
+                console.log(`✅ Success: ${relayChain}-${paraID} Local Asset Regsitry (Found:${assetCnt}) cahced @\n    ${fnDirFn}`)
+                break;
+            case 'xcAssets':
+                console.log(`✅ Success: ${relayChain}-${paraID} XCM/MultiLocation Regsitry cahced @\n    ${fnDirFn}`)
+                break;
+            default:
+                console.log(`✅ Success: ${relayChain}-${paraID} cahced @n    ${fnDirFn}`)
         }
     }
 
-    async writeJSONFn(relayChain, fExt = 'endpoint', jsonObj = {}) {
+    async writeJSONFn(relayChain, fExt = 'publicEndpoints', jsonObj = {}) {
         let jsonStr = JSON.stringify(jsonObj, null, 4)
         if (jsonObj == undefined) {
             console.log(`jsonObj missing`)
@@ -121,19 +134,35 @@ module.exports = class XCMGlobalAssetRegistry {
             // set up fnDir fn  (deleting old file if exists)
             try {
                 fnDirFn = path.join(fnDir, fn);
-                console.log("****open_file****", fnDirFn);
+                //console.log("****open_file****", fnDirFn);
                 await fs.closeSync(fs.openSync(fnDirFn, 'w'));
             } catch (err) {
-                console.log(err);
+                console.log(`❌ Error setting up ${fnDir}`, err);
+                process.exit(0)
             }
-        } catch (err) {
-            console.log(err, "open_file", fn);
+        } catch (err0) {
+            console.log(`❌ Error Opening ${fn}:`, err0);
+            process.exit(0)
         }
         try {
-            console.log("***** write_json ***** ", fnDirFn)
+            //console.log("***** write_json ***** ", fnDirFn)
             await fs.appendFileSync(fnDirFn, jsonStr);
         } catch (err1) {
-            console.log(err1, "write_json", fnDirFn, jsonObj);
+            console.log(`❌ Error writing ${fnDirFn}:`, err1);
+            process.exit(0)
+        }
+
+        switch (fExt) {
+            case 'publicEndpoints':
+                let reachableCnt = Object.keys(jsonObj).length
+                console.log(`✅ Success: ${relayChain} ${reachableCnt} reachable parachain endpoints cahced @\n    ${fnDirFn}`)
+                break;
+            case 'xcmRegistry':
+                let xcmAsseCnt = Object.keys(jsonObj).length
+                console.log(`✅ Success: ${relayChain} XCM Global Asset Registry (Found:${xcmAsseCnt}) cahced @\n    ${fnDirFn}`)
+                break;
+            default:
+                console.log(`✅ Success: ${relayChain} ${fExt} cahced @\n    ${fnDirFn}`)
         }
     }
 
@@ -221,20 +250,22 @@ module.exports = class XCMGlobalAssetRegistry {
         return [parachainList, parathreadList]
     }
 
-    async updatePublicEndpoints(relaychains = ['polkadot', 'kusama'], validParachainList = []) {
+    async updatePublicEndpoints(relaychains = ['polkadot', 'kusama'], validParachainList = [], isUpdate = true) {
         for (const relayChain of relaychains) {
             let [supportedList, unverifiedList, rejectedList, missingList] = endpoints.getEndpointsByRelaychain(relayChain, validParachainList);
             console.log(`Missing ${relayChain} endpoints[${Object.keys(missingList).length}]`, Object.keys(missingList))
             console.log(`Rejected: ${relayChain} endpoints[${Object.keys(rejectedList).length}]`, Object.keys(rejectedList))
             console.log(`Supported: ${relayChain} endpoints[${Object.keys(supportedList).length}]`, Object.keys(supportedList))
             console.log(`Unverified ${relayChain} endpoints[${Object.keys(unverifiedList).length}]`, Object.keys(unverifiedList))
-            await this.writeJSONFn(relayChain, 'publicEndpoints', supportedList)
+            if (isUpdate){
+                await this.writeJSONFn(relayChain, 'publicEndpoints', supportedList)
+            }
         }
     }
 
-    async updateXcmGar() {
+    async updateXcmRegistry() {
         let relayChain = this.relaychain
-        await this.writeJSONFn(relayChain, 'xcmgar', this.getXcmAssetMap())
+        await this.writeJSONFn(relayChain, 'xcmRegistry', this.getXcmAssetMap())
     }
 
     async updateLocalAsset() {
@@ -402,7 +433,6 @@ module.exports = class XCMGlobalAssetRegistry {
 
     async getCrawler(chainkey = 'kusama-0') {
         if (this.chainAPIs[chainkey] != undefined) {
-            console.log(`${chainkey} already initiated`)
             return this.chainAPIs[chainkey]
         } else {
             return false
@@ -411,7 +441,6 @@ module.exports = class XCMGlobalAssetRegistry {
 
     async getAPI(chainkey = 'kusama-0') {
         if (this.chainAPIs[chainkey] != undefined) {
-            console.log(`${chainkey} already initiated`)
             return this.chainAPIs[chainkey]
         } else {
             return false
@@ -507,7 +536,7 @@ module.exports = class XCMGlobalAssetRegistry {
     chainParser implemented, use it instead.
     */
     chainParserInit(chainkey, api, manager) {
-        console.log(`chainParserInit start`)
+        console.log(`[${chainkey}] chainParserInit start`)
         let chainParser;
         if (this.isMatched(chainkey, ['polkadot-2000|acala', 'kusama-2000|karura'])) {
             chainParser = new AcalaParser(api, manager)
@@ -548,7 +577,7 @@ module.exports = class XCMGlobalAssetRegistry {
         } else {
             chainParser = new CommonChainParser(api, manager, false) // set isCustomParser to false
         }
-        console.log(`chainParserInit end`)
+        console.log(`[${chainkey}] chainParserInit end`)
         return chainParser
     }
 
@@ -591,7 +620,7 @@ module.exports = class XCMGlobalAssetRegistry {
     setChainAsset(chainkey, assetChainkey, assetInfo, isUpdate = false) {
         if (assetInfo.xcmInteriorKey != undefined) assetInfo.xcmInteriorKeyV1 = xcmgarTool.convertXcmInteriorKeyV2toV1(assetInfo.xcmInteriorKey)
 
-        if (this.assetMap[assetChainkey] != undefined) console.log(`UPDATED [${chainkey}] ${assetChainkey}`, assetInfo)
+        //if (this.assetMap[assetChainkey] != undefined) console.log(`UPDATED [${chainkey}] ${assetChainkey}`, assetInfo)
         this.assetMap[assetChainkey] = assetInfo
 
         if (this.chainAssetMap[chainkey] == undefined) this.chainAssetMap[chainkey] = {}
@@ -613,7 +642,7 @@ module.exports = class XCMGlobalAssetRegistry {
     setXcmAsset(xcmInteriorKey, xcmAssetInfo, chainkey) {
         let paraIDSource = xcmgarTool.dechexToInt(xcmAssetInfo.source[0])
         if (this.xcmAssetMap[xcmInteriorKey] == undefined) {
-            console.log(`add new xcm Asset ${xcmInteriorKey}`)
+            //console.log(`add new xcm Asset ${xcmInteriorKey}`)
             this.xcmAssetMap[xcmInteriorKey] = xcmAssetInfo
         } else {
             this.xcmAssetMap[xcmInteriorKey].confidence += 1
@@ -635,7 +664,7 @@ module.exports = class XCMGlobalAssetRegistry {
     addXcmAssetLocalCurrencyID(xcmInteriorKey, localParaID, localCurrencyID) {
         let xcmAsset = this.xcmAssetMap[xcmInteriorKey]
         if (xcmAsset != undefined) {
-            console.log(`add LocalCurrencyID ${xcmInteriorKey}`)
+            //console.log(`add LocalCurrencyID ${xcmInteriorKey}`)
             this.xcmAssetMap[xcmInteriorKey]['xcCurrencyID'][localParaID] = localCurrencyID
         }
     }
@@ -644,7 +673,7 @@ module.exports = class XCMGlobalAssetRegistry {
         let xcmAsset = this.xcmAssetMap[xcmInteriorKey]
         if (xcmAsset != undefined) {
             let xcContractAddress = xcmgarTool.xcAssetIDToContractAddr(localCurrencyID)
-            console.log(`add xcContractAddress ${xcContractAddress}`)
+            //console.log(`add xcContractAddress ${xcContractAddress}`)
             this.xcmAssetMap[xcmInteriorKey]['xcContractAddress'][localParaID] = xcContractAddress.toLowerCase()
         }
     }

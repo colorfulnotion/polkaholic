@@ -45,10 +45,10 @@ module.exports = class ChainParser {
                 return true
             }
         } catch (e) {
-            console.log(`err [${chainkey}] detectPalletStorage [${pallet}:${storage}] not detected!`)
+            //console.log(`err [${chainkey}] detectPalletStorage [${pallet}:${storage}] not detected!`)
             return false
         }
-        console.log(`[${chainkey}] detectPalletStorage [${pallet}:${storage}] not detected!`)
+        //console.log(`[${chainkey}] detectPalletStorage [${pallet}:${storage}] not detected!`)
         return false
     }
 
@@ -234,7 +234,7 @@ module.exports = class ChainParser {
                     assetType: xcmgarTool.assetTypeToken
                 };
                 assetList[assetChainkey] = assetInfo
-                console.log(`addAssetInfo [${asset}]`, assetInfo)
+                //console.log(`addAssetInfo [${asset}]`, assetInfo)
                 //this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
             } else {
                 //if (this.debugLevel >= xcmgarTool.debugErrorOnly) console.log("COULD NOT ADD asset -- no assetType", decimals, assetType, parsedAsset, asset);
@@ -532,7 +532,7 @@ module.exports = class ChainParser {
                 }
             }
         }
-        console.log(`** interiork=${interiork}, interiorV`, interiorV, `paraID: ${paraID}`)
+        //console.log(`** interiork=${interiork}, interiorV`, interiorV, `paraID: ${paraID}`)
         return [paraID, interiork, interiorV]
     }
 
@@ -578,7 +578,7 @@ module.exports = class ChainParser {
                 let assetChainkey = xcmgarTool.makeAssetChain(asset, chainkey);
                 let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
                 if (cachedAssetInfo != undefined && cachedAssetInfo.symbol != undefined) {
-                    console.log(`cached AssetInfo found`, cachedAssetInfo)
+                    //console.log(`cached AssetInfo found`, cachedAssetInfo)
                     let symbol = (cachedAssetInfo.symbol) ? cachedAssetInfo.symbol.replace('xc', '') : ''
                     let nativeSymbol = symbol
                     let decimals = cachedAssetInfo.decimals
@@ -640,7 +640,7 @@ module.exports = class ChainParser {
 
                     //For cached found case: let's write xcmInteriorKey back to the cachedAssetInfo
                     cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
-                    console.log(`xcmAssetInfo ${xcmInteriorKey}`, xcmAssetInfo)
+                    //console.log(`xcmAssetInfo ${xcmInteriorKey}`, xcmAssetInfo)
                     xcAssetList[xcmInteriorKey] = xcmAssetInfo
                     assetIDList[xcmInteriorKey] = assetID
                     updatedAssetList[assetChainkey] = cachedAssetInfo

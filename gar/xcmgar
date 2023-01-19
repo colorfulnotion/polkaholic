@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+const { Command } = require('commander');
+const endpoints = require("./endpoints");
+const fs = require('fs');
+var XCMGlobalAssetRegistryManager = require("./xcmgarManager");
+
+class XCMGlobalAssetRegistryCLI {
+    async registry(opt) {
+        //console.log(o)
+        let { relaychain, paraID } = opt;
+        let targetedRelaychain = relaychain
+        let targetedParaID = paraID
+        let isDryRun = (opt.dry)? true : false
+        switch (relaychain) {
+            case 'kusama':
+            case 'polkadot':
+                break;
+            default:
+                console.log(`Unsupported relaychain ${relaychain}.`)
+                return;
+        }
+        var xcmgarm = new XCMGlobalAssetRegistryManager();
+        await xcmgarm.initPublicEndpointsMap(targetedRelaychain)
+        let supportedChains = xcmgarm.getSupportedChains()
+        let supportedChainKeys = Object.keys(supportedChains)
+        let supportedChainHelper = xcmgarm.printChainhelper()
+
+        console.log(`[${targetedRelaychain}] SupportedChains`, supportedChainHelper)
+        if(targetedParaID != 'all') {
+            let singleChainkey = `${targetedRelaychain}-${targetedParaID}`
+            supportedChainKeys = [singleChainkey]
+        }
+        let failedChainkeys = await xcmgarm.batchApiInit(supportedChainKeys)
+        console.log(`failedChainkeys`, failedChainkeys)
+        for (const chainkey of supportedChainKeys){
+            let crawler = await xcmgarm.getCrawler(chainkey)
+            if (crawler){
+                await xcmgarm.crawlRegistry(crawler)
+            }
+        }
+        let chainAssetMap = xcmgarm.getChainAssetMap()
+        let xcmAssetMap = xcmgarm.getXcmAssetMap()
+        console.log(`AssetMap`, chainAssetMap)
+        console.log(`XcmAssetMap`, xcmAssetMap)
+        if (!isDryRun){
+            if(targetedParaID == 'all') {
+                await xcmgarm.updateXcmRegistry()
+            }
+            await xcmgarm.updateLocalAsset()
+        }
+    }
+
+    async updateEndpoints(opt) {
+        var polkadotEndpoint = {
+            chainkey: 'polkadot-0',
+            relaychain: 'polkadot',
+            endpoints: ['wss://rpc.polkadot.io']
+        }
+        var kusamaEndpoint = {
+            chainkey: 'kusama-0',
+            relaychain: 'kusama',
+            endpoints: ['wss://kusama-rpc.polkadot.io']
+        }
+        var xcmgarm = new XCMGlobalAssetRegistryManager();
+        let { relaychain } = opt;
+        let isDryRun = (opt.dry)? true : false
+        let relaychains = [relaychain]
+        let relayEndpoints = []
+        switch (relaychain) {
+            case 'all':
+                relayEndpoints = [polkadotEndpoint, kusamaEndpoint]
+                break;
+            case 'polkadot':
+                relayEndpoints = [polkadotEndpoint]
+                break;
+            case 'kusama':
+                relayEndpoints = [kusamaEndpoint]
+                break;
+            default:
+                console.log(`Unsupported relaychain ${relaychain}.`)
+                return
+        }
+        if (relaychain == 'all'){
+            relaychains = ['polkadot', 'kusama']
+        }
+        let validParachainList = await xcmgarm.fetchParaIDs(relayEndpoints)
+        await xcmgarm.updatePublicEndpoints(relaychains, validParachainList, !isDryRun)
+    }
+}
+
+async function main() {
+    const program = new Command();
+    program
+	.name('xcmgar')
+	.description('XCM Global Asset Registry. Repo: https://github.com/colorfulnotion/xcm-global-registry')
+	.version('0.0.1');
+
+    program.command('registry')
+	.description('Fetch on-chain Asset Registry and XCM MultiLocation Registry')
+	.option('-r, --relaychain <relaychain>', 'relaychain (polkadot or kusama)', 'polkadot')
+    .option('-p, --paraID <paraID>', `Targeted paraID (relaychain itself is identified using paraID=0). If not specified, crawl for all reachable parachains.`, 'all')
+    .option('-d, --dry', `dry run the cmd without updating`, false)
+	.action(async (opt) => {
+	    let xcmgarcli = new XCMGlobalAssetRegistryCLI();
+	    await xcmgarcli.registry(opt);
+	});
+
+    program.command('endpoint')
+	.description('Update public endpoints')
+	.option('-r, --relaychain <relaychain>', 'Targeted relaychain (polkadot or kusama). If not specified, crawl both polkadot and kusama.', 'all')
+    .option('-d, --dry', `dry run the cmd without updating`, false)
+	.action(async (opt) => {
+	    let xcmgarcli = new XCMGlobalAssetRegistryCLI();
+	    await xcmgarcli.updateEndpoints(opt);
+	});
+    await program.parseAsync(process.argv);
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

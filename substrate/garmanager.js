@@ -5,7 +5,7 @@ const path = require("path");
 const AssetManager = require("./assetManager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
-const garTool = require("./../gar/garTool");
+const xcmgarTool = require("./../gar/xcmgarTool");
 
 const Endpoints = require("./summary/endpoints");
 const mysql = require("mysql2");
@@ -23,7 +23,7 @@ const {
 
 module.exports = class GarManager extends AssetManager {
 
-    readJSONFn(relayChain = 'polkadot', fExt = 'xcmConcept') {
+    readJSONFn(relayChain = 'polkadot', fExt = 'xcmRegistry') {
         const logDir = "../gar"
         let fnDir = path.join(logDir, fExt);
         let fn = `${relayChain}_${fExt}.json`
@@ -99,7 +99,7 @@ module.exports = class GarManager extends AssetManager {
             let nativeAssetChain = paraTool.makeAssetChain(assetString, chainID)
             let xcCurrencyIDMap = {}
             for (const paraIDSource of Object.keys(xcmAsset.xcCurrencyID)) {
-                let chainIDsource = paraTool.getChainIDFromParaIDAndRelayChain(garTool.dechexToInt(paraIDSource), xcmAsset.relayChain)
+                let chainIDsource = paraTool.getChainIDFromParaIDAndRelayChain(xcmgarTool.dechexToInt(paraIDSource), xcmAsset.relayChain)
                 let currencyID = xcmAsset.xcCurrencyID[paraIDSource]
                 let assetString = '';
                 if (this.isObject(currencyID)) {

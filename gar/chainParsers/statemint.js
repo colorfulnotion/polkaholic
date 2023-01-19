@@ -2,85 +2,70 @@ const xcmgarTool = require("../xcmgarTool");
 const ChainParser = require("./common_chainparser");
 
 /*
-Fork this template to create new custom parser. And replace all [Sample] in this
-file with para name
+Fork this template to create new custom parser
 
 Support chains
-[relaychain-paraID|projectName]
+polkadot-1000|statemint
+kusama-1000|statemine
 */
 
-module.exports = class SampleParser extends ChainParser {
+module.exports = class StatemintParser extends ChainParser {
 
-    parserName = 'ChangeToProjectName';
+    parserName = 'Statemint';
 
     //change [garPallet:garPallet] to the location where the asset registry is located.  ex: [assets:metadata]
     garPallet = 'assets';
     garStorage = 'metadata';
 
     //change [xcGarPallet:xcGarStorage] to the location where the xc registry is located.  ex: [assetManager:assetIdType]
-    xcGarPallet = 'assetManager'
-    xcGarStorage = 'assetIdType'
+    xcGarPallet = 'unknown'
+    xcGarStorage = 'unknown'
 
-    /*
-    Not every parachain has published its xc Asset registry. But we
-    can still augment xcAsset registry by inferring.
-
-    To augment the xcAsset by parsing, please provide an array of xcm extrinsicIDs
-    containing the xcAsset asset you try to cover:
-
-    augment = {
-        'relaychain-paraID': [{
-            paraID: 'paraID',
-            extrinsicIDs: ['extrinsicID']
-        }]
-    }
-    */
-
-    /*
-    Parachain usually does not publish native asset in its own xc registry.
-    Allow team to polish xcRegistry using the following format:
-
-    manualRegistry = {
-        "relaychain-paraID": [{
-            asset: {
-                "Token": "currencyID"
-            },
-            xcmV1Standardized: [{"network":"relaychain"},{"parachain":paraID},{palletInstance/generalKey/generalIndex...}],
-        }]
-    }
-    */
     augment = {}
-    manualRegistry = {}
+    manualRegistry = {
+        "polkadot-1000": [{
+            asset: {
+                "Token": "1984"
+            },
+            xcmInteriorKey: '[{"network":"polkadot"},{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'
+        }],
+        'kusama-1000': [{
+            asset: {
+                "Token": "1984"
+            },
+            xcmInteriorKey: '[{"network":"kusama"},{"parachain":1000},{"palletInstance":50},{"generalIndex":1984}]'
+        }]
+    }
 
-    isXcRegistryAvailable = true
+    isXcRegistryAvailable = false
 
     //step 1: parse gar pallet, storage for parachain's asset registry
     async fetchGar(chainkey) {
         // implement your gar parsing function here.
-        await this.processSampleGar(chainkey)
+        await this.processStatemintGar(chainkey)
     }
 
     //step 2: parse xcGar pallet, storage for parachain's xc asset registry
     async fetchXcGar(chainkey) {
+        //statemint does not expose xc registry
         if (!this.isXcRegistryAvailable) {
             // skip if xcGar parser is unavailable
             console.log(`[${chainkey}] ${this.parserName} xcGar NOT IMPLEMENTED - SKIP`)
             return
         }
-        // implement your xcGar parsing function here.
-        await this.processSampleXcGar(chainkey)
     }
 
     //step 3: Optional augmentation by providing (a) a list xcm extrinsicIDs or (b) known xcmInteriorKeys-assets mapping
     async fetchAugments(chainkey) {
         //[Optional A] implement your augment parsing function here.
-        await this.processSampleAugment(chainkey)
+        await this.processStatemintAugment(chainkey)
         //[Optional B ] implement your manual registry here.
-        await this.processSampleManualRegistry(chainkey)
+        await this.processStatemintManualRegistry(chainkey)
+
     }
 
-    // Implement Sample gar parsing function here
-    async processSampleGar(chainkey) {
+    // Implement statemint gar parsing function here
+    async processStatemintGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
         //step 0: use fetchQuery to retrieve gar registry at the location [assets:garStorage]
         let a = await super.fetchQuery(chainkey, this.garPallet, this.garStorage, 'GAR')
@@ -95,36 +80,13 @@ module.exports = class SampleParser extends ChainParser {
         }
     }
 
-    // Implement Sample xcgar parsing function here
-    async processSampleXcGar(chainkey) {
-        console.log(`[${chainkey}] ${this.parserName} custom xcGAR parser`)
-        let pieces = chainkey.split('-')
-        let relayChain = pieces[0]
-        let paraIDSource = pieces[1]
-        //step 0: use fetchQuery to retrieve xc registry at the location [assetManager:assetIdType]
-        var a = await super.fetchQuery(chainkey, this.xcGarPallet, this.xcGarStorage, 'xcGAR')
-        if (!a) return
-        if (a) {
-            // step 1: use common XcmAssetIdType parser func available at generic chainparser.
-            let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXcmAssetIdType(chainkey, a)
-            console.log(`custom xcAssetList=[${Object.keys(xcAssetList)}], updatedAssetList=[${Object.keys(updatedAssetList)}], unknownAsset=[${Object.keys(unknownAsset)}], assetIDList=[${Object.keys(assetIDList)}]`, xcAssetList)
-            // step 2: load up results
-            for (const xcmInteriorKey of Object.keys(xcAssetList)) {
-                let xcmAssetInfo = xcAssetList[xcmInteriorKey]
-                let assetID = assetIDList[xcmInteriorKey]
-                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
-                // update global xcRegistry to include assetID used by this parachain
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID)
-            }
-            for (const assetChainkey of Object.keys(updatedAssetList)) {
-                let assetInfo = updatedAssetList[assetChainkey]
-                this.manager.setChainAsset(chainkey, assetChainkey, assetInfo, true)
-            }
-        }
+    // Implement statemint xcGar parsing function here
+    async processStatemintXcGar(chainkey) {
+        //TODO
     }
 
-    // Implement Sample manual registry function here
-    async processSampleManualRegistry(chainkey) {
+    // Implement Statemint manual registry function here
+    async processStatemintManualRegistry(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} manual`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
@@ -133,8 +95,7 @@ module.exports = class SampleParser extends ChainParser {
         this.processManualRegistry(chainkey, manualRecs)
     }
 
-    // Implement Sample Augment function here
-    async processSampleAugment(chainkey) {
+    async processStatemintAugment(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom augmentation`)
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]

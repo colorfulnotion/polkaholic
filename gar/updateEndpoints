@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // Usage:
 
-var XCMGlobalAssetRegistry = require("./xcmgar");
-
+var XCMGlobalAssetRegistryManager = require("./xcmgarManager");
 
 var polkadotEndpoint = {
     chainkey: 'polkadot-0',
@@ -16,10 +15,10 @@ var kusamaEndpoint = {
 }
 
 async function main() {
-    var xcmgar = new XCMGlobalAssetRegistry();
+    var xcmgarm = new XCMGlobalAssetRegistryManager();
     let relaychains = ['polkadot', 'kusama']
-    let validParachainList = await xcmgar.fetchParaIDs([polkadotEndpoint, kusamaEndpoint])
-    await xcmgar.updatePublicEndpoints(relaychains, validParachainList)
+    let validParachainList = await xcmgarm.fetchParaIDs([polkadotEndpoint, kusamaEndpoint])
+    await xcmgarm.updatePublicEndpoints(relaychains, validParachainList)
 }
 
 main()
