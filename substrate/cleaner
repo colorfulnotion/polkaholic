@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+ // Usage:  xcmcleaner [extrinsicHash]
+var XCMCleaner = require("./xcmCleaner.js");
+
+async function main() {
+    while ( 1 )  {
+	var manager = new XCMCleaner();
+	await manager.assetManagerInit();
+	let res = await manager.bulk_generate_XCMInfo(null, 1);
+	await manager.sleep(2000)
+    }
+}
+
+
+main()
+    .then(() => {
+        console.log("finishing...")
+
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

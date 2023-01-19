@@ -415,7 +415,7 @@ module.exports = class XCMManager extends Query {
         }, sqlDebug); */
     }
 
-    async buildSuccessXcmTransactInfo(substrateTx, remoteEvmTx, matchRec) {
+    async buildSuccessXcmTransactInfo(substrateTx, remoteEvmTx, matchRec, xcmIndex = 0, transferIndex = 0) {
         let decorate = true
         let decorateExtra = ["usd", "address", "related", "data"]
         let d = substrateTx
@@ -473,10 +473,11 @@ module.exports = class XCMManager extends Query {
         }
 
         //fee -> initiation + teleport fee
-        // those number doesn't make sense...
-        if (decimals !== false) {
+        xcm.sourceTxFee = 0;
+        xcm.sourceTxFeeUSD = 0;
+        xcm.sourceChainSymbol = null;
+        if (decimals !== false && (xcmIndex == 0 && transferIndex == 0)) {
             xcm.fee = xcm.amountSent - xcm.amountReceived
-            //xcm.feeUSD = xcm.fee * (xcm.amountSentUSD / xcm.amountReceived) // temp hack
             xcm.feeUSD = 0
             xcm.sourceTxFee = sourceTxFee
             xcm.sourceTxFeeUSD = sourceTxFeeUSD
@@ -559,7 +560,7 @@ module.exports = class XCMManager extends Query {
     }
 
 
-    async buildSuccessXcmInfo(substrateTx, matchRec) {
+    async buildSuccessXcmInfo(substrateTx, matchRec, xcmIndex = 0, transferIndex = 0) {
         let decorate = true
         let decorateExtra = ["usd", "address", "related", "data"]
         let d = substrateTx
@@ -623,52 +624,38 @@ module.exports = class XCMManager extends Query {
             xcm.symbol = this.getAssetSymbol(xcm.asset);
         }
 
-        //fee -> initiation + teleport fee
-        if (decimals !== false) {
-            // TODO --- IDEA: if we know feeSymbol and get fee priceUSD then we should compute estfeeUSD with that instead of this
-            let fee = xcm.amountSent - xcm.amountReceived
-            let estPrice = xcm.amountSentUSD / xcm.amountReceived
-            let estFeeUSD = estPrice * fee // temp hack
-            if (xcm.xcmMethod == 'transferMulticurrencies') {
-                console.log(`extrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceived}, fee=${fee}, p=${estPrice}, feeUSD=${estFeeUSD}, feeSymbol=${xcm.symbol}`)
-            }
-            xcm.fee = fee
-            if (estFeeUSD > 0 && estFeeUSD < this.irregularFeeUSDThreshold) {
-                xcm.feeUSD = estFeeUSD
-            } else {
-                console.log(`Irregular FeeUSD xtrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceived}, fee=${fee}, p=${estPrice}, feeUSD=${estFeeUSD}, feeSymbol=${xcm.symbol}`)
-                xcm.feeUSD = 0
-            }
+        //txfees
+        // 100% of txfees are assigned to the first xcmIndex/transferIndex
+        if (xcmIndex == 0 && transferIndex == 0) {
             xcm.sourceTxFee = sourceTxFee
             xcm.sourceTxFeeUSD = sourceTxFeeUSD
             xcm.sourceChainSymbol = sourceChainSymbol
-            /*await this.decorateUSD(xcm, "amountSent", xcm.asset, xcm.chainID, xcm.destTS, decorateUSD)
-            if (decorateUSD){
-              xcm.amountReceivedUSD = xcm.priceUSD * xcm.amountReceived;
-            }
-            */
-            if (xcm.amountSentUSD > xcm.amountReceivedUSD && xcm.amountReceivedUSD > 0 && xcm.amountSentUSD - xcm.amountReceivedUSD < this.irregularFeeUSDThreshold) {
-                xcm.feeUSD = xcm.amountSentUSD - xcm.amountReceivedUSD
-            }
-            let p = await this.computePriceUSD({
-                val: xcm.amountSent,
-                asset: xcm.asset,
-                chainID: xcm.chainID,
-                ts: xcm.destTS
-            });
-            if (p) {
-                //console.log(`p found`, p)
-                xcm.amountSentUSD = p.valUSD;
-                xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
-                xcm.feeUSD = p.priceUSD * xcm.fee
-                if (xcm.feeUSD > this.irregularFeeUSDThreshold) {
-                    console.log(`Irregular FeeUSD  feeUSD extrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceivedUSD}, feeUSD=${estFeeUSD}`)
-                    xcm.feeUSD = 0
-                }
-                xcm.priceUSD = p.priceUSD;
-                xcm.priceUSDCurrent = p.priceUSDCurrent;
-            }
+        } else {
+            xcm.sourceTxFee = 0;
+            xcm.sourceTxFeeUSD = 0;
+            xcm.sourceChainSymbol = null;
         }
+        // teleport fee
+        xcm.fee = xcm.amountSent - xcm.amountReceived
+        let p = await this.computePriceUSD({
+            val: xcm.amountSent,
+            asset: xcm.asset,
+            chainID: xcm.chainID,
+            ts: xcm.destTS
+        });
+        if (p) {
+            //console.log(`p found`, p)
+            xcm.amountSentUSD = p.valUSD;
+            xcm.amountReceivedUSD = p.priceUSD * xcm.amountReceived;
+            xcm.feeUSD = p.priceUSD * xcm.fee
+            if (xcm.feeUSD > this.irregularFeeUSDThreshold) {
+                console.log(`Irregular FeeUSD  feeUSD extrinsicHash=${xcm.extrinsicHash}, amountSentUSD=${xcm.amountSentUSD}, amountReceived=${xcm.amountReceivedUSD}, feeUSD=${estFeeUSD}`)
+                xcm.feeUSD = 0
+            }
+            xcm.priceUSD = p.priceUSD;
+            xcm.priceUSDCurrent = p.priceUSDCurrent;
+        }
+
         let xcmInfo = {
             symbol: xcm.symbol,
             priceUSD: xcm.priceUSD,
@@ -732,7 +719,7 @@ module.exports = class XCMManager extends Query {
 
 
 
-    async buildFailedXcmInfo(substrateTx, failedRecord) {
+    async buildFailedXcmInfo(substrateTx, failedRecord, xcmIndex = 0, transferIndex = 0) {
         let decorate = true
         let decorateExtra = ["usd", "address", "related", "data"]
         let d = substrateTx
@@ -787,7 +774,10 @@ module.exports = class XCMManager extends Query {
         }
 
         //fee -> initiation only; teleport fee are irrelevant
-        if (decimals !== false) {
+        xcm.sourceTxFee = 0;
+        xcm.sourceTxFeeUSD = 0;
+        xcm.sourceChainSymbol = null;
+        if (decimals !== false && (xcmIndex == 0 && transferIndex == 0)) {
             xcm.sourceTxFee = sourceTxFee
             xcm.sourceTxFeeUSD = sourceTxFeeUSD
             xcm.sourceChainSymbol = sourceChainSymbol
@@ -950,6 +940,8 @@ module.exports = class XCMManager extends Query {
           xcmtransfer.sentAt,
           xcmtransfer.blockNumber,
           xcmtransfer.sectionMethod,
+          xcmtransfer.xcmIndex,
+          xcmtransfer.transferIndex,
           xcmtransfer.xcmType,
           xcmtransfer.xcmInfoAudited,
           d.eventID,
@@ -1083,7 +1075,7 @@ module.exports = class XCMManager extends Query {
                     let xcmInfo, xcmOld;
                     if (substratetx != undefined) {
                         try {
-                            [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match)
+                            [xcmInfo, xcmOld] = await this.buildSuccessXcmInfo(substratetx, match, d.xcmIndex, d.transferIndex)
                             if (this.debugLevel > paraTool.debugTracing) console.log(`buildSuccessXcmInfo sendExternalWSProvider`, xcmInfo)
                             //this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
@@ -1191,6 +1183,8 @@ module.exports = class XCMManager extends Query {
           xcmtransfer.blockNumber,
           xcmtransfer.sectionMethod,
           xcmtransfer.xcmType,
+          xcmtransfer.xcmIndex,
+          xcmtransfer.transferIndex,
           xcmtransfer.connectedTxHash as remoteEVMTxHash,
           d.eventID,
           d.extrinsicID as destExtrinsicID,
@@ -1325,7 +1319,7 @@ module.exports = class XCMManager extends Query {
                     let xcmInfo, xcmOld;
                     if (substratetx != undefined) {
                         try {
-                            [xcmInfo, xcmOld] = await this.buildSuccessXcmTransactInfo(substratetx, remoteEvmTx, match)
+                            [xcmInfo, xcmOld] = await this.buildSuccessXcmTransactInfo(substratetx, remoteEvmTx, match, d.xcmIndex, d.transferIndex)
                             //if (this.debugLevel > paraTool.debugTracing) console.log(`TODO: buildSuccessXcmTransactInfo sendExternalWSProvider`, xcmInfo)
                         } catch (e) {
                             console.log(`!!!!buildSuccessXcmTransactInfo extrinsicHash=${substrateTxHash} ERROR!!!!, xcmInfo`, xcmInfo)
@@ -1453,6 +1447,8 @@ module.exports = class XCMManager extends Query {
           xcmtransfer.destStatus,
           xcmtransfer.errorDesc,
           xcmtransfer.incomplete,
+          xcmtransfer.xcmIndex,
+          xcmtransfer.transferIndex,
           xcmtransfer.blockNumberDest
         from xcmtransfer
  where  ((xcmtransfer.destStatus = 0 and xcmtransfer.incomplete = 0) or xcmtransfer.incomplete = 1) and
@@ -1569,7 +1565,7 @@ module.exports = class XCMManager extends Query {
                     let xcmInfo, xcmOld;
                     if (substratetx != undefined) {
                         try {
-                            [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord)
+                            [xcmInfo, xcmOld] = await this.buildFailedXcmInfo(substratetx, failedRecord, d.xcmIndex, d.transferIndex)
                             if (this.debugLevel > paraTool.debugTracing) console.log(`buildFailedXcmInfo sendExternalWSProvider`, xcmInfo)
                             //this.sendExternalWSProvider("xcminfo", xcmInfo);
                         } catch (e) {
@@ -2717,7 +2713,7 @@ order by msgHash`
                 let extrinsicID = xcmmatches[i].extrinsicID;
                 let xcmIndex = xcmmatches[i].xcmIndex;
                 let transferIndex = xcmmatches[i].transferIndex;
-		let destStatus = xcmmatches[i].destStatus;
+                let destStatus = xcmmatches[i].destStatus;
                 let x = JSON.parse(xcmmatches[i].xcmInfo);
                 let amountSent = 0;
                 let amountSentUSD = 0;
@@ -2739,10 +2735,10 @@ order by msgHash`
                         //    one xcminfo has isFeeItem=1 (fee paying item) and
                         //    one xcminfo has isFeeItem=0 (the asset being transferred)
                         confidence = amountReceived / amountSent;
-			destStatus = 1;
+                        destStatus = 1;
                     } else {
                         confidence = 0;
-			destStatus = -1;
+                        destStatus = -1;
                     }
                 } else {
                     destStatus = -1;

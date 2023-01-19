@@ -224,6 +224,29 @@ module.exports = class XCMCleaner extends Query {
         return null;
     }
 
+    async get_tx_fees(extrinsicHash) {
+        let txFee = 0;
+        let txFeeUSD = 0;
+        let txFeeChainSymbol = null;
+        let d = await this.getTransaction(extrinsicHash);
+        txFee = d.fee
+        txFeeUSD = d.feeUSD
+        txFeeChainSymbol = d.chainSymbol
+        if (d.evm != undefined && d.evm.transactionHash != undefined) {
+            let evmTransactionHash = d.evm.transactionHash
+            let evmtx = await this.getTransaction(evmTransactionHash);
+            if (!evmtx) return [false, false]
+            txFee = evmtx.fee
+            txFeeUSD = evmtx.feeUSD
+            txFeeChainSymbol = evmtx.symbol
+        }
+        return {
+            txFee,
+            txFeeUSD,
+            txFeeChainSymbol
+        }
+    }
+
     /*
     for any extrinsicHash / extrinsicID in xcmtransfer, pull out the assetChain/xcmInteriorKey, sourceTS, beneficiary and construct the "origination" structure
 read a short window of  N minutes from block${chainIDDest} and open up an API connection for ${chainIDDest}.  Query beneficiary for all N minutes for { accounts, tokens } for the asset
@@ -284,13 +307,16 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 if (xcm.fromAddress.length == 66) xcm.destAddress = paraTool.getAddress(xcm.fromAddress, chainIDDestInfo.ss58Format)
             }
         }
-        let isMsgSent = (xcm.failureType == 'failedOrigination') ? true : false
+        let isMsgSent = (xcm.incomplete == 0) ? true : false;
+        // note that we assign 100% of the tx fees to the FIRST xcmIndex (message) and FIRST asset
+        let fees = (transferIndex == 0 && xcmIndex == 0) ? await this.get_tx_fees(extrinsicHash) : null;
+
         let xcmInfo = {
             symbol: xcm.symbol,
             priceUSD: xcm.priceUSD,
             relayChain: {
                 relayChain: xcm.relayChain,
-                relayAt: (xcm.failureType == 'failedOrigination') ? null : xcm.sentAt, // failedOrigination are not relayed
+                relayAt: isMsgSent ? xcm.sentAt : null,
             },
             origination: {
                 chainName: xcm.chainName,
@@ -298,17 +324,18 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 chainID: xcm.chainID,
                 paraID: xcm.paraID,
                 sender: xcm.fromAddress,
-                amountSent: (xcm.failureType == 'failedOrigination') ? 0 : xcm.amountSent, //failedOrigination deosn't send anything
-                amountSentUSD: (xcm.failureType == 'failedOrigination') ? 0 : xcm.amountSentUSD, //failedOrigination deosn't send anything
+                amountSent: isMsgSent ? xcm.amountSent : 0,
+                amountSentUSD: isMsgSent ? xcm.amountSentUSD : 0,
                 blockNumber: xcm.blockNumber,
                 extrinsicID: xcm.extrinsicID,
                 extrinsicHash: xcm.extrinsicHash,
-
+                txFee: fees ? fees.txFee : 0,
+                txFeeUSD: fees ? fees.txFeeUSD : 0,
+                txFeeChainSymbol: fees ? fees.txFeeChainSymbol : "",
                 msgHash: xcm.msgHash,
                 sentAt: xcm.sentAt,
                 ts: xcm.sourceTS,
-                //complete: (xcm.failureType == 'failedOrigination') ? false : true,
-                //isMsgSent: isMsgSent,
+                isMsgSent: isMsgSent,
                 finalized: true,
             },
             destination: {
@@ -332,20 +359,20 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             },
             version: 'V4'
         }
-	let invalid_dest_address = false;
-	if ( ! xcm.destAddress ) invalid_dest_address = true;
+        let invalid_dest_address = false;
+        if (!xcm.destAddress) invalid_dest_address = true;
         xcmInfo.origination.section = xcmSection;
         xcmInfo.origination.method = xcmMethod;
         try {
             console.log("xcm.amountSent", xcm.amountSent, "Dest", xcm.destAddress, invalid_dest_address);
-	    if ( xcmInfo.destination.chainID == 2011 || xcmInfo.destination.chainID ==	22024 || xcmInfo.destination.chainID == -1 || invalid_dest_address || xcm.xcmInfoAudited < -1 ) {
-		xcmInfo.destination.executionStatus = "unknown";
+            if (xcmInfo.destination.chainID == 2011 || xcmInfo.destination.chainID == 22024 || xcmInfo.destination.chainID == -1 || invalid_dest_address || xcm.xcmInfoAudited < -1) {
+                xcmInfo.destination.executionStatus = "unknown";
                 let sql_final = `update xcmtransfer set xcmInfoAudited = 2, destStatus = -1, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
                 console.log(sql_final);
                 this.batchedSQL.push(sql_final);
                 await this.update_batchedSQL();
                 return xcmInfo;
-	    }
+            }
             let [balances, blocks] = await this.searchDestinationChainBalances(xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol);
             if (balances) {
                 let best = this.match_balance_adjustment(balances, xcm.amountSent, blocks);
@@ -401,26 +428,26 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
     async bulk_generate_XCMInfo(chainIDDest = null, limit = 1000) {
         let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and  xcmInfoAudited = 0 and sourceTS > UNIX_TIMESTAMP("2023-01-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) ${w} order by sourceTS desc limit ${limit}`;
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and xcmInfoAudited = 0 and sourceTS > UNIX_TIMESTAMP(date_sub(Now(), interval 24 hour)) and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) ${w} order by sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
-	let extrinsic = {};
-	let extrinsicconfidence = {};
+        let extrinsic = {};
+        let extrinsicconfidence = {};
         let results = {};
-	if ( extrinsics.length == 0 ) {
-	    return (false);
-	}
+        if (extrinsics.length == 0) {
+            return (false);
+        }
         for (const e of extrinsics) {
             try {
                 let xcmInfo = await this.generate_extrinsic_XCMInfo(e.extrinsicHash, e.transferIndex, e.xcmIndex);
                 if (results[e.extrinsicHash] == undefined) {
                     results[e.extrinsicHash] = [xcmInfo];
-		    extrinsic[e.extrinsicHash] = e;
-		    extrinsicconfidence[e.extrinsicHash] = this.get_confidence(xcmInfo);
+                    extrinsic[e.extrinsicHash] = e;
+                    extrinsicconfidence[e.extrinsicHash] = this.get_confidence(xcmInfo);
                 } else {
                     let confidence = this.get_confidence(xcmInfo)
                     if (confidence > extrinsicconfidence[e.extrinsicHash]) {
-			extrinsicconfidence[e.extrinsicHash] = confidence;
+                        extrinsicconfidence[e.extrinsicHash] = confidence;
                     }
                 }
             } catch (err) {
@@ -428,15 +455,15 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             }
         }
 
-	let hashesRowsToInsert = [];
-	for (const extrinsicHash of Object.keys(extrinsicconfidence) ) {
-	    let confidence = extrinsicconfidence[extrinsicHash]; // store confidence in xcmtransfer
-	    let e = extrinsic[extrinsicHash];
-	    let extrinsicID = e.extrinsicID;
-	    let sourceTS = e.sourceTS;
+        let hashesRowsToInsert = [];
+        for (const extrinsicHash of Object.keys(extrinsicconfidence)) {
+            let confidence = extrinsicconfidence[extrinsicHash]; // store confidence in xcmtransfer
+            let e = extrinsic[extrinsicHash];
+            let extrinsicID = e.extrinsicID;
+            let sourceTS = e.sourceTS;
             let hashrec = {};
             let col = extrinsicID
-	    let xcmInfo = results[extrinsicHash];
+            let xcmInfo = results[extrinsicHash];
             hashrec[col] = {
                 value: (xcmInfo.length == 1) ? JSON.stringify(xcmInfo[0]) : JSON.stringify(xcmInfo),
                 timestamp: sourceTS * 1000000
@@ -451,8 +478,8 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
         if (hashesRowsToInsert.length > 0) {
             await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
-	}
-	return(true);
+        }
+        return (true);
     }
 
 

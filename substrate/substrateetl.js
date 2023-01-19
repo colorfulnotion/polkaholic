@@ -283,7 +283,7 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async dump_xcmtransfers_range(relayChain = "polkadot", range_days_ago = 2) {
         let currTS = this.getCurrentTS();
-	range_days_ago = ( relayChain == "kusama" ) ? 567 : 260;
+        range_days_ago = (relayChain == "kusama") ? 567 : 260;
         for (let daysago = 90; daysago < range_days_ago; daysago++) {
             let ts = currTS - 86400 * daysago;
             let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
