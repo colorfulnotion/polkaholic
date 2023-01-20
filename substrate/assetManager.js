@@ -549,7 +549,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     a.decimals = decimals
                     a.symbol = symbol
                     if (symbol) {
-                        let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain); // REVIEW: why upper case here??
+                        let symbolRelayChain = paraTool.makeXcmInteriorKey(symbol.toUpperCase(), v.relayChain);
                         xcmSymbolInfo[symbolRelayChain] = a
                     }
                     xcmAssetInfo[xcmInteriorKey] = a; //the key has no chainID
@@ -615,18 +615,56 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
             }
 
-            let assetRecs = await this.poolREADONLY.query("select chainID, currencyID, xcContractAddress, xcmInteriorKey from asset where xcmInteriorKey is not null and (xcContractAddress is not null or currencyID is not null)");
+            let assetRecs = await this.poolREADONLY.query("select asset.chainID, asset.asset, asset.currencyID, asset.xcContractAddress, asset.xcmInteriorKey, xcmasset.symbol, xcmasset.relayChain from asset join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey and (xcContractAddress is not null or currencyID is not null)");
             for (const assetRec of assetRecs) {
-                let xcmInteriorKey = assetRec.xcmInteriorKey
-                if (xcmConceptInfo[xcmInteriorKey] != undefined) {
-                    let relaychain = paraTool.getRelayChainByChainID(assetRec.chainID)
-                    let paraID = paraTool.getParaIDfromChainID(assetRec.chainID)
-                    if (assetRec.xcContractAddress != null) xcmConceptInfo[xcmInteriorKey]["xcContractAddress"][paraID] = assetRec.xcContractAddress
-                    if (assetRec.currencyID != null && !isNaN(assetRec.currencyID)) xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"][paraID] = assetRec.currencyID
-                    //if (assetRec.xcContractAddress != null) xcmConceptInfo[xcmInteriorKey]["xcContractAddress"][assetRec.chainID] = assetRec.xcContractAddress
-                    //if (assetRec.currencyID != null && !isNaN(assetRec.currencyID)) xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"][assetRec.chainID] = assetRec.currencyID
+                let symbol = assetRec.symbol;
+                let relaychain = assetRec.relayChain;
+                let xcmInteriorKey = assetRec.xcmInteriorKey;
+                let symbolRelaychain = paraTool.makeAssetChain(symbol, relaychain);
+                let paraID = paraTool.getParaIDfromChainID(assetRec.chainID)
+                if (xcmSymbolInfo[symbolRelaychain] != undefined) {
+                    if (assetRec.asset != null) {
+                        if (xcmSymbolInfo[symbolRelaychain]["assets"] == undefined) {
+                            xcmSymbolInfo[symbolRelaychain]["assets"] = {};
+                        }
+                        xcmSymbolInfo[symbolRelaychain]["assets"][paraID] = assetRec.asset;
+                    }
+                    if (assetRec.xcContractAddress != null) {
+                        if (xcmSymbolInfo[symbolRelaychain]["xcContractAddress"] == undefined) {
+                            xcmSymbolInfo[symbolRelaychain]["assets"] = {};
+                        }
+                        xcmSymbolInfo[symbolRelaychain]["xcContractAddress"][paraID] = assetRec.xcContractAddress;
+                    }
+                    if (assetRec.currencyID != null && !isNaN(assetRec.currencyID)) {
+                        if (xcmSymbolInfo[symbolRelaychain]["xcCurrencyID"] == undefined) {
+                            xcmSymbolInfo[symbolRelaychain]["assets"] = {};
+                        }
+                        xcmSymbolInfo[symbolRelaychain]["xcCurrencyID"][paraID] = assetRec.currencyID
+                    }
                 }
+                if (xcmConceptInfo[xcmInteriorKey] != undefined) {
+                    if (assetRec.asset != null) {
+                        if (xcmConceptInfo[xcmInteriorKey]["assets"] == undefined) {
+                            xcmConceptInfo[xcmInteriorKey]["assets"] = {};
+                        }
+                        xcmConceptInfo[xcmInteriorKey]["assets"][paraID] = assetRec.asset;
+                    }
+                    if (assetRec.xcContractAddress != null) {
+                        if (xcmConceptInfo[xcmInteriorKey]["xcContractAddress"] == undefined) {
+                            xcmConceptInfo[xcmInteriorKey]["xcContractAddress"] = {};
+                        }
+                        xcmConceptInfo[xcmInteriorKey]["xcContractAddress"][paraID] = assetRec.xcContractAddress;
+                    }
+                    if (assetRec.currencyID != null && !isNaN(assetRec.currencyID)) {
+                        if (xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"] == undefined) {
+                            xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"] = {};
+                        }
+                        xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"][paraID] = assetRec.currencyID
+                    }
+                }
+
             }
+
 
             let routerRecs = await this.poolREADONLY.query("select routerAssetChain, routerName from router");
             let routers = {};

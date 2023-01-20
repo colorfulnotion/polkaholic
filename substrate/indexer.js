@@ -80,8 +80,6 @@ module.exports = class Indexer extends AssetManager {
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
     numXCMMessagesOut = {};
-    recentExtrinsics = [];
-    recentTransfers = [];
 
     xcmMeta = []; //this should be removed after every block
 
@@ -94,6 +92,7 @@ module.exports = class Indexer extends AssetManager {
     ably_channel = null;
 
     addressBalanceRequest = {}
+    xcmtransfers_beneficiary = {};
 
     context = {};
     stat = {
@@ -784,7 +783,7 @@ module.exports = class Indexer extends AssetManager {
         if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(g): flush_xcmMeta", xcmMetaTS);
 
         await this.dump_xcm_messages()
-        await this.dump_recent_activity()
+
         await this.dump_failed_traces()
         if (isTip) {
             await this.dump_addressBalanceRequest();
@@ -1295,15 +1294,13 @@ module.exports = class Indexer extends AssetManager {
             }
             let sqlDebug = true
             this.xcmtransfer = {};
-            // TODO: adjust upsertSQL to use existing matched value and finalization -- then xcmInfo in xcmInfo column, not pendingXcmInfo
-            //  unfinalized (isTip = true) -- do not NOT replace;
-            //  finalized : if matched=1 -- do NOT replace; matched=0 - REPLACE
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "pendingXcmInfo"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "pendingXcmInfo"]
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"],
+                "replaceIfNull": ["xcmInfo"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
             }, sqlDebug);
 
             let out = [];
@@ -1703,7 +1700,7 @@ module.exports = class Indexer extends AssetManager {
         return (asset);
     }
 
-    updateXCMTransferStorage(xcmtransfer, isTip, finalized) {
+    async updateXCMTransferStorage(xcmtransfer, isTip, finalized) {
         //console.log(`adding xcmtransfer`, xcmtransfer)
         //!only isXcmTipSafe can get here
         try {
@@ -1756,20 +1753,294 @@ module.exports = class Indexer extends AssetManager {
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
-            if (this.chainID == 22085) {
-                // setup ably client + channel with api key, send xcmtransfer
-                if (this.ably_client == null) {
-                    this.ably_client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");
+            try {
+                this.publish_ably_message(xcmtransfer);
+                // TODO: await this.publish_xcminfo(xcmtransfer.xcmInfo);
+
+                let stage = finalized ? 'OriginationFinalized' : 'OriginationUnfinalized';
+                let vals = ["symbol", "sourceTS", "chainID", "chainIDDest", "xcmInfo", "addTS", "lastUpdateTS"];
+
+                let currTS = this.getCurrentTS();
+                let out = `('${xcmtransfer.extrinsicHash}', '${xcmtransfer.transferIndex}', '${xcmtransfer.xcmIndex}', '${stage}', '${xcmtransfer.xcmSymbol}', '${xcmtransfer.sourceTS}', '${xcmtransfer.chainID}', '${xcmtransfer.chainIDDest}', ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))}, '${currTS}', '${currTS}')`;
+                await this.upsertSQL({
+                    "table": "xcmtransferslog",
+                    "keys": ["extrinsicHash", "transferIndex", "xcmIndex", "stage"],
+                    "vals": vals,
+                    "data": [out],
+                    "replace": ["lastUpdateTS", "symbol"]
+                });
+                // since we have two different indexers writing xcmInfo object independently, we only write finalized = false case since it is possible the destination chain finalizes first?
+                if (finalized == false) {
+                    this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, xcmtransfer.xcmInfo, xcmtransfer.sourceTS);
                 }
-                if (this.ably_client) {
-                    if (this.ably_channel == null) {
-                        this.ably_channel = this.ably_client.channels.get('xcminfo');
-                    }
-                    if (this.ably_channel) {
-                        this.ably_channel.publish(xcmtransfer);
+            } catch (err) {
+                this.logger.error({
+                    "op": "xcmtransferslog updateXCMTransferStorage ERROR",
+                    "err": err
+                })
+            }
+        }
+    }
+
+    store_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS) {
+        try {
+            // write "hashes" xcminfofinalized with row key extrinsicHash and column extrinsicID
+            let hres = {
+                key: extrinsicHash,
+                data: {
+                    xcminfofinalized: {}
+                }
+            }
+            hres['data']['xcminfofinalized'][extrinsicID] = {
+                value: JSON.stringify(xcmInfo),
+                timestamp: sourceTS * 1000000
+            };
+            this.hashesRowsToInsert.push(hres)
+        } catch (e) {
+            this.logger.error({
+                "op": "xcmtransferslog store_xcminfo_finalized ERROR",
+                "err": err
+            })
+        }
+    }
+
+    async get_accountbalance_xcmtransfer(apiAt, address, xcmtransfer) {
+        let balance = 0
+        let multilocation = xcmtransfer.xcmInteriorKey;
+        let symbol = xcmtransfer.xcmSymbol;
+        let method = "unk";
+        let chainID = this.chainID;
+        let paraID = paraTool.getParaIDfromChainID(chainID);
+        let symbolRelaychain = paraTool.makeXcmInteriorKey(symbol, xcmtransfer.relayChain);
+        let currencyIDmap = this.xcmSymbolInfo[symbolRelaychain] != undefined ? this.xcmSymbolInfo[symbolRelaychain]["xcCurrencyID"] : null;
+        let currencyID = currencyIDmap && currencyIDmap[paraID] != undefined ? currencyIDmap[paraID] : null;
+        let assetMap = this.xcmSymbolInfo[symbolRelaychain] != undefined ? this.xcmSymbolInfo[symbolRelaychain]["assets"] : null;
+        let asset = assetMap && assetMap[paraID] != undefined ? assetMap[paraID] : null;
+
+        let isNative = (this.chainInfos[chainID] != undefined && this.chainInfos[chainID].symbol != undefined) ? symbol == this.chainInfos[chainID].symbol : false;
+        try {
+            // exception so far: Kintsugi and Interlay represent native token in tokens.accounts pallet storage instead of system.account storage
+            if (chainID == 22092 && symbol == "KINT" || chainID == 2032 && symbol == "INTR") isNative = false;
+            // statemine/t + collectives have DOT + KSM
+            if (chainID == 21000 && symbol == "KSM") isNative = true;
+            if ((chainID == 1000 || chainID == 1001) && symbol == "DOT") isNative = true;
+            if (isNative) {
+                method = "system.account";
+                let query = await apiAt.query.system.account(address);
+                let qR = query.toJSON();
+                if (qR && qR.data && qR.data.free) {
+                    balance = qR.data.free;
+                }
+            } else if (apiAt.query.tokens != undefined && apiAt.query.tokens.accounts != undefined && currencyID) {
+                method = "tokens.accounts";
+                if (chainID == 22000 || chainID == 2000 || chainID == 22092 || chainID == 2032) {
+                    currencyID = asset;
+                }
+                let query = await apiAt.query.tokens.accounts(address, currencyID);
+                let qR = query.toJSON();
+                if (qR && qR.free != undefined) {
+                    balance = qR.free;
+                }
+            } else if (apiAt.query.assets != undefined && apiAt.query.assets.account != undefined && currencyID) {
+
+                let query = await apiAt.query.assets.account(currencyID, address);
+                let qR = query.toJSON();
+                if (qR && qR.balance != undefined) {
+                    method = "assets.account";
+                    balance = qR.balance;
+                }
+            }
+        } catch (err) {
+            this.logger.error({
+                "op": "get_accountbalance_multilocation ERR",
+                err
+            });
+            return (0);
+        }
+        /*
+        this.logger.error({
+            "op": "get_accountbalance_xcmtransfer",
+            balance,
+            chainID,
+            paraID,
+            symbol,
+            method,
+            address,
+            multilocation,
+            currencyID,
+            isNative,
+            xcmtransfer
+        });
+*/
+        return (balance);
+    }
+
+    // for any messages concerning xcmtransfers indexed by beneficiary in the last 3m, does a balance check
+    //  if the balance increased by approximately the amountsent, fill in the xcmInfo and broadcast it
+    async check_xcmtransfers_beneficiary(api, bn, blockTS, finalized = false) {
+        try {
+            for (const beneficiary of Object.keys(this.xcmtransfers_beneficiary)) {
+                let xcmtransfers = this.xcmtransfers_beneficiary[beneficiary];
+                for (const xcmtransferkey of Object.keys(xcmtransfers)) {
+                    let xcmtransfer = xcmtransfers[xcmtransferkey];
+                    if (xcmtransfer && (this.getCurrentTS() - xcmtransfer.sourceTS < 180)) {
+                        let balance = await this.get_accountbalance_xcmtransfer(api, beneficiary, xcmtransfer);
+                        xcmtransfer.balances[bn] = balance;
+                        if (xcmtransfer.balances[bn - 1] !== undefined && (xcmtransfer.balances[bn - 1] != xcmtransfer.balances[bn])) {
+                            let diff = (xcmtransfer.balances[bn] - xcmtransfer.balances[bn - 1]);
+                            let amountSent = xcmtransfer.amountSent ? xcmtransfer.amountSent : 0;
+                            let rat = amountSent ? diff / amountSent : 0;
+                            if (rat > .9 && (rat <= 1.000001)) {
+                                let stage = finalized ? 'DestinationFinalized' : 'DestinationUnfinalized';
+                                let xcmInfo = xcmtransfer.xcmInfo ? xcmtransfer.xcmInfo : null;
+                                let o = xcmInfo && xcmInfo.origination ? xcmInfo.origination : null;
+
+                                // fill in destination.{ amountReceived, amountReceivedUSD, teleportFee, teleportFee, teleportFeeUSD, blockNumber, ts, finalized, executionStatus }
+                                let decimals = o && o.decimals ? o.decimals : null;
+                                let priceUSD = xcmInfo.priceUSD;
+                                if (decimals && xcmInfo && xcmInfo.destination) {
+                                    let destination = xcmInfo.destination;
+                                    destination.teleportFee = (amountSent - diff) / 10 ** decimals;
+                                    destination.teleportFeeUSD = (destination.teleportFee * priceUSD);
+                                    destination.amountReceived = diff / 10 ** decimals;
+                                    destination.amountReceivedUSD = destination.amountReceived * priceUSD;
+                                    destination.blockNumber = bn;
+                                    destination.ts = blockTS;
+                                    destination.finalized = finalized;
+                                    destination.executionStatus = "success";
+                                } else {
+                                    // ...
+                                }
+
+                                let vals = ["symbol", "sourceTS", "chainID", "chainIDDest", "xcmInfo", "addTS", "lastUpdateTS"];
+                                let currTS = this.getCurrentTS();
+                                let out = `('${xcmtransfer.extrinsicHash}', '${xcmtransfer.transferIndex}', '${xcmtransfer.xcmIndex}', '${stage}', '${xcmtransfer.xcmSymbol}', '${xcmtransfer.sourceTS}', '${xcmtransfer.chainID}', '${xcmtransfer.chainIDDest}', ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))}, '${currTS}', '${currTS}')`;
+                                await this.upsertSQL({
+                                    "table": "xcmtransferslog",
+                                    "keys": ["extrinsicHash", "transferIndex", "xcmIndex", "stage"],
+                                    "vals": vals,
+                                    "data": [out],
+                                    "replace": ["lastUpdateTS", "symbol"]
+                                });
+                                if (o.finalized && finalized && o.initiateTS) {
+                                    xcmInfo.flightTime = this.getCurrentTS() - o.initiateTS;
+                                }
+                                // update matched, xcmInfoAudited, and xcmInfo
+                                let xcmInfoAudited = finalized ? 4 : 3; // temporary: should be just 2
+                                let sql = `update xcmtransfer set matched = 1, xcmInfoAudited = ${xcmInfoAudited}, xcmInfo = ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))} where extrinsicHash = '${xcmtransfer.extrinsicHash}' and transferIndex = '${xcmtransfer.transferIndex}' and xcmIndex='${xcmtransfer.xcmIndex}'`
+                                this.batchedSQL.push(sql);
+                                await this.update_batchedSQL();
+                                await this.publish_xcminfo(xcmtransfer.xcmInfo);
+                                await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, xcmInfo, xcmtransfer.sourceTS);
+
+                                this.logger.error({
+                                    "op": `xcmtransferslog:${stage}`,
+                                    beneficiary,
+                                    bn,
+                                    out,
+                                    amountSent,
+                                    diff,
+                                    rat,
+                                    finalized,
+                                    xcmtransfer
+                                });
+                            }
+                        }
                     }
                 }
             }
+        } catch (err) {
+            this.logger.error({
+                "op": "xcmtransferslog check_xcmtransfers_beneficiary ERROR",
+                err
+            });
+        }
+    }
+
+    async publish_xcminfo(xcmInfo) {
+        // TODO
+    }
+
+    async process_ably_xcm_indexer_message(message) {
+        // if the incoming xcmtransfer is a chainIDDest matching our indexer's chainID, then record a starting balance in xcmtransfers_beneficiary
+        let xcmtransfer = message.data;
+        try {
+            if (xcmtransfer.beneficiary != undefined && (xcmtransfer.chainIDDest == this.chainID)) {
+                console.log('process_ably_xcm_indexer_message MATCHING Received msg: ', xcmtransfer);
+                let beneficiary = xcmtransfer.destAddress;
+                if (this.xcmtransfers_beneficiary[beneficiary] == undefined) {
+                    this.xcmtransfers_beneficiary[beneficiary] = {};
+                    xcmtransfer.balances = {}
+                }
+                let xcmtransferkey = `${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`;
+                if (this.xcmtransfers_beneficiary[beneficiary][xcmtransferkey] == undefined) {
+                    this.xcmtransfers_beneficiary[beneficiary][xcmtransferkey] = xcmtransfer;
+                } else {
+                    let xcmInfo = xcmtransfer.xcmInfo;
+                    // if the origination chain has been finalized, we should mark it as such locally so that when we write destination info
+                    if (xcmInfo && xcmInfo.origination) {
+                        let existing_xcmtransfer = this.xcmtransfers_beneficiary[beneficiary][xcmtransferkey];
+                        let existing_xcmInfo = existing_xcmtransfer.xcmInfo;
+                        if (existing_xcmInfo && existing_xcmInfo.origination) {
+                            if ((existing_xcmInfo.origination.finalized == false) && xcmInfo.origination.finalized) {
+                                existing_xcmInfo.origination.finalized = true;
+                                if (xcmInfo.destination && xcmInfo.destination.finalized) {
+                                    // destination chain was finalized BEFORE origination chain, so we must record xcminfo 
+                                    await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, existing_xcmInfo, xcmtransfer.sourceTS)
+                                    if (o.initiateTS) {
+                                        xcmInfo.flightTime = this.getCurrentTS() - o.initiateTS;
+                                    }
+                                    await this.publish_xcminfo(existing_xcmInfo);
+                                }
+                            }
+                        } else {
+                            this.logger.error({
+                                "op": "process_ably_xcm_indexer_message ERROR2",
+                                err,
+                                existing_xcmtransfer
+                            });
+                        }
+                    } else {
+                        this.logger.error({
+                            "op": "process_ably_xcm_indexer_message ERROR1",
+                            err,
+                            xcmtransfer
+                        });
+                    }
+                }
+            }
+        } catch (err) {
+            this.logger.error({
+                "op": "process_ably_xcm_indexer_message ERROR0",
+                err,
+                xcmtransfer
+            });
+        }
+    }
+
+    async setup_ably_client() {
+        this.ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
+        await this.ably_client.connection.once('connected');
+        this.ably_channel = this.ably_client.channels.get("xcm-indexer");
+        let indexer = this;
+        this.ably_channel.subscribe(async function(message) {
+            await indexer.process_ably_xcm_indexer_message(message);
+        });
+        console.log("setup_ably_client")
+    }
+
+    publish_ably_message(msg) {
+        if (this.ably_client && this.ably_channel) {
+            try {
+                if (this.ably_channel) {
+                    this.ably_channel.publish("xcm-indexer", msg);
+                    console.log("publish_ably_message published:", msg);
+                }
+            } catch (err) {
+                console.log("publish_ably_message ERR", err)
+            }
+        } else {
+            console.log("publish_ably_message: client/channel not initialized")
         }
     }
 
@@ -3562,43 +3833,6 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async dump_recent_activity() {
-        if (this.recentExtrinsics.length > 0) {
-            let rows = this.recentExtrinsics
-            let i = 0;
-            for (i = 0; i < rows.length; i += 10000) {
-                let j = i + 10000;
-                if (j > rows.length) j = rows.length;
-                await this.upsertSQL({
-                    "table": `extrinsicsrecent`,
-                    "keys": ["extrinsicID", "chainID"],
-                    "vals": ["logDT", "hr", "blockNumber", "extrinsicHash", "section", "method", "fromAddress", "ts", "result", "signed"],
-                    "data": rows.slice(i, j),
-                    "replace": ["logDT", "hr", "blockNumber", "extrinsicHash", "section", "method", "fromAddress", "ts", "result", "signed"]
-                });
-            }
-            this.recentExtrinsics = []
-        }
-
-        if (this.recentTransfers.length > 0) {
-            let rows = this.recentTransfers
-            let i = 0;
-            for (i = 0; i < rows.length; i += 10000) {
-                let j = i + 10000;
-                if (j > rows.length) j = rows.length;
-                await this.upsertSQL({
-                    "table": `transfersrecent`,
-                    "keys": ["extrinsicID", "chainID"],
-                    "vals": ["logDT", "hr", "blockNumber", "extrinsicHash", "section", "method", "fromAddress", "toAddress", "asset", "symbol", "amount", "priceUSD", "amountUSD", "ts", "rawAsset", "rawAmount", "decimals"],
-                    "data": rows.slice(i, j),
-                    "replace": ["logDT", "hr", "blockNumber", "extrinsicHash", "section", "method", "fromAddress", "toAddress", "asset", "symbol", "amount", "priceUSD", "amountUSD", "ts", "rawAsset", "rawAmount", "decimals"]
-                });
-            }
-            this.recentTransfers = []
-        }
-
-    }
-
     async dump_failed_traces() {
         let traceRows = this.failedParseTraces
         let i = 0;
@@ -4893,7 +5127,7 @@ module.exports = class Indexer extends AssetManager {
                             let pendingXcmInfo = await this.buildPendingXcmInfo(xcmtransfer, rExtrinsic, finalized)
                             if (this.debugLevel >= paraTool.debugInfo) console.log(`pendingXcmInfo [${xcmtransfer.extrinsicID}] [${xcmtransfer.extrinsicHash}]`, pendingXcmInfo)
                             xcmtransfer.xcmInfo = pendingXcmInfo
-                            this.updateXCMTransferStorage(xcmtransfer, isTip, finalized); // store, flushed in flushXCM
+                            await this.updateXCMTransferStorage(xcmtransfer, isTip, finalized); // store, flushed in flushXCM
                         }
                     } else {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`unsafeXcmTip [${rExtrinsic.extrinsicID}] [${rExtrinsic.section}:${rExtrinsic.method}] xcmCnt=${rExtrinsic.xcms.length} - skip`)
@@ -5213,6 +5447,7 @@ module.exports = class Indexer extends AssetManager {
                 sender: x.sender,
                 amountSent: (failureType == 'failedOrigination') ? 0 : amountSent,
                 amountSentUSD: (failureType == 'failedOrigination') ? 0 : x.amountSentUSD,
+                initiateTS: this.getCurrentTS(),
                 txFee: sourceTxFee,
                 txFeeUSD: sourceTxFeeUSD,
                 txFeeSymbol: sourceChainSymbol,
@@ -6599,8 +6834,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         if (paraID == 0) {
             //this.trailingBlockHashs[blockHash] = blockNumber;
         }
-        let recentExtrinsics = [];
-        let recentTransfers = [];
         let recentXcmMsgs = []; //new xcm here
         if (finalized == true && autoTraces) {
             //console.log("STANDARD BLOCK", JSON.stringify(evmBlock, null, 4));
@@ -6645,7 +6878,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 evmReceipts = newReceipts;
             }
         }
-        // setParserContext
+        // setParserContext 
         this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash, chainID);
         if (this.isRelayChain) this.chainParser.setRelayParentStateRoot(stateRoot)
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
@@ -6676,8 +6909,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     if (signed) {
                         fromAddress = paraTool.getPubKey(ext.signer)
                         if (fromAddress === false) fromAddress = null;
-                        let recentExtrinsic = `('${ext.extrinsicID}', '${this.chainID}', '${logDT}', '${hr}', '${ext.blockNumber}', '${ext.extrinsicHash}', '${ext.section}', '${ext.method}', '${fromAddress}', '${ext.ts}', '${ext.result}', '${signed}')`
-                        recentExtrinsics.push(recentExtrinsic);
                         if (ext.transfers && ext.transfers.length > 0) {
                             for (const t of ext.transfers) {
                                 if (t.fromAddress != undefined && t.toAddress != undefined) {
@@ -6691,9 +6922,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                                     let tDecimals = (t.decimals != undefined && t.decimals > 0) ? `'${t.decimals}'` : 'Null';
                                     let tRawAsset = (t.rawAsset != undefined) ? `'${t.rawAsset}'` : 'Null';
                                     let tRawAmount = (t.rawAmount != undefined && t.rawAmount >= 0) ? `'${t.rawAmount}'` : 'Null';
-                                    let recentTransfer = `('${ext.extrinsicID}', '${this.chainID}', '${logDT}', '${hr}', '${ext.blockNumber}', '${ext.extrinsicHash}', '${t.section}', '${t.method}', '${t.fromAddress}', '${t.toAddress}', ${tAsset}, ${tSymbol}, ${tAmount}, '${priceUSD}', '${amountUSD}', '${ext.ts}', ${tRawAsset}, ${tRawAmount}, ${tDecimals})`
-                                    //console.log(`recentTransfer`, recentTransfer)
-                                    recentTransfers.push(recentTransfer);
                                     if (isTip && (tracesPresent == false)) {
                                         // because traces are missing, we'll fill in gaps dynamically at the tip for the sender and the receiver
                                         this.flagAddressBalanceRequest(t.fromAddress);
@@ -7009,12 +7237,16 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             this.hashesRowsToInsert.push(evmBlockHashRec)
 
         }
+        if (isTip) {
+            // process realtime xcmInfo matches 
+            await this.check_xcmtransfers_beneficiary(api, blockNumber, blockTS, finalized);
+        }
 
         let blockStats = this.getBlockStats(block, eventsRaw, evmBlock, evmReceipts, autoTraces);
 
         this.blockRowsToInsert.push(cres)
-        if (recentExtrinsics.length > 0 || recentTransfers.length > 0 || recentXcmMsgs.length > 0) {
-            this.add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs)
+        if (recentXcmMsgs.length > 0) {
+            this.add_recent_activity(recentXcmMsgs)
         }
         //let xcmMeta = this.xcmMeta;
         //this.xcmMeta = []
@@ -7024,13 +7256,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
         return [blockStats, xcmMeta];
     }
 
-    add_recent_activity(recentExtrinsics, recentTransfers, recentXcmMsgs) {
-        for (const r of recentExtrinsics) {
-            this.recentExtrinsics.push(r);
-        }
-        for (const r of recentTransfers) {
-            this.recentTransfers.push(r);
-        }
+    add_recent_activity(recentXcmMsgs) {
         for (const r of recentXcmMsgs) {
             this.recentXcmMsgs.push(r);
         }

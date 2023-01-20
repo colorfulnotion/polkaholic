@@ -61,7 +61,7 @@ module.exports = class XCMCleaner extends Query {
         return null;
     }
 
-    async searchDestinationChainBalances(chainID, sourceTS, destAddress, symbol, amountSent, N = 2) {
+    async searchDestinationChainBalances(chainID, sourceTS, destAddress, symbol, amountSent, N = 3) {
         let chain = await this.setupChainAndAPI(chainID)
         if (this.api == null) {
             return ([null, null]);
@@ -275,7 +275,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 xcmtransfer.xcmInfoAudited
               from xcmtransfer
        where  extrinsicHash = '${extrinsicHash}' and transferIndex = '${transferIndex}' and xcmIndex = '${xcmIndex}' limit 1`
-
+        console.log(sqlA);
         let xcmRecs = await this.poolREADONLY.query(sqlA)
         let xcm = null
         if (xcmRecs.length == 1) {
@@ -365,7 +365,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         xcmInfo.origination.method = xcmMethod;
         try {
             console.log("xcm.amountSent", xcm.amountSent, "Dest", xcm.destAddress, invalid_dest_address);
-            if (xcmInfo.destination.chainID == 2011 || xcmInfo.destination.chainID == 22024 || xcmInfo.destination.chainID == -1 || invalid_dest_address || xcm.xcmInfoAudited < -1) {
+            if (xcmInfo.destination.chainID == 2011 || xcmInfo.destination.chainID == 22024 || xcmInfo.destination.chainID == -1 || invalid_dest_address || xcm.xcmInfoAudited < -1 || xcmInfo.symbol == null) {
                 xcmInfo.destination.executionStatus = "unknown";
                 let sql_final = `update xcmtransfer set xcmInfoAudited = 2, destStatus = -1, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
                 console.log(sql_final);
@@ -413,7 +413,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         } catch (e) {
             console.log(e);
         }
-        let sql_final = `update xcmtransfer set xcmInfoAudited = -1 where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+        let sql_final = `update xcmtransfer set xcmInfoAudited = -2 where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
         this.batchedSQL.push(sql_final);
         await this.update_batchedSQL();
         return (false);
@@ -428,7 +428,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
     async bulk_generate_XCMInfo(chainIDDest = null, limit = 1000) {
         let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and xcmInfoAudited = 0 and sourceTS > UNIX_TIMESTAMP(date_sub(Now(), interval 24 hour)) and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) ${w} order by sourceTS desc limit ${limit}`;
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and xcmInfoAudited in ( 0, -1 ) and sourceTS > UNIX_TIMESTAMP("2023-01-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 4 MINUTE)) ${w} order by sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
         let extrinsic = {};
