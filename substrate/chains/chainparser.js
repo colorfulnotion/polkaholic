@@ -4494,6 +4494,23 @@ module.exports = class ChainParser {
             let parsedAsset = {
                 Token: assetID
             }
+            // blacklist
+            if (indexer.chainID == paraTool.chainIDBasilisk || indexer.chainID == paraTool.chainIDListen){
+                //skipping BSX / LT
+                if (assetID == '0') continue
+            }
+            if (indexer.chainID == paraTool.chainIDAstar){
+                //skipping ???
+                if (assetID == '1333') continue
+            }
+            if (indexer.chainID == paraTool.chainIDParallel){
+                //skipping PARA
+                if (assetID == '0') continue
+            }
+            if (indexer.chainID == paraTool.chainIDHeiko){
+                //skipping HKO
+                if (assetID == '1') continue
+            }
             var asset = JSON.stringify(parsedAsset);
             let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
             let cachedAssetInfo = indexer.assetInfo[assetChain]

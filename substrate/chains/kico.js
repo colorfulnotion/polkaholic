@@ -134,6 +134,11 @@ module.exports = class KicoParser extends ChainParser {
             let parsedAsset = {
                 Token: assetID
             }
+            //black list
+            if (assetID == 0) {
+                //KICO
+                continue
+            }
             var asset = JSON.stringify(parsedAsset);
             let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
             let cachedAssetInfo = indexer.assetInfo[assetChain]

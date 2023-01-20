@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "SUB"
+        },
+        "name": "SUB",
+        "symbol": "SUB",
+        "decimals": 10
+    }
+]

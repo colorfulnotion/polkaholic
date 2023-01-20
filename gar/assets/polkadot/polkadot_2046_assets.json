@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "RING"
+        },
+        "name": "RING",
+        "symbol": "RING",
+        "decimals": 18
+    }
+]

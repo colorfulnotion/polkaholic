@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "PICA"
+        },
+        "name": "PICA",
+        "symbol": "PICA",
+        "decimals": 12
+    }
+]

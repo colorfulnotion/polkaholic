@@ -1,0 +1,92 @@
+[
+    {
+        "asset": {
+            "Token": "0"
+        },
+        "name": "listen",
+        "symbol": "LT",
+        "decimals": 12,
+        "currencyID": "0"
+    },
+    {
+        "asset": {
+            "Token": "1"
+        },
+        "name": "like",
+        "symbol": "LIKE",
+        "decimals": 12,
+        "currencyID": "1"
+    },
+    {
+        "asset": {
+            "Token": "10"
+        },
+        "name": "KICO",
+        "symbol": "KICO",
+        "decimals": 14,
+        "currencyID": "10"
+    },
+    {
+        "asset": {
+            "Token": "100"
+        },
+        "name": "kisten",
+        "symbol": "KT",
+        "decimals": 12,
+        "currencyID": "100"
+    },
+    {
+        "asset": {
+            "Token": "128"
+        },
+        "name": "Karura Token",
+        "symbol": "KAR",
+        "decimals": 12,
+        "currencyID": "128"
+    },
+    {
+        "asset": {
+            "Token": "129"
+        },
+        "name": "Acala Dollar",
+        "symbol": "aUSD",
+        "decimals": 12,
+        "currencyID": "129"
+    },
+    {
+        "asset": {
+            "Token": "131"
+        },
+        "name": "Liquid Staking KSM",
+        "symbol": "LKSM",
+        "decimals": 12,
+        "currencyID": "131"
+    },
+    {
+        "asset": {
+            "Token": "2"
+        },
+        "name": "kusama",
+        "symbol": "KSM",
+        "decimals": 12,
+        "currencyID": "2",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},\"here\"]"
+    },
+    {
+        "asset": {
+            "Token": "5"
+        },
+        "name": "usdt",
+        "symbol": "USDT",
+        "decimals": 12,
+        "currencyID": "5"
+    },
+    {
+        "asset": {
+            "Token": "LT"
+        },
+        "name": "LT",
+        "symbol": "LT",
+        "decimals": 12
+    }
+]

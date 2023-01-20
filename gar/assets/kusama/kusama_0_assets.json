@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "KSM"
+        },
+        "name": "KSM",
+        "symbol": "KSM",
+        "decimals": 12
+    }
+]

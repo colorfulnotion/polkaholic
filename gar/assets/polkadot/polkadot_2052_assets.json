@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "KYL"
+        },
+        "name": "KYL",
+        "symbol": "KYL",
+        "decimals": 18
+    }
+]

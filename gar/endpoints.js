@@ -1299,8 +1299,8 @@ const prodParasKusama = [{
         paraId: 2100,
         text: 'SubsocialX',
         providers: {
-            'Dappforce 1': 'wss://para.f3joule.space',
-            'Dappforce 2': 'wss://para.subsocial.network'
+            //'Dappforce 1': 'wss://para.f3joule.space',
+            //'Dappforce 2': 'wss://para.subsocial.network'
         }
     },
     {
@@ -1409,13 +1409,17 @@ const prodRelayKusama = {
 }
 
 //returning all endpoint, including parachain, common,
-function prepareEndpoints(relaychain = 'polkadot') {
+function prepareEndpoints(relaychain = 'polkadot', validParachainList = []) {
     let chainMap = {}
     let supportedMap = {} // [relaychain-paraID] -> endpoints
     let unsupportedMap = {} // list of unknown/unsupported parachain.
+    let rejectedMap = {} // list of invalid paraIDs
+    let missingMap = {} // list of paraID without public endpoints
+    let foundMap = {} // list of paraID present in the public endpoints lsit
     let endpointList = []
-    let knownPublicEndpointsMap = polkaholicKnownPublicEndpoints
-    //console.log(`knownPublicEndpointsMap`, knownPublicEndpointsMap)
+    let knownPublicEndpoints = Object.keys(polkaholicKnownPublicEndpoints)
+    let knownParachains = validParachainList.filter(element => element.includes(relaychain));
+    console.log(`[${relaychain}] knownParachains`, knownParachains)
     switch (relaychain) {
         case 'kusama':
             endpointList = prodParasKusama.concat(prodParasKusamaCommon);
@@ -1430,52 +1434,73 @@ function prepareEndpoints(relaychain = 'polkadot') {
     }
 
     for (const ep of endpointList) {
-        let k = `${relaychain}-${ep.paraId}`
+        let chainkey = `${relaychain}-${ep.paraId}`
         let chainID = ep.paraId
         //polkadot-relayChain/kusama-relaychain will have paraId = 0
         if (ep.info == 'polkadot') {
-            k = `${relaychain}-0`
+            chainkey = `${relaychain}-0`
             ep.paraId = 0
             chainID = 0
         } else if (ep.info == 'kusama') {
-            k = `${relaychain}-0`
+            chainkey = `${relaychain}-0`
             ep.paraId = 0
             chainID = 2
         } else if (relaychain == 'kusama') {
             chainID = ep.paraId + 20000
         }
         let endpoint = {
-            chainkey: k,
+            chainkey: chainkey,
             name: ep.text,
             id: ep.info,
             paraID: ep.paraId,
-            chainID: chainID,
+            //chainID: chainID,
             //website: ep.homepage,
-            isUnreachable: ep.isUnreachable,
+            //isUnreachable: (ep.isUnreachable != undefined)? ep.isUnreachable: false,
             //rpc: ep.text,
             WSEndpoints: [],
             relaychain: relaychain,
         }
+        if (ep.isUnreachable != undefined && ep.isUnreachable) {
+            endpoint.isUnreachable = true
+        }
         for (const p of Object.keys(ep.providers)) {
             endpoint.WSEndpoints.push(ep.providers[p])
         }
-        chainMap[k] = endpoint
+        if (endpoint.WSEndpoints.length == 0) {
+            console.log(`${chainkey} Empty`, endpoint)
+        } else if (endpoint.isUnreachable) {
+            console.log(`${chainkey} Unreachable`, endpoint)
+        } else {
+            chainMap[chainkey] = endpoint
+        }
     }
     let chainMapKeys = Object.keys(chainMap)
     chainMapKeys.sort();
     for (const sk of chainMapKeys) {
         let skEndpoint = chainMap[sk]
-        if (knownPublicEndpointsMap[sk] != undefined) {
+        if (!knownParachains.includes(sk)) {
+            rejectedMap[sk] = skEndpoint
+            //console.log(`[${sk}] Rejected!`)
+            continue
+        }
+        if (knownPublicEndpoints.includes(sk)) {
             supportedMap[sk] = skEndpoint
         } else {
             unsupportedMap[sk] = skEndpoint
         }
     }
-    return [supportedMap, unsupportedMap]
+    for (const parachainkey of knownParachains) {
+        if (supportedMap[parachainkey] != undefined || unsupportedMap[parachainkey] != undefined) {
+            foundMap[parachainkey] = 1
+        } else {
+            missingMap[parachainkey] = 1
+        }
+    }
+    return [supportedMap, unsupportedMap, rejectedMap, missingMap]
 }
 
 module.exports = {
-    getEndpointsByRelaychain: function(relaychain = 'polkadot') {
-        return prepareEndpoints(relaychain);
+    getEndpointsByRelaychain: function(relaychain = 'polkadot', validParachainList = []) {
+        return prepareEndpoints(relaychain, validParachainList);
     },
 };

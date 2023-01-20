@@ -1,0 +1,30 @@
+[
+    {
+        "asset": {
+            "Token": "11"
+        },
+        "name": "PARA",
+        "symbol": "PARA",
+        "decimals": 12,
+        "currencyID": "11",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2012},{\"generalKey\":\"0x50415241\"}]"
+    },
+    {
+        "asset": {
+            "Token": "12"
+        },
+        "name": "Astar",
+        "symbol": "ASTR",
+        "decimals": 18,
+        "currencyID": "12",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2006}]"
+    },
+    {
+        "asset": {
+            "Token": "CLV"
+        },
+        "name": "CLV",
+        "symbol": "CLV",
+        "decimals": 18
+    }
+]
