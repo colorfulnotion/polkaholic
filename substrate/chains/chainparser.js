@@ -4495,19 +4495,19 @@ module.exports = class ChainParser {
                 Token: assetID
             }
             // blacklist
-            if (indexer.chainID == paraTool.chainIDBasilisk || indexer.chainID == paraTool.chainIDListen){
+            if (indexer.chainID == paraTool.chainIDBasilisk || indexer.chainID == paraTool.chainIDListen) {
                 //skipping BSX / LT
                 if (assetID == '0') continue
             }
-            if (indexer.chainID == paraTool.chainIDAstar){
+            if (indexer.chainID == paraTool.chainIDAstar) {
                 //skipping ???
                 if (assetID == '1333') continue
             }
-            if (indexer.chainID == paraTool.chainIDParallel){
+            if (indexer.chainID == paraTool.chainIDParallel) {
                 //skipping PARA
                 if (assetID == '0') continue
             }
-            if (indexer.chainID == paraTool.chainIDHeiko){
+            if (indexer.chainID == paraTool.chainIDHeiko) {
                 //skipping HKO
                 if (assetID == '1') continue
             }
