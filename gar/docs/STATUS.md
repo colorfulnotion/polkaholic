@@ -1,6 +1,6 @@
 ## Current Project Status
 
-(keep it here for now. remove later)
+[TODO commit gitgub action logs to this file]
 
 As of this commit, [xcmRegistry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/gar/xcmRegistry) is currently compiled with:
 
