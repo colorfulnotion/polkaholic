@@ -2,13 +2,36 @@
 
 (keep it here for now. remove later)
 
-As of this commit, [xcGar](https://github.com/colorfulnotion/xcm-global-registry/tree/main/gar/xcmRegistry) is currently compiled with:
+As of this commit, [xcmRegistry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/gar/xcmRegistry) is currently compiled with:
 
+Auto-generate Summary:
 ```
+45 polkadot xcAssets in xcmRegistry
 22 polkadot-parachain supported endpoints.
  9 polkadot-parachain does not have public endpoints/is unreachable.
  6 polkadot-parachain pending for verification
 
+45  Kusama xcAssets in xcmRegistry
+32  kusama-parachain supported endpoints.
+ 9  kusama-parachain does not have public endpoints/is unreachable.
+ 6  kusama-parachain pending for verification
+```
+
+Polkadot Endpoints:
+```
+./xcmgar endpoint -r polkadot
+Missing polkadot endpoints[9] [
+  'polkadot-2008',
+  'polkadot-2027',
+  'polkadot-2040',
+  'polkadot-2053',
+  'polkadot-2055',
+  'polkadot-2056',
+  'polkadot-2058',
+  'polkadot-2090',
+  'polkadot-2092'
+]
+Rejected: polkadot endpoints[2] [ 'polkadot-2028', 'polkadot-2093' ]
 Supported: polkadot endpoints[22] [
   'polkadot-0',    'polkadot-1000',
   'polkadot-2000', 'polkadot-2002',
@@ -22,17 +45,6 @@ Supported: polkadot endpoints[22] [
   'polkadot-2039', 'polkadot-2043',
   'polkadot-2046', 'polkadot-2052'
 ]
-Missing polkadot endpoints[9]
-'polkadot-2008',
-  'polkadot-2027',
-  'polkadot-2040',
-  'polkadot-2053',
-  'polkadot-2055',
-  'polkadot-2056',
-  'polkadot-2058',
-  'polkadot-2090',
-  'polkadot-2092'
-]
 Unverified polkadot endpoints[6] [
   'polkadot-1001',
   'polkadot-2007',
@@ -41,33 +53,36 @@ Unverified polkadot endpoints[6] [
   'polkadot-2086',
   'polkadot-2091'
 ]
+✅ Success: polkadot 22 reachable parachain endpoints cahced @
+    publicEndpoints/polkadot_publicEndpoints.json
 ```
 
+Kusama Endpoints:
 ```
-32 kusama-parachain supported endpoints.
-9  kusama-parachain does not have public endpoints/is unreachable.
-6  kusama-parachain pending for verification
-
-Supported: kusama endpoints[32] [
+./xcmgar endpoint -r kusama
+Missing kusama endpoints[8] [
+  'kusama-1002',
+  'kusama-2024',
+  'kusama-2100',
+  'kusama-2223',
+  'kusama-2224',
+  'kusama-2229',
+  'kusama-2233',
+  'kusama-2245'
+]
+Rejected: kusama endpoints[3] [ 'kusama-2008', 'kusama-2227', 'kusama-2232' ]
+Supported: kusama endpoints[31] [
   'kusama-0',    'kusama-1000', 'kusama-2000',
   'kusama-2001', 'kusama-2004', 'kusama-2007',
   'kusama-2011', 'kusama-2012', 'kusama-2015',
   'kusama-2023', 'kusama-2048', 'kusama-2084',
   'kusama-2085', 'kusama-2087', 'kusama-2088',
   'kusama-2090', 'kusama-2092', 'kusama-2095',
-  'kusama-2096', 'kusama-2100', 'kusama-2101',
-  'kusama-2102', 'kusama-2105', 'kusama-2106',
-  'kusama-2110', 'kusama-2113', 'kusama-2114',
-  'kusama-2115', 'kusama-2118', 'kusama-2119',
-  'kusama-2121', 'kusama-2222'
-]
-Missing kusama endpoints[6] [
-  'kusama-2024',
-  'kusama-2223',
-  'kusama-2224',
-  'kusama-2229',
-  'kusama-2233',
-  'kusama-2245'
+  'kusama-2096', 'kusama-2101', 'kusama-2102',
+  'kusama-2105', 'kusama-2106', 'kusama-2110',
+  'kusama-2113', 'kusama-2114', 'kusama-2115',
+  'kusama-2118', 'kusama-2119', 'kusama-2121',
+  'kusama-2222'
 ]
 Unverified kusama endpoints[8] [
   'kusama-1001',
@@ -79,9 +94,135 @@ Unverified kusama endpoints[8] [
   'kusama-2129',
   'kusama-2236'
 ]
+✅ Success: kusama 31 reachable parachain endpoints cahced @
+    publicEndpoints/kusama_publicEndpoints.json
 ```
 
-xcGAR Currently covers 30 [xcAssets](https://github.com/colorfulnotion/xcm-global-registry/tree/main/gar/xcmRegistry/polkadot_xcmRegistry.json) on Polkadot:
+Cached Result - Kusama:
+```
+./xcmgar registry -r kusama
+✅ Success: kusama XCM Global Asset Registry (Found:45) cahced @
+    xcmRegistry/kusama_xcmRegistry.json
+✅ Success: kusama-0 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_0_assets.json
+✅ Success: kusama-1000 Local Asset Regsitry (Found:142) cahced @
+    assets/kusama/kusama_1000_assets.json
+✅ Success: kusama-2000 Local Asset Regsitry (Found:36) cahced @
+    assets/kusama/kusama_2000_assets.json
+✅ Success: kusama-2001 Local Asset Regsitry (Found:44) cahced @
+    assets/kusama/kusama_2001_assets.json
+✅ Success: kusama-2004 Local Asset Regsitry (Found:17) cahced @
+    assets/kusama/kusama_2004_assets.json
+✅ Success: kusama-2007 Local Asset Regsitry (Found:23) cahced @
+    assets/kusama/kusama_2007_assets.json
+✅ Success: kusama-2012 Local Asset Regsitry (Found:8) cahced @
+    assets/kusama/kusama_2012_assets.json
+✅ Success: kusama-2015 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2015_assets.json
+✅ Success: kusama-2023 Local Asset Regsitry (Found:18) cahced @
+    assets/kusama/kusama_2023_assets.json
+✅ Success: kusama-2048 Local Asset Regsitry (Found:6) cahced @
+    assets/kusama/kusama_2048_assets.json
+✅ Success: kusama-2084 Local Asset Regsitry (Found:7) cahced @
+    assets/kusama/kusama_2084_assets.json
+✅ Success: kusama-2085 Local Asset Regsitry (Found:30) cahced @
+    assets/kusama/kusama_2085_assets.json
+✅ Success: kusama-2087 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2087_assets.json
+✅ Success: kusama-2088 Local Asset Regsitry (Found:3) cahced @
+    assets/kusama/kusama_2088_assets.json
+✅ Success: kusama-2090 Local Asset Regsitry (Found:11) cahced @
+    assets/kusama/kusama_2090_assets.json
+✅ Success: kusama-2092 Local Asset Regsitry (Found:11) cahced @
+    assets/kusama/kusama_2092_assets.json
+✅ Success: kusama-2095 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2095_assets.json
+✅ Success: kusama-2096 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2096_assets.json
+✅ Success: kusama-2100 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2100_assets.json
+✅ Success: kusama-2101 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2101_assets.json
+✅ Success: kusama-2102 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2102_assets.json
+✅ Success: kusama-2105 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2105_assets.json
+✅ Success: kusama-2106 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2106_assets.json
+✅ Success: kusama-2110 Local Asset Regsitry (Found:20) cahced @
+    assets/kusama/kusama_2110_assets.json
+✅ Success: kusama-2113 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2113_assets.json
+✅ Success: kusama-2114 Local Asset Regsitry (Found:9) cahced @
+    assets/kusama/kusama_2114_assets.json
+✅ Success: kusama-2115 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2115_assets.json
+✅ Success: kusama-2118 Local Asset Regsitry (Found:10) cahced @
+    assets/kusama/kusama_2118_assets.json
+✅ Success: kusama-2119 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2119_assets.json
+✅ Success: kusama-2121 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2121_assets.json
+✅ Success: kusama-2222 Local Asset Regsitry (Found:1) cahced @
+    assets/kusama/kusama_2222_assets.json
+```
+
+Cached Result - Polkadot:
+```
+./xcmgar registry -r polkadot
+✅ Success: polkadot XCM Global Asset Registry (Found:35) cahced @
+    xcmRegistry/polkadot_xcmRegistry.json
+✅ Success: polkadot-0 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_0_assets.json
+✅ Success: polkadot-1000 Local Asset Regsitry (Found:24) cahced @
+    assets/polkadot/polkadot_1000_assets.json
+✅ Success: polkadot-2000 Local Asset Regsitry (Found:22) cahced @
+    assets/polkadot/polkadot_2000_assets.json
+✅ Success: polkadot-2002 Local Asset Regsitry (Found:3) cahced @
+    assets/polkadot/polkadot_2002_assets.json
+✅ Success: polkadot-2004 Local Asset Regsitry (Found:14) cahced @
+    assets/polkadot/polkadot_2004_assets.json
+✅ Success: polkadot-2006 Local Asset Regsitry (Found:32) cahced @
+    assets/polkadot/polkadot_2006_assets.json
+✅ Success: polkadot-2011 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_2011_assets.json
+✅ Success: polkadot-2012 Local Asset Regsitry (Found:37) cahced @
+    assets/polkadot/polkadot_2012_assets.json
+✅ Success: polkadot-2013 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_2013_assets.json
+✅ Success: polkadot-2019 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_2019_assets.json
+✅ Success: polkadot-2021 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_2021_assets.json
+✅ Success: polkadot-2026 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_2026_assets.json
+✅ Success: polkadot-2030 Local Asset Regsitry (Found:37) cahced @
+    assets/polkadot/polkadot_2030_assets.json
+✅ Success: polkadot-2031 Local Asset Regsitry (Found:5) cahced @
+    assets/polkadot/polkadot_2031_assets.json
+✅ Success: polkadot-2032 Local Asset Regsitry (Found:8) cahced @
+    assets/polkadot/polkadot_2032_assets.json
+✅ Success: polkadot-2034 Local Asset Regsitry (Found:8) cahced @
+    assets/polkadot/polkadot_2034_assets.json
+✅ Success: polkadot-2035 Local Asset Regsitry (Found:10) cahced @
+    assets/polkadot/polkadot_2035_assets.json
+✅ Success: polkadot-2037 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_2037_assets.json
+✅ Success: polkadot-2039 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_2039_assets.json
+✅ Success: polkadot-2043 Local Asset Regsitry (Found:2) cahced @
+    assets/polkadot/polkadot_2043_assets.json
+✅ Success: polkadot-2046 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_2046_assets.json
+✅ Success: polkadot-2052 Local Asset Regsitry (Found:1) cahced @
+    assets/polkadot/polkadot_2052_assets.json
+```
+
+xcmRegistry Currently covers 35 [xcAssets](https://github.com/colorfulnotion/xcm-global-registry/tree/main/gar/xcmRegistry/polkadot_xcmRegistry.json) on Polkadot:
+
+```
+mysql>  select xcmInteriorKeyV2 as xcmInteriorKey, symbol, paraID, decimals from xcmassetgar where relayChain = 'polkadot' order by paraID, symbol;
+```
 
 | xcmInteriorKey                                                                                            | symbol     | paraID | decimals |
 |-----------------------------------------------------------------------------------------------------------|------------|--------|----------|
@@ -119,7 +260,11 @@ xcGAR Currently covers 30 [xcAssets](https://github.com/colorfulnotion/xcm-globa
 | [{"network":"polkadot"},{"parachain":2046},{"palletInstance":5}]                                          | RING       |   2046 |       18 |
 
 
-And 44 [xcAssets](https://github.com/colorfulnotion/xcm-global-registry/tree/main/gar/xcmRegistry/kusama_xcmRegistry.json) on Kusama:
+And 45 [xcAssets](https://github.com/colorfulnotion/xcm-global-registry/tree/main/gar/xcmRegistry/kusama_xcmRegistry.json) on Kusama:
+
+```
+mysql>  select xcmInteriorKeyV2 as xcmInteriorKey, symbol, paraID, decimals from xcmassetgar where relayChain = 'kusama' order by paraID, symbol;
+```
 
 | xcmInteriorKey                                                                                          | symbol  | paraID | decimals |
 |---------------------------------------------------------------------------------------------------------|---------|--------|----------|
