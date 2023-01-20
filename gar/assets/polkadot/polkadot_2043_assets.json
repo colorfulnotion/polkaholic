@@ -1,0 +1,20 @@
+[
+    {
+        "asset": {
+            "Token": "1"
+        },
+        "name": "TRAC",
+        "symbol": "TRAC",
+        "decimals": 18,
+        "currencyID": "1",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2043},{\"generalIndex\":1}]"
+    },
+    {
+        "asset": {
+            "Token": "OTP"
+        },
+        "name": "OTP",
+        "symbol": "OTP",
+        "decimals": 12
+    }
+]

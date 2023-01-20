@@ -1,0 +1,70 @@
+[
+    {
+        "asset": {
+            "Token": "1"
+        },
+        "name": "Liquid DOT",
+        "symbol": "LDOT",
+        "decimals": 10,
+        "currencyID": "1",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0003\"}]"
+    },
+    {
+        "asset": {
+            "Token": "2"
+        },
+        "name": "Tether USD",
+        "symbol": "USDT",
+        "decimals": 6,
+        "currencyID": "2",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
+    },
+    {
+        "asset": {
+            "Token": "DOT"
+        },
+        "name": "DOT",
+        "symbol": "DOT",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "Token": "IBTC"
+        },
+        "name": "IBTC",
+        "symbol": "IBTC",
+        "decimals": 8
+    },
+    {
+        "asset": {
+            "Token": "INTR"
+        },
+        "name": "INTR",
+        "symbol": "INTR",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "Token": "KBTC"
+        },
+        "name": "KBTC",
+        "symbol": "KBTC",
+        "decimals": 8
+    },
+    {
+        "asset": {
+            "Token": "KINT"
+        },
+        "name": "KINT",
+        "symbol": "KINT",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "Token": "KSM"
+        },
+        "name": "KSM",
+        "symbol": "KSM",
+        "decimals": 12
+    }
+]

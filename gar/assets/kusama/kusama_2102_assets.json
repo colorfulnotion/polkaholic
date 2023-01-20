@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "PCHU"
+        },
+        "name": "PCHU",
+        "symbol": "PCHU",
+        "decimals": 18
+    }
+]

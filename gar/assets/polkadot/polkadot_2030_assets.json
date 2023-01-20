@@ -1,0 +1,303 @@
+[
+    {
+        "asset": {
+            "Token": "BNC"
+        },
+        "name": "BNC",
+        "symbol": "BNC",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "Token2": "0"
+        },
+        "name": "Polkadot DOT",
+        "symbol": "DOT",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "Token2": "1"
+        },
+        "name": "Moonbeam Native Token",
+        "symbol": "GLMR",
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":10}]"
+    },
+    {
+        "asset": {
+            "Token2": "2"
+        },
+        "name": "Tether USD",
+        "symbol": "USDT",
+        "decimals": 6,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
+    },
+    {
+        "asset": {
+            "Token2": "3"
+        },
+        "name": "Astar",
+        "symbol": "ASTR",
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2006}]"
+    },
+    {
+        "asset": {
+            "VSBond2": "02000613"
+        },
+        "name": "vsBOND-DOT-2000-6-13",
+        "symbol": "vsBOND-DOT-2000-6-13",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02003714"
+        },
+        "name": "vsBOND-DOT-2003-7-14",
+        "symbol": "vsBOND-DOT-2003-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02004613"
+        },
+        "name": "vsBOND-DOT-2004-6-13",
+        "symbol": "vsBOND-DOT-2004-6-13",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02006613"
+        },
+        "name": "vsBOND-DOT-2006-6-13",
+        "symbol": "vsBOND-DOT-2006-6-13",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "020081017"
+        },
+        "name": "vsBOND-DOT-2008-10-17",
+        "symbol": "vsBOND-DOT-2008-10-17",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02008714"
+        },
+        "name": "vsBOND-DOT-2008-7-14",
+        "symbol": "vsBOND-DOT-2008-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02013613"
+        },
+        "name": "vsBOND-DOT-2013-6-13",
+        "symbol": "vsBOND-DOT-2013-6-13",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02013714"
+        },
+        "name": "vsBOND-DOT-2013-7-14",
+        "symbol": "vsBOND-DOT-2013-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02013815"
+        },
+        "name": "vsBOND-DOT-2013-8-15",
+        "symbol": "vsBOND-DOT-2013-8-15",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02015613"
+        },
+        "name": "vsBOND-DOT-2015-6-13",
+        "symbol": "vsBOND-DOT-2015-6-13",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02018613"
+        },
+        "name": "vsBOND-DOT-2018-6-13",
+        "symbol": "vsBOND-DOT-2018-6-13",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02019714"
+        },
+        "name": "vsBOND-DOT-2019-7-14",
+        "symbol": "vsBOND-DOT-2019-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02021613"
+        },
+        "name": "vsBOND-DOT-2021-6-13",
+        "symbol": "vsBOND-DOT-2021-6-13",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02021714"
+        },
+        "name": "vsBOND-DOT-2021-7-14",
+        "symbol": "vsBOND-DOT-2021-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02026714"
+        },
+        "name": "vsBOND-DOT-2026-7-14",
+        "symbol": "vsBOND-DOT-2026-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02027714"
+        },
+        "name": "vsBOND-DOT-2027-7-14",
+        "symbol": "vsBOND-DOT-2027-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02027815"
+        },
+        "name": "vsBOND-DOT-2027-8-15",
+        "symbol": "vsBOND-DOT-2027-8-15",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02030815"
+        },
+        "name": "vsBOND-DOT-2030-8-15",
+        "symbol": "vsBOND-DOT-2030-8-15",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02031714"
+        },
+        "name": "vsBOND-DOT-2031-7-14",
+        "symbol": "vsBOND-DOT-2031-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02032714"
+        },
+        "name": "vsBOND-DOT-2032-7-14",
+        "symbol": "vsBOND-DOT-2032-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02034714"
+        },
+        "name": "vsBOND-DOT-2034-7-14",
+        "symbol": "vsBOND-DOT-2034-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02035714"
+        },
+        "name": "vsBOND-DOT-2035-7-14",
+        "symbol": "vsBOND-DOT-2035-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02036714"
+        },
+        "name": "vsBOND-DOT-2036-7-14",
+        "symbol": "vsBOND-DOT-2036-7-14",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02037815"
+        },
+        "name": "vsBOND-DOT-2037-8-15",
+        "symbol": "vsBOND-DOT-2037-8-15",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02039916"
+        },
+        "name": "vsBOND-DOT-2039-9-16",
+        "symbol": "vsBOND-DOT-2039-9-16",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02040815"
+        },
+        "name": "vsBOND-DOT-2040-8-15",
+        "symbol": "vsBOND-DOT-2040-8-15",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "02043815"
+        },
+        "name": "vsBOND-DOT-2043-8-15",
+        "symbol": "vsBOND-DOT-2043-8-15",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "020511017"
+        },
+        "name": "vsBOND-DOT-2051-10-17",
+        "symbol": "vsBOND-DOT-2051-10-17",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSBond2": "020901017"
+        },
+        "name": "vsBOND-DOT-2090-10-17",
+        "symbol": "vsBOND-DOT-2090-10-17",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "VSToken2": "0"
+        },
+        "name": "Voucher Slot DOT",
+        "symbol": "vsDOT",
+        "decimals": 10,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2030},{\"generalKey\":\"0x0403\"}]"
+    },
+    {
+        "asset": {
+            "VToken2": "0"
+        },
+        "name": "Voucher DOT",
+        "symbol": "vDOT",
+        "decimals": 10,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2030},{\"generalKey\":\"0x0900\"}]"
+    },
+    {
+        "asset": {
+            "VToken2": "1"
+        },
+        "name": "Voucher GLMR",
+        "symbol": "vGLMR",
+        "decimals": 18
+    }
+]

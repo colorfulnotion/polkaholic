@@ -1,0 +1,350 @@
+[
+    {
+        "asset": {
+            "Token": "1001"
+        },
+        "name": "sDOT",
+        "symbol": "sDOT",
+        "decimals": 10,
+        "currencyID": "1001",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2012},{\"generalKey\":\"0x73444f54\"}]"
+    },
+    {
+        "asset": {
+            "Token": "101"
+        },
+        "name": "DOT",
+        "symbol": "DOT",
+        "decimals": 10,
+        "currencyID": "101",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},\"here\"]"
+    },
+    {
+        "asset": {
+            "Token": "102"
+        },
+        "name": "USDT",
+        "symbol": "USDT",
+        "decimals": 6,
+        "currencyID": "102",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
+    },
+    {
+        "asset": {
+            "Token": "104"
+        },
+        "name": "AUSD",
+        "symbol": "AUSD",
+        "decimals": 12,
+        "currencyID": "104"
+    },
+    {
+        "asset": {
+            "Token": "106"
+        },
+        "name": "lcDOT",
+        "symbol": "lcDOT",
+        "decimals": 10,
+        "currencyID": "106",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x040d000000\"}]"
+    },
+    {
+        "asset": {
+            "Token": "108"
+        },
+        "name": "ACA",
+        "symbol": "ACA",
+        "decimals": 12,
+        "currencyID": "108",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0000\"}]"
+    },
+    {
+        "asset": {
+            "Token": "110"
+        },
+        "name": "LDOT",
+        "symbol": "LDOT",
+        "decimals": 10,
+        "currencyID": "110",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0003\"}]"
+    },
+    {
+        "asset": {
+            "Token": "112"
+        },
+        "name": "ASTR",
+        "symbol": "ASTR",
+        "decimals": 18,
+        "currencyID": "112"
+    },
+    {
+        "asset": {
+            "Token": "114"
+        },
+        "name": "GLMR",
+        "symbol": "GLMR",
+        "decimals": 18,
+        "currencyID": "114",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":10}]"
+    },
+    {
+        "asset": {
+            "Token": "115"
+        },
+        "name": "PHA",
+        "symbol": "PHA",
+        "decimals": 12,
+        "currencyID": "115",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2035}]"
+    },
+    {
+        "asset": {
+            "Token": "120"
+        },
+        "name": "INTR",
+        "symbol": "INTR",
+        "decimals": 10,
+        "currencyID": "120",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2032},{\"generalKey\":\"0x0002\"}]"
+    },
+    {
+        "asset": {
+            "Token": "122"
+        },
+        "name": "IBTC",
+        "symbol": "IBTC",
+        "decimals": 8,
+        "currencyID": "122",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2032},{\"generalKey\":\"0x0001\"}]"
+    },
+    {
+        "asset": {
+            "Token": "130"
+        },
+        "name": "CLV",
+        "symbol": "CLV",
+        "decimals": 18,
+        "currencyID": "130",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2002}]"
+    },
+    {
+        "asset": {
+            "Token": "200060013"
+        },
+        "name": "cDOT-6/13",
+        "symbol": "cDOT-6/13",
+        "decimals": 10,
+        "currencyID": "200060013",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2012},{\"palletInstance\":6},{\"generalIndex\":200060013}]"
+    },
+    {
+        "asset": {
+            "Token": "200070014"
+        },
+        "name": "cDOT-7/14",
+        "symbol": "cDOT-7/14",
+        "decimals": 10,
+        "currencyID": "200070014",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2012},{\"palletInstance\":6},{\"generalIndex\":200070014}]"
+    },
+    {
+        "asset": {
+            "Token": "200080015"
+        },
+        "name": "cDOT-8/15",
+        "symbol": "cDOT-8/15",
+        "decimals": 10,
+        "currencyID": "200080015",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2012},{\"palletInstance\":6},{\"generalIndex\":200080015}]"
+    },
+    {
+        "asset": {
+            "Token": "200090016"
+        },
+        "name": "cDOT-9/16",
+        "symbol": "cDOT-9/16",
+        "decimals": 10,
+        "currencyID": "200090016",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2012},{\"palletInstance\":6},{\"generalIndex\":200090016}]"
+    },
+    {
+        "asset": {
+            "Token": "200100017"
+        },
+        "name": "cDOT-10/17",
+        "symbol": "cDOT-10/17",
+        "decimals": 10,
+        "currencyID": "200100017",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2012},{\"palletInstance\":6},{\"generalIndex\":200100017}]"
+    },
+    {
+        "asset": {
+            "Token": "200110018"
+        },
+        "name": "cDOT-11/18",
+        "symbol": "cDOT-11/18",
+        "decimals": 10,
+        "currencyID": "200110018"
+    },
+    {
+        "asset": {
+            "Token": "4294957296"
+        },
+        "name": "DOT_U",
+        "symbol": "DOT_U",
+        "decimals": 10,
+        "currencyID": "4294957296"
+    },
+    {
+        "asset": {
+            "Token": "6002"
+        },
+        "name": "LP-DOT/PARA",
+        "symbol": "LP-DOT/PARA",
+        "decimals": 12,
+        "currencyID": "6002"
+    },
+    {
+        "asset": {
+            "Token": "6003"
+        },
+        "name": "LP-DOT/sDOT",
+        "symbol": "LP-DOT/sDOT",
+        "decimals": 12,
+        "currencyID": "6003"
+    },
+    {
+        "asset": {
+            "Token": "6004"
+        },
+        "name": "LP-DOT/cDOT-6/13",
+        "symbol": "LP-DOT/cDOT-6/13",
+        "decimals": 12,
+        "currencyID": "6004"
+    },
+    {
+        "asset": {
+            "Token": "6005"
+        },
+        "name": "LP-DOT/cDOT-7/14",
+        "symbol": "LP-DOT/cDOT-7/14",
+        "decimals": 12,
+        "currencyID": "6005"
+    },
+    {
+        "asset": {
+            "Token": "6006"
+        },
+        "name": "LP-PARA/cDOT-6/13",
+        "symbol": "LP-PARA/cDOT-6/13",
+        "decimals": 12,
+        "currencyID": "6006"
+    },
+    {
+        "asset": {
+            "Token": "6007"
+        },
+        "name": "LP-DOT/cDOT-8/15",
+        "symbol": "LP-DOT/cDOT-8/15",
+        "decimals": 12,
+        "currencyID": "6007"
+    },
+    {
+        "asset": {
+            "Token": "6008"
+        },
+        "name": "LP-GLMR/PARA",
+        "symbol": "LP-GLMR/PARA",
+        "decimals": 12,
+        "currencyID": "6008"
+    },
+    {
+        "asset": {
+            "Token": "6009"
+        },
+        "name": "LP-PHA/PARA",
+        "symbol": "LP-PHA/PARA",
+        "decimals": 12,
+        "currencyID": "6009"
+    },
+    {
+        "asset": {
+            "Token": "6010"
+        },
+        "name": "LP-USDT/PARA",
+        "symbol": "LP-USDT/PARA",
+        "decimals": 12,
+        "currencyID": "6010"
+    },
+    {
+        "asset": {
+            "Token": "6011"
+        },
+        "name": "LP-lcDOT/PARA",
+        "symbol": "LP-lcDOT/PARA",
+        "decimals": 12,
+        "currencyID": "6011"
+    },
+    {
+        "asset": {
+            "Token": "6012"
+        },
+        "name": "LP-PARA/cDOT-7/14",
+        "symbol": "LP-PARA/cDOT-7/14",
+        "decimals": 12,
+        "currencyID": "6012"
+    },
+    {
+        "asset": {
+            "Token": "6013"
+        },
+        "name": "LP-PARA/cDOT-8/15",
+        "symbol": "LP-PARA/cDOT-8/15",
+        "decimals": 12,
+        "currencyID": "6013"
+    },
+    {
+        "asset": {
+            "Token": "6014"
+        },
+        "name": "LP-ACA/PARA",
+        "symbol": "LP-ACA/PARA",
+        "decimals": 12,
+        "currencyID": "6014"
+    },
+    {
+        "asset": {
+            "Token": "6015"
+        },
+        "name": "LP-LDOT/PARA",
+        "symbol": "LP-LDOT/PARA",
+        "decimals": 12,
+        "currencyID": "6015"
+    },
+    {
+        "asset": {
+            "Token": "6016"
+        },
+        "name": "LP-INTR/PARA",
+        "symbol": "LP-INTR/PARA",
+        "decimals": 12,
+        "currencyID": "6016"
+    },
+    {
+        "asset": {
+            "Token": "6017"
+        },
+        "name": "LP-IBTC/PARA",
+        "symbol": "LP-IBTC/PARA",
+        "decimals": 12,
+        "currencyID": "6017"
+    },
+    {
+        "asset": {
+            "Token": "PARA"
+        },
+        "name": "PARA",
+        "symbol": "PARA",
+        "decimals": 12
+    }
+]

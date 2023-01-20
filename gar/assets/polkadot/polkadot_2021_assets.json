@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "EFI"
+        },
+        "name": "EFI",
+        "symbol": "EFI",
+        "decimals": 18
+    }
+]

@@ -4,7 +4,6 @@
         "name": "Polkadot",
         "id": "polkadot",
         "paraID": 0,
-        "chainID": 0,
         "WSEndpoints": [
             "wss://rpc.polkadot.io",
             "wss://polkadot.api.onfinality.io/public-ws",
@@ -23,7 +22,6 @@
         "name": "Statemint",
         "id": "statemint",
         "paraID": 1000,
-        "chainID": 1000,
         "WSEndpoints": [
             "wss://statemint-rpc.polkadot.io",
             "wss://statemint.api.onfinality.io/public-ws",
@@ -39,7 +37,6 @@
         "name": "Acala",
         "id": "acala",
         "paraID": 2000,
-        "chainID": 2000,
         "WSEndpoints": [
             "wss://acala-rpc-0.aca-api.network",
             "wss://acala-rpc-1.aca-api.network",
@@ -55,7 +52,6 @@
         "name": "Clover",
         "id": "clover",
         "paraID": 2002,
-        "chainID": 2002,
         "WSEndpoints": [
             "wss://rpc-para.clover.finance"
         ],
@@ -66,7 +62,6 @@
         "name": "Moonbeam",
         "id": "moonbeam",
         "paraID": 2004,
-        "chainID": 2004,
         "WSEndpoints": [
             "wss://wss.api.moonbeam.network",
             "wss://1rpc.io/glmr",
@@ -82,7 +77,6 @@
         "name": "Astar",
         "id": "astar",
         "paraID": 2006,
-        "chainID": 2006,
         "WSEndpoints": [
             "wss://rpc.astar.network",
             "wss://astar.public.blastapi.io",
@@ -100,7 +94,6 @@
         "name": "Equilibrium",
         "id": "equilibrium",
         "paraID": 2011,
-        "chainID": 2011,
         "WSEndpoints": [
             "wss://node.pol.equilibrium.io/",
             "wss://equilibrium-rpc.dwellir.com"
@@ -112,7 +105,6 @@
         "name": "Parallel",
         "id": "parallel",
         "paraID": 2012,
-        "chainID": 2012,
         "WSEndpoints": [
             "wss://rpc.parallel.fi"
         ],
@@ -123,7 +115,6 @@
         "name": "Litentry",
         "id": "litentry",
         "paraID": 2013,
-        "chainID": 2013,
         "WSEndpoints": [
             "wss://rpc.litentry-parachain.litentry.io",
             "wss://litentry-rpc.dwellir.com"
@@ -135,7 +126,6 @@
         "name": "Composable Finance",
         "id": "composableFinance",
         "paraID": 2019,
-        "chainID": 2019,
         "WSEndpoints": [
             "wss://rpc.composable.finance"
         ],
@@ -146,7 +136,6 @@
         "name": "Efinity",
         "id": "efinity",
         "paraID": 2021,
-        "chainID": 2021,
         "WSEndpoints": [
             "wss://rpc.efinity.io",
             "wss://efinity-rpc.dwellir.com",
@@ -159,7 +148,6 @@
         "name": "Nodle",
         "id": "nodle",
         "paraID": 2026,
-        "chainID": 2026,
         "WSEndpoints": [
             "wss://nodle-parachain.api.onfinality.io/public-ws",
             "wss://eden-rpc.dwellir.com",
@@ -172,7 +160,6 @@
         "name": "Bifrost",
         "id": "bifrost",
         "paraID": 2030,
-        "chainID": 2030,
         "WSEndpoints": [
             "wss://hk.p.bifrost-rpc.liebi.com/ws",
             "wss://bifrost-polkadot.api.onfinality.io/public-ws"
@@ -184,7 +171,6 @@
         "name": "Centrifuge",
         "id": "centrifuge",
         "paraID": 2031,
-        "chainID": 2031,
         "WSEndpoints": [
             "wss://fullnode.parachain.centrifuge.io",
             "wss://centrifuge-parachain.api.onfinality.io/public-ws"
@@ -196,7 +182,6 @@
         "name": "Interlay",
         "id": "interlay",
         "paraID": 2032,
-        "chainID": 2032,
         "WSEndpoints": [
             "wss://api.interlay.io/parachain",
             "wss://interlay.api.onfinality.io/public-ws"
@@ -208,7 +193,6 @@
         "name": "HydraDX",
         "id": "hydra",
         "paraID": 2034,
-        "chainID": 2034,
         "WSEndpoints": [
             "wss://rpc.hydradx.cloud",
             "wss://hydradx-rpc.dwellir.com"
@@ -220,7 +204,6 @@
         "name": "Phala Network",
         "id": "phala",
         "paraID": 2035,
-        "chainID": 2035,
         "WSEndpoints": [
             "wss://api.phala.network/ws",
             "wss://phala.api.onfinality.io/public-ws"
@@ -232,7 +215,6 @@
         "name": "Unique Network",
         "id": "unique",
         "paraID": 2037,
-        "chainID": 2037,
         "WSEndpoints": [
             "wss://us-ws.unique.network/",
             "wss://asia-ws.unique.network/",
@@ -245,7 +227,6 @@
         "name": "Integritee Shell",
         "id": "integritee",
         "paraID": 2039,
-        "chainID": 2039,
         "WSEndpoints": [
             "wss://polkadot.api.integritee.network"
         ],
@@ -256,7 +237,6 @@
         "name": "OriginTrail",
         "id": "origintrail-parachain",
         "paraID": 2043,
-        "chainID": 2043,
         "WSEndpoints": [
             "wss://parachain-rpc.origin-trail.network"
         ],
@@ -267,7 +247,6 @@
         "name": "Darwinia",
         "id": "darwinia",
         "paraID": 2046,
-        "chainID": 2046,
         "WSEndpoints": [
             "wss://parachain-rpc.darwinia.network"
         ],
@@ -278,7 +257,6 @@
         "name": "Kylin",
         "id": "kylin",
         "paraID": 2052,
-        "chainID": 2052,
         "WSEndpoints": [
             "wss://polkadot.kylin-node.co.uk"
         ],

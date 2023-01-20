@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "KAB"
+        },
+        "name": "KAB",
+        "symbol": "KAB",
+        "decimals": 12
+    }
+]

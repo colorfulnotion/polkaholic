@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "NEER"
+        },
+        "name": "NEER",
+        "symbol": "NEER",
+        "decimals": 18
+    }
+]

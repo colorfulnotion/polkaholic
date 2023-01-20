@@ -20,7 +20,7 @@ async function main() {
 
     var garManager = new GarManager();
 
-    let xcRegistryRaw = garManager.readJSONFn(targetedRelaychain, 'xcmConcept')
+    let xcRegistryRaw = garManager.readJSONFn(targetedRelaychain, 'xcmRegistry')
     let xcRegistryNew = garManager.transformXcGarRegistry(xcRegistryRaw)
     //console.log(`xcRegistryNew`, xcRegistryNew)
 
@@ -29,8 +29,8 @@ async function main() {
 
     let [xcRegistryNewOnly, xcRegistryOldOnly, identicalXcRegsitry, diffXcRefistry] = garManager.compareXcRegistry(xcRegistryNew, xcRegistryOld)
 
-    //await garManager.flushXcmAssetGar(xcRegistryNew)
-    await garManager.flushAssetGar(xcRegistryNew)
+    await garManager.flushXcmAssetGar(xcRegistryNew)
+    //await garManager.flushAssetGar(xcRegistryNew)
 }
 
 main()

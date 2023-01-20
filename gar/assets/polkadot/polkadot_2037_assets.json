@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "UNQ"
+        },
+        "name": "UNQ",
+        "symbol": "UNQ",
+        "decimals": 18
+    }
+]

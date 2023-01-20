@@ -7583,7 +7583,6 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
             this.chainID == paraTool.chainIDCrustShadow) {
             await this.chainParser.fetchAsset(this)
             if (this.chainID == paraTool.chainIDHeiko || this.chainID == paraTool.chainIDParallel) {
-                await this.chainParser.fetchAsset(this)
                 await this.chainParser.updateLiquidityInfo(this)
             }
             if (this.chainID == paraTool.chainIDMoonbeam || this.chainID == paraTool.chainIDMoonriver || this.chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta) {
