@@ -92,7 +92,7 @@ module.exports = class Indexer extends AssetManager {
     wasmContractMap = {};
     ably_client = null;
     ably_channel = null;
-    
+
     addressBalanceRequest = {}
 
     context = {};
@@ -1756,23 +1756,23 @@ module.exports = class Indexer extends AssetManager {
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
             this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
-	    if ( this.chainID == 22085 ) {
-		// setup ably client + channel with api key, send xcmtransfer
-		if ( this.ably_client == null ) {
-		    this.ably_client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");
-		}
-		if ( this.ably_client ) {
-		    if ( this.ably_channel == null ) {
-			this.ably_channel = this.ably_client.channels.get('xcminfo');
-		    }
-		    if ( this.ably_channel ) {
-			this.ably_channel.publish(xcmtransfer);
-		    }
-		}
-	    }
+            if (this.chainID == 22085) {
+                // setup ably client + channel with api key, send xcmtransfer
+                if (this.ably_client == null) {
+                    this.ably_client = new Ably.Realtime("DTaENA.C13wMg:WBLRXZd-9u73gBtrFc19WPFrkeX0ACnW0dhRrYPaRuU");
+                }
+                if (this.ably_client) {
+                    if (this.ably_channel == null) {
+                        this.ably_channel = this.ably_client.channels.get('xcminfo');
+                    }
+                    if (this.ably_channel) {
+                        this.ably_channel.publish(xcmtransfer);
+                    }
+                }
+            }
         }
     }
-    
+
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
     // this is send in real time (both unfinalized/finalized)
     updateXCMTransferDestCandidate(candidate, caller = false, isTip = false, finalized = false) {
