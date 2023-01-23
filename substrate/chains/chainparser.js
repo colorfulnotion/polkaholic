@@ -104,6 +104,8 @@ module.exports = class ChainParser {
         let o = {};
         if (i.token !== undefined) o['Token'] = i.token
         if (i.Token !== undefined) o['Token'] = i.Token
+        if (i.erc20 !== undefined) o['Erc20'] = i.erc20
+        if (i.Erc20 !== undefined) o['Erc20'] = i.Erc20
 
         if (i.foreignAsset !== undefined) o.ForeignAsset = i.foreignAsset.toString();
         if (i.ForeignAsset !== undefined) o.ForeignAsset = i.ForeignAsset.toString();
@@ -1979,7 +1981,7 @@ module.exports = class ChainParser {
         let feeAsset = evetnData[2]
         if (feeAsset.fun !== undefined && feeAsset.fun.fungible !== undefined) {
             let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, feeAsset)
-            //console.log(`processOutgoingXTokensEvent asset targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}`, asset)
+            console.log(`processOutgoingXTokensEvent asset targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}`, feeAsset)
             feePayingXcmInteriorkey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTokensEvent ${section_method}`, feeAsset)
         }
         console.log(`feePayingXcmInteriorkey=${feePayingXcmInteriorkey}`)
@@ -2641,6 +2643,7 @@ module.exports = class ChainParser {
 
                     let interiorVStr = JSON.stringify(v1_id_concrete_interiorVal)
                     let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
+                    console.log(`!!!IM here xcmInteriorKey=${xcmInteriorKey}`)
                     let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                     if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                         targetSymbol = cachedXcmAssetInfo.symbol
@@ -2661,7 +2664,7 @@ module.exports = class ChainParser {
                             targetSymbol = symbol
                         }
                     } else {
-                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
                         //lookup failed... should store the interiorVStr some where else for further debugging
                         //targetedAsset = interiorVStr
                         //rawTargetedAsset = interiorVStr
@@ -4864,7 +4867,7 @@ module.exports = class ChainParser {
     getAssetRegistrySymbolAndDecimals(indexer, currency_id) {
         let convertedAssetString = false
         let assetString = this.token_to_string(currency_id)
-        //console.log(`getAssetRegistrySymbolAndDecimals assetString=${assetString}`, `currency_id`, currency_id)
+        console.log(`getAssetRegistrySymbolAndDecimals assetString=${assetString}`, `currency_id`, currency_id)
         let newAssetString = assetString
         let parsedAsset = JSON.parse(assetString)
         let decimals = false
