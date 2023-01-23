@@ -6,7 +6,8 @@ async function insertRowsAsStream(rows) {
         BigQuery
     } = require('@google-cloud/bigquery');
     const bigquery = new BigQuery({
-        projectId: 'substrate-etl'
+        keyFilename: '/root/gc/substrate-etl/substrate-etl-a91ad34acaa8.json'
+        //        projectId: 'substrate-etl'
     });
 
     // Insert data into a table
@@ -17,7 +18,7 @@ async function insertRowsAsStream(rows) {
             .insert(rows);
         console.log(`Inserted ${rows.length} rows`);
     } catch (err) {
-        console.log(err);
+        console.log(JSON.stringify(err));
     }
 }
 
@@ -59,7 +60,7 @@ async function main() {
         //origination_transfer_index: 0,
         origination_id: 2034,
         destination_id: 0,
-        xcm_info: {
+        xcm_info: JSON.stringify({
             symbol: "DOT",
             origination: {
                 ts: 1674410916,
@@ -68,7 +69,7 @@ async function main() {
             destination: {
                 id: 0
             }
-        }
+        })
     }];
     await insertRowsAsStream(rows);
 
