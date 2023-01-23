@@ -151,10 +151,7 @@
   <% if ( traceID ) { %>
     <%- uiTool.presentXCMScanTrace(traceID); %><br/>
   <% } %>
-  <% if ( xcm.origination.ts && xcm.destination.ts  ) { %>
-  <%  let flightTime = xcm.destination.ts  - xcm.origination.ts; %>
-  <i>Flight time: <%= flightTime %> seconds</i>
-
-
+  <% if ( xcm.flightTime ) { %>
+    <i>Flight time: <%= xcm.flightTime %> seconds</i>
   <% } %>
 </div>

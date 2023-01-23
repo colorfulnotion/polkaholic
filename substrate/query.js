@@ -1171,25 +1171,17 @@ module.exports = class Query extends AssetManager {
         return s;
     }
 
-    async getPendingXCMInfo(extrinsicHash) {
-        let pendingXCMInfo = {}
+    async getTraceXCMInfo(extrinsicHash) {
         let traceID = null
-        let sql = `select extrinsicHash, extrinsicID, convert(pendingXcmInfo using utf8) as pendingXcmInfo, traceID from xcmtransfer where extrinsicHash = '${extrinsicHash}' order by isFeeItem, sourceTS desc limit 1`
+        let sql = `select extrinsicHash, extrinsicID, traceID from xcmtransfer where extrinsicHash = '${extrinsicHash}' order by isFeeItem, sourceTS desc limit 1`
         let xcmtransfers = await this.poolREADONLY.query(sql);
         if (xcmtransfers.length > 0) {
             let xcmtransfer = xcmtransfers[0]
             if (xcmtransfer.traceID != undefined) {
                 traceID = xcmtransfer.traceID
             }
-            if (xcmtransfer.pendingXcmInfo != undefined) {
-                try {
-                    pendingXCMInfo = JSON.parse(xcmtransfer.pendingXcmInfo)
-                } catch (e) {
-
-                }
-            }
         }
-        return [pendingXCMInfo, traceID]
+        return traceID;
     }
 
     async getXCMTransfersUI(filters = {}, limit = 10, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
@@ -1226,7 +1218,7 @@ module.exports = class Query extends AssetManager {
                 w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest in (${chainList.join(",")}) )`)
             }
             let wstr = (w.length > 0) ? " where " + w.join(" and ") : "";
-            let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo, convert(pendingXcmInfo using utf8) as pendingXcmInfo, traceID from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
+            let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo, traceID from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
             //console.log(filters, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
@@ -1279,7 +1271,7 @@ module.exports = class Query extends AssetManager {
                 }
                 let parsedXcmInfo;
                 try {
-                    parsedXcmInfo = (x.xcmInfo != undefined) ? JSON.parse(`${x.xcmInfo}`) : JSON.parse(`${x.pendingXcmInfo}`) //use xcmInfo, if not available, fallback to pendingXcmInfo
+                    parsedXcmInfo = (x.xcmInfo != undefined) ? JSON.parse(`${x.xcmInfo}`) : false;
                     if (parsedXcmInfo.origination) {
                         x.amountSent = parsedXcmInfo.origination.amountSent;
                         x.amountSentUSD = parsedXcmInfo.origination.amountSentUSD;
@@ -1397,7 +1389,7 @@ module.exports = class Query extends AssetManager {
                 w.push(`( chainID in ( ${chainList.join(",")} ) or chainIDDest in (${chainList.join(",")}) )`)
             }
             let wstr = (w.length > 0) ? " where " + w.join(" and ") : "";
-            let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo, convert(pendingXcmInfo using utf8) as pendingXcmInfo, traceID from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
+            let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, chainID, chainIDDest, blockNumber, fromAddress, destAddress, sectionMethod, symbol, relayChain, amountSentUSD, amountReceivedUSD, blockNumberDest, executedEventID, sentAt, sourceTS, destTS, amountSent, amountReceived, status, destStatus, relayChain, incomplete, relayChain, msgHash, errorDesc, convert(xcmInfo using utf8) as xcmInfo, traceID from xcmtransfer ${wstr} order by sourceTS desc limit ${limit}`
             let xcmtransfers = await this.poolREADONLY.query(sql);
             //console.log(filters, sql);
             for (let i = 0; i < xcmtransfers.length; i++) {
@@ -1450,7 +1442,7 @@ module.exports = class Query extends AssetManager {
                 }
                 let parsedXcmInfo;
                 try {
-                    parsedXcmInfo = (x.xcmInfo != undefined) ? JSON.parse(`${x.xcmInfo}`) : JSON.parse(`${x.pendingXcmInfo}`) //use xcmInfo, if not available, fallback to pendingXcmInfo
+                    parsedXcmInfo = (x.xcmInfo != undefined) ? JSON.parse(`${x.xcmInfo}`) : false;
                     if (parsedXcmInfo.origination) {
                         x.amountSent = parsedXcmInfo.origination.amountSent;
                         x.amountSentUSD = parsedXcmInfo.origination.amountSentUSD;
@@ -1799,7 +1791,7 @@ module.exports = class Query extends AssetManager {
                 }
 
                 try {
-                    let pendingXcmInfo = null
+
                     let traceID = null
                     if (XCMInfoData) {
                         let extrinsicIDs = Object.keys(XCMInfoData)
@@ -1813,9 +1805,8 @@ module.exports = class Query extends AssetManager {
                         d.xcmInfo = c.xcmInfo
                         return d;
                     } else if (isExtrinsicXcm) {
-                        let [pendingXcmInfo, traceID] = await this.getPendingXCMInfo(txHash)
+                        let [traceID] = await this.getTraceXCMInfo(txHash)
                         if (traceID != undefined) d.traceID = traceID
-                        if (pendingXcmInfo != undefined) d.xcmInfo = pendingXcmInfo
                         console.log(`${txHash} is extrinsicXcm! traceID=${traceID}`)
                     }
                     return d;

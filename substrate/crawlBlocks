@@ -6,7 +6,7 @@ var paraTool = require("./paraTool");
 let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
 var debugLevel = paraTool.debugErrorOnly
 if (isDevelopment){
-    debugLevel = paraTool.debugTracing
+//    debugLevel = paraTool.debugTracing
     console.log(`[isDevelopment:${isDevelopment}] debugLevel: ${debugLevel}`)
 }
 

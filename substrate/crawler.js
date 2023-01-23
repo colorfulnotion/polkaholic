@@ -2044,6 +2044,7 @@ create table talismanEndpoint (
         // Subscribe to chain updates and log the current block number on update.
         let chain = await this.setupChainAndAPI(chainID);
         await this.check_chain_endpoint_correctness(chain);
+        await this.setup_ably_client();
 
         await this.setup_chainParser(chain, paraTool.debugNoLog, true);
         if (chain.WSEndpointSelfHosted == 1) {
