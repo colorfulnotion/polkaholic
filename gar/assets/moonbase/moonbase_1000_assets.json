@@ -1,0 +1,310 @@
+[
+    {
+        "asset": {
+            "Token": "102433417954722588084020852587557555194"
+        },
+        "name": "Basilisk",
+        "symbol": "xcBSX",
+        "decimals": 12,
+        "currencyID": "102433417954722588084020852587557555194",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2090},{\"generalKey\":\"0x00000000\"}]"
+    },
+    {
+        "asset": {
+            "Token": "103375685556851705998693585864132362191"
+        },
+        "name": "Voucher KSM",
+        "symbol": "vKSM",
+        "decimals": 12,
+        "currencyID": "103375685556851705998693585864132362191",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2001},{\"generalKey\":\"0x0104\"}]"
+    },
+    {
+        "asset": {
+            "Token": "105075627293246237499203909093923548958"
+        },
+        "name": "TEER",
+        "symbol": "xcTEER",
+        "decimals": 12,
+        "currencyID": "105075627293246237499203909093923548958",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2015},{\"generalKey\":\"0x54454552\"}]"
+    },
+    {
+        "asset": {
+            "Token": "108036400430056508975016746969135344601"
+        },
+        "name": "XRT",
+        "symbol": "xcXRT",
+        "decimals": 9,
+        "currencyID": "108036400430056508975016746969135344601",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2048}]"
+    },
+    {
+        "asset": {
+            "Token": "10810581592933651521121702237638664357"
+        },
+        "name": "xcKarura",
+        "symbol": "xcKAR",
+        "decimals": 12,
+        "currencyID": "10810581592933651521121702237638664357",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]"
+    },
+    {
+        "asset": {
+            "Token": "108457044225666871745333730479173774551"
+        },
+        "name": "Crust Shadow Native Token",
+        "symbol": "xcCSM",
+        "decimals": 12,
+        "currencyID": "108457044225666871745333730479173774551",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2012}]"
+    },
+    {
+        "asset": {
+            "Token": "113757166108095571031373835444145329310"
+        },
+        "name": "xcLiquid-KSM",
+        "symbol": "xcLKSM",
+        "decimals": 12,
+        "currencyID": "113757166108095571031373835444145329310",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2000},{\"generalKey\":\"0x0083\"}]"
+    },
+    {
+        "asset": {
+            "Token": "122531866982275221270783173426160033062"
+        },
+        "name": "Kintsugi Wrapped BTC",
+        "symbol": "xcKBTC",
+        "decimals": 8,
+        "currencyID": "122531866982275221270783173426160033062",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":1002},{\"generalKey\":\"0x000b\"}]"
+    },
+    {
+        "asset": {
+            "Token": "156305701417244550631956600137082963628"
+        },
+        "name": "xcTestToken1",
+        "symbol": "xcTT1",
+        "decimals": 18,
+        "currencyID": "156305701417244550631956600137082963628",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":1001},{\"palletInstance\":50},{\"generalIndex\":2}]"
+    },
+    {
+        "asset": {
+            "Token": "16797826370226091782818345603793389938"
+        },
+        "name": "Astar",
+        "symbol": "xcASTR",
+        "decimals": 18,
+        "currencyID": "16797826370226091782818345603793389938",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2007}]"
+    },
+    {
+        "asset": {
+            "Token": "173481220575862801646329923366065693029"
+        },
+        "name": "Pangolin Alpha Network Native Token",
+        "symbol": "xcPARING",
+        "decimals": 18,
+        "currencyID": "173481220575862801646329923366065693029",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2105},{\"palletInstance\":5}]"
+    },
+    {
+        "asset": {
+            "Token": "187224307232923873519830480073807488153"
+        },
+        "name": "Equilibrium Dollar",
+        "symbol": "xcEQD",
+        "decimals": 9,
+        "currencyID": "187224307232923873519830480073807488153",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2011},{\"generalKey\":\"0x657164\"}]"
+    },
+    {
+        "asset": {
+            "Token": "189307976387032586987344677431204943363"
+        },
+        "name": "PHA",
+        "symbol": "xcPHA",
+        "decimals": 12,
+        "currencyID": "189307976387032586987344677431204943363",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2004}]"
+    },
+    {
+        "asset": {
+            "Token": "190590555344745888270686124937537713878"
+        },
+        "name": "Equilibrium Token",
+        "symbol": "xcEQ",
+        "decimals": 9,
+        "currencyID": "190590555344745888270686124937537713878",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2011}]"
+    },
+    {
+        "asset": {
+            "Token": "213357169630950964874127107356898319277"
+        },
+        "name": "Calamari Token",
+        "symbol": "xcKMA",
+        "decimals": 12,
+        "currencyID": "213357169630950964874127107356898319277",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2084}]"
+    },
+    {
+        "asset": {
+            "Token": "214920334981412447805621250067209749032"
+        },
+        "name": "xcKarura-Dollar",
+        "symbol": "xcKUSD",
+        "decimals": 12,
+        "currencyID": "214920334981412447805621250067209749032",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]"
+    },
+    {
+        "asset": {
+            "Token": "246731721631919099516624243100078522143"
+        },
+        "name": "ICZ",
+        "symbol": "xcICZ",
+        "decimals": 18,
+        "currencyID": "246731721631919099516624243100078522143",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2006},{\"generalKey\":\"0x0000\"}]"
+    },
+    {
+        "asset": {
+            "Token": "280024949790879322861822169150106601773"
+        },
+        "name": "xcMockRMRK",
+        "symbol": "xcmRMRK",
+        "decimals": 10,
+        "currencyID": "280024949790879322861822169150106601773",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":1001},{\"palletInstance\":50},{\"generalIndex\":1}]"
+    },
+    {
+        "asset": {
+            "Token": "306639095083798603270835754515874921389"
+        },
+        "name": "BIT",
+        "symbol": "xcBIT",
+        "decimals": 18,
+        "currencyID": "306639095083798603270835754515874921389",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2096},{\"generalKey\":\"0x020000000000000000\"}]"
+    },
+    {
+        "asset": {
+            "Token": "319623561105283008236062145480775032445"
+        },
+        "name": "BNC",
+        "symbol": "xcBNC",
+        "decimals": 12,
+        "currencyID": "319623561105283008236062145480775032445",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2001},{\"generalKey\":\"0x0001\"}]"
+    },
+    {
+        "asset": {
+            "Token": "35487752324713722007834302681851459189"
+        },
+        "name": "xcBETADEV",
+        "symbol": "BetaDev",
+        "decimals": 18,
+        "currencyID": "35487752324713722007834302681851459189",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":888},{\"palletInstance\":3}]"
+    },
+    {
+        "asset": {
+            "Token": "42259045809535163221576417993425387648"
+        },
+        "name": "xcUNIT",
+        "symbol": "xcUNIT",
+        "decimals": 12,
+        "currencyID": "42259045809535163221576417993425387648",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},\"here\"]"
+    },
+    {
+        "asset": {
+            "Token": "43334822478192663701103039265086012377"
+        },
+        "name": "xcSubsquidToken",
+        "symbol": "xcSQD",
+        "decimals": 2,
+        "currencyID": "43334822478192663701103039265086012377",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":1001},{\"palletInstance\":50},{\"generalIndex\":3}]"
+    },
+    {
+        "asset": {
+            "Token": "52280927600883288560727505734200597597"
+        },
+        "name": "NEER",
+        "symbol": "xcNEER",
+        "decimals": 18,
+        "currencyID": "52280927600883288560727505734200597597",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2096},{\"generalKey\":\"0x000000000000000000\"}]"
+    },
+    {
+        "asset": {
+            "Token": "52837329483626033197882584414163773570"
+        },
+        "name": "xcKintsugi",
+        "symbol": "XCKINT",
+        "decimals": 12,
+        "currencyID": "52837329483626033197882584414163773570",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":1002},{\"generalKey\":\"0x000c\"}]"
+    },
+    {
+        "asset": {
+            "Token": "54799287759721089563242211737206786491"
+        },
+        "name": "xcGenshiro",
+        "symbol": "xcGENS",
+        "decimals": 9,
+        "currencyID": "54799287759721089563242211737206786491",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2024}]"
+    },
+    {
+        "asset": {
+            "Token": "56557508561302779576079054873115361688"
+        },
+        "name": "Zeitgeist",
+        "symbol": "ZTG",
+        "decimals": 10,
+        "currencyID": "56557508561302779576079054873115361688",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2101},{\"generalKey\":\"0x0001\"}]"
+    },
+    {
+        "asset": {
+            "Token": "65216491554813189869575508812319036608"
+        },
+        "name": "Litentry",
+        "symbol": "xcLIT",
+        "decimals": 12,
+        "currencyID": "65216491554813189869575508812319036608",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2106},{\"palletInstance\":10}]"
+    },
+    {
+        "asset": {
+            "Token": "69536036667157951501899290870203586130"
+        },
+        "name": "xcAlphaUniqueQuartz",
+        "symbol": "xcAUQ",
+        "decimals": 18,
+        "currencyID": "69536036667157951501899290870203586130",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2095}]"
+    },
+    {
+        "asset": {
+            "Token": "76100021443485661246318545281171740067"
+        },
+        "name": "HKO",
+        "symbol": "xcHKO",
+        "decimals": 12,
+        "currencyID": "76100021443485661246318545281171740067",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2085},{\"generalKey\":\"0x484b4f\"}]"
+    },
+    {
+        "asset": {
+            "Token": "DEV"
+        },
+        "name": "DEV",
+        "symbol": "DEV",
+        "decimals": 18
+    }
+]

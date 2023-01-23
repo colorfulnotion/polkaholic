@@ -32,8 +32,8 @@
         "asset": {
             "Token": "4"
         },
-        "name": "ETH",
-        "symbol": "ETH",
+        "name": "WETH",
+        "symbol": "WETH",
         "decimals": 18,
         "currencyID": "4",
         "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x025a4d6acdc4e3e5ab15717f407afe957f7a242578\"}]"

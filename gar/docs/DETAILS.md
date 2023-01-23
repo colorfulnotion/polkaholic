@@ -1,6 +1,6 @@
 ## How it works
 *Long version*:
-* Given a relaychain, retrieve a list of its partaIDs on-chain via `api.query.paras.paraLifecycles`. exclude parathread, as its not live yet.
+* Given a relaychain, retrieve a list of its partIDs on-chain via `api.query.paras.paraLifecycles`. exclude parathread, as its not live yet.
 
 * Crawl polkadot.js's [public endpoint registry](https://github.com/polkadot-js/apps/blob/master/packages/apps-config/src/endpoints/), reject invalid endpoint like polkadex. Also remove endpoints that are unreachable or have no public endpoints
 * Spin up chainParser (using public wss endpoint from previous step) for every reachable parachains(paraIDs).

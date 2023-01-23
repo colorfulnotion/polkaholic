@@ -21,7 +21,7 @@ const {
     StorageKey
 } = require('@polkadot/types');
 
-module.exports = class GarManager extends AssetManager {
+module.exports = class XCMGARLoadManager extends AssetManager {
 
     readJSONFn(relayChain = 'polkadot', fExt = 'xcmRegistry') {
         const logDir = "../gar"

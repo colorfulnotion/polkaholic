@@ -1028,6 +1028,19 @@ module.exports = class ChainParser {
                     let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
                     if (cachedAssetInfo != undefined) {
                         cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
+                        /*
+                        let [parseAssetChain, _] = xcmgarTool.parseAssetChain(assetChainkey)
+                        let assetID = JSON.parse(assetString)
+                        let cachedXcmAssetInfo = this.manager.getXcmAsset(xcmInteriorKey)
+                        if (cachedXcmAssetInfo){
+                            cachedXcmAssetInfo.source = [paraIDSource]
+                            cachedXcmAssetInfo.xcCurrencyID = {}
+                            cachedXcmAssetInfo.xcContractAddress = {}
+                            console.log(`cachedXcmAssetInfo [${xcmInteriorKey}]`, cachedXcmAssetInfo, `assetID`, assetID)
+                            this.manager.setXcmAsset(xcmInteriorKey, cachedXcmAssetInfo, chainkey)
+                            this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID, chainkey)
+                        }
+                        */
                         this.manager.setChainAsset(chainkey, assetChainkey, cachedAssetInfo, true)
                     } else {
                         console.log(`[${chainkey}] Asset=${assetString} NOT FOUND Skip`)

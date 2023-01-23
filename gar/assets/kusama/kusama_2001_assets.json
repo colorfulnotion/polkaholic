@@ -454,6 +454,19 @@
     },
     {
         "asset": {
+            "VSBond": [
+                "KSM",
+                "2,256",
+                "27",
+                "34"
+            ]
+        },
+        "name": "vsBOND-KSM-2256-27-34",
+        "symbol": "vsBOND-KSM-2256-27-34",
+        "decimals": 12
+    },
+    {
+        "asset": {
             "VSToken": "KSM"
         },
         "name": "Bifrost Voucher Slot Voucher Slot KSM",

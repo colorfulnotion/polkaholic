@@ -7,7 +7,7 @@
 // EX: test a specific parser
 // Usage: ./garcmd polkadot 2004
 
-var GarManager = require("./garmanager");
+var XCMGARLoadManager = require("./xcmgarloadmanager");
 
 async function main() {
     var targetedRelaychain = 'polkadot'
@@ -18,18 +18,18 @@ async function main() {
         }
     });
 
-    var garManager = new GarManager();
+    var xcmgarlm = new XCMGARLoadManager();
 
-    let xcRegistryRaw = garManager.readJSONFn(targetedRelaychain, 'xcmRegistry')
-    let xcRegistryNew = garManager.transformXcGarRegistry(xcRegistryRaw)
+    let xcRegistryRaw = xcmgarlm.readJSONFn(targetedRelaychain, 'xcmRegistry')
+    let xcRegistryNew = xcmgarlm.transformXcGarRegistry(xcRegistryRaw)
     //console.log(`xcRegistryNew`, xcRegistryNew)
 
-    let xcRegistryOld = await garManager.init_xcm_asset_old(targetedRelaychain)
+    let xcRegistryOld = await xcmgarlm.init_xcm_asset_old(targetedRelaychain)
     //console.log(`xcRegistryOld`, xcRegistryOld)
 
-    let [xcRegistryNewOnly, xcRegistryOldOnly, identicalXcRegsitry, diffXcRefistry] = garManager.compareXcRegistry(xcRegistryNew, xcRegistryOld)
+    let [xcRegistryNewOnly, xcRegistryOldOnly, identicalXcRegsitry, diffXcRefistry] = xcmgarlm.compareXcRegistry(xcRegistryNew, xcRegistryOld)
 
-    await garManager.flushXcmAssetGar(xcRegistryNew)
+    await xcmgarlm.flushXcmAssetGar(xcRegistryNew)
     //await garManager.flushAssetGar(xcRegistryNew)
 }
 
