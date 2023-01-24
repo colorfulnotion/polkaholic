@@ -58,9 +58,9 @@ async function main() {
             let b = blocks[i]
             console.log(`[chainID:${chainID}] [${i+1}/${blocks.length}] indexBlocks [${b.extrinsicID}] [${b.extrinsicHash}] blkHash=${b.blockHash}`)
             await ccrawler.index_block(chain, b.blockNumber, b.blockHash);
-	    let sql = `update xcmtransfer set xcmInfoAudited = 0 where extrinsicHash = '${b.extrinsicHash}' and blockNumber = '${b.blockNumber}'`
-	    ccrawler.batchedSQL.push(sql);
-	    await ccrawler.update_batchedSQL();
+            let sql = `update xcmtransfer set xcmInfoAudited = 0 where extrinsicHash = '${b.extrinsicHash}' and blockNumber = '${b.blockNumber}'`
+            ccrawler.batchedSQL.push(sql);
+            await ccrawler.update_batchedSQL();
         }
     }
 }
