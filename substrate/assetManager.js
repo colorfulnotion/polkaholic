@@ -937,6 +937,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             nassets++;
         }
         //console.log(assetInfo)
+        //console.log(currencyIDInfo)
         this.assetInfo = assetInfo;
         this.alternativeAssetInfo = alternativeAssetInfo;
         this.symbolRelayChainAsset = symbolRelayChainAsset;

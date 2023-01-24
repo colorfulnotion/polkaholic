@@ -106,6 +106,11 @@ module.exports = class ChainParser {
         if (i.Token !== undefined) o['Token'] = i.Token
         if (i.erc20 !== undefined) o['Erc20'] = i.erc20
         if (i.Erc20 !== undefined) o['Erc20'] = i.Erc20
+        if (i.Token2 !== undefined) o['Token2'] = i.Token2
+        if (i.token2 !== undefined) o['Token2'] = i.token2
+        if (o['Token2'] != undefined && paraTool.isInt(o['Token2'])){
+            o['Token2'] = `${o['Token2']}`
+        }
 
         if (i.foreignAsset !== undefined) o.ForeignAsset = i.foreignAsset.toString();
         if (i.ForeignAsset !== undefined) o.ForeignAsset = i.ForeignAsset.toString();
@@ -4853,6 +4858,7 @@ module.exports = class ChainParser {
             return parsedAsset.Token
         } else {
             let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> ${assetString}, assetInfo`, assetInfo)
             if (assetInfo != undefined && assetInfo.symbol != undefined && assetInfo.isXCAsset) {
                 let xcmAssetSymbol = assetInfo.symbol
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`convert currency_id [${JSON.stringify(currency_id)}] ->  xcmAssetSymbol ${xcmAssetSymbol}`)
@@ -5086,6 +5092,7 @@ module.exports = class ChainParser {
         //let rawAssetString = this.processRawGenericCurrencyID(indexer, d[0]);
         //let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         let relayChain = indexer.relayChain
+        //console.log(`${e.eventID} processXcmGenericCurrencyID asset=`,d[0])
         let targetedSymbol = this.processXcmGenericCurrencyID(indexer, d[0]) //inferred approach
         let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "processXcmGenericCurrencyID", "tokens(Deposited)", d[0])
         let fromAddress = paraTool.getPubKey(d[1]);
@@ -5199,9 +5206,14 @@ module.exports = class ChainParser {
         //console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)
         if (cachedAssetInfo !== undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
             return (cachedAssetInfo);
-        } else {
-            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`parsedAsset not found --skip key=[${assetChain}]`)
         }
+        //cachedAssetInfo via currencyID
+        let cachedAssetInfo2 = indexer.currencyIDInfo[assetChain]
+        //console.log(`getAssetInfo cachedAssetInfo2`, cachedAssetInfo2)
+        if (cachedAssetInfo2 !== undefined && cachedAssetInfo2.decimals != undefined && cachedAssetInfo2.assetType != undefined && cachedAssetInfo2.symbol != undefined) {
+            return (cachedAssetInfo2);
+        }
+        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`parsedAsset not found --skip key=[${assetChain}]`)
     }
 
     cleanedAssetID(assetID) {
