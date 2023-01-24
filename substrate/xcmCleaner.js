@@ -111,9 +111,21 @@ module.exports = class XCMCleaner extends Query {
             if (chainID == 2030 || chainID == 22001) {
                 // these chains have JSON objects in currencyID
                 currencies.push(JSON.parse(asset.currencyID));
-            } else if (chainID == 22000 || chainID == 2000 || chainID == 22092 || chainID == 2032) {
+            } else if (chainID == 22000 || chainID == 2000) {
                 // TODO: import GAR such that the above will cover these chains instead
-                currencies.push(JSON.parse(asset.asset));
+		let asset0 = JSON.parse(asset.asset)
+		let currencyID = null;
+		let flds = ["Token", "ForeignAsset", "Erc20", "LiquidCrowdloan", "StableAsset"];
+		for ( const fld of flds ) {
+		    if ( asset0[fld] ) {
+			currencyID = {}
+			currencyID[fld.toLowerCase()] = asset0[fld];
+			currencies.push(currencyID);
+		    }
+		}
+		if ( currencyID ) {
+                    currencies.push(currencyID);
+		}
             } else {
                 currencies.push(asset.currencyID);
             }
