@@ -907,8 +907,9 @@ module.exports = class AssetManager extends PolkaholicDB {
                     a.xcContractAddress = v.xcContractAddress;
                     if (v.xcmasset_symbol && a.symbol != v.xcmasset_symbol) {
                         a.localSymbol = a.symbol; // when present, this could override the symbol in a UI (e.g. xcDOT)
+                        a.symbol = v.xcmasset_symbol;
                     }
-                    a.symbol = v.xcmasset_symbol;
+                    //a.symbol = v.xcmasset_symbol; //TODO: xcmasset symbol is potentially not there
                     a.priceUSD = v.xcmpriceUSD;
                     a.relayChain = v.xcmasset_relayChain
                     let symbolRelayChain = paraTool.makeAssetChain(a.symbol, a.relayChain)

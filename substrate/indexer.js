@@ -7380,7 +7380,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     } catch (merr) {
                         console.log("this.chainParser.getGenericSymbolAndDecimal", rAsset, merr)
                     }
-                    console.log(`rawAssetSymbol=${rawAssetSymbol}, rawAssetDecimals=${rawAssetDecimals}, rawAssetString=${rawAssetString}, fdata`, fdata, )
+                    //console.log(`rawAssetSymbol=${rawAssetSymbol}, rawAssetDecimals=${rawAssetDecimals}, rawAssetString=${rawAssetString}, fdata`, fdata, )
                     if (rAsset.token != undefined || rAsset.Token != undefined) { // move to chainParser ... this is Acala specific
                         symbol = rawAssetSymbol
                         decimals = rawAssetDecimals

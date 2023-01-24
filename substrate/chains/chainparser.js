@@ -4832,7 +4832,7 @@ module.exports = class ChainParser {
                 Token: assetID
             }
             let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`rawAssetID=${rawAssetID}, assetInfo`, assetInfo)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`rawAssetID=${rawAssetID}, assetInfo`, assetInfo)
             if (assetInfo != undefined && assetInfo.symbol != undefined && assetInfo.isXCAsset) {
                 let xcmAssetSymbol = assetInfo.symbol
                 //if (this.debugLevel >= paraTool.debugVerbose) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> xcmAssetSymbol ${xcmAssetSymbol}`)
@@ -4911,13 +4911,14 @@ module.exports = class ChainParser {
             }
         }
 
-        if (rawAssetID) {
+        if (rawAssetID !== false) {
             let assetIDWithComma = paraTool.toNumWithComma(paraTool.dechexAssetID(rawAssetID))
             let assetID = this.cleanedAssetID(assetIDWithComma)
             let parsedAsset = {
                 Token: assetID
             }
             let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
+            //console.log(`getDecHexCurrencyIDSymbolAndDecimals rawAssetID=${rawAssetID}, parsedAsset=`, parsedAsset, `assetInfo=`, assetInfo)
             if (assetInfo != undefined && assetInfo.symbol != undefined && assetInfo.decimals != undefined) {
                 let rAasset = {
                     Token: assetInfo.symbol
@@ -5193,10 +5194,10 @@ module.exports = class ChainParser {
         var asset = JSON.stringify(parsedAsset);
         //console.log(`getAssetInfo `, parsedAsset, asset, indexer.chainID)
         let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
-        console.log(`assetChain=${assetChain}`, parsedAsset, asset, indexer.chainID)
+        //console.log(`assetChain=${assetChain}`, parsedAsset, asset, indexer.chainID)
         let cachedAssetInfo = indexer.assetInfo[assetChain]
-        console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)
-        if (cachedAssetInfo !== undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
+        //console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)
+        if (cachedAssetInfo !== undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
             return (cachedAssetInfo);
         } else {
             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`parsedAsset not found --skip key=[${assetChain}]`)
