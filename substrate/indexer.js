@@ -1828,48 +1828,49 @@ module.exports = class Indexer extends AssetManager {
             } else if (apiAt.query.tokens != undefined && apiAt.query.tokens.accounts != undefined) {
                 method = "tokens.accounts";
                 if (chainID == 22000 || chainID == 2000) {
-		    let currencyID = null;
-		    let asset0 = JSON.parse(asset);
-		    let flds = ["Token", "ForeignAsset", "Erc20", "LiquidCrowdloan", "StableAsset"];
-		    for ( const fld of flds ) {
-			if ( asset0[fld] ) {
-			    currencyID = {}
-			    currencyID[fld.toLowerCase()] = asset0[fld];
-			}
-		    }
+                    let currencyID = null;
+                    let asset0 = JSON.parse(asset);
+                    let flds = ["Token", "ForeignAsset", "Erc20", "LiquidCrowdloan", "StableAsset"];
+                    for (const fld of flds) {
+                        if (asset0[fld]) {
+                            currencyID = {}
+                            currencyID[fld.toLowerCase()] = asset0[fld];
+                        }
+                    }
                 }
-		if ( currencyID ) {
+                if (currencyID) {
                     let query = await apiAt.query.tokens.accounts(address, currencyID);
                     let qR = query.toJSON();
                     if (qR && qR.free != undefined) {
-			balance = qR.free;
+                        let free = paraTool.dechexToInt(qR.free.toString());
+                        balance = free;
                     }
-		} else {
-		    this.logger.warn({
-			"op": "get_accountbalance_xcmtransfer:tokens.account missing currencyID",
-			chainID,
-			address,
-			symbolRelaychain,
-			currencyIDmap
-		    });
-		}
-            } else if (apiAt.query.assets != undefined && apiAt.query.assets.account != undefined ) {
-		if ( currencyID ) {
+                } else {
+                    this.logger.warn({
+                        "op": "get_accountbalance_xcmtransfer:tokens.account missing currencyID",
+                        chainID,
+                        address,
+                        symbolRelaychain,
+                        currencyIDmap
+                    });
+                }
+            } else if (apiAt.query.assets != undefined && apiAt.query.assets.account != undefined) {
+                if (currencyID) {
                     let query = await apiAt.query.assets.account(currencyID, address);
                     let qR = query.toJSON();
                     if (qR && qR.balance != undefined) {
-			method = "assets.account";
-			balance = qR.balance;
+                        method = "assets.account";
+                        balance = paraTool.dechexToInt(qR.balance.toString());
                     }
-		} else {
-		    this.logger.warn({
-			"op": "get_accountbalance_xcmtransfer:assets.account missing currencyID",
-			chainID,
-			address,
-			symbolRelaychain,
-			currencyIDmap
-		    });
-		} 
+                } else {
+                    this.logger.warn({
+                        "op": "get_accountbalance_xcmtransfer:assets.account missing currencyID",
+                        chainID,
+                        address,
+                        symbolRelaychain,
+                        currencyIDmap
+                    });
+                }
             }
         } catch (err) {
             this.logger.error({

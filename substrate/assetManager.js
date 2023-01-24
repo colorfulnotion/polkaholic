@@ -542,7 +542,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     symbol: symbol, // unknown
                     paraID: v.paraID,
                     relayChain: v.relayChain,
-                    parents: v.parents,  // should be removed
+                    parents: v.parents, // should be removed
                     xcmInteriorKey: xcmInteriorKey,
                     //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
                     xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),

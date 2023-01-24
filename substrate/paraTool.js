@@ -1843,7 +1843,7 @@ module.exports = {
     /*
     paraTool uses older XcmInteriorKeyV1 format, whereas garTool uses XcmInteriorKeyV1 format
     */
-    parseXcmInteriorKeyV1: function (xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
+    parseXcmInteriorKeyV1: function(xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
         return parseXcmInteriorKeyV1(xcmInteriorKey);
     },
     makeXcmInteriorKey: function(interior, relayChain) {
