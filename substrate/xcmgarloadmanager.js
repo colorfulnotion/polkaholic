@@ -128,7 +128,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
 
             let transformedXcmAsset = {
                 xcmchainID: chainID,
-                paraID: paraID,
+                parachainID: paraID,
                 xcmInteriorKey: xcmInteriorKeyV1,
                 xcmInteriorKeyV2: xcmInteriorKeyV2,
                 symbol: symbol,
@@ -262,7 +262,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 //["xcmInteriorKey", "symbol", "relayChain"]
                 // ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parents"]
                 let t = "(" + [`'${r.xcmInteriorKey}'`, `'${r.symbol}'`, `'${r.relayChain}'`,
-                    `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.paraID}'`
+                    `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`
                 ].join(",") + ")";
                 if (r.msgHash == "0x" && !r.finalized) {
                     //msgHash is missing... we will
@@ -275,9 +275,9 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmassetgar",
                 "keys": ["xcmInteriorKey", "symbol", "relayChain"],
-                "vals": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "paraID"],
+                "vals": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID"],
                 "data": xcmAssets,
-                "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "paraID"]
+                "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID"]
             }, sqlDebug);
         }
     }
