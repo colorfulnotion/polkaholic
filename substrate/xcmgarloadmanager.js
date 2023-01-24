@@ -84,6 +84,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         for (const xcmInteriorKeyV2 of Object.keys(xcGarMap)) {
             let xcmAsset = xcGarMap[xcmInteriorKeyV2]
             let xcmInteriorKeyV1 = paraTool.convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2)
+            let xcmV1Standardized = JSON.parse(xcmInteriorKeyV2)
 
             //console.log(`xcmInteriorKeyV1=${xcmInteriorKeyV1}, xcmInteriorKeyV2=${xcmInteriorKeyV2}`)
             let decimals = xcmAsset.decimals
@@ -94,6 +95,17 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             //nativeAssetChain are different for statemine asset (i.e USDt)
             let parsedAsset = {
                 Token: symbol
+            }
+            if (chainID == paraTool.chainIDStatemine || chainID == paraTool.chainIDStatemint ){
+                try {
+                    console.log(`xcmV1Standardized`, xcmV1Standardized)
+                    let assetID = xcmV1Standardized[3]['generalIndex']
+                    parsedAsset = {
+                        Token: `${assetID}`
+                    }
+                } catch(e){
+                    console.log(`statemine/t e`, e)
+                }
             }
             var assetString = JSON.stringify(parsedAsset);
             let nativeAssetChain = paraTool.makeAssetChain(assetString, chainID)
