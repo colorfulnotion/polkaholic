@@ -1828,11 +1828,12 @@ module.exports = class Indexer extends AssetManager {
             } else if (apiAt.query.tokens != undefined && apiAt.query.tokens.accounts != undefined) {
                 method = "tokens.accounts";
                 if (chainID == 22000 || chainID == 2000) {
+		    let currencyID = null;
 		    let asset0 = JSON.parse(asset);
 		    let flds = ["Token", "ForeignAsset", "Erc20", "LiquidCrowdloan", "StableAsset"];
 		    for ( const fld of flds ) {
-			currencyID = {}
 			if ( asset0[fld] ) {
+			    currencyID = {}
 			    currencyID[fld.toLowerCase()] = asset0[fld];
 			}
 		    }
