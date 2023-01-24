@@ -571,6 +571,8 @@ module.exports = class AcalaParser extends ChainParser {
 
         if (i.token !== undefined) o['Token'] = i.token
         if (i.Token !== undefined) o['Token'] = i.Token
+        if (i.erc20 !== undefined) o['Erc20'] = i.erc20
+        if (i.Erc20 !== undefined) o['Erc20'] = i.Erc20
 
         if (i.foreignAsset !== undefined) o.ForeignAsset = i.foreignAsset.toString();
         if (i.ForeignAsset !== undefined) o.ForeignAsset = i.ForeignAsset.toString();

@@ -1849,7 +1849,7 @@ module.exports = class Indexer extends AssetManager {
 			"op": "get_accountbalance_xcmtransfer:tokens.account missing currencyID",
 			chainID,
 			address,
-			symbolRelayChain,
+			symbolRelaychain,
 			currencyIDmap
 		    });
 		}
@@ -1866,7 +1866,7 @@ module.exports = class Indexer extends AssetManager {
 			"op": "get_accountbalance_xcmtransfer:assets.account missing currencyID",
 			chainID,
 			address,
-			symbolRelayChain,
+			symbolRelaychain,
 			currencyIDmap
 		    });
 		} 
@@ -7250,6 +7250,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
     */
 
 
+
     //TODO: no good way to catch token:Deposited / assets:Issued
     // MK
     async decorateFeedTransfer(pallet, method, data, feed, eventID, blockTS) {
@@ -7283,11 +7284,19 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 case "currencies:Transferred":
                 case "tokens:Transfer":
                     /*
-                    currencies:Transferred [
+                    currencies:Transferred
+                    [
                       { token: 'ACA' },
                       '23M5ttkmR6KcoUwA7NqBjLuMJFWCvobsD9Zy95MgaAECEhit',
                       '23M5ttkmR6Kco7bReRDve6bQUSAcwqebatp3fWGJYb4hDSDJ',
                       1205600000000
+                    ]
+                    currencies:Transferred
+                    [
+                      { erc20: '0x5a4d6acdc4e3e5ab15717f407afe957f7a242578' },
+                      '22PHkP2GdGTQh3WEaDKpYtzfPfWccbXFdMGqineZPfukbbus',
+                      '23UvQ3ZWXwinF3JfBcxFBFadwDAAw9wwjAGbUVb1Ttf88vWw',
+                      1000000000000000
                     ]
                     tokens:Transfer [
                       { token: 'AUSD' },
@@ -7315,6 +7324,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                     } catch (merr) {
                         console.log("this.chainParser.getGenericSymbolAndDecimal", rAsset, merr)
                     }
+                    //console.log(`rawAssetSymbol=${rawAssetSymbol}, rawAssetDecimals=${rawAssetDecimals}, rawAssetString=${rawAssetString}, fdata`, fdata, )
                     if (rAsset.token != undefined || rAsset.Token != undefined) { // move to chainParser ... this is Acala specific
                         symbol = rawAssetSymbol
                         decimals = rawAssetDecimals

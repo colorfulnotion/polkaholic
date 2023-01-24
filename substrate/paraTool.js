@@ -1833,9 +1833,6 @@ module.exports = {
     makeXcmInteriorKeyV1: function(interior, relayChain = 'kusama') {
         return makeXcmInteriorKeyV1(interior, relayChain)
     },
-    parseXcmInteriorKeyV1: function (xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
-        return parseXcmInteriorKeyV1(xcmInteriorKey);
-    },
     makeXcmInteriorKeyV2: function(interior, relayChain = 'kusama') {
         return makeXcmInteriorKeyV2(interior, relayChain)
     },
@@ -1846,6 +1843,9 @@ module.exports = {
     /*
     paraTool uses older XcmInteriorKeyV1 format, whereas garTool uses XcmInteriorKeyV1 format
     */
+    parseXcmInteriorKeyV1: function (xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
+        return parseXcmInteriorKeyV1(xcmInteriorKey);
+    },
     makeXcmInteriorKey: function(interior, relayChain) {
         return makeXcmInteriorKeyV1(interior, relayChain)
     },
