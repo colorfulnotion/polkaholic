@@ -100,6 +100,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 try {
                     console.log(`xcmV1Standardized`, xcmV1Standardized)
                     let assetID = xcmV1Standardized[3]['generalIndex']
+                    if (assetID == undefined) continue // invalid registry
                     parsedAsset = {
                         Token: `${assetID}`
                     }
