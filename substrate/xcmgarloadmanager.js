@@ -103,6 +103,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                     console.log(`xcmV1Standardized`, xcmV1Standardized)
                     let assetID = xcmV1Standardized[3]['generalIndex']
                     if (assetID == undefined) continue // invalid registry
+                    if (assetID != 1984 && assetID != 8) continue // skip unused weth/wbtc for now
                     parsedAsset = {
                         Token: `${assetID}`
                     }
