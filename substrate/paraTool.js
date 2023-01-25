@@ -1167,7 +1167,6 @@ function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = '[{"parac
                 interiorN = 1
                 interior = [interior]
             }
-            //console.log(`assetUnparsed ${assetUnparsed} interiorN=${interiorN},interior`, interior)
             let interiorType = (isUppercase) ? `X${interiorN}` : `x${interiorN}`
             if (interiorN == 1) {
                 xcmV1MultiLocation.interior[interiorType] = interior[0]
@@ -1183,7 +1182,7 @@ function convert_xcmInteriorKey_to_xcmV1MultiLocation(xcmInteriorKey = '[{"parac
         xcmVersionedMultiLocation[versionType] = xcmV1MultiLocation
         return xcmVersionedMultiLocation
     } catch (e) {
-        console.log(`convert_xcmInteriorKey_to_xcmV1MultiLocation err`, e)
+        console.log(`convert_xcmInteriorKey_to_xcmV1MultiLocation xcmInteriorKey=${xcmInteriorKey}, err`, e)
         return false
     }
 }

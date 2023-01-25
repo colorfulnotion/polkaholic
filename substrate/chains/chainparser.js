@@ -1988,8 +1988,8 @@ module.exports = class ChainParser {
             let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey1] = this.processV1ConcreteFungible(indexer, feeAsset)
             //console.log(`processOutgoingXTokensEvent asset targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}`, feeAsset)
             feePayingXcmInteriorkey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTokensEvent ${section_method}`, feeAsset)
-            console.log(`feePayingXcmInteriorkey=${feePayingXcmInteriorkey}`)
             if (feePayingXcmInteriorkey == false) feePayingXcmInteriorkey = targetedXcmInteriorKey1
+            console.log(`feePayingXcmInteriorkey=${feePayingXcmInteriorkey}`)
         }
 
         let aAsset = evetnData[1] //Vec<XcmV1MultiAsset>
@@ -2011,7 +2011,7 @@ module.exports = class ChainParser {
                     let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = this.processV1ConcreteFungible(indexer, asset)
                     //console.log(`processOutgoingXTokensEvent asset targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}`, asset)
                     let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTokensEvent ${section_method}`, asset)
-                    if (targetedXcmInteriorKey == false) feePayingXcmInteriorkey = targetedXcmInteriorKey0
+                    if (targetedXcmInteriorKey == false) targetedXcmInteriorKey = targetedXcmInteriorKey0
                     let aa = {
                         //asset: targetedAsset,
                         //rawAsset: rawTargetedAsset,
