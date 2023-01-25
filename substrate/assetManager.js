@@ -550,7 +550,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
             }
 
-            let assetRecs = await this.poolREADONLY.query("select asset.chainID, asset.asset, asset.currencyID, asset.xcContractAddress, asset.xcmInteriorKey, xcmasset.symbol, xcmasset.relayChain from asset join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey and (xcContractAddress is not null or currencyID is not null)");
+            let assetRecs = await this.poolREADONLY.query("select asset.chainID, asset.asset, asset.currencyID, asset.xcContractAddress, asset.xcmInteriorKey, xcmasset.symbol, xcmasset.relayChain from asset join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey and (xcContractAddress is not null or currencyID is not null) order by xcmasset.xcmInteriorKey");
             for (const assetRec of assetRecs) {
                 let symbol = assetRec.symbol;
                 let relaychain = assetRec.relayChain;

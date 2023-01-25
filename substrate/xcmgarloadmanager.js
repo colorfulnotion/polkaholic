@@ -103,7 +103,6 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                     console.log(`xcmV1Standardized`, xcmV1Standardized)
                     let assetID = xcmV1Standardized[3]['generalIndex']
                     if (assetID == undefined) continue // invalid registry
-                    if (assetID != 1984 && assetID != 8) continue // skip unused weth/wbtc for now
                     parsedAsset = {
                         Token: `${assetID}`
                     }
@@ -267,8 +266,8 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 let r = xcRegistryNew[xcmtransferKeys[i]];
                 //["xcmInteriorKey", "symbol", "relayChain"]
                 // ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parents"]
-                let t = "(" + [`'${r.xcmInteriorKey}'`, `'${r.symbol}'`, `'${r.relayChain}'`,
-                    `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`
+                let t = "(" + [`'${r.xcmInteriorKey}'`,
+                `'${r.symbol}'`, `'${r.relayChain}'`, `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`
                 ].join(",") + ")";
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} >>>`, t)
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} res`, r)
@@ -278,10 +277,11 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             let sqlDebug = true
             await this.upsertSQL({
                 "table": "xcmassetgar",
-                "keys": ["xcmInteriorKey", "symbol", "relayChain"],
-                "vals": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID"],
+                "keys": ["xcmInteriorKey"],
+                "vals": ["symbol", "relayChain", "xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID"],
                 "data": xcmAssets,
-                "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID"]
+                "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID"],
+                "replaceIfNull": ["symbol"]
             }, sqlDebug);
         }
     }
@@ -310,7 +310,8 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 "keys": ["asset", "chainID", ],
                 "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol"],
                 "data": assets,
-                "replace": ["assetType", "xcmInteriorKey", "decimals", "symbol"]
+                "replace": ["assetType", "xcmInteriorKey", "decimals"],
+                "replaceIfNull": ["symbol"]
             }, sqlDebug);
             //await this.update_batchedSQL()
         }
