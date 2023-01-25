@@ -531,6 +531,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                         relayChain: v.relayChain,
                         parents: v.parents,
                         xcmInteriorKey: xcmInteriorKey,
+                        symbolRelaychain: paraTool.makeAssetChain(v.symbol, v.relayChain),
                         //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
                         xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
                         evmMultiLocation: JSON.stringify(evmMultiLocation),
@@ -540,6 +541,24 @@ module.exports = class AssetManager extends PolkaholicDB {
                         assetType: "Token",
                         priceUSD: (v.priceUSD > 0) ? v.priceUSD : null
                     }
+                    let s = {
+                        decimals: v.decimals,
+                        symbol: v.symbol,
+                        paraID: paraID,
+                        relayChain: v.relayChain,
+                        parents: v.parents,
+                        xcmInteriorKey: xcmInteriorKey,
+                        symbolRelaychain: paraTool.makeAssetChain(v.symbol, v.relayChain),
+                        //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
+                        xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
+                        evmMultiLocation: JSON.stringify(evmMultiLocation),
+                        assets: {},
+                        xcContractAddress: {},
+                        xcCurrencyID: {},
+                        nativeAssetChain: nativeAssetChain, //probably unknown without indexing the native chain
+                        priceUSD: (v.priceUSD > 0) ? v.priceUSD : null
+                    }
+                    xcmSymbolInfo[s.symbolRelaychain] = s;
                     xcmConceptInfo[v.xcmInteriorKey] = a;
                 }
             }
