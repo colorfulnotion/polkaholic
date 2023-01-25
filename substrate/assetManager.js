@@ -498,6 +498,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
             }
 
+/*
             //via xcmConcept
             let xcmAssetRecs = await this.poolREADONLY.query("select chainID, xcmConcept, asset, paraID, relayChain, parent as parents from xcmConcept;");
             for (let i = 0; i < xcmAssetRecs.length; i++) {
@@ -561,6 +562,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 //does not have assetPair, token0, token1, token0Symbol, token1Symbol, token0Decimals, token1Decimals
             }
 
+*/
             //via xcmAsset
             for (let i = 0; i < xcmAssets.length; i++) {
                 let v = xcmAssets[i];
