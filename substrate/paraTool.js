@@ -725,22 +725,6 @@ function toUSD(symbol, relayChain) {
     return symbol
 }
 
-function VSTokenToToken(tokenStr) {
-    try {
-        let token = JSON.parse(tokenStr)
-        if (token.VSToken != undefined) {
-            let v = `VS${token.VSToken}`
-            return JSON.stringify({
-                Token: v
-            })
-        }
-    } catch (e) {
-        //console.log(`VSTokenToToken tokenStr=${tokenStr}`, e.toString())
-        return tokenStr
-    }
-    return tokenStr
-}
-
 //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
 // 340282366920938463463374607431768211455 -> 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF
 // 42259045809535163221576417993425387648  -> 0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080
@@ -2018,9 +2002,6 @@ module.exports = {
     },
     toUSD: function(x, relayChain) {
         return toUSD(x, relayChain)
-    },
-    VSTokenToToken: function(tokenStr) {
-        return VSTokenToToken(tokenStr)
     },
     xcAssetIDToContractAddr: function(xcAssetID) {
         return xcAssetIDToContractAddr(xcAssetID)

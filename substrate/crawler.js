@@ -1196,7 +1196,7 @@ module.exports = class Crawler extends Indexer {
             let updateChainAssetTS = (new Date().getTime() - updateChainAssetStartTS) / 1000
             console.log("update_chain_assets time=", updateChainAssetTS);
             if (chain.isEVM > 0 && (chain.evmRPC)) { //  moonbeam, moonriver, astar, shiden, clover ... where clover has an evmRPC external endpoint
-                await this.updateChainAssetHoldersBalances(chain); // 10min
+                // DISABLED FOR NOW await this.updateChainAssetHoldersBalances(chain); // 10min
                 await this.updateERC20TokenSupply(chain); // 5mins
             }
             await this.updateSpecVersions(chain);

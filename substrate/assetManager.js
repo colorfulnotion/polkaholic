@@ -723,8 +723,8 @@ module.exports = class AssetManager extends PolkaholicDB {
             let v = assetRecs[i];
             let a = {}
             // add assetChain (string) + parseUSDpaths (JSON array)
-            let vAsset = paraTool.VSTokenToToken(v.asset)
-            let assetChain = paraTool.makeAssetChain(vAsset, v.chainID);
+
+            let assetChain = paraTool.makeAssetChain(v.asset, v.chainID);
             let assetKey = paraTool.twox_128(assetChain)
             let priceUSDpaths = (v.priceUSDpaths) ? JSON.parse(v.priceUSDpaths.toString()) : false;
             if (v.asset == '{"StableAssetPoolToken":"0"}') {
@@ -739,7 +739,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     assetName: v.assetName,
                     numHolders: v.numHolders,
                     totalSupply: v.totalSupply,
-                    asset: vAsset,
+                    asset: v.asset,
                     symbol: v.symbol,
                     decimals: v.decimals,
                     token0: v.token0,
@@ -767,7 +767,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     assetName: v.assetName,
                     numHolders: v.numHolders,
                     totalSupply: v.totalSupply,
-                    asset: vAsset,
+                    asset: v.asset,
                     symbol: v.symbol,
                     decimals: v.decimals,
                     chainID: v.chainID,

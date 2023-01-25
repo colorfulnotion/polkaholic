@@ -200,14 +200,20 @@ module.exports = class ChainParser {
                     //cached assetInfo
                 } else {
                     await indexer.addAssetInfo(asset, chainID, assetInfo, 'getSystemProperties');
-                    // if chain does not have a "asset" specified, it will get one
-                    if (!chain.asset && (i == 0)) {
-                        let newAsset = JSON.stringify({
-                            Token: symbol
-                        })
-                        //console.log("adding NEW asset to chain", newAsset)
-                        indexer.batchedSQL.push(`update chain set asset = '${newAsset}' where chainID = '${chainID}'`);
-                    }
+                    // if chain does not have a "asset" specified, it will get one from the FIRST one
+		    if ( i == 0 ) {
+			if (!chain.asset) {
+                            let newAsset = JSON.stringify({
+				Token: symbol
+                            })
+                            //console.log("adding NEW asset to chain", newAsset)
+                            indexer.batchedSQL.push(`update chain set asset = '${newAsset}' where chainID = '${chainID}'`);
+			}
+			if (!chain.symbol) {
+                            // TODO: add this after checking chain.symbol and symbol
+			    // indexer.batchedSQL.push(`update chain set symbol = '${symbol}' where chainID = '${chainID}'`);
+			}
+		    }
                 }
             }
             await indexer.update_batchedSQL(true);

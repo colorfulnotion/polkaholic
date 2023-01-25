@@ -215,11 +215,11 @@ module.exports = class Manager extends AssetManager {
                     })
                     let assetChain = paraTool.makeAssetChain(asset, chainID);
                     if (this.assetInfo[assetChain] == undefined) {
-                        this.logger.fatal({
+                        this.logger.error({
                             "op": "updateNonNativeBalances - unknown asset",
                             assetChain
                         })
-                        process.exit(0);
+			continue;
                     }
                     let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
 
@@ -258,19 +258,14 @@ module.exports = class Manager extends AssetManager {
                     let currencyID = asset
                     let decimals = this.getAssetDecimal(asset, chainID, "tokens")
                     if ((chainID == paraTool.chainIDKico) || (chainID == paraTool.chainIDMangataX) || (chainID == paraTool.chainIDListen) || (chainID == paraTool.chainIDBasilisk) ||
-                        (chainID == paraTool.chainIDComposable) || (chainID == paraTool.chainIDPicasso)) {
+                        (chainID == paraTool.chainIDComposable) || (chainID == paraTool.chainIDPicasso) ||
+			(chainID == paraTool.chainIDTuring) || (chainID == paraTool.chainIDDoraFactory) ) {
                         currencyID = paraTool.toNumWithoutComma(currencyID).toString();
                         decimals = this.getCurrencyIDDecimal(currencyID, chainID)
                         asset = JSON.stringify({
                             "Token": currencyID
                         })
                         //console.log(currencyID, "asset=", asset, "decimals=", decimals);
-                    } else if ((chainID == paraTool.chainIDTuring) || (chainID == paraTool.chainIDDoraFactory)) {
-                        decimals = this.getCurrencyIDDecimal(currencyID, chainID)
-                        asset = JSON.stringify({
-                            "Token": currencyID
-                        })
-                        console.log(currencyID, "asset=", asset, "decimals=", decimals);
                     }
                     let state = userTokenAccountBal;
                     let assetChain = paraTool.makeAssetChain(asset, chainID);
@@ -279,7 +274,7 @@ module.exports = class Manager extends AssetManager {
                             "op": "updateNonNativeBalances - unknown asset",
                             assetChain
                         })
-                        process.exit(0);
+			continue;
                     }
                     let symbol = this.assetInfo[assetChain] ? this.assetInfo[assetChain].symbol : null;
                     let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
@@ -288,20 +283,18 @@ module.exports = class Manager extends AssetManager {
                     let reserved = 0;
                     let miscFrozen = 0;
                     let frozen = 0;
-
-
                     if (decimals !== false) {
                         if (state.free != undefined) {
-                            free = state.free / 10 ** decimals;
+                            free = paraTool.dechexToInt(state.free.toString()) / 10 ** decimals;
                         }
                         if (state.reserved != undefined) {
-                            reserved = state.reserved / 10 ** decimals;
+                            reserved = paraTool.dechexToInt(state.reserved.toString()) / 10 ** decimals;
                         }
                         if (state.miscFrozen != undefined) {
-                            miscFrozen = state.miscFrozen / 10 ** decimals;
+                            miscFrozen = paraTool.dechexToInt(state.miscFrozen.toString()) / 10 ** decimals;
                         }
                         if (state.frozen != undefined) {
-                            frozen = state.frozen / 10 ** decimals;
+                            frozen = paraTool.dechexToInt(state.frozen.toString()) / 10 ** decimals;
                         }
 
                         out.push(`('${asset}', '${address}', '${account_id}', ${mysql.escape(asset)}, '${symbol}', '${free}', '${reserved}', '${miscFrozen}', '${frozen}', '${finalizedBlockHash}', Now(), '${bn}', '${blockTS}', ${mysql.escape(JSON.stringify(state))})`);
