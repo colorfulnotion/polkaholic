@@ -1985,11 +1985,12 @@ module.exports = class ChainParser {
         let feePayingXcmInteriorkey = false
         let feeAsset = evetnData[2]
         if (feeAsset.fun !== undefined && feeAsset.fun.fungible !== undefined) {
-            let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, feeAsset)
+            let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey1] = this.processV1ConcreteFungible(indexer, feeAsset)
             //console.log(`processOutgoingXTokensEvent asset targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}`, feeAsset)
             feePayingXcmInteriorkey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTokensEvent ${section_method}`, feeAsset)
+            console.log(`feePayingXcmInteriorkey=${feePayingXcmInteriorkey}`)
+            if (feePayingXcmInteriorkey == false) feePayingXcmInteriorkey = targetedXcmInteriorKey1
         }
-        console.log(`feePayingXcmInteriorkey=${feePayingXcmInteriorkey}`)
 
         let aAsset = evetnData[1] //Vec<XcmV1MultiAsset>
         if (aAsset != undefined && Array.isArray(aAsset)) {
@@ -2005,11 +2006,12 @@ module.exports = class ChainParser {
                 // 0xc003ebdaaa4ef4d8ed2d89ca419cf79cefc883859ab9d74349d882dacf6bb811
                 // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                 if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                    //let [targetedAsset, rawTargetedAsset] = this.processV1ConcreteFungible(indexer, asset)
+                    //let [targetedAsset, rawTargetedAsset, targetedXcmInteriorKey] = this.processV1ConcreteFungible(indexer, asset)
                     //rawTargetedAsset = indexer.check_refintegrity_asset(rawTargetedAsset, "processOutgoingXTokensEvent - processV1ConcreteFungible", asset)
-                    let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
+                    let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = this.processV1ConcreteFungible(indexer, asset)
                     //console.log(`processOutgoingXTokensEvent asset targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}`, asset)
                     let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTokensEvent ${section_method}`, asset)
+                    if (targetedXcmInteriorKey == false) feePayingXcmInteriorkey = targetedXcmInteriorKey0
                     let aa = {
                         //asset: targetedAsset,
                         //rawAsset: rawTargetedAsset,
@@ -2206,8 +2208,9 @@ module.exports = class ChainParser {
                     //asset processing
                     let asset = a.asset
                     if (asset != undefined && asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                        let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
+                        let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = this.processV1ConcreteFungible(indexer, asset)
                         let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTransfer ${section_method}`, asset)
+                        if (targetedXcmInteriorKey == false) targetedXcmInteriorKey = targetedXcmInteriorKey0
                         let aa = {
                             xcmInteriorKey: targetedXcmInteriorKey,
                             xcmSymbol: targetedSymbol,
@@ -2403,8 +2406,9 @@ module.exports = class ChainParser {
                             // 0xc003ebdaaa4ef4d8ed2d89ca419cf79cefc883859ab9d74349d882dacf6bb811
                             // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                                let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
+                                let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = this.processV1ConcreteFungible(indexer, asset)
                                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXTokensTransfer ${section_method}`, asset)
+                                if (targetedXcmInteriorKey == false) targetedXcmInteriorKey = targetedXcmInteriorKey0
                                 let aa = {
                                     xcmInteriorKey: targetedXcmInteriorKey,
                                     xcmSymbol: targetedSymbol,
@@ -2653,6 +2657,7 @@ module.exports = class ChainParser {
                     if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                         targetSymbol = cachedXcmAssetInfo.symbol
                         targetedAsset = cachedXcmAssetInfo.asset
+                        targetXcmInteriorKey = cachedXcmAssetInfo.xcmInteriorKey
                         //rawTargetedAsset = cachedXcmAssetInfo.asset
                         if (cachedXcmAssetInfo.paraID == 1000 && relayChain != 'moonbase-relay') {
                             //statemine/statemint
@@ -2673,6 +2678,7 @@ module.exports = class ChainParser {
                         //lookup failed... should store the interiorVStr some where else for further debugging
                         //targetedAsset = interiorVStr
                         //rawTargetedAsset = interiorVStr
+                        targetXcmInteriorKey = xcmInteriorKey
                     }
                 }
 
@@ -2682,7 +2688,7 @@ module.exports = class ChainParser {
         } else {
             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible fungibleAsset unknown id not found?`, fungibleAsset)
         }
-        return [targetSymbol, relayChain]
+        return [targetSymbol, relayChain, targetXcmInteriorKey]
         //return [targetedAsset, rawTargetedAsset]
     }
 
@@ -3068,8 +3074,9 @@ module.exports = class ChainParser {
                             // 0x2374aae493ae96e44954bcb4f242a049f2578d490bc382eae113fd5893dfd297
                             // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                                let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
+                                let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = this.processV1ConcreteFungible(indexer, asset)
                                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingPolkadotXcm ${section_method}`, asset)
+                                if (targetedXcmInteriorKey == false) targetedXcmInteriorKey = targetedXcmInteriorKey0
                                 let aa = {
                                     xcmInteriorKey: targetedXcmInteriorKey,
                                     xcmSymbol: targetedSymbol,
@@ -3339,8 +3346,9 @@ module.exports = class ChainParser {
                             "fee_asset_item": 0
                             */
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
-                                let [targetedSymbol, targetedRelayChain] = this.processV1ConcreteFungible(indexer, asset)
+                                let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = this.processV1ConcreteFungible(indexer, asset)
                                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXcmPallet ${section_method}`, asset)
+                                if (targetedXcmInteriorKey == false) targetedXcmInteriorKey = targetedXcmInteriorKey0
                                 let aa = {
                                     xcmInteriorKey: targetedXcmInteriorKey,
                                     xcmSymbol: targetedSymbol,
