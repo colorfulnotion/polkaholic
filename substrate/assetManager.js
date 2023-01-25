@@ -487,7 +487,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         	}
             */
 
-            let xcmAssets = await this.poolREADONLY.query("select xcmchainID, xcmInteriorKey, symbol, relayChain, nativeAssetChain, isUSD, decimals, priceUSD, parent as parents from xcmasset where xcmInteriorKey is not null");
+            let xcmAssets = await this.poolREADONLY.query("select xcmchainID, xcmInteriorKey, symbol, relayChain, nativeAssetChain, isUSD, decimals, priceUSD, parent as parents, isXCMAsset from xcmasset where xcmInteriorKey is not null and isXCMAsset=1");
             let xcmPriceInfo = {}
             for (let i = 0; i < xcmAssets.length; i++) {
                 let v = xcmAssets[i];
