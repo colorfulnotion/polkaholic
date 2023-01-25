@@ -81,7 +81,9 @@ module.exports = class XCMGARLoadManager extends AssetManager {
     transformXcGarRegistry(xcGarMap) {
         let polkaholicXcGar = {}
         let assetGar = []
-        for (const xcmInteriorKeyV2 of Object.keys(xcGarMap)) {
+        let xcGarMapKey = Object.keys(xcGarMap)
+        xcGarMapKey.sort()
+        for (const xcmInteriorKeyV2 of xcGarMapKey) {
             let xcmAsset = xcGarMap[xcmInteriorKeyV2]
             let xcmInteriorKeyV1 = paraTool.convertXcmInteriorKeyV2toV1(xcmInteriorKeyV2)
             let xcmV1Standardized = JSON.parse(xcmInteriorKeyV2)
@@ -142,6 +144,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 xcCurrencyID: xcCurrencyIDMap,
             }
             polkaholicXcGar[xcmInteriorKeyV1] = transformedXcmAsset
+            console.log(`xcmInteriorKeyV1=${xcmInteriorKeyV1}`, transformedXcmAsset)
             //polkaholicXcGar[xcmInteriorKeyV1] = xcmAsset
         }
         return polkaholicXcGar
@@ -256,6 +259,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
     async flushXcmAssetGar(xcRegistryNew) {
         // flush new xc Registry into
         let xcmtransferKeys = Object.keys(xcRegistryNew)
+        console.log(`xcmtransferKeys[${xcmtransferKeys.length}]`, xcmtransferKeys)
         if (xcmtransferKeys.length > 0) {
             let xcmAssets = [];
             for (let i = 0; i < xcmtransferKeys.length; i++) {
@@ -265,12 +269,10 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 let t = "(" + [`'${r.xcmInteriorKey}'`, `'${r.symbol}'`, `'${r.relayChain}'`,
                     `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`
                 ].join(",") + ")";
-                if (r.msgHash == "0x" && !r.finalized) {
-                    //msgHash is missing... we will
-                    console.log(`[${r.extrinsicHash} [${r.extrinsicID}] [finzlied=${r.finalized}] msgHash missing!`)
-                } else {
-                    xcmAssets.push(t);
-                }
+                console.log(`xcmInteriorKey=${r.xcmInteriorKey} >>>`, t)
+                console.log(`xcmInteriorKey=${r.xcmInteriorKey} res`, r)
+                xcmAssets.push(t);
+
             }
             let sqlDebug = true
             await this.upsertSQL({
