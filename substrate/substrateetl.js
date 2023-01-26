@@ -71,9 +71,9 @@ module.exports = class SubstrateETL extends AssetManager {
         }
 
         // setup paraID specific tables, including paraID=0 for the relay chain
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "traces", "specversions"]
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions"]
         let p = (chainID) ? ` where chainID = ${chainID} ` : ""
-        let sql = `select chainID from chain ${p} order by chainID`
+        let sql = `select chainID from chain ${p} where relayChain in ('polkadot', 'kusama') order by chainID`
         let recs = await this.poolREADONLY.query(sql);
         for (const rec of recs) {
             let chainID = parseInt(rec.chainID, 10);
@@ -81,13 +81,17 @@ module.exports = class SubstrateETL extends AssetManager {
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             //console.log(" --- ", chainID, paraID, relayChain);
             for (const tbl of tbls) {
-                let p = (this.partitioned_table(tbl)) ? "--time_partitioning_field block_time --time_partitioning_type DAY" : "";
+		let fld = tbl == "balances" ? "ts" : "block_time";
+                let p = (this.partitioned_table(tbl)) ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
                 let cmd = `bq mk  --project_id=substrate-etl  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
 
                 try {
-                    console.log(cmd);
-                    await exec(cmd);
+                    if ( tbl == "balances" ) {
+			console.log(cmd);
+			await exec(cmd);
+		    }
                 } catch (e) {
+		    console.log(e);
                     // TODO optimization: do not create twice
                 }
             }

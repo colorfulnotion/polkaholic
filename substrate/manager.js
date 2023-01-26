@@ -89,6 +89,20 @@ module.exports = class Manager extends AssetManager {
         }
         return [finalizedBlockHash, blockTS, bn]
     }
+
+    async getFinalizedBlockLogDT(chainID, logDT) {
+	let sql = `select blockNumber, unix_timestamp(blockDT) as blockTS, blockHash from block${chainID} where blockDT < '${logDT} 23:59:59' and blockHash is not null order by blockDT desc limit 1`;
+	console.log(sql);
+	let lastRec = await this.poolREADONLY.query(sql)
+	if ( lastRec.length == 0 ) {
+	    return [null, null, null];
+	}
+        let bn = lastRec[0].blockNumber;
+        let blockTS = lastRec[0].blockTS;
+        let blockHash = lastRec[0].blockHash;
+	return [blockHash, blockTS, bn];
+    }
+    
     canonicalizeAssetJSON(a) {
         if (a.DexShare != undefined) {
             return (JSON.stringify(a.DexShare));
@@ -118,25 +132,45 @@ module.exports = class Manager extends AssetManager {
         }
     }
 
-
-    async updateNonNativeBalances(chainID, perPagelimit = 1000) {
+    async load_bqlogfn(chainID, logDT) {
+	try {
+	    let relayChain = paraTool.getRelayChainByChainID(chainID)
+            let paraID = paraTool.getParaIDfromChainID(chainID)
+	    let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${relayChain}.balances${paraID}' /tmp/balances${chainID}-${logDT}.json schema/substrateetl/balances.json`
+	    console.log(cmd);
+            await exec(cmd);
+	} catch (err) {
+	    console.log(err);
+	}
+    }
+    clean_bqlogfn(chainID, logDT) {
+	let bqlogfn = logDT ? this.get_bqlogfn(chainID, logDT) : null;
+	if ( fs.existsSync(bqlogfn) ) {
+	    fs.unlinkSync(bqlogfn);
+	}
+    }
+    
+    get_bqlogfn(chainID, logDT) {
+	return `/tmp/balances${chainID}-${logDT}.json`
+    }
+    
+    async updateNonNativeBalances(chainID, logDT = null, perPagelimit = 1000) {
         await this.assetManagerInit();
-        let chains = await this.pool.query(`select chainID, WSEndpoint, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
+        let chains = await this.pool.query(`select chainID, paraID, id, WSEndpoint, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
         if (chains.length == 0) {
             console.log("No chain found ${chainID}")
             return false;
         }
         let chain = chains[0];
-        if (chain.assetaddressPallet == "none") {
-            console.log(`No valid pallet ${chainID}: ${chain.assetaddresPallet}`)
-            return false;
-        }
         let wsEndpoint = chain.WSEndpoint;
-        let chainName = chain.chainName
+        let chainName = chain.chainName;
+	let paraID = chain.paraID;
+	let id = chain.id;
         const provider = new WsProvider(wsEndpoint);
         const api = await ApiPromise.create({
             provider
         });
+	let bqlogfn = logDT ? this.get_bqlogfn(chainID, logDT) : null;
         const rawChainInfo = await api.registry.getChainProperties()
         var chainInfo = JSON.parse(rawChainInfo);
         const prefix = chainInfo.ss58Format
@@ -144,7 +178,15 @@ module.exports = class Manager extends AssetManager {
         let rows = [];
         let asset = this.getChainAsset(chainID);
         let [tblName, tblRealtime] = this.get_btTableRealtime()
-        let [finalizedBlockHash, blockTS, bn] = await this.getFinalizedBlockInfo(chainID, api)
+        let [finalizedBlockHash, blockTS, bn] = logDT ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api)
+	if ( finalizedBlockHash == null ) {
+	    console.log("Could not determine blockHash", chainID, logDT);
+	    // log.fatal
+	    return false;
+	} else {
+	    console.log("FINALIZED HASH", finalizedBlockHash, blockTS, bn);
+	}
+	let bqRows = [];
         let apiAt = await api.at(finalizedBlockHash)
         let last_key = '';
         let numHolders = {}
@@ -154,7 +196,7 @@ module.exports = class Manager extends AssetManager {
         let sql_create_table = `create table if not exists ${TABLE} like assetaddress1000`;
         this.batchedSQL.push(sql_create_table);
         await this.update_batchedSQL();
-
+	let unknown = {};
         while (true) {
             let query = null
             if (apiAt.query.assets != undefined && apiAt.query.assets.account != undefined) {
@@ -181,7 +223,7 @@ module.exports = class Manager extends AssetManager {
                 console.log(`Query Completed:`, numHolders)
                 break
             }
-
+	    
             var cnt = 0
             let out = [];
             let vals = ["ss58Address", "asset", "symbol", "free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN", "blockTS", "lastState"];
@@ -215,10 +257,18 @@ module.exports = class Manager extends AssetManager {
                     })
                     let assetChain = paraTool.makeAssetChain(asset, chainID);
                     if (this.assetInfo[assetChain] == undefined) {
-                        this.logger.error({
-                            "op": "updateNonNativeBalances - unknown asset",
-                            assetChain
-                        })
+			console.log("UNKNOWN ASSET", chainID, assetChain);
+			if ( ( chainID == 2030 || chainID == 22001 ) && ( assetChain.includes("LPToken") )  ) {
+			    // skip this for now since there is no metadata
+			} else if ( unknown[assetChain] == undefined ) {
+			    this.logger.error({
+				"op": "updateNonNativeBalances - unknown asset",
+				assetChain
+                            })
+			    unknown[assetChain] = 1;
+			} else {
+			    unknown[assetChain]++;
+			}
 			continue;
                     }
                     let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
@@ -228,15 +278,18 @@ module.exports = class Manager extends AssetManager {
                         if (val.balance != undefined) {
                             balance = parseFloat(paraTool.toNumWithoutComma(val.balance), 10) / 10 ** decimals;
                         }
-                        out.push(`('${currencyID}', '${address}', '${account_id}', ${mysql.escape(asset)}, '${symbol}', '${balance}', 0, 0, 0, '${finalizedBlockHash}', Now(), '${bn}', '${blockTS}', ${mysql.escape(JSON.stringify(val))})`);
-                        let rowKey = address.toLowerCase() // just in case
-
                         if (numHolders[currencyID] != undefined) {
-                            numHolders[currencyID]++;
+			    numHolders[currencyID]++;
                         } else {
-                            numHolders[currencyID] = 1;
+			    numHolders[currencyID] = 1;
                         }
-                        rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, balance, 0, 0, 0, blockTS, bn));
+			if ( logDT ) {
+			    bqRows.push({chain_name: chainName, id, para_id: paraID, ts: blockTS, address, symbol, asset, free: balance } );
+			} else {
+                            out.push(`('${currencyID}', '${address}', '${account_id}', ${mysql.escape(asset)}, '${symbol}', '${balance}', 0, 0, 0, '${finalizedBlockHash}', Now(), '${bn}', '${blockTS}', ${mysql.escape(JSON.stringify(val))})`);
+                            let rowKey = address.toLowerCase() // just in case
+                            rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, balance, 0, 0, 0, blockTS, bn));
+			}
                         console.log(symbol, currencyID, `cbt read accountrealtime prefix=${rowKey}`, balance, val.balance, "decimals", decimals);
                     } else {
                         if (numFailures[currencyID] != undefined) {
@@ -270,10 +323,15 @@ module.exports = class Manager extends AssetManager {
                     let state = userTokenAccountBal;
                     let assetChain = paraTool.makeAssetChain(asset, chainID);
                     if (this.assetInfo[assetChain] == undefined) {
-                        this.logger.fatal({
-                            "op": "updateNonNativeBalances - unknown asset",
-                            assetChain
-                        })
+			if ( unknown[assetChain] == undefined ) {
+                            this.logger.error({
+				"op": "updateNonNativeBalances - unknown tokens",
+				assetChain
+                            })
+			    unknown[assetChain] = 1;
+			} else {
+			    unknown[assetChain]++;
+			}
 			continue;
                     }
                     let symbol = this.assetInfo[assetChain] ? this.assetInfo[assetChain].symbol : null;
@@ -296,17 +354,21 @@ module.exports = class Manager extends AssetManager {
                         if (state.frozen != undefined) {
                             frozen = paraTool.dechexToInt(state.frozen.toString()) / 10 ** decimals;
                         }
-
-                        out.push(`('${asset}', '${address}', '${account_id}', ${mysql.escape(asset)}, '${symbol}', '${free}', '${reserved}', '${miscFrozen}', '${frozen}', '${finalizedBlockHash}', Now(), '${bn}', '${blockTS}', ${mysql.escape(JSON.stringify(state))})`);
-                        let rowKey = address.toLowerCase() // just in case
-
+			   
                         if (numHolders[currencyID] != undefined) {
-                            numHolders[currencyID]++;
+			    numHolders[currencyID]++;
                         } else {
-                            numHolders[currencyID] = 1;
+			    numHolders[currencyID] = 1;
                         }
-                        rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free, reserved, miscFrozen, frozen, blockTS, bn));
-                        console.log(`CHECK ${assetChain} -- cbt read accountrealtime prefix=${rowKey}`);
+                        
+                        let rowKey = address.toLowerCase() // just in case
+			if (logDT) {
+			    bqRows.push({ chain_name: chainName, id, para_id: paraID, ts: blockTS, address, symbol, asset, free, reserved, misc_frozen: miscFrozen, frozen } );
+			} else {
+                            out.push(`('${asset}', '${address}', '${account_id}', ${mysql.escape(asset)}, '${symbol}', '${free}', '${reserved}', '${miscFrozen}', '${frozen}', '${finalizedBlockHash}', Now(), '${bn}', '${blockTS}', ${mysql.escape(JSON.stringify(state))})`);
+			    rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free, reserved, miscFrozen, frozen, blockTS, bn));
+			} 
+                        //console.log(`CHECK ${assetChain} -- cbt read accountrealtime prefix=${rowKey}`);
                     } else {
                         if (numFailures[currencyID] != undefined) {
                             numFailures[currencyID]++;
@@ -323,78 +385,97 @@ module.exports = class Manager extends AssetManager {
                 }
                 last_key = user[0];
             }
-
-            await this.upsertSQL({
-                "table": TABLE,
-                "keys": ["currencyID", "address"],
-                "vals": vals,
-                "data": out,
-                "replace": vals,
-                "lastUpdateBN": lastUpdateBN
-            });
-            console.log(`writing ${chainName}`, rows.length, "rows chainID=", chainID);
-            await this.insertBTRows(tblRealtime, rows, tblName);
-
+	    if ( logDT ) {
+		// write rows
+		let rawRows = bqRows.map( (r) => {
+		    return JSON.stringify(r);
+		});
+		if ( rawRows.length > 0 ) {
+		    rawRows.push("");
+		    await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
+		}
+		bqRows = [];
+	    } else {
+		await this.upsertSQL({
+                    "table": TABLE,
+                    "keys": ["currencyID", "address"],
+                    "vals": vals,
+                    "data": out,
+                    "replace": vals,
+                    "lastUpdateBN": lastUpdateBN
+		});
+		console.log(`writing ${chainName}`, rows.length, "rows chainID=", chainID);
+		await this.insertBTRows(tblRealtime, rows, tblName);
+	    }
             rows = [];
         }
 
-        // for all the other accounts that did NOT appear, we can delete them if they were OLDER than bn, because they are reaped == but we still need to 0 out the balances
-        let sql_reap = `select address, asset, lastUpdateBN from ${TABLE} where lastUpdateBN < ${bn}`
-        let sql_delete = `delete from ${TABLE} where lastUpdateBN < ${bn}`
-        console.log(`REAPING: `, sql_reap, ` DELETE: `, sql_delete);
-
-        let reapedAccounts = await this.poolREADONLY.query(sql_reap)
-        for (let a = 0; a < reapedAccounts.length; a++) {
-            let address = reapedAccounts[a].address;
-            let asset = reapedAccounts[a].asset;
-            let assetChain = paraTool.makeAssetChain(asset, chainID);
-            if (this.assetInfo[assetChain] == undefined) {
-                this.logger.fatal({
-                    "op": "updateAddressBalances - unknown asset",
-                    assetChain
-                })
-                process.exit(0);
+        if ( logDT ) {
+	    // close files
+	    
+	} else {
+            // for all the other accounts that did NOT appear, we can delete them if they were OLDER than bn, because they are reaped == but we still need to 0 out the balances
+            let sql_reap = `select address, asset, lastUpdateBN from ${TABLE} where lastUpdateBN < ${bn}`
+            let sql_delete = `delete from ${TABLE} where lastUpdateBN < ${bn}`
+            console.log(`REAPING: `, sql_reap, ` DELETE: `, sql_delete);
+	    
+            let reapedAccounts = await this.poolREADONLY.query(sql_reap)
+            for (let a = 0; a < reapedAccounts.length; a++) {
+		let address = reapedAccounts[a].address;
+		let asset = reapedAccounts[a].asset;
+		let assetChain = paraTool.makeAssetChain(asset, chainID);
+		if (this.assetInfo[assetChain] == undefined) {
+                    this.logger.fatal({
+			"op": "updateAddressBalances - unknown asset",
+			assetChain
+                    })
+		} else {
+		    let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
+		    rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
+		    console.log("REAPED ACCOUNT-ADDRESS", address, encodedAssetChain);
+		}
+	    }
+	    console.log("writing ", rows.length, " REAPED accounts to bt");
+            await this.insertBTRows(tblRealtime, rows, tblName);
+            rows = [];
+            // now that we have written them out to BT, we can delete them
+            this.batchedSQL.push(sql_delete);
+            await this.update_batchedSQL();
+            for (const asset of Object.keys(numHolders)) {
+		let cnt = numHolders[asset];
+		let sql = `update asset set numHolders = '${cnt}'  where asset = '${asset}' and chainID = '${chainID}'`
+		this.batchedSQL.push(sql);
+		console.log("writing", asset, chainID, "rows numHolders=", cnt, sql)
             }
-
-            let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
-            rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
-            console.log("REAPED ACCOUNT-ADDRESS", address, encodedAssetChain);
-        }
-        console.log("writing ", rows.length, " REAPED accounts to bt");
-        await this.insertBTRows(tblRealtime, rows, tblName);
-        rows = [];
-
-        // now that we have written them out to BT, we can delete them
-        this.batchedSQL.push(sql_delete);
-        await this.update_batchedSQL();
-
-        for (const asset of Object.keys(numHolders)) {
-            let cnt = numHolders[asset];
-            let sql = `update asset set numHolders = '${cnt}'  where asset = '${asset}' and chainID = '${chainID}'`
-            this.batchedSQL.push(sql);
-            console.log("writing", asset, chainID, "rows numHolders=", cnt, sql)
-        }
-        for (const asset of Object.keys(numFailures)) {
-            let cnt = numFailures[asset];
-            let sql = `insert into assetfailures ( asset, chainID, numFailures, lastUpdateDT ) values ( '${asset}', '${chainID}', '${cnt}', Now() ) on duplicate key update numFailures = values(numFailures)`
-            this.batchedSQL.push(sql);
-            console.log("writing", asset, chainID, "rows numHolders=", cnt, sql)
-        }
-
-        let sql_assetPallet = `update chain set assetaddressPallet = '${pallet}', assetNonNativeRegistered = '${Object.keys(numHolders).length}', assetNonNativeUnregistered = '${Object.keys(numFailures).length}'  where chainID = '${chainID}'`
-        this.batchedSQL.push(sql_assetPallet);
-        await this.update_batchedSQL();
+            for (const asset of Object.keys(numFailures)) {
+		let cnt = numFailures[asset];
+		let sql = `insert into assetfailures ( asset, chainID, numFailures, lastUpdateDT ) values ( '${asset}', '${chainID}', '${cnt}', Now() ) on duplicate key update numFailures = values(numFailures)`
+		this.batchedSQL.push(sql);
+		console.log("writing", asset, chainID, "rows numHolders=", cnt, sql)
+            }
+	    
+            let sql_assetPallet = `update chain set assetaddressPallet = '${pallet}', assetNonNativeRegistered = '${Object.keys(numHolders).length}', assetNonNativeUnregistered = '${Object.keys(numFailures).length}'  where chainID = '${chainID}'`
+            this.batchedSQL.push(sql_assetPallet);
+            await this.update_batchedSQL();
+	}
 
     }
 
-    async updateNativeBalances(chainID, perPagelimit = 1000) {
+    async updateNativeBalances(chainID, logDT = null, perPagelimit = 1000) {
         await this.assetManagerInit();
-        let chains = await this.pool.query(`select chainID, WSEndpoint, numHolders from chain where chainID = ${chainID}`);
+        let chains = await this.pool.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, numHolders from chain where chainID = ${chainID}`);
         if (chains.length == 0) {
             console.log("No chain found ${chainID}")
             return false;
         }
+	let bqRows = [];
+	let bqlogfn = logDT ? this.get_bqlogfn(chainID, logDT) : null;
         let chain = chains[0];
+	let relayChain = chain.relayChain;
+	let paraID = chain.paraID;
+	let chainName = chain.chainName;
+	let id = chain.id;
+
         let wsEndpoint = chain.WSEndpoint;
         let prev_numHolders = chain.numHolders;
         const provider = new WsProvider(wsEndpoint);
@@ -409,18 +490,20 @@ module.exports = class Manager extends AssetManager {
         let rows = [];
         let asset = this.getChainAsset(chainID);
         let assetChain = paraTool.makeAssetChain(asset, chainID);
+	let symbol = null;
         if (this.assetInfo[assetChain] == undefined) {
             this.logger.fatal({
                 "op": "updateNativeBalances - unknown asset",
                 assetChain
             })
-            process.exit(0);
-        }
+        } else {
+	    symbol = this.assetInfo[assetChain].symbol;
+	}
         let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
         let [tblName, tblRealtime] = this.get_btTableRealtime()
 
         let decimals = this.getChainDecimal(chainID)
-        let [finalizedBlockHash, blockTS, bn] = await this.getFinalizedBlockInfo(chainID, api)
+        let [finalizedBlockHash, blockTS, bn] = logDT ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api)
         let apiAt = await api.at(finalizedBlockHash)
         let last_key = '';
         while (true) {
@@ -455,46 +538,64 @@ module.exports = class Manager extends AssetManager {
                 let stateHash = u8aToHex(user[1].createdAtHash)
                 out.push(`('${pubkey}', '${account_id}', '${free_balance}', '${reserved_balance}', '${miscFrozen_balance}', '${feeFrozen_balance}', '${finalizedBlockHash}', Now(), '${bn}')`);
                 let rowKey = pubkey.toLowerCase()
-                console.log(rowKey, `cbt read accountrealtime prefix=${rowKey}`);
-                console.log("updateNativeBalances", encodedAssetChain);
-                rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn));
+		if ( logDT ) {
+		    bqRows.push({chain_name: chainName, id, para_id: paraID, address: pubkey, asset, symbol, free: free_balance, reserved: reserved_balance, misc_frozen: miscFrozen_balance, frozen: feeFrozen_balance});
+		} else {
+                    console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
+                    rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn));
+		}
                 last_key = user[0];
             }
-            await this.upsertSQL({
-                "table": `address${chainID}`,
-                "keys": ["address"],
-                "vals": vals,
-                "data": out,
-                "replace": vals,
-                "lastUpdateBN": lastUpdateBN
-            });
-            console.log("writing", rows.length, chainID, "rows numHolders=", numHolders, "/", prev_numHolders);
-            await this.insertBTRows(tblRealtime, rows, tblName);
+	    if ( logDT ) {
+		// write rows
+		let rawRows = bqRows.map( (r) => {
+		    return JSON.stringify(r);
+		});
+		if ( rawRows.length > 0 ) {
+		    rawRows.push("");
+		    await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
+		}
+		bqRows = [];
+	    } else {
+		await this.upsertSQL({
+                    "table": `address${chainID}`,
+                    "keys": ["address"],
+                    "vals": vals,
+                    "data": out,
+                    "replace": vals,
+                    "lastUpdateBN": lastUpdateBN
+		});
+		console.log("writing", rows.length, chainID, "rows numHolders=", numHolders, "/", prev_numHolders);
+		await this.insertBTRows(tblRealtime, rows, tblName);
+	    }
             rows = [];
         }
-        // for all the other accounts that did NOT appear, we can delete them if they were OLDER than bn, because they are reaped == but we still need to 0 out the balances
-        let sql_reap = `select address, lastUpdateBN from address${chainID} where lastUpdateBN < ${bn}`
-        let sql_delete = `delete from address${chainID} where lastUpdateBN < ${bn}`
-        console.log(`REAPING: `, sql_reap, ` DELETE: `, sql_delete);
-
-        let reapedAccounts = await this.poolREADONLY.query(sql_reap)
-        for (let a = 0; a < reapedAccounts.length; a++) {
-            let address = reapedAccounts[a].address;
-            rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
-            console.log("REAPED ACCOUNT", address);
-        }
-        console.log("writing ", rows.length, " REAPED accounts to bt");
-        await this.insertBTRows(tblRealtime, rows, tblName);
-        rows = [];
-
-        // now that we have written them out to BT, we can delete them
-        this.batchedSQL.push(sql_delete);
-        await this.update_batchedSQL();
-
-        let sql = `update chain set numHolders = '${numHolders}', lastUpdateAddressNativeBalanceDT = Now() where chainID = ${chainID}`
-        console.log(numHolders, sql);
-        this.batchedSQL.push(sql);
-        await this.update_batchedSQL();
+	if ( logDT ) {
+	} else {
+            // for all the other accounts that did NOT appear, we can delete them if they were OLDER than bn, because they are reaped == but we still need to 0 out the balances
+            let sql_reap = `select address, lastUpdateBN from address${chainID} where lastUpdateBN < ${bn}`
+            let sql_delete = `delete from address${chainID} where lastUpdateBN < ${bn}`
+            console.log(`REAPING: `, sql_reap, ` DELETE: `, sql_delete);
+	    
+            let reapedAccounts = await this.poolREADONLY.query(sql_reap)
+            for (let a = 0; a < reapedAccounts.length; a++) {
+		let address = reapedAccounts[a].address;
+		rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
+		console.log("REAPED ACCOUNT", address);
+            }
+            console.log("writing ", rows.length, " REAPED accounts to bt");
+            await this.insertBTRows(tblRealtime, rows, tblName);
+            rows = [];
+	    
+            // now that we have written them out to BT, we can delete them
+            this.batchedSQL.push(sql_delete);
+            await this.update_batchedSQL();
+	    
+            let sql = `update chain set numHolders = '${numHolders}', lastUpdateAddressNativeBalanceDT = Now() where chainID = ${chainID}`
+            console.log(numHolders, sql);
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL();
+	}
     }
 
     async updateChainlogNumAccountsActive(chainID = null, lookback = 7) {

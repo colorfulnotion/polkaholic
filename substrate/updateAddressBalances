@@ -1,6 +1,7 @@
 #!/usr/bin/env node
  // Usage:  updateAddressBalances
 var Manager = require("./manager");
+var paraTool = require("./paraTool");
 async function main() {
     var manager = new Manager();
     let chainID = -1;
@@ -10,27 +11,14 @@ async function main() {
         }
     });
     if ( chainID >= 0 ) {
-	await manager.updateNativeBalances(chainID);
-	await manager.updateNonNativeBalances(chainID);
+	let ts = manager.getCurrentTS() - 86400;
+	console.log("TS", ts);
+	let [logDT, hr] = paraTool.ts_to_logDT_hr(ts)
+	manager.clean_bqlogfn(chainID, logDT);
+	await manager.updateNativeBalances(chainID, logDT);
+	await manager.updateNonNativeBalances(chainID, logDT);
 	await manager.update_chain_lastBalanceUpdateDT(chainID);
-    } else {
-	chainID = await manager.get_chain_balance_update();
-	try {
-	    if ( chainID != null ) {
-		await manager.updateNativeBalances(chainID);
-		await manager.updateNonNativeBalances(chainID);
-	    }
-	    await manager.update_chain_lastBalanceUpdateDT(chainID, true);
-	} catch (e) {
-	    await manager.update_chain_lastBalanceUpdateDT(chainID, true);
-	}
-	await manager.updateAddressBalances()
-	await manager.computeAddressColumnsBQ("transfersIn");
-	await manager.computeAddressColumnsBQ("extrinsics");
-	await manager.computeAddressColumnsBQ("crowdloans");
-	await manager.computeAddressColumnsBQ("rewards");
-	await manager.computeAddressColumnsBQ("transfersOut"); 
-	await manager.updateAddressTopN();
+	manager.load_bqlogfn(chainID, logDT);
     }
 }
 
