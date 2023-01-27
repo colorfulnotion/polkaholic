@@ -636,8 +636,8 @@ function getParaIDExtra(relaychain = 'polkadot') {
 }
 
 function getRelayChainByChainID(chainID = 0) {
-    if (chainID == 0) {
-        return 'polkadot'
+    if (chainID == 0 || chainID == 22086 || chainID == 22100) {
+        return 'polkadot'; // Subsocial (22100, now paraID 2101) + Kilt (22086, 2086 on both)
     } else if (chainID == 2) {
         return 'kusama'
     }
@@ -689,6 +689,12 @@ function getRelayChainID(relaychain = 'polkadot') {
 }
 
 function getChainIDFromParaIDAndRelayChain(paraID, relayChain = 'polkadot') {
+    // parachains that moved relaychains
+    // kilt spiritnet chainID 22086 is now paraID 2086 on polkadot
+    if (paraID == 2086 && relayChain == "polkadot") return (22086);
+    // subsocial chainID 22110 is now paraID 2101 on polkadot
+    if (paraID == 2101 && relayChain == "polkadot") return (22110);
+
     let relayChainID = getRelayChainID(relayChain)
     let paraIDExtra = getParaIDExtra(relayChain)
     if (paraID == 0) return relayChainID
@@ -707,7 +713,9 @@ function getParaIDfromChainID(chainID) {
     let paraID;
     if (chainID == 0 || chainID == 2 || chainID == 30000 || chainID == 40000 || chainID == 60000 || chainID == 80000) {
         paraID = 0
-    } else {
+    } else if (chainID == 22110) { // subsocial is now 2101
+        paraID = 2101;
+    } else { // kilt spiritnet did not change its paraID 2086
         paraID = chainID % 10000
     }
     return paraID

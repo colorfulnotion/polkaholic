@@ -98,7 +98,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             let parsedAsset = {
                 Token: symbol
             }
-            if (chainID == paraTool.chainIDStatemine || chainID == paraTool.chainIDStatemint ){
+            if (chainID == paraTool.chainIDStatemine || chainID == paraTool.chainIDStatemint) {
                 try {
                     console.log(`xcmV1Standardized`, xcmV1Standardized)
                     let assetID = xcmV1Standardized[3]['generalIndex']
@@ -106,7 +106,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                     parsedAsset = {
                         Token: `${assetID}`
                     }
-                } catch(e){
+                } catch (e) {
                     console.log(`statemine/t e`, e)
                 }
             }
@@ -267,7 +267,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 //["xcmInteriorKey", "symbol", "relayChain"]
                 // ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parents"]
                 let t = "(" + [`'${r.xcmInteriorKey}'`,
-                `'${r.symbol}'`, `'${r.relayChain}'`, `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`
+                    `'${r.symbol}'`, `'${r.relayChain}'`, `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`
                 ].join(",") + ")";
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} >>>`, t)
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} res`, r)

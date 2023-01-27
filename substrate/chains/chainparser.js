@@ -108,7 +108,7 @@ module.exports = class ChainParser {
         if (i.Erc20 !== undefined) o['Erc20'] = i.Erc20
         if (i.Token2 !== undefined) o['Token2'] = i.Token2
         if (i.token2 !== undefined) o['Token2'] = i.token2
-        if (o['Token2'] != undefined && paraTool.isInt(o['Token2'])){
+        if (o['Token2'] != undefined && paraTool.isInt(o['Token2'])) {
             o['Token2'] = `${o['Token2']}`
         }
 
@@ -201,19 +201,19 @@ module.exports = class ChainParser {
                 } else {
                     await indexer.addAssetInfo(asset, chainID, assetInfo, 'getSystemProperties');
                     // if chain does not have a "asset" specified, it will get one from the FIRST one
-		    if ( i == 0 ) {
-			if (!chain.asset) {
+                    if (i == 0) {
+                        if (!chain.asset) {
                             let newAsset = JSON.stringify({
-				Token: symbol
+                                Token: symbol
                             })
                             //console.log("adding NEW asset to chain", newAsset)
                             indexer.batchedSQL.push(`update chain set asset = '${newAsset}' where chainID = '${chainID}'`);
-			}
-			if (!chain.symbol) {
+                        }
+                        if (!chain.symbol) {
                             // TODO: add this after checking chain.symbol and symbol
-			    // indexer.batchedSQL.push(`update chain set symbol = '${symbol}' where chainID = '${chainID}'`);
-			}
-		    }
+                            // indexer.batchedSQL.push(`update chain set symbol = '${symbol}' where chainID = '${chainID}'`);
+                        }
+                    }
                 }
             }
             await indexer.update_batchedSQL(true);

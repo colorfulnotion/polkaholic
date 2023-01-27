@@ -6,8 +6,13 @@
   },
   {
     "mode": "REQUIRED",
-    "name": "address",
-    "type": "FLOAT"
+    "name": "address_ss58",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "address_pubkey",
+    "type": "STRING"
   },
   {
     "mode": "REQUIRED",
@@ -72,6 +77,11 @@
   {
     "mode": "NULLABLE",
     "name": "frozen_usd",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "price_usd",
     "type": "FLOAT"
   }
 ]

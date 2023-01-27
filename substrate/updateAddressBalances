@@ -11,14 +11,16 @@ async function main() {
         }
     });
     if ( chainID >= 0 ) {
-	let ts = manager.getCurrentTS() - 86400;
-	console.log("TS", ts);
-	let [logDT, hr] = paraTool.ts_to_logDT_hr(ts)
-	manager.clean_bqlogfn(chainID, logDT);
-	await manager.updateNativeBalances(chainID, logDT);
-	await manager.updateNonNativeBalances(chainID, logDT);
-	await manager.update_chain_lastBalanceUpdateDT(chainID);
-	manager.load_bqlogfn(chainID, logDT);
+	await manager.update_address_balances_logDT(chainID);
+    } else {
+	while ( 1 ) {
+	    let res = await manager.updateAddressBalances();
+	    if ( res == false ) {
+		await manager.sleep(30000);
+	    } else {
+		await manager.sleep(5000);
+	    }
+	}
     }
 }
 

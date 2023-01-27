@@ -36,9 +36,6 @@ module.exports = class AssetManager extends PolkaholicDB {
     assetInfo = {};
     alternativeAssetInfo = {};
     xcmAssetInfo = {}; // xcmInteriorKey   ->
-    xcmConceptInfo = {};
-    xcmInteriorInfo = {}; // nativeAssetChain ->
-    // TODO:fuse these together
     xcmSymbolInfo = {}; // symbolRelayChain ->
     symbolRelayChainAsset = {}; // symbolRelayChain -> { ${chainID}: assetInfo }
     xcContractAddress = {};
@@ -210,7 +207,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         await this.init_chainInfos()
 
         //init_asset_info: {assetInfo, alternativeAssetInfo, symbolRelayChainAsset, xcContractAddress, currencyIDInfo}
-        //init_xcm_asset:  {routers, xcmAssetInfo, xcmInteriorInfo, xcmSymbolInfo, xcmConceptInfo}
+        //init_xcm_asset:  {routers, xcmAssetInfo, xcmSymbolInfo}
         //init_paras: {paras}
         await this.init_chain_asset_and_nativeAsset()
 
@@ -470,23 +467,9 @@ module.exports = class AssetManager extends PolkaholicDB {
 
     async init_xcm_asset() {
         let xcmAssetInfo = {};
-        let xcmConceptInfo = {}
-        let xcmInteriorInfo = {};
         let xcmSymbolInfo = {};
-        let unknownXcmConcepts = {};
 
         try {
-            /*
-            if (this.apiParser != null ) {
-                    console.log(`polkadotjs already initiated`)
-        	} else {
-        	    var api = await ApiPromise.create()
-        	    await api.isReady;
-        	    this.apiParser = api
-        	    console.log(`initiated polkadotjs api`)
-        	}
-            */
-
             let xcmAssets = await this.poolREADONLY.query("select xcmchainID, xcmInteriorKey, symbol, relayChain, nativeAssetChain, isUSD, decimals, priceUSD, parent as parents, isXCMAsset from xcmasset where xcmInteriorKey is not null and isXCMAsset=1");
             let xcmPriceInfo = {}
             for (let i = 0; i < xcmAssets.length; i++) {
@@ -509,13 +492,9 @@ module.exports = class AssetManager extends PolkaholicDB {
                 if (xcmAssetInfo[xcmInteriorKey] == undefined) {
                     xcmAssetInfo[xcmInteriorKey] = v;
                 }
-                if (xcmConceptInfo[xcmInteriorKey] == undefined) {
-                    let unknownXcmConceptCache = unknownXcmConcepts[xcmInteriorKey]
+                let symbolRelaychain = paraTool.makeAssetChain(v.symbol, v.relayChain);
+                if (xcmSymbolInfo[symbolRelaychain] == undefined) {
                     let nativeAssetChain = null
-                    if (unknownXcmConceptCache != undefined && unknownXcmConceptCache.nativeAssetChain != undefined) {
-                        nativeAssetChain = unknownXcmConceptCache.nativeAssetChain
-                        delete unknownXcmConcepts[xcmInteriorKey]
-                    }
                     let xcmV1MultiLocation = paraTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
                     //let xcmV1MultiLocationHex = paraTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, false) //this call requires apiparser
                     let evmMultiLocation = paraTool.convertXcmV1MultiLocationToMoonbeamEvmMultiLocation(xcmV1MultiLocation)
@@ -531,7 +510,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                         relayChain: v.relayChain,
                         parents: v.parents,
                         xcmInteriorKey: xcmInteriorKey,
-                        symbolRelaychain: paraTool.makeAssetChain(v.symbol, v.relayChain),
+                        symbolRelaychain: symbolRelaychain,
                         //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
                         xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
                         evmMultiLocation: JSON.stringify(evmMultiLocation),
@@ -548,7 +527,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                         relayChain: v.relayChain,
                         parents: v.parents,
                         xcmInteriorKey: xcmInteriorKey,
-                        symbolRelaychain: paraTool.makeAssetChain(v.symbol, v.relayChain),
+                        symbolRelaychain: symbolRelaychain,
                         //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
                         xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
                         evmMultiLocation: JSON.stringify(evmMultiLocation),
@@ -558,14 +537,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                         nativeAssetChain: nativeAssetChain, //probably unknown without indexing the native chain
                         priceUSD: (v.priceUSD > 0) ? v.priceUSD : null
                     }
-                    xcmSymbolInfo[s.symbolRelaychain] = s;
-                    xcmConceptInfo[v.xcmInteriorKey] = a;
-                }
-            }
-            for (const k of Object.keys(unknownXcmConcepts)) {
-                let u = unknownXcmConcepts[k]
-                if (xcmConceptInfo[u.xcmInteriorKey] == undefined) {
-                    xcmConceptInfo[u.xcmInteriorKey] = u
+                    xcmSymbolInfo[symbolRelaychain] = s;
                 }
             }
 
@@ -596,26 +568,6 @@ module.exports = class AssetManager extends PolkaholicDB {
                         xcmSymbolInfo[symbolRelaychain]["xcCurrencyID"][paraID] = assetRec.currencyID
                     }
                 }
-                if (xcmConceptInfo[xcmInteriorKey] != undefined) {
-                    if (assetRec.asset != null) {
-                        if (xcmConceptInfo[xcmInteriorKey]["assets"] == undefined) {
-                            xcmConceptInfo[xcmInteriorKey]["assets"] = {};
-                        }
-                        xcmConceptInfo[xcmInteriorKey]["assets"][paraID] = assetRec.asset;
-                    }
-                    if (assetRec.xcContractAddress != null) {
-                        if (xcmConceptInfo[xcmInteriorKey]["xcContractAddress"] == undefined) {
-                            xcmConceptInfo[xcmInteriorKey]["xcContractAddress"] = {};
-                        }
-                        xcmConceptInfo[xcmInteriorKey]["xcContractAddress"][paraID] = assetRec.xcContractAddress;
-                    }
-                    if (assetRec.currencyID != null && !isNaN(assetRec.currencyID)) {
-                        if (xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"] == undefined) {
-                            xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"] = {};
-                        }
-                        xcmConceptInfo[xcmInteriorKey]["xcCurrencyID"][paraID] = assetRec.currencyID
-                    }
-                }
 
             }
 
@@ -630,15 +582,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             this.routers = routers;
             this.xcmAssetInfo = xcmAssetInfo; // key: xcmInteriorKey => a (1, ignore asset/chain)
-            this.xcmInteriorInfo = xcmInteriorInfo; // key: asset~chainID  => a (N)
             this.xcmSymbolInfo = xcmSymbolInfo; // key: symbol~relayChain => a (1, ignore asset/chain)
-            this.xcmConceptInfo = xcmConceptInfo;
-            // console.log(`this.xcmSymbolInfo`, this.xcmSymbolInfo)
-            //if (this.debugLevel >= paraTool.debugVerbose)console.log(`this.xcmConceptInfo`, this.xcmConceptInfo)
-            //if (this.debugLevel >= paraTool.debugVerbose)console.log(`this.xcmAssetInfo`, this.xcmAssetInfo)
-            for (let i = 0; i < xcmAssets.length; i++) {
-
-            }
         } catch (e) {
             console.log(`init_xcm_asset err`, e)
         }
@@ -663,14 +607,6 @@ module.exports = class AssetManager extends PolkaholicDB {
     getXcmAssetInfoByInteriorkey(xcmInteriorKey) {
         let xcmAssetInfo = this.xcmAssetInfo[xcmInteriorKey]
         console.log(`getXcmAssetInfoByInteriorkey k=${xcmInteriorKey}`, xcmAssetInfo)
-        if (xcmAssetInfo != undefined) {
-            return xcmAssetInfo
-        }
-        return false
-    }
-
-    getXcmAssetInfoByNativeAssetChain(nativeAssetChain) {
-        let xcmAssetInfo = this.xcmInteriorInfo[nativeAssetChain]
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo
         }
