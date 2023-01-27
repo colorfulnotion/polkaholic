@@ -364,7 +364,7 @@ module.exports = class ChainParser {
     ]
     */
     //OrmlTraitsAssetRegistryAssetMetadata, AssetsRegistryAssetRegistryInfo
-    async processXcmAssetsRegistryAssetMetadata(chainkey, a) {
+    async processXcmAssetsRegistryAssetMetadata(chainkey, a, prefixType = false) {
         let pieces = chainkey.split('-')
         let relayChain = pieces[0]
         let paraIDSource = xcmgarTool.dechexToInt(pieces[1])
@@ -378,8 +378,19 @@ module.exports = class ChainParser {
             let key = a[i][0];
             let val = a[i][1];
             let assetID = xcmgarTool.cleanedAssetID(key.args.map((k) => k.toHuman())[0]) //input: assetIDWithComma
-            let parsedAsset = {
-                Token: assetID
+            let parsedAsset = {}
+            if (prefixType) {
+                parsedAsset[prefixType] = assetID
+            }else{
+              parsedAsset.Token = assetID
+            }
+            if (this.isObject(assetID)){
+                try {
+                  let prefixType = Object.keys(assetID)[0]
+                  parsedAsset = assetID
+                } catch(e){
+                  console.log(`processXcmAssetsRegistryAssetMetadata err`, e)
+                }
             }
             //let paraID = 0
             let chainID = -1

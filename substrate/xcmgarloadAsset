@@ -27,7 +27,7 @@ async function main() {
     let globalAsetMap = {}
     for (const chainAssetFn of chainAssetFiles){
       let r = xcmgarlm.readParachainFiles(targetedRelaychain, chainAssetFn)
-      if (targetedParaID == 'all' || targetedParaID == `${r.chainID}`){
+      if (targetedParaID == 'all' || targetedParaID == `${r.paraID}`){
         let assetMap = xcmgarlm.transformParachainAssets(r)
         for (const assetChain of Object.keys(assetMap)){
           globalAsetMap[assetChain] = assetMap[assetChain]
@@ -35,7 +35,12 @@ async function main() {
       }
     }
     console.log(`[${targetedRelaychain}-${targetedParaID}]`, globalAsetMap)
-    await xcmgarlm.flushParachainAssets(globalAsetMap)
+
+    let cachedParachainAssetsMap = await xcmgarlm.init_parachain_asset_old(targetedRelaychain, targetedParaID)
+    console.log(`cachedParachainAssetsMap[${Object.keys(cachedParachainAssetsMap).length}]`, Object.keys(cachedParachainAssetsMap))
+
+    let [newParaAssetOnly, oldParaAssetOnly, identicalParaAssets, diffParaAssets] = xcmgarlm.compareParachainAssets(globalAsetMap, cachedParachainAssetsMap)
+    //await xcmgarlm.flushParachainAssets(globalAsetMap)
 }
 
 main()

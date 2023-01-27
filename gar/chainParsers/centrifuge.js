@@ -91,9 +91,26 @@ module.exports = class CentrifugeParser extends ChainParser {
             // step 2: load up results
             for (const assetChainkey of Object.keys(assetList)) {
                 let assetInfo = assetList[assetChainkey]
-                this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
+                let standardizedAssetChainkey = this.unpadCurrencyID(assetChainkey)
+                this.manager.setChainAsset(chainkey, standardizedAssetChainkey, assetInfo)
             }
         }
+    }
+
+    unpadCurrencyID(assetChainkey, prefixType = 'ForeignAsset'){
+      let updatedAssetChainkey = assetChainkey
+      let [assetUnparsed, chainkey] = xcmgarTool.parseAssetChain(assetChainkey)
+      try {
+        let asset = JSON.parse(assetUnparsed)
+        let assetID = asset.Token
+        if (assetID[prefixType]!= undefined){
+           let updatedAssetID = assetID
+           updatedAssetChainkey = xcmgarTool.makeAssetChain(JSON.stringify(updatedAssetID), chainkey)
+        }
+      } catch (e){
+        console.log(`unpadCurrencyID err`, e)
+      }
+      return updatedAssetChainkey
     }
 
     // Implement Centrifuge xcgar parsing function here

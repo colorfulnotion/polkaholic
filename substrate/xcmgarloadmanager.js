@@ -84,16 +84,44 @@ module.exports = class XCMGARLoadManager extends AssetManager {
       return r
     }
 
+    categorizeAssetType(assetName, assetSymbol, chainID){
+      let assetType = paraTool.assetTypeToken
+      if (chainID = paraTool.chainIDParallel || chainID == paraTool.chainIDParallel){
+          if (assetName.substr(0,3) == 'LP-'){
+             assetType = paraTool.assetTypeLiquidityPair
+          }
+      }
+      return assetType
+    }
+
+    //(vsBOND-DOT-2000-6-13) 02000613 -> {"VSBond2":["0","2,000","6","13"]}
+    standardizedVBBond2(assetName = 'vsBOND-DOT-2000-6-13'){
+      let pieces = assetName.split('-')
+      let convertedVSBond2 = ["","","",""]
+      let d = (pieces[1] == "DOT")? '0': '1' // DOT/KSM?
+      let paraID = paraTool.toNumWithComma(pieces[2])
+      let leaseStart = paraTool.toNumWithComma(pieces[3])
+      let leaseEnd = paraTool.toNumWithComma(pieces[4])
+      convertedVSBond2 = [d, paraID, leaseStart, leaseEnd]
+      console.log(`assetName=${assetName}, convertedVSBond2`, convertedVSBond2)
+      return convertedVSBond2
+    }
+
     transformParachainAssets(r){
       let assetMap = {}
       let chainID = r.chainID
       let paraID = r.paraID
       for (const a of r.assets){
-        console.log(`asset`, a)
+        //console.log(`asset`, a)
+        let xcmInteriorKey = a.xcmInteriorKey
+        let assetName = a.name
+        let assetSymbol = a.symbol
+        let decimals = a.decimals
         let rawAsset = a.asset
         let assetString = JSON.stringify(rawAsset)
         let currencyID = null
         let xcContractAddress = null
+        let assetType = this.categorizeAssetType(assetName, assetSymbol, chainID)
         try {
           let prefixType = Object.keys(rawAsset)[0]
           let rawAssetVal = rawAsset[prefixType]
@@ -102,11 +130,15 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             if (this.knownEvmChains.includes(chainID)){
               xcContractAddress = paraTool.xcAssetIDToContractAddr(currencyID).toLowerCase()
             }
+          }else if (prefixType == "VSBond2") {
+            let converedAsset = {}
+            converedAsset[prefixType] = this.standardizedVBBond2(assetName)
+            assetString = JSON.stringify(converedAsset)
           }else if (prefixType != "Token"){
             currencyID = assetString
           }
         } catch (e){
-          console.log(`no prefixType type rawAsset`, rawAsset)
+          console.log(`no prefixType type rawAsset`, rawAsset, `err`, e)
         }
         let assetChain = paraTool.makeAssetChain(assetString, chainID)
         let assetInfo = {
@@ -114,14 +146,14 @@ module.exports = class XCMGARLoadManager extends AssetManager {
           assetString: assetString,
           chainID: chainID,
           paraID: paraID,
-          assetName: a.name,
-          decimals: a.decimals,
-          symbol: a.symbol,
-          assetType: paraTool.assetTypeToken,
-          xcmInteriorKeyV1: (a.xcmInteriorKey != undefined)? paraTool.convertXcmInteriorKeyV2toV1(a.xcmInteriorKey) : false,
-          xcmInteriorKeyV2: (a.xcmInteriorKey != undefined)? a.xcmInteriorKey : false,
-          currencyID: (a.xcmInteriorKey != undefined)? currencyID: false,
-          xcContractAddress: (a.xcmInteriorKey != undefined)? xcContractAddress: false,
+          assetName: assetName,
+          decimals: decimals,
+          symbol: assetSymbol,
+          assetType: assetType,
+          xcmInteriorKeyV1: (xcmInteriorKey != undefined)? paraTool.convertXcmInteriorKeyV2toV1(xcmInteriorKey) : null,
+          xcmInteriorKeyV2: (xcmInteriorKey != undefined)? a.xcmInteriorKey : null,
+          currencyID: currencyID,
+          xcContractAddress: (xcmInteriorKey != undefined)? xcContractAddress: null,
         }
         assetMap[assetChain] = assetInfo
         //let xcmInteriorKey = a.xcmInteriorKey
@@ -131,6 +163,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
       }
       return assetMap
     }
+
 
     /*
     '[{"parachain":2000},{"generalKey":"0x0003"}]~polkadot': {
@@ -305,6 +338,88 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         return [xcRegistryNewOnly, xcRegistryOldOnly, identicalXcRegsitry, diffXcRefistry]
     }
 
+    compareParachainAssets(newParaAssets, oldParaAssets) {
+        let newParaAssetOnly = {}
+        let oldParaAssetOnly = {}
+        let identicalParaAssets = {}
+        let diffParaAssets = {}
+
+        let newParaAssetsKeys = Object.keys(newParaAssets)
+        let oldParaAssetsKeys = Object.keys(oldParaAssets)
+        //console.log( a2.filter(x => !a1.includes(x)) );
+        console.log(`newParaAssetsKeys`, newParaAssetsKeys)
+        console.log(`oldParaAssetsKeys`, oldParaAssetsKeys)
+        let paraAssetKeysCommon = newParaAssetsKeys.filter(value => oldParaAssetsKeys.includes(value));
+        console.log(`paraAssetKeysCommon`, paraAssetKeysCommon)
+        let paraAssetKeysNew = newParaAssetsKeys.filter(x => !oldParaAssetsKeys.includes(x))
+        console.log(`paraAssetKeysNew`, paraAssetKeysNew)
+        let paraAssetKeysOld = oldParaAssetsKeys.filter(x => !newParaAssetsKeys.includes(x))
+        console.log(`paraAssetKeysOld`, paraAssetKeysOld)
+
+        for (const assetChain of paraAssetKeysCommon) {
+            let paraAssetOld = oldParaAssets[assetChain]
+            let paraAssetNew = newParaAssets[assetChain]
+            // check if'xcmInteriorKey', 'symbol', 'nativeAssetChain', 'decimals', 'xcContractAddress', 'currencyID' are all the same
+            let checkList = ['xcmInteriorKey', 'symbol', 'nativeAssetChain', 'decimals', 'xcContractAddress', 'currencyID']
+            let mismatchedFlds = []
+            let matchedFlds = []
+            let isMismatch = false
+            for (const k of checkList) {
+                if (paraAssetOld[k] == paraAssetNew[k]) {
+                    matchedFlds.push(k)
+                } else {
+                    isMismatch = true
+                    mismatchedFlds.push(k)
+                }
+                if (isMismatch) {
+                    for (const mismatchedFld of mismatchedFlds) {
+                        let mistMatched = {}
+                        mistMatched[mismatchedFld] = {
+                            new: paraAssetNew[mismatchedFld],
+                            old: paraAssetOld[mismatchedFld]
+                        }
+                        diffParaAssets[assetChain] = mistMatched
+                    }
+                } else {
+                    identicalParaAssets[assetChain] = paraAssetNew
+                }
+            }
+        }
+
+        for (const assetChain of paraAssetKeysNew) {
+            newParaAssetOnly[assetChain] = newParaAssets[assetChain]
+        }
+
+        for (const assetChain of paraAssetKeysOld) {
+            oldParaAssetOnly[assetChain] = oldParaAssets[assetChain]
+        }
+        console.log(`New Only [${Object.keys(newParaAssetOnly).length}]`, newParaAssetOnly)
+        console.log(`Old Only [${Object.keys(oldParaAssetOnly).length}]`, oldParaAssetOnly)
+        //console.log(`Identical [${Object.keys(identicalParaAssets).length}]`, Object.keys(identicalParaAssets))
+        console.log(`Diff [${Object.keys(diffParaAssets).length}]`, diffParaAssets)
+        console.log(`New=[${Object.keys(newParaAssetOnly).length}], Old=${Object.keys(oldParaAssetOnly).length}, Identical=${Object.keys(identicalParaAssets).length}, Diff=${Object.keys(diffParaAssets).length}`)
+        return [newParaAssetOnly, oldParaAssetOnly, identicalParaAssets, diffParaAssets]
+    }
+
+    async init_parachain_asset_old(targetedRelaychain = 'polkadot', targetedParaID = 'all') {
+        let parachainAssets = await this.poolREADONLY.query(`select asset, assetName, symbol, decimals, currencyID, xcContractAddress, xcmInteriorkey, chainID from asset where assetType in ('${paraTool.assetTypeLiquidityPair}', '${paraTool.assetTypeToken}')`);
+        let parachainAssetsMap = {}
+        for (let i = 0; i < parachainAssets.length; i++) {
+            let parachainAsset = parachainAssets[i]
+            let chainID = parachainAsset.chainID
+            let relayChain = paraTool.getRelayChainByChainID(chainID)
+            let paraID = paraTool.getParaIDfromChainID(chainID)
+            if (targetedRelaychain == relayChain){
+              if (targetedParaID == 'all' || targetedParaID == paraID){
+                 let assetChain = paraTool.makeAssetChain(parachainAsset.asset, chainID)
+                 parachainAsset.assetChain = assetChain
+                 parachainAssetsMap[assetChain] = parachainAsset
+              }
+            }
+        }
+        return parachainAssetsMap
+    }
+
     async init_xcm_asset_old(relayChain = 'polkadot') {
         let xcmAssets = await this.poolREADONLY.query(`select xcmchainID, xcmInteriorKey, symbol, relayChain, nativeAssetChain, isUSD, decimals, priceUSD, parent as parents from xcmasset where xcmInteriorKey is not null and relaychain in ('${relayChain}')`);
         let xcmAssetMap = {}
@@ -389,9 +504,9 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 let xcmInteriorKey = (r.xcmInteriorKeyV1 && r.xcmInteriorKeyV1 !== false) ? `${mysql.escape(r.xcmInteriorKeyV1)}` : `NULL`
                 let assetName = (r.assetName!= undefined ) ? `${mysql.escape(r.assetName)}` : `NULL`
                 let currencyID = (r.currencyID != undefined && r.currencyID !== false) ? `${mysql.escape(r.currencyID)}` : `NULL`
-                let xccontractaddress = (r.xcContractAddress != undefined && r.xcContractAddress !== false) ? `${mysql.escape(r.xcContractAddress)}` : `NULL`
+                let xcContractAddress = (r.xcContractAddress != undefined && r.xcContractAddress !== false) ? `${mysql.escape(r.xcContractAddress)}` : `NULL`
                 let a = "(" + [`'${r.assetString}'`, `'${r.chainID}'`,
-                    `'${paraTool.assetTypeToken}'`, xcmInteriorKey, `'${r.decimals}'`, `'${r.symbol}'`, assetName, currencyID, xccontractaddress
+                    `'${paraTool.assetTypeToken}'`, xcmInteriorKey, `'${r.decimals}'`, `'${r.symbol}'`, assetName, currencyID, xcContractAddress
                 ].join(",") + ")";
                 assets.push(a)
             }
@@ -401,9 +516,9 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             await this.upsertSQL({
                 "table": "assetgar",
                 "keys": ["asset", "chainID"],
-                "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xccontractaddress"],
+                "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"],
                 "data": assets,
-                "replaceIfNull": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xccontractaddress"]
+                "replaceIfNull": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"]
             }, sqlDebug);
             await this.update_batchedSQL()
         }

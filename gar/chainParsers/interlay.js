@@ -137,7 +137,7 @@ module.exports = class InterlayParser extends ChainParser {
         if (!a) return
         if (a) {
             // step 1: use common XcmAssetIdType parser func available at generic chainparser.
-            let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXcmAssetsRegistryAssetMetadata(chainkey, a)
+            let [xcAssetList, assetIDList, updatedAssetList, unknownAsset] = await this.processXcmAssetsRegistryAssetMetadata(chainkey, a, 'ForeignAsset')
             console.log(`custom xcAssetList=[${Object.keys(xcAssetList)}], updatedAssetList=[${Object.keys(updatedAssetList)}], unknownAsset=[${Object.keys(unknownAsset)}], assetIDList=[${Object.keys(assetIDList)}]`, xcAssetList)
             // step 2: load up results
             for (const xcmInteriorKey of Object.keys(xcAssetList)) {
