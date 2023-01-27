@@ -97,9 +97,9 @@ module.exports = class AstarParser extends ChainParser {
             for (const xcmInteriorKey of Object.keys(xcAssetList)) {
                 let xcmAssetInfo = xcAssetList[xcmInteriorKey]
                 let assetID = assetIDList[xcmInteriorKey]
-                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
+                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo, chainkey)
                 // update global xcRegistry to include assetID used by this parachain
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID)
+                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID, chainkey)
                 // compute xcContractAddress
                 this.manager.addXcmAssetLocalxcContractAddress(xcmInteriorKey, paraIDSource, assetID)
             }

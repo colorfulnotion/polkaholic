@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const { Command } = require('commander');
 const endpoints = require("./endpoints");
+const xcmgarTool = require("./xcmgarTool");
 const fs = require('fs');
 var XCMGlobalAssetRegistryManager = require("./xcmgarManager");
 
@@ -11,9 +12,12 @@ class XCMGlobalAssetRegistryCLI {
         let targetedRelaychain = relaychain
         let targetedParaID = paraID
         let isDryRun = (opt.dry)? true : false
+        let initType = (opt.serial)? 'serial' : 'parallel'
         switch (relaychain) {
             case 'kusama':
             case 'polkadot':
+            case 'rococo':
+            case 'moonbase':
                 break;
             default:
                 console.log(`Unsupported relaychain ${relaychain}.`)
@@ -30,7 +34,7 @@ class XCMGlobalAssetRegistryCLI {
             let singleChainkey = `${targetedRelaychain}-${targetedParaID}`
             supportedChainKeys = [singleChainkey]
         }
-        let failedChainkeys = await xcmgarm.batchApiInit(supportedChainKeys)
+        let failedChainkeys = (initType == 'serial')? await xcmgarm.serialCrawlerInit(supportedChainKeys) : await xcmgarm.batchCrawlerInit(supportedChainKeys)
         console.log(`failedChainkeys`, failedChainkeys)
         for (const chainkey of supportedChainKeys){
             let crawler = await xcmgarm.getCrawler(chainkey)
@@ -47,6 +51,7 @@ class XCMGlobalAssetRegistryCLI {
                 await xcmgarm.updateXcmRegistry()
             }
             await xcmgarm.updateLocalAsset()
+            await xcmgarm.updateLocalMultilocation()
         }
     }
 
@@ -89,16 +94,18 @@ class XCMGlobalAssetRegistryCLI {
 }
 
 async function main() {
+    let cli_version = '0.0.1'
     const program = new Command();
     program
 	.name('xcmgar')
 	.description('XCM Global Asset Registry. Repo: https://github.com/colorfulnotion/xcm-global-registry')
-	.version('0.0.1');
+	.version(`${cli_version}-commit.${xcmgarTool.commitHash()}`);
 
     program.command('registry')
 	.description('Fetch on-chain Asset Registry and XCM MultiLocation Registry')
 	.option('-r, --relaychain <relaychain>', 'relaychain (polkadot or kusama)', 'polkadot')
     .option('-p, --paraID <paraID>', `Targeted paraID (relaychain itself is identified using paraID=0). If not specified, crawl for all reachable parachains.`, 'all')
+    .option('-s, --serial', `Serial the registry endpoints init. By default all endpoints are initilized in parallel`, false)
     .option('-d, --dry', `dry run the cmd without updating`, false)
 	.action(async (opt) => {
 	    let xcmgarcli = new XCMGlobalAssetRegistryCLI();

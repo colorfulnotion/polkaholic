@@ -236,10 +236,7 @@
         "name": "SubsocialX",
         "id": "subsocialX",
         "paraID": 2100,
-        "WSEndpoints": [
-            "wss://para.f3joule.space",
-            "wss://para.subsocial.network"
-        ],
+        "WSEndpoints": [], 
         "relaychain": "kusama"
     },
     "kusama-2101": {
@@ -259,8 +256,8 @@
         "id": "pichiu",
         "paraID": 2102,
         "WSEndpoints": [
-            "wss://kusama.kylin-node.co.uk",
-            "wss://pichiu.api.onfinality.io/public-ws"
+            "wss://pichiu.api.onfinality.io/public-ws",
+            "wss://kusama.kylin-node.co.uk"
         ],
         "relaychain": "kusama"
     },

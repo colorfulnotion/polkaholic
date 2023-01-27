@@ -1196,7 +1196,6 @@ module.exports = class Crawler extends Indexer {
             let updateChainAssetTS = (new Date().getTime() - updateChainAssetStartTS) / 1000
             console.log("update_chain_assets time=", updateChainAssetTS);
             if (chain.isEVM > 0 && (chain.evmRPC)) { //  moonbeam, moonriver, astar, shiden, clover ... where clover has an evmRPC external endpoint
-                await this.updateChainAssetHoldersBalances(chain); // 10min
                 await this.updateERC20TokenSupply(chain); // 5mins
             }
             await this.updateSpecVersions(chain);
@@ -1991,7 +1990,7 @@ create table talismanEndpoint (
                     await this.getSpecVersionMetadata(chain, specVersion, finalizedHash, bn);
                 }
 
-                //console.log("subscribeFinalizedHeads", chain.chainName, bn, `CHECK: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(bn), "|  ", sql2);
+                console.log("subscribeFinalizedHeads", chain.chainName, bn, `CHECK: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(bn), "|  ", sql2);
                 await this.update_batchedSQL();
 
                 if (this.readyToCrawlParachains && (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama)) {

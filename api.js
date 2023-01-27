@@ -698,16 +698,12 @@ app.get('/q/:q', async (req, res) => {
 
 app.get('/xcm/multilocation/:chainID_or_chainName', async (req, res) => {
     try {
-        let chainID_or_chainName = req.params["chainID_or_chainName"]
-        let version = req.query['v'] ? req.query['v'] : 'v1';
-        let mRes = await query.getMultilocation(chainID_or_chainName, version);
-        if (mRes) {
-            res.write(JSON.stringify(mRes));
-            await query.tallyAPIKey(getapikey(req));
-            res.end();
-        } else {
-            res.sendStatus(404);
-        }
+        let results = {
+            "redirect_url": "https://github.com/colorfulnotion/xcm-global-registry",
+            "description": "Replaced by XCM Global Registry"
+        };
+        res.write(JSON.stringify(results));
+        res.end();
     } catch (err) {
         return res.status(400).json({
             error: err.toString()

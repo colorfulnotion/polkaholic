@@ -1535,7 +1535,7 @@
     "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x025a4d6acdc4e3e5ab15717f407afe957f7a242578\"}]": {
         "paraID": 2000,
         "relayChain": "polkadot",
-        "symbol": "ETH",
+        "symbol": "WETH",
         "decimals": 18,
         "interiorType": "x2",
         "xcmV1Standardized": [

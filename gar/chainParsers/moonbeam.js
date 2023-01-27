@@ -7,6 +7,8 @@ Fork this template to create new custom parser
 Support chains
 polkadot-2004|moonbeam
 kusama-2023|moonriver
+moonbase-1000|alpha
+moonbase-888|beta
 */
 
 
@@ -98,9 +100,9 @@ module.exports = class MoonbeamParser extends ChainParser {
             for (const xcmInteriorKey of Object.keys(xcAssetList)) {
                 let xcmAssetInfo = xcAssetList[xcmInteriorKey]
                 let assetID = assetIDList[xcmInteriorKey]
-                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
+                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo, chainkey)
                 // update global xcRegistry to include assetID used by this parachain
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID)
+                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID, chainkey)
                 // compute xcContractAddress
                 this.manager.addXcmAssetLocalxcContractAddress(xcmInteriorKey, paraIDSource, assetID)
             }

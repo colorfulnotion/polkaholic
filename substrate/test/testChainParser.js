@@ -177,7 +177,7 @@ async function main() {
             indexer.relayChain = paraTool.getRelayChainByChainID(chainID);
             indexer.chainID = chainID;
             for (const c of testcases[chainID]) {
-                let [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
+                let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = indexer.chainParser.processV1ConcreteFungible(indexer, c);
                 console.log(`relaychain=${indexer.relayChain}, chainID=${chainID},targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedSymbol}, ${JSON.stringify(c,null,4)}`);
             }
         }
@@ -193,7 +193,7 @@ async function main() {
             await indexer.setup_chainParser(chain, paraTool.debugTracing);
             indexer.relayChain = paraTool.getRelayChainByChainID(chainID);
             indexer.chainID = chainID;
-            let targetedSymbol, targetedRelayChain;
+            let targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0;
             for (const c of xcmViolations[chainID]) {
                 let callerFunc = c.caller
                 let parserFunc = c.parser
@@ -203,7 +203,7 @@ async function main() {
                         [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV0ConcreteFungible(indexer, instruction);
                         break;
                     case 'processV1ConcreteFungible':
-                        [targetedSymbol, targetedRelayChain] = indexer.chainParser.processV1ConcreteFungible(indexer, instruction);
+                        [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = indexer.chainParser.processV1ConcreteFungible(indexer, instruction);
                         break;
                     case 'processFeeLocation':
                         [targetedSymbol, targetedRelayChain] = indexer.chainParser.processFeeLocation(indexer, instruction)

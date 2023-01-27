@@ -1,15 +1,15 @@
 # XCM Global Asset Registry
 
 ## TL;DR
-This XCM Global Asset Registry repo(XCMGAR) is a data processing algorithm to aggregate multiple on-chain asset registries into one XCM Global Asset Registry.  
+This XCM Global Asset Registry (XCMGAR) repo does all the data processing needed to aggregate multiple on-chain asset registries from the Polkadot and Kusama ecosystem into one XCM Global Asset Registry.  
 
-* Input: known [RPC endpoints](https://github.com/colorfulnotion/xcm-global-registry/tree/main/assets) from relaychains (Polkadot/Kusama/Rococo/..) and its parachains.
+* Input: known [Polkadot + Kusama RPC endpoints](https://github.com/colorfulnotion/xcm-global-registry/tree/main/assets)
 
-* Output: one [[global registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/xcmRegistry)] containing all xcAsset across parachains and [[local (xc)Assets registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/assets/polkadot)] per each parachain.
+* Output: one [[XCM Global Asset Registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/xcmRegistry)] containing all xcAsset across parachains and [[local (xc)Assets registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/assets/polkadot) + [local xcm registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/xcAssets/polkadot)] per each parachain.
 
-As of mid-January 2023, XCMGAR covers 55+ chains with 30 xcAssets on Polkadot and 44 on Kusama. This is a work in progress and needs contributions from parachain teams to be successful. Data is updated weekly to daily.
+As of mid-January 2023, XCMGAR covers 55+ chains with 30 xcAssets on Polkadot and 44 on Kusama. This is a work in progress and needs contributions from parachain teams to be successful. Data is updated daily via Github Actions.
 
-Target use cases: multichain dapps, chain analytics in the Substrate ecosystem.
+Target use cases: multichain dapps, chain analytics in the Substrate ecosystem
 
 ## Install
 To get started, clone this repo:
@@ -21,10 +21,9 @@ And install all dependencies, [python3](https://www.python.org/downloads/) may b
 npm install
 ```
 ## Quick Start
-See available function from xcmgar cli:
 
 ```
-node xcmgar
+./xcmgar
 Usage: xcmgar [options] [command]
 
 XCM Global Asset Registry. Repo: https://github.com/colorfulnotion/xcm-global-registry
@@ -39,7 +38,7 @@ Commands:
   help [command]      display help for command
 ```
 
-### Generate XCM Global Asset Registry:
+To generate XCM Global Asset Registry:
 ```
 Usage: xcmgar registry [options]
 
@@ -52,18 +51,18 @@ Options:
   -h, --help                     display help for command
 
 # generate polkadot xcmRegistry
-node xcmgar registry -r polkadot -p all
+./xcmgar registry -r polkadot -p all
 
 # generate polkadot xcmRegistry
-node xcmgar registry -r kusama -p all
+./xcmgar registry -r kusama -p all
 ```
 
 [xcmRegistry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/xcmRegistry) and [parachains (xc)Asset Registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/assets/polkadot) will be cached/updated after successful run:
 ```
-✅ Success: polkadot XCM Global Asset Registry (Found:35) cahced @
+✅ Success: polkadot XCM Global Asset Registry (Found:35) cached @
     xcmRegistry/polkadot_xcmRegistry.json
 ...
-✅ Success: polkadot-2000 Local Asset Regsitry (Found:22) cahced @
+✅ Success: polkadot-2000 Local Asset Regsitry (Found:22) cached @
 
 ```
 
@@ -72,10 +71,10 @@ Single parachain (xc)Asset registry can be generated/inspected by passing in wit
 
 ```
 # generate acala's (xc)Asset registry:
-node xcmgar registry -r polkadot -p 2000
+./xcmgar registry -r polkadot -p 2000
 
 # dry-run moonriver's (xc)Asset registry:
-node xcmgar registry -r polkadot -p 2000 -d
+./xcmgar registry -r polkadot -p 2000 -d
 ```
 
 ### Implement Custom Parser:

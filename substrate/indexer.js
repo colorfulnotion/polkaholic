@@ -1983,7 +1983,7 @@ module.exports = class Indexer extends AssetManager {
                         if ((existing_xcmInfo.origination.finalized == false) && xcmInfo.origination.finalized) {
                             existing_xcmInfo.origination.finalized = true;
                             if (xcmInfo.destination && xcmInfo.destination.finalized) {
-                                // destination chain was finalized BEFORE origination chain, so we must record xcminfo 
+                                // destination chain was finalized BEFORE origination chain, so we must record xcminfo
                                 if (o.initiateTS) {
                                     xcmInfo.flightTime = this.getCurrentTS() - o.initiateTS;
                                 }
@@ -5259,7 +5259,7 @@ module.exports = class Indexer extends AssetManager {
     async buildPendingXcmInfo(xcmtransfer, extrinsic, originationFinalized) {
         let x = xcmtransfer // need deep clone?
         //build systhetic xcmInfo here when xcmInfo is not set yet
-        //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
+        if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
         try {
             let sectionPieces = x.sectionMethod.split(':')
@@ -6823,7 +6823,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 evmReceipts = newReceipts;
             }
         }
-        // setParserContext 
+        // setParserContext
         this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash, chainID);
         if (this.isRelayChain) this.chainParser.setRelayParentStateRoot(stateRoot)
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
@@ -7183,7 +7183,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
 
         }
         if (isTip) {
-            // process realtime xcmInfo matches 
+            // process realtime xcmInfo matches
             await this.check_xcmtransfers_beneficiary(api, blockNumber, blockTS, finalized);
         }
 

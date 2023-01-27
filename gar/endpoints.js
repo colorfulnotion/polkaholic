@@ -270,12 +270,6 @@ const polkaholicKnownPublicEndpoints = {
         "paraID": 22096,
         "relaychain": "kusama"
     },
-    "kusama-2100": {
-        "id": "subsocialx",
-        "chainID": 22100,
-        "paraID": 22100,
-        "relaychain": "kusama"
-    },
     "kusama-2101": {
         "id": "zeitgeist",
         "chainID": 22101,

@@ -112,7 +112,7 @@ module.exports = class StatemintParser extends ChainParser {
                 let augmentedInfo = augmentedMap[xcmInteriorKey]
                 let assetID = augmentedInfo.assetID
                 let assetChainkey = augmentedInfo.assetChainkey
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID)
+                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID, chainkey)
                 let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
                 if (cachedAssetInfo) {
                     cachedAssetInfo.xcmInteriorKey = xcmInteriorKey

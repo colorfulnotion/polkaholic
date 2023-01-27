@@ -71,9 +71,9 @@ module.exports = class SubstrateETL extends AssetManager {
         }
 
         // setup paraID specific tables, including paraID=0 for the relay chain
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "traces", "specversions"]
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions"]
         let p = (chainID) ? ` where chainID = ${chainID} ` : ""
-        let sql = `select chainID from chain ${p} order by chainID`
+        let sql = `select chainID from chain ${p} where relayChain in ('polkadot', 'kusama') order by chainID`
         let recs = await this.poolREADONLY.query(sql);
         for (const rec of recs) {
             let chainID = parseInt(rec.chainID, 10);
@@ -81,13 +81,15 @@ module.exports = class SubstrateETL extends AssetManager {
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             //console.log(" --- ", chainID, paraID, relayChain);
             for (const tbl of tbls) {
-                let p = (this.partitioned_table(tbl)) ? "--time_partitioning_field block_time --time_partitioning_type DAY" : "";
+                let fld = tbl == "balances" ? "ts" : "block_time";
+                let p = (this.partitioned_table(tbl)) ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
                 let cmd = `bq mk  --project_id=substrate-etl  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
 
                 try {
                     console.log(cmd);
                     await exec(cmd);
                 } catch (e) {
+                    console.log(e);
                     // TODO optimization: do not create twice
                 }
             }
@@ -210,9 +212,6 @@ module.exports = class SubstrateETL extends AssetManager {
                 errors.push(`source record count incorrect: Expected ${cnt} (${bn1}-${bn0}+1)> ${nrecs}`);
             } else {
                 let tbls = ["blocks", "extrinsics", "events"];
-                if (audit_traces) {
-                    tbls.push("traces");
-                }
                 for (const tbl of tbls) {
                     let bsql = `SELECT distinct block_number, block_time FROM \`substrate-etl.${relayChain}.${tbl}${paraID}\` where date(block_time) = '${logDT}' order by block_number`;
                     let fld = "block_number";
@@ -313,9 +312,9 @@ module.exports = class SubstrateETL extends AssetManager {
         });
         let NL = "\r\n";
         let project = "substrate-etl";
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "traces", "specversions"];
-        console.log("|chain|blocks|extrinsics|events|transfers|logs|traces|specversions");
-        console.log("|-----|------|----------|------|---------|----|------|------------");
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "specversions"];
+        console.log("|chain|blocks|extrinsics|events|transfers|logs|specversions");
+        console.log("|-----|------|----------|------|---------|----|------------");
         chains.forEach((c) => {
             fs.writeSync(f, JSON.stringify(c) + NL);
             let sa = [];
@@ -431,12 +430,6 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "specversions"]
-        let dump_traces = false;
-        if (this.daysago(logDT) < 31) {
-            tbls.push("traces");
-            dump_traces = true;
-            console.log("DUMP_TRACES TRUE");
-        }
 
         // 1. get bnStart, bnEnd for logDT
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
@@ -600,21 +593,7 @@ module.exports = class SubstrateETL extends AssetManager {
                     }
                 });;
                 let trace = r.autotrace;
-                let traces = trace ? trace.map((t) => {
-                    block.trace_count++;
-                    return {
-                        trace_id: t.traceID,
-                        block_time: block.block_time,
-                        block_number: block.number,
-                        block_hash: block.hash,
-                        section: t.p,
-                        storage: t.s,
-                        k: t.k,
-                        v: t.v,
-                        pk_extra: t.pkExtra ? t.pkExtra : null,
-                        pv: t.pv ? t.pv : null
-                    }
-                }) : [];
+                let traces = [];
                 // write block
                 fs.writeSync(f["blocks"], JSON.stringify(block) + NL);
                 block_count++;
@@ -636,12 +615,7 @@ module.exports = class SubstrateETL extends AssetManager {
                         fs.writeSync(f["transfers"], JSON.stringify(t) + NL);
                     });
                 }
-                //console.log("traces", traces);
-                if (block.trace_count > 0 && dump_traces) {
-                    traces.forEach((t) => {
-                        fs.writeSync(f["traces"], JSON.stringify(t) + NL);
-                    });
-                }
+
                 if (log_count > 0) {
                     logs.forEach((t) => {
                         fs.writeSync(f["logs"], JSON.stringify(t) + NL);

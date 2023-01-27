@@ -1,0 +1,618 @@
+[
+    {
+        "paraID": 0,
+        "relayChain": "polkadot",
+        "symbol": "DOT",
+        "decimals": 10,
+        "interiorType": "here",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            "here"
+        ],
+        "xcmV1MultiLocationByte": "0x0100",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "here": null
+                }
+            }
+        },
+        "asset": "101",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 1000,
+        "relayChain": "polkadot",
+        "symbol": "USDT",
+        "decimals": 6,
+        "interiorType": "x3",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 1000
+            },
+            {
+                "palletInstance": 50
+            },
+            {
+                "generalIndex": 1984
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010300a10f043205011f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 1000
+                        },
+                        {
+                            "palletInstance": 50
+                        },
+                        {
+                            "generalIndex": 1984
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "102",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2000,
+        "relayChain": "polkadot",
+        "symbol": "ACA",
+        "decimals": 12,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2000
+            },
+            {
+                "generalKey": "0x0000"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200411f06080000",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2000
+                        },
+                        {
+                            "generalKey": "0x0000"
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "108",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2000,
+        "relayChain": "polkadot",
+        "symbol": "LDOT",
+        "decimals": 10,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2000
+            },
+            {
+                "generalKey": "0x0003"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200411f06080003",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2000
+                        },
+                        {
+                            "generalKey": "0x0003"
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "110",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2000,
+        "relayChain": "polkadot",
+        "symbol": "lcDOT",
+        "decimals": 10,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2000
+            },
+            {
+                "generalKey": "0x040d000000"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200411f0614040d000000",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2000
+                        },
+                        {
+                            "generalKey": "0x040d000000"
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "106",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2002,
+        "relayChain": "polkadot",
+        "symbol": "CLV",
+        "decimals": 18,
+        "interiorType": "x1",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2002
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010100491f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2002
+                    }
+                }
+            }
+        },
+        "asset": "130",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2004,
+        "relayChain": "polkadot",
+        "symbol": "GLMR",
+        "decimals": 18,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2004
+            },
+            {
+                "palletInstance": 10
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200511f040a",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2004
+                        },
+                        {
+                            "palletInstance": 10
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "114",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2012,
+        "relayChain": "polkadot",
+        "symbol": "sDOT",
+        "decimals": 10,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2012
+            },
+            {
+                "generalKey": "0x73444f54"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200711f061073444f54",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2012
+                        },
+                        {
+                            "generalKey": "0x73444f54"
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "1001",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2012,
+        "relayChain": "polkadot",
+        "symbol": "cDOT-6/13",
+        "decimals": 10,
+        "interiorType": "x3",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2012
+            },
+            {
+                "palletInstance": 6
+            },
+            {
+                "generalIndex": 200060013
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010300711f040605b6b1b22f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 2012
+                        },
+                        {
+                            "palletInstance": 6
+                        },
+                        {
+                            "generalIndex": 200060013
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "200060013",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2012,
+        "relayChain": "polkadot",
+        "symbol": "cDOT-7/14",
+        "decimals": 10,
+        "interiorType": "x3",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2012
+            },
+            {
+                "palletInstance": 6
+            },
+            {
+                "generalIndex": 200070014
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010300711f040605fa4db32f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 2012
+                        },
+                        {
+                            "palletInstance": 6
+                        },
+                        {
+                            "generalIndex": 200070014
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "200070014",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2012,
+        "relayChain": "polkadot",
+        "symbol": "cDOT-8/15",
+        "decimals": 10,
+        "interiorType": "x3",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2012
+            },
+            {
+                "palletInstance": 6
+            },
+            {
+                "generalIndex": 200080015
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010300711f0406053eeab32f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 2012
+                        },
+                        {
+                            "palletInstance": 6
+                        },
+                        {
+                            "generalIndex": 200080015
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "200080015",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2012,
+        "relayChain": "polkadot",
+        "symbol": "cDOT-9/16",
+        "decimals": 10,
+        "interiorType": "x3",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2012
+            },
+            {
+                "palletInstance": 6
+            },
+            {
+                "generalIndex": 200090016
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010300711f0406058286b42f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 2012
+                        },
+                        {
+                            "palletInstance": 6
+                        },
+                        {
+                            "generalIndex": 200090016
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "200090016",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2012,
+        "relayChain": "polkadot",
+        "symbol": "cDOT-10/17",
+        "decimals": 10,
+        "interiorType": "x3",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2012
+            },
+            {
+                "palletInstance": 6
+            },
+            {
+                "generalIndex": 200100017
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010300711f040605c622b52f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 2012
+                        },
+                        {
+                            "palletInstance": 6
+                        },
+                        {
+                            "generalIndex": 200100017
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "200100017",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2032,
+        "relayChain": "polkadot",
+        "symbol": "IBTC",
+        "decimals": 8,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2032
+            },
+            {
+                "generalKey": "0x0001"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200c11f06080001",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2032
+                        },
+                        {
+                            "generalKey": "0x0001"
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "122",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2032,
+        "relayChain": "polkadot",
+        "symbol": "INTR",
+        "decimals": 10,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2032
+            },
+            {
+                "generalKey": "0x0002"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200c11f06080002",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2032
+                        },
+                        {
+                            "generalKey": "0x0002"
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "120",
+        "source": [
+            "2012"
+        ]
+    },
+    {
+        "paraID": 2035,
+        "relayChain": "polkadot",
+        "symbol": "PHA",
+        "decimals": 12,
+        "interiorType": "x1",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2035
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010100cd1f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2035
+                    }
+                }
+            }
+        },
+        "asset": "115",
+        "source": [
+            "2012"
+        ]
+    }
+]

@@ -1982,12 +1982,12 @@ module.exports = class Query extends AssetManager {
                 assetChain = alternativeAssetChain
             }
         }
-        console.log(`assetInfo found!`, this.assetInfo[assetChain])
+        let holders = [];
+        return holders
+        // TODO: bring from substrate-etl.{polkadot,kusama}.balances${paraID}
         try {
             let [asset, chainID] = paraTool.parseAssetChain(assetChain)
-            let w = (chainID) ? ` and chainID = '${chainID}'` : "";
-            let sql = `select holder, free, reserved, miscFrozen, frozen  from assetholder${chainID} where asset = '${asset}' and free > 0 ${w} order by free desc limit ${limit}`
-            console.log("getAssetHolders", sql)
+            let sql = `select holder, free, reserved, miscFrozen, frozen  from substrate-etl.${relayChai}.balances${paraID} where asset = '${asset}' and free > 0 ${w} order by free desc limit ${limit}`
             let holders = await this.poolREADONLY.query(sql);
             let ts = this.currentTS();
             let p = await this.computePriceUSD({
@@ -1995,7 +1995,8 @@ module.exports = class Query extends AssetManager {
                 chainID
             });
             let priceUSDCurrent = p && p.priceUSDCurrent ? p.priceUSDCurrent : 0
-            for (let i = 0; i < holders.length; i++) {
+
+            /*for (let i = 0; i < holders.length; i++) {
                 holders[i].free = parseFloat(holders[i].free);
                 holders[i].reserved = parseFloat(holders[i].reserved);
                 holders[i].miscFrozen = parseFloat(holders[i].miscFrozen);
@@ -2015,7 +2016,7 @@ module.exports = class Query extends AssetManager {
                 holders[i].miscFrozenUSD = priceUSDCurrent * holders[i].miscFrozen;
                 holders[i].frozenUSD = priceUSDCurrent * holders[i].frozen;
             }
-
+	    */
             return holders;
         } catch (err) {
             this.logger.error({
@@ -6550,40 +6551,6 @@ module.exports = class Query extends AssetManager {
         let sql = `update wasmCode set metadata = ${mysql.escape(contractData)}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)} where codeHash = '${contract.codeHash}'`
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
-    }
-
-    async getMultilocation(chainID_or_chainName, version = 'v1') {
-        console.log(`chainID_or_chainName=${chainID_or_chainName}, version=${version}`)
-        let [chainID, id] = this.convertChainID(chainID_or_chainName)
-        if (chainID === false) return [];
-        let relayChain = paraTool.getRelayChainByChainID(chainID)
-        let xcmConceptInfoMap = this.xcmConceptInfo
-        let multiLocations = []
-        for (const xcmInteriorKey of Object.keys(xcmConceptInfoMap)) {
-            let v = xcmConceptInfoMap[xcmInteriorKey]
-            let xcmInteriorKeyV = (version.toLowerCase() == 'v2') ? paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey) : xcmInteriorKey
-            let m = {
-                chainID: v.chainID,
-                paraID: v.paraID,
-                relayChain: v.relayChain,
-                isUSD: v.isUSD,
-                //xcmConcept: v.xcmConcept,
-                //asset: v.asset,
-                decimals: v.decimals,
-                symbol: v.symbol,
-                //parents: v.parents,
-                xcmInteriorKey: xcmInteriorKeyV,
-                xcmV1MultiLocationHex: v.xcmV1MultiLocationHex,
-                xcmV1MultiLocation: JSON.parse(v.xcmV1MultiLocation),
-                evmMultiLocation: JSON.parse(v.evmMultiLocation),
-                xcContractAddress: v.xcContractAddress,
-                xcCurrencyID: v.xcCurrencyID,
-            }
-            if (m.relayChain == relayChain) {
-                multiLocations.push(m)
-            }
-        }
-        return multiLocations
     }
 
     async getXCMInfoLatest(chainID_or_chainName) {

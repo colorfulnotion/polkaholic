@@ -98,9 +98,9 @@ module.exports = class InterlayParser extends ChainParser {
             for (const xcmInteriorKey of Object.keys(xcAssetList)) {
                 let xcmAssetInfo = xcAssetList[xcmInteriorKey]
                 let assetID = assetIDList[xcmInteriorKey]
-                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo)
+                this.manager.setXcmAsset(xcmInteriorKey, xcmAssetInfo, chainkey)
                 // update global xcRegistry to include assetID used by this parachain
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID)
+                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID, chainkey)
             }
             for (const assetChainkey of Object.keys(updatedAssetList)) {
                 let assetInfo = updatedAssetList[assetChainkey]
@@ -126,7 +126,7 @@ module.exports = class InterlayParser extends ChainParser {
                 let augmentedInfo = augmentedMap[xcmInteriorKey]
                 let assetID = augmentedInfo.assetID
                 let assetChainkey = augmentedInfo.assetChainkey
-                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID)
+                this.manager.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID, chainkey)
                 let cachedAssetInfo = this.manager.getChainAsset(assetChainkey)
                 if (cachedAssetInfo) {
                     cachedAssetInfo.xcmInteriorKey = xcmInteriorKey
