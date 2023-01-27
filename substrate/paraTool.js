@@ -622,6 +622,7 @@ function getParaIDExtra(relaychain = 'polkadot') {
         case 'rococo':
             return 40000
             break;
+        case 'moonbase':
         case 'moonbase-relay':
             return 60000
             break;
@@ -676,6 +677,7 @@ function getRelayChainID(relaychain = 'polkadot') {
         case 'rococo':
             return 40000
             break;
+        case 'moonbase':
         case 'moonbase-relay':
             return 60000
             break;

@@ -23,6 +23,8 @@ const {
 
 module.exports = class XCMGARLoadManager extends AssetManager {
 
+    knownEvmChains = [paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDMoonbaseBeta, paraTool.chainIDMoonbaseAlpha, paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDShibuya]
+
     readJSONFn(relayChain = 'polkadot', fExt = 'xcmRegistry') {
         const logDir = "../gar"
         let fnDir = path.join(logDir, fExt);
@@ -88,7 +90,24 @@ module.exports = class XCMGARLoadManager extends AssetManager {
       let paraID = r.paraID
       for (const a of r.assets){
         console.log(`asset`, a)
-        let assetString = JSON.stringify(a.asset)
+        let rawAsset = a.asset
+        let assetString = JSON.stringify(rawAsset)
+        let currencyID = null
+        let xcContractAddress = null
+        try {
+          let prefixType = Object.keys(rawAsset)[0]
+          let rawAssetVal = rawAsset[prefixType]
+          if (prefixType == "Token" && xcmgarTool.isNumeric(rawAssetVal)){
+            currencyID = rawAssetVal
+            if (this.knownEvmChains.includes(chainID)){
+              xcContractAddress = paraTool.xcAssetIDToContractAddr(currencyID).toLowerCase()
+            }
+          }else if (prefixType != "Token"){
+            currencyID = assetString
+          }
+        } catch (e){
+          console.log(`no prefixType type rawAsset`, rawAsset)
+        }
         let assetChain = paraTool.makeAssetChain(assetString, chainID)
         let assetInfo = {
           assetChain: assetChain,
@@ -101,6 +120,8 @@ module.exports = class XCMGARLoadManager extends AssetManager {
           assetType: paraTool.assetTypeToken,
           xcmInteriorKeyV1: (a.xcmInteriorKey != undefined)? paraTool.convertXcmInteriorKeyV2toV1(a.xcmInteriorKey) : false,
           xcmInteriorKeyV2: (a.xcmInteriorKey != undefined)? a.xcmInteriorKey : false,
+          currencyID: (a.xcmInteriorKey != undefined)? currencyID: false,
+          xcContractAddress: (a.xcmInteriorKey != undefined)? xcContractAddress: false,
         }
         assetMap[assetChain] = assetInfo
         //let xcmInteriorKey = a.xcmInteriorKey
@@ -365,22 +386,24 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 let r = assetMap[assetMapKey[i]]
                 //["asset", "chainID",]
                 //[ "assetType", "xcmInteriorKey", "decimals", "symbol"]
-                let xcmInteriorKey = (r.xcmInteriorKeyV1) ? `${mysql.escape(r.xcmInteriorKeyV1)}` : `NULL`
-                let assetName = (r.assetName != undefined) ? `${mysql.escape(r.assetName)}` : `NULL`
+                let xcmInteriorKey = (r.xcmInteriorKeyV1 && r.xcmInteriorKeyV1 !== false) ? `${mysql.escape(r.xcmInteriorKeyV1)}` : `NULL`
+                let assetName = (r.assetName!= undefined ) ? `${mysql.escape(r.assetName)}` : `NULL`
+                let currencyID = (r.currencyID != undefined && r.currencyID !== false) ? `${mysql.escape(r.currencyID)}` : `NULL`
+                let xccontractaddress = (r.xcContractAddress != undefined && r.xcContractAddress !== false) ? `${mysql.escape(r.xcContractAddress)}` : `NULL`
                 let a = "(" + [`'${r.assetString}'`, `'${r.chainID}'`,
-                    `'${paraTool.assetTypeToken}'`, xcmInteriorKey, `'${r.decimals}'`, `'${r.symbol}'`, assetName
+                    `'${paraTool.assetTypeToken}'`, xcmInteriorKey, `'${r.decimals}'`, `'${r.symbol}'`, assetName, currencyID, xccontractaddress
                 ].join(",") + ")";
                 assets.push(a)
             }
             console.log(`sql`, assets)
+            //return
             let sqlDebug = true
             await this.upsertSQL({
                 "table": "assetgar",
                 "keys": ["asset", "chainID"],
-                "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName"],
+                "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xccontractaddress"],
                 "data": assets,
-                "replace": ["decimals"],
-                "replaceIfNull": ["symbol", "assetName", "xcmInteriorKey", "assetType"]
+                "replaceIfNull": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xccontractaddress"]
             }, sqlDebug);
             await this.update_batchedSQL()
         }
