@@ -40,6 +40,76 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         return jsonObj
     }
 
+    //fs.readdirSync('../gar/assets/kusama')
+    readFilelist(relayChain = 'polkadot', fExt = 'assets') {
+        const logDir = "../gar"
+        let fnDir = path.join(logDir, fExt, relayChain);
+        let fn = ``
+        let fnDirFn = false
+        let files = false
+        try {
+            fnDirFn = path.join(fnDir, fn)
+            console.log(`fnDirFn`, fnDirFn)
+            files = fs.readdirSync(fnDirFn, 'utf8');
+        } catch (err) {
+            console.log(err, "readJSONFn", fnDirFn);
+            return false
+        }
+        return files
+    }
+
+    readParachainFiles(relayChain = 'polkadot', fn = 'polkadot_2000_assets.json', fExt = 'assets'){
+      const logDir = "../gar"
+      let fnDir = path.join(logDir, fExt, relayChain);
+      let pieces = fn.split('_')
+      let paraID = paraTool.dechexToInt(pieces[1])
+      let fnDirFn = false
+      let jsonObj = false
+      try {
+          fnDirFn = path.join(fnDir, fn)
+          const fnContent = fs.readFileSync(fnDirFn, 'utf8');
+          jsonObj = JSON.parse(fnContent)
+      } catch (err) {
+          console.log(err, "readParachainAssets", fnDirFn);
+          return false
+      }
+      let r = {
+        chainkey: `${relayChain}-${paraID}`,
+        chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
+        paraID: paraID,
+        assets: jsonObj
+      }
+      return r
+    }
+
+    transformParachainAssets(r){
+      let assetMap = {}
+      let chainID = r.chainID
+      let paraID = r.paraID
+      for (const a of r.assets){
+        console.log(`asset`, a)
+        let assetString = JSON.stringify(a.asset)
+        let assetChain = paraTool.makeAssetChain(assetString, chainID)
+        let assetInfo = {
+          assetChain: assetChain,
+          assetString: assetString,
+          chainID: chainID,
+          paraID: paraID,
+          assetName: a.name,
+          decimals: a.decimals,
+          symbol: a.symbol,
+          assetType: paraTool.assetTypeToken,
+          xcmInteriorKeyV1: (a.xcmInteriorKey != undefined)? paraTool.convertXcmInteriorKeyV2toV1(a.xcmInteriorKey) : false,
+          xcmInteriorKeyV2: (a.xcmInteriorKey != undefined)? a.xcmInteriorKey : false,
+        }
+        assetMap[assetChain] = assetInfo
+        //let xcmInteriorKey = a.xcmInteriorKey
+        //let xcmInteriorKey = JSON.stringify(r.xcmV1Standardized)
+        //["asset", "chainID",]
+        //[ "assetType", "xcmInteriorKey", "decimals", "symbol"]
+      }
+      return assetMap
+    }
 
     /*
     '[{"parachain":2000},{"generalKey":"0x0003"}]~polkadot': {
@@ -286,34 +356,33 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         }
     }
 
-    async flushAssetGar(xcRegistryNew) {
+    async flushParachainAssets(assetMap) {
         // flush new xc Registry into
-        let xcmtransferKeys = Object.keys(xcRegistryNew)
-        if (xcmtransferKeys.length > 0) {
+        let assetMapKey = Object.keys(assetMap)
+        if (assetMapKey.length > 0) {
             let assets = []
-            for (let i = 0; i < xcmtransferKeys.length; i++) {
-                let r = xcRegistryNew[xcmtransferKeys[i]];
+            for (let i = 0; i < assetMapKey.length; i++) {
+                let r = assetMap[assetMapKey[i]]
                 //["asset", "chainID",]
                 //[ "assetType", "xcmInteriorKey", "decimals", "symbol"]
-                for (const chainID of Object.keys(r.xcCurrencyID)) {
-                    let assetString = r.xcCurrencyID[chainID]
-                    let a = "(" + [`'${assetString}'`, `'${chainID}'`,
-                        `'${paraTool.assetTypeToken}'`, `'${r.xcmInteriorKey}'`, `'${r.decimals}'`, `'${r.symbol}'`
-                    ].join(",") + ")";
-                    assets.push(a)
-                }
+                let xcmInteriorKey = (r.xcmInteriorKeyV1) ? `${mysql.escape(r.xcmInteriorKeyV1)}` : `NULL`
+                let assetName = (r.assetName != undefined) ? `${mysql.escape(r.assetName)}` : `NULL`
+                let a = "(" + [`'${r.assetString}'`, `'${r.chainID}'`,
+                    `'${paraTool.assetTypeToken}'`, xcmInteriorKey, `'${r.decimals}'`, `'${r.symbol}'`, assetName
+                ].join(",") + ")";
+                assets.push(a)
             }
             console.log(`sql`, assets)
             let sqlDebug = true
             await this.upsertSQL({
                 "table": "assetgar",
-                "keys": ["asset", "chainID", ],
-                "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol"],
+                "keys": ["asset", "chainID"],
+                "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName"],
                 "data": assets,
-                "replace": ["assetType", "xcmInteriorKey", "decimals"],
-                "replaceIfNull": ["symbol"]
+                "replace": ["decimals"],
+                "replaceIfNull": ["symbol", "assetName", "xcmInteriorKey", "assetType"]
             }, sqlDebug);
-            //await this.update_batchedSQL()
+            await this.update_batchedSQL()
         }
     }
 }

@@ -1,53 +1,48 @@
 [
     {
         "asset": {
-            "Token": "1"
+            "ForeignAsset": "1"
         },
         "name": "Acala Dollar",
         "symbol": "AUSD",
         "decimals": 12,
-        "currencyID": "1",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]"
+        "currencyID": "1"
     },
     {
         "asset": {
-            "Token": "2"
+            "ForeignAsset": "2"
         },
         "name": "Liquid KSM",
         "symbol": "LKSM",
         "decimals": 12,
-        "currencyID": "2",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0083\"}]"
+        "currencyID": "2"
     },
     {
         "asset": {
-            "Token": "3"
+            "ForeignAsset": "3"
         },
         "name": "Tether USD",
         "symbol": "USDT",
         "decimals": 6,
-        "currencyID": "3",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
+        "currencyID": "3"
     },
     {
         "asset": {
-            "Token": "4"
+            "ForeignAsset": "4"
         },
         "name": "Moonriver Token",
         "symbol": "MOVR",
         "decimals": 18,
-        "currencyID": "4",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2023},{\"palletInstance\":10}]"
+        "currencyID": "4"
     },
     {
         "asset": {
-            "Token": "5"
+            "ForeignAsset": "5"
         },
         "name": "Voucher KSM",
         "symbol": "VKSM",
         "decimals": 12,
-        "currencyID": "5",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2001},{\"generalKey\":\"0x0104\"}]"
+        "currencyID": "5"
     },
     {
         "asset": {
@@ -79,7 +74,8 @@
         },
         "name": "KBTC",
         "symbol": "KBTC",
-        "decimals": 8
+        "decimals": 8,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]"
     },
     {
         "asset": {
@@ -87,7 +83,8 @@
         },
         "name": "KINT",
         "symbol": "KINT",
-        "decimals": 12
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]"
     },
     {
         "asset": {

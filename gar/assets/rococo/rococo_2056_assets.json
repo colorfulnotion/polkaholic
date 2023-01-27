@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "MOVR"
+        },
+        "name": "MOVR",
+        "symbol": "MOVR",
+        "decimals": 18
+    }
+]

@@ -1,0 +1,49 @@
+#!/usr/bin/env node
+// Usage: ./garcmd [relayChain] [targetedParaID]
+
+// EX: parse all supported registry on polkadot
+// Usage: ./garcmd polkadot all
+
+// EX: test a specific parser
+// Usage: ./garcmd polkadot 2004
+
+var XCMGARLoadManager = require("./xcmgarloadmanager");
+
+async function main() {
+    var targetedRelaychain = 'polkadot'
+    var targetedParaID = 'all'
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            targetedRelaychain = val;
+        }
+        if (index == 3 && val.length > 0) {
+            targetedParaID = val;
+        }
+    });
+
+    var xcmgarlm = new XCMGARLoadManager();
+    var chainAssetFiles = xcmgarlm.readFilelist(targetedRelaychain)
+    console.log(`chainAssetFiles`, chainAssetFiles)
+    let globalAsetMap = {}
+    for (const chainAssetFn of chainAssetFiles){
+      let r = xcmgarlm.readParachainFiles(targetedRelaychain, chainAssetFn)
+      if (targetedParaID == 'all' || targetedParaID == `${r.chainID}`){
+        let assetMap = xcmgarlm.transformParachainAssets(r)
+        for (const assetChain of Object.keys(assetMap)){
+          globalAsetMap[assetChain] = assetMap[assetChain]
+        }
+      }
+    }
+    console.log(`[${targetedRelaychain}-${targetedParaID}]`, globalAsetMap)
+    await xcmgarlm.flushParachainAssets(globalAsetMap)
+}
+
+main()
+    .then(() => {
+        console.log("finishing...")
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "MD5"
+        },
+        "name": "MD5",
+        "symbol": "MD5",
+        "decimals": 18
+    }
+]

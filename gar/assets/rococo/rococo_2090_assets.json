@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "BSX"
+        },
+        "name": "BSX",
+        "symbol": "BSX",
+        "decimals": 12
+    }
+]

@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "STGX"
+        },
+        "name": "STGX",
+        "symbol": "STGX",
+        "decimals": 12
+    }
+]

@@ -23,18 +23,66 @@ module.exports = class AcalaParser extends ChainParser {
 
     augment = {}
     manualRegistry = {
-        "polkadot-2000": [{
+        "polkadot-2000":
+        [
+        {
             asset: {
                 "Token": "ACA"
             },
             xcmInteriorKey: '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x0000"}]'
-        }],
-        'kusama-2000': [{
+        },
+        {
             asset: {
-                "Erc20": "0x1f3a10587a20114ea25ba1b388ee2dd4a337ce27"
+                "Token": "AUSD"
             },
-            xcmInteriorKey: '[{"network":"kusama"},{"parachain":2000},{"generalKey":"0x021f3a10587a20114ea25ba1b388ee2dd4a337ce27"}]'
-        }]
+            xcmInteriorKey: '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x0001"}]'
+        },
+        {
+            asset: {
+                "Token": "LDOT"
+            },
+            xcmInteriorKey: '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x0003"}]'
+        },
+        {
+            asset: {
+                "Token": "DOT"
+            },
+            xcmInteriorKey: '[{"network":"polkadot"},"here"]'
+        },
+        {
+            asset: {
+                "LiquidCrowdloan": "13"
+            },
+            xcmInteriorKey: '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x040d000000"}]'
+        }
+        ],
+        'kusama-2000':
+        [
+        {
+            asset: {
+                "Token": "KAR"
+            },
+            xcmInteriorKey: '[{"network":"kusama"},{"parachain":2000},{"generalKey":"0x0080"}]'
+        },
+        {
+            asset: {
+                "Token": "KUSD"
+            },
+            xcmInteriorKey: '[{"network":"kusama"},{"parachain":2000},{"generalKey":"0x0081"}]'
+        },
+        {
+            asset: {
+                "Token": "LKSM"
+            },
+            xcmInteriorKey: '[{"network":"kusama"},{"parachain":2000},{"generalKey":"0x0083"}]'
+        },
+        {
+            asset: {
+                "Token": "KSM"
+            },
+            xcmInteriorKey: '[{"network":"kusama"},"here"]'
+        }
+        ]
     }
 
     isXcRegistryAvailable = true
@@ -64,6 +112,28 @@ module.exports = class AcalaParser extends ChainParser {
         await this.processAcalaManualRegistry(chainkey)
     }
 
+    // add xcmInteriorKey for erc20
+    isAcalaXcAsset(assetChainkey, prefixType = 'Erc20'){
+      let xcmV1Standardized = false
+      let [assetUnparsed, chainkey] = xcmgarTool.parseAssetChain(assetChainkey)
+      try {
+        let asset = JSON.parse(assetUnparsed)
+        if (asset[prefixType] != undefined){
+          let pieces = chainkey.split('-')
+          let relayChain = pieces[0]
+          let paraIDSource = xcmgarTool.dechexToInt(pieces[1])
+          //Erc20: 0x54a37a01cd75b616d63e0ab665bffdb0143c52ae - >0x0254a37a01cd75b616d63e0ab665bffdb0143c52ae
+          // > '[{"network":"polkadot"},{"parachain":2000},{"generalKey":"0x CurrencyId encoded"}]'
+          let prefixTypeIdx = '02' // erc20
+          let currencyIdEncoded = '0x' + prefixTypeIdx + asset[prefixType].substr(2)
+          xcmV1Standardized = [{network:relayChain},{parachain:paraIDSource},{generalKey: currencyIdEncoded}]
+        }
+      } catch (e){
+        console.log(`isAcalaXcAsset err`, e)
+      }
+      return xcmV1Standardized
+    }
+
     // Implement acala gar parsing function here
     async processAcalaGar(chainkey) {
         console.log(`[${chainkey}] ${this.parserName} custom GAR parser`)
@@ -74,7 +144,12 @@ module.exports = class AcalaParser extends ChainParser {
             let assetList = this.processGarTokensPallet(chainkey, a)
             // step 2: load up results
             for (const assetChainkey of Object.keys(assetList)) {
+                // [opinionated] publish aca erc20 with xcmInteriorKey
+                let xcmV1Standardized = this.isAcalaXcAsset(assetChainkey)
                 let assetInfo = assetList[assetChainkey]
+                if (xcmV1Standardized){
+                  assetInfo.xcmInteriorKey = JSON.stringify(xcmV1Standardized)
+                }
                 this.manager.setChainAsset(chainkey, assetChainkey, assetInfo)
             }
         }

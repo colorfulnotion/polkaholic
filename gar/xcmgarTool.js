@@ -34,6 +34,16 @@ const {
     stringToHex
 } = require("@polkadot/util");
 
+function isInt(n) {
+    return Number(n) === n && n % 1 === 0;
+}
+
+function isNumeric(str) {
+  if (typeof str != "string") return false // we only process strings!
+  return !isNaN(str) && // use type coercion to parse the _entirety_ of the string (`parseFloat` alone does not do this)...
+         !isNaN(parseFloat(str)) // ...and ensure strings of whitespace fail
+}
+
 function dechexToInt(number) {
     if (number && typeof number == "string" && (number.length > 2) && number.substring(0, 2) == "0x") {
         return parseInt(number);
@@ -398,5 +408,11 @@ module.exports = {
     },
     commitHash: function(shortHash = true) {
         return git_hash(shortHash)
+    },
+    isInt: function(x) {
+        return isInt(x)
+    },
+    isNumeric: function(x) {
+        return isNumeric(x)
     },
 };

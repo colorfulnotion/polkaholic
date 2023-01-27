@@ -14,7 +14,8 @@
         },
         "name": "DAI Stablecoin (Portal)",
         "symbol": "DAI",
-        "decimals": 18
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x024bb6afb5fa2b07a5d1c499e1c3ddb5a15e709a71\"}]"
     },
     {
         "asset": {
@@ -22,7 +23,8 @@
         },
         "name": "Acala Dollar (Portal)",
         "symbol": "waUSD",
-        "decimals": 12
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x02e20683ad1ed8bbeed7e1ae74be10f19d8045b530\"}]"
     },
     {
         "asset": {
@@ -243,7 +245,8 @@
         },
         "name": "Karura",
         "symbol": "KAR",
-        "decimals": 12
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0080\"}]"
     },
     {
         "asset": {
@@ -267,7 +270,8 @@
         },
         "name": "Kusama",
         "symbol": "KSM",
-        "decimals": 12
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},\"here\"]"
     },
     {
         "asset": {
@@ -275,7 +279,8 @@
         },
         "name": "Acala Dollar",
         "symbol": "aUSD",
-        "decimals": 12
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0081\"}]"
     },
     {
         "asset": {
@@ -283,7 +288,8 @@
         },
         "name": "Liquid KSM",
         "symbol": "LKSM",
-        "decimals": 12
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2000},{\"generalKey\":\"0x0083\"}]"
     },
     {
         "asset": {

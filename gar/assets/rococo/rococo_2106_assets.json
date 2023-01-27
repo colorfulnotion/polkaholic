@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "LIT"
+        },
+        "name": "LIT",
+        "symbol": "LIT",
+        "decimals": 12
+    }
+]

@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "BAJU"
+        },
+        "name": "BAJU",
+        "symbol": "BAJU",
+        "decimals": 12
+    }
+]
