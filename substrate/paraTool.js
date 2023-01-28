@@ -715,7 +715,7 @@ function getParaIDfromChainID(chainID) {
     let paraID;
     if (chainID == 0 || chainID == 2 || chainID == 30000 || chainID == 40000 || chainID == 60000 || chainID == 80000) {
         paraID = 0
-    } else if (chainID == 22110) { // subsocial is now 2101
+    } else if (chainID == 22100) { // subsocial is now 2101
         paraID = 2101;
     } else { // kilt spiritnet did not change its paraID 2086
         paraID = chainID % 10000

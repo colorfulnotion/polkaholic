@@ -1,9 +1,9 @@
 #!/usr/bin/env node
  // Usage:  updateAddressBalances
-var Manager = require("./manager");
+var SubstrateETL = require("./substrateetl");
 var paraTool = require("./paraTool");
 async function main() {
-    var manager = new Manager();
+    var manager = new SubstrateETL();
     let chainID = -1;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
@@ -11,7 +11,10 @@ async function main() {
         }
     });
     if ( chainID >= 0 ) {
-	await manager.update_address_balances_logDT(chainID);
+	let done = false;
+	do {
+	    done = await manager.update_address_balances_logDT(chainID);
+	} while ( ! done ) 
     } else {
 	while ( 1 ) {
 	    let res = await manager.updateAddressBalances();

@@ -60,108 +60,108 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         return files
     }
 
-    readParachainFiles(relayChain = 'polkadot', fn = 'polkadot_2000_assets.json', fExt = 'assets'){
-      const logDir = "../gar"
-      let fnDir = path.join(logDir, fExt, relayChain);
-      let pieces = fn.split('_')
-      let paraID = paraTool.dechexToInt(pieces[1])
-      let fnDirFn = false
-      let jsonObj = false
-      try {
-          fnDirFn = path.join(fnDir, fn)
-          const fnContent = fs.readFileSync(fnDirFn, 'utf8');
-          jsonObj = JSON.parse(fnContent)
-      } catch (err) {
-          console.log(err, "readParachainAssets", fnDirFn);
-          return false
-      }
-      let r = {
-        chainkey: `${relayChain}-${paraID}`,
-        chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-        paraID: paraID,
-        assets: jsonObj
-      }
-      return r
+    readParachainFiles(relayChain = 'polkadot', fn = 'polkadot_2000_assets.json', fExt = 'assets') {
+        const logDir = "../gar"
+        let fnDir = path.join(logDir, fExt, relayChain);
+        let pieces = fn.split('_')
+        let paraID = paraTool.dechexToInt(pieces[1])
+        let fnDirFn = false
+        let jsonObj = false
+        try {
+            fnDirFn = path.join(fnDir, fn)
+            const fnContent = fs.readFileSync(fnDirFn, 'utf8');
+            jsonObj = JSON.parse(fnContent)
+        } catch (err) {
+            console.log(err, "readParachainAssets", fnDirFn);
+            return false
+        }
+        let r = {
+            chainkey: `${relayChain}-${paraID}`,
+            chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
+            paraID: paraID,
+            assets: jsonObj
+        }
+        return r
     }
 
-    categorizeAssetType(assetName, assetSymbol, chainID){
-      let assetType = paraTool.assetTypeToken
-      if (chainID = paraTool.chainIDParallel || chainID == paraTool.chainIDParallel){
-          if (assetName.substr(0,3) == 'LP-'){
-             assetType = paraTool.assetTypeLiquidityPair
-          }
-      }
-      return assetType
+    categorizeAssetType(assetName, assetSymbol, chainID) {
+        let assetType = paraTool.assetTypeToken
+        if (chainID = paraTool.chainIDParallel || chainID == paraTool.chainIDParallel) {
+            if (assetName.substr(0, 3) == 'LP-') {
+                assetType = paraTool.assetTypeLiquidityPair
+            }
+        }
+        return assetType
     }
 
     //(vsBOND-DOT-2000-6-13) 02000613 -> {"VSBond2":["0","2,000","6","13"]}
-    standardizedVBBond2(assetName = 'vsBOND-DOT-2000-6-13'){
-      let pieces = assetName.split('-')
-      let convertedVSBond2 = ["","","",""]
-      let d = (pieces[1] == "DOT")? '0': '1' // DOT/KSM?
-      let paraID = paraTool.toNumWithComma(pieces[2])
-      let leaseStart = paraTool.toNumWithComma(pieces[3])
-      let leaseEnd = paraTool.toNumWithComma(pieces[4])
-      convertedVSBond2 = [d, paraID, leaseStart, leaseEnd]
-      console.log(`assetName=${assetName}, convertedVSBond2`, convertedVSBond2)
-      return convertedVSBond2
+    standardizedVBBond2(assetName = 'vsBOND-DOT-2000-6-13') {
+        let pieces = assetName.split('-')
+        let convertedVSBond2 = ["", "", "", ""]
+        let d = (pieces[1] == "DOT") ? '0' : '1' // DOT/KSM?
+        let paraID = paraTool.toNumWithComma(pieces[2])
+        let leaseStart = paraTool.toNumWithComma(pieces[3])
+        let leaseEnd = paraTool.toNumWithComma(pieces[4])
+        convertedVSBond2 = [d, paraID, leaseStart, leaseEnd]
+        console.log(`assetName=${assetName}, convertedVSBond2`, convertedVSBond2)
+        return convertedVSBond2
     }
 
-    transformParachainAssets(r){
-      let assetMap = {}
-      let chainID = r.chainID
-      let paraID = r.paraID
-      for (const a of r.assets){
-        //console.log(`asset`, a)
-        let xcmInteriorKey = a.xcmInteriorKey
-        let assetName = a.name
-        let assetSymbol = a.symbol
-        let decimals = a.decimals
-        let rawAsset = a.asset
-        let assetString = JSON.stringify(rawAsset)
-        let currencyID = null
-        let xcContractAddress = null
-        let assetType = this.categorizeAssetType(assetName, assetSymbol, chainID)
-        try {
-          let prefixType = Object.keys(rawAsset)[0]
-          let rawAssetVal = rawAsset[prefixType]
-          if (prefixType == "Token" && xcmgarTool.isNumeric(rawAssetVal)){
-            currencyID = rawAssetVal
-            if (this.knownEvmChains.includes(chainID)){
-              xcContractAddress = paraTool.xcAssetIDToContractAddr(currencyID).toLowerCase()
+    transformParachainAssets(r) {
+        let assetMap = {}
+        let chainID = r.chainID
+        let paraID = r.paraID
+        for (const a of r.assets) {
+            //console.log(`asset`, a)
+            let xcmInteriorKey = a.xcmInteriorKey
+            let assetName = a.name
+            let assetSymbol = a.symbol
+            let decimals = a.decimals
+            let rawAsset = a.asset
+            let assetString = JSON.stringify(rawAsset)
+            let currencyID = null
+            let xcContractAddress = null
+            let assetType = this.categorizeAssetType(assetName, assetSymbol, chainID)
+            try {
+                let prefixType = Object.keys(rawAsset)[0]
+                let rawAssetVal = rawAsset[prefixType]
+                if (prefixType == "Token" && xcmgarTool.isNumeric(rawAssetVal)) {
+                    currencyID = rawAssetVal
+                    if (this.knownEvmChains.includes(chainID)) {
+                        xcContractAddress = paraTool.xcAssetIDToContractAddr(currencyID).toLowerCase()
+                    }
+                } else if (prefixType == "VSBond2") {
+                    let converedAsset = {}
+                    converedAsset[prefixType] = this.standardizedVBBond2(assetName)
+                    assetString = JSON.stringify(converedAsset)
+                } else if (prefixType != "Token") {
+                    currencyID = assetString
+                }
+            } catch (e) {
+                console.log(`no prefixType type rawAsset`, rawAsset, `err`, e)
             }
-          }else if (prefixType == "VSBond2") {
-            let converedAsset = {}
-            converedAsset[prefixType] = this.standardizedVBBond2(assetName)
-            assetString = JSON.stringify(converedAsset)
-          }else if (prefixType != "Token"){
-            currencyID = assetString
-          }
-        } catch (e){
-          console.log(`no prefixType type rawAsset`, rawAsset, `err`, e)
+            let assetChain = paraTool.makeAssetChain(assetString, chainID)
+            let assetInfo = {
+                assetChain: assetChain,
+                assetString: assetString,
+                chainID: chainID,
+                paraID: paraID,
+                assetName: assetName,
+                decimals: decimals,
+                symbol: assetSymbol,
+                assetType: assetType,
+                xcmInteriorKeyV1: (xcmInteriorKey != undefined) ? paraTool.convertXcmInteriorKeyV2toV1(xcmInteriorKey) : null,
+                xcmInteriorKeyV2: (xcmInteriorKey != undefined) ? a.xcmInteriorKey : null,
+                currencyID: currencyID,
+                xcContractAddress: (xcmInteriorKey != undefined) ? xcContractAddress : null,
+            }
+            assetMap[assetChain] = assetInfo
+            //let xcmInteriorKey = a.xcmInteriorKey
+            //let xcmInteriorKey = JSON.stringify(r.xcmV1Standardized)
+            //["asset", "chainID",]
+            //[ "assetType", "xcmInteriorKey", "decimals", "symbol"]
         }
-        let assetChain = paraTool.makeAssetChain(assetString, chainID)
-        let assetInfo = {
-          assetChain: assetChain,
-          assetString: assetString,
-          chainID: chainID,
-          paraID: paraID,
-          assetName: assetName,
-          decimals: decimals,
-          symbol: assetSymbol,
-          assetType: assetType,
-          xcmInteriorKeyV1: (xcmInteriorKey != undefined)? paraTool.convertXcmInteriorKeyV2toV1(xcmInteriorKey) : null,
-          xcmInteriorKeyV2: (xcmInteriorKey != undefined)? a.xcmInteriorKey : null,
-          currencyID: currencyID,
-          xcContractAddress: (xcmInteriorKey != undefined)? xcContractAddress: null,
-        }
-        assetMap[assetChain] = assetInfo
-        //let xcmInteriorKey = a.xcmInteriorKey
-        //let xcmInteriorKey = JSON.stringify(r.xcmV1Standardized)
-        //["asset", "chainID",]
-        //[ "assetType", "xcmInteriorKey", "decimals", "symbol"]
-      }
-      return assetMap
+        return assetMap
     }
 
 
@@ -222,7 +222,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             let parsedAsset = {
                 Token: symbol
             }
-            if (chainID == paraTool.chainIDStatemine || chainID == paraTool.chainIDStatemint ){
+            if (chainID == paraTool.chainIDStatemine || chainID == paraTool.chainIDStatemint) {
                 try {
                     console.log(`xcmV1Standardized`, xcmV1Standardized)
                     let assetID = xcmV1Standardized[3]['generalIndex']
@@ -230,7 +230,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                     parsedAsset = {
                         Token: `${assetID}`
                     }
-                } catch(e){
+                } catch (e) {
                     console.log(`statemine/t e`, e)
                 }
             }
@@ -409,12 +409,12 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             let chainID = parachainAsset.chainID
             let relayChain = paraTool.getRelayChainByChainID(chainID)
             let paraID = paraTool.getParaIDfromChainID(chainID)
-            if (targetedRelaychain == relayChain){
-              if (targetedParaID == 'all' || targetedParaID == paraID){
-                 let assetChain = paraTool.makeAssetChain(parachainAsset.asset, chainID)
-                 parachainAsset.assetChain = assetChain
-                 parachainAssetsMap[assetChain] = parachainAsset
-              }
+            if (targetedRelaychain == relayChain) {
+                if (targetedParaID == 'all' || targetedParaID == paraID) {
+                    let assetChain = paraTool.makeAssetChain(parachainAsset.asset, chainID)
+                    parachainAsset.assetChain = assetChain
+                    parachainAssetsMap[assetChain] = parachainAsset
+                }
             }
         }
         return parachainAssetsMap
@@ -473,7 +473,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 //["xcmInteriorKey", "symbol", "relayChain"]
                 // ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parents"]
                 let t = "(" + [`'${r.xcmInteriorKey}'`,
-                `'${r.symbol}'`, `'${r.relayChain}'`, `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`
+                    `'${r.symbol}'`, `'${r.relayChain}'`, `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`
                 ].join(",") + ")";
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} >>>`, t)
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} res`, r)
@@ -504,18 +504,18 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 //["asset", "chainID",]
                 //[ "assetType", "xcmInteriorKey", "decimals", "symbol"]
                 let xcmInteriorKey = (r.xcmInteriorKeyV1 && r.xcmInteriorKeyV1 !== false) ? `${mysql.escape(r.xcmInteriorKeyV1)}` : `NULL`
-                let assetName = (r.assetName!= undefined ) ? `${mysql.escape(r.assetName)}` : `NULL`
+                let assetName = (r.assetName != undefined) ? `${mysql.escape(r.assetName)}` : `NULL`
                 let currencyID = (r.currencyID != undefined && r.currencyID !== false) ? `${mysql.escape(r.currencyID)}` : `NULL`
                 let xcContractAddress = (r.xcContractAddress != undefined && r.xcContractAddress !== false) ? `${mysql.escape(r.xcContractAddress)}` : `NULL`
                 let a = "(" + [`'${r.assetString}'`, `'${r.chainID}'`,
                     `'${paraTool.assetTypeToken}'`, xcmInteriorKey, `'${r.decimals}'`, `'${r.symbol}'`, assetName, currencyID, xcContractAddress
                 ].join(",") + ")";
-                if (filterList){
-                  if (filterList.includes(assetChain)){
-                     assets.push(a)
-                  }
-                }else{
-                  assets.push(a)
+                if (filterList) {
+                    if (filterList.includes(assetChain)) {
+                        assets.push(a)
+                    }
+                } else {
+                    assets.push(a)
                 }
             }
             console.log(`sql`, assets)
