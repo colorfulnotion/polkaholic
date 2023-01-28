@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "TUR"
+        },
+        "name": "TUR",
+        "symbol": "TUR",
+        "decimals": 10
+    }
+]

@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "DOL"
+        },
+        "name": "DOL",
+        "symbol": "DOL",
+        "decimals": 18
+    }
+]

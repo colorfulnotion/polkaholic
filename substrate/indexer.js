@@ -7911,7 +7911,7 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 console.log(`Fetch assetRegistry:assetMetadatas`)
                 await this.chainParser.fetchAssetRegistry(this)
                 console.log(`Fetch assetRegistry:foreignAssetLocations`)
-                await this.chainParser.fetchXCMAssetRegistryLocations(this)
+                //await this.chainParser.fetchXCMAssetRegistryLocations(this)
                 await this.chainParser.updateLiquidityInfo(this)
             }
             if (this.chainID == paraTool.chainIDBifrostKSM || this.chainID == paraTool.chainIDBifrostDOT) {
@@ -7943,12 +7943,12 @@ from assetholder${chainID} as assetholder, asset where assetholder.asset = asset
                 this.chainID == paraTool.chainIDCrustShadow ||
                 this.chainID == paraTool.chainIDBasilisk) {
                 console.log(`fetch assetManager:assetIdType`)
-                await this.chainParser.fetchXCMAssetIdType(this)
+                //await this.chainParser.fetchXCMAssetIdType(this)
             }
             if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya ||
                 this.chainID == paraTool.chainIDCalamari) {
                 console.log(`fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
-                await this.chainParser.fetchXCMAssetIdToLocation(this)
+                //await this.chainParser.fetchXCMAssetIdToLocation(this)
             }
         } else if (this.chainID == paraTool.chainIDKico) {
             console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)

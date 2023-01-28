@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "OTP"
+        },
+        "name": "OTP",
+        "symbol": "OTP",
+        "decimals": 12
+    }
+]

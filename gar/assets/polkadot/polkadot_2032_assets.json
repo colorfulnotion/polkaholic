@@ -1,7 +1,7 @@
 [
     {
         "asset": {
-            "Token": "1"
+            "ForeignAsset": "1"
         },
         "name": "Liquid DOT",
         "symbol": "LDOT",
@@ -11,7 +11,7 @@
     },
     {
         "asset": {
-            "Token": "2"
+            "ForeignAsset": "2"
         },
         "name": "Tether USD",
         "symbol": "USDT",
@@ -33,7 +33,8 @@
         },
         "name": "IBTC",
         "symbol": "IBTC",
-        "decimals": 8
+        "decimals": 8,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2032},{\"generalKey\":\"0x0001\"}]"
     },
     {
         "asset": {
@@ -41,7 +42,8 @@
         },
         "name": "INTR",
         "symbol": "INTR",
-        "decimals": 10
+        "decimals": 10,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2032},{\"generalKey\":\"0x0002\"}]"
     },
     {
         "asset": {

@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "AMPE"
+        },
+        "name": "AMPE",
+        "symbol": "AMPE",
+        "decimals": 12
+    }
+]

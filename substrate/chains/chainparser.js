@@ -108,7 +108,7 @@ module.exports = class ChainParser {
         if (i.Erc20 !== undefined) o['Erc20'] = i.Erc20
         if (i.Token2 !== undefined) o['Token2'] = i.Token2
         if (i.token2 !== undefined) o['Token2'] = i.token2
-        if (o['Token2'] != undefined && paraTool.isInt(o['Token2'])) {
+        if (o['Token2'] != undefined && paraTool.isInt(o['Token2'])){
             o['Token2'] = `${o['Token2']}`
         }
 

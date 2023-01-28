@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "XRT"
+        },
+        "name": "XRT",
+        "symbol": "XRT",
+        "decimals": 9
+    }
+]

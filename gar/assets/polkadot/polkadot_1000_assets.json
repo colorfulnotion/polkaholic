@@ -28,6 +28,15 @@
     },
     {
         "asset": {
+            "Token": "1000"
+        },
+        "name": "BRZ Token",
+        "symbol": "BRZ",
+        "decimals": 18,
+        "currencyID": "1000"
+    },
+    {
+        "asset": {
             "Token": "101"
         },
         "name": "DOTMATIONS",

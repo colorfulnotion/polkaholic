@@ -1,17 +1,7 @@
 [
     {
         "asset": {
-            "Token": "CFG"
-        },
-        "name": "CFG",
-        "symbol": "CFG",
-        "decimals": 18
-    },
-    {
-        "asset": {
-            "Token": {
-                "ForeignAsset": "1"
-            }
+            "ForeignAsset": "1"
         },
         "name": "Tether USDT",
         "symbol": "USDT",
@@ -23,9 +13,7 @@
     },
     {
         "asset": {
-            "Token": {
-                "ForeignAsset": "2"
-            }
+            "ForeignAsset": "2"
         },
         "name": "Axelar USDC",
         "symbol": "xcUSDC",
@@ -36,9 +24,7 @@
     },
     {
         "asset": {
-            "Token": {
-                "ForeignAsset": "3"
-            }
+            "ForeignAsset": "3"
         },
         "name": "Acala Dollar",
         "symbol": "aUSD",
@@ -50,9 +36,7 @@
     },
     {
         "asset": {
-            "Token": {
-                "ForeignAsset": "4"
-            }
+            "ForeignAsset": "4"
         },
         "name": "Glimmer",
         "symbol": "GLMR",
@@ -61,5 +45,13 @@
             "ForeignAsset": "4"
         },
         "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":10}]"
+    },
+    {
+        "asset": {
+            "Token": "CFG"
+        },
+        "name": "CFG",
+        "symbol": "CFG",
+        "decimals": 18
     }
 ]

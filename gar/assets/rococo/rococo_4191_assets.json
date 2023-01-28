@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "ACRST"
+        },
+        "name": "ACRST",
+        "symbol": "ACRST",
+        "decimals": 12
+    }
+]

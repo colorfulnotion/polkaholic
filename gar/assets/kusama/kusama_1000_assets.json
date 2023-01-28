@@ -434,6 +434,15 @@
     },
     {
         "asset": {
+            "Token": "222"
+        },
+        "name": "Planet Neo Token",
+        "symbol": "PNEO",
+        "decimals": 12,
+        "currencyID": "222"
+    },
+    {
+        "asset": {
             "Token": "223"
         },
         "name": "BILLCOIN",

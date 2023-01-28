@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "ROC"
+        },
+        "name": "ROC",
+        "symbol": "ROC",
+        "decimals": 12
+    }
+]

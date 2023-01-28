@@ -5,7 +5,8 @@
         },
         "name": "USD Coin (Portal from Ethereum)",
         "symbol": "USDCet",
-        "decimals": 6
+        "decimals": 6,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0207df96d1341a7d16ba1ad431e2c847d978bc2bce\"}]"
     },
     {
         "asset": {
@@ -13,7 +14,8 @@
         },
         "name": "DAI Stablecoin (Portal)",
         "symbol": "DAI",
-        "decimals": 18
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0254a37a01cd75b616d63e0ab665bffdb0143c52ae\"}]"
     },
     {
         "asset": {
@@ -21,7 +23,8 @@
         },
         "name": "Wrapped Ether (Portal)",
         "symbol": "WETH",
-        "decimals": 18
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x025a4d6acdc4e3e5ab15717f407afe957f7a242578\"}]"
     },
     {
         "asset": {
@@ -29,7 +32,8 @@
         },
         "name": "Wrapped Bitcoin (Portal)",
         "symbol": "WBTC",
-        "decimals": 8
+        "decimals": 8,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x02c80084af223c8b598536178d9361dc55bfda6818\"}]"
     },
     {
         "asset": {
@@ -37,7 +41,8 @@
         },
         "name": "ApeCoin (Portal)",
         "symbol": "APE",
-        "decimals": 18
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x02f4c723e61709d90f89939c1852f516e373d418a8\"}]"
     },
     {
         "asset": {
@@ -135,7 +140,8 @@
         },
         "name": "Liquid Crowdloan DOT",
         "symbol": "LcDOT",
-        "decimals": 10
+        "decimals": 10,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x040d000000\"}]"
     },
     {
         "asset": {
@@ -160,7 +166,8 @@
         },
         "name": "Acala Dollar",
         "symbol": "aUSD",
-        "decimals": 12
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0001\"}]"
     },
     {
         "asset": {
@@ -168,7 +175,8 @@
         },
         "name": "Polkadot",
         "symbol": "DOT",
-        "decimals": 10
+        "decimals": 10,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},\"here\"]"
     },
     {
         "asset": {
@@ -176,7 +184,8 @@
         },
         "name": "Liquid DOT",
         "symbol": "LDOT",
-        "decimals": 10
+        "decimals": 10,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0003\"}]"
     },
     {
         "asset": {

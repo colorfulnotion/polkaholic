@@ -1,0 +1,74 @@
+[
+    {
+        "asset": {
+            "Token": "BNC"
+        },
+        "name": "BNC",
+        "symbol": "BNC",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "Token": "DOT"
+        },
+        "name": "DOT",
+        "symbol": "DOT",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "Token": "KAR"
+        },
+        "name": "KAR",
+        "symbol": "KAR",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "Token": "KSM"
+        },
+        "name": "KSM",
+        "symbol": "KSM",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "Token": "KUSD"
+        },
+        "name": "KUSD",
+        "symbol": "KUSD",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "Token": "MOVR"
+        },
+        "name": "MOVR",
+        "symbol": "MOVR",
+        "decimals": 18
+    },
+    {
+        "asset": {
+            "Token": "PHA"
+        },
+        "name": "PHA",
+        "symbol": "PHA",
+        "decimals": 12
+    },
+    {
+        "asset": {
+            "Token": "RMRK"
+        },
+        "name": "RMRK",
+        "symbol": "RMRK",
+        "decimals": 10
+    },
+    {
+        "asset": {
+            "Token": "ZLK"
+        },
+        "name": "ZLK",
+        "symbol": "ZLK",
+        "decimals": 18
+    }
+]
