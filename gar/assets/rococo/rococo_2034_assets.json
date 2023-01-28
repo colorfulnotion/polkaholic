@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "HDX"
+        },
+        "name": "HDX",
+        "symbol": "HDX",
+        "decimals": 12
+    }
+]

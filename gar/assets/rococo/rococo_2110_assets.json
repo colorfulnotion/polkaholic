@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "MGAT"
+        },
+        "name": "MGAT",
+        "symbol": "MGAT",
+        "decimals": 18
+    }
+]

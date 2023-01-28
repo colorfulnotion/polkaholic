@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "PRING"
+        },
+        "name": "PRING",
+        "symbol": "PRING",
+        "decimals": 18
+    }
+]

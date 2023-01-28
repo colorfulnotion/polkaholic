@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "WATRD"
+        },
+        "name": "WATRD",
+        "symbol": "WATRD",
+        "decimals": 18
+    }
+]

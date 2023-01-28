@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "ICZ"
+        },
+        "name": "ICZ",
+        "symbol": "ICZ",
+        "decimals": 18
+    }
+]

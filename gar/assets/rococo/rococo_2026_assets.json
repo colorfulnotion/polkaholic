@@ -1,0 +1,10 @@
+[
+    {
+        "asset": {
+            "Token": "notNODL"
+        },
+        "name": "notNODL",
+        "symbol": "notNODL",
+        "decimals": 11
+    }
+]

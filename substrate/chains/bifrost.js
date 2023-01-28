@@ -38,17 +38,19 @@ module.exports = class BifrostParser extends ChainParser {
             if (assetKey.slice(-1) == 2) {
                 assetKey = assetKey.slice(0, -1)
             }
-            console.log(`assetKey=${assetKey}, assetMetadata=`, assetMetadata)
+            console.log(`assetKey=${assetKey},assetRawKey=${assetRawKey} , assetMetadata=`, assetMetadata)
             let assetKeyVal = "";
             if (assetKey == "Token" || assetKey == "VSBond" || assetKey == "VToken" || assetKey == "VSToken") {
                 let assetKey2 = `${assetKey}2`
-                if (assetKeyWithID[assetKey2] != undefined) {
-                    assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetKey2]) // "123,456" or {"Token":"XXX"}
+                if (assetKeyWithID[assetRawKey] != undefined) {
+                    //assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetKey2]) // "123,456" or {"Token":"XXX"}
+                    assetKeyVal = assetKeyWithID[assetRawKey]
                 } else if (assetKeyWithID[assetRawKey] != undefined) {
-                    assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetRawKey]) // "123,456" or {"Token":"XXX"}
+                    //assetKeyVal = this.cleanedAssetID(assetKeyWithID[assetRawKey]) // "123,456" or {"Token":"XXX"}
+                    assetKeyVal = assetKeyWithID[assetRawKey]
                 }
-
             }
+            console.log(`assetKey=${assetKey}, assetKeyVal=${assetKeyVal}`)
             if (assetKey == 'NativeAssetId') {
                 //this is the bifrost case
                 parsedAsset = assetKeyVal
@@ -56,7 +58,8 @@ module.exports = class BifrostParser extends ChainParser {
                 parsedAsset[assetRawKey] = assetKeyWithID[assetRawKey]
             } else {
                 // this is the acala/karura case
-                let assetKeyWithoutID = assetKey.replace('Id', '') //ForeignAsset
+                //let assetKeyWithoutID = assetKey.replace('Id', '') //ForeignAsset
+                let assetKeyWithoutID = assetRawKey.replace('Id', '') //ForeignAsset
                 parsedAsset[assetKeyWithoutID] = assetKeyVal
             }
             var asset = JSON.stringify(parsedAsset);
@@ -75,8 +78,8 @@ module.exports = class BifrostParser extends ChainParser {
                     if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
                         //biforst VSToken has erroneous/ambiguous symbol representation
                         if (parsedAsset.VSToken != undefined) {
-                            symbol = 'VS' + symbol
-                            name = `Bifrost Voucher Slot ` + name
+                            //symbol = 'VS' + symbol
+                            //name = `Bifrost Voucher Slot ` + name
                         }
                     }
                     let assetInfo = {
