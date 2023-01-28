@@ -113,6 +113,15 @@
     },
     {
         "asset": {
+            "Token": "20"
+        },
+        "name": "LiquidityPoolToken0x00000014",
+        "symbol": "TKN0x00000004-TKN0x0000000E",
+        "decimals": 18,
+        "currencyID": "20"
+    },
+    {
+        "asset": {
             "Token": "3"
         },
         "name": "LiquidityPoolToken0x00000003",

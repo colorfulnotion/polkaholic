@@ -6,7 +6,8 @@
         "name": "Liquid DOT",
         "symbol": "LDOT",
         "decimals": 10,
-        "currencyID": "1"
+        "currencyID": "1",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2000},{\"generalKey\":\"0x0003\"}]"
     },
     {
         "asset": {
@@ -15,7 +16,8 @@
         "name": "Tether USD",
         "symbol": "USDT",
         "decimals": 6,
-        "currencyID": "2"
+        "currencyID": "2",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
     },
     {
         "asset": {

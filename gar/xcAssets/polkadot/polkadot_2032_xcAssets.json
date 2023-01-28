@@ -38,7 +38,9 @@
                 }
             }
         },
-        "asset": "2",
+        "asset": {
+            "ForeignAsset": "2"
+        },
         "source": [
             "2032"
         ]
@@ -76,7 +78,9 @@
                 }
             }
         },
-        "asset": "1",
+        "asset": {
+            "ForeignAsset": "1"
+        },
         "source": [
             "2032"
         ]

@@ -1,10 +1,10 @@
 [
     {
         "asset": {
-            "Token": "SUB"
+            "Token": "MOVR"
         },
-        "name": "SUB",
-        "symbol": "SUB",
-        "decimals": 10
+        "name": "MOVR",
+        "symbol": "MOVR",
+        "decimals": 18
     }
 ]

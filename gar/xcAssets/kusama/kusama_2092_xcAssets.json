@@ -38,7 +38,9 @@
                 }
             }
         },
-        "asset": "3",
+        "asset": {
+            "ForeignAsset": "3"
+        },
         "source": [
             "2092"
         ]
@@ -76,7 +78,9 @@
                 }
             }
         },
-        "asset": "1",
+        "asset": {
+            "ForeignAsset": "1"
+        },
         "source": [
             "2092"
         ]
@@ -114,7 +118,9 @@
                 }
             }
         },
-        "asset": "2",
+        "asset": {
+            "ForeignAsset": "2"
+        },
         "source": [
             "2092"
         ]
@@ -152,7 +158,9 @@
                 }
             }
         },
-        "asset": "5",
+        "asset": {
+            "ForeignAsset": "5"
+        },
         "source": [
             "2092"
         ]
@@ -190,7 +198,9 @@
                 }
             }
         },
-        "asset": "4",
+        "asset": {
+            "ForeignAsset": "4"
+        },
         "source": [
             "2092"
         ]
