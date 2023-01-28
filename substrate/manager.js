@@ -166,7 +166,7 @@ module.exports = class Manager extends AssetManager {
         let sql_upd = `update chain set lastUpdateAddressBalancesStartDT = Now() where chainID = ${chainID}`;
         console.log("updateAddressBalances START", sql_upd);
         this.batchedSQL.push(sql_upd);
-	await this.update_batchedSQL();
+        await this.update_batchedSQL();
     }
 
     get_bqlogfn(chainID, logDT) {
@@ -561,7 +561,6 @@ module.exports = class Manager extends AssetManager {
             console.log("No chain found ${chainID}")
             return false;
         }
-        let bqRows = [];
         let bqlogfn = logDT ? this.get_bqlogfn(chainID, logDT) : null;
         let chain = chains[0];
         let relayChain = chain.relayChain;
@@ -597,7 +596,6 @@ module.exports = class Manager extends AssetManager {
         let priceUSDCache = {}; // this will map any assetChain asset to a priceUSD at blockTS, if possible
         let decimals = this.getChainDecimal(chainID)
         let [finalizedBlockHash, blockTS, bn] = logDT ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api)
-        let apiAt = await api.at(finalizedBlockHash)
         let p = await this.computePriceUSD({
             assetChain,
             ts: blockTS
@@ -606,6 +604,7 @@ module.exports = class Manager extends AssetManager {
         let last_key = '';
         let page = 0;
         while (true) {
+            let apiAt = await api.at(finalizedBlockHash)
             let query = await apiAt.query.system.account.entriesPaged({
                 args: [],
                 pageSize: perPagelimit,
@@ -615,7 +614,12 @@ module.exports = class Manager extends AssetManager {
                 console.log(`Query Completed: total ${numHolders} accounts`)
                 break
             } else {
-                console.log(`system.account page: `, page++);
+                last_key = query[query.length - 1][0];
+                const mu = process.memoryUsage();
+                let field = "heapUsed";
+                const gbNow = mu[field] / 1024 / 1024 / 1024;
+                const gbRounded = Math.round(gbNow * 100) / 100;
+                console.log(`system.account page: `, page++, last_key.toString(), "recs=", query.length, `Heap allocated ${gbRounded} GB`);
             }
 
             var cnt = 0
@@ -623,6 +627,7 @@ module.exports = class Manager extends AssetManager {
             let vals = ["ss58Address", "free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN"];
             let replace = ["ss58Address"];
             let lastUpdateBN = ["free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN"];
+            let bqRows = [];
             for (const user of query) {
                 cnt++
                 numHolders++;
@@ -666,7 +671,7 @@ module.exports = class Manager extends AssetManager {
                     console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
                     rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn));
                 }
-                last_key = user[0];
+
             }
             if (logDT) {
                 // write rows
@@ -677,7 +682,6 @@ module.exports = class Manager extends AssetManager {
                     rawRows.push("");
                     await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
                 }
-                bqRows = [];
             } else {
                 await this.insertBTRows(tblRealtime, rows, tblName);
             }

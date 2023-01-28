@@ -64,17 +64,24 @@ module.exports = class XCMCleaner extends Query {
     async searchDestinationChainBalances(chainID, sourceTS, destAddress, symbol, amountSent, N = 3) {
         let chain = await this.setupChainAndAPI(chainID)
         if (this.api == null) {
-            return ([null, null]);
+            return [null, null];
+        }
+        if (!destAddress) {
+            console.log("NO DestAddress");
+            return [null, null];
         }
 
         let destAddressPubkey = paraTool.getPubKey(destAddress);
+        console.log("destAddress", destAddress, "destAddressPubkey", destAddressPubkey);
         let sqlD = `select blockNumber, blockHash, UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} where blockDT >= FROM_UNIXTIME(${sourceTS}-30) and blockDT <= FROM_UNIXTIME(${sourceTS + N*60}) and blockHash is not null order by blockNumber limit 1000`
+        console.log(sqlD);
         let blocks = await this.poolREADONLY.query(sqlD)
         if (blocks.length == 0) {
             return ([null, null]);
         }
-        console.log("found ", blocks.length, " blocks", sqlD);
         let asset = await this.getAssetChainFromSymbol(chainID, symbol);
+        console.log("found ", blocks.length, " blocks", sqlD, "ASSET", asset);
+
         let balances = {}
         let guess = null;
         let currencies = [];
@@ -111,11 +118,12 @@ module.exports = class XCMCleaner extends Query {
             if (chainID == 2030 || chainID == 22001) {
                 // these chains have JSON objects in currencyID
                 currencies.push(JSON.parse(asset.currencyID));
-            } else if (chainID == 22000 || chainID == 2000) {
+            } else if (chainID == 22000 || chainID == 2000 || (chainID == 2032 || chainID == 22092)) {
                 // TODO: import GAR such that the above will cover these chains instead
                 let asset0 = JSON.parse(asset.asset)
                 let currencyID = null;
                 let flds = ["Token", "ForeignAsset", "Erc20", "LiquidCrowdloan", "StableAsset"];
+
                 for (const fld of flds) {
                     if (asset0[fld]) {
                         currencyID = {}
@@ -140,7 +148,7 @@ module.exports = class XCMCleaner extends Query {
             let bn = b.blockNumber;
             let blockHash = b.blockHash
             try {
-                console.log("checking apiAt ", chainID, "blockHash", blockHash, "bn", bn, "symbol", symbol, destAddress, isNative);
+                console.log("checking apiAt ", chainID, "blockHash", blockHash, "bn", bn, "symbol", symbol, "destAddress", destAddress, "isNative", isNative);
                 let apiAt = await this.api.at(blockHash)
 
                 if (isNative) {
@@ -151,8 +159,10 @@ module.exports = class XCMCleaner extends Query {
                     }
                     balances[asset.currencyID][bn] = qR.data.free
                 } else if (apiAt.query.tokens != undefined && apiAt.query.tokens.accounts != undefined) {
+
                     for (const currencyID of currencies) {
                         let currencyIDString = (typeof currencyID == "string") ? currencyID : JSON.stringify(currencyID);
+                        console.log("TRYING tokens with currencyID=", currencyID);
                         let query = await apiAt.query.tokens.accounts(destAddress, currencyID);
                         let qR = query.toJSON();
                         if (balances[currencyIDString] == undefined) {
@@ -174,8 +184,9 @@ module.exports = class XCMCleaner extends Query {
                             balances[currencyIDString] = {}
                         }
                         if (qR && qR.balance != undefined) {
-                            console.log("assets SUCC", symbol, currencyID, destAddress, qR);
-                            balances[currencyIDString][bn] = qR.balance
+                            let bl = paraTool.dechexToInt(qR.balance.toString());
+                            console.log("assets SUCC", symbol, currencyID, destAddress, bl);
+                            balances[currencyIDString][bn] = bl;
                         } else {
                             console.log("assets FAIL", symbol, currencyID, destAddress, qR);
                         }
@@ -269,6 +280,7 @@ module.exports = class XCMCleaner extends Query {
         } else if (fromAddress) {
             sql += ` and fromAddress = '${fromAddress}' `;
         } else {
+            console.log("NO msgHash or fromAddress");
             return null;
         }
         console.log(sql);
@@ -428,6 +440,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             let destAddress = paraTool.getPubKey(xcm.destAddress);
             best = await this.searchXCMTransferDestCandidate(xcm.msgHash, xcm.sourceTS, xcm.amountSent, destAddress);
             if (best == null) {
+                console.log("balance search....", xcm.sourceTS, xcm.destAddress, xcm.symbol)
                 let [balances, blocks] = await this.searchDestinationChainBalances(xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol);
                 if (balances) {
                     best = this.match_balance_adjustment(balances, xcm.amountSent, blocks);
@@ -472,7 +485,8 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         } catch (e) {
             console.log(e);
         }
-        let sql_final = `update xcmtransfer set xcmInfoAudited = -2 where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+        let sql_final = `update xcmtransfer set matchAttempts = matchAttempts + 1, matchAttemptDT = Now() where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+        console.log(sql_final);
         this.batchedSQL.push(sql_final);
         await this.update_batchedSQL();
         return (false);
@@ -487,7 +501,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
     async bulk_generate_XCMInfo(chainIDDest = null, limit = 1000) {
         let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and xcmInfoAudited in ( 0 ) and sourceTS > UNIX_TIMESTAMP("2023-01-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 4 MINUTE)) ${w} order by sourceTS desc limit ${limit}`;
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and xcmInfoAudited < 1 and sourceTS > UNIX_TIMESTAMP("2022-10-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 4 MINUTE)) and matchAttempts < 2 and matchAttemptDT < date_sub(Now(), interval 2 minute) ${w} order by matchAttempts asc, sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
         let extrinsic = {};

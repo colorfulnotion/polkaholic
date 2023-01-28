@@ -470,7 +470,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         let xcmSymbolInfo = {};
 
         try {
-            let xcmAssets = await this.poolREADONLY.query("select xcmchainID, xcmInteriorKey, symbol, relayChain, nativeAssetChain, isUSD, decimals, priceUSD, parent as parents, isXCMAsset from xcmasset where xcmInteriorKey is not null and isXCMAsset=1");
+            let xcmAssets = await this.poolREADONLY.query("select xcmchainID, xcmInteriorKey, symbol, relayChain, nativeAssetChain, isUSD, decimals, priceUSD, parent as parents from xcmasset where isXCMAsset=1");
             let xcmPriceInfo = {}
             for (let i = 0; i < xcmAssets.length; i++) {
                 let v = xcmAssets[i];
@@ -494,47 +494,25 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
                 let symbolRelaychain = paraTool.makeAssetChain(v.symbol, v.relayChain);
                 if (xcmSymbolInfo[symbolRelaychain] == undefined) {
-                    let nativeAssetChain = null
                     let xcmV1MultiLocation = paraTool.convertXcmInteriorKeyToXcmV1MultiLocation(xcmInteriorKey)
-                    //let xcmV1MultiLocationHex = paraTool.convertXcmV1MultiLocationToByte(xcmV1MultiLocation, false) //this call requires apiparser
                     let evmMultiLocation = paraTool.convertXcmV1MultiLocationToMoonbeamEvmMultiLocation(xcmV1MultiLocation)
-                    let [xcmConcept, relayChain] = paraTool.parseXcmInteriorKey(v.xcmInteriorKey)
-                    let a = {
-                        chainID: chainID,
-                        isUSD: v.isUSD,
-                        xcmConcept: xcmConcept,
-                        asset: v.asset,
-                        decimals: v.decimals,
-                        symbol: v.symbol,
-                        paraID: paraID,
-                        relayChain: v.relayChain,
-                        parents: v.parents,
-                        xcmInteriorKey: xcmInteriorKey,
-                        symbolRelaychain: symbolRelaychain,
-                        //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
-                        xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
-                        evmMultiLocation: JSON.stringify(evmMultiLocation),
-                        xcContractAddress: {},
-                        xcCurrencyID: {},
-                        nativeAssetChain: nativeAssetChain, //probably unknown without indexing the native chain
-                        assetType: "Token",
-                        priceUSD: (v.priceUSD > 0) ? v.priceUSD : null
-                    }
                     let s = {
+                        assetType: "Token",
                         decimals: v.decimals,
                         symbol: v.symbol,
                         paraID: paraID,
+                        chainID: chainID,
                         relayChain: v.relayChain,
+                        isUSD: v.isUSD,
                         parents: v.parents,
                         xcmInteriorKey: xcmInteriorKey,
                         symbolRelaychain: symbolRelaychain,
-                        //xcmV1MultiLocationHex: xcmV1MultiLocationHex,
                         xcmV1MultiLocation: JSON.stringify(xcmV1MultiLocation),
                         evmMultiLocation: JSON.stringify(evmMultiLocation),
                         assets: {},
                         xcContractAddress: {},
                         xcCurrencyID: {},
-                        nativeAssetChain: nativeAssetChain, //probably unknown without indexing the native chain
+                        nativeAssetChain: null,
                         priceUSD: (v.priceUSD > 0) ? v.priceUSD : null
                     }
                     xcmSymbolInfo[symbolRelaychain] = s;
@@ -568,7 +546,6 @@ module.exports = class AssetManager extends PolkaholicDB {
                         xcmSymbolInfo[symbolRelaychain]["xcCurrencyID"][paraID] = assetRec.currencyID
                     }
                 }
-
             }
 
 
@@ -1224,6 +1201,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             assetInfo = this.xcmSymbolInfo[symbolRelayChain];
             if (assetInfo) q.isXCAsset = true;
         }
+
         let res = {}
         if (assetInfo) {
             q.symbol = assetInfo.symbol
@@ -1252,7 +1230,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         // console.log("computePriceUSD", q, "assetInfo", assetInfo);
         let priceUSDCurrent = assetInfo.priceUSD;
         let currentTS = this.getCurrentTS();
-        let assetType = assetInfo.assetType
+        let assetType = assetInfo.assetType ? assetInfo.assetType : "Token"; // NEED CORRECT SOLUTION here...
         if (q.chainID == paraTool.chainIDParallel || q.chainID == paraTool.chainIDHeiko) {
             // use oracle for parallel lp
             //if (assetInfo.assetType == paraTool.assetTypeLiquidityPair) assetType = paraTool.assetTypeToken
