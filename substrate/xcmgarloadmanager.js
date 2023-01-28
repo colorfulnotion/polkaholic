@@ -492,13 +492,15 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         }
     }
 
-    async flushParachainAssets(assetMap) {
+    async flushParachainAssets(assetMap, filterList = false) {
         // flush new xc Registry into
         let assetMapKey = Object.keys(assetMap)
+        console.log(`flushParachainAssets, filterList[${filterList.length}]`, filterList)
         if (assetMapKey.length > 0) {
             let assets = []
             for (let i = 0; i < assetMapKey.length; i++) {
-                let r = assetMap[assetMapKey[i]]
+                let assetChain = assetMapKey[i]
+                let r = assetMap[assetChain]
                 //["asset", "chainID",]
                 //[ "assetType", "xcmInteriorKey", "decimals", "symbol"]
                 let xcmInteriorKey = (r.xcmInteriorKeyV1 && r.xcmInteriorKeyV1 !== false) ? `${mysql.escape(r.xcmInteriorKeyV1)}` : `NULL`
@@ -508,7 +510,13 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 let a = "(" + [`'${r.assetString}'`, `'${r.chainID}'`,
                     `'${paraTool.assetTypeToken}'`, xcmInteriorKey, `'${r.decimals}'`, `'${r.symbol}'`, assetName, currencyID, xcContractAddress
                 ].join(",") + ")";
-                assets.push(a)
+                if (filterList){
+                  if (filterList.includes(assetChain)){
+                     assets.push(a)
+                  }
+                }else{
+                  assets.push(a)
+                }
             }
             console.log(`sql`, assets)
             //return

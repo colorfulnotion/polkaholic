@@ -40,7 +40,11 @@ async function main() {
     console.log(`cachedParachainAssetsMap[${Object.keys(cachedParachainAssetsMap).length}]`, Object.keys(cachedParachainAssetsMap))
 
     let [newParaAssetOnly, oldParaAssetOnly, identicalParaAssets, diffParaAssets] = xcmgarlm.compareParachainAssets(globalAsetMap, cachedParachainAssetsMap)
-    //await xcmgarlm.flushParachainAssets(globalAsetMap)
+    let newParaAssetkeys = Object.keys(newParaAssetOnly)
+    let oldParaAssetkeys = Object.keys(oldParaAssetOnly)
+    let identicalParaAssetKeys = Object.keys(identicalParaAssets)
+    let diffParaAssetsKeys = Object.keys(diffParaAssets)
+    await xcmgarlm.flushParachainAssets(globalAsetMap, newParaAssetkeys)
 }
 
 main()
