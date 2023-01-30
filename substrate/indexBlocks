@@ -24,7 +24,7 @@ async function main() {
     await crawler.setupChainAndAPI(chainID);
     let w = chainIDs ? ` and chainID in (${chainIDs})` : "";
 
-    let targetSQL = `select sectionMethod, extrinsicHash, symbol, chainID, chainIDDest, from_unixtime(sourceTS), errorDesc, blockNumber from xcmtransfer where symbol is not null and destStatus = -1 and xcmInfoAudited < 0 and incomplete = 0 and chainIDDest < 40000 ${w} order by sourceTS desc;`;
+    let targetSQL = `select sectionMethod, extrinsicHash, symbol, chainID, chainIDDest, from_unixtime(sourceTS), errorDesc, blockNumber from xcmtransfer where symbol is not null and destStatus = -1 and incomplete = 0 and chainIDDest < 40000 ${w} order by sourceTS desc;`;
     let recs = await crawler.poolREADONLY.query(targetSQL);
     let targetMap = {}
     for (let i = 0; i < recs.length; i++) {

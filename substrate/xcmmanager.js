@@ -924,7 +924,7 @@ module.exports = class XCMManager extends Query {
         //   (c) time difference matching has to be less than 7200 (and greater than 0)
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
-        let rematchClause = forceRematch ? ` ` : `((xcmtransfer.matched = 0 and d.matched = 0) or xcmtransfer.xcmInfo is null or xcmtransfer.xcmInfoAudited = -1) and `
+        let rematchClause = forceRematch ? ` ` : `((xcmtransfer.matched = 0 and d.matched = 0) or xcmtransfer.xcmInfo is null) and `
         let targetChainClause = (targetChainID == 'all') ? ` ` : `(xcmtransfer.chainID = ${targetChainID} or xcmtransfer.chainIDDest = ${targetChainID}) and `
         let sqlA = `select
           chainID, extrinsicHash, d.chainIDDest, d.fromAddress, d.symbol, d.relayChain,
@@ -943,7 +943,6 @@ module.exports = class XCMManager extends Query {
           xcmtransfer.xcmIndex,
           xcmtransfer.transferIndex,
           xcmtransfer.xcmType,
-          xcmtransfer.xcmInfoAudited,
           d.eventID,
           d.extrinsicID as destExtrinsicID,
           d.sentAt as destSentAt,
@@ -1100,7 +1099,6 @@ module.exports = class XCMManager extends Query {
                 matched = 1,
                 matchedExtrinsicID = '${d.destExtrinsicID}',
                 matchedEventID = '${d.eventID}',
-                xcmInfoAudited = '2',
                 xcmInfo = ${xcmInfoBlob},
                 xcmInfolastUpdateDT = Now()
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
@@ -1166,7 +1164,7 @@ module.exports = class XCMManager extends Query {
         //   (c) time difference matching has to be less than 7200 (and greater than 0)
         //   (d) TODO: require xcmtransferdestcandidate.paraIDs to match xcmtransfer.chainIDDest (this is NOT guarateed to be present)
         // In case of ties, the FIRST one ( "order by diffTS" ) covers this
-        let rematchClause = forceRematch ? ` ` : `((xcmtransfer.matched = 0 and d.matched = 0) or xcmtransfer.xcmInfo is null or xcmtransfer.xcmInfoAudited = -1) and `
+        let rematchClause = forceRematch ? ` ` : `((xcmtransfer.matched = 0 and d.matched = 0) or xcmtransfer.xcmInfo is null) and `
         let targetChainClause = (targetChainID == 'all') ? ` ` : `(xcmtransfer.chainID = ${targetChainID} or xcmtransfer.chainIDDest = ${targetChainID}) and `
         let sqlA = `select
           chainID, extrinsicHash, d.chainIDDest, d.fromAddress, d.symbol, d.relayChain,
@@ -1339,7 +1337,6 @@ module.exports = class XCMManager extends Query {
                 matched = 1,
                 matchedExtrinsicID = '${d.destExtrinsicID}',
                 matchedEventID = '${d.eventID}',
-                xcmInfoAudited = '2',
                 xcmInfo = ${xcmInfoBlob},
                 xcmInfolastUpdateDT = Now()
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
@@ -1592,7 +1589,6 @@ module.exports = class XCMManager extends Query {
                 matched = 1,
                 matchedExtrinsicID = ${matchedExtrinsicID},
                 matchedEventID = ${matchedEventID},
-                xcmInfoAudited = '2',
                 xcmInfo = ${xcmInfoBlob},
                 xcmInfolastUpdateDT = Now()
              where extrinsicHash = '${d.extrinsicHash}' and transferIndex = '${d.transferIndex}'`
@@ -2667,16 +2663,16 @@ order by msgHash`
         }
     }
 
-    // xcmReanalytics writes hashes table with "xcminfofinalized" column for xcmInfoAudited = 1 records with "v4" column
+    // when we need to do some reanalytics on demand, xcmReanalytics writes hashes table with "xcminfofinalized" column records with "v4" column
     //  either an array or object based on the number of xcmInfo objects -- to cover xcmIndex > 0 and transferIndex > 0 situations
     async xcm_reanalytics() {
-        let sql = `select extrinsicHash, extrinsicID, xcmIndex, transferIndex, destStatus, sourceTS, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null and xcmInfoAudited = 1 order by extrinsicHash, xcmIndex, transferIndex limit 1000`
+        let sql = `select extrinsicHash, extrinsicID, xcmIndex, transferIndex, destStatus, sourceTS, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null order by extrinsicHash, xcmIndex, transferIndex limit 1000`
         try {
             console.log(sql);
             let xcmmatches = await this.pool.query(sql);
             console.log("...done");
             let out = [];
-            let vals = ["extrinsicID", "xcmInfoAudited", "confidence", "amountReceived", "amountReceivedUSD"];
+            let vals = ["extrinsicID", "confidence", "amountReceived", "amountReceivedUSD"];
             let hashesRowsToInsert = [];
             let xcmInfo = [];
             let pieces = [];
@@ -2744,7 +2740,7 @@ order by msgHash`
                     destStatus = -1;
                 }
                 xcmInfo.push(x);
-                let sql0 = `update xcmtransfer set destStatus = '${destStatus}', xcmInfoAudited = 2, confidence = ${confidence}, amountReceived = ${amountReceived}, amountReceivedUSD = ${amountReceivedUSD} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+                let sql0 = `update xcmtransfer set destStatus = '${destStatus}', confidence = ${confidence}, amountReceived = ${amountReceived}, amountReceivedUSD = ${amountReceivedUSD} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
                 if (confidence < .1) {
                     console.log(sql0);
                 }

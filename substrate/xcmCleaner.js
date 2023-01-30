@@ -334,8 +334,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 xcmtransfer.destStatus,
                 xcmtransfer.errorDesc,
                 xcmtransfer.incomplete,
-                xcmtransfer.blockNumberDest,
-                xcmtransfer.xcmInfoAudited
+                xcmtransfer.blockNumberDest
               from xcmtransfer
        where  extrinsicHash = '${extrinsicHash}' and transferIndex = '${transferIndex}' and xcmIndex = '${xcmIndex}' limit 1`
         console.log(sqlA);
@@ -430,7 +429,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             console.log("xcm.amountSent", xcm.amountSent, "Dest", xcm.destAddress, invalid_dest_address);
             if ((xcmInfo.destination.chainID == 2011 || xcmInfo.destination.chainID == 22024 || xcmInfo.destination.chainID == -1 || invalid_dest_address || xcmInfo.symbol == null)) {
                 xcmInfo.destination.executionStatus = "unknown";
-                let sql_final = `update xcmtransfer set xcmInfoAudited = 2, destStatus = -1, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+                let sql_final = `update xcmtransfer set matchAttempts = 5, destStatus = -1, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
                 console.log("ABANDON", sql_final);
                 this.batchedSQL.push(sql_final);
                 await this.update_batchedSQL();
@@ -475,7 +474,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                     }
                     console.log("xcmInfo", JSON.stringify(xcmInfo, null, 4));
 
-                    let sql_final = `update xcmtransfer set xcmInfoAudited = 2, destStatus = 1, amountReceived = '${xcmInfo.destination.amountReceived}', amountReceivedUSD = '${xcmInfo.destination.amountReceivedUSD}', xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+                    let sql_final = `update xcmtransfer set destStatus = 1, amountReceived = '${xcmInfo.destination.amountReceived}', amountReceivedUSD = '${xcmInfo.destination.amountReceivedUSD}', xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
                     console.log(sql_final);
                     this.batchedSQL.push(sql_final);
                     await this.update_batchedSQL();
@@ -501,7 +500,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
     async bulk_generate_XCMInfo(chainIDDest = null, limit = 1000) {
         let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and xcmInfoAudited < 1 and sourceTS > UNIX_TIMESTAMP("2022-10-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 4 MINUTE)) and matchAttempts < 2 and matchAttemptDT < date_sub(Now(), interval 2 minute) ${w} order by matchAttempts asc, sourceTS desc limit ${limit}`;
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2022-01-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 4 MINUTE)) and matchAttempts < 2 and matchAttemptDT < date_sub(Now(), interval 2 minute) ${w} order by matchAttempts asc, sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
         let extrinsic = {};

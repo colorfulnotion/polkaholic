@@ -1135,7 +1135,7 @@ module.exports = class Crawler extends Indexer {
                 await this.update_batchedSQL();
                 try {
                     let elapsedTS = await this.index_blocks_period(chain, period, jmp, write_bq_log);
-                    if (elapsedTS > 210) {
+                    if (elapsedTS > 600) {
                         indexPeriodProcessedCnt++
                         console.log(`indexChain unhealthy after ${indexPeriodProcessedCnt}`)
                         process.exit(1)
