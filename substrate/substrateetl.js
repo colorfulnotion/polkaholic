@@ -72,9 +72,9 @@ module.exports = class SubstrateETL extends AssetManager {
         }
 
         // setup paraID specific tables, including paraID=0 for the relay chain
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions"]
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers"]
         let p = (chainID) ? ` and chainID = ${chainID} ` : ""
-        let sql = `select chainID from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
+        let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
         let recs = await this.poolREADONLY.query(sql);
         for (const rec of recs) {
             let chainID = parseInt(rec.chainID, 10);
@@ -85,10 +85,14 @@ module.exports = class SubstrateETL extends AssetManager {
                 let fld = tbl == "balances" ? "ts" : "block_time";
                 let p = (this.partitioned_table(tbl)) ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
                 let cmd = `bq mk  --project_id=substrate-etl  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
-
+                if ((tbl == "evmtxs" || tbl == "evmtransfers") && rec.isEVM == 0) {
+                    cmd = null;
+                }
                 try {
-                    console.log(cmd);
-                    await exec(cmd);
+                    if (cmd) {
+                        console.log(cmd);
+                        await exec(cmd);
+                    }
                 } catch (e) {
                     console.log(e);
                     // TODO optimization: do not create twice
@@ -121,14 +125,16 @@ module.exports = class SubstrateETL extends AssetManager {
         [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
         paraID = paraTool.getParaIDfromChainID(chainID);
         relayChain = paraTool.getRelayChainByChainID(chainID);
-        console.log("CHAIN", chainID, logDT, "paraID", paraID, "relayChain", relayChain);
+        let isEVM = 0;
+        // TODO: mark isEVM = 1
         let sql0 = `update blocklog set attempted = attempted + 1 where chainID = '${chainID}' and logDT = '${logDT}'`
         this.batchedSQL.push(sql0);
         await this.update_batchedSQL();
         return {
             logDT,
             paraID,
-            relayChain
+            relayChain,
+            isEVM
         };
     }
 
@@ -229,23 +235,24 @@ module.exports = class SubstrateETL extends AssetManager {
     // pick a random chain to load yesterday for all chains
     async updateAddressBalances() {
         // pick a chain that has not been STARTED recently
-        let sql = `select chainID from chain where crawling = 1 and ( ( lastUpdateAddressBalanceslogDT < date(date_sub(Now(), interval 24 hour)) or lastUpdateAddressBalancesEndDT is null ) and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 1 hour) or lastUpdateAddressBalancesStartDT is Null ) ) order by rand() limit 1`;
+        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where chainID in ( select chainID from chain where crawling = 1 ) and lastUpdateAddressBalancesEndDT is null and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 1 hour) or lastUpdateAddressBalancesStartDT is Null ) and logDT >= date(date_sub(Now(), interval 8 day)) and logDT < date(date_sub(Now(), interval 1 day)) and lastUpdateAddressBalancesAttempts < 1 order by lastUpdateAddressBalancesAttempts, logDT desc, rand()`;
         let chains = await this.pool.query(sql);
+
         if (chains.length == 0) {
             console.log(`No chain found`)
             // TODO: since we loaded every chain from yesterday that we could, pick a chain where we load real time balances instead of loading yesterday
             return false;
         }
         let chainID = chains[0].chainID;
+        let [logDT, hr] = paraTool.ts_to_logDT_hr(chains[0].indexTS);
+        sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}'`;
+        this.batchedSQL.push(sql);
         await this.update_batchedSQL();
-        await this.update_address_balances_logDT(chainID);
+        await this.update_address_balances_logDT(chainID, logDT);
         return (true);
     }
 
-    async update_address_balances_logDT(chainID) {
-        let ts = this.getCurrentTS() - 86400;
-        let [logDT, hr] = paraTool.ts_to_logDT_hr(ts)
-
+    async update_address_balances_logDT(chainID, logDT) {
         let res0 = await this.updateNativeBalances(chainID, logDT);
         if (res0 == false) {
             return (false);
@@ -266,7 +273,7 @@ module.exports = class SubstrateETL extends AssetManager {
             await exec(cmd);
 
             // mark that we're done
-            let sql_upd = `update chain set lastUpdateAddressBalancesEndDT = Now(), lastUpdateAddressBalanceslogDT = '${logDT}' where chainID = ${chainID}`;
+            let sql_upd = `update blocklog set lastUpdateAddressBalancesEndDT = Now() where chainID = ${chainID} and logDT = '${logDT}'`;
             console.log("updateAddressBalances FIN", sql_upd);
             this.batchedSQL.push(sql_upd);
             await this.update_batchedSQL();
@@ -280,7 +287,7 @@ module.exports = class SubstrateETL extends AssetManager {
         if (fs.existsSync(bqlogfn)) {
             fs.unlinkSync(bqlogfn);
         }
-        let sql_upd = `update chain set lastUpdateAddressBalancesStartDT = Now() where chainID = ${chainID}`;
+        let sql_upd = `update blocklog set lastUpdateAddressBalancesStartDT = Now() where chainID = ${chainID} and logDT = '${logDT}'`;
         console.log("updateAddressBalances START", sql_upd);
         this.batchedSQL.push(sql_upd);
         await this.update_batchedSQL();
@@ -681,7 +688,7 @@ module.exports = class SubstrateETL extends AssetManager {
             }
 
         }
-        let sql_assetPallet = `update chain set assetaddressPallet = '${pallet}', assetNonNativeRegistered = '${Object.keys(numHolders).length}', assetNonNativeUnregistered = '${Object.keys(numFailures).length}' where chainID = '${chainID}'`
+        let sql_assetPallet = `update blocklog set assetNonNativeRegistered = '${Object.keys(numHolders).length}', assetNonNativeUnregistered = '${Object.keys(numFailures).length}' where chainID = '${chainID}' and logDT = '${logDT}'`
         this.batchedSQL.push(sql_assetPallet);
         await this.update_batchedSQL();
         console.log(sql_assetPallet);
@@ -699,11 +706,12 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async updateNativeBalances(chainID, logDT = null, perPagelimit = 1000) {
         await this.assetManagerInit();
-        let chains = await this.pool.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, numHolders, lastUpdateAddressBalancesLastKey, unix_timestamp(Now()) - unix_timestamp(lastUpdateAddressBalancesStartDT) secondsago from chain where chainID = ${chainID}`);
+        let chains = await this.pool.query(`select chain.chainID, chain.id, chain.relayChain, chain.paraID, chain.chainName, chain.WSEndpoint, chain.numHolders, blocklog.lastUpdateAddressBalancesLastKey, unix_timestamp(Now()) - unix_timestamp(blocklog.lastUpdateAddressBalancesStartDT) secondsago from chain join blocklog on chain.chainID = blocklog.chainID where blocklog.chainID = ${chainID} and logDT = '${logDT}'`);
         if (chains.length == 0) {
             console.log("No chain found ${chainID}")
             return false;
         }
+
         let bqlogfn = logDT ? this.get_bqlogfn(chainID, logDT) : null;
         let chain = chains[0];
         let relayChain = chain.relayChain;
@@ -838,7 +846,7 @@ module.exports = class SubstrateETL extends AssetManager {
             console.log(`system.account page: `, page++, last_key.toString(), "recs=", query.length, `Heap allocated ${gbRounded} GB`, query.length);
             // save last_key state in db and get out -- we will pick it up again
 
-            let sql = `update chain set lastUpdateAddressBalancesLastKey = '${last_key.toString()}'  where chainID = ${chainID}`
+            let sql = `update blocklog set lastUpdateAddressBalancesLastKey = '${last_key.toString()}'  where chainID = ${chainID} and logDT = '${logDT}'`
             console.log(sql);
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
@@ -865,7 +873,7 @@ module.exports = class SubstrateETL extends AssetManager {
             rows = [];
 	    */
         }
-        let sql = `update chain set numHolders = '${numHolders}', lastUpdateAddressBalancesLastKey = '' where chainID = ${chainID}`
+        let sql = `update blocklog set numNativeHolders = '${numHolders}', lastUpdateAddressBalancesLastKey = '' where chainID = ${chainID} and logDT = '${logDT}'`
         console.log(numHolders, sql);
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
@@ -1123,9 +1131,12 @@ module.exports = class SubstrateETL extends AssetManager {
         return (daysago);
     }
 
-    async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+    async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot", isEVM = 0) {
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back
-
+        if (isEVM) {
+            tbls.push("evmtxs");
+            tbls.push("evmtransfers");
+        }
         // 1. get bnStart, bnEnd for logDT
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let minLogDT = `${logDT} 00:00:00`;
@@ -1180,6 +1191,7 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const row of rows) {
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
+
                 let hdr = b.header;
                 if (!hdr || hdr.number == undefined) {
                     let bn = parseInt(row.id.substr(2), 16);
@@ -1216,6 +1228,67 @@ module.exports = class SubstrateETL extends AssetManager {
                     trace_count: 0
                 };
                 let transfers = [];
+                let evmtxs = [];
+                let evmtransfers = [];
+                if (r.evmFullBlock) {
+
+
+                    let eb = r.evmFullBlock;
+                    eb.transactions.forEach((tx) => {
+                        let i = tx.decodedInput ? tx.decodedInput : null;
+                        let evmtx = {
+                            //id: id,
+                            //para_id: paraID,
+                            hash: tx.transactionHash,
+                            nonce: tx.nonce,
+                            transaction_index: tx.transactionIndex,
+                            from_address: tx.from,
+                            to_address: tx.to,
+                            value: tx.value,
+                            // gas: gas provided by the sender
+                            gas_price: tx.gasPrice,
+                            input: tx.input,
+                            // receipt_cumulative_gas_used
+                            receipt_gas_used: tx.gasUsed, // receipt_gas_used
+                            receipt_contract_address: tx.creates ? tx.creates : null,
+                            // receipt_root
+                            receipt_status: tx.status ? 1 : 0,
+                            block_timestamp: tx.timestamp,
+                            block_number: tx.blockNumber,
+                            block_hash: tx.blockHash,
+                            // max_fee_per_gas, max_priority_fee_per_gas, receipt_effective_gas_price
+                            fee: tx.fee,
+                            burned_fee: tx.burnedFee,
+                            gas_limit: tx.gasLimit,
+                            base_fee_per_gas: tx.baseFeePerGas,
+                            extrinsic_id: tx.substrate.extrinsicID,
+                            extrinsic_hash: tx.substrate.extrinsicHash,
+                            transaction_type: tx.txType,
+                            method_id: i && i.methodID ? i.methodID : null,
+                            signature: i && i.signature ? i.signature : null,
+                            params: i && i.params ? i.params : null
+                        }
+                        evmtxs.push(evmtx);
+
+                        let transfers = tx.transfers;
+                        transfers.forEach((t) => {
+                            let evmtransfer = {
+                                token_address: t.tokenAddress,
+                                from_address: t.from,
+                                to_address: t.to,
+                                value: t.value,
+                                transaction_hash: tx.transactionHash,
+                                //log_index: 0,
+                                block_timestamp: tx.timestamp,
+                                block_number: tx.blockNumber,
+                                block_hash: tx.blockHash,
+                                transfer_type: t.type,
+                            }
+                            evmtransfers.push(evmtransfer);
+                        });
+                    });
+                }
+
                 let events = [];
                 let extrinsics = b.extrinsics.map((ext) => {
                     ext.events.forEach((e) => {
@@ -1305,9 +1378,23 @@ module.exports = class SubstrateETL extends AssetManager {
                     });
                 }
                 // write transfers
-                if (block.transfer_count > 0) {
+                if (transfers.length > 0) {
                     transfers.forEach((t) => {
                         fs.writeSync(f["transfers"], JSON.stringify(t) + NL);
+                    });
+                }
+
+                // write evmtxs
+                if (evmtxs.length > 0) {
+                    evmtxs.forEach((t) => {
+                        fs.writeSync(f["evmtxs"], JSON.stringify(t) + NL);
+                    });
+                }
+
+                // write evmtransfers
+                if (evmtransfers.length > 0) {
+                    evmtransfers.forEach((t) => {
+                        fs.writeSync(f["evmtransfers"], JSON.stringify(t) + NL);
                     });
                 }
 
@@ -1375,7 +1462,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let row = rows.length > 0 ? rows[0] : null;
             if (row) {
                 for (const a of Object.keys(row)) {
-                    r[a] = row[a]  >0 ? row[a] : 0;
+                    r[a] = row[a] > 0 ? row[a] : 0;
                     vals.push(` ${a} = ${mysql.escape(row[a])}`);
                 }
             }

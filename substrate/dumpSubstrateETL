@@ -1,13 +1,13 @@
 #!/usr/bin/env node
- // Usage: 
+ // Usage:
 //  setup tables:                       dumpSubstrateETL polkadot setup paraID
 //    sets up dataset for all known paraIDs using substateetllog table
 //  dump all chains:                    dumpSubstrateETL polkadot chains
 //  dump random paraID for a day:       dumpSubstrateETL
-//    This uses the "substateetllog.loaded" field to choose a logDT/paraID/relayChain 
+//    This uses the "substateetllog.loaded" field to choose a logDT/paraID/relayChain
 //  dump paraID 2000 for specific day:  dumpSubstrateETL polkadot 2000 2022-12-29
 //  dump all xcmtransfers for a day:    dumpSubstrateETL polkadot xcmtransfers 2022-12-29
-//  dump all xcmtransfers in last year: dumpSubstrateETL polkadot xcmtransfers 
+//  dump all xcmtransfers in last year: dumpSubstrateETL polkadot xcmtransfers
 
 var SubstrateETL = require("./substrateetl");
 
@@ -15,6 +15,8 @@ async function main() {
     let relayChain = null;
     let paraID = -1;
     let logDT = null;
+    let isEVM = 0;
+
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             relayChain = val;
@@ -30,6 +32,9 @@ async function main() {
         if (index == 4 && val.length > 0) {
             logDT = val;
         }
+        if (index == 5 && val.length > 0) {
+            isEVM = parseInt(val, 10);
+        }
     });
 
     var substrateetl = new SubstrateETL();
@@ -44,15 +49,16 @@ async function main() {
     } else if (paraID == "chains" && relayChain) {
         await substrateetl.dump_chains(relayChain);
     } else if (paraID >= 0 && logDT && relayChain) {
-        await substrateetl.dump_substrateetl(logDT, paraID, relayChain);
+        await substrateetl.dump_substrateetl(logDT, paraID, relayChain, isEVM);
     } else {
         while (true) {
             let x = await substrateetl.get_random_substrateetl(logDT, paraID, relayChain);
             let _logDT = x.logDT;
             let _paraID = x.paraID;
             let _relayChain = x.relayChain;
+            let _isEVM = x.isEVM;
             if (_logDT && (_paraID >= 0) && _relayChain) {
-                await substrateetl.dump_substrateetl(_logDT, _paraID, _relayChain);
+                await substrateetl.dump_substrateetl(_logDT, _paraID, _relayChain, _isEVM);
                 await substrateetl.sleep(1000);
             } else {
                 await substrateetl.sleep(10000);

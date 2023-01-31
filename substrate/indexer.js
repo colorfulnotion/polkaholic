@@ -767,7 +767,7 @@ module.exports = class Indexer extends AssetManager {
 
         // writes to mysql
         let assetHolderStartTS = new Date().getTime();
-        await this.flushAssetHolder();
+        this.assetholder = {};
         let assetHolderTS = (new Date().getTime() - assetHolderStartTS) / 1000
         if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(c): Assets Holder", assetHolderTS);
         this.timeStat.flush_c_TS += assetHolderTS
@@ -975,56 +975,6 @@ module.exports = class Indexer extends AssetManager {
         }, true);
     }
 
-    async flushAssetHolder() {
-        // flush assetholders
-        let assetholderKeys = Object.keys(this.assetholder)
-        let assetholders = [];
-        let assetholderscrawl = [];
-        for (let i = 0; i < assetholderKeys.length; i++) {
-            let assetChainHolder = assetholderKeys[i];
-            let [blockNumber, lastState] = this.assetholder[assetChainHolder];
-            let [asset, chainID, holder] = this.parseAssetChainHolder(assetChainHolder);
-            let accKey = holder.toLowerCase();
-            if (this.validAssetState(lastState)) {
-                let free = lastState.free ? lastState.free : 0;
-                let reserved = lastState.reserved ? lastState.reserved : 0;
-                let miscFrozen = lastState.miscFrozen ? lastState.miscFrozen : 0;
-                let frozen = lastState.frozen ? lastState.frozen : 0;
-                if (free < 10 ** 32) {
-                    let t = "(" + [`'${asset}'`, `'${this.chainID}'`, `'${accKey}'`, `'${blockNumber}'`, `'${blockNumber}'`, mysql.escape(JSON.stringify(lastState)), `'${free}'`, `'${reserved}'`, `'${miscFrozen}'`, `'${frozen}'`].join(",") + ")";
-                    if (this.validAsset(asset, this.chainID, "assetholder", t)) {
-                        assetholders.push(t);
-                    }
-                }
-            } else {
-                // if lastState == false that means we are (a) in a EVM chain  (b) with isTip = false  (c) with an ERC20 asset and (d) we know it should be updated, but we are not going to get the state.
-                // However, we would like to record in assetholder${chainID} that this asset-holder combination SHOULD be covered
-                let t = "(" + [`'${asset}'`, `'${this.chainID}'`, `'${accKey}'`, `'${blockNumber}'`].join(",") + ")";
-                assetholderscrawl.push(t);
-            }
-        }
-        this.assetholder = {};
-        // --- assetholder
-        await this.upsertSQL({
-            "table": `assetholder${this.chainID}`,
-            "keys": ["asset", "chainID"],
-            "vals": ["holder", "lastUpdateBN", "lastCrawlBN", "lastState", "free", "reserved", "miscFrozen", "frozen"],
-            "data": assetholders,
-            "lastUpdateBN": ["free", "reserved", "miscFrozen", "frozen", "lastUpdateBN", "lastCrawlBN", "lastState"]
-        });
-
-        // --- assetholder
-        if (assetholderscrawl.length > 0) {
-            await this.upsertSQL({
-                "table": `assetholder${this.chainID}`,
-                "keys": ["asset", "chainID"],
-                "vals": ["holder", "lastUpdateBN"],
-                "data": assetholderscrawl,
-                "lastUpdateBN": ["lastUpdateBN"]
-            });
-        }
-
-    }
 
     async insertBTRows(tbl, rows, tableName = "") {
         if (rows.length == 0) return (true);
@@ -1248,6 +1198,7 @@ module.exports = class Indexer extends AssetManager {
                     console.log(`invalid asset`, r.xcmSymbol, r.chainID, "xcmtransfer", r)
                 } else {
                     let innerCall = (r.innerCall) ? `'${r.innerCall}'` : `NULL`
+                    let msgHash = (r.msgHash && r.msgHash != "0x") ? `'${r.msgHash}'` : `NULL`
                     let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `${mysql.escape(r.xcmInteriorKey)}` : `NULL`
                     let xcmSymbol = (r.xcmSymbol) ? `${mysql.escape(r.xcmSymbol)}` : `NULL`
                     let xcmType = (r.xcmType != undefined) ? `'${r.xcmType}'` : 'xcmtransfer'
@@ -1256,9 +1207,16 @@ module.exports = class Indexer extends AssetManager {
 
                     //["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"]
                     //["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"]
-                    let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`, `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
-                        `'${r.chainID}'`, `'${r.chainIDDest}'`, `'${r.blockNumber}'`, `'${r.fromAddress}'`, xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}', '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}', '${r.msgHash}', '${r.sentAt}'`, xcmInteriorKey, innerCall, xcmType, pendingXcmInfoBlob
+                    let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`,
+                        `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
+                        `'${r.chainID}'`,
+                        `'${r.chainIDDest}'`,
+                        `'${r.blockNumber}'`, `'${r.fromAddress}'`,
+                        xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}'`,
+                        '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}',
+                        msgHash, `'${r.sentAt}'`, xcmInteriorKey, innerCall, xcmType, pendingXcmInfoBlob
                     ].join(",") + ")";
+                    // CHECK: do we need isXcmTipSafe = (isSigned || finalized) ? true : false concept here to ensure that xcmtransfer records are inserted only when "safe" 
                     if (r.msgHash == "0x" && !r.finalized) {
                         //msgHash is missing... we will
                         console.log(`[${r.extrinsicHash} [${r.extrinsicID}] [finzlied=${r.finalized}] msgHash missing!`)
@@ -1279,8 +1237,8 @@ module.exports = class Indexer extends AssetManager {
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
                 "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"],
-                "replaceIfNull": ["xcmInfo"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"],
+                "replaceIfNull": ["xcmInfo", "msgHash"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
             }, sqlDebug);
 
             let out = [];
@@ -1681,7 +1639,7 @@ module.exports = class Indexer extends AssetManager {
         return (asset);
     }
 
-    async updateXCMTransferStorage(xcmtransfer, isTip, finalized, isXcmTipSafe) {
+    async updateXCMTransferStorage(xcmtransfer, isTip, finalized, isXcmTipSafe, isSigned, section, method) {
         //console.log(`adding xcmtransfer`, xcmtransfer)
         try {
             let errs = []
@@ -1735,15 +1693,15 @@ module.exports = class Indexer extends AssetManager {
         this.sendManagerMessage(xcmtransfer, "xcmtransfer", finalized);
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
-            this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
             try {
                 await this.publish_xcminfo(xcmtransfer.xcmInfo);
                 // add to xcmtransferslog
+                let _isSigned = isSigned ? 1 : 0;
                 let stage = finalized ? 'OriginationFinalized' : 'OriginationUnfinalized';
-                let vals = ["extrinsicHash", "transferIndex", "xcmIndex", "msgHash", "transactionHash", "symbol", "sourceTS", "chainID", "chainIDDest", "xcmInfo", "addTS", "lastUpdateTS"];
+                let vals = ["extrinsicHash", "transferIndex", "xcmIndex", "msgHash", "transactionHash", "symbol", "sourceTS", "chainID", "chainIDDest", "xcmInfo", "isSigned", "section", "method", "addTS", "lastUpdateTS"];
                 let transactionHash = xcmtransfer.xcmInfo && xcmtransfer.xcmInfo.origination && xcmtransfer.xcmInfo.origination.transactionHash ? xcmtransfer.xcmInfo.origination.transactionHash : null;
                 let currTS = this.getCurrentTS();
-                let out = `('${xcmtransfer.xcmtransferHash}', '${stage}', '${xcmtransfer.extrinsicHash}', '${xcmtransfer.transferIndex}', '${xcmtransfer.xcmIndex}', ${mysql.escape(xcmtransfer.msgHash)}, ${mysql.escape(transactionHash)}, '${xcmtransfer.xcmSymbol}', '${xcmtransfer.sourceTS}', '${xcmtransfer.chainID}', '${xcmtransfer.chainIDDest}', ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))}, '${currTS}', '${currTS}')`;
+                let out = `('${xcmtransfer.xcmtransferHash}', '${stage}', '${xcmtransfer.extrinsicHash}', '${xcmtransfer.transferIndex}', '${xcmtransfer.xcmIndex}', ${mysql.escape(xcmtransfer.msgHash)}, ${mysql.escape(transactionHash)}, '${xcmtransfer.xcmSymbol}', '${xcmtransfer.sourceTS}', '${xcmtransfer.chainID}', '${xcmtransfer.chainIDDest}', ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))}, '${_isSigned}', ${mysql.escape(section)}, ${mysql.escape(method)}, '${currTS}', '${currTS}')`;
                 await this.upsertSQL({
                     "table": "xcmtransferslog",
                     "keys": ["xcmtransferhash", "stage"],
@@ -1759,6 +1717,7 @@ module.exports = class Indexer extends AssetManager {
                 if (isXcmTipSafe) {
                     this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, xcmtransfer.xcmInfo, xcmtransfer.sourceTS);
                 }
+                this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
             } catch (err) {
                 this.logger.error({
                     "op": "xcmtransferslog updateXCMTransferStorage ERROR",
@@ -1980,6 +1939,8 @@ module.exports = class Indexer extends AssetManager {
                         let amountReceived = null;
                         let extrinsicID = null;
                         let eventID = null;
+                        let section = "";
+                        let method = "";
                         let errorDesc = null;
                         let res = await this.search_xcmtransferdestcandidate(api, beneficiary, xcmtransfer, amountSent, xcmtransfer.msgHash);
                         if (res) {
@@ -2008,7 +1969,10 @@ module.exports = class Indexer extends AssetManager {
                             let stage = finalized ? 'DestinationFinalized' : 'DestinationUnfinalized';
                             let xcmInfo = xcmtransfer.xcmInfo ? xcmtransfer.xcmInfo : null;
                             let o = xcmInfo && xcmInfo.origination ? xcmInfo.origination : null;
-
+                            if (o) {
+                                if (o.section) section = o.section;
+                                if (o.method) method = o.method;
+                            }
                             // fill in destination.{ amountReceived, amountReceivedUSD, teleportFee, teleportFee, teleportFeeUSD, blockNumber, ts, finalized, executionStatus }
                             let decimals = o && o.decimals ? o.decimals : null;
                             let priceUSD = xcmInfo.priceUSD;
@@ -2034,16 +1998,16 @@ module.exports = class Indexer extends AssetManager {
                                     destination.amountReceivedUSD = destination.amountReceived * priceUSD;
                                     destination.executionStatus = "success";
                                 }
-                                let vals = ["extrinsicHash", "transferIndex", "xcmIndex", "msgHash", "transactionHash", "symbol", "sourceTS", "chainID", "chainIDDest", "xcmInfo", "addTS", "lastUpdateTS"];
+                                let vals = ["extrinsicHash", "transferIndex", "xcmIndex", "msgHash", "transactionHash", "symbol", "sourceTS", "chainID", "chainIDDest", "xcmInfo", "section", "method", "addTS", "lastUpdateTS"];
                                 let currTS = this.getCurrentTS();
                                 let transactionHash = xcmtransfer.xcmInfo && xcmtransfer.xcmInfo.origination && xcmtransfer.xcmInfo.origination.transactionHash ? xcmtransfer.xcmInfo.origination.transactionHash : null;
-                                let out = `('${xcmtransfer.xcmtransferHash}', '${stage}', '${xcmtransfer.extrinsicHash}', '${xcmtransfer.transferIndex}', '${xcmtransfer.xcmIndex}', ${mysql.escape(xcmtransfer.msgHash)}, ${mysql.escape(transactionHash)}, '${xcmtransfer.xcmSymbol}', '${xcmtransfer.sourceTS}', '${xcmtransfer.chainID}', '${xcmtransfer.chainIDDest}', ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))}, '${currTS}', '${currTS}')`;
+                                let out = `('${xcmtransfer.xcmtransferHash}', '${stage}', '${xcmtransfer.extrinsicHash}', '${xcmtransfer.transferIndex}', '${xcmtransfer.xcmIndex}', ${mysql.escape(xcmtransfer.msgHash)}, ${mysql.escape(transactionHash)}, '${xcmtransfer.xcmSymbol}', '${xcmtransfer.sourceTS}', '${xcmtransfer.chainID}', '${xcmtransfer.chainIDDest}', ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))}, '${section}', '${method}', '${currTS}', '${currTS}')`;
                                 await this.upsertSQL({
                                     "table": "xcmtransferslog",
                                     "keys": ["xcmtransferHash", "stage"],
                                     "vals": vals,
                                     "data": [out],
-                                    "replace": ["lastUpdateTS", "symbol"]
+                                    "replace": ["lastUpdateTS", "symbol", "section", "method"]
                                 });
                                 let extra = ""
                                 if (o.finalized && finalized && o.initiateTS) {
@@ -5288,7 +5252,7 @@ module.exports = class Indexer extends AssetManager {
                         // build XCMInfo here
                         xcmtransfer.xcmInfo = await this.buildPendingXcmInfo(xcmtransfer, rExtrinsic, finalized)
 
-                        await this.updateXCMTransferStorage(xcmtransfer, isTip, finalized, isXcmTipSafe); // store, flushed in flushXCM
+                        await this.updateXCMTransferStorage(xcmtransfer, isTip, finalized, isXcmTipSafe, isSigned, exSection, exMethod); // store, flushed in flushXCM
                     }
                     delete rExtrinsic.xcms
                 }
@@ -5841,184 +5805,6 @@ module.exports = class Indexer extends AssetManager {
                 this.assetholder[assetholder] = [bn, newState];
             }
         }
-    }
-
-    // for all holders get the balances (native or not) and write to BT and mysql ... within 10 mins
-    async updateChainAssetHoldersBalances(chain, limitSeconds = 600) {
-        let batchSize = 128;
-        let bn = chain.blocksFinalized;
-        await this.setupAPI(chain);
-        let chainID = chain.chainID;
-        this.chainID = chainID;
-        let web3Api = this.web3Api
-        let startTS = this.getCurrentTS();
-
-        let nativeAsset = this.getNativeAsset();
-        var sql = `select asset.asset, assetholder.holder, asset.decimals, asset.xcContractAddress, asset.assetType, assetholder.lastUpdateBN, UNIX_TIMESTAMP(assetholder.lastUpdateDT) as lastUpdateTS
-from assetholder${chainID} as assetholder, asset where assetholder.asset = asset.asset and asset.chainID = ${chainID} and assetholder.lastCrawlBN < assetholder.lastUpdateBN and length(holder) = 42 limit 100000`;
-        // and asset.assetType in ( 'ERC20', 'ERC20LP', 'Token' )
-        console.log(sql);
-        let ts = this.getCurrentTS();
-        var assetholderRecs = await this.poolREADONLY.query(sql);
-        let assetdecimals = {};
-        let assetholders = {};
-        for (let i = 0; i < assetholderRecs.length; i++) {
-            let a = assetholderRecs[i];
-            let asset = a.asset;
-            let assetChain = paraTool.makeAssetChain(asset, chainID);
-            let holder = a.holder;
-            let decimals = a.decimals;
-            let lastUpdateTS = a.lastUpdateTS;
-            let lastUpdateBN = a.lastUpdateBN;
-            if (!assetdecimals[assetChain]) {
-                assetdecimals[assetChain] = decimals;
-            }
-            if (!assetholders[assetChain]) {
-                assetholders[assetChain] = {};
-            }
-            assetholders[assetChain][holder] = a;
-        }
-        let rows = [];
-        let out = [];
-        let assetsList = []; //for debugging
-        for (const assetChain of Object.keys(assetholders)) {
-            if (this.getCurrentTS() - startTS > limitSeconds) return (true);
-            let a = assetholders[assetChain];
-            let holdersAll = Object.keys(assetholders[assetChain]);
-            let i = 0;
-            let decimals = this.getChainDecimal(chainID);
-            while (i < holdersAll.length) {
-                let holders = holdersAll.slice(i, i + batchSize);
-                let holderBalances = {};
-                let [asset, _] = paraTool.parseAssetChain(assetChain);
-                let tokenDecimal = assetdecimals[asset];
-                try {
-                    console.log("FETCH", asset, holders.length, nativeAsset, this.chainID)
-                    if (asset == nativeAsset && (chainID !== paraTool.chainIDMoonbeam) && (chainID !== paraTool.chainIDMoonriver)) { // TODO: check Astar/Shiden
-                        holderBalances.blockNumber = chain.blocksFinalized;
-                        holderBalances.holders = [];
-                        for (let h = 0; h < holders.length; h++) {
-                            let account_id = holders[h];
-                            try {
-                                var x = await this.api.query.system.account(account_id);
-                                let d = x.toJSON().data;
-                                d.free = d.free / 10 ** decimals;
-                                d.reserved = d.reserved / 10 ** decimals;
-                                d.miscFrozen = d.miscFrozen / 10 ** decimals;
-                                d.feeFrozen = d.feeFrozen / 10 ** decimals;
-                                holderBalances.holders.push({
-                                    holderAddress: account_id,
-                                    data: d
-                                });
-                            } catch (e) {
-                                console.log(e);
-                            }
-                        }
-                        // holderBalances = await ethTool.getNativeChainBalances(web3Api, holders, bn)
-                    } else {
-                        let tokenAddress = asset;
-                        let assetInfo = this.assetInfo[assetChain];
-                        if (assetInfo && assetInfo.xcContractAddress) {
-                            // if there is a mapping from asset => xcContractAddress,use that for the tokenAddress in this ethTool rpccall
-                            tokenAddress = assetInfo.xcContractAddress;
-                        }
-                        holderBalances = await ethTool.getTokenHoldersRawBalances(web3Api, tokenAddress, holders, tokenDecimal, bn)
-                        if (holderBalances.holders.length != holders.length) {
-                            console.log("FETCH FAIL", tokenAddress, holders.length, holderBalances.holders.length);
-                        }
-                    }
-                } catch (err) {
-                    this.logger.warn({
-                        "op": "crawlAssetHoldersBalances",
-                        "asset": asset,
-                        err
-                    })
-                }
-                if (holderBalances && holderBalances.holders) {
-                    let lastCrawlBN = holderBalances.blockNumber;
-                    let nwrites = 0;
-                    holderBalances.holders.map((b) => {
-                        let holder = b.holderAddress;
-                        let accKey = b.holderAddress.toLowerCase();
-                        let newState = false;
-                        let free = 0;
-                        let reserved = 0;
-                        let feeFrozen = 0;
-                        let miscFrozen = 0;
-                        if (b.data) {
-                            newState = b.data;
-                            free = newState.free;
-                            reserved = newState.reserved;
-                            feeFrozen = newState.feeFrozen;
-                            miscFrozen = newState.miscFrozen;
-
-                        } else if (b.balance != undefined) {
-                            free = b.balance;
-                            if (b.error != undefined) {
-                                console.log(`crawlAssetHoldersBalances acctError ${holder}, asset=${asset}, errMsg= ${b.error}`)
-                            }
-                            newState = {
-                                free: b.balance
-                            }
-                        }
-
-                        if (free < 10 ** 32) {
-                            let rec = {};
-                            let lastUpdateTS = assetholders[holder];
-                            rec[assetChain] = {
-                                value: JSON.stringify(newState),
-                                // timestamp could be added from lastUpdateTS
-                                timestamp: ts * 1000000
-                            }
-                            rows.push({
-                                key: accKey,
-                                data: {
-                                    realtime: rec
-                                }
-                            });
-                            out.push(`('${asset}', '${chainID}', '${accKey}', '${free}', '${reserved}', '${feeFrozen}', '${miscFrozen}', '${lastCrawlBN}')`);
-                            nwrites++;
-                        }
-                    });
-                    console.log(" --> ", asset, nwrites);
-                }
-                console.log(out);
-
-                i += batchSize
-                if (out.length > 0) {
-                    await this.upsertSQL({
-                        "table": `assetholder${chainID}`,
-                        "keys": ["asset", "chainID", "holder"],
-                        "vals": ["free", "reserved", "frozen", "miscFrozen", "lastCrawlBN"],
-                        "data": out,
-                        "replace": ["free", "reserved", "frozen", "miscFrozen", "lastCrawlBN"]
-                    });
-                    out = [];
-                }
-                // write addressrealtime
-                if (rows.length > batchSize) { // temp
-                    await this.insertBTRows(this.btAccountRealtime, rows, "accountrealtime");
-                    rows = [];
-                }
-            }
-        }
-
-        if (rows.length > 0) {
-            await this.insertBTRows(this.btAccountRealtime, rows, "accountrealtime");
-            rows = [];
-        }
-
-        if (out.length > 0) {
-            await this.upsertSQL({
-                "table": `assetholder${chainID}`,
-                "keys": ["asset", "chainID", "holder"],
-                "vals": ["free", "reserved", "frozen", "miscFrozen", "lastCrawlBN"],
-                "data": out,
-                "replace": ["free", "reserved", "frozen", "miscFrozen", "lastCrawlBN"]
-            });
-            out = [];
-        }
-        return (true);
     }
 
     async process_erc20_token_transfer(tx, t, chainID, eventID = "0", finalized = false) {
