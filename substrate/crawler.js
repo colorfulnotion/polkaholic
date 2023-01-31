@@ -1649,117 +1649,6 @@ module.exports = class Crawler extends Indexer {
         this.readyToCrawlParachains = false;
     }
 
-    // gets talisman data
-    async crawlParachains() {
-        let cmd = 'curl https://raw.githubusercontent.com/TalismanSociety/chaindata/main/chaindata.json'
-        const {
-            stdout,
-            stderr
-        } = await exec(cmd, {
-            maxBuffer: 1024 * 64000
-        });
-        let parachains = [];
-        let parachainsData = JSON.parse(stdout);
-        for (let i = 0; i < parachainsData.length; i++) {
-            let p = parachainsData[i];
-            /*
-create table talismanEndpoint (
-  `paraID` int(11),
-  `relayChain` enum('polkadot','kusama','testnet'),
-  `id` varchar(64),
-  `chainName` varchar(32),
-  `coingeckoID` varchar(64),
-  `account` varchar(64),
-  `prefix` int,
-  `decimals` int,
-  `symbol` varchar(64),
-  `asset` varchar(64),
-  `WSEndpoint` varchar(128),
-  `WSEndpoint2` varchar(128),
-  `WSEndpoint3` varchar(128),
-  PRIMARY KEY (`paraID`,`relayChain`)
-);
-    "'undefined'",
-    "'none'",
-    "'subsocial'",
-    "'undefined'",
-    "'undefined'",
-    "'11'",
-    "'*25519'",
-    "'wss://rpc.subsocial.network'",
-    "''",
-    "''",
-    "'null'",
-    "'28'",
-    "''''"
-
-{
-  id: 'moonriver',
-  prefix: 1285,
-  name: 'Moonriver',
-  token: 'MOVR',
-  decimals: 18,
-  account: 'secp256k1',
-  subscanUrl: 'https://moonriver.subscan.io/',
-  rpcs: [
-    'wss://wss.moonriver.moonbeam.network',
-    'wss://moonriver.api.onfinality.io/public-ws',
-    'wss://rpc.pinknode.io/moonriver/explorer'
-  ],
-  paraId: 2023,
-  relay: { id: 'kusama' }
-}
-	    */
-            let relayChain = p.relay && p.relay.id ? p.relay.id : "none";
-            let rpcs = p.rpcs && p.rpcs.length > 0 ? p.rpcs : [];
-            let WSEndpoint = rpcs.length > 0 ? rpcs[0] : "";
-            let WSEndpoint2 = rpcs.length > 1 ? rpcs[1] : "";
-            let WSEndpoint3 = rpcs.length > 2 ? rpcs[2] : "";
-            let symbol = p.token ? p.token : "";
-            let decimals = p.decimals ? p.decimals : "NULL";
-            let asset = symbol ? JSON.stringify({
-                Token: symbol
-            }) : "";
-            let coingeckoId = p.coingeckoId ? p.coingeckoId : "";
-            let prefix = p.prefix ? p.prefix : "NULL";
-            let t = [
-                `'${p.paraId}'`,
-                `'${relayChain}'`,
-                `'${p.id}'`,
-                `'${symbol}'`,
-                `${decimals}`,
-                `'${p.account}'`,
-                `'${WSEndpoint}'`,
-                `'${WSEndpoint2}'`,
-                `'${WSEndpoint3}'`,
-                `'${coingeckoId}'`,
-                `${prefix}`,
-                `${mysql.escape(asset)}`,
-            ];
-
-            if (p.paraId > 2) {
-                parachains.push("(" + t.join(",") + ")");
-            }
-        }
-        if (parachains.length > 0) {
-            this.logger.info({
-                "op": "crawlParachains-talisman",
-                "numParachains": parachains.length
-            });
-            await this.upsertSQL({
-                "table": "talismanEndpoint",
-                "keys": ["paraID", "relayChain"],
-                "vals": ["id", "symbol", "decimals", "account", "WSEndpoint", "WSEndpoint2", "WSEndpoint3", "coingeckoID", "prefix", "asset"],
-                "data": parachains,
-                "replaceIfNull": ["id", "symbol", "decimals", "account", "WSEndpoint", "WSEndpoint2", "WSEndpoint3", "coingeckoID", "prefix", "asset"]
-            });
-        }
-        // update prefixes automatically
-        let sql = 'update chain, talismanEndpoint as t set chain.ss58Format = t.prefix where t.prefix > 0 and chain.paraID=t.paraID and chain.relayChain = t.relayChain and t.prefix != chain.ss58Format';
-        this.batchedSQL.push(sql);
-        await this.update_batchedSQL();
-    }
-
     async processFinalizedHead(chain, chainID, bn, finalizedHash, parentHash, isTip = false) {
         const tableChain = this.getTableChain(chainID);
         await this.initApiAtStorageKeys(chain, finalizedHash, bn);
@@ -1997,7 +1886,6 @@ create table talismanEndpoint (
                     await this.crawl_parachains(chainID);
                 }
                 if (bn % 7200 == 0) { // 1-2x/day
-                    await this.crawlParachains();
                     try {
                         await this.setup_chainParser(chain, paraTool.debugNoLog, true);
                     } catch (e1) {}
@@ -2018,20 +1906,24 @@ create table talismanEndpoint (
     }
 
     async check_chain_endpoint_correctness(chain) {
-        let bn = chain.blocksFinalized - 100;
-        let sql = `select blockNumber, blockHash, parentHash from block${chain.chainID} where blockNumber >= ${bn} and blockHash is not null limit 20`
-        let blocks = await this.poolREADONLY.query(sql);
-        if (blocks.length > 0) {
-            let bHash = blocks[0].blockHash;
-            let header = await this.api.rpc.chain.getHeader(bHash);
-            let parentHash = header.parentHash.toString();
-            let success = (blocks[0].parentHash == parentHash);
-            if (success == false) {
-                console.log(`FATAL: FAILED to match chain @ blockNumber: ${blocks[0].blockNumber} expected ${blocks[0].parentHash} got ${parentHash}`);
-                process.exit(0);
-            } else {
-                console.log(`PASSED check`)
+        try {
+            let bn = chain.blocksFinalized - 100;
+            let sql = `select blockNumber, blockHash, parentHash from block${chain.chainID} where blockNumber >= ${bn} and blockHash is not null limit 20`
+            let blocks = await this.poolREADONLY.query(sql);
+            if (blocks.length > 0) {
+                let bHash = blocks[0].blockHash;
+                let header = await this.api.rpc.chain.getHeader(bHash);
+                let parentHash = header.parentHash.toString();
+                let success = (blocks[0].parentHash == parentHash);
+                if (success == false) {
+                    console.log(`FATAL: FAILED to match chain @ blockNumber: ${blocks[0].blockNumber} expected ${blocks[0].parentHash} got ${parentHash}`);
+                    process.exit(0);
+                } else {
+                    console.log(`PASSED check`)
+                }
             }
+        } catch (e) {
+            console.log(e);
         }
     }
 

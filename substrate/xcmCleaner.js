@@ -271,10 +271,10 @@ module.exports = class XCMCleaner extends Query {
         }
     }
 
-    async searchXCMTransferDestCandidate(msgHash, sourceTS, amountSent, fromAddress) {
+    async searchXCMTransferDestCandidate(msgHash, sourceTS, amountSent, fromAddress, chainID, chainIDDest) {
         let startTS = sourceTS - 10;
         let endTS = sourceTS + 60 * 2;
-        let sql = `select * from xcmtransferdestcandidate where destTS >= ${startTS} and destTS <= ${endTS}`
+        let sql = `select * from xcmtransferdestcandidate where chainIDDest = ${chainIDDest} and destTS >= ${startTS} and destTS <= ${endTS}`
         if (msgHash.length > 4) {
             sql += ` and msgHash = '${msgHash}' `;
         } else if (fromAddress) {
@@ -307,6 +307,21 @@ module.exports = class XCMCleaner extends Query {
             });
             return changes[0];
         }
+	// new
+	if ( msgHash.length > 4 ) {
+	let sql2 = `select blockNumber, executedEventID, errorDesc, blockTS from xcmmessages where msgHash = '${msgHash}' and chainIDDest = '${chainIDDest}' and incoming = 1 and blockTS >= ${sourceTS} and destTS <= ${endTS} order by startTS`;
+        let xcmmessages = await this.poolREADONLY.query(sql)
+	for (const m of messages) {
+	    // return the first one
+	    // log 
+            return {
+                bn: m.blockNumber,
+                eventID: m.executedEventID,
+                errorDesc: m.errorDesc,
+                ts: m.blockTS
+            }
+        }
+        
         return null;
     }
 
@@ -455,26 +470,34 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 if (inp.decimals) {
                     // if symbol is known we can compute this
                     xcmInfo.destination.blockNumber = parseInt(best.bn, 10);
-                    xcmInfo.origination.amountSent = xcm.amountSent / 10 ** inp.decimals;
-                    xcmInfo.destination.amountReceived = best.amountReceived / 10 ** inp.decimals;
-                    xcmInfo.destination.teleportFee = xcmInfo.origination.amountSent - xcmInfo.destination.amountReceived;
-                    xcmInfo.destination.ts = best.ts;
-                    if (q && q.priceUSD) {
-                        xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
-                        xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
-                        xcmInfo.destination.teleportFeeUSD = q.priceUSD * xcmInfo.destination.teleportFee;
-                    }
-                    xcmInfo.destination.confidence = best.confidence;
-                    xcmInfo.destination.executionStatus = "success";
-                    if (best.extrinsicID) {
-                        xcmInfo.destination.extrinsicID = best.extrinsicID;
-                    }
+		    let destStatus = 1;
+		    if ( best.errorDesc ) {
+			xcmInfo.destination.error = paraTool.getXCMErrorDescription(best.errorDesc);
+                        xcmInfo.destination.executionStatus = "failed";
+                        xcmInfo.destination.amountReceivedUSD = 0;
+			destStatus = 0;
+		    } else {
+			xcmInfo.destination.amountReceived = best.amountReceived / 10 ** inp.decimals;
+			xcmInfo.destination.teleportFee = xcmInfo.origination.amountSent - xcmInfo.destination.amountReceived;
+			xcmInfo.origination.amountSent = xcm.amountSent / 10 ** inp.decimals;
+			xcmInfo.destination.ts = best.ts;
+			if (q && q.priceUSD) {
+                            xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
+                            xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
+                            xcmInfo.destination.teleportFeeUSD = q.priceUSD * xcmInfo.destination.teleportFee;
+			}
+			xcmInfo.destination.confidence = best.confidence;
+			xcmInfo.destination.executionStatus = "success";
+			if (best.extrinsicID) {
+                            xcmInfo.destination.extrinsicID = best.extrinsicID;
+			}
+		    }
                     if (best.eventID) {
                         xcmInfo.destination.eventID = best.eventID;
                     }
                     console.log("xcmInfo", JSON.stringify(xcmInfo, null, 4));
 
-                    let sql_final = `update xcmtransfer set destStatus = 1, amountReceived = '${xcmInfo.destination.amountReceived}', amountReceivedUSD = '${xcmInfo.destination.amountReceivedUSD}', xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+                    let sql_final = `update xcmtransfer set destStatus = ${destStatus}, amountReceived = '${xcmInfo.destination.amountReceived}', amountReceivedUSD = '${xcmInfo.destination.amountReceivedUSD}', xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
                     console.log(sql_final);
                     this.batchedSQL.push(sql_final);
                     await this.update_batchedSQL();

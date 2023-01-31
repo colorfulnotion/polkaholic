@@ -1211,10 +1211,24 @@ module.exports = class Indexer extends AssetManager {
                         `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
                         `'${r.chainID}'`,
                         `'${r.chainIDDest}'`,
-                        `'${r.blockNumber}'`, `'${r.fromAddress}'`,
-                        xcmSymbol, `'${r.sourceTS}'`, `'${r.amountSent}'`,
-                        '${r.relayChain}', '${r.paraID}', '${r.paraIDDest}', '${r.destAddress}', '${r.sectionMethod}', '${r.incomplete}', '${r.isFeeItem}',
-                        msgHash, `'${r.sentAt}'`, xcmInteriorKey, innerCall, xcmType, pendingXcmInfoBlob
+                        `'${r.blockNumber}'`,
+                        `'${r.fromAddress}'`,
+                        xcmSymbol,
+                        `'${r.sourceTS}'`,
+                        `'${r.amountSent}'`,
+                        `'${r.relayChain}'`,
+                        `'${r.paraID}'`,
+                        `'${r.paraIDDest}'`,
+                        `'${r.destAddress}'`,
+                        `'${r.sectionMethod}'`,
+                        `'${r.incomplete}'`,
+                        `'${r.isFeeItem}'`,
+                        msgHash,
+                        `'${r.sentAt}'`,
+                        xcmInteriorKey,
+                        innerCall,
+                        xcmType,
+                        pendingXcmInfoBlob
                     ].join(",") + ")";
                     // CHECK: do we need isXcmTipSafe = (isSigned || finalized) ? true : false concept here to ensure that xcmtransfer records are inserted only when "safe" 
                     if (r.msgHash == "0x" && !r.finalized) {
@@ -1445,6 +1459,7 @@ module.exports = class Indexer extends AssetManager {
                     isFresh: true,
                     isPreemptive: true,
                     matchable: true,
+                    canUpdate: true,
                 }
                 //console.log(`updateXCMMsg ${Object.keys(this.xcmTrailingKeyMap)}`)
                 this.xcmmsgMap[xcmKey] = xcmMsg //TODO: MK review
@@ -1452,15 +1467,15 @@ module.exports = class Indexer extends AssetManager {
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg adding ${xcmKey}`)
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`updateXCMMsg new xcmKey ${xcmKey}`, xcmMsg)
             } else {
-                /*
+
                 let trailingXcm = this.xcmTrailingKeyMap[xcmKey]
-                if (trailingXcm.canUpdate === true){
+                if (trailingXcm.canUpdate === true) {
                     trailingXcm.blockNumber = xcmMsg.blockNumber, //we observe the same "msgHash" at new blockNum
-                    trailingXcm.canUpdate = false
-                     this.xcmTrailingKeyMap[xcmKey] = trailingXcm
-                     if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg valid duplicates! ${xcmKey}`, trailingXcm)
+                        trailingXcm.canUpdate = false
+                    this.xcmTrailingKeyMap[xcmKey] = trailingXcm
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg valid duplicates! ${xcmKey}`, trailingXcm)
                 }
-                */
+
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`updateXCMMsg duplicates! ${xcmKey}`)
             }
         }
@@ -1989,7 +2004,7 @@ module.exports = class Indexer extends AssetManager {
                                 }
                                 let destStatus = errorDesc ? 0 : 1;
                                 if (errorDesc) {
-                                    destination.error = this.getXCMErrorDescription(errorDesc);
+                                    destination.error = paraTool.getXCMErrorDescription(errorDesc);
                                     destination.executionStatus = "failed";
                                 } else {
                                     destination.teleportFee = (amountSent - amountReceived) / 10 ** decimals;
@@ -2030,55 +2045,6 @@ module.exports = class Indexer extends AssetManager {
                 "op": "check_xcmtransfers_beneficiary ERROR",
                 err
             });
-        }
-    }
-
-    getXCMErrorDescription(errorDesc) {
-        let errorMap = {}
-        let officialErrors = [
-            'Overflow|0|An arithmetic overflow happened.',
-            'Unimplemented|1|The instruction is intentionally unsupported.',
-            'UntrustedReserveLocation|2|Origin Register does not contain a value value for a reserve transfer notification.',
-            'UntrustedTeleportLocation|3|Origin Register does not contain a value value for a teleport notification.',
-            'MultiLocationFull|4|`MultiLocation` value too large to descend further.',
-            'MultiLocationNotInvertible|5|`MultiLocation` value ascend more parents than known ancestors of local location.',
-            'BadOrigin|6|The Origin Register does not contain a valid value for instruction.',
-            'InvalidLocation|7|The location parameter is not a valid value for the instruction.',
-            'AssetNotFound|8|The given asset is not handled.',
-            'FailedToTransactAsset|9|An asset transaction (like withdraw or deposit) failed (typically due to type conversions).',
-            'NotWithdrawable|10|An asset cannot be withdrawn, potentially due to lack of ownership, availability or rights.',
-            'LocationCannotHold|11|An asset cannot be deposited under the ownership of a particular location.',
-            'ExceedsMaxMessageSize|12|Attempt to send a message greater than the maximum supported by the transport protocol.',
-            'DestinationUnsupported|13|The given message cannot be translated into a format supported by the destination.',
-            'Transport|14|Destination is routable, but there is some issue with the transport mechanism.',
-            'Unroutable|15|Destination is known to be unroutable.',
-            'UnknownClaim|16|Used by `ClaimAsset` when the given claim could not be recognized/found.',
-            'FailedToDecode|17|Used by `Transact` when the functor cannot be decoded.',
-            'TooMuchWeightRequired|18|Used by `Transact` to indicate that the given weight limit could be breached by the functor.',
-            'NotHoldingFees|19|Used by `BuyExecution` when the Holding Register does not contain payable fees.',
-            'TooExpensive|20|Used by `BuyExecution` when the fees declared to purchase weight are insufficient.',
-            'Trap(u64)|21|Used by the `Trap` instruction to force an error intentionally. Its code is included.',
-            'ExpectationFalse|22|Used by `ExpectAsset`, `ExpectError` and `ExpectOrigin` when the expectation was not true.'
-        ]
-        for (const officialErr of officialErrors) {
-            let e = officialErr.split('|')
-            let errDetail = {
-                errorCode: parseInt(e[1]),
-                errorType: e[0],
-                errorDesc: e[2],
-            }
-            errorMap[errDetail.errorType.toLowerCase()] = errDetail
-        }
-        //console.log(errorMap)
-        let errPieces = errorDesc.split(':')
-        let errorType = (errPieces.length == 2) ? errPieces[1] : 'NA'
-        if (errorMap[errorType.toLowerCase()] != undefined) {
-            return errorMap[errorType.toLowerCase()]
-        }
-        return {
-            errorCode: 'NA',
-            errorType: 'NA',
-            errorDesc: errorDesc,
         }
     }
 
@@ -3744,15 +3710,40 @@ module.exports = class Indexer extends AssetManager {
             let firstSeenBN = trailingXcm.blockNumber
             let msgHex = trailingXcm.msgHex
             let msgHash = trailingXcm.msgHash
-            if (firstSeenBN == targetBN && msgHex.includes(rawMatcher)) {
+            if (msgHex.includes(rawMatcher)) {
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
-                if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
-                if (this.xcmmsgMap[tk] != undefined && extrinsicID && extrinsicHash) {
-                    this.xcmmsgMap[tk].extrinsicID = extrinsicID
-                    this.xcmmsgMap[tk].extrinsicHash = extrinsicHash
+                if (firstSeenBN == targetBN) {
+                    if (this.debugLevel >= paraTool.debugInfo) {
+                        this.logger.error({
+                            "op": "getMsgHashCandidate1",
+                            targetBN,
+                            msgHash,
+                            extrinsicID,
+                            extrinsicHash,
+                            chainID: this.chainID,
+                        })
+                        console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
+                    }
+                    if (this.xcmmsgMap[tk] != undefined && extrinsicID && extrinsicHash) {
+                        this.xcmmsgMap[tk].extrinsicID = extrinsicID
+                        this.xcmmsgMap[tk].extrinsicHash = extrinsicHash
+                    }
+                    return msgHash
+                } else {
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash} but FAILED with firstSeenBN(${firstSeenBN})=targetBN(${targetBN})`)
+                    if (this.debugLevel >= paraTool.debugInfo) {
+                        this.logger.error({
+                            "op": "getMsgHashCandidate2",
+                            targetBN,
+                            msgHash,
+                            extrinsicID,
+                            extrinsicHash,
+                            chainID: this.chainID,
+                        })
+                        console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
+                    }
                 }
-                return msgHash
             }
         }
         if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}, ${matcherType}] MISS`)
@@ -4912,8 +4903,7 @@ module.exports = class Indexer extends AssetManager {
         // queue requests in address${chainID} so streaming process can work through requests
         let addresses = Object.keys(this.addressBalanceRequest);
         if (addresses.length == 0) return;
-        let out = [];
-        let vals = ["free", "reserved", "miscFrozen", "frozen", "blockHash", "lastUpdateDT", "lastUpdateBN", "blockTS", "requested"];
+
         let rows = [];
         for (const address of addresses) {
             let r = this.addressBalanceRequest[address];
@@ -4939,10 +4929,6 @@ module.exports = class Indexer extends AssetManager {
                 })
             }
 
-
-            let str = `('${address}', '${free_balance}', '${reserved_balance}', '${miscFrozen_balance}', '${feeFrozen_balance}', '${r.blockHash}', Now(), '${r.blockNumber}', '${r.blockTS}',   2)`
-            out.push(str)
-            //console.log("dump_addressBalanceRequest", str);
 
             let asset = this.getChainAsset(this.chainID);
             let assetChain = paraTool.makeAssetChain(asset, this.chainID);
@@ -4986,13 +4972,6 @@ module.exports = class Indexer extends AssetManager {
         let [tblName, tblRealtime] = this.get_btTableRealtime()
         await this.insertBTRows(tblRealtime, rows, tblName);
         rows = [];
-        await this.upsertSQL({
-            "table": `address${this.chainID}`,
-            "keys": ["address"],
-            "vals": vals,
-            "data": out,
-            "lastUpdateBN": vals
-        });
         // TODO OPTIMIZATION: also write placeholder in "accountrealtime" (in "request" column family) which can mark the need to do work on the client (ie when traces are not available)
         this.addressBalanceRequest = {}
     }
@@ -7757,9 +7736,24 @@ module.exports = class Indexer extends AssetManager {
         //console.log('index_chain_block_row', JSON.stringify(r))
 
         let autoTraces = false
-        if (r.block && r.trace) {
+        let blkNum = false
+        let blkHash = false
+        let blockAvailable = false
+        let traceAvailable = false
+        let eventAvailable = false
+        let blk = r.block
+        if (r.block) {
+            blockAvailable = true
+            blkNum = blk.header.number;
+            blkHash = blk.hash;
+        }
+        if (r.trace) traceAvailable = true
+        if (r.events) eventAvailable = true
+
+        console.log(`[${blkNum}] [${blkHash}] Trace?${traceAvailable}, Events?${eventAvailable} , currTS=${this.getCurrentTS()}`)
+        if (blockAvailable && traceAvailable) {
             // setup ParserContext here
-            let blk = r.block
+
             let blockNumber = blk.header.number;
             let blockHash = blk.hash;
             let blockTS = blk.blockTS;
@@ -7771,7 +7765,7 @@ module.exports = class Indexer extends AssetManager {
                     "msg": 'missing blockHash - check source',
                 })
             } else {
-                let forceParseTrace = false
+                let forceParseTrace = true
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
                 if (blockTS >= traceParseTS) {
@@ -7785,7 +7779,6 @@ module.exports = class Indexer extends AssetManager {
                     }
                     await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // use result from rawtrace to decorate
                 }
-
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
                 //console.log(`index_chain_block_row: processTrace`, processTraceTS);
                 this.timeStat.processTraceTS += processTraceTS
@@ -7793,9 +7786,7 @@ module.exports = class Indexer extends AssetManager {
             }
         }
 
-
-
-        if (r.block && r.events) {
+        if (blockAvailable && eventAvailable) {
             let decodeRawBlockStartTS = new Date().getTime()
             if (!signedBlock) {
                 let decodeRawBlockSignedBlockStartTS = new Date().getTime()
@@ -8264,7 +8255,7 @@ module.exports = class Indexer extends AssetManager {
         });
 
         await this.upsertSQL({
-            "table": "substrateetllog",
+            "table": "blocklog",
             "keys": ["chainID", "logDT"],
             "vals": ["loaded", "audited"],
             "data": [`('${chainID}', '${logDT}', '0', 'Unknown')`],

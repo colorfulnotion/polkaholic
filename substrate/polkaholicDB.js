@@ -521,7 +521,7 @@ module.exports = class PolkaholicDB {
                     });
                     this.numIndexingErrors++;
                     let tsm = new Date().getTime();
-                    let fn = "/var/log/update_batchedSQL/" + tsm + "-" + i + ".sql";
+                    let fn = "/var/log/" + tsm + "-" + i + ".sql";
                     await fs.writeFileSync(fn, sql);
                 }
             }
@@ -545,7 +545,7 @@ module.exports = class PolkaholicDB {
                         });
                         this.numIndexingErrors++;
                         let tsm = new Date().getTime()
-                        let fn = "/var/log/update_batchedSQL/" + tsm + "-" + i + ".sql";
+                        let fn = "/var/log/" + tsm + "-" + i + ".sql";
                         await fs.writeFileSync(fn, sql);
                     }
                 }
