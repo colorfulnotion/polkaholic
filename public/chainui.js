@@ -423,11 +423,15 @@ async function showxcmtransfers(filter = {}) {
                             let pendingStr = `<button type="button" class="btn btn-info text-capitalize">Pending</button>`
                             let str = `<button type="button" class="btn btn-warning text-capitalize">Unknown</button>`
                             let unk = true;
+			    let blockNumberDest = null;
                             if (row.xcmInfo && ((row.xcmInfo.status == undefined) || row.xcmInfo.destination && row.xcmInfo.destination.executionStatus != undefined)) {
+				if ( row.xcmInfo.destination.blockNumber ) {
+				    blockNumberDest = row.xcmInfo.destination.blockNumber 
+				}
                                 if (row.xcmInfo.status == true || row.xcmInfo.destination.executionStatus == 'success') {
                                     str = `<button type="button" class="btn btn-success text-capitalize">Success</button>`
                                     unk = false;
-                                } else if (row.xcmInfo.destination.error) {
+                                } else if (row.xcmInfo.destination.error && row.xcmInfo.destination.error.errorType) {
                                     str = `<button type="button" class="btn btn-danger text-capitalize">${row.xcmInfo.destination.error.errorType}</button>`
                                     unk = false;
                                 }
@@ -439,8 +443,8 @@ async function showxcmtransfers(filter = {}) {
                                 }
                                 //console.log(row.xcmInfo);
                             }
-                            if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest != undefined) {
-                                return presentBlockNumber(row.idDest, row.chainDestName, row.blockNumberDest) + "<BR>" + str;
+                            if (row.chainIDDest != undefined && row.chainDestName && blockNumberDest ) {
+                                return presentBlockNumber(row.idDest, row.chainDestName, blockNumberDest) + "<BR>" + str;
                             } else if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest == undefined) {
                                 return `${row.chainDestName}` + "<BR>" + str;
                             } else {
