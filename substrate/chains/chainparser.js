@@ -169,6 +169,8 @@ module.exports = class ChainParser {
 
     async getSystemProperties(indexer, chain) {
         let chainID = chain.chainID;
+        let relayChain = paraTool.getRelayChainByChainID(chainID);
+        let paraID = paraTool.getParaIDfromChainID(chainID)
         if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta || chainID == paraTool.chainIDMoonbaseRelay) {
             //suppress DEV
             return
@@ -177,9 +179,8 @@ module.exports = class ChainParser {
         let props = JSON.parse(propsNative.toString());
         // {"ss58Format":10,"tokenDecimals":[12,12,10,10],"tokenSymbol":["ACA","AUSD","DOT","LDOT"]}
         // NOT MAINTAINED let ss58Format = props.ss58Format;
-        console.log(`chainID=${chainID}, props=`, props)
         let chainSymbolXcmInteriorKey = indexer.getChainSymbolXcmInteriorKey(chainID)
-        console.log(`[${chainID}] chainSymbolXcmInteriorKey=${chainSymbolXcmInteriorKey}`)
+        console.log(`[${chainID}] chainSymbolXcmInteriorKey=${chainSymbolXcmInteriorKey}, properties`, props)
         if (props.tokenSymbol) {
             for (let i = 0; i < props.tokenSymbol.length; i++) {
                 let symbol = props.tokenSymbol[i];
@@ -196,11 +197,37 @@ module.exports = class ChainParser {
                 };
                 // TODO: skip this if we already know about this!
                 let assetChain = paraTool.makeAssetChain(asset, chainID);
+                if (i == 0 && !chainSymbolXcmInteriorKey){
+                    let pseudoXCMAssets = []
+                    let pseudoXCMInteriorkey = paraTool.makeAssetChain(symbol, relayChain)
+                    if (symbol == 'KSM' || symbol == 'DOT'){
+                        pseudoXCMInteriorkey = `here~${relayChain}`
+                    }
+                    let chainSymbolXcmInteriorSql = `update chain set symbolXcmInteriorKey = '${pseudoXCMInteriorkey}', symbol = '${symbol}' where chainID = '${chainID}'`
+                    console.log(`updating chain SymbolXcmInteriorKey`, chainSymbolXcmInteriorSql)
+                    indexer.batchedSQL.push(chainSymbolXcmInteriorSql);
+                    let t = "(" + [`'${pseudoXCMInteriorkey}'`,
+                        `'${assetInfo.symbol}'`, `'${relayChain}'`, `'${chainID}'`, `'${assetChain}'`, `'${assetInfo.decimals}'`, `'${paraID}'`, '0'
+                    ].join(",") + ")";
+                    if (pseudoXCMInteriorkey != `here~${relayChain}`){
+                        console.log(`adding pseudo native asset!`, t)
+                        pseudoXCMAssets.push(t)
+                        let sqlDebug = true
+                        await indexer.upsertSQL({
+                            "table": "xcmasset",
+                            "keys": ["xcmInteriorKey"],
+                            "vals": ["symbol", "relayChain", "xcmchainID", "nativeAssetChain", "decimals", "parachainID", "isXCMAsset"],
+                            "data": pseudoXCMAssets,
+                            "replace": ["xcmchainID", "nativeAssetChain", "decimals", "parachainID"],
+                            "replaceIfNull": ["symbol"]
+                        }, sqlDebug);
+                    }
+                }
                 let cachedAssetInfo = indexer.assetInfo[assetChain]
-                console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)
+                //console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)
                 if (cachedAssetInfo !== undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
                     //cached assetInfo
-                    console.log(`[Cached Asset] asset=${asset}, chainID=${chainID}, assetInfo`, assetInfo)
+                    //console.log(`[Cached Asset] asset=${asset}, chainID=${chainID}, assetInfo`, assetInfo)
                 } else {
                     console.log(`[Fresh Asset] asset=${asset}, chainID=${chainID}, assetInfo`, assetInfo)
                     await indexer.addAssetInfo(asset, chainID, assetInfo, 'getSystemProperties');
@@ -215,7 +242,7 @@ module.exports = class ChainParser {
                         }
                         if (!chain.symbol) {
                             // TODO: add this after checking chain.symbol and symbol
-                            // indexer.batchedSQL.push(`update chain set symbol = '${symbol}' where chainID = '${chainID}'`);
+                            indexer.batchedSQL.push(`update chain set symbol = '${symbol}' where chainID = '${chainID}'`);
                         }
                     }
                 }
