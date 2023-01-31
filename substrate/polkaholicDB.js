@@ -521,7 +521,7 @@ module.exports = class PolkaholicDB {
                     });
                     this.numIndexingErrors++;
                     let tsm = new Date().getTime();
-                    let fn = "/var/log/update_batchedSQL/" + tsm + "-" + i + ".sql";
+                    let fn = "/var/log/" + tsm + "-" + i + ".sql";
                     await fs.writeFileSync(fn, sql);
                 }
             }
@@ -545,7 +545,7 @@ module.exports = class PolkaholicDB {
                         });
                         this.numIndexingErrors++;
                         let tsm = new Date().getTime()
-                        let fn = "/var/log/update_batchedSQL/" + tsm + "-" + i + ".sql";
+                        let fn = "/var/log/" + tsm + "-" + i + ".sql";
                         await fs.writeFileSync(fn, sql);
                     }
                 }
@@ -632,7 +632,7 @@ module.exports = class PolkaholicDB {
 unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents,
 valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numAccountsActive, numAccountsActive7d, numAccountsActive30d, chain.relayChain, totalIssuance, lastUpdateChainAssetsTS,
 onfinalityID, onfinalityStatus, isEVM, chain.asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, xcmasset.priceUSD, xcmasset.priceUSDPercentChange, 0 as numHolders
-from chain left join xcmasset on chain.symbol = xcmasset.symbol and chain.relayChain = xcmasset.relayChain where crawling = ${crawling} order by ${orderBy}`);
+from chain left join xcmasset on chain.symbolXcmInteriorKey = xcmasset.xcmInteriorKey where crawling = ${crawling} order by ${orderBy}`);
         return (chains);
     }
 
@@ -653,7 +653,7 @@ numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSign
 numXCMTransferIncoming, numXCMTransferIncoming7d, numXCMTransferIncoming30d, numXCMTransferOutgoing, numXCMTransferOutgoing7d, numXCMTransferOutgoing30d, valXCMTransferIncomingUSD, valXCMTransferIncomingUSD7d, valXCMTransferIncomingUSD30d, valXCMTransferOutgoingUSD,
 valXCMTransferOutgoingUSD7d, valXCMTransferOutgoingUSD30d, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, 0 as numHolders, numAccountsActive, numAccountsActive7d, numAccountsActive30d, chain.relayChain, totalIssuance, isEVM, blocksCovered, blocksFinalized,
 crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, chain.asset, xcmasset.decimals, xcmasset.priceUSD, xcmasset.priceUSDPercentChange
-from chain left join xcmasset on chain.symbol = xcmasset.symbol and chain.relayChain = xcmasset.relayChain where crawling = ${crawling} order by relayChain, id, chainID;`);
+from chain left join xcmasset on chain.symbolXcmInteriorKey = xcmasset.xcmInteriorKey where crawling = ${crawling} order by relayChain, id, chainID;`);
         return (chains);
     }
 
