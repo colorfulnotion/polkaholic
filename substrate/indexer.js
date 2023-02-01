@@ -3732,7 +3732,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     // find the msgHash given {BN, recipient} or {BN, innercall}
-    getMsgHashCandidate(targetBN, finalized = false, matcher = false, extrinsicID = false, extrinsicHash = false, matcherType = 'address') {
+    getMsgHashCandidate(targetBN, finalized = false, isTip = false, matcher = false, extrinsicID = false, extrinsicHash = false, matcherType = 'address') {
         if (!matcher) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}], matcher MISSING`)
             return false
@@ -3754,18 +3754,19 @@ module.exports = class Indexer extends AssetManager {
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
                 if (firstSeenBN == targetBN) {
-                    this.logger.error({
-                        "op": "getMsgHashCandidate1",
-                        targetBN,
-                        msgHash,
-                        extrinsicID,
-                        extrinsicHash,
-                        matcher,
-                        matcherType,
-                        chainID: this.chainID,
-                    })
+                    if (isTip){
+                      this.logger.error({
+                          "op": "getMsgHashCandidate1",
+                          targetBN,
+                          msgHash,
+                          extrinsicID,
+                          extrinsicHash,
+                          matcher,
+                          matcherType,
+                          chainID: this.chainID,
+                      })
+                    }
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
-
                     if (this.xcmmsgMap[tk] != undefined && extrinsicID && extrinsicHash) {
                         this.xcmmsgMap[tk].extrinsicID = extrinsicID
                         this.xcmmsgMap[tk].extrinsicHash = extrinsicHash
@@ -3773,32 +3774,37 @@ module.exports = class Indexer extends AssetManager {
                     return msgHash
                 } else {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash} but FAILED with firstSeenBN(${firstSeenBN})=targetBN(${targetBN})`)
-                    this.logger.error({
-                        "op": "getMsgHashCandidate2",
-                        targetBN,
-                        firstSeenBN,
-                        msgHash,
-                        extrinsicID,
-                        extrinsicHash,
-                        matcher,
-                        matcherType,
-                        chainID: this.chainID,
-                    })
+                    if (isTip){
+                      this.logger.error({
+                          "op": "getMsgHashCandidate2",
+                          targetBN,
+                          firstSeenBN,
+                          msgHash,
+                          extrinsicID,
+                          extrinsicHash,
+                          matcher,
+                          matcherType,
+                          diffSentAt: firstSeenBN - targetBN,
+                          chainID: this.chainID,
+                      })
+                    }
                     if (firstSeenBN >= targetBN && firstSeenBN - targetBN <= 6) return msgHash
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
                 }
             }
         }
         if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}, ${matcherType}] MISS`)
-        this.logger.error({
-            "op": "getMsgHashCandidate3 lookup failed",
-            targetBN,
-            extrinsicID,
-            extrinsicHash,
-            matcher,
-            matcherType,
-            chainID: this.chainID,
-        })
+        if (isTip){
+          this.logger.error({
+              "op": "getMsgHashCandidate3 lookup failed",
+              targetBN,
+              extrinsicID,
+              extrinsicHash,
+              matcher,
+              matcherType,
+              chainID: this.chainID,
+          })
+        }
     }
 
     getEvmMsgHashCandidate(targetBN, matcher = false, matcherType = 'evm') {
@@ -5235,7 +5241,7 @@ module.exports = class Indexer extends AssetManager {
                                 }
                             } else if (xcm.innerCall != undefined) {
                                 // lookup msgHash using innerCall -- it shouldn't be empty?
-                                let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, xcm.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
+                                let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, isTip, xcm.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
                                 if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                                 //accept the fact that this xcm doesn not have destAddress
                             } else {
@@ -5265,9 +5271,9 @@ module.exports = class Indexer extends AssetManager {
                         if (xcmtransfer.msgHash == undefined || xcmtransfer.msgHash.length != 66) {
                             let msgHashCandidate;
                             if (xcmtransfer.innerCall != undefined) {
-                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, xcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
+                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, isTip, xcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
                             } else {
-                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'address')
+                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, isTip, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'address')
                             }
                             if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                             if (msgHashCandidate) rExtrinsic.msgHash = msgHashCandidate
