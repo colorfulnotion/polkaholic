@@ -307,19 +307,19 @@ module.exports = class XCMCleaner extends Query {
             });
             return changes[0];
         }
-	// new
-	if ( msgHash &&  msgHash.length > 4 ) {
-	    let sql2 = `select blockNumber, executedEventID, errorDesc, blockTS from xcmmessages where msgHash = '${msgHash}' and chainIDDest = '${chainIDDest}' and incoming = 1 and blockTS >= ${sourceTS} and destTS <= ${endTS} order by blockTS limit 1`;
+        // new
+        if (msgHash && msgHash.length > 4) {
+            let sql2 = `select blockNumber, executedEventID, errorDesc, blockTS from xcmmessages where msgHash = '${msgHash}' and chainIDDest = '${chainIDDest}' and incoming = 1 and blockTS >= ${sourceTS} and destTS <= ${endTS} order by blockTS limit 1`;
             let xcmmessages = await this.poolREADONLY.query(sql2)
-	    for (const m of xcmmessages) {
-		if ( m.errorDesc ) {
-		    return {
-			bn: m.blockNumber,
-			eventID: m.executedEventID,
-			errorDesc: m.errorDesc,
-			ts: m.blockTS
-		    }
-		}
+            for (const m of xcmmessages) {
+                if (m.errorDesc) {
+                    return {
+                        bn: m.blockNumber,
+                        eventID: m.executedEventID,
+                        errorDesc: m.errorDesc,
+                        ts: m.blockTS
+                    }
+                }
             }
         }
         return null;
@@ -467,32 +467,32 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                     ts: best.ts
                 };
                 let q = await this.computePriceUSD(inp)
-		console.log("BEST", best, q)
+                console.log("BEST", best, q)
                 if (inp.decimals) {
                     // if symbol is known we can compute this
                     xcmInfo.destination.blockNumber = parseInt(best.bn, 10);
-		    let destStatus = 1;
-		    if ( best.errorDesc ) {
-			xcmInfo.destination.error = paraTool.getXCMErrorDescription(best.errorDesc);
+                    let destStatus = 1;
+                    if (best.errorDesc) {
+                        xcmInfo.destination.error = paraTool.getXCMErrorDescription(best.errorDesc);
                         xcmInfo.destination.executionStatus = "failed";
                         xcmInfo.destination.amountReceivedUSD = 0;
-			destStatus = 0;
-		    } else {
-			xcmInfo.destination.amountReceived = best.amountReceived / 10 ** inp.decimals;
-			xcmInfo.destination.teleportFee = xcmInfo.origination.amountSent - xcmInfo.destination.amountReceived;
-			xcmInfo.origination.amountSent = xcm.amountSent / 10 ** inp.decimals;
-			xcmInfo.destination.ts = best.ts;
-			if (q && q.priceUSD) {
+                        destStatus = 0;
+                    } else {
+                        xcmInfo.destination.amountReceived = best.amountReceived / 10 ** inp.decimals;
+                        xcmInfo.origination.amountSent = xcm.amountSent / 10 ** inp.decimals;
+                        xcmInfo.destination.teleportFee = xcmInfo.origination.amountSent - xcmInfo.destination.amountReceived;
+                        xcmInfo.destination.ts = best.ts;
+                        if (q && q.priceUSD) {
                             xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
                             xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
                             xcmInfo.destination.teleportFeeUSD = q.priceUSD * xcmInfo.destination.teleportFee;
-			}
-			xcmInfo.destination.confidence = best.confidence;
-			xcmInfo.destination.executionStatus = "success";
-			if (best.extrinsicID) {
+                        }
+                        xcmInfo.destination.confidence = best.confidence;
+                        xcmInfo.destination.executionStatus = "success";
+                        if (best.extrinsicID) {
                             xcmInfo.destination.extrinsicID = best.extrinsicID;
-			}
-		    }
+                        }
+                    }
                     if (best.eventID) {
                         xcmInfo.destination.eventID = best.eventID;
                     }
@@ -524,7 +524,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
     async bulk_generate_XCMInfo(chainIDDest = null, limit = 1000) {
         let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2022-01-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 4 MINUTE)) and matchAttempts < 2 and matchAttemptDT < date_sub(Now(), interval 2 minute) ${w} order by matchAttempts asc, sourceTS desc limit ${limit}`;
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2021-01-01") and chainID in ( 21000, 1000 ) and  sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 4 MINUTE)) and matchAttempts < 2 and matchAttemptDT < date_sub(Now(), interval 2 minute) ${w} order by matchAttempts asc, sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
         let extrinsic = {};

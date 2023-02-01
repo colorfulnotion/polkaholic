@@ -4,16 +4,20 @@ var SubstrateETL = require("./substrateetl");
 var paraTool = require("./paraTool");
 async function main() {
     let chainID = -1;
+    let logDT = "2023-01-31";
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = parseInt(val, 10);
+        }
+        if (index == 3 && val.length > 0) {
+            logDT = val;
         }
     });
     if ( chainID >= 0 ) {
 	var manager = new SubstrateETL();
 	let done = false;
 	do {
-	    done = await manager.update_address_balances_logDT(chainID);
+	    done = await manager.update_address_balances_logDT(chainID, logDT);
 	} while ( ! done ) 
     } else {
 	while ( 1 ) {

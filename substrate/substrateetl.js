@@ -102,31 +102,27 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null) {
-        //let sql0 = `insert into blocklog ( logDT, chainID, loaded ) (select distinct logDT, chainID, 0 as loaded from indexlog where logDT >= date_sub(Now(), interval 3 day) and chainID < 40000 and chainID not in ( 22110 ) and indexed = 1 and readyForIndexing = 1) on duplicate key update chainID = values(chainID)`
-        //this.batchedSQL.push(sql0);
-        //await this.update_batchedSQL();
 
         let w = "";
         if (paraID >= 0 && relayChain) {
             let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
-            w = ` and chainID = ${chainID}`
+            w = ` and chain.chainID = ${chainID}`
         } else {
-            w = " and chainID in ( select chainID from chain where crawling = 1 )"
+            w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, chainID from blocklog where chainID not in ( 22110, 22100 )  and loaded = 0 and logDT <= date(date_sub(Now(), interval 1 day)) ${w} order by attempted, logDT desc, rand() limit 1`
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and chain.chainID not in ( 22110, 22100 )  and blocklog.loaded = 0 and logDT <= date(date_sub(Now(), interval 1 day)) ${w} order by attempted, logDT desc, rand() limit 1`
         console.log("get_random_substrateetl", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
         let {
             indexTS,
-            chainID
+            chainID,
+	    isEVM
         } = recs[0];
         let hr = 0;
         [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
         paraID = paraTool.getParaIDfromChainID(chainID);
         relayChain = paraTool.getRelayChainByChainID(chainID);
-        let isEVM = 0;
-        // TODO: mark isEVM = 1
         let sql0 = `update blocklog set attempted = attempted + 1 where chainID = '${chainID}' and logDT = '${logDT}'`
         this.batchedSQL.push(sql0);
         await this.update_batchedSQL();
@@ -381,6 +377,13 @@ module.exports = class SubstrateETL extends AssetManager {
                     startKey: last_key
                 })
                 pallet = "tokens";
+            } else if (apiAt.query.ormlTokens != undefined && apiAt.query.ormlTokens.accounts != undefined) {
+                query = await apiAt.query.ormlTokens.accounts.entriesPaged({
+                    args: [],
+                    pageSize: perPagelimit,
+                    startKey: last_key
+                })
+                pallet = "ormltokens";
             } else {
                 console.log(`${chainID}: No assets or tokens pallet!`);
                 pallet = "none";
@@ -495,7 +498,7 @@ module.exports = class SubstrateETL extends AssetManager {
                             numFailures[asset] = failure;
                         }
                     }
-                } else if (pallet == "tokens") { //this is by [account-asset]. not way to tally by asset
+                } else if (pallet == "tokens" || pallet == "ormltokens") { //this is by [account-asset]. not way to tally by asset
                     let userTokenAccountK = user[0].toHuman()
                     let userTokenAccountBal = user[1].toJSON()
                     let account_id = userTokenAccountK[0];
@@ -1281,7 +1284,7 @@ module.exports = class SubstrateETL extends AssetManager {
                                 //log_index: 0,
                                 block_timestamp: tx.timestamp,
                                 block_number: tx.blockNumber,
-                                block_hash: tx.blockHash,
+                                block_hash: tx.blockHash ? tx.blockHash : "",
                                 transfer_type: t.type,
                             }
                             evmtransfers.push(evmtransfer);
