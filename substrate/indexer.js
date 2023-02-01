@@ -1709,7 +1709,21 @@ module.exports = class Indexer extends AssetManager {
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
             try {
+                let xcmTransferHash = xcmtransfer.xcmtransferHash
+                let extrinsicHash = xcmtransfer.extrinsicHash
+                let msgHash = xcmtransfer.msgHash
+                this.logger.error({
+                    "op": "origin publish_xcminfo",
+                    xcmTransferHash,
+                    extrinsicHash,
+                    msgHash,
+                    stage: finalized ? 'OriginationFinalized' : 'OriginationUnfinalized',
+                    isSigned: isSigned ? 1 : 0,
+                    finalized: finalized,
+                    chainID: this.chainID,
+                })
                 await this.publish_xcminfo(xcmtransfer.xcmInfo);
+                //MK!!!
                 // add to xcmtransferslog
                 let _isSigned = isSigned ? 1 : 0;
                 let stage = finalized ? 'OriginationFinalized' : 'OriginationUnfinalized';
@@ -1727,6 +1741,7 @@ module.exports = class Indexer extends AssetManager {
 
                 // since we have two different indexers writing xcmInfo object independently, we only write finalized = false case since it is possible the destination chain finalizes first?
                 if (finalized == false) {
+                    //why finalized here?
                     this.publish_xcmtransfer(xcmtransfer);
                 }
                 if (isXcmTipSafe) {
@@ -2033,6 +2048,18 @@ module.exports = class Indexer extends AssetManager {
                                 let sql = `update xcmtransfer set matched = 1, destStatus = ${destStatus}, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))} ${extra} where extrinsicHash = '${xcmtransfer.extrinsicHash}' and transferIndex = '${xcmtransfer.transferIndex}' and xcmIndex='${xcmtransfer.xcmIndex}'`
                                 this.batchedSQL.push(sql);
                                 await this.update_batchedSQL();
+                                let xcmTransferHash = xcmtransfer.xcmtransferHash
+                                let extrinsicHash = xcmtransfer.extrinsicHash
+                                let msgHash = xcmtransfer.msgHash
+                                this.logger.error({
+                                    "op": "destination publish_xcminfo",
+                                    xcmTransferHash,
+                                    extrinsicHash,
+                                    msgHash,
+                                    stage: stage,
+                                    finalized: finalized,
+                                    chainID: this.chainID,
+                                })
                                 await this.publish_xcminfo(xcmtransfer.xcmInfo);
                                 await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, xcmInfo, this.getCurrentTS());
                             }
@@ -2086,6 +2113,19 @@ module.exports = class Indexer extends AssetManager {
                                     existing_xcmInfo
                                 });
                                 await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, existing_xcmInfo, this.getCurrentTS());
+                                let xcmTransferHash = xcmtransfer.xcmtransferHash
+                                let extrinsicHash = xcmtransfer.extrinsicHash
+                                let msgHash = xcmtransfer.msgHash
+                                this.logger.error({
+                                    "op": "existing publish_xcminfo",
+                                    xcmTransferHash,
+                                    extrinsicHash,
+                                    msgHash,
+                                    stage: finalized ? 'OriginationFinalized' : 'OriginationUnfinalized',
+                                    isSigned: isSigned ? 1 : 0,
+                                    finalized: finalized,
+                                    chainID: this.chainID,
+                                })
                                 await this.publish_xcminfo(existing_xcmInfo);
                             }
                         }
@@ -3733,22 +3773,32 @@ module.exports = class Indexer extends AssetManager {
                     return msgHash
                 } else {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash} but FAILED with firstSeenBN(${firstSeenBN})=targetBN(${targetBN})`)
-
-                        this.logger.error({
-                            "op": "getMsgHashCandidate2",
-                            targetBN,
-                            msgHash,
-                            extrinsicID,
-                            extrinsicHash,
-                            matcher,
-                            matcherType,
-                            chainID: this.chainID,
-                        })
+                    this.logger.error({
+                        "op": "getMsgHashCandidate2",
+                        targetBN,
+                        firstSeenBN,
+                        msgHash,
+                        extrinsicID,
+                        extrinsicHash,
+                        matcher,
+                        matcherType,
+                        chainID: this.chainID,
+                    })
+                    if (firstSeenBN >= targetBN && firstSeenBN - targetBN <= 6) return msgHash
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
                 }
             }
         }
         if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}, ${matcherType}] MISS`)
+        this.logger.error({
+            "op": "getMsgHashCandidate3 lookup failed",
+            targetBN,
+            extrinsicID,
+            extrinsicHash,
+            matcher,
+            matcherType,
+            chainID: this.chainID,
+        })
     }
 
     getEvmMsgHashCandidate(targetBN, matcher = false, matcherType = 'evm') {
@@ -5220,6 +5270,7 @@ module.exports = class Indexer extends AssetManager {
                                 msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'address')
                             }
                             if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
+                            if (msgHashCandidate) rExtrinsic.msgHash = msgHashCandidate
                         }
                         // signed Extrinsic are guranteed to be consistent, regardless of proposer
                         // unsigned Extrinsic is NOT guranteed to bo consistent, therefore we shouldn't write it unless it's finalized
