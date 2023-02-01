@@ -2696,20 +2696,6 @@ module.exports = class ChainParser {
                         targetedAsset = cachedXcmAssetInfo.asset
                         targetXcmInteriorKey = cachedXcmAssetInfo.xcmInteriorKey
                         //rawTargetedAsset = cachedXcmAssetInfo.asset
-                        if (cachedXcmAssetInfo.paraID == 1000 && relayChain != 'moonbase-relay') {
-                            //statemine/statemint
-                            let nativeChainID = paraIDExtra + 1000
-                            let t = JSON.parse(targetedAsset)
-                            let currencyID = t.Token
-                            let symbol = indexer.getCurrencyIDSymbol(currencyID, nativeChainID);
-                            /*
-                            targetedAsset = JSON.stringify({
-                                Token: symbol
-                            })
-                            */
-                            //REVIEW USDT
-                            targetSymbol = symbol
-                        }
                     } else {
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible cachedXcmAssetInfo lookup failed! parents=[${v1_id_concrete_parents}] [${xType}]`, xcmInteriorKey)
                         //lookup failed... should store the interiorVStr some where else for further debugging
@@ -2819,6 +2805,12 @@ module.exports = class ChainParser {
                                 new_interiorV0.push(interiorV0Piece)
                             }
                             interiorVStr = JSON.stringify(new_interiorV0)
+                            if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint) && (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance"))){
+                                // pad palletInstance
+                                console.log(`pad!! original`, new_interiorV0)
+                                let padded_interiorV0 = [expandedParachainPiece, { palletInstance: 50 }, new_interiorV0[1]]
+                                console.log(`pad!! padded_interiorV0`, new_interiorV0)
+                            }
                         } else {
                             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible unknown fungibleAsset type [${xType}]`, JSON.stringify(interiorV0, null, 2))
                         }
@@ -2827,23 +2819,14 @@ module.exports = class ChainParser {
                 //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible derived interiorVStr [${xType}] ${JSON.stringify(interiorV0)} -> ${interiorVStr}`)
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
+                //console.log(`[${xcmInteriorKey}] cachedXcmAssetInfo`, cachedXcmAssetInfo)
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     targetedAsset = cachedXcmAssetInfo.asset
                     //rawTargetedAsset = cachedXcmAssetInfo.asset
-                    if (cachedXcmAssetInfo.paraID == 1000 && relayChain != 'moonbase-relay') {
-                        //statemine/statemint
-                        let nativeChainID = paraIDExtra + 1000
-                        let t = JSON.parse(targetedAsset)
-                        let currencyID = t.Token
-                        let symbol = indexer.getCurrencyIDSymbol(currencyID, nativeChainID);
-                        /*
-                        targetedAsset = JSON.stringify({
-                            Token: symbol
-                        })
-                        */
-                        targetSymbol = symbol
-
+                    if (cachedXcmAssetInfo.xcmchainID == 1000 || cachedXcmAssetInfo.xcmchainID == 21000){
+                        targetSymbol = cachedXcmAssetInfo.symbol
                     }
+
                     //if (this.debugLevel >= paraTool.debugVerbose) console.log(`xcmInteriorKey ${xcmInteriorKey} Found -> targetSymbol=${targetSymbol} (${relayChain})`)
                 } else {
                     //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible cachedXcmAssetInfo lookup failed! [${xType}]`, xcmInteriorKey)
@@ -3088,6 +3071,7 @@ module.exports = class ChainParser {
                                 let [targetedSymbol, targetedRelayChain, amountSent] = this.processV0ConcreteFungible(indexer, fungibleAsset)
                                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV0ConcreteFungible", `processOutgoingPolkadotXcm ${section_method}`, fungibleAsset)
                                 //if (this.debugLevel >= paraTool.debugVerbose) console.log(`targetedSymbol=${targetedSymbol}, amountSent=${amountSent}`)
+                                console.log(`[${extrinsic.extrinsicHash}] ++ processV0ConcreteFungible targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}`)
                                 let aa = {
                                     //asset: targetedAsset,
                                     //rawAsset: rawTargetedAsset,
@@ -3113,6 +3097,7 @@ module.exports = class ChainParser {
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                                 let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = this.processV1ConcreteFungible(indexer, asset)
                                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingPolkadotXcm ${section_method}`, asset)
+                                console.log(`[${extrinsic.extrinsicHash}] ++ processV1ConcreteFungible targetedSymbol=${targetedSymbol}, targetedRelayChain=${targetedRelayChain}, targetedXcmInteriorKey=${targetedXcmInteriorKey}, targetedXcmInteriorKey0=${targetedXcmInteriorKey0}`)
                                 if (targetedXcmInteriorKey == false) targetedXcmInteriorKey = targetedXcmInteriorKey0
                                 let aa = {
                                     xcmInteriorKey: targetedXcmInteriorKey,
