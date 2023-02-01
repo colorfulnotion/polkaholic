@@ -1346,13 +1346,14 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    fixOutgoingUnknownSentAt(sentAt) {
+    fixOutgoingUnknownSentAt(sentAt, finalized = false) {
         let xcmKeys = Object.keys(this.xcmmsgSentAtUnknownMap)
+        let overwrite = true
         for (const xcmKey of xcmKeys) {
             let xcmMsg = this.xcmmsgSentAtUnknownMap[xcmKey]
             xcmMsg.sentAt = sentAt
             //if (this.debugLevel >= paraTool.debugInfo) console.log(`Adding sentAt ${sentAt} [${xcmKey}]`)
-            this.updateXCMMsg(xcmMsg, true)
+            this.updateXCMMsg(xcmMsg, finalized, overwrite)
         }
         this.xcmmsgSentAtUnknownMap = {}
     }
@@ -1437,9 +1438,8 @@ module.exports = class Indexer extends AssetManager {
     }
 
     //this is the xcmmessages table
-    updateXCMMsg(xcmMsg, overwrite = false) {
+    updateXCMMsg(xcmMsg, finalized = false, overwrite = false) {
         //for out going msg wait till we have all available info
-
         let direction = (xcmMsg.isIncoming) ? 'incoming' : 'outgoing'
         if (direction == 'outgoing' && xcmMsg.msgType != 'dmp' && !overwrite) {
             //sentAt is theoretically unknown for ump/hrmp..
@@ -1448,6 +1448,7 @@ module.exports = class Indexer extends AssetManager {
             this.xcmmsgSentAtUnknownMap[xcmKey] = xcmMsg
         } else {
             let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
+            console.log(`[${xcmKey}], finalized=${false}, overwrite=${overwrite}`)
             if (this.xcmTrailingKeyMap[xcmKey] == undefined) {
                 this.xcmTrailingKeyMap[xcmKey] = {
                     chainID: xcmMsg.chainID,
@@ -7587,7 +7588,7 @@ module.exports = class Indexer extends AssetManager {
         return (true);
     }
 
-    async processTraceAsAuto(blockTS, blockNumber, blockHash, chainID, trace, traceType, api) {
+    async processTraceAsAuto(blockTS, blockNumber, blockHash, chainID, trace, traceType, api, finalized = false) {
         // setParserContext
         this.chainParser.setParserContext(blockTS, blockNumber, blockHash, chainID)
         let rawTraces = [];
@@ -7617,8 +7618,8 @@ module.exports = class Indexer extends AssetManager {
       pv: '101052848337458791'
     }
     */
-    async processTraceFromAuto(blockTS, blockNumber, blockHash, chainID, autoTraces, traceType, api) {
-
+    async processTraceFromAuto(blockTS, blockNumber, blockHash, chainID, autoTraces, traceType, api, finalized = false) {
+        // console.log(`processTraceFromAuto [${blockNumber}] [${blockHash}] finalized=${finalized}`)
         // setParserContext
         this.chainParser.setParserContext(blockTS, blockNumber, blockHash, chainID)
 
@@ -7660,7 +7661,7 @@ module.exports = class Indexer extends AssetManager {
             }
             //console.log(`processTrace ${pallet_section}`, a2)
             if (a2.mpType && a2.mpIsSet) {
-                await this.chainParser.processMP(this, p, s, a2)
+                await this.chainParser.processMP(this, p, s, a2, finalized)
             } else if (a2.mpIsEmpty) {
                 // we can safely skip the empty mp here - so that it doens't count towards not handled
             } else if (a2.accountID && a2.asset) {
@@ -7800,7 +7801,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     // given a row r fetched with "fetch_block_row", processes the block, events + trace
-    async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false, traceParseTS = 1670544000) {
+    async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false, isFinalized = true, traceParseTS = 1670544000) {
         /* index_chain_block_row shall process trace(if available) + block + events in orders
         xcm steps:
         (1a) processTrace: parse outgoing xcmmessages from traces
@@ -7845,13 +7846,13 @@ module.exports = class Indexer extends AssetManager {
                 if (blockTS >= traceParseTS) {
                     if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0) || forceParseTrace) {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
-                        autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api);
+                        autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api, isFinalized);
                     } else {
                         // SKIP PROCESSING since we covered autotrace generation already
                         if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
                         autoTraces = r.autotrace;
                     }
-                    await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api); // use result from rawtrace to decorate
+                    await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api, isFinalized); // use result from rawtrace to decorate
                 }
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
                 //console.log(`index_chain_block_row: processTrace`, processTraceTS);
@@ -8241,7 +8242,7 @@ module.exports = class Indexer extends AssetManager {
                     let buildBlockFromRowTS = (new Date().getTime() - buildBlockFromRowStartTS) / 1000
                     this.timeStat.buildBlockFromRowTS += buildBlockFromRowTS
                     this.timeStat.buildBlockFromRow++
-                    let r = await this.index_chain_block_row(rRow, false, true, refreshAPI, false, traceParseTS);
+                    let r = await this.index_chain_block_row(rRow, false, true, refreshAPI, false, true, traceParseTS);
                     let blockNumber = r.blockNumber
                     let blockHash = r.blockHash
                     let parentHash = r.block.header && r.block.header.parentHash ? r.block.header.parentHash : false;
