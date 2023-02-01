@@ -213,6 +213,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             let xcmV1Standardized = JSON.parse(xcmInteriorKeyV2)
 
             //console.log(`xcmInteriorKeyV1=${xcmInteriorKeyV1}, xcmInteriorKeyV2=${xcmInteriorKeyV2}`)
+            let confidence = xcmAsset.confidence
             let decimals = xcmAsset.decimals
             let symbol = xcmAsset.symbol
             let relayChain = xcmAsset.relayChain
@@ -266,6 +267,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 priceUSD: null,
                 parents: 1,
                 xcCurrencyID: xcCurrencyIDMap,
+                confidence: confidence,
             }
             polkaholicXcGar[xcmInteriorKeyV1] = transformedXcmAsset
             console.log(`xcmInteriorKeyV1=${xcmInteriorKeyV1}`, transformedXcmAsset)
@@ -473,7 +475,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 //["xcmInteriorKey", "symbol", "relayChain"]
                 // ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parents"]
                 let t = "(" + [`'${r.xcmInteriorKey}'`,
-                    `'${r.symbol}'`, `'${r.relayChain}'`, `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`
+                    `'${r.symbol}'`, `'${r.relayChain}'`, `'${r.xcmchainID}'`, `'${r.nativeAssetChain}'`, `'${r.isUSD}'`, `'${r.decimals}'`, `'${r.parents}'`, `'${r.xcmInteriorKeyV2}'`, `'${r.parachainID}'`, `'${r.confidence}'`
                 ].join(",") + ")";
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} >>>`, t)
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} res`, r)
@@ -484,9 +486,9 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmassetgar",
                 "keys": ["xcmInteriorKey"],
-                "vals": ["symbol", "relayChain", "xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID"],
+                "vals": ["symbol", "relayChain", "xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
                 "data": xcmAssets,
-                "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID"],
+                "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
                 "replaceIfNull": ["symbol"]
             }, sqlDebug);
         }
