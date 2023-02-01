@@ -38,7 +38,6 @@ module.exports = class AssetManager extends PolkaholicDB {
     xcmAssetInfo = {}; // xcmInteriorKey   ->
     xcmSymbolInfo = {}; // symbolRelayChain ->
     symbolRelayChainAsset = {}; // symbolRelayChain -> { ${chainID}: assetInfo }
-    symbolXcmInteriorKeys = {};
     xcContractAddress = {};
     assetlog = {};
     ratelog = {};
@@ -461,9 +460,6 @@ module.exports = class AssetManager extends PolkaholicDB {
         // reload xcmAsset
         await this.init_xcm_asset();
 
-        // reload chain symbolXcmInteriorKey
-        await this.init_chain_symbolXcmInteriorKey();
-
         // reload paras
         await this.init_paras();
 
@@ -747,29 +743,16 @@ module.exports = class AssetManager extends PolkaholicDB {
         this.currencyIDInfo = currencyIDInfo;
     }
 
-    async init_chain_symbolXcmInteriorKey() {
-        let symbolXcmInteriorKey = {};
-        let assetRecs = await this.poolREADONLY.query("select chainID, paraID, id, symbolXcmInteriorKey, symbol from chain where symbol is not null");
-
-        for (let i = 0; i < assetRecs.length; i++) {
-            let chainAsset = assetRecs[i]
-            let r = {
-                symbol: chainAsset.symbol,
-                chainID: chainAsset.chainID,
-                paraID: chainAsset.paraID,
-                symbolXcmInteriorKey: chainAsset.symbolXcmInteriorKey
+    async checkChainSymbolXcmInteriorKey(chainID) {
+        let symbolXcmInteriorKey = false
+        let chainRecs = await this.poolREADONLY.query(`select symbolXcmInteriorKey, symbol from chain where chainID = '${chainID}'`);
+        if (chainRecs.length > 0){
+            let chainRec = chainRecs[0]
+            if (chainRec.symbolXcmInteriorKey != undefined && chainRec.symbol != undefined){
+                symbolXcmInteriorKey = chainRec.symbolXcmInteriorKey
             }
-            symbolXcmInteriorKey[chainAsset.chainID] = r
         }
-        this.symbolXcmInteriorKey = symbolXcmInteriorKey;
-    }
-
-    getChainSymbolXcmInteriorKey(chainID) {
-        let chainSymbolAsset = this.symbolXcmInteriorKey[chainID]
-        if (chainSymbolAsset != undefined && chainSymbolAsset.symbolXcmInteriorKey != undefined) {
-            return chainSymbolAsset.symbolXcmInteriorKey
-        }
-        return false
+        return symbolXcmInteriorKey
     }
 
     validXCMSymbol(symbol, chainID, ctx, o) {

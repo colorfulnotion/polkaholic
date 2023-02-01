@@ -179,7 +179,9 @@ module.exports = class ChainParser {
         let props = JSON.parse(propsNative.toString());
         // {"ss58Format":10,"tokenDecimals":[12,12,10,10],"tokenSymbol":["ACA","AUSD","DOT","LDOT"]}
         // NOT MAINTAINED let ss58Format = props.ss58Format;
-        let chainSymbolXcmInteriorKey = indexer.getChainSymbolXcmInteriorKey(chainID)
+        // checking if chainSymbolXcmInteriorKey is set
+        let chainSymbolXcmInteriorKey = await indexer.checkChainSymbolXcmInteriorKey(chainID)
+        //let chainSymbolXcmInteriorKey = indexer.getChainSymbolXcmInteriorKey(chainID)
         console.log(`[${chainID}] chainSymbolXcmInteriorKey=${chainSymbolXcmInteriorKey}, properties`, props)
         if (props.tokenSymbol) {
             for (let i = 0; i < props.tokenSymbol.length; i++) {
