@@ -1440,8 +1440,8 @@ module.exports = class Indexer extends AssetManager {
     updateXCMMsg(xcmMsg, overwrite = false) {
         //for out going msg wait till we have all available info
 
-        let direction = (xcmMsg.isIncoming) ? 'i' : 'o'
-        if (direction == 'o' && xcmMsg.msgType != 'dmp' && !overwrite) {
+        let direction = (xcmMsg.isIncoming) ? 'incoming' : 'outgoing'
+        if (direction == 'outgoing' && xcmMsg.msgType != 'dmp' && !overwrite) {
             //sentAt is theoretically unknown for ump/hrmp..
             let xcmKey = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${direction}`
             if (this.debugLevel >= paraTool.debugVerbose) console.log(`xcmmsg SentAt Unknown [${xcmKey}]`)
@@ -3731,8 +3731,17 @@ module.exports = class Indexer extends AssetManager {
         return false
     }
 
+    filterXCMkeyByDirection(xcmkey, outgoing = true){
+        if(outgoing){
+          if (xcmkey.includes('outgoing')) return true
+        }else{
+          if (xcmkey.includes('incoming')) return true
+        }
+        return false
+    }
+
     // find the msgHash given {BN, recipient} or {BN, innercall}
-    getMsgHashCandidate(targetBN, finalized = false, isTip = false, matcher = false, extrinsicID = false, extrinsicHash = false, matcherType = 'address') {
+    getMsgHashCandidate(targetBN, finalized = false, isTip = false, matcher = false, extrinsicID = false, extrinsicHash = false, matcherType = 'address', isOutgoing = true) {
         if (!matcher) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getMsgHashCandidate [${targetBN}], matcher MISSING`)
             return false
@@ -3743,8 +3752,10 @@ module.exports = class Indexer extends AssetManager {
             return false
         }
         let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
+        //trailingKeys format = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
         if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] trailingKeys`, trailingKeys)
         for (const tk of trailingKeys) {
+            if (!this.filterXCMkeyByDirection(tk, isOutgoing)) continue
             let trailingXcm = this.xcmTrailingKeyMap[tk]
             if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] trailingXcm`, trailingXcm)
             let firstSeenBN = trailingXcm.blockNumber
@@ -3788,7 +3799,7 @@ module.exports = class Indexer extends AssetManager {
                           chainID: this.chainID,
                       })
                     }
-                    if (firstSeenBN >= targetBN && firstSeenBN - targetBN <= 6) return msgHash
+                    //if (firstSeenBN >= targetBN && firstSeenBN - targetBN <= 6) return msgHash
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
                 }
             }
@@ -5241,7 +5252,7 @@ module.exports = class Indexer extends AssetManager {
                                 }
                             } else if (xcm.innerCall != undefined) {
                                 // lookup msgHash using innerCall -- it shouldn't be empty?
-                                let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, isTip, xcm.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
+                                let msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, isTip, xcm.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall', true)
                                 if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                                 //accept the fact that this xcm doesn not have destAddress
                             } else {
@@ -5271,9 +5282,9 @@ module.exports = class Indexer extends AssetManager {
                         if (xcmtransfer.msgHash == undefined || xcmtransfer.msgHash.length != 66) {
                             let msgHashCandidate;
                             if (xcmtransfer.innerCall != undefined) {
-                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, isTip, xcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall')
+                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, isTip, xcmtransfer.innerCall, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'innercall', true)
                             } else {
-                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, isTip, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'address')
+                                msgHashCandidate = this.getMsgHashCandidate(xcmtransfer.blockNumber, finalized, isTip, xcmtransfer.destAddress, rExtrinsic.extrinsicID, rExtrinsic.extrinsicHash, 'address', true)
                             }
                             if (msgHashCandidate) xcmtransfer.msgHash = msgHashCandidate
                             if (msgHashCandidate) rExtrinsic.msgHash = msgHashCandidate
