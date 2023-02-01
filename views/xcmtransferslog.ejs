@@ -1,0 +1,34 @@
+<%- include('header', {chainInfo: chainInfo, title: "XCM Transfers"}); %>
+
+<h5>XCM Transfers</h5>
+ xcmIndex, transferIndex, symbol, msgHash, sourceTS, chainIDDest, convert(xcmInfo using utf8) xcmInfo, addTS, stage
+
+<table id="tablexcmtransferslog" class="display" style='width: 100%'>
+      <thead>
+        <tr>
+          <th><%- include("tooltip", {k: "xcmtransferslogaddts"}) %>Msg Time</th>
+          <th><%- include("tooltip", {k: "xcmtransferslogextrinsic"}) %>Origination/Extrinsic</th>
+          <th><%- include("tooltip", {k: "iddest"}) %>Destination</th>
+          <th><%- include("tooltip", {k: "xcmtransferslogstage"}) %>Stage</th>
+          <th><%- include("tooltip", {k: "xcmtransferslogsourcets"}) %>Original Extrinsic Time</th>
+          <th><%- include("tooltip", {k: "xcmtransferslogsymbol"}) %>Symbol</th>
+          <th><%- include("tooltip", {k: "xcminfo"}) %>XCM Info</th>
+          <th>Relay</th>
+        </tr>
+      </thead>
+</table>
+
+<%- include('footer', {apiUrl: apiUrl}); %>
+<script>
+let id = '<% id %>';
+let data = <%- JSON.stringify(data) %>;
+let chainID_or_chainName = "<%- chainID_or_chainName %>";
+let chainIDDest_or_chainName = "<%- chainIDDest_or_chainName %>";
+
+$(document).ready(function() {
+    showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainName);
+});
+</script>
+<script src="/chains.js"></script>
+<script src="/chainui.js"></script>
+<script src="/xcmtransferslogui.js"></script>
