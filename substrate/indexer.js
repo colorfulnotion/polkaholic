@@ -3752,10 +3752,12 @@ module.exports = class Indexer extends AssetManager {
             return false
         }
         let trailingKeys = Object.keys(this.xcmTrailingKeyMap)
+        let directionalXcmKeys = []
         //trailingKeys format = `${xcmMsg.msgHash}-${xcmMsg.msgType}-${xcmMsg.sentAt}-${direction}`
         if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] trailingKeys`, trailingKeys)
         for (const tk of trailingKeys) {
             if (!this.filterXCMkeyByDirection(tk, isOutgoing)) continue
+            directionalXcmKeys.push(tk)
             let trailingXcm = this.xcmTrailingKeyMap[tk]
             if (this.debugLevel >= paraTool.debugTracing) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] trailingXcm`, trailingXcm)
             let firstSeenBN = trailingXcm.blockNumber
@@ -3795,6 +3797,7 @@ module.exports = class Indexer extends AssetManager {
                           extrinsicHash,
                           matcher,
                           matcherType,
+                          directionalXcmKeys,
                           diffSentAt: firstSeenBN - targetBN,
                           chainID: this.chainID,
                       })
@@ -3813,6 +3816,7 @@ module.exports = class Indexer extends AssetManager {
               extrinsicHash,
               matcher,
               matcherType,
+              directionalXcmKeys,
               chainID: this.chainID,
           })
         }
