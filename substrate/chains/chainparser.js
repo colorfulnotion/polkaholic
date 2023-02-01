@@ -1199,7 +1199,7 @@ module.exports = class ChainParser {
                         if (uMsgs) {
                             for (const uMsg of uMsgs) {
                                 indexer.updateXCMChannelMsg(uMsg, this.parserBlockNumber, this.parserTS)
-                                indexer.updateXCMMsg(uMsg)
+                                indexer.updateXCMMsg(uMsg, finalized)
                             }
                         }
                     }
@@ -1256,7 +1256,7 @@ module.exports = class ChainParser {
                     this.setRelayParentStateRoot(relayParentStateRoot)
                     //if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${this.parserBlockNumber}] Update hrmpWatermark from extrinsic: ${hrmpWatermark} (${relayParentStateRoot})`)
                     //update all outgoing trace msg with this hrmp
-                    indexer.fixOutgoingUnknownSentAt(hrmpWatermark);
+                    indexer.fixOutgoingUnknownSentAt(hrmpWatermark, finalized);
                 } catch (err1) {
                     console.log(`unable to find watermarkBN`, err1.toString())
                 }
@@ -1275,7 +1275,7 @@ module.exports = class ChainParser {
                     if (dMsgs) {
                         for (const dMsg of dMsgs) {
                             indexer.updateXCMChannelMsg(dMsg, this.parserBlockNumber, this.parserTS)
-                            indexer.updateXCMMsg(dMsg)
+                            indexer.updateXCMMsg(dMsg, finalized)
                         }
                     }
                 }
@@ -1292,7 +1292,7 @@ module.exports = class ChainParser {
                         if (xcMsgs) {
                             for (const xcMsg of xcMsgs) {
                                 indexer.updateXCMChannelMsg(xcMsg, this.parserBlockNumber, this.parserTS)
-                                indexer.updateXCMMsg(xcMsg)
+                                indexer.updateXCMMsg(xcMsg, finalized)
                             }
                         }
                     }
@@ -3959,7 +3959,7 @@ module.exports = class ChainParser {
     }
 
     //mk: review this
-    async processMPTrace(indexer, p, s, e2, mpType = false) {
+    async processMPTrace(indexer, p, s, e2, mpType = false, finalized = false) {
         let sectionMethod = `${p}:${s}`
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`processMPTrace ${sectionMethod}`, e2);
         try {
@@ -3967,7 +3967,7 @@ module.exports = class ChainParser {
             for (const msg of msgs) {
                 let xcmRec = this.processxcmMsgRaw(indexer, msg)
                 if (xcmRec) {
-                    indexer.updateXCMMsg(xcmRec)
+                    indexer.updateXCMMsg(xcmRec, finalized)
                 }
             }
         } catch (e) {
@@ -4042,17 +4042,17 @@ module.exports = class ChainParser {
         return;
     }
 
-    async processMP(indexer, p, s, e2) {
+    async processMP(indexer, p, s, e2, finalized = false) {
         let pallet_section = `${p}:${s}`
         if (pallet_section == "Dmp:DownwardMessageQueues") {
             //TODO
-            await this.processMPTrace(indexer, p, s, e2, 'dmp');
+            await this.processMPTrace(indexer, p, s, e2, 'dmp', finalized);
         } else if (pallet_section == "ParachainSystem:HrmpOutboundMessages") {
             //TODO
-            await this.processMPTrace(indexer, p, s, e2, 'hrmp');
+            await this.processMPTrace(indexer, p, s, e2, 'hrmp', finalized);
         } else if (pallet_section == "ParachainSystem:UpwardMessages") {
             //TODO
-            await this.processMPTrace(indexer, p, s, e2, 'ump');
+            await this.processMPTrace(indexer, p, s, e2, 'ump', finalized);
         } else {
             //if (this.debugLevel >= paraTool.debugInfo) console.log(`pallet_section ${pallet_section} not handled`)
         }
