@@ -1793,8 +1793,9 @@ module.exports = class Crawler extends Indexer {
 
                 let refreshAPI = false
                 let isTip = true
-                //index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false)
-                let r = await this.index_chain_block_row(rRow, isSignedBlock, false, refreshAPI, isTip);
+                let finalized = true
+                //index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false, isFinalized = true, traceParseTS = 1670544000)
+                let r = await this.index_chain_block_row(rRow, isSignedBlock, false, refreshAPI, isTip, finalized);
                 blockStats = r.blockStats;
                 // IMMEDIATELY flush all address feed + hashes (txs + blockhashes)
                 await this.flush(block.blockTS, bn, false, isTip); //ts, bn, isFullPeriod, isTip
@@ -2075,11 +2076,13 @@ module.exports = class Crawler extends Indexer {
                             let signedExtrinsicBlock = block
                             signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
                             // IMPORTANT NOTE: we only need to do this for evm chains... (review)
-                            let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api);
                             let isFinalized = false
-
                             let isTip = true
                             let isTracesPresent = success // true here
+
+                            let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
+                            await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized); // use result from rawtrace to decorate
+
                             //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
                             let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces, isFinalized, false, isTip, isTracesPresent);
 
