@@ -1230,7 +1230,7 @@ module.exports = class Indexer extends AssetManager {
                         xcmType,
                         pendingXcmInfoBlob
                     ].join(",") + ")";
-                    // CHECK: do we need isXcmTipSafe = (isSigned || finalized) ? true : false concept here to ensure that xcmtransfer records are inserted only when "safe" 
+                    // CHECK: do we need isXcmTipSafe = (isSigned || finalized) ? true : false concept here to ensure that xcmtransfer records are inserted only when "safe"
                     if (r.msgHash == "0x" && !r.finalized) {
                         //msgHash is missing... we will
                         console.log(`[${r.extrinsicHash} [${r.extrinsicID}] [finzlied=${r.finalized}] msgHash missing!`)
@@ -3723,7 +3723,7 @@ module.exports = class Indexer extends AssetManager {
                         chainID: this.chainID,
                     })
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
-		    
+
                     if (this.xcmmsgMap[tk] != undefined && extrinsicID && extrinsicHash) {
                         this.xcmmsgMap[tk].extrinsicID = extrinsicID
                         this.xcmmsgMap[tk].extrinsicHash = extrinsicHash

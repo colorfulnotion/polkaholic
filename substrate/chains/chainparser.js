@@ -169,6 +169,8 @@ module.exports = class ChainParser {
 
     async getSystemProperties(indexer, chain) {
         let chainID = chain.chainID;
+        let relayChain = paraTool.getRelayChainByChainID(chainID);
+        let paraID = paraTool.getParaIDfromChainID(chainID)
         if (chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta || chainID == paraTool.chainIDMoonbaseRelay) {
             //suppress DEV
             return
@@ -177,7 +179,8 @@ module.exports = class ChainParser {
         let props = JSON.parse(propsNative.toString());
         // {"ss58Format":10,"tokenDecimals":[12,12,10,10],"tokenSymbol":["ACA","AUSD","DOT","LDOT"]}
         // NOT MAINTAINED let ss58Format = props.ss58Format;
-        //console.log(propsNative)
+        let chainSymbolXcmInteriorKey = indexer.getChainSymbolXcmInteriorKey(chainID)
+        console.log(`[${chainID}] chainSymbolXcmInteriorKey=${chainSymbolXcmInteriorKey}, properties`, props)
         if (props.tokenSymbol) {
             for (let i = 0; i < props.tokenSymbol.length; i++) {
                 let symbol = props.tokenSymbol[i];
@@ -193,12 +196,40 @@ module.exports = class ChainParser {
                     isNativeChain: 0
                 };
                 // TODO: skip this if we already know about this!
-                let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
+                let assetChain = paraTool.makeAssetChain(asset, chainID);
+                if (i == 0 && !chainSymbolXcmInteriorKey){
+                    let pseudoXCMAssets = []
+                    let pseudoXCMInteriorkey = paraTool.makeAssetChain(symbol, relayChain)
+                    if (symbol == 'KSM' || symbol == 'DOT'){
+                        pseudoXCMInteriorkey = `here~${relayChain}`
+                    }
+                    let chainSymbolXcmInteriorSql = `update chain set symbolXcmInteriorKey = '${pseudoXCMInteriorkey}', symbol = '${symbol}' where chainID = '${chainID}'`
+                    console.log(`updating chain SymbolXcmInteriorKey`, chainSymbolXcmInteriorSql)
+                    indexer.batchedSQL.push(chainSymbolXcmInteriorSql);
+                    let t = "(" + [`'${pseudoXCMInteriorkey}'`,
+                        `'${assetInfo.symbol}'`, `'${relayChain}'`, `'${chainID}'`, `'${assetChain}'`, `'${assetInfo.decimals}'`, `'${paraID}'`, '0'
+                    ].join(",") + ")";
+                    if (pseudoXCMInteriorkey != `here~${relayChain}`){
+                        console.log(`adding pseudo native asset!`, t)
+                        pseudoXCMAssets.push(t)
+                        let sqlDebug = true
+                        await indexer.upsertSQL({
+                            "table": "xcmasset",
+                            "keys": ["xcmInteriorKey"],
+                            "vals": ["symbol", "relayChain", "xcmchainID", "nativeAssetChain", "decimals", "parachainID", "isXCMAsset"],
+                            "data": pseudoXCMAssets,
+                            "replace": ["xcmchainID", "nativeAssetChain", "decimals", "parachainID"],
+                            "replaceIfNull": ["symbol"]
+                        }, sqlDebug);
+                    }
+                }
                 let cachedAssetInfo = indexer.assetInfo[assetChain]
                 //console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)
                 if (cachedAssetInfo !== undefined && cachedAssetInfo.assetName != undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
                     //cached assetInfo
+                    //console.log(`[Cached Asset] asset=${asset}, chainID=${chainID}, assetInfo`, assetInfo)
                 } else {
+                    console.log(`[Fresh Asset] asset=${asset}, chainID=${chainID}, assetInfo`, assetInfo)
                     await indexer.addAssetInfo(asset, chainID, assetInfo, 'getSystemProperties');
                     // if chain does not have a "asset" specified, it will get one from the FIRST one
                     if (i == 0) {
@@ -211,7 +242,7 @@ module.exports = class ChainParser {
                         }
                         if (!chain.symbol) {
                             // TODO: add this after checking chain.symbol and symbol
-                            // indexer.batchedSQL.push(`update chain set symbol = '${symbol}' where chainID = '${chainID}'`);
+                            indexer.batchedSQL.push(`update chain set symbol = '${symbol}' where chainID = '${chainID}'`);
                         }
                     }
                 }
@@ -4800,11 +4831,13 @@ module.exports = class ChainParser {
             //assetregistry
             return this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
         } else if (indexer.chainID == paraTool.chainIDBifrostKSM || indexer.chainID == paraTool.chainIDBifrostDOT) {
-            // token2 format
+            //original format
             let assetString = this.processXcmDecHexCurrencyID(indexer, currency_id)
+            //console.log(`BIFROST Token ${assetString}`)
             if (!assetString) {
-                //original format
+                // token2 format
                 assetString = this.processXcmAssetRegistryCurrencyID(indexer, currency_id)
+                //console.log(`BIFROST Token2 ${assetString}`)
             }
             return assetString
         } else if (indexer.chainID == paraTool.chainIDInterlay || indexer.chainID == paraTool.chainIDKintsugi) {
@@ -4843,7 +4876,7 @@ module.exports = class ChainParser {
                 rawAssetID = currency_id
             }
         }
-        //if (this.debugLevel >= paraTool.debugTracing) console.log(`rawAssetID=${rawAssetID}, currency_id`, currency_id)
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`processXcmDecHexCurrencyID rawAssetID=${rawAssetID}, currency_id`, currency_id)
         if (rawAssetID != undefined) {
             let assetIDWithComma = paraTool.toNumWithComma(paraTool.dechexAssetID(rawAssetID))
             let assetID = this.cleanedAssetID(assetIDWithComma)
@@ -4872,7 +4905,7 @@ module.exports = class ChainParser {
             return parsedAsset.Token
         } else {
             let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
-            //if (this.debugLevel >= paraTool.debugInfo) console.log(`convert currency_id [${JSON.stringify(currency_id)}] -> ${assetString}, assetInfo`, assetInfo)
+            //if (this.debugLevel >= paraTool.debugInfo) console.log(`processXcmAssetRegistryCurrencyID convert currency_id [${JSON.stringify(currency_id)}] -> ${assetString}, assetInfo`, assetInfo)
             if (assetInfo != undefined && assetInfo.symbol != undefined && assetInfo.isXCAsset) {
                 let xcmAssetSymbol = assetInfo.symbol
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`convert currency_id [${JSON.stringify(currency_id)}] ->  xcmAssetSymbol ${xcmAssetSymbol}`)
@@ -5211,19 +5244,20 @@ module.exports = class ChainParser {
         return [false, false]
     }
 
+    //use currencyIDInfo for backup search
     getSynchronizedAssetInfo(indexer, parsedAsset) {
         var asset = JSON.stringify(parsedAsset);
         //console.log(`getAssetInfo `, parsedAsset, asset, indexer.chainID)
         let assetChain = paraTool.makeAssetChain(asset, indexer.chainID);
-        //console.log(`assetChain=${assetChain}`, parsedAsset, asset, indexer.chainID)
+        //console.log(`** assetChain=${assetChain}`, parsedAsset, asset, indexer.chainID)
         let cachedAssetInfo = indexer.assetInfo[assetChain]
-        //console.log(`getAssetInfo cachedAssetInfo`, cachedAssetInfo)
+        //console.log(`getSynchronizedAssetInfo assetChain=${assetChain} cachedAssetInfo`, cachedAssetInfo)
         if (cachedAssetInfo !== undefined && cachedAssetInfo.decimals != undefined && cachedAssetInfo.assetType != undefined && cachedAssetInfo.symbol != undefined) {
             return (cachedAssetInfo);
         }
         //cachedAssetInfo via currencyID
-        let cachedAssetInfo2 = indexer.currencyIDInfo[assetChain]
-        //console.log(`getAssetInfo cachedAssetInfo2`, cachedAssetInfo2)
+        let cachedAssetInfo2 = indexer.getAssetByCurrencyID(asset, indexer.chainID)
+        //console.log(`getAssetInfo cachedAssetInfo2 assetChain=${assetChain}`, cachedAssetInfo2)
         if (cachedAssetInfo2 !== undefined && cachedAssetInfo2.decimals != undefined && cachedAssetInfo2.assetType != undefined && cachedAssetInfo2.symbol != undefined) {
             return (cachedAssetInfo2);
         }
