@@ -197,10 +197,10 @@ module.exports = class ChainParser {
                 };
                 // TODO: skip this if we already know about this!
                 let assetChain = paraTool.makeAssetChain(asset, chainID);
-                if (i == 0 && !chainSymbolXcmInteriorKey){
+                if (i == 0 && !chainSymbolXcmInteriorKey) {
                     let pseudoXCMAssets = []
                     let pseudoXCMInteriorkey = paraTool.makeAssetChain(symbol, relayChain)
-                    if (symbol == 'KSM' || symbol == 'DOT'){
+                    if (symbol == 'KSM' || symbol == 'DOT') {
                         pseudoXCMInteriorkey = `here~${relayChain}`
                     }
                     let chainSymbolXcmInteriorSql = `update chain set symbolXcmInteriorKey = '${pseudoXCMInteriorkey}', symbol = '${symbol}' where chainID = '${chainID}'`
@@ -209,7 +209,7 @@ module.exports = class ChainParser {
                     let t = "(" + [`'${pseudoXCMInteriorkey}'`,
                         `'${assetInfo.symbol}'`, `'${relayChain}'`, `'${chainID}'`, `'${assetChain}'`, `'${assetInfo.decimals}'`, `'${paraID}'`, '0'
                     ].join(",") + ")";
-                    if (pseudoXCMInteriorkey != `here~${relayChain}`){
+                    if (pseudoXCMInteriorkey != `here~${relayChain}`) {
                         console.log(`adding pseudo native asset!`, t)
                         pseudoXCMAssets.push(t)
                         let sqlDebug = true

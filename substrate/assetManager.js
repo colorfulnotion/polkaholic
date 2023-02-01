@@ -754,19 +754,19 @@ module.exports = class AssetManager extends PolkaholicDB {
         for (let i = 0; i < assetRecs.length; i++) {
             let chainAsset = assetRecs[i]
             let r = {
-               symbol: chainAsset.symbol,
-               chainID: chainAsset.chainID,
-               paraID: chainAsset.paraID,
-               symbolXcmInteriorKey: chainAsset.symbolXcmInteriorKey
-             }
-             symbolXcmInteriorKey[chainAsset.chainID] = r
+                symbol: chainAsset.symbol,
+                chainID: chainAsset.chainID,
+                paraID: chainAsset.paraID,
+                symbolXcmInteriorKey: chainAsset.symbolXcmInteriorKey
+            }
+            symbolXcmInteriorKey[chainAsset.chainID] = r
         }
         this.symbolXcmInteriorKey = symbolXcmInteriorKey;
     }
 
     getChainSymbolXcmInteriorKey(chainID) {
         let chainSymbolAsset = this.symbolXcmInteriorKey[chainID]
-        if (chainSymbolAsset != undefined && chainSymbolAsset.symbolXcmInteriorKey != undefined){
+        if (chainSymbolAsset != undefined && chainSymbolAsset.symbolXcmInteriorKey != undefined) {
             return chainSymbolAsset.symbolXcmInteriorKey
         }
         return false
@@ -913,13 +913,13 @@ module.exports = class AssetManager extends PolkaholicDB {
         }
     }
 
-    getAssetByCurrencyID(currencyID, chainID){
-      let currencyChain = paraTool.makeAssetChain(currencyID, chainID);
-      if (this.currencyIDInfo[currencyChain] !== undefined) {
-          let assetInfo = this.currencyIDInfo[currencyChain];
-          return assetInfo
-      }
-      return false
+    getAssetByCurrencyID(currencyID, chainID) {
+        let currencyChain = paraTool.makeAssetChain(currencyID, chainID);
+        if (this.currencyIDInfo[currencyChain] !== undefined) {
+            let assetInfo = this.currencyIDInfo[currencyChain];
+            return assetInfo
+        }
+        return false
     }
 
     getCurrencyIDDecimal(currencyID, chainID) {

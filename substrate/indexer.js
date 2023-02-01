@@ -3732,14 +3732,14 @@ module.exports = class Indexer extends AssetManager {
                 } else {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash} but FAILED with firstSeenBN(${firstSeenBN})=targetBN(${targetBN})`)
 
-                        this.logger.error({
-                            "op": "getMsgHashCandidate2",
-                            targetBN,
-                            msgHash,
-                            extrinsicID,
-                            extrinsicHash,
-                            chainID: this.chainID,
-                        })
+                    this.logger.error({
+                        "op": "getMsgHashCandidate2",
+                        targetBN,
+                        msgHash,
+                        extrinsicID,
+                        extrinsicHash,
+                        chainID: this.chainID,
+                    })
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
                 }
             }
