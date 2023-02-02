@@ -5201,8 +5201,8 @@ module.exports = class Indexer extends AssetManager {
         if (!isSigned) {
             let xcmCandidates = this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, isTip, finalized);
             for (const c of xcmCandidates){
-                console.log(`** Indexer caller=${c.caller}, candiate`, c.candidate)
-                //this.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
+                console.log(`** Indexer caller=${c.caller}, candidate`, c.candidate)
+                this.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
             }
         }
         //console.log('hash!!', extrinsicHash, `isSigned=${isSigned}`, `${JSON.stringify(extrinsic.signature)}`, extrinsic.signature.signer)

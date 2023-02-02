@@ -975,13 +975,16 @@ module.exports = class ChainParser {
         }
     }
 
-    processRawDestCandidates(rawCandidates){
+    processRawDestCandidates(rawCandidates, rawWithdrawCandidates){
         let candidates = []
         let rawCandidateCnt = rawCandidates.length
         if (rawCandidateCnt == 0) return candidates
+
+        let c1 = rawCandidates[rawCandidateCnt-1].candidate
+        let c1_caller = rawCandidates[rawCandidateCnt-1].caller
+
         if (rawCandidateCnt == 1){
-           // Reap case 0x890a6807bd375ffbda017016002cfefb9f85aa4df19d5b27cf101119aca69cd2 0-13209424
-           let c1 = rawCandidates[rawCandidateCnt-1].candidate
+           // Reap case 0x890a6807bd375ffbda017016002cfefb9f85aa4df19d5b27cf101119aca69cd2 (0 13209424)
            let xcmTeleportFees = c1.amountReceived
            let feeRecipient =  c1.fromAddress
            let treasuryEventID = c1.eventID
@@ -992,26 +995,63 @@ module.exports = class ChainParser {
            c1.treasuryEventID = treasuryEventID
            c1.xcmTeleportFees = xcmTeleportFees
            c1.treasuryAddress = feeRecipient
+           c1.isFeeItem = 1
            c1.reaped = 1
            c1.reapedAmount = 0
-           candidates.push(c1)
+           if (rawWithdrawCandidates.length > 0){
+               // assume the first rec is the deposit amount
+               let w0 = rawWithdrawCandidates[0].candidate
+               let reapedAmount = w0.amountReceived - xcmTeleportFees
+               if (reapedAmount > 0){
+                  c1.reapedAmount = reapedAmount
+               }
+           }
+           candidates.push({candidate: c1, caller: c1_caller})
         }else if (rawCandidateCnt == 2){
-           // Normal case (2-16463036)
+           // Normal case (2-16463036) single asset
            let c0 = rawCandidates[0].candidate
-           let c1 = rawCandidates[rawCandidateCnt-1].candidate
-           if (c0.xcmSymbol == c1.xcmSymbol && c0.xcmInteriorKey == c1.xcmInteriorKey){
+           let c0_caller = rawCandidates[0].caller
+           if (c0.xcmSymbol == c1.xcmSymbol){
               let xcmTeleportFees = c1.amountReceived
               let feeRecipient =  c1.fromAddress
               let treasuryEventID = c1.eventID
                c0.treasuryEventID = treasuryEventID
                c0.xcmTeleportFees = xcmTeleportFees
                c0.treasuryAddress = feeRecipient
-               c1.reaped = 0
-               c1.reapedAmount = 0
+               c0.isFeeItem = 1
+               c0.reaped = 0
+               c0.reapedAmount = 0
            }
-           candidates.push(c0)
-        }else if (rawCandidateCnt >= 3){
+          candidates.push({candidate: c0, caller: c0_caller})
+        }else{
           // MultiAssets case 0x92bec041b54422d08e436be1a8db247d5f4466e20c299647405fed2261bc5ba1 (2004 2858049)
+          let xcmTeleportFees = c1.amountReceived
+          let feeRecipient =  c1.fromAddress
+          let treasuryEventID = c1.eventID
+          let feepayingSymbol = c1.xcmSymbol
+          console.log(`[${treasuryEventID}] ${feepayingSymbol} feeRecipient=${feeRecipient}, xcmTeleportFees=${xcmTeleportFees}`)
+          for (let i = 0; i < rawCandidateCnt -1 ; i++) {
+              let c0 = rawCandidates[i].candidate
+              let c0_caller = rawCandidates[i].caller
+              if (c0.xcmSymbol == feepayingSymbol){
+                  // fee paying.
+                  c0.treasuryEventID = treasuryEventID
+                  c0.xcmTeleportFees = xcmTeleportFees
+                  c0.treasuryAddress = feeRecipient
+                  c0.isFeeItem = 1
+                  c0.reaped = 0
+                  c0.reapedAmount = 0
+              }else{
+                // not fee paying but still mark it with treasuryEventID?
+                c0.treasuryEventID = treasuryEventID
+                c0.xcmTeleportFees = 0
+                c0.treasuryAddress = feeRecipient
+                c0.isFeeItem = 0
+                c0.reaped = 0
+                c0.reapedAmount = 0
+              }
+              candidates.push({candidate: c0, caller: c0_caller})
+          }
         }
         return candidates
     }
@@ -1065,44 +1105,37 @@ module.exports = class ChainParser {
                 //console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] eventRange`,eventRange)
                 //update xcmMessages
                 indexer.updateMPState(mpState)
-                //only compute candiate mpState is successful
+                //only compute candidate mpState is successful
                 if (mpState.success === true) {
-                    let candiateCnt = 0
+                    let candidateCnt = 0
                     let rawCandidates = []
+                    let rawWithdrawCandidates = []
                     let candidates = []
                     for (let i = 0; i < eventRangeLengthWithFee; i++) {
                         let e = eventRange[i]
-                        let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
-                        console.log(`processIncomingAssetSignal candidate`, candidate)
+                        let [candidate, caller] = this.processIncomingAssetDepositSignal(indexer, extrinsicID, e, mpState, finalized)
+                        //console.log(`processIncomingAssetDepositSignal candidate`, candidate)
                         if (candidate) {
-                            candiateCnt++
+                            candidateCnt++
                             rawCandidates.push({candidate: candidate, caller: caller})
+                            //indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
+                        }
+                        let [withdrawCandidate, withdrawCaller] = this.processIncomingAssetWithdralSignal(indexer, extrinsicID, e, mpState, finalized)
+                        if (withdrawCandidate) {
+                            candidateCnt++
+                            rawWithdrawCandidates.push({candidate: withdrawCandidate, caller: withdrawCaller})
                             //indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
                         }
                     }
                     if (rawCandidates.length >= 0 ){
-                        console.log(`rawCandidates ***`, rawCandidates)
-                        xcmCandidates = this.processRawDestCandidates(rawCandidates)
-                        console.log(`candidates **`, candidates)
+                        //console.log(`rawCandidates ***`, rawCandidates)
+                        xcmCandidates = this.processRawDestCandidates(rawCandidates, rawWithdrawCandidates)
+                        //console.log(`candidates **`, xcmCandidates)
                     }
                     for (const c of candidates){
                         //indexer.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
                     }
-                    //console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
-                    /*
-                    if (candiateCnt == 0) {
-                        let lastEvent = eventRange[eventRange.length - 1]
-                        //let lastEvent = eventRange[eventRange.length - 1]
-                        if (lastEvent) {
-                            let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, lastEvent, mpState, finalized)
-                            //console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
-                            if (candidate) {
-                                candiateCnt++
-                                //indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
-                            }
-                        }
-                    }
-                    */
+                    //console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candidate=${candidateCnt}`)
                 } else {
                     //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
                 }
@@ -1754,8 +1787,45 @@ module.exports = class ChainParser {
         }
     }
 
-    processIncomingAssetSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
+    processIncomingAssetWithdralSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
         //TODO need withdraw signal somehow
+        let [pallet, method] = indexer.parseEventSectionMethod(e)
+        let palletMethod = `${pallet}(${method})` //event
+        let candidate = false;
+        let caller = false;
+        //console.log(`processIncomingAssetSignal ${e.eventID} ${palletMethod}`)
+        switch (palletMethod) {
+            case 'balances(Withdraw)':
+                //kusama/polkadot format
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processBalancesDepositSignal(indexer, extrinsicID, e, mpState, finalized)
+                }
+                break;
+            case 'currencies(Withdrawn)':
+                // acala/bifrost format
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processCurrenciesDepositedSignal(indexer, extrinsicID, e, mpState, finalized)
+                }
+                break;
+            case 'tokens(Withdrawn)':
+                // acala format?
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processTokensDepositedSignal(indexer, extrinsicID, e, mpState, finalized)
+                }
+                break;
+            case 'assets(Destroyed)':
+                // not sure if this is ever emmited
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processAssetsIssuedSignal(indexer, extrinsicID, e, mpState, finalized)
+                }
+                break;
+            default:
+                break;
+        }
+        return [candidate, caller]
+    }
+
+    processIncomingAssetDepositSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         let palletMethod = `${pallet}(${method})` //event
         let candidate = false;
