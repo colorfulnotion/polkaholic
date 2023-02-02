@@ -1225,6 +1225,37 @@ app.get('/xcmtransfers/:chainIDorChainName?', async (req, res) => {
     }
 })
 
+// Usage: https://polkaholic.io/xcmtransfers
+app.get('/xcmtransferslog/:chainIDorChainName?/:chainIDDestorChainName?', async (req, res) => {
+    try {
+        let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
+        let chainIDDestorChainName = req.params.chainIDDestorChainName ? req.params.chainIDDestorChainName : null;
+        let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
+        res.render('xcmtransferslog', {
+            chainID: chainID,
+            id: id,
+            chainInfo: query.getChainInfo(chainID),
+            chain: chain,
+            chainIDorChainName,
+            chainIDDestorChainName,
+            apiUrl: req.path,
+            docsSection: "get-xcmtransferslog"
+        });
+    } catch (err) {
+        if (err instanceof paraTool.NotFoundError) {
+            res.render('notfound', {
+                recordtype: "chain",
+                chainInfo: query.getChainInfo()
+            });
+        } else {
+            res.render('error', {
+                chainInfo: query.getChainInfo(),
+                err: err
+            });
+        }
+    }
+})
+
 // Usage: https://polkaholic.io/xcmmessages
 app.get('/xcmmessages/:chainIDorChainName?', async (req, res) => {
     try {

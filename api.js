@@ -207,6 +207,28 @@ app.get('/chains', async (req, res) => {
     }
 })
 
+
+// Usage: http://api.polkaholic.io/xcmtransfers
+app.get('/xcmtransferslog/:chainID?/:chainIDDest?', async (req, res) => {
+    try {
+        let chainID = req.params.chainID ? req.params.chainID : "all";
+        let chainIDDest = req.params.chainIDDest ? req.params.chainIDDest : "all";
+        let xcmtransferslog = await query.getXCMTransfersLog(chainID, chainIDDest);
+        if (xcmtransferslog) {
+            res.write(JSON.stringify(xcmtransferslog));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+
 // Usage: http://api.polkaholic.io/xcmtransfers
 app.get('/xcmtransfers', async (req, res) => {
     try {

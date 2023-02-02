@@ -2769,10 +2769,12 @@ module.exports = class ChainParser {
                                 new_interiorV0.push(interiorV0Piece)
                             }
                             interiorVStr = JSON.stringify(new_interiorV0)
-                            if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint) && (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance"))){
+                            if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint) && (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance"))) {
                                 // pad palletInstance
                                 console.log(`pad!! original`, new_interiorV0)
-                                let padded_interiorV0 = [expandedParachainPiece, { palletInstance: 50 }, new_interiorV0[1]]
+                                let padded_interiorV0 = [expandedParachainPiece, {
+                                    palletInstance: 50
+                                }, new_interiorV0[1]]
                                 console.log(`pad!! padded_interiorV0`, new_interiorV0)
                             }
                         } else {
@@ -2787,7 +2789,7 @@ module.exports = class ChainParser {
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     targetedAsset = cachedXcmAssetInfo.asset
                     //rawTargetedAsset = cachedXcmAssetInfo.asset
-                    if (cachedXcmAssetInfo.xcmchainID == 1000 || cachedXcmAssetInfo.xcmchainID == 21000){
+                    if (cachedXcmAssetInfo.xcmchainID == 1000 || cachedXcmAssetInfo.xcmchainID == 21000) {
                         targetSymbol = cachedXcmAssetInfo.symbol
                     }
 

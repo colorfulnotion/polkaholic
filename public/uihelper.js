@@ -423,6 +423,17 @@ function presentTS(ts) {
     }
 }
 
+function presentUTCTime(ts) {
+    if (!ts) return ("");
+    if (ts == 0) return ("");
+    try {
+        const dateObject = new Date(ts * 1000)
+        return dateObject.toISOString().replace(/T/, ' ').replace(/\..+/, '');
+    } catch (err) {
+        return "";
+    }
+}
+
 function presentExtrinsicInfo(i) {
     let out = [];
     if (i.extrinsicHash !== undefined) {
