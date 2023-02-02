@@ -1007,7 +1007,7 @@ module.exports = class ChainParser {
            }
            candidates.push({candidate: c1, caller: c1_caller})
         }else if (rawCandidateCnt == 2){
-           // Normal case (2-16463036) single asset
+           // Normal case - single asset 0x5e59a12ab1cc9229a14fc67d1f7f8303643ac2d1f6e0df611b6d71e9864f4b87 (2 16463036)
            let c0 = rawCandidates[0].candidate
            let c0_caller = rawCandidates[0].caller
            if (c0.xcmSymbol == c1.xcmSymbol){
@@ -1021,8 +1021,7 @@ module.exports = class ChainParser {
           candidates.push({candidate: c0, caller: c0_caller})
         }else{
           // MultiAssets case 0x92bec041b54422d08e436be1a8db247d5f4466e20c299647405fed2261bc5ba1 (2004 2858049)
-
-          console.log(`[${treasuryEventID}] ${feepayingSymbol} feeRecipient=${feeRecipient}, xcmTeleportFees=${xcmTeleportFees}`)
+          //console.log(`[${treasuryEventID}] ${feepayingSymbol} feeRecipient=${feeRecipient}, xcmTeleportFees=${xcmTeleportFees}`)
           for (let i = 0; i < rawCandidateCnt -1 ; i++) {
               let c0 = rawCandidates[i].candidate
               let c0_caller = rawCandidates[i].caller
@@ -1111,19 +1110,15 @@ module.exports = class ChainParser {
                         if (candidate) {
                             candidateCnt++
                             rawCandidates.push({candidate: candidate, caller: caller})
-                            //indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
                         }
                         let [withdrawCandidate, withdrawCaller] = this.processIncomingAssetWithdralSignal(indexer, extrinsicID, e, mpState, finalized)
                         if (withdrawCandidate) {
                             candidateCnt++
                             rawWithdrawCandidates.push({candidate: withdrawCandidate, caller: withdrawCaller})
-                            //indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
                         }
                     }
                     if (rawCandidates.length >= 0 ){
-                        //console.log(`rawCandidates ***`, rawCandidates)
                         xcmCandidates = this.processRawDestCandidates(rawCandidates, rawWithdrawCandidates)
-                        //console.log(`candidates **`, xcmCandidates)
                     }
                     for (const c of candidates){
                         //indexer.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
