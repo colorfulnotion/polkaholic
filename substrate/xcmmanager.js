@@ -1157,99 +1157,49 @@ order by msgHash`
     // when we need to do some reanalytics on demand, xcmReanalytics writes hashes table with "xcminfofinalized" column records with "v4" column
     //  either an array or object based on the number of xcmInfo objects -- to cover xcmIndex > 0 and transferIndex > 0 situations
     async xcm_reanalytics() {
-        let sql = `select extrinsicHash, extrinsicID, xcmIndex, transferIndex, destStatus, sourceTS, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null order by extrinsicHash, xcmIndex, transferIndex limit 1000`
+        let sql = `select chainID, chainIDDest, symbol, relayChain, extrinsicHash, extrinsicID, xcmIndex, isFeeItem, transferIndex, destStatus, sourceTS, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null and xcmInfoAudited = 0 and destStatus = 1 order by extrinsicHash, xcmIndex, transferIndex limit 5000`
         try {
             console.log(sql);
             let xcmmatches = await this.pool.query(sql);
-            console.log("...done");
-            let out = [];
-            let vals = ["extrinsicID", "confidence", "amountReceived", "amountReceivedUSD"];
-            let hashesRowsToInsert = [];
-            let xcmInfo = [];
-            let pieces = [];
-            let prevExtrinsicID = null;
-            let prevExtrinsicHash = null;
-            let prevsourceTS = null;
-            console.log(xcmmatches.length, " recs");
             for (let i = 0; i < xcmmatches.length; i++) {
-                let extrinsicHash = xcmmatches[i].extrinsicHash;
-
-                if (prevExtrinsicHash && (extrinsicHash != prevExtrinsicHash)) {
-                    let hashrec = {};
-                    let col = prevExtrinsicID
-                    // write xcmInfo[0] object or xcmInfo to BigTable "hashes"
-                    if (xcmInfo.length > 1) {
-                        console.log("MULTIPLE", prevExtrinsicHash, JSON.stringify(xcmInfo, null, 4), pieces);
-                    }
-                    hashrec[col] = {
-                        value: (xcmInfo.length == 1) ? JSON.stringify(xcmInfo[0]) : JSON.stringify(xcmInfo),
-                        timestamp: prevsourceTS * 1000000
-                    };
-                    let extrinsicHashRec = {
-                        key: prevExtrinsicHash,
-                        data: {},
-                    };
-                    extrinsicHashRec.data["xcminfofinalized"] = hashrec;
-                    hashesRowsToInsert.push(extrinsicHashRec);
-                    for (const p of pieces) {
-                        out.push(p);
-                    }
-                    xcmInfo = [];
-                    pieces = [];
-                }
-                let extrinsicID = xcmmatches[i].extrinsicID;
-                let xcmIndex = xcmmatches[i].xcmIndex;
-                let transferIndex = xcmmatches[i].transferIndex;
-                let destStatus = xcmmatches[i].destStatus;
-                let x = JSON.parse(xcmmatches[i].xcmInfo);
-                let amountSent = 0;
-                let amountSentUSD = 0;
-                let amountReceivedUSD = 0;
-                let amountReceived = 0;
-                let confidence = .01;
+                let r = xcmmatches[i];
+                let x = JSON.parse(r.xcmInfo);
+                let teleportFee = 0;
+                let teleportFeeUSD = 0;
                 if (x.origination && x.destination) {
-                    if (x.origination.amountSent > 0) {
-                        amountSent = x.origination.amountSent;
-                        amountSentUSD = x.origination.amountSentUSD;
-                    }
-                    if (x.destination.amountReceived > 0) {
-                        amountReceived = x.destination.amountReceived;
-                        amountReceivedUSD = x.destination.amountReceivedUSD;
-                    }
-
-                    if (amountReceived > 0 && amountSent > 0 && amountSent >= amountReceived) {
-                        // TODO: in the array of xcmInfo cases, use isFeeItem=1 to improve this:
-                        //    one xcminfo has isFeeItem=1 (fee paying item) and
-                        //    one xcminfo has isFeeItem=0 (the asset being transferred)
-                        confidence = amountReceived / amountSent;
-                        destStatus = 1;
+                    let inp = {
+                        symbol: r.symbol,
+                        relayChain: r.relayChain,
+                        ts: r.sourceTS
+                    };
+                    let q = await this.computePriceUSD(inp)
+                    let priceUSD = q && q.priceUSD ? q.priceUSD : 0;
+                    teleportFee = x.destination.teleportFee;
+                    teleportFeeUSD = x.destination.teleportFeeUSD;
+                    let teleportFee2 = x.origination.amountSent - x.destination.amountReceived;
+                    let teleportFeeUSD2 = teleportFee2 * priceUSD;
+                    let expectedXCMTeleportFees = this.getXCMTeleportFees(r.chainIDDest, r.symbol);
+                    if (r.isFeeItem) {
+                        x.destination.teleportFee = teleportFee2;
+                        x.destination.teleportFeeUSD = teleportFeeUSD2;
+                        x.destination.teleportFeeChainSymbol = r.symbol;
                     } else {
-                        confidence = 0;
-                        destStatus = -1;
+                        x.destination.teleportFee = null;
+                        x.destination.teleportFeeUSD = null;
+                        x.destination.teleportFeeChainSymbol = null;
                     }
-                } else {
-                    destStatus = -1;
+                    let xcmInfoAudited = x.destination.teleportFeeUSD  && x.destination.teleportFeeUSD  > 100 ? -10 : 1;
+                    let sql0 = `update xcmtransfer set xcmInfoAudited = ${xcmInfoAudited}, teleportFee = '${teleportFee2}', teleportFeeUSD = '${teleportFeeUSD2}', xcmInfo = ${mysql.escape(JSON.stringify(x))} where extrinsicHash = '${r.extrinsicHash}' and xcmIndex = '${r.xcmIndex}' and transferIndex = '${r.transferIndex}'`
+                    if (xcmInfoAudited < 0) {
+                        console.log("FEE FAILURE expected:", expectedXCMTeleportFees, "observed:", teleportFee2, r.symbol);
+                    }
+                    this.batchedSQL.push(sql0);
                 }
-                xcmInfo.push(x);
-                let sql0 = `update xcmtransfer set destStatus = '${destStatus}', confidence = ${confidence}, amountReceived = ${amountReceived}, amountReceivedUSD = ${amountReceivedUSD} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
-                if (confidence < .1) {
-                    console.log(sql0);
-                }
-                this.batchedSQL.push(sql0);
-
-                prevsourceTS = xcmmatches[i].sourceTS;
-                prevExtrinsicHash = extrinsicHash;
-                prevExtrinsicID = extrinsicID;
-            }
-            if (hashesRowsToInsert.length > 0) {
-                console.log("writing", hashesRowsToInsert.length);
-                await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
-                await this.update_batchedSQL();
-                return hashesRowsToInsert.length
             }
         } catch (err) {
             console.log("xcmtransfer_reanalytics", err)
         }
+        await this.update_batchedSQL();
         return 0
     }
 

@@ -38,6 +38,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     xcmAssetInfo = {}; // xcmInteriorKey   ->
     xcmSymbolInfo = {}; // symbolRelayChain ->
     symbolRelayChainAsset = {}; // symbolRelayChain -> { ${chainID}: assetInfo }
+    xcmTeleportFees = {}; // chainIDDest-symbol
     xcContractAddress = {};
     assetlog = {};
     ratelog = {};
@@ -465,7 +466,6 @@ module.exports = class AssetManager extends PolkaholicDB {
 
         return true
     }
-
     async init_xcm_asset() {
         let xcmAssetInfo = {};
         let xcmSymbolInfo = {};
@@ -625,6 +625,14 @@ module.exports = class AssetManager extends PolkaholicDB {
         return nativeAssetChain
     }
 
+    getXCMTeleportFees(chainIDDest, symbol) {
+        let k = `${chainIDDest}-${symbol}`;
+        if (this.xcmTeleportFees[k]) {
+            return this.xcmTeleportFees[k];
+        }
+        return null;
+    }
+
     async init_asset_info() {
         let nassets = 0;
         let assetInfo = {};
@@ -734,8 +742,16 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             nassets++;
         }
-        //console.log(assetInfo)
-        //console.log(currencyIDInfo)
+
+        // load a model of expectedTeleportFee by chainID-chainIDDest-symbol in assetManager, use teleportFeeChainSymbol
+        let xcmTeleportFeeRecs = await this.poolREADONLY.query("select chainIDDest, symbol, xcmTeleportFees from xcmteleportfees");
+        for (let i = 0; i < xcmTeleportFeeRecs.length; i++) {
+            let r = xcmTeleportFeeRecs[i];
+            let k = `${r.chainIDDest}-${r.symbol}`;
+            this.xcmTeleportFees[k] = r.xcmTeleportFees
+        }
+
+        //console.log(this.expectedTeleportFee)
         this.assetInfo = assetInfo;
         this.alternativeAssetInfo = alternativeAssetInfo;
         this.symbolRelayChainAsset = symbolRelayChainAsset;
@@ -746,9 +762,9 @@ module.exports = class AssetManager extends PolkaholicDB {
     async checkChainSymbolXcmInteriorKey(chainID) {
         let symbolXcmInteriorKey = false
         let chainRecs = await this.poolREADONLY.query(`select symbolXcmInteriorKey, symbol from chain where chainID = '${chainID}'`);
-        if (chainRecs.length > 0){
+        if (chainRecs.length > 0) {
             let chainRec = chainRecs[0]
-            if (chainRec.symbolXcmInteriorKey != undefined && chainRec.symbol != undefined){
+            if (chainRec.symbolXcmInteriorKey != undefined && chainRec.symbol != undefined) {
                 symbolXcmInteriorKey = chainRec.symbolXcmInteriorKey
             }
         }
