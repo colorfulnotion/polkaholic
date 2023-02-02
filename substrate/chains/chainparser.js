@@ -975,7 +975,50 @@ module.exports = class ChainParser {
         }
     }
 
+    processRawDestCandidates(rawCandidates){
+        let candidates = []
+        let rawCandidateCnt = rawCandidates.length
+        if (rawCandidateCnt == 0) return candidates
+        if (rawCandidateCnt == 1){
+           // Reap case 0x890a6807bd375ffbda017016002cfefb9f85aa4df19d5b27cf101119aca69cd2 0-13209424
+           let c1 = rawCandidates[rawCandidateCnt-1].candidate
+           let xcmTeleportFees = c1.amountReceived
+           let feeRecipient =  c1.fromAddress
+           let treasuryEventID = c1.eventID
+           // marking as null
+           c1.fromAddress = '0x'
+           c1.amountReceived = 0
+           // add new field
+           c1.treasuryEventID = treasuryEventID
+           c1.xcmTeleportFees = xcmTeleportFees
+           c1.treasuryAddress = feeRecipient
+           c1.reaped = 1
+           c1.reapedAmount = 0
+           candidates.push(c1)
+        }else if (rawCandidateCnt == 2){
+           // Normal case (2-16463036)
+           let c0 = rawCandidates[0].candidate
+           let c1 = rawCandidates[rawCandidateCnt-1].candidate
+           if (c0.xcmSymbol == c1.xcmSymbol && c0.xcmInteriorKey == c1.xcmInteriorKey){
+              let xcmTeleportFees = c1.amountReceived
+              let feeRecipient =  c1.fromAddress
+              let treasuryEventID = c1.eventID
+               c0.treasuryEventID = treasuryEventID
+               c0.xcmTeleportFees = xcmTeleportFees
+               c0.treasuryAddress = feeRecipient
+               c1.reaped = 0
+               c1.reapedAmount = 0
+           }
+           candidates.push(c0)
+        }else if (rawCandidateCnt >= 3){
+          // MultiAssets case 0x92bec041b54422d08e436be1a8db247d5f4466e20c299647405fed2261bc5ba1 (2004 2858049)
+        }
+        return candidates
+    }
+
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
+
+        let xcmCandidates = [];
         //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
         this.mpReceived = false;
         this.mpReceivedHashes = {};
@@ -1000,6 +1043,7 @@ module.exports = class ChainParser {
                 this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
                 let mpState = this.mpReceivedHashes[idxKey]
                 let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
+                let eventRangeLengthWithFee = eventRange.length
                 let eventRangeLengthWithoutFee = eventRange.length - 1 // remove the fee event here
                 //let lastEvent = eventRange[-1]
                 for (let i = 0; i < eventRange.length; i++) {
@@ -1024,32 +1068,48 @@ module.exports = class ChainParser {
                 //only compute candiate mpState is successful
                 if (mpState.success === true) {
                     let candiateCnt = 0
-                    for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
+                    let rawCandidates = []
+                    let candidates = []
+                    for (let i = 0; i < eventRangeLengthWithFee; i++) {
                         let e = eventRange[i]
                         let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
+                        console.log(`processIncomingAssetSignal candidate`, candidate)
                         if (candidate) {
                             candiateCnt++
-                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
+                            rawCandidates.push({candidate: candidate, caller: caller})
+                            //indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
                         }
                     }
+                    if (rawCandidates.length >= 0 ){
+                        console.log(`rawCandidates ***`, rawCandidates)
+                        xcmCandidates = this.processRawDestCandidates(rawCandidates)
+                        console.log(`candidates **`, candidates)
+                    }
+                    for (const c of candidates){
+                        //indexer.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
+                    }
                     //console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
+                    /*
                     if (candiateCnt == 0) {
                         let lastEvent = eventRange[eventRange.length - 1]
+                        //let lastEvent = eventRange[eventRange.length - 1]
                         if (lastEvent) {
                             let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, lastEvent, mpState, finalized)
                             //console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
                             if (candidate) {
                                 candiateCnt++
-                                indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
+                                //indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
                             }
                         }
                     }
+                    */
                 } else {
                     //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
                 }
                 prevIdx = parseInt(idxKey) + 1
             }
         }
+        return xcmCandidates
     }
 
     //channelMsgIndex: extrinsicID-mpType-receiverChainID-senderChainID-msgIdx
@@ -1695,7 +1755,7 @@ module.exports = class ChainParser {
     }
 
     processIncomingAssetSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
-
+        //TODO need withdraw signal somehow
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         let palletMethod = `${pallet}(${method})` //event
         let candidate = false;

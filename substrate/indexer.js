@@ -1291,6 +1291,8 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
             this.xcmtransferdestcandidate = {};
+            //MK skip for debugging
+            return
             try {
                 // these events we can't say for sure without matching to recent sends
                 if (xcmtransferdestcandidates.length > 0) {
@@ -5197,7 +5199,11 @@ module.exports = class Indexer extends AssetManager {
         }
 
         if (!isSigned) {
-            this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, isTip, finalized);
+            let xcmCandidates = this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, isTip, finalized);
+            for (const c of xcmCandidates){
+                console.log(`** Indexer caller=${c.caller}, candiate`, c.candidate)
+                //this.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
+            }
         }
         //console.log('hash!!', extrinsicHash, `isSigned=${isSigned}`, `${JSON.stringify(extrinsic.signature)}`, extrinsic.signature.signer)
 

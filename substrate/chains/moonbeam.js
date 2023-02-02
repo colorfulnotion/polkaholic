@@ -8,6 +8,11 @@ module.exports = class MoonbeamParser extends ChainParser {
     xcmTransactorMethodList = ["0xfe430475", "0x185de2ae", "0xd7ab340c", "0xb648f3fe"];
 
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
+        let xcmCandidates = super.processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip, finalized)
+        return xcmCandidates
+    }
+
+    processIncomingXCMOLD(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
         //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
         this.mpReceived = false;
         this.mpReceivedHashes = {};
