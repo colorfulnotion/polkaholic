@@ -5,10 +5,14 @@ let initxcmtransferslog = false;
 async function showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainName) {
     let pathParams = `xcmtransferslog`
     if ( chainID_or_chainName ) {
-      pathParams += "/" + chainID_or_chainName;
-      if ( chainIDDest_or_chainName ) {
+	pathParams += "/" + chainID_or_chainName;
+    } else {
+	pathParams += "/all";
+    }
+    if ( chainIDDest_or_chainName ) {
         pathParams += "/" + chainIDDest_or_chainName;
-      }
+    } else {
+	pathParams += "/all";
     }
     let tableName = '#tablexcmtransferslog'
     if (initxcmtransferslog) {
@@ -18,6 +22,32 @@ async function showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainNam
         initxcmtransferslog = true;
         xcmtransferslogTable = $(tableName).DataTable({
             dom: 'lfrtipB',
+	    "createdRow": function( row, data, dataIndex){
+		let extrinsicHash = data.extrinsicHash;
+		let b = extrinsicHash.substr(2, 1);
+		let bgcolor = "#FFFFFF";
+		switch ( b ) {
+		case "0": bgcolor = "#EECCEE"; break;
+		case "1": bgcolor = "#CCEEEE"; break;
+		case "2": bgcolor = "#EEEECC"; break;
+		case "3": bgcolor = "#CCEECC"; break;
+		case "4": bgcolor = "#CCCCCC"; break;
+		case "5": bgcolor = "#CCCCEE"; break; 
+		case "6": bgcolor = "#EEEEFF"; break;
+		case "7": bgcolor = "#FFEEFF"; break;
+		case "8": bgcolor = "#EEEEFF"; break;
+		case "9": bgcolor = "#EEAAEE"; break;
+		case "a": bgcolor = "#EEFFEE"; break;
+		case "b": bgcolor = "#FFEEEE"; break;
+		case "c": bgcolor = "#EEEEFF"; break;
+		case "d": bgcolor = "#DDCCEE"; break; 
+		case "e": bgcolor = "#CCDDEE"; break;
+		case "f": bgcolor = "#EEDDCC"; break;
+		}
+		console.log("#", bgcolor);
+		$(row).css({"background-color":`${bgcolor}`})
+
+            },
             buttons: [{
                 extend: 'csv',
                 text: 'Download CSV',
@@ -36,7 +66,8 @@ async function showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainNam
                 "targets": [1, 2, 3]
             }],
             order: [
-                [0, "desc"]
+                [0, "desc"],
+                [3, "desc"]
             ],
 
             columns: [{
@@ -44,7 +75,7 @@ async function showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainNam
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         if (row.sourceTS !== undefined) {
-                            let s = presentTS(row.sourceTS);
+                            let s = presentUTCTime(row.addTS);
                             return s;
                         } else {
                             return "--";
@@ -57,7 +88,11 @@ async function showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainNam
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         let s = presentExtrinsicIDHash(row.xcmInfo.origination.extrinsicID, row.extrinsicHash, false);
-                        return `${presentChain(row.xcmInfo.origination.id, row.xcmInfo.origination.id)} (${s}) `
+			let t = getShortHash(row.extrinsicHash);
+			if ( row.xcmIndex > 0 || row.transferIndex > 0 ) {
+			    t += ` xcmIndex: ${row.xcmIndex} | transferIndex: ${row.transferIndex}`
+			}
+                        return `${presentChain(row.xcmInfo.origination.id, row.xcmInfo.origination.id)} (${s})<br/> ${t}`
                     } else {
                         try {
                             return data + " " + row.xcmInfo.origination.extrinsicID + " " + row.extrinsicHash;
@@ -94,12 +129,10 @@ async function showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainNam
                                 }
                                 //console.log(row.xcmInfo);
                             }
-                            if (row.chainIDDest != undefined && row.chainDestName && blockNumberDest) {
-                                return presentBlockNumber(row.idDest, row.chainDestName, blockNumberDest) + "<BR>" + str;
-                            } else if (row.chainIDDest != undefined && row.chainDestName && row.blockNumberDest == undefined) {
-                                return `${row.chainDestName}` + "<BR>" + str;
+                            if (blockNumberDest && row.xcmInfo.destination.id != undefined && row.xcmInfo.destination.chainName) {
+                                return presentBlockNumber(row.xcmInfo.destination.id, row.xcmInfo.destination.chainName, blockNumberDest) + "<BR>" + str;
                             } else {
-                                return "-"
+				return row.xcmInfo.destination.chainName
                             }
                         } catch (err) {
                             console.log(err);
@@ -110,23 +143,11 @@ async function showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainNam
                     }
                 }
             }, {
-                data: 'stage',
-                render: function(data, type, row, meta) {
-                    if (type == 'display') {
-                        if (row.stage !== undefined) {
-                            return row.stage;
-                        } else {
-                            return "--";
-                        }
-                    }
-                    return data;
-                }
-            }, {
                 data: 'sourceTS',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         if (row.sourceTS !== undefined) {
-                            let s = presentTS(row.sourceTS);
+                            let s = presentUTCTime(row.sourceTS);
                             return s;
                         } else {
                             return "--";
@@ -139,7 +160,8 @@ async function showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainNam
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         if (row.symbol !== undefined) {
-                            return row.symbol;
+			    let sent = row.xcmInfo.origination.amountSent
+                            return sent + " " + row.symbol;
                         } else {
                             return "--";
                         }
@@ -150,16 +172,27 @@ async function showxcmtransferslog(chainID_or_chainName, chainIDDest_or_chainNam
                 data: 'xcmInfo',
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
+			let title = row.stage;
+			if ( row.stage == "DestinationFinalized" ) title = "<B> 😀😀😀 DESTINATION FINALIZED 😀😀😀<B>";
+			if ( row.stage == "OriginationFinalized" ) title = "Origination finalized 😀";
+			if ( row.stage == "OriginationUnfinalized" ) title = "<i> Origination unfinalized 🚀<i>";
+                        return presentInstructions(JSON.stringify(row.xcmInfo), "AR" + row.extrinsicHash + row.stage + row.xcmIndex + row.transferIndex, title);
 
                     }
                     return "-todo-";
                 }
+            }, {
+                data: 'delay',
+                render: function(data, type, row, meta) {
+                    if (type == 'display') {
+
+                    }
+                    return data;
+                }
             }]
         });
     }
-    if (filter) {
-        await loadData2(pathParams, tableName, true)
-    } else {
-        console.log("MANUAL SETUP");
-    }
+    
+    await loadData2(pathParams, tableName, true)
+
 }

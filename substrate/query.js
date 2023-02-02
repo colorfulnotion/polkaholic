@@ -6574,42 +6574,40 @@ module.exports = class Query extends AssetManager {
         return null;
     }
 
-    async getXCMTransfersLog(chainID_or_chainName = "all", chainIDDest_or_chainName = "all") {
-        let [chainID, id] = this.convertChainID(chainID_or_chainName)
-        if (chainID_or_chainName == "all") chainID = null;
-        let [chainIDDest, idDest] = this.convertChainID(chainIDDest_or_chainName)
-        if (chainID_or_chainName == "all") chainIDDest = null;
+    async getXCMTransfersLog(chainID_or_chainName = null, chainIDDest_or_chainName = null) {
+        let [chainID, id] = (chainID_or_chainName == null || chainID_or_chainName == "all") ? [null, null] : this.convertChainID(chainID_or_chainName)
+        let [chainIDDest, idDest] = (chainIDDest_or_chainName == null || chainIDDest_or_chainName == "all") ? [null, null] : this.convertChainID(chainIDDest_or_chainName)
         let w = [];
         w.push(`sourceTS > unix_timestamp(date_sub(Now(), interval 48 hour))`)
         if (chainID) {
-          w.push(`chainID = '${chainID}'`);
+            w.push(`chainID = '${chainID}'`);
         }
         if (chainIDDest) {
-          w.push(`chainIDDest = '${chainIDDest}'`);
+            w.push(`chainIDDest = '${chainIDDest}'`);
         }
         if (typeof chainID_or_chainName == "string" && (chainID_or_chainName.includes("0x"))) {
             w.push(`extrinsicHash = '${chainID_or_chainName}'`);
         }
         let addTS_origination_unfinalized = {};
         let wstr = w.join(" and ");
-        let sql = `select extrinsicHash, transactionHash, xcmIndex, transferIndex, symbol, msgHash, sourceTS, chainIDDest, convert(xcmInfo using utf8) xcmInfo, addTS, stage, 0 as delay from xcmtransferslog where ${wstr} order by addTS desc limit 500`
+        let sql = `select extrinsicHash, transactionHash, xcmIndex, transferIndex, symbol, msgHash, sourceTS, chainID, chainIDDest, convert(xcmInfo using utf8) xcmInfo, addTS, stage, 0 as delay from xcmtransferslog where ${wstr} order by addTS desc limit 100`
         try {
             let xcmtransferslog = await this.poolREADONLY.query(sql);
             if (xcmtransferslog.length > 0) {
-              for ( const m of xcmtransferslog ) {
-                if ( m.stage == "OriginationUnfinalized" ) {
-                    addTS_origination_unfinalized[m.extrinsicHash] = m.addTS;
+                for (const m of xcmtransferslog) {
+                    if (m.stage == "OriginationUnfinalized") {
+                        addTS_origination_unfinalized[m.extrinsicHash] = m.addTS;
+                    }
+                    m.xcmInfo = JSON.parse(m.xcmInfo)
                 }
-                m.xcmInfo = JSON.parse(m.xcmInfo)
-              }
-              for ( const m of xcmtransferslog ) {
-                if ( m.stage != "OriginationUnfinalized" && addTS_origination_unfinalized[m.extrinsicHash] != undefined ) {
-                    m.delay = m.addTS - addTS_origination_unfinalized[m.extrinsicHash];
-                    if ( m.delay > 180 ) {
-                      m.delay = -1; // probably weirdness happened with extrinsicHash non-uniqueness
+                for (const m of xcmtransferslog) {
+                    if (m.stage != "OriginationUnfinalized" && addTS_origination_unfinalized[m.extrinsicHash] != undefined) {
+                        m.delay = m.addTS - addTS_origination_unfinalized[m.extrinsicHash];
+                        if (m.delay > 180) {
+                            m.delay = -1; // probably weirdness happened with extrinsicHash non-uniqueness
+                        }
                     }
                 }
-              }
             }
             return xcmtransferslog;
         } catch (e) {

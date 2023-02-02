@@ -1792,7 +1792,7 @@ module.exports = class Indexer extends AssetManager {
     // search_xcmtransferdestcandidate searches:
     // 1. among all the xcmtransferdestcandidate records that appeared in this block find the one that matches the fromAddress/amountSent
     // 2. or among all the xcmmessages to find the one that the matches the, looking for any errors
-    search_xcmtransferdestcandidate(api, beneficiary, xcmtransfer, amountSent, msgHash) {
+    search_xcmtransferdestcandidate(api, beneficiary, xcmtransfer, amountSent, msgHash, expectedXCMTeleportFees) {
         try {
             let xcmtransferdestcandidateKeys = Object.keys(this.xcmtransferdestcandidate)
             if (xcmtransferdestcandidateKeys.length > 0) {
@@ -1800,11 +1800,28 @@ module.exports = class Indexer extends AssetManager {
                 for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
                     let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
                     if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
-                        let rat = r.amountReceived / amountSent;
-                        if (rat > .9 && rat < 1.0001) {
-                            // TODO: msgHash should match, if one is provided
-                            r.confidence = rat;
-                            xcmtransferdestcandidates.push(r);
+                        try {
+                            let rat = r.amountReceived / amountSent;
+                            let isFeeItem = (xcmtransfer.xcmInfo && xcmtransfer.xcmInfo.origination && xcmtransfer.xcmInfo.origination.isFeeItem == undefined && (xcmtransfer.xcmInfo.origination.isFeeItem === false)) ? false : true;
+                            let ratRequirement = (isFeeItem) ? .1 : .5;
+                            let msgHashProvided = msgHash && msgHash.length > 2 ? true : false;
+                            let matchingMsgHash = (msgHashProvided && (r.msgHash == msgHash)) ? true : false;
+                            /*if ( isFeeItem && expectedXCMTeleportFees > 0 ) {
+                            // if fee item adjust rat using xcmtransfer.origination.isFeeItem and expectedXCMTeleportFees
+                            if ( amountSent > expectedXCMTeleportFees && amountReceived > expectedTeleportFee && ( amountSent >= amountReceived + expectedXCMTeleportFees ) ) {
+                            rat = ( amountReceived + expectedXCMTeleportFees ) / ( amountSent );
+                            }
+                            } */
+                            if (rat >= ratRequirement && rat < 1.0001 || matchingMsgHash) {
+                                r.confidence = rat;
+                                if (msgHashProvided && !matchingMsgHash) r.confidence = 0.01;
+                                xcmtransferdestcandidates.push(r);
+                            }
+                        } catch (err) {
+                            this.logger.error({
+                                op: "search_xcmtransferdestcandidate:ERR",
+                                err
+                            });
                         }
                     }
                 }
@@ -1973,7 +1990,9 @@ module.exports = class Indexer extends AssetManager {
                         let section = "";
                         let method = "";
                         let errorDesc = null;
-                        let res = await this.search_xcmtransferdestcandidate(api, beneficiary, xcmtransfer, amountSent, xcmtransfer.msgHash);
+                        let teleportFeeChainSymbol = xcmInfo.symbol;
+                        let expectedXCMTeleportFees = this.getXCMTeleportFees(xcmtransfer.chainIDDest, teleportFeeChainSymbol);
+                        let res = await this.search_xcmtransferdestcandidate(api, beneficiary, xcmtransfer, amountSent, xcmtransfer.msgHash, expectedXCMTeleportFees);
                         if (res) {
                             eventID = res.eventID;
                             amountReceived = res.amountReceived;
@@ -2025,6 +2044,7 @@ module.exports = class Indexer extends AssetManager {
                                 } else {
                                     destination.teleportFee = (amountSent - amountReceived) / 10 ** decimals;
                                     destination.teleportFeeUSD = (destination.teleportFee * priceUSD);
+                                    destination.teleportFeeChainSymbol = teleportFeeChainSymbol;
                                     destination.amountReceived = amountReceived / 10 ** decimals;
                                     destination.amountReceivedUSD = destination.amountReceived * priceUSD;
                                     destination.executionStatus = "success";
@@ -3732,11 +3752,11 @@ module.exports = class Indexer extends AssetManager {
         return false
     }
 
-    filterXCMkeyByDirection(xcmkey, outgoing = true){
-        if(outgoing){
-          if (xcmkey.includes('outgoing')) return true
-        }else{
-          if (xcmkey.includes('incoming')) return true
+    filterXCMkeyByDirection(xcmkey, outgoing = true) {
+        if (outgoing) {
+            if (xcmkey.includes('outgoing')) return true
+        } else {
+            if (xcmkey.includes('incoming')) return true
         }
         return false
     }
@@ -3768,18 +3788,18 @@ module.exports = class Indexer extends AssetManager {
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
                 if (firstSeenBN == targetBN) {
-                    if (isTip){
-                      this.logger.error({
-                          "op": finalized ? "getMsgHashCandidateF" : "getMsgHashCandidateU",
-                          targetBN,
-                          msgHash,
-                          extrinsicID,
-                          extrinsicHash,
-                          matcher,
-                          matcherType,
-                          finalized,
-                          chainID: this.chainID,
-                      })
+                    if (isTip) {
+                        this.logger.error({
+                            "op": finalized ? "getMsgHashCandidateF" : "getMsgHashCandidateU",
+                            targetBN,
+                            msgHash,
+                            extrinsicID,
+                            extrinsicHash,
+                            matcher,
+                            matcherType,
+                            finalized,
+                            chainID: this.chainID,
+                        })
                     }
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
                     if (this.xcmmsgMap[tk] != undefined && extrinsicID && extrinsicHash) {
@@ -3789,21 +3809,21 @@ module.exports = class Indexer extends AssetManager {
                     return msgHash
                 } else {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash} but FAILED with firstSeenBN(${firstSeenBN})=targetBN(${targetBN})`)
-                    if (isTip){
-                      this.logger.error({
-                          "op": finalized ? "getMsgHashCandidate2F" : "getMsgHashCandidate2U" ,
-                          targetBN,
-                          firstSeenBN,
-                          msgHash,
-                          extrinsicID,
-                          extrinsicHash,
-                          matcher,
-                          matcherType,
-                          directionalXcmKeys,
-                          finalized,
-                          diffSentAt: firstSeenBN - targetBN,
-                          chainID: this.chainID,
-                      })
+                    if (isTip) {
+                        this.logger.error({
+                            "op": finalized ? "getMsgHashCandidate2F" : "getMsgHashCandidate2U",
+                            targetBN,
+                            firstSeenBN,
+                            msgHash,
+                            extrinsicID,
+                            extrinsicHash,
+                            matcher,
+                            matcherType,
+                            directionalXcmKeys,
+                            finalized,
+                            diffSentAt: firstSeenBN - targetBN,
+                            chainID: this.chainID,
+                        })
                     }
                     //if (firstSeenBN >= targetBN && firstSeenBN - targetBN <= 6) return msgHash
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
@@ -3811,18 +3831,18 @@ module.exports = class Indexer extends AssetManager {
             }
         }
         if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}, ${matcherType}] MISS`)
-        if (isTip){
-          this.logger.error({
-              "op": finalized ? "getMsgHashCandidate3F" : "getMsgHashCandidate3U" ,
-              targetBN,
-              extrinsicID,
-              extrinsicHash,
-              matcher,
-              matcherType,
-              finalized,
-              directionalXcmKeys,
-              chainID: this.chainID,
-          })
+        if (isTip) {
+            this.logger.error({
+                "op": finalized ? "getMsgHashCandidate3F" : "getMsgHashCandidate3U",
+                targetBN,
+                extrinsicID,
+                extrinsicHash,
+                matcher,
+                matcherType,
+                finalized,
+                directionalXcmKeys,
+                chainID: this.chainID,
+            })
         }
     }
 
@@ -5565,6 +5585,7 @@ module.exports = class Indexer extends AssetManager {
             let xcmtransferkey = `${txHash}${x.xcmIndex}${x.transferIndex}`
             xcmtransfer.xcmtransferHash = paraTool.twox_128(xcmtransferkey);
             xcmInfo.origination = {
+                // transferindex + xcmindex should be here?
                 chainName: x.chainName,
                 id: x.id,
                 chainID: x.chainID,
@@ -5589,6 +5610,7 @@ module.exports = class Indexer extends AssetManager {
                 decimals: x.decimals,
                 isMsgSent: isMsgSent,
                 finalized: originationFinalized,
+                isFeeItem: x.isFeeItem
             }
             if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
             if (failureType != undefined) {

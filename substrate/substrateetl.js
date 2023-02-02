@@ -117,7 +117,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let {
             indexTS,
             chainID,
-	    isEVM
+            isEVM
         } = recs[0];
         let hr = 0;
         [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
@@ -883,6 +883,27 @@ module.exports = class SubstrateETL extends AssetManager {
         return (true);
     }
 
+    async compute_xcmteleportfees(relayChain, logDT = '2023-01-01') {
+        let bsql = `SELECT destination_para_id, destination_teleport_fee_symbol, count(*) cnt, avg(destination_teleport_fee) avg_fee, avg(destination_teleport_fee_usd) avgfeeusd  FROM \`substrate-etl.${relayChain}.xcmtransfers\` WHERE DATE(origination_ts) >= "${logDT}" and origination_is_fee_item and destination_teleport_fee_usd < 1 group by destination_para_id, destination_teleport_fee_symbol having count(*) > 10 and avg_fee > 0 order by destination_para_id, cnt desc LIMIT 10000`
+        console.log(bsql);
+        let rows = await this.execute_bqJob(bsql);
+        let vals = ["teleportFee"];
+        let out = [];
+        for (const r of rows) {
+            let chainID = paraTool.getChainIDFromParaIDAndRelayChain(r.destination_para_id, relayChain);
+            console.log(chainID, r);
+            out.push(`('${chainID}', '${r.destination_teleport_fee_symbol}', '${r.avg_fee}')`);
+        }
+        await this.upsertSQL({
+            "table": "xcmteleportfees",
+            "keys": ["chainIDDest", "symbol"],
+            "vals": vals,
+            "data": out,
+            "replace": vals
+        });
+
+    }
+
     async audit_substrateetl(logDT = null, paraID = -1, relayChain = null) {
         let w = [];
 
@@ -1066,10 +1087,10 @@ module.exports = class SubstrateETL extends AssetManager {
                 if (o && d) {
                     let destination_execution_status = (r.destStatus == 1 || (d.executionStatus == "success" || d.amountReceived > 0)) ? "success" : "unknown";
                     xcmtransfers.push({
-                        symbol: r.symbol,
-                        price_usd: r.priceUSD,
-                        origination_transfer_index: r.transferIndex,
-                        origination_xcm_index: r.xcmIndex,
+                        symbol: r.symbol, // xcmInfo.symbol
+                        price_usd: r.priceUSD, // xcmInfo.priceUSD
+                        origination_transfer_index: r.transferIndex, // should be o.transferIndex?
+                        origination_xcm_index: r.xcmIndex, // should be o.xcmIndex?
                         origination_id: o.id,
                         origination_para_id: o.paraID,
                         origination_chain_name: o.chainName,
@@ -1086,7 +1107,7 @@ module.exports = class SubstrateETL extends AssetManager {
                         origination_tx_fee: o.txFee ? o.txFee : 0,
                         origination_tx_fee_usd: o.txFeeUSD ? o.txFeeUSD : 0,
                         origination_tx_fee_symbol: r.symbol,
-                        origination_is_fee_item: r.isFeeItem ? true : false,
+                        origination_is_fee_item: r.isFeeItem ? true : false, // TODO: o.isFeeItem
                         origination_sent_at: o.sentAt,
                         origination_extrinsic_hash: o.extrinsicHash,
                         origination_extrinsic_id: o.extrinsicID,
@@ -1097,9 +1118,10 @@ module.exports = class SubstrateETL extends AssetManager {
                         destination_para_id: d.paraID,
                         destination_amount_received: d.amountReceived,
                         destination_amount_received_usd: d.amountReceivedUSD,
+                        // TODO: if origination_is_fee_item == false then these fields should null
                         destination_teleport_fee: d.teleportFee,
                         destination_teleport_fee_usd: d.teleportFeeUSD,
-                        destination_teleport_fee_symbol: r.symbol, // TODO
+                        destination_teleport_fee_symbol: r.symbol,
                         destination_chain_name: d.chainName,
                         destination_beneficiary_ss58: d.beneficiary,
                         destination_beneficiary_pub_key: paraTool.getPubKey(d.beneficiary),
@@ -1264,8 +1286,8 @@ module.exports = class SubstrateETL extends AssetManager {
                             burned_fee: tx.burnedFee,
                             gas_limit: tx.gasLimit,
                             base_fee_per_gas: tx.baseFeePerGas,
-                            extrinsic_id: tx.substrate.extrinsicID,
-                            extrinsic_hash: tx.substrate.extrinsicHash,
+                            extrinsic_id: tx.substrate ? tx.substrate.extrinsicID : null,
+                            extrinsic_hash: tx.substrate ? tx.substrate.extrinsicHash : null,
                             transaction_type: tx.txType,
                             method_id: i && i.methodID ? i.methodID : null,
                             signature: i && i.signature ? i.signature : null,

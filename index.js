@@ -1234,7 +1234,6 @@ app.get('/xcmtransferslog/:chainIDorChainName?/:chainIDDestorChainName?', async 
         res.render('xcmtransferslog', {
             chainID: chainID,
             id: id,
-            data: xcmtransferslog,
             chainInfo: query.getChainInfo(chainID),
             chain: chain,
             chainIDorChainName,
