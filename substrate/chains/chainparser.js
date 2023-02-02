@@ -2184,52 +2184,6 @@ module.exports = class ChainParser {
         let outgoingXTransfer = []
         try {
             if (section_method == "xTransfer:transfer") {
-                // test case: indexPeriods 2035 2022-08-25 10
-                // 0xc1af594726fc296d9eb795ed0c2f63b64c71dd12e50da7c0e8ee6e126304521e | xTransfer:transfer
-                //let a = feed.params;
-                /*
-                {
-                  "asset": {
-                    "id": {
-                      "concrete": {
-                        "parents": 1,
-                        "interior": {
-                          "x2": [
-                            {
-                              "parachain": 2004
-                            },
-                            {
-                              "palletInstance": 10
-                            }
-                          ]
-                        }
-                      }
-                    },
-                    "fun": {
-                      "fungible": "0x000000000000000002aa1efb94e00000"
-                    }
-                  },
-                  "dest": {
-                    "parents": 1,
-                    "interior": {
-                      "x2": [
-                        {
-                          "parachain": 2004
-                        },
-                        {
-                          "accountKey20": {
-                            "network": {
-                              "any": null
-                            },
-                            "key": "0xef46c7649270c912704fb09b75097f6e32208b85"
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  "dest_weight": 1000000000
-                }
-                */
                 let a = args
                 let assetAndAmountSents = [];
                 let dest = a.dest;
@@ -2335,8 +2289,16 @@ module.exports = class ChainParser {
             //let module_section = extrinsic.section;
             //let module_method = extrinsic.method;
             //let section_method = `${module_section}:${module_method}`
-            //handle token2 case for bifrost tokens:Transfer
-            if (section_method == "xTokens:transfer" || section_method == "xTokens:transferMulticurrencies" || section_method == "xTokens:transferMultiasset") {
+            //we are only looking at transfer/transferMulticurrencies/transferMultiasset
+            let known_section_methods = [
+                "xTokens:transfer",
+                "xTokens:transferMultiasset",
+                "xTokens:transferMultiassetWithFee",
+                "xTokens:transferMultiassets",
+                "xTokens:transferMulticurrencies",
+                "xTokens:transferWithFee"
+            ]
+            if (known_section_methods.includes(section_method)) {
                 // see https://github.com/open-web3-stack/open-runtime-module-library/tree/master/xtokens
                 // test case: indexPeriods 8 2022-03-30 21
                 // 0x11fbddaf7d2f0b4451bb85fab337d1d61c94234c4b9e5562d481a268236c5a7f | xTokens:transfer
@@ -2948,8 +2910,15 @@ module.exports = class ChainParser {
             //let module_section = extrinsic.section;
             //let module_method = extrinsic.method;
             //let section_method = `${module_section}:${module_method}`
-
-            if (section_method == "polkadotXcm:teleportAssets" || section_method == "polkadotXcm:limitedTeleportAssets" || section_method == "polkadotXcm:reserveTransferAssets" || section_method == "polkadotXcm:limitedReserveTransferAssets" || section_method == "polkadotXcm:send" || section_method == "polkadotXcm:reserveWithdrawAssets") {
+            let known_section_methods = [
+                "polkadotXcm:limitedReserveTransferAssets",
+                "polkadotXcm:limitedReserveWithdrawAssets",
+                "polkadotXcm:limitedTeleportAssets",
+                "polkadotXcm:reserveTransferAssets",
+                "polkadotXcm:reserveWithdrawAssets",
+                "polkadotXcm:send",
+                "polkadotXcm:teleportAssets"]
+            if (known_section_methods.includes(section_method)) {
 
                 let chainID = indexer.chainID
                 let paraID = paraTool.getParaIDfromChainID(chainID)
@@ -3214,8 +3183,16 @@ module.exports = class ChainParser {
             //let section_method = `${module_section}:${module_method}`
 
             //0x22729316af52c146e6a0773bd6e119efa51f5dda1f678b2891b53a8f2e5a2521 xcmPallet:reserveTransferAssets
-
-            if (section_method == "xcmPallet:teleportAssets" || section_method == "xcmPallet:limitedTeleportAssets" || section_method == "xcmPallet:reserveTransferAssets" || section_method == "xcmPallet:limitedReserveTransferAssets" || section_method == "xcmPallet:send") {
+            let known_section_methods = [
+                "xcmPallet:limitedReserveTransferAssets",
+                "xcmPallet:limitedReserveWithdrawAssets",
+                "xcmPallet:limitedTeleportAssets",
+                "xcmPallet:reserveTransferAssets",
+                "xcmPallet:reserveWithdrawAssets",
+                "xcmPallet:send",
+                "xcmPallet:teleportAssets"
+            ]
+            if (known_section_methods.includes(section_method)) {
                 let chainID = indexer.chainID
                 let paraID = paraTool.getParaIDfromChainID(chainID)
                 let paraIDDest = -1;
