@@ -975,13 +975,29 @@ module.exports = class ChainParser {
         }
     }
 
+    dedupeRawCandidates(rawCandidates){
+        //remove dup token/currency events (22090 2686996)
+        let dedupedCandidates = []
+        let covered = {}
+        for (const rawCandidate of rawCandidates){
+            let f = rawCandidate.candidate
+            let k = `${f.fromAddress}-${f.amountReceived}-${f.xcmSymbol}`
+            if (covered[k] == undefined) {
+                covered[k] = 1
+                dedupedCandidates.push(rawCandidate)
+            }
+        }
+        return dedupedCandidates
+    }
+
     processRawDestCandidates(indexer, rawCandidates, rawWithdrawCandidates) {
         let candidates = []
-        let rawCandidateCnt = rawCandidates.length
+        let dedupedCandidates = this.dedupeRawCandidates(rawCandidates)
+        let rawCandidateCnt = dedupedCandidates.length
         if (rawCandidateCnt == 0) return candidates
 
-        let c1 = rawCandidates[rawCandidateCnt - 1].candidate
-        let c1_caller = rawCandidates[rawCandidateCnt - 1].caller
+        let c1 = dedupedCandidates[rawCandidateCnt - 1].candidate
+        let c1_caller = dedupedCandidates[rawCandidateCnt - 1].caller
         let xcmTeleportFees = c1.amountReceived
         let feeRecipient = c1.fromAddress
         let feeEventID = c1.eventID
@@ -1011,10 +1027,11 @@ module.exports = class ChainParser {
                     if (amountReaped > 0) c1.amountReaped = amountReaped
                 }
             }else{
-                let c0 = rawCandidates[rawCandidateCnt - 1].candidate
-                let c0_caller = rawCandidates[rawCandidateCnt - 1].caller
+                //no fee transfer 2006 2865334
+                let c0 = dedupedCandidates[rawCandidateCnt - 1].candidate
+                let c0_caller = dedupedCandidates[rawCandidateCnt - 1].caller
                 c0.feeEventID = feeEventID
-                c0.xcmTeleportFees = xcmTeleportFees
+                c0.xcmTeleportFees = 0
                 c0.feeReceivingAddress = feeRecipient
                 c0.isFeeItem = 1
                 c0.reaped = 0
@@ -1027,8 +1044,8 @@ module.exports = class ChainParser {
             })
         } else if (rawCandidateCnt == 2) {
             // Normal case - single asset 0x5e59a12ab1cc9229a14fc67d1f7f8303643ac2d1f6e0df611b6d71e9864f4b87 (2 16463036)
-            let c0 = rawCandidates[0].candidate
-            let c0_caller = rawCandidates[0].caller
+            let c0 = dedupedCandidates[0].candidate
+            let c0_caller = dedupedCandidates[0].caller
             if (c0.xcmSymbol == c1.xcmSymbol) {
                 c0.feeEventID = feeEventID
                 c0.xcmTeleportFees = xcmTeleportFees
@@ -1045,8 +1062,8 @@ module.exports = class ChainParser {
             // MultiAssets case 0x92bec041b54422d08e436be1a8db247d5f4466e20c299647405fed2261bc5ba1 (2004 2858049)
             //console.log(`[${feeEventID}] ${feepayingSymbol} feeRecipient=${feeRecipient}, xcmTeleportFees=${xcmTeleportFees}`)
             for (let i = 0; i < rawCandidateCnt - 1; i++) {
-                let c0 = rawCandidates[i].candidate
-                let c0_caller = rawCandidates[i].caller
+                let c0 = dedupedCandidates[i].candidate
+                let c0_caller = dedupedCandidates[i].caller
                 if (c0.xcmSymbol == feepayingSymbol) {
                     // fee paying.
                     c0.feeEventID = feeEventID
