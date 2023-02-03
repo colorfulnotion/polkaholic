@@ -11,7 +11,7 @@ module.exports = class MoonbeamParser extends ChainParser {
         let xcmCandidates = super.processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip, finalized)
         return xcmCandidates
     }
-    
+
     // we are actually getting inner call from the event
     getMsgHashAndInnerCall(indexer, extrinsic, feed) {
         let msgHash = '0x'

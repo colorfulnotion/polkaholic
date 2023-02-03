@@ -1179,38 +1179,38 @@ order by msgHash`
                     let teleportFee2 = x.origination.amountSent - x.destination.amountReceived;
                     let teleportFeeUSD2 = teleportFee2 * priceUSD;
                     let expectedXCMTeleportFees = this.getXCMTeleportFees(r.chainIDDest, r.symbol);
-		    let destStatus = -1;
-		    let xcmInfoAudited = 0;
-		    if (x.destination.executionStatus == "success") {
-			destStatus = 1;
-		    } else if (x.destination.executionStatus == "failed") {
-			destStatus = 0;
-		    }
-                    if ( teleportFeeUSD2 > 5 ) {
-			destStatus = -1;
-			teleportFee2 = 0;
-			teleportFeeUSD2 = 0;
-			xcmInfoAudited = -1;
-			x.destination.executionStatus = "unknown";
-		    } else {
-			xcmInfoAudited = 1;
-		    }
+                    let destStatus = -1;
+                    let xcmInfoAudited = 0;
+                    if (x.destination.executionStatus == "success") {
+                        destStatus = 1;
+                    } else if (x.destination.executionStatus == "failed") {
+                        destStatus = 0;
+                    }
+                    if (teleportFeeUSD2 > 5) {
+                        destStatus = -1;
+                        teleportFee2 = 0;
+                        teleportFeeUSD2 = 0;
+                        xcmInfoAudited = -1;
+                        x.destination.executionStatus = "unknown";
+                    } else {
+                        xcmInfoAudited = 1;
+                    }
 
-                    if (r.isFeeItem && ( teleportFeeUSD2 > 0 ) && ( destStatus == 1 ) ) { 
+                    if (r.isFeeItem && (teleportFeeUSD2 > 0) && (destStatus == 1)) {
                         x.destination.teleportFee = teleportFee2;
                         x.destination.teleportFeeUSD = teleportFeeUSD2;
                         x.destination.teleportFeeChainSymbol = r.symbol;
                     } else {
-			teleportFee2 = 0;
-			teleportFeeUSD2 = 0;
+                        teleportFee2 = 0;
+                        teleportFeeUSD2 = 0;
                         x.destination.teleportFee = null;
                         x.destination.teleportFeeUSD = null;
                         x.destination.teleportFeeChainSymbol = null;
                     }
                     let sql0 = `update xcmtransfer set destStatus = ${destStatus}, xcmInfoAudited = ${xcmInfoAudited}, teleportFee = '${teleportFee2}', teleportFeeUSD = '${teleportFeeUSD2}', xcmInfo = ${mysql.escape(JSON.stringify(x))} where extrinsicHash = '${r.extrinsicHash}' and xcmIndex = '${r.xcmIndex}' and transferIndex = '${r.transferIndex}'`
-		    if ( teleportFeeUSD2 > 5 || ( destStatus == 1 ) ) {
-			console.log(sql0);
-		    }
+                    if (teleportFeeUSD2 > 5 || (destStatus == 1)) {
+                        console.log(sql0);
+                    }
                     this.batchedSQL.push(sql0);
                 }
             }

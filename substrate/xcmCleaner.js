@@ -210,12 +210,12 @@ module.exports = class XCMCleaner extends Query {
             let balances = balances_currencies[currencyID];
             for (const bn of Object.keys(balances)) {
                 let free = balances[bn];
-		let diff = ( prevFree != null ) ? free - prevFree : null
-                if (diff > 0 && ( diff <= amountSent ) ) {
+                let diff = (prevFree != null) ? free - prevFree : null
+                if (diff > 0 && (diff <= amountSent)) {
                     let amountReceived = diff;
-                    let rat = expectedXCMTeleportFees && (amountReceived + expectedXCMTeleportFees <= amountSent) ? ((amountReceived + expectedXCMTeleportFees) / amountSent ) : ( amountReceived / amountSent );
+                    let rat = expectedXCMTeleportFees && (amountReceived + expectedXCMTeleportFees <= amountSent) ? ((amountReceived + expectedXCMTeleportFees) / amountSent) : (amountReceived / amountSent);
 
-		    if ( rat > .97 ) {
+                    if (rat > .97) {
                         changes.push({
                             currencyID,
                             bn,
@@ -231,7 +231,7 @@ module.exports = class XCMCleaner extends Query {
                 prevFree = free;
             }
         }
-	console.log("chainges", changes);
+        console.log("chainges", changes);
         // find the change in balance that matches amountSent best, along with a "confidence" level
         if (changes.length > 0) {
             changes.sort(function compareFn(a, b) {
@@ -276,22 +276,22 @@ module.exports = class XCMCleaner extends Query {
     async searchXCMTransferDestCandidate(msgHash, sourceTS, amountSent, fromAddress, chainID, chainIDDest, sentAt = null, expectedXCMTeleportFees = 0) {
         let startTS = sourceTS - 10;
         let endTS = sourceTS + 60 * 2;
-	let q = "";
-        if (msgHash && msgHash.length > 4 ) {
-	    if ( sentAt > 0 ) {
-		// search within "sentAt + 4+2(#(hops-1)" window
-		let numHops = 1; // TODO should be possible to get this...
-		let sentAtWindow = 4 + 2 * (numHops - 1);
-		let sentAt2 = sentAt + sentAtWindow;
-		q = ` ( sentAt >= ${sentAt} and sentAt <= ${sentAt2} and msgHash = '${msgHash}' ) `
-	    } else {
-		q = `( destTS >= ${startTS} and destTS <= ${endTS} and msgHash = '${msgHash}' )`;
-	    }
-	} else {
-	    q = `( destTS >= ${startTS} and destTS <= ${endTS} )`;
-	}
+        let q = "";
+        if (msgHash && msgHash.length > 4) {
+            if (sentAt > 0) {
+                // search within "sentAt + 4+2(#(hops-1)" window
+                let numHops = 1; // TODO should be possible to get this...
+                let sentAtWindow = 4 + 2 * (numHops - 1);
+                let sentAt2 = sentAt + sentAtWindow;
+                q = ` ( sentAt >= ${sentAt} and sentAt <= ${sentAt2} and msgHash = '${msgHash}' ) `
+            } else {
+                q = `( destTS >= ${startTS} and destTS <= ${endTS} and msgHash = '${msgHash}' )`;
+            }
+        } else {
+            q = `( destTS >= ${startTS} and destTS <= ${endTS} )`;
+        }
         let sql = `select destTS, amountReceived, xcmTeleportFees, reaped, isFeeItem, eventID, extrinsicID from xcmtransferdestcandidate where chainIDDest = ${chainIDDest} and ${q} `
-	if (fromAddress) {
+        if (fromAddress) {
             sql += ` and fromAddress = '${fromAddress}' `;
         }
 
@@ -299,35 +299,35 @@ module.exports = class XCMCleaner extends Query {
         let changes = [];
         for (const m of messages) {
             let amountReceived = parseInt(m.amountReceived, 10);
-	    let xcmTeleportFees = m.xcmTeleportFees ? parseInt(m.xcmTeleportFees, 10) : expectedXCMTeleportFees;
-	    if ( m.reaped && fromAddress ) {
-		console.log(m);
+            let xcmTeleportFees = m.xcmTeleportFees ? parseInt(m.xcmTeleportFees, 10) : expectedXCMTeleportFees;
+            if (m.reaped && fromAddress) {
+                console.log(m);
                 return {
-		    bn: m.blockNumberDest,
-		    amountReceived: 0,
+                    bn: m.blockNumberDest,
+                    amountReceived: 0,
                     errorDesc: "AccountReaped",
-		    confidence: 1,
-		    amountSent,
-		    eventID: m.eventID,
-		    extrinsicID: m.extrinsicID,
-		    ts: m.destTS
+                    confidence: 1,
+                    amountSent,
+                    eventID: m.eventID,
+                    extrinsicID: m.extrinsicID,
+                    ts: m.destTS
                 };
-	    } else if (amountReceived > 0 && (amountReceived <= amountSent)) {
-		let sum = amountReceived + xcmTeleportFees;
-		let ratReq =  m.xcmTeleportFees ? .999 : .5; 
-		let rat = xcmTeleportFees && (sum <= amountSent) ? (sum / amountSent) : (amountReceived / amountSent );
-		console.log("rat", rat, "xcm", xcmTeleportFees, "rec", amountReceived, "sum", sum, "sent", amountSent, "exp", expectedXCMTeleportFees);
-		if ( rat > ratReq ) {
+            } else if (amountReceived > 0 && (amountReceived <= amountSent)) {
+                let sum = amountReceived + xcmTeleportFees;
+                let ratReq = m.xcmTeleportFees ? .999 : .5;
+                let rat = xcmTeleportFees && (sum <= amountSent) ? (sum / amountSent) : (amountReceived / amountSent);
+                console.log("rat", rat, "xcm", xcmTeleportFees, "rec", amountReceived, "sum", sum, "sent", amountSent, "exp", expectedXCMTeleportFees);
+                if (rat > ratReq) {
                     return {
-			bn: m.blockNumberDest,
-			amountReceived,
-			confidence: rat,
-			amountSent,
-			eventID: m.eventID,
-			extrinsicID: m.extrinsicID,
-			ts: m.destTS
+                        bn: m.blockNumberDest,
+                        amountReceived,
+                        confidence: rat,
+                        amountSent,
+                        eventID: m.eventID,
+                        extrinsicID: m.extrinsicID,
+                        ts: m.destTS
                     };
-		}
+                }
             }
         }
 
@@ -482,30 +482,30 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             let best = null;
             let destAddress = paraTool.getPubKey(xcm.destAddress);
             let sentAt = xcmInfo.relayChain && xcmInfo.relayChain.sentAt ? xcmInfo.relayChain.sentAt : null;
-	    let inp = {
+            let inp = {
                 symbol: xcm.symbol,
                 relayChain: xcm.relayChain,
-	    };
+            };
             let q = await this.computePriceUSD(inp)
-	    let expectedXCMTeleportFees = this.getXCMTeleportFees(xcmInfo.destination.chainID, xcmInfo.symbol);
-	    if ( expectedXCMTeleportFees && inp.decimals ) {
-		expectedXCMTeleportFees = expectedXCMTeleportFees * 10**inp.decimals;
-	    } else {
-		expectedXCMTeleportFees = 0;
-	    }
-	    console.log("xxx", expectedXCMTeleportFees);
+            let expectedXCMTeleportFees = this.getXCMTeleportFees(xcmInfo.destination.chainID, xcmInfo.symbol);
+            if (expectedXCMTeleportFees && inp.decimals) {
+                expectedXCMTeleportFees = expectedXCMTeleportFees * 10 ** inp.decimals;
+            } else {
+                expectedXCMTeleportFees = 0;
+            }
+            console.log("xxx", expectedXCMTeleportFees);
             best = await this.searchXCMTransferDestCandidate(xcm.msgHash, xcm.sourceTS, xcm.amountSent, destAddress, xcm.chainID, xcm.chainIDDest, xcm.sentAt, expectedXCMTeleportFees);
             if (best == null) {
                 console.log("balance search....", xcm.sourceTS, xcm.destAddress, xcm.symbol)
                 let [balances, blocks] = await this.searchDestinationChainBalances(xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol);
                 if (balances) {
-		    console.log("expectedXCMTeleportFees", expectedXCMTeleportFees);
+                    console.log("expectedXCMTeleportFees", expectedXCMTeleportFees);
                     best = this.match_balance_adjustment(balances, xcm.amountSent, blocks, expectedXCMTeleportFees);
                 }
             }
             if (best) {
-		inp.ts = best.ts;
-		q = await this.computePriceUSD(inp)
+                inp.ts = best.ts;
+                q = await this.computePriceUSD(inp)
                 if (inp.decimals) {
                     // if symbol is known we can compute this
                     xcmInfo.destination.blockNumber = parseInt(best.bn, 10);
@@ -523,24 +523,24 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                             xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
                             xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
                             xcmInfo.destination.teleportFeeUSD = q.priceUSD * xcmInfo.destination.teleportFee;
-			    if ( xcmInfo.destination.teleportFeeUSD > 25 ) {
-				destStatus = -1;
-			    }
-			}
+                            if (xcmInfo.destination.teleportFeeUSD > 25) {
+                                destStatus = -1;
+                            }
+                        }
                         xcmInfo.destination.confidence = best.confidence;
-			if ( destStatus == 1 ) {
+                        if (destStatus == 1) {
                             xcmInfo.destination.executionStatus = "success";
                             if (best.extrinsicID) {
-				xcmInfo.destination.extrinsicID = best.extrinsicID;
+                                xcmInfo.destination.extrinsicID = best.extrinsicID;
                             }
                             xcmInfo.destination.ts = best.ts;
-			} else {
-			    xcmInfo.destination.amountReceived = 0;
-			    xcmInfo.destination.amountReceivedUSD = 0;
+                        } else {
+                            xcmInfo.destination.amountReceived = 0;
+                            xcmInfo.destination.amountReceivedUSD = 0;
                             xcmInfo.destination.executionStatus = "unknown";
                             xcmInfo.destination.teleportFee = null;
                             xcmInfo.destination.teleportFeeUSD = null;
-			}
+                        }
                     }
                     if (best.eventID) {
                         xcmInfo.destination.eventID = best.eventID;
