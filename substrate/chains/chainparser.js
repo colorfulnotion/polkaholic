@@ -987,7 +987,7 @@ module.exports = class ChainParser {
         let feeEventID = c1.eventID
         let feepayingSymbol = c1.xcmSymbol
         let beneficiary = indexer.getBeneficiaryFromMsgHash(c1.msgHash)
-
+        console.log(`[MsgHash ${c1.msgHash}], beneficiary=${beneficiary}`)
         if (rawCandidateCnt == 1) {
             // Reap 0x890a6807bd375ffbda017016002cfefb9f85aa4df19d5b27cf101119aca69cd2 (0 13209424)
             // Not reaped 0x5ff106dc2fd9cc6fca65a0c4675c2fe504d8c1e82a53e61bfe247f3966dc50fc (2006 2865334)

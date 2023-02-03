@@ -1493,6 +1493,7 @@ module.exports = class Indexer extends AssetManager {
         this.wasmContractMap[wasmContract.extrinsicHash] = wasmContract
     }
 
+    // this is used for destination candidate beneficiary lookup
     updateXCMChannelMsg(xcmChannelMsg, blockNumber, blockTS) {
         let xcmID = xcmChannelMsg.msgIndex
         if (this.xcmeventsMap[xcmID] == undefined) {
@@ -3730,6 +3731,14 @@ module.exports = class Indexer extends AssetManager {
         let xcmKeys = Object.keys(this.xcmmsgMap)
         for (const tk of xcmKeys) {
             let xcm = this.xcmmsgMap[tk]
+            let cachedMsgHash = xcm.msgHash
+            if (cachedMsgHash == msgHash && xcm.beneficiaries != undefined) {
+                return xcm.beneficiaries.split('|')[0]
+            }
+        }
+        let xcmIDs = Object.keys(this.xcmeventsMap)
+        for (const xcmID of xcmIDs) {
+            let xcm = this.xcmeventsMap[xcmID]
             let cachedMsgHash = xcm.msgHash
             if (cachedMsgHash == msgHash && xcm.beneficiaries != undefined) {
                 return xcm.beneficiaries.split('|')[0]
