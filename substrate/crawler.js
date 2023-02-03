@@ -1190,11 +1190,10 @@ module.exports = class Crawler extends Indexer {
         await this.indexChain(chain, lookbackBackfillDays, audit, backfill, write_bq_log);
         await this.update_batchedSQL();
 
-        if (update_chain_assets && (this.currentTS() - chain.lastUpdateChainAssetsTS >= 3600)) {
+        if (this.currentTS() - chain.lastUpdateChainAssetsTS >= 3600) {
             let updateChainAssetStartTS = new Date().getTime();
-            await this.update_chain_assets(chain)
+            await this.update_indexlog_hourly(chain)
             let updateChainAssetTS = (new Date().getTime() - updateChainAssetStartTS) / 1000
-            console.log("update_chain_assets time=", updateChainAssetTS);
             if (chain.isEVM > 0 && (chain.evmRPC)) { //  moonbeam, moonriver, astar, shiden, clover ... where clover has an evmRPC external endpoint
                 await this.updateERC20TokenSupply(chain); // 5mins
             }
