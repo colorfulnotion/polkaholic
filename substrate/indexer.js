@@ -6822,6 +6822,11 @@ module.exports = class Indexer extends AssetManager {
 
         // (0.c) derive/cache session validators - called once every ~ 2400 blocks
         await this.getBlockAuthor(this.api, block, isNewSession, sessionIndex)
+        if (block.author != undefined){
+            this.chainParser.setAuthor(block.author)
+        }else{
+            this.chainParser.setAuthor(false)
+        }
 
         // NEW REQUIREMENT: must process extrinsics before evmTx
         // (0.d) decode block extrinsic (from the raw encoded bytes from crawlBlock)
