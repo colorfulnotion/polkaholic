@@ -290,9 +290,9 @@ module.exports = class XCMCleaner extends Query {
         } else {
             q = `( destTS >= ${startTS} and destTS <= ${endTS} )`;
         }
-        let sql = `select destTS, amountReceived, xcmTeleportFees, reaped, isFeeItem, eventID, extrinsicID from xcmtransferdestcandidate where chainIDDest = ${chainIDDest} and ${q} `
+        let sql = `select destTS, amountReceived, xcmTeleportFees, reaped, isFeeItem, eventID, extrinsicID, fromAddress from xcmtransferdestcandidate where chainIDDest = ${chainIDDest} and ${q} `
         if (fromAddress) {
-            sql += ` and fromAddress = '${fromAddress}' `;
+            sql += ` and ( fromAddress = '${fromAddress}' or reaped > 0 )`;
         }
 
         let messages = await this.poolREADONLY.query(sql)
@@ -300,12 +300,11 @@ module.exports = class XCMCleaner extends Query {
         for (const m of messages) {
             let amountReceived = parseInt(m.amountReceived, 10);
             let xcmTeleportFees = m.xcmTeleportFees ? parseInt(m.xcmTeleportFees, 10) : expectedXCMTeleportFees;
-            if (m.reaped && fromAddress) {
-                console.log(m);
+            if (m.reaped) {
                 return {
                     bn: m.blockNumberDest,
                     amountReceived: 0,
-                    errorDesc: "AccountReaped",
+                    errorDesc: "AccountReaped:ReapedAtDestinationChain",
                     confidence: 1,
                     amountSent,
                     eventID: m.eventID,

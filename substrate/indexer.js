@@ -1800,44 +1800,41 @@ module.exports = class Indexer extends AssetManager {
     // 2. or among all the xcmmessages to find the one that the matches the, looking for any errors
     search_xcmtransferdestcandidate(api, beneficiary, xcmtransfer, amountSent, msgHash, expectedXCMTeleportFees) {
         try {
+            let msgHashProvided = msgHash && msgHash.length > 2 ? true : false;
             let xcmtransferdestcandidateKeys = Object.keys(this.xcmtransferdestcandidate)
             if (xcmtransferdestcandidateKeys.length > 0) {
                 let xcmtransferdestcandidates = [];
                 for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
-                    let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
-                    if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
-                        try {
-                            let rat = r.amountReceived / amountSent;
-                            let ratRequirement = (r.isFeeItem) ? .5 : .97;
-                            let msgHashProvided = msgHash && msgHash.length > 2 ? true : false;
-                            let matchingMsgHash = (msgHashProvided && (r.msgHash == msgHash)) ? true : false;
-                            if (r.xcmTeleportFees) {
+                    try {
+                        let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
+                        let matchingMsgHash = (msgHashProvided && (r.msgHash == msgHash)) ? true : false;
+                        if (matchingMsgHash && r.reaped) {
+                            return {
+                                amountReceived: 0,
+                                eventID: r.eventID,
+                                extrinsicID: r.extrinsicID,
+                                errorDesc: "AccountReaped:ReapedAtDestinationChain"
+                            }
+                        } else if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
+                            let rat = r.amountReceived / amountSent; // old default
+                            let ratRequirement = (r.isFeeItem) ? .9 : .97;
+                            if (r.xcmTeleportFees) { // new approach
                                 if ((r.xcmTeleportFees + r.amountReceived) <= amountSent) {
                                     rat = (r.xcmTeleportFees + r.amountReceived) / amountSent;
                                     ratRequirement = 0.999;
                                 }
-                                this.logger.error({
-                                    op: "search_xcmtransferdestcandidate:XCMTELEPORTFEES",
-                                    xcmTeleportFees: r.xcmTeleportFees,
-                                    amountReceived: r.amountReceived,
-                                    amountSent,
-                                    rat,
-                                    ratRequirement,
-                                    matchingMsgHash,
-                                    xcmtransfer
-                                });
                             }
-                            if (rat >= ratRequirement && rat < 1.0001 || matchingMsgHash) {
+                            if (msgHashProvided && !matchingMsgHash) {} else if (rat >= ratRequirement && rat < 1.0001) {
                                 r.confidence = rat;
-                                if (msgHashProvided && !matchingMsgHash) r.confidence = 0.01;
                                 xcmtransferdestcandidates.push(r);
                             }
-                        } catch (err) {
-                            this.logger.error({
-                                op: "search_xcmtransferdestcandidate:ERR",
-                                err
-                            });
                         }
+                    } catch (err) {
+                        this.logger.error({
+                            op: "search_xcmtransferdestcandidate:ERR",
+                            err
+                        });
+
                     }
                 }
                 if (xcmtransferdestcandidates.length > 0) {
@@ -1845,7 +1842,7 @@ module.exports = class Indexer extends AssetManager {
                         return b.confidence - a.confidence
                     });
                     return xcmtransferdestcandidates[0];
-                } else if (msgHash.length > 10) {
+                } else if (msgHashProvided) {
                     // Treat error with map to get at errorDesc and directly populate using msgHash from xcmtransfer
                     for (const k of Object.keys(this.incomingXcmState)) {
                         let r = this.incomingXcmState[k];
@@ -1864,7 +1861,7 @@ module.exports = class Indexer extends AssetManager {
                                 return {
                                     amountReceived: 0,
                                     eventID: r.eventID,
-                                    extrinsicID: null,
+                                    extrinsicID: r.extrinsicID,
                                     errorDesc
                                 }
                             }
