@@ -2185,6 +2185,11 @@ module.exports = class Indexer extends AssetManager {
     updateXCMTransferDestCandidate(candidate, caller = false, isTip = false, finalized = false) {
         //potentially add sentAt here, but it's 2-4
 
+        if (candidate.reaped){
+            // validate reap status..
+            let beneficiary = this.getBeneficiaryFromMsgHash(candidate.msgHash)
+        }
+
         let eventID = candidate.eventID
         let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
         if (this.xcmtransferdestcandidate[k] == undefined || finalized) {

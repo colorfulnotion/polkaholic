@@ -975,7 +975,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processRawDestCandidates(rawCandidates, rawWithdrawCandidates) {
+    processRawDestCandidates(indexer, rawCandidates, rawWithdrawCandidates) {
         let candidates = []
         let rawCandidateCnt = rawCandidates.length
         if (rawCandidateCnt == 0) return candidates
@@ -986,25 +986,41 @@ module.exports = class ChainParser {
         let feeRecipient = c1.fromAddress
         let feeEventID = c1.eventID
         let feepayingSymbol = c1.xcmSymbol
+        let beneficiary = indexer.getBeneficiaryFromMsgHash(c1.msgHash)
 
         if (rawCandidateCnt == 1) {
-            // Reap case 0x890a6807bd375ffbda017016002cfefb9f85aa4df19d5b27cf101119aca69cd2 (0 13209424)
-            // marking as null
-            c1.fromAddress = '0x'
-            c1.amountReceived = 0
-            // add new field
-            c1.feeEventID = feeEventID
-            c1.xcmTeleportFees = xcmTeleportFees
-            c1.feeReceivingAddress = feeRecipient
-            c1.isFeeItem = 1
-            c1.reaped = 1
-            c1.amountReaped = 0
-            if (rawWithdrawCandidates.length > 0) {
-                // assume the first rec is the deposit amount
-                let w0 = rawWithdrawCandidates[0].candidate
-                let amountReaped = w0.amountReceived - xcmTeleportFees
-                if (amountReaped > 0) c1.amountReaped = amountReaped
+            // Reap 0x890a6807bd375ffbda017016002cfefb9f85aa4df19d5b27cf101119aca69cd2 (0 13209424)
+            // Not reaped 0x5ff106dc2fd9cc6fca65a0c4675c2fe504d8c1e82a53e61bfe247f3966dc50fc (2006 2865334)
+            let reaped = false
+            if (beneficiary && beneficiary != feeRecipient) reaped = true
+            if (reaped){
+                // marking as null
+                c1.fromAddress = '0x'
+                c1.amountReceived = 0
+                // add new field
+                c1.feeEventID = feeEventID
+                c1.xcmTeleportFees = xcmTeleportFees
+                c1.feeReceivingAddress = feeRecipient
+                c1.isFeeItem = 1
+                c1.reaped = 1
+                c1.amountReaped = 0
+                if (rawWithdrawCandidates.length > 0) {
+                    // assume the first rec is the deposit amount
+                    let w0 = rawWithdrawCandidates[0].candidate
+                    let amountReaped = w0.amountReceived - xcmTeleportFees
+                    if (amountReaped > 0) c1.amountReaped = amountReaped
+                }
+            }else{
+                let c0 = rawCandidates[rawCandidateCnt - 1].candidate
+                let c0_caller = rawCandidates[rawCandidateCnt - 1].caller
+                c0.feeEventID = feeEventID
+                c0.xcmTeleportFees = xcmTeleportFees
+                c0.feeReceivingAddress = feeRecipient
+                c0.isFeeItem = 1
+                c0.reaped = 0
+                c0.amountReaped = 0
             }
+
             candidates.push({
                 candidate: c1,
                 caller: c1_caller
@@ -1134,7 +1150,7 @@ module.exports = class ChainParser {
                     }
                     if (rawCandidates.length >= 0) {
                         console.log(`rawCandidates`, rawCandidates)
-                        xcmCandidates = this.processRawDestCandidates(rawCandidates, rawWithdrawCandidates)
+                        xcmCandidates = this.processRawDestCandidates(indexer, rawCandidates, rawWithdrawCandidates)
                         console.log(`xcmCandidates`, xcmCandidates)
                     }
                     for (const c of candidates) {
