@@ -1280,9 +1280,15 @@ module.exports = class Indexer extends AssetManager {
                 // ["chainIDDest", "eventID"] + ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT", "nativeAssetChain", "xcmInteriorKey"
                 //let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
                 let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
+                let xcmTeleportFees = (r.xcmTeleportFees != undefined) ? `'${r.xcmTeleportFees}'` : `NULL`
+                let feeEventID = (r.feeEventID != undefined) ? `'${r.feeEventID}'` : `NULL`
+                let feeReceivingAddress = (r.feeReceivingAddress != undefined) ? `'${r.feeReceivingAddress}'` : `NULL`
+                let amountReaped = (r.amountReaped != undefined) ? `'${r.amountReaped}'` : `NULL`
+                let reaped = (r.reaped != undefined) ? `'${r.reaped}'` : `NULL`
+                let isFeeItem = (r.isFeeItem != undefined) ? `'${r.isFeeItem}'` : `NULL`
                 //["chainIDDest", "eventID"]
                 //["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"]
-                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.xcmSymbol}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.relayChain}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, xcmInteriorKey].join(",") + ")";
+                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.xcmSymbol}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.relayChain}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, xcmInteriorKey, xcmTeleportFees, feeEventID, feeReceivingAddress, amountReaped, reaped, isFeeItem].join(",") + ")";
 
                 if (r.finalized && (r.xcmSymbol) && this.validXCMSymbol(r.xcmSymbol, r.chainIDDest, "xcmtransfer", r)) {
                     xcmtransferdestcandidates.push(t);
@@ -1297,9 +1303,9 @@ module.exports = class Indexer extends AssetManager {
                     await this.upsertSQL({
                         "table": "xcmtransferdestcandidate",
                         "keys": ["chainIDDest", "eventID"],
-                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"],
+                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey", "xcmTeleportFees", "feeEventID", "feeReceivingAddress", "amountReaped", "reaped", "isFeeItem"],
                         "data": xcmtransferdestcandidates,
-                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"]
+                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey", "xcmTeleportFees", "feeEventID", "feeReceivingAddress", "amountReaped", "reaped", "isFeeItem"]
                     });
                 }
             } catch (err0) {
@@ -1706,26 +1712,14 @@ module.exports = class Indexer extends AssetManager {
         if (isXcmTipSafe) {
             this.xcmtransfer[`${xcmtransfer.extrinsicHash}-${xcmtransfer.transferIndex}-${xcmtransfer.xcmIndex}`] = xcmtransfer;
         }
-        this.sendManagerMessage(xcmtransfer, "xcmtransfer", finalized);
         if (isTip) {
             //console.log(`[Delay=${this.chainParser.parserBlockNumber - xcmtransfer.blockNumber}] send xcmtransfer ${xcmtransfer.extrinsicHash} (msgHash:${xcmtransfer.msgHash}), isTip=${isTip}`)
             try {
                 let xcmTransferHash = xcmtransfer.xcmtransferHash
                 let extrinsicHash = xcmtransfer.extrinsicHash
                 let msgHash = xcmtransfer.msgHash
-                /*this.logger.error({
-                    "op": "origin publish_xcminfo",
-                    xcmTransferHash,
-                    extrinsicHash,
-                    msgHash,
-                    stage: finalized ? 'OriginationFinalized' : 'OriginationUnfinalized',
-                    isSigned: isSigned ? 1 : 0,
-                    finalized: finalized,
-                    chainID: this.chainID,
-                }) */
+                // publish to "xcminfo" channel, record in  xcmtransferslog
                 await this.publish_xcminfo(xcmtransfer.xcmInfo);
-                //MK!!!
-                // add to xcmtransferslog
                 let _isSigned = isSigned ? 1 : 0;
                 let stage = finalized ? 'OriginationFinalized' : 'OriginationUnfinalized';
                 let vals = ["extrinsicHash", "transferIndex", "xcmIndex", "msgHash", "transactionHash", "symbol", "sourceTS", "chainID", "chainIDDest", "xcmInfo", "isSigned", "section", "method", "addTS", "lastUpdateTS"];
@@ -1740,15 +1734,15 @@ module.exports = class Indexer extends AssetManager {
                     "replace": ["lastUpdateTS", "symbol"]
                 });
 
-                // since we have two different indexers writing xcmInfo object independently, we only write finalized = false case since it is possible the destination chain finalizes first?
-                if (finalized == false) {
-                    //why finalized here?
+                // we only publish xcmtransfer to kick off destination matching; if it is incomplete we don't publish it to the network
+                if (xcmtransfer.incomplete == 1) {} else { // send it both on finalized and unfinalized, since many chains have "subscribeStorage" off
                     this.publish_xcmtransfer(xcmtransfer);
                 }
                 if (isXcmTipSafe) {
                     this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, xcmtransfer.xcmInfo, xcmtransfer.sourceTS);
                 }
                 this.sendWSMessage(xcmtransfer, "xcmtransfer", finalized);
+                this.sendManagerMessage(xcmtransfer, "xcmtransfer", finalized);
             } catch (err) {
                 this.logger.error({
                     "op": "xcmtransferslog updateXCMTransferStorage ERROR",
@@ -1794,35 +1788,41 @@ module.exports = class Indexer extends AssetManager {
     // 2. or among all the xcmmessages to find the one that the matches the, looking for any errors
     search_xcmtransferdestcandidate(api, beneficiary, xcmtransfer, amountSent, msgHash, expectedXCMTeleportFees) {
         try {
+            let msgHashProvided = msgHash && msgHash.length > 2 ? true : false;
             let xcmtransferdestcandidateKeys = Object.keys(this.xcmtransferdestcandidate)
             if (xcmtransferdestcandidateKeys.length > 0) {
                 let xcmtransferdestcandidates = [];
                 for (let i = 0; i < xcmtransferdestcandidateKeys.length; i++) {
-                    let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
-                    if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
-                        try {
-                            let rat = r.amountReceived / amountSent;
-                            let isFeeItem = (xcmtransfer.xcmInfo && xcmtransfer.xcmInfo.origination && xcmtransfer.xcmInfo.origination.isFeeItem == undefined && (xcmtransfer.xcmInfo.origination.isFeeItem === false)) ? false : true;
-                            let ratRequirement = (isFeeItem) ? .1 : .5;
-                            let msgHashProvided = msgHash && msgHash.length > 2 ? true : false;
-                            let matchingMsgHash = (msgHashProvided && (r.msgHash == msgHash)) ? true : false;
-                            /*if ( isFeeItem && expectedXCMTeleportFees > 0 ) {
-                            // if fee item adjust rat using xcmtransfer.origination.isFeeItem and expectedXCMTeleportFees
-                            if ( amountSent > expectedXCMTeleportFees && amountReceived > expectedTeleportFee && ( amountSent >= amountReceived + expectedXCMTeleportFees ) ) {
-                            rat = ( amountReceived + expectedXCMTeleportFees ) / ( amountSent );
+                    try {
+                        let r = this.xcmtransferdestcandidate[xcmtransferdestcandidateKeys[i]];
+                        let matchingMsgHash = (msgHashProvided && (r.msgHash == msgHash)) ? true : false;
+                        if (matchingMsgHash && r.reaped) {
+                            return {
+                                amountReceived: 0,
+                                eventID: r.eventID,
+                                extrinsicID: r.extrinsicID,
+                                errorDesc: "AccountReaped:ReapedAtDestinationChain"
                             }
-                            } */
-                            if (rat >= ratRequirement && rat < 1.0001 || matchingMsgHash) {
+                        } else if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
+                            let rat = r.amountReceived / amountSent; // old default
+                            let ratRequirement = (r.isFeeItem) ? .9 : .97;
+                            if (r.xcmTeleportFees) { // new approach
+                                if ((r.xcmTeleportFees + r.amountReceived) <= amountSent) {
+                                    rat = (r.xcmTeleportFees + r.amountReceived) / amountSent;
+                                    ratRequirement = 0.999;
+                                }
+                            }
+                            if (msgHashProvided && !matchingMsgHash) {} else if (rat >= ratRequirement && rat < 1.0001) {
                                 r.confidence = rat;
-                                if (msgHashProvided && !matchingMsgHash) r.confidence = 0.01;
                                 xcmtransferdestcandidates.push(r);
                             }
-                        } catch (err) {
-                            this.logger.error({
-                                op: "search_xcmtransferdestcandidate:ERR",
-                                err
-                            });
                         }
+                    } catch (err) {
+                        this.logger.error({
+                            op: "search_xcmtransferdestcandidate:ERR",
+                            err
+                        });
+
                     }
                 }
                 if (xcmtransferdestcandidates.length > 0) {
@@ -1830,7 +1830,7 @@ module.exports = class Indexer extends AssetManager {
                         return b.confidence - a.confidence
                     });
                     return xcmtransferdestcandidates[0];
-                } else if (msgHash.length > 10) {
+                } else if (msgHashProvided) {
                     // Treat error with map to get at errorDesc and directly populate using msgHash from xcmtransfer
                     for (const k of Object.keys(this.incomingXcmState)) {
                         let r = this.incomingXcmState[k];
@@ -1849,7 +1849,7 @@ module.exports = class Indexer extends AssetManager {
                                 return {
                                     amountReceived: 0,
                                     eventID: r.eventID,
-                                    extrinsicID: null,
+                                    extrinsicID: r.extrinsicID,
                                     errorDesc
                                 }
                             }
@@ -2066,21 +2066,12 @@ module.exports = class Indexer extends AssetManager {
                                     extra = `, flightTime = '${xcmInfo.flightTime}'`
                                 }
                                 // update matched and xcmInfo
-                                let sql = `update xcmtransfer set matched = 1, destStatus = ${destStatus}, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))} ${extra} where extrinsicHash = '${xcmtransfer.extrinsicHash}' and transferIndex = '${xcmtransfer.transferIndex}' and xcmIndex='${xcmtransfer.xcmIndex}'`
+                                let sql = `update xcmtransfer set destStatus = ${destStatus}, xcmInfolastUpdateDT = Now(), teleportFee = ${mysql.escape(destination.teleportFee)}, teleportFeeUSD = ${mysql.escape(destination.teleportFeeUSD)}, amountReceived = ${mysql.escape(destination.amountReceived)}, amountReceivedUSD = ${mysql.escape(destination.amountReceivedUSD)}, executedEventID = ${mysql.escape(destination.eventID)}, xcmInfo = ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))} ${extra} where extrinsicHash = '${xcmtransfer.extrinsicHash}' and transferIndex = '${xcmtransfer.transferIndex}' and xcmIndex='${xcmtransfer.xcmIndex}'`
                                 this.batchedSQL.push(sql);
                                 await this.update_batchedSQL();
                                 let xcmTransferHash = xcmtransfer.xcmtransferHash
                                 let extrinsicHash = xcmtransfer.extrinsicHash
                                 let msgHash = xcmtransfer.msgHash
-                                /*this.logger.error({
-                                    "op": "destination publish_xcminfo",
-                                    xcmTransferHash,
-                                    extrinsicHash,
-                                    msgHash,
-                                    stage: stage,
-                                    finalized: finalized,
-                                    chainID: this.chainID,
-                                })*/
                                 await this.publish_xcminfo(xcmtransfer.xcmInfo);
                                 await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, xcmInfo, this.getCurrentTS());
                             }
@@ -2127,7 +2118,7 @@ module.exports = class Indexer extends AssetManager {
                             if (existing_xcmInfo.destination && existing_xcmInfo.destination.finalized) {
                                 // destination chain was finalized BEFORE origination chain
                                 if (existing_xcmInfo.origination.initiateTS) {
-                                    existing_xcmInfo.flightTime = this.getCurrentTS() - o.initiateTS;
+                                    existing_xcmInfo.flightTime = this.getCurrentTS() - existing_xcmInfo.origination.initiateTS;
                                 }
                                 this.logger.error({
                                     "op": "process_ably_xcm_indexer_message:origf > destf",
@@ -2137,16 +2128,6 @@ module.exports = class Indexer extends AssetManager {
                                 let xcmTransferHash = xcmtransfer.xcmtransferHash
                                 let extrinsicHash = xcmtransfer.extrinsicHash
                                 let msgHash = xcmtransfer.msgHash
-                                this.logger.error({
-                                    "op": "existing publish_xcminfo",
-                                    xcmTransferHash,
-                                    extrinsicHash,
-                                    msgHash,
-                                    stage: finalized ? 'OriginationFinalized' : 'OriginationUnfinalized',
-                                    isSigned: isSigned ? 1 : 0,
-                                    finalized: finalized,
-                                    chainID: this.chainID,
-                                })
                                 await this.publish_xcminfo(existing_xcmInfo);
                             }
                         }
@@ -5155,7 +5136,11 @@ module.exports = class Indexer extends AssetManager {
         }
 
         if (!isSigned) {
-            this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, isTip, finalized);
+            let xcmCandidates = this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, isTip, finalized);
+            for (const c of xcmCandidates) {
+                console.log(`** Indexer caller=${c.caller}, candidate`, c.candidate)
+                this.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
+            }
         }
         //console.log('hash!!', extrinsicHash, `isSigned=${isSigned}`, `${JSON.stringify(extrinsic.signature)}`, extrinsic.signature.signer)
 
@@ -5483,7 +5468,7 @@ module.exports = class Indexer extends AssetManager {
                 }
                 x.symbol = assetInfo.symbol;
             } else {
-                console.log(`[${x.extrinsicHash}] [${x.extrinsicID}] MISSING x.asset`, x.asset, x.chainID);
+                console.log(`[${x.extrinsicHash}] [${x.extrinsicID}] ${symbolRelayChain} MISSING x.asset`, x.asset, x.chainID);
             }
 
             if (x.chainID != undefined) {
@@ -7817,7 +7802,7 @@ module.exports = class Indexer extends AssetManager {
                     "msg": 'missing blockHash - check source',
                 })
             } else {
-                let forceParseTrace = true
+                let forceParseTrace = false;
                 let traceType = this.compute_trace_type(r.trace, r.traceType);
                 let api = (refreshAPI) ? await this.api.at(blockHash) : this.apiAt;
                 if (blockTS >= traceParseTS) {

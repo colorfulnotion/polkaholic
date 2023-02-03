@@ -1014,7 +1014,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let currTS = this.getCurrentTS();
         range_days_ago = (relayChain == "kusama") ? 577 : 270;
         //range_days_ago = 1;
-        for (let daysago = 365; daysago < range_days_ago; daysago++) {
+        for (let daysago = 0; daysago < range_days_ago; daysago++) {
             let ts = currTS - 86400 * daysago;
             let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
             await this.dump_xcmtransfers(logDT, relayChain);

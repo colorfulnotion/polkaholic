@@ -596,10 +596,14 @@ module.exports = class AssetManager extends PolkaholicDB {
     getXcmAssetInfoBySymbolKey(symbolRelayChain) {
         let pieces = symbolRelayChain.split('~')
         pieces[0] = pieces[0].toUpperCase()
-        symbolRelayChain = pieces.join('~')
-        let xcmAssetInfo = this.xcmSymbolInfo[symbolRelayChain]
+        let symbolRelayChainUpper = pieces.join('~')
+        let xcmAssetInfo = this.xcmSymbolInfo[symbolRelayChainUpper]
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo
+        }
+        let xcmAssetInfo2 = this.xcmSymbolInfo[symbolRelayChain]
+        if (xcmAssetInfo2 != undefined) {
+            return xcmAssetInfo2
         }
         return false
     }
