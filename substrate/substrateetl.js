@@ -762,7 +762,7 @@ or lastUpdateAddressBalancesStartDT is Null ) and logDT >= date(date_sub(Now(), 
             ts: blockTS
         })
         let priceUSD = p && p.priceUSD ? p.priceUSD : 0;
-        let last_key = (chain.lastUpdateAddressBalancesLastKey.length > 0 && chain.secondsago < 7200) ? chain.lastUpdateAddressBalancesLastKey : "";
+        let last_key = (chain.lastUpdateAddressBalancesLastKey.length > 0 && chain.secondsago < 3550) ? chain.lastUpdateAddressBalancesLastKey : "";
         if (last_key == "") {
             await this.clean_bqlogfn(chainID, logDT);
             console.log("STARTING CLEAN");
