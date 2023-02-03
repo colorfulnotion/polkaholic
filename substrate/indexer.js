@@ -1281,12 +1281,14 @@ module.exports = class Indexer extends AssetManager {
                 //let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
                 let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
                 let xcmTeleportFees = (r.xcmTeleportFees != undefined) ? `'${r.xcmTeleportFees}'` : `NULL`
-                let treasuryEventID = (r.treasuryEventID != undefined) ? `'${r.treasuryEventID}'` : `NULL`
-                let treasuryAddress = (r.treasuryAddress != undefined) ? `'${r.treasuryAddress}'` : `NULL`
+                let feeEventID = (r.feeEventID != undefined) ? `'${r.feeEventID}'` : `NULL`
+                let feeReceivingAddress = (r.feeReceivingAddress != undefined) ? `'${r.feeReceivingAddress}'` : `NULL`
                 let amountReaped = (r.amountReaped != undefined) ? `'${r.amountReaped}'` : `NULL`
+                let reaped = (r.reaped != undefined) ? `'${r.reaped}'` : `NULL`
+                let isFeeItem = (r.isFeeItem != undefined) ? `'${r.isFeeItem}'` : `NULL`
                 //["chainIDDest", "eventID"]
                 //["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"]
-                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.xcmSymbol}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.relayChain}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, xcmInteriorKey, xcmTeleportFees, treasuryEventID, treasuryAddress, amountReaped].join(",") + ")";
+                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.xcmSymbol}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.relayChain}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, xcmInteriorKey, xcmTeleportFees, feeEventID, feeReceivingAddress, amountReaped, reaped, isFeeItem].join(",") + ")";
 
                 if (r.finalized && (r.xcmSymbol) && this.validXCMSymbol(r.xcmSymbol, r.chainIDDest, "xcmtransfer", r)) {
                     xcmtransferdestcandidates.push(t);
@@ -1301,9 +1303,9 @@ module.exports = class Indexer extends AssetManager {
                     await this.upsertSQL({
                         "table": "xcmtransferdestcandidate",
                         "keys": ["chainIDDest", "eventID"],
-                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey", "xcmTeleportFees", "treasuryEventID", "treasuryAddress", "amountReaped"],
+                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey", "xcmTeleportFees", "feeEventID", "feeReceivingAddress", "amountReaped", "reaped", "isFeeItem"],
                         "data": xcmtransferdestcandidates,
-                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey", "xcmTeleportFees", "treasuryEventID", "treasuryAddress", "amountReaped"]
+                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey", "xcmTeleportFees", "feeEventID", "feeReceivingAddress", "amountReaped", "reaped", "isFeeItem"]
                     });
                 }
             } catch (err0) {

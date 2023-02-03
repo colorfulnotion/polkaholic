@@ -984,7 +984,7 @@ module.exports = class ChainParser {
         let c1_caller = rawCandidates[rawCandidateCnt-1].caller
         let xcmTeleportFees = c1.amountReceived
         let feeRecipient =  c1.fromAddress
-        let treasuryEventID = c1.eventID
+        let feeEventID = c1.eventID
         let feepayingSymbol = c1.xcmSymbol
 
         if (rawCandidateCnt == 1){
@@ -993,9 +993,9 @@ module.exports = class ChainParser {
            c1.fromAddress = '0x'
            c1.amountReceived = 0
            // add new field
-           c1.treasuryEventID = treasuryEventID
+           c1.feeEventID = feeEventID
            c1.xcmTeleportFees = xcmTeleportFees
-           c1.treasuryAddress = feeRecipient
+           c1.feeReceivingAddress = feeRecipient
            c1.isFeeItem = 1
            c1.reaped = 1
            c1.amountReaped = 0
@@ -1011,9 +1011,9 @@ module.exports = class ChainParser {
            let c0 = rawCandidates[0].candidate
            let c0_caller = rawCandidates[0].caller
            if (c0.xcmSymbol == c1.xcmSymbol){
-               c0.treasuryEventID = treasuryEventID
+               c0.feeEventID = feeEventID
                c0.xcmTeleportFees = xcmTeleportFees
-               c0.treasuryAddress = feeRecipient
+               c0.feeReceivingAddress = feeRecipient
                c0.isFeeItem = 1
                c0.reaped = 0
                c0.amountReaped = 0
@@ -1021,23 +1021,23 @@ module.exports = class ChainParser {
           candidates.push({candidate: c0, caller: c0_caller})
         }else{
           // MultiAssets case 0x92bec041b54422d08e436be1a8db247d5f4466e20c299647405fed2261bc5ba1 (2004 2858049)
-          //console.log(`[${treasuryEventID}] ${feepayingSymbol} feeRecipient=${feeRecipient}, xcmTeleportFees=${xcmTeleportFees}`)
+          //console.log(`[${feeEventID}] ${feepayingSymbol} feeRecipient=${feeRecipient}, xcmTeleportFees=${xcmTeleportFees}`)
           for (let i = 0; i < rawCandidateCnt -1 ; i++) {
               let c0 = rawCandidates[i].candidate
               let c0_caller = rawCandidates[i].caller
               if (c0.xcmSymbol == feepayingSymbol){
                   // fee paying.
-                  c0.treasuryEventID = treasuryEventID
+                  c0.feeEventID = feeEventID
                   c0.xcmTeleportFees = xcmTeleportFees
-                  c0.treasuryAddress = feeRecipient
+                  c0.feeReceivingAddress = feeRecipient
                   c0.isFeeItem = 1
                   c0.reaped = 0
                   c0.amountReaped = 0
               }else{
-                // not fee paying but still mark it with treasuryEventID?
-                c0.treasuryEventID = treasuryEventID
+                // not fee paying but still mark it with feeEventID?
+                c0.feeEventID = feeEventID
                 c0.xcmTeleportFees = 0
-                c0.treasuryAddress = feeRecipient
+                c0.feeReceivingAddress = feeRecipient
                 c0.isFeeItem = 0
                 c0.reaped = 0
                 c0.amountReaped = 0
