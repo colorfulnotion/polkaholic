@@ -1133,7 +1133,9 @@ module.exports = class ChainParser {
                         }
                     }
                     if (rawCandidates.length >= 0) {
+                        console.log(`rawCandidates`, rawCandidates)
                         xcmCandidates = this.processRawDestCandidates(rawCandidates, rawWithdrawCandidates)
+                        console.log(`xcmCandidates`, xcmCandidates)
                     }
                     for (const c of candidates) {
                         //indexer.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
