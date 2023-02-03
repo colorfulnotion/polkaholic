@@ -277,30 +277,48 @@ module.exports = class XCMCleaner extends Query {
         let startTS = sourceTS - 10;
         let endTS = sourceTS + 60 * 2;
 	let q = "";
-        if (msgHash && msgHash.length > 4 && sentAt > 0 ) {
-            // search within "sentAt + 4+2(#(hops-1)" window
-            let numHops = 1; // TODO should be possible to get this...
-            let sentAtWindow = 4 + 2 * (numHops - 1);
-            let sentAt2 = sentAt + sentAtWindow;
-            q = ` or ( sentAt >= ${sentAt} and sentAt <= ${sentAt2} ) `
-        }
-
-        let sql = `select * from xcmtransferdestcandidate where chainIDDest = ${chainIDDest} and ( ( destTS >= ${startTS} and destTS <= ${endTS} ) ${q} ) `
-        if (msgHash && msgHash.length > 4) {
-            sql += ` and msgHash = '${msgHash}' `;
-        }
+        if (msgHash && msgHash.length > 4 ) {
+	    if ( sentAt > 0 ) {
+		// search within "sentAt + 4+2(#(hops-1)" window
+		let numHops = 1; // TODO should be possible to get this...
+		let sentAtWindow = 4 + 2 * (numHops - 1);
+		let sentAt2 = sentAt + sentAtWindow;
+		q = ` ( sentAt >= ${sentAt} and sentAt <= ${sentAt2} and msgHash = '${msgHash}' ) `
+	    } else {
+		q = `( destTS >= ${startTS} and destTS <= ${endTS} and msgHash = '${msgHash}' )`;
+	    }
+	} else {
+	    q = `( destTS >= ${startTS} and destTS <= ${endTS} )`;
+	}
+        let sql = `select destTS, amountReceived, xcmTeleportFees, reaped, isFeeItem, eventID, extrinsicID from xcmtransferdestcandidate where chainIDDest = ${chainIDDest} and ${q} `
 	if (fromAddress) {
             sql += ` and fromAddress = '${fromAddress}' `;
         }
-        console.log(sql);
+
         let messages = await this.poolREADONLY.query(sql)
         let changes = [];
         for (const m of messages) {
-            let amountReceived = m.amountReceived;
-            if (amountReceived > 0 && (amountReceived <= amountSent)) {
-		let rat = expectedXCMTeleportFees && (amountReceived + expectedXCMTeleportFees <= amountSent) ? ((amountReceived + expectedXCMTeleportFees) / amountSent ) : ( amountReceived / amountSent );
-		if ( rat > .9 ) {
-                    changes.push({
+            let amountReceived = parseInt(m.amountReceived, 10);
+	    let xcmTeleportFees = m.xcmTeleportFees ? parseInt(m.xcmTeleportFees, 10) : expectedXCMTeleportFees;
+	    if ( m.reaped && fromAddress ) {
+		console.log(m);
+                return {
+		    bn: m.blockNumberDest,
+		    amountReceived: 0,
+                    errorDesc: "AccountReaped",
+		    confidence: 1,
+		    amountSent,
+		    eventID: m.eventID,
+		    extrinsicID: m.extrinsicID,
+		    ts: m.destTS
+                };
+	    } else if (amountReceived > 0 && (amountReceived <= amountSent)) {
+		let sum = amountReceived + xcmTeleportFees;
+		let ratReq =  m.xcmTeleportFees ? .999 : .5; 
+		let rat = xcmTeleportFees && (sum <= amountSent) ? (sum / amountSent) : (amountReceived / amountSent );
+		console.log("rat", rat, "xcm", xcmTeleportFees, "rec", amountReceived, "sum", sum, "sent", amountSent, "exp", expectedXCMTeleportFees);
+		if ( rat > ratReq ) {
+                    return {
 			bn: m.blockNumberDest,
 			amountReceived,
 			confidence: rat,
@@ -308,10 +326,11 @@ module.exports = class XCMCleaner extends Query {
 			eventID: m.eventID,
 			extrinsicID: m.extrinsicID,
 			ts: m.destTS
-                    });
+                    };
 		}
             }
         }
+
         if (changes.length > 0) {
             changes.sort(function compareFn(a, b) {
                 return b.confidence - a.confidence
@@ -363,7 +382,6 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 xcmtransfer.blockNumberDest
               from xcmtransfer
        where  extrinsicHash = '${extrinsicHash}' and transferIndex = '${transferIndex}' and xcmIndex = '${xcmIndex}' limit 1`
-        console.log(sqlA);
         let xcmRecs = await this.poolREADONLY.query(sqlA)
         let xcm = null
         if (xcmRecs.length == 1) {

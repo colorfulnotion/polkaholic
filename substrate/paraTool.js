@@ -2071,6 +2071,7 @@ module.exports = {
     getXCMErrorDescription: function(errorDesc) {
         let errorMap = {}
         let officialErrors = [
+            'AccountReaped|404|The account was reaped.',
             'Overflow|0|An arithmetic overflow happened.',
             'Unimplemented|1|The instruction is intentionally unsupported.',
             'UntrustedReserveLocation|2|Origin Register does not contain a value value for a reserve transfer notification.',
