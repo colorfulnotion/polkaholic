@@ -2066,7 +2066,7 @@ module.exports = class Indexer extends AssetManager {
                                     extra = `, flightTime = '${xcmInfo.flightTime}'`
                                 }
                                 // update matched and xcmInfo
-                                let sql = `update xcmtransfer set destStatus = ${destStatus}, xcmInfolastUpdateDT = Now(), teleportFee = ${mysql.escape(destination.teleportFee)}, teleportFeeUSD = ${mysql.escape(destination.teleportFeeUSD)}, amountReceived = ${mysql.escape(destination.amountReceived)}, amountReceivedUSD = ${mysql.escape(destination.amountReceivedUSD)}, executedEventID = ${mysql.escape(destination.eventID)}, xcmInfo = ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))} ${extra} where extrinsicHash = '${xcmtransfer.extrinsicHash}' and transferIndex = '${xcmtransfer.transferIndex}' and xcmIndex='${xcmtransfer.xcmIndex}'`
+                                let sql = `update xcmtransfer set destStatus = ${destStatus}, xcmInfolastUpdateDT = Now(), teleportFee = ${mysql.escape(destination.teleportFee)}, teleportFeeUSD = ${mysql.escape(destination.teleportFeeUSD)}, amountReceived = ${mysql.escape(destination.amountReceived)}, amountReceivedUSD = ${mysql.escape(destination.amountReceivedUSD)}, executedEventID = ${mysql.escape(destination.eventID)}, errorDesc = ${mysql.escape(errorDesc)}, xcmInfo = ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))} ${extra} where extrinsicHash = '${xcmtransfer.extrinsicHash}' and transferIndex = '${xcmtransfer.transferIndex}' and xcmIndex='${xcmtransfer.xcmIndex}'`
                                 this.batchedSQL.push(sql);
                                 await this.update_batchedSQL();
                                 let xcmTransferHash = xcmtransfer.xcmtransferHash
@@ -5468,7 +5468,7 @@ module.exports = class Indexer extends AssetManager {
                 }
                 x.symbol = assetInfo.symbol;
             } else {
-                console.log(`[${x.extrinsicHash}] [${x.extrinsicID}] ${symbolRelayChain} MISSING x.asset`, x.asset, x.chainID);
+              console.log(`[${x.extrinsicHash}] [${x.extrinsicID}] ${symbolRelayChain} MISSING x.asset`, x.asset, x.chainID);
             }
 
             if (x.chainID != undefined) {

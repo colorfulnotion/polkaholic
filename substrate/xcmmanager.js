@@ -1157,8 +1157,7 @@ order by msgHash`
     // when we need to do some reanalytics on demand, xcmReanalytics writes hashes table with "xcminfofinalized" column records with "v4" column
     //  either an array or object based on the number of xcmInfo objects -- to cover xcmIndex > 0 and transferIndex > 0 situations
     async xcm_reanalytics() {
-        let sql = `select chainID, chainIDDest, symbol, relayChain, extrinsicHash, extrinsicID, xcmIndex, isFeeItem, transferIndex, destStatus, sourceTS, convert(xcmInfo using utf8) as xcmInfo, incomplete from xcmtransfer where 
-xcmInfo is not null and sourceTS >= UNIX_TIMESTAMP("2020-01-01") and ( incomplete = 1 ) and xcmInfoAudited = 0 order by extrinsicHash, xcmIndex, transferIndex limit 5000`
+        let sql = `select chainID, chainIDDest, symbol, relayChain, extrinsicHash, extrinsicID, xcmIndex, isFeeItem, transferIndex, destStatus, sourceTS, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null and sourceTS >= UNIX_TIMESTAMP("2023-01-01") and destStatus = 1 and (teleportFee = 0 or amountReceived = 0) and xcmInfoAudited < 2 order by extrinsicHash, xcmIndex, transferIndex limit 5000`
         try {
             console.log(sql);
             let xcmmatches = await this.pool.query(sql);
@@ -1185,15 +1184,20 @@ xcmInfo is not null and sourceTS >= UNIX_TIMESTAMP("2020-01-01") and ( incomplet
                     let teleportFeeUSD2 = teleportFee2 * priceUSD;
                     let expectedXCMTeleportFees = this.getXCMTeleportFees(r.chainIDDest, r.symbol);
                     let destStatus = -1;
-                    let xcmInfoAudited = 2;
-                    if (x.destination.executionStatus == "failed" || (r.incomplete)) {
+                    let xcmInfoAudited = 0;
+                    if (x.destination.executionStatus == "success") {
+                        destStatus = 1;
+                    } else if (x.destination.executionStatus == "failed") {
                         destStatus = 0;
+                    }
+                    if (teleportFeeUSD2 > 5) {
+                        destStatus = -1;
                         teleportFee2 = 0;
                         teleportFeeUSD2 = 0;
-                        x.destination.amountReceived = 0;
-                        x.destination.amountReceivedUSD = 0;
-                    } else if (x.destination.executionStatus == "success") {
-                        destStatus = 1;
+                        xcmInfoAudited = -1;
+                        x.destination.executionStatus = "unknown";
+                    } else {
+                        xcmInfoAudited = 2;
                     }
 
                     if (r.isFeeItem && (teleportFeeUSD2 > 0) && (destStatus == 1)) {
@@ -1207,8 +1211,10 @@ xcmInfo is not null and sourceTS >= UNIX_TIMESTAMP("2020-01-01") and ( incomplet
                         x.destination.teleportFeeUSD = null;
                         x.destination.teleportFeeChainSymbol = null;
                     }
-                    let sql0 = `update xcmtransfer set destStatus = ${destStatus}, xcmInfoAudited = ${xcmInfoAudited}, teleportFee = '${teleportFee2}', teleportFeeUSD = '${teleportFeeUSD2}', amountReceived = ${mysql.escape(x.destination.amountReceived)}, amountReceivedUSD = ${mysql.escape(x.destination.amountReceivedUSD)},  xcmInfo = ${mysql.escape(JSON.stringify(x))} where extrinsicHash = '${r.extrinsicHash}' and xcmIndex = '${r.xcmIndex}' and transferIndex = '${r.transferIndex}'`
-                    console.log(sql0);
+                    let sql0 = `update xcmtransfer set destStatus = ${destStatus}, xcmInfoAudited = ${xcmInfoAudited}, teleportFee = '${teleportFee2}', teleportFeeUSD = '${teleportFeeUSD2}', amountReceived = ${mysql.escape(x.destination.amountReceived)}, amountReceivedUSD = ${mysql.escape(x.destination.amountReceivedUSD)}, xcmInfo = ${mysql.escape(JSON.stringify(x))} where extrinsicHash = '${r.extrinsicHash}' and xcmIndex = '${r.xcmIndex}' and transferIndex = '${r.transferIndex}'`
+                    if (teleportFeeUSD2 > 5 || (destStatus == 1)) {
+                        console.log(sql0);
+                    }
                     this.batchedSQL.push(sql0);
                 }
             }
