@@ -1157,7 +1157,7 @@ order by msgHash`
     // when we need to do some reanalytics on demand, xcmReanalytics writes hashes table with "xcminfofinalized" column records with "v4" column
     //  either an array or object based on the number of xcmInfo objects -- to cover xcmIndex > 0 and transferIndex > 0 situations
     async xcm_reanalytics() {
-        let sql = `select chainID, chainIDDest, symbol, relayChain, extrinsicHash, extrinsicID, xcmIndex, isFeeItem, transferIndex, destStatus, sourceTS, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null and xcmInfoAudited = 0 and destStatus = 1 order by extrinsicHash, xcmIndex, transferIndex limit 5000`
+        let sql = `select chainID, chainIDDest, symbol, relayChain, extrinsicHash, extrinsicID, xcmIndex, isFeeItem, transferIndex, destStatus, sourceTS, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null and xcmInfoAudited = 0 order by extrinsicHash, xcmIndex, transferIndex limit 5000`
         try {
             console.log(sql);
             let xcmmatches = await this.pool.query(sql);
@@ -1179,20 +1179,38 @@ order by msgHash`
                     let teleportFee2 = x.origination.amountSent - x.destination.amountReceived;
                     let teleportFeeUSD2 = teleportFee2 * priceUSD;
                     let expectedXCMTeleportFees = this.getXCMTeleportFees(r.chainIDDest, r.symbol);
-                    if (r.isFeeItem) {
+		    let destStatus = -1;
+		    let xcmInfoAudited = 0;
+		    if (x.destination.executionStatus == "success") {
+			destStatus = 1;
+		    } else if (x.destination.executionStatus == "failed") {
+			destStatus = 0;
+		    }
+                    if ( teleportFeeUSD2 > 5 ) {
+			destStatus = -1;
+			teleportFee2 = 0;
+			teleportFeeUSD2 = 0;
+			xcmInfoAudited = -1;
+			x.destination.executionStatus = "unknown";
+		    } else {
+			xcmInfoAudited = 1;
+		    }
+
+                    if (r.isFeeItem && ( teleportFeeUSD2 > 0 ) && ( destStatus == 1 ) ) { 
                         x.destination.teleportFee = teleportFee2;
                         x.destination.teleportFeeUSD = teleportFeeUSD2;
                         x.destination.teleportFeeChainSymbol = r.symbol;
                     } else {
+			teleportFee2 = 0;
+			teleportFeeUSD2 = 0;
                         x.destination.teleportFee = null;
                         x.destination.teleportFeeUSD = null;
                         x.destination.teleportFeeChainSymbol = null;
                     }
-                    let xcmInfoAudited = x.destination.teleportFeeUSD  && x.destination.teleportFeeUSD  > 100 ? -10 : 1;
-                    let sql0 = `update xcmtransfer set xcmInfoAudited = ${xcmInfoAudited}, teleportFee = '${teleportFee2}', teleportFeeUSD = '${teleportFeeUSD2}', xcmInfo = ${mysql.escape(JSON.stringify(x))} where extrinsicHash = '${r.extrinsicHash}' and xcmIndex = '${r.xcmIndex}' and transferIndex = '${r.transferIndex}'`
-                    if (xcmInfoAudited < 0) {
-                        console.log("FEE FAILURE expected:", expectedXCMTeleportFees, "observed:", teleportFee2, r.symbol);
-                    }
+                    let sql0 = `update xcmtransfer set destStatus = ${destStatus}, xcmInfoAudited = ${xcmInfoAudited}, teleportFee = '${teleportFee2}', teleportFeeUSD = '${teleportFeeUSD2}', xcmInfo = ${mysql.escape(JSON.stringify(x))} where extrinsicHash = '${r.extrinsicHash}' and xcmIndex = '${r.xcmIndex}' and transferIndex = '${r.transferIndex}'`
+		    if ( teleportFeeUSD2 > 5 || ( destStatus == 1 ) ) {
+			console.log(sql0);
+		    }
                     this.batchedSQL.push(sql0);
                 }
             }
