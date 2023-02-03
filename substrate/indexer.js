@@ -1808,16 +1808,25 @@ module.exports = class Indexer extends AssetManager {
                     if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
                         try {
                             let rat = r.amountReceived / amountSent;
-                            let isFeeItem = (xcmtransfer.xcmInfo && xcmtransfer.xcmInfo.origination && xcmtransfer.xcmInfo.origination.isFeeItem == undefined && (xcmtransfer.xcmInfo.origination.isFeeItem === false)) ? false : true;
-                            let ratRequirement = (isFeeItem) ? .1 : .5;
+                            let ratRequirement = (r.isFeeItem) ? .5 : .97;
                             let msgHashProvided = msgHash && msgHash.length > 2 ? true : false;
                             let matchingMsgHash = (msgHashProvided && (r.msgHash == msgHash)) ? true : false;
-                            /*if ( isFeeItem && expectedXCMTeleportFees > 0 ) {
-                            // if fee item adjust rat using xcmtransfer.origination.isFeeItem and expectedXCMTeleportFees
-                            if ( amountSent > expectedXCMTeleportFees && amountReceived > expectedTeleportFee && ( amountSent >= amountReceived + expectedXCMTeleportFees ) ) {
-                            rat = ( amountReceived + expectedXCMTeleportFees ) / ( amountSent );
+                            if (r.xcmTeleportFees) {
+                                if ((r.xcmTeleportFees + r.amountReceived) <= amountSent) {
+                                    rat = (r.xcmTeleportFees + r.amountReceived) / amountSent;
+                                    ratRequirement = 0.999;
+                                }
+                                this.logger.error({
+                                    op: "search_xcmtransferdestcandidate:XCMTELEPORTFEES",
+                                    xcmTeleportFees: r.xcmTeleportFees,
+                                    amountReceived: r.amountReceived,
+                                    amountSent,
+                                    rat,
+                                    ratRequirement,
+                                    matchingMsgHash,
+                                    xcmtransfer
+                                });
                             }
-                            } */
                             if (rat >= ratRequirement && rat < 1.0001 || matchingMsgHash) {
                                 r.confidence = rat;
                                 if (msgHashProvided && !matchingMsgHash) r.confidence = 0.01;
