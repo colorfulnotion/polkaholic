@@ -1,6 +1,7 @@
 <%
 function getHostChain() {
   let fullhost = req.get('host');
+  if ( ! fullhost ) return(null);
   let sa = fullhost.split(".");
   if (sa.length < 2) return(null);
   let domain = sa[sa.length - 2];

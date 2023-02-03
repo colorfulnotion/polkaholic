@@ -1717,7 +1717,7 @@ module.exports = class Indexer extends AssetManager {
                 let xcmTransferHash = xcmtransfer.xcmtransferHash
                 let extrinsicHash = xcmtransfer.extrinsicHash
                 let msgHash = xcmtransfer.msgHash
-                this.logger.error({
+                /*this.logger.error({
                     "op": "origin publish_xcminfo",
                     xcmTransferHash,
                     extrinsicHash,
@@ -1726,7 +1726,7 @@ module.exports = class Indexer extends AssetManager {
                     isSigned: isSigned ? 1 : 0,
                     finalized: finalized,
                     chainID: this.chainID,
-                })
+                }) */
                 await this.publish_xcminfo(xcmtransfer.xcmInfo);
                 //MK!!!
                 // add to xcmtransferslog
@@ -1994,7 +1994,7 @@ module.exports = class Indexer extends AssetManager {
                         let section = "";
                         let method = "";
                         let errorDesc = null;
-                        let teleportFeeChainSymbol = xcmInfo.symbol;
+                        let teleportFeeChainSymbol = xcmtransfer.symbol;
                         let expectedXCMTeleportFees = this.getXCMTeleportFees(xcmtransfer.chainIDDest, teleportFeeChainSymbol);
                         let res = await this.search_xcmtransferdestcandidate(api, beneficiary, xcmtransfer, amountSent, xcmtransfer.msgHash, expectedXCMTeleportFees);
                         if (res) {
@@ -2076,7 +2076,7 @@ module.exports = class Indexer extends AssetManager {
                                 let xcmTransferHash = xcmtransfer.xcmtransferHash
                                 let extrinsicHash = xcmtransfer.extrinsicHash
                                 let msgHash = xcmtransfer.msgHash
-                                this.logger.error({
+                                /*this.logger.error({
                                     "op": "destination publish_xcminfo",
                                     xcmTransferHash,
                                     extrinsicHash,
@@ -2084,7 +2084,7 @@ module.exports = class Indexer extends AssetManager {
                                     stage: stage,
                                     finalized: finalized,
                                     chainID: this.chainID,
-                                })
+                                })*/
                                 await this.publish_xcminfo(xcmtransfer.xcmInfo);
                                 await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, xcmInfo, this.getCurrentTS());
                             }
@@ -3792,19 +3792,6 @@ module.exports = class Indexer extends AssetManager {
                 //criteria: firstSeen at the block when xcmtransfer is found + recipient match
                 //this should give 99% coverage? let's return on first hit for now
                 if (firstSeenBN == targetBN) {
-                    if (isTip) {
-                        this.logger.error({
-                            "op": finalized ? "getMsgHashCandidateF" : "getMsgHashCandidateU",
-                            targetBN,
-                            msgHash,
-                            extrinsicID,
-                            extrinsicHash,
-                            matcher,
-                            matcherType,
-                            finalized,
-                            chainID: this.chainID,
-                        })
-                    }
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
                     if (this.xcmmsgMap[tk] != undefined && extrinsicID && extrinsicHash) {
                         this.xcmmsgMap[tk].extrinsicID = extrinsicID
@@ -3813,41 +3800,12 @@ module.exports = class Indexer extends AssetManager {
                     return msgHash
                 } else {
                     if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash} but FAILED with firstSeenBN(${firstSeenBN})=targetBN(${targetBN})`)
-                    if (isTip) {
-                        this.logger.error({
-                            "op": finalized ? "getMsgHashCandidate2F" : "getMsgHashCandidate2U",
-                            targetBN,
-                            firstSeenBN,
-                            msgHash,
-                            extrinsicID,
-                            extrinsicHash,
-                            matcher,
-                            matcherType,
-                            directionalXcmKeys,
-                            finalized,
-                            diffSentAt: firstSeenBN - targetBN,
-                            chainID: this.chainID,
-                        })
-                    }
                     //if (firstSeenBN >= targetBN && firstSeenBN - targetBN <= 6) return msgHash
                     console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}] FOUND candidate=${msgHash}`)
                 }
             }
         }
         if (this.debugLevel >= paraTool.debugInfo) console.log(`getMsgHashCandidate [${targetBN}, matcher=${matcher}, ${matcherType}] MISS`)
-        if (isTip) {
-            this.logger.error({
-                "op": finalized ? "getMsgHashCandidate3F" : "getMsgHashCandidate3U",
-                targetBN,
-                extrinsicID,
-                extrinsicHash,
-                matcher,
-                matcherType,
-                finalized,
-                directionalXcmKeys,
-                chainID: this.chainID,
-            })
-        }
     }
 
     getEvmMsgHashCandidate(targetBN, matcher = false, matcherType = 'evm') {
@@ -5675,12 +5633,6 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
             if (this.debugLevel > paraTool.debugInfo) console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)
-            if (x.chainID == 2004 || x.chainID == 22023) {
-                this.logger.error({
-                    "op": "buildingPendingXcmInfoEVM",
-                    xcmtransfer
-                })
-            }
             return xcmInfo
         } catch (e) {
             this.logger.error({

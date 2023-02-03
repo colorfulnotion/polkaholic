@@ -2,7 +2,7 @@
 <%
 let f = tx;
 let assetTransferFound = (tx.transfers && tx.transfers.length > 0 )? true : false;
-let xcmInfoFound = ( f.xcmInfo != undefined )? true : false;
+let xcmInfoFound = ( f.xcmInfo && f.xcmInfo.origination && f.xcmInfo.destination )? true : false;
 let newDate = new Date();
 newDate.setTime(f.timestamp*1000);
 let dateString = newDate.toUTCString();

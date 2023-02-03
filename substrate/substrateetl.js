@@ -110,7 +110,7 @@ module.exports = class SubstrateETL extends AssetManager {
         } else {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and chain.chainID not in ( 22110, 22100 )  and blocklog.loaded = 0 and logDT <= date(date_sub(Now(), interval 1 day)) ${w} order by attempted, logDT desc, rand() limit 1`
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and chain.chainID not in ( 22110, 22100 )  and blocklog.loaded = 0 and logDT >= '2019-11-28' and logDT <= date(date_sub(Now(), interval 1 day)) ${w} order by attempted, logDT desc, rand() limit 1`
         console.log("get_random_substrateetl", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
@@ -1168,7 +1168,6 @@ module.exports = class SubstrateETL extends AssetManager {
         let maxLogDT = `${logDT} 23:59:59`;
         let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}'`
         let bnRanges = await this.poolREADONLY.query(sql1)
-        console.log(bnRanges, sql1);
         let {
             bnStart,
             bnEnd
@@ -1178,7 +1177,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let fn = {}
         let f = {}
         for (const tbl of tbls) {
-            fn[tbl] = path.join(dir, `${tbl}${paraID}.json`)
+            fn[tbl] = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
             console.log("openSync", fn[tbl]);
             f[tbl] = fs.openSync(fn[tbl], 'w', 0o666);
         }
@@ -1288,7 +1287,7 @@ module.exports = class SubstrateETL extends AssetManager {
                             base_fee_per_gas: tx.baseFeePerGas,
                             extrinsic_id: tx.substrate ? tx.substrate.extrinsicID : null,
                             extrinsic_hash: tx.substrate ? tx.substrate.extrinsicHash : null,
-                            transaction_type: tx.txType,
+                            transaction_type: tx.txType ? tx.txType : -1,
                             method_id: i && i.methodID ? i.methodID : null,
                             signature: i && i.signature ? i.signature : null,
                             params: i && i.params ? i.params : null
