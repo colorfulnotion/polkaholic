@@ -8,78 +8,10 @@ module.exports = class MoonbeamParser extends ChainParser {
     xcmTransactorMethodList = ["0xfe430475", "0x185de2ae", "0xd7ab340c", "0xb648f3fe"];
 
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
-        //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
-        this.mpReceived = false;
-        this.mpReceivedHashes = {};
-        //console.log(`[${extrinsicID}] processIncomingXCM start`, `mpReceived=${this.mpReceived}`)
-
-        //step0. parse incoming messages (raw)
-        super.processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, finalized)
-
-        //step1. parse incoming transfer heuristically
-        for (let i = 0; i < events.length; i++) {
-            let e = events[i]
-            super.processIncomingXCMSignal(indexer, extrinsicID, e, i, finalized)
-        }
-        if (this.mpReceived) {
-            let idxKeys = Object.keys(this.mpReceivedHashes)
-            let prevIdx = 0;
-
-            //TODO: blacklist: author, 0x6d6f646c70792f74727372790000000000000000 (modlpy/trsry)
-            //conjecture: the last event prior to msgHash is typically the "fee" event either going to blockproducer or trsry
-            for (const idxKey of idxKeys) {
-                this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx)
-                this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
-                let mpState = this.mpReceivedHashes[idxKey]
-                let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
-                let eventRangeLengthWithoutFee = eventRange.length - 1 // remove the fee event here
-                //let lastEvent = eventRange[-1]
-                for (let i = 0; i < eventRange.length; i++) {
-                    let ev = eventRange[i]
-                    //filter on xcmpallet(AssetsTrapped) - need to mark mpState as fail
-                    if (this.xcmAssetTrapFilter(`${ev.section}(${ev.method})`)) {
-                        //not sure what does the hash mean ...
-                        mpState.success = false
-                        mpState.errorDesc = `complete`
-                        mpState.description = `${ev.method}`
-                        mpState.defaultEventID = `${mpState.eventID}` // original eventID
-                        //mpState.description = `Executed ${mpState.eventID}`
-                        mpState.eventID = ev.eventID // update eventID with AssetsTrapped
-                        this.mpReceivedHashes[idxKey] = mpState
-                        //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
-                    }
-                }
-                //console.log(`MoonbeamParser mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
-                //update xcmMessages
-                indexer.updateMPState(mpState)
-                //only compute candiate mpState is successful
-                if (mpState.success === true) {
-                    for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
-                        let e = eventRange[i]
-                        let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
-                        if (candidate) {
-                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
-                        }
-                    }
-                } else {
-                    //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
-                }
-                prevIdx = parseInt(idxKey) + 1
-            }
-        }
+        let xcmCandidates = super.processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip, finalized)
+        return xcmCandidates
     }
-
-    processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized = false) {
-        let [candidate, caller] = super.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
-        caller = `generic processIncomingAssetSignal assets:Issued`
-        if (candidate && candidate.asset != undefined) {
-            //remove xc
-            candidate.asset = candidate.asset.replace('xc', '') //temporary hack to remove the xc in asset..
-        }
-        return [candidate, caller]
-    }
-
-
+    
     // we are actually getting inner call from the event
     getMsgHashAndInnerCall(indexer, extrinsic, feed) {
         let msgHash = '0x'

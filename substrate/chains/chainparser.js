@@ -975,7 +975,82 @@ module.exports = class ChainParser {
         }
     }
 
+    processRawDestCandidates(rawCandidates, rawWithdrawCandidates){
+        let candidates = []
+        let rawCandidateCnt = rawCandidates.length
+        if (rawCandidateCnt == 0) return candidates
+
+        let c1 = rawCandidates[rawCandidateCnt-1].candidate
+        let c1_caller = rawCandidates[rawCandidateCnt-1].caller
+        let xcmTeleportFees = c1.amountReceived
+        let feeRecipient =  c1.fromAddress
+        let feeEventID = c1.eventID
+        let feepayingSymbol = c1.xcmSymbol
+
+        if (rawCandidateCnt == 1){
+           // Reap case 0x890a6807bd375ffbda017016002cfefb9f85aa4df19d5b27cf101119aca69cd2 (0 13209424)
+           // marking as null
+           c1.fromAddress = '0x'
+           c1.amountReceived = 0
+           // add new field
+           c1.feeEventID = feeEventID
+           c1.xcmTeleportFees = xcmTeleportFees
+           c1.feeReceivingAddress = feeRecipient
+           c1.isFeeItem = 1
+           c1.reaped = 1
+           c1.amountReaped = 0
+           if (rawWithdrawCandidates.length > 0){
+               // assume the first rec is the deposit amount
+               let w0 = rawWithdrawCandidates[0].candidate
+               let amountReaped = w0.amountReceived - xcmTeleportFees
+               if (amountReaped > 0) c1.amountReaped = amountReaped
+           }
+           candidates.push({candidate: c1, caller: c1_caller})
+        }else if (rawCandidateCnt == 2){
+           // Normal case - single asset 0x5e59a12ab1cc9229a14fc67d1f7f8303643ac2d1f6e0df611b6d71e9864f4b87 (2 16463036)
+           let c0 = rawCandidates[0].candidate
+           let c0_caller = rawCandidates[0].caller
+           if (c0.xcmSymbol == c1.xcmSymbol){
+               c0.feeEventID = feeEventID
+               c0.xcmTeleportFees = xcmTeleportFees
+               c0.feeReceivingAddress = feeRecipient
+               c0.isFeeItem = 1
+               c0.reaped = 0
+               c0.amountReaped = 0
+           }
+          candidates.push({candidate: c0, caller: c0_caller})
+        }else{
+          // MultiAssets case 0x92bec041b54422d08e436be1a8db247d5f4466e20c299647405fed2261bc5ba1 (2004 2858049)
+          //console.log(`[${feeEventID}] ${feepayingSymbol} feeRecipient=${feeRecipient}, xcmTeleportFees=${xcmTeleportFees}`)
+          for (let i = 0; i < rawCandidateCnt -1 ; i++) {
+              let c0 = rawCandidates[i].candidate
+              let c0_caller = rawCandidates[i].caller
+              if (c0.xcmSymbol == feepayingSymbol){
+                  // fee paying.
+                  c0.feeEventID = feeEventID
+                  c0.xcmTeleportFees = xcmTeleportFees
+                  c0.feeReceivingAddress = feeRecipient
+                  c0.isFeeItem = 1
+                  c0.reaped = 0
+                  c0.amountReaped = 0
+              }else{
+                // not fee paying but still mark it with feeEventID?
+                c0.feeEventID = feeEventID
+                c0.xcmTeleportFees = 0
+                c0.feeReceivingAddress = feeRecipient
+                c0.isFeeItem = 0
+                c0.reaped = 0
+                c0.amountReaped = 0
+              }
+              candidates.push({candidate: c0, caller: c0_caller})
+          }
+        }
+        return candidates
+    }
+
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
+
+        let xcmCandidates = [];
         //IMPORTANT: reset mpReceived at the start of every unsigned extrinsic
         this.mpReceived = false;
         this.mpReceivedHashes = {};
@@ -1000,6 +1075,7 @@ module.exports = class ChainParser {
                 this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
                 let mpState = this.mpReceivedHashes[idxKey]
                 let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
+                let eventRangeLengthWithFee = eventRange.length
                 let eventRangeLengthWithoutFee = eventRange.length - 1 // remove the fee event here
                 //let lastEvent = eventRange[-1]
                 for (let i = 0; i < eventRange.length; i++) {
@@ -1021,35 +1097,40 @@ module.exports = class ChainParser {
                 //console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] eventRange`,eventRange)
                 //update xcmMessages
                 indexer.updateMPState(mpState)
-                //only compute candiate mpState is successful
+                //only compute candidate mpState is successful
                 if (mpState.success === true) {
-                    let candiateCnt = 0
-                    for (let i = 0; i < eventRangeLengthWithoutFee; i++) {
+                    let candidateCnt = 0
+                    let rawCandidates = []
+                    let rawWithdrawCandidates = []
+                    let candidates = []
+                    for (let i = 0; i < eventRangeLengthWithFee; i++) {
                         let e = eventRange[i]
-                        let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, e, mpState, finalized)
+                        let [candidate, caller] = this.processIncomingAssetDepositSignal(indexer, extrinsicID, e, mpState, finalized)
+                        //console.log(`processIncomingAssetDepositSignal candidate`, candidate)
                         if (candidate) {
-                            candiateCnt++
-                            indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
+                            candidateCnt++
+                            rawCandidates.push({candidate: candidate, caller: caller})
+                        }
+                        let [withdrawCandidate, withdrawCaller] = this.processIncomingAssetWithdralSignal(indexer, extrinsicID, e, mpState, finalized)
+                        if (withdrawCandidate) {
+                            candidateCnt++
+                            rawWithdrawCandidates.push({candidate: withdrawCandidate, caller: withdrawCaller})
                         }
                     }
-                    //console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candiate=${candiateCnt}`)
-                    if (candiateCnt == 0) {
-                        let lastEvent = eventRange[eventRange.length - 1]
-                        if (lastEvent) {
-                            let [candidate, caller] = this.processIncomingAssetSignal(indexer, extrinsicID, lastEvent, mpState, finalized)
-                            //console.log(`***[Last] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] idx=${mpState.endIdx}, eventID=${lastEvent.eventID} sectionMethod=${lastEvent.section}(${lastEvent.method}) Candidate? ${candidate != false}`)
-                            if (candidate) {
-                                candiateCnt++
-                                indexer.updateXCMTransferDestCandidate(candidate, caller, isTip, finalized)
-                            }
-                        }
+                    if (rawCandidates.length >= 0 ){
+                        xcmCandidates = this.processRawDestCandidates(rawCandidates, rawWithdrawCandidates)
                     }
+                    for (const c of candidates){
+                        //indexer.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
+                    }
+                    //console.log(`[Exclusive] mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx}] Found Candidate=${candidateCnt}`)
                 } else {
                     //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] skipped. (${mpState.errorDesc})`)
                 }
                 prevIdx = parseInt(idxKey) + 1
             }
         }
+        return xcmCandidates
     }
 
     //channelMsgIndex: extrinsicID-mpType-receiverChainID-senderChainID-msgIdx
@@ -1694,8 +1775,45 @@ module.exports = class ChainParser {
         }
     }
 
-    processIncomingAssetSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
+    processIncomingAssetWithdralSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
+        //TODO need withdraw signal somehow
+        let [pallet, method] = indexer.parseEventSectionMethod(e)
+        let palletMethod = `${pallet}(${method})` //event
+        let candidate = false;
+        let caller = false;
+        //console.log(`processIncomingAssetSignal ${e.eventID} ${palletMethod}`)
+        switch (palletMethod) {
+            case 'balances(Withdraw)':
+                //kusama/polkadot format
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processBalancesDepositSignal(indexer, extrinsicID, e, mpState, finalized)
+                }
+                break;
+            case 'currencies(Withdrawn)':
+                // acala/bifrost format
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processCurrenciesDepositedSignal(indexer, extrinsicID, e, mpState, finalized)
+                }
+                break;
+            case 'tokens(Withdrawn)':
+                // acala format?
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processTokensDepositedSignal(indexer, extrinsicID, e, mpState, finalized)
+                }
+                break;
+            case 'assets(Burned)':
+                // not sure if this is ever emmited
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processAssetsIssuedSignal(indexer, extrinsicID, e, mpState, finalized)
+                }
+                break;
+            default:
+                break;
+        }
+        return [candidate, caller]
+    }
 
+    processIncomingAssetDepositSignal(indexer, extrinsicID, e, mpState = false, finalized = false) {
         let [pallet, method] = indexer.parseEventSectionMethod(e)
         let palletMethod = `${pallet}(${method})` //event
         let candidate = false;
@@ -5015,6 +5133,7 @@ module.exports = class ChainParser {
     processBalancesDepositSignal(indexer, extrinsicID, e, mpState, finalized) {
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
+        let palletMethod = `${pallet}(${method})`
         let eventIndex = e.eventID.split('-')[3]
         let d = e.data;
         // data: [ 'E67Dnpw6F8uUoWJstb6GdgSY91AzKdxrqnkMrFYWMYpLURD', 6711567141759 ],
@@ -5022,7 +5141,7 @@ module.exports = class ChainParser {
         //let rawAssetString = indexer.getNativeAsset();
         let relayChain = indexer.relayChain
         let targetedSymbol = indexer.getNativeSymbol()
-        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "getNativeSymbol", "balances(Deposit)", targetedSymbol)
+        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "getNativeSymbol", palletMethod, targetedSymbol)
 
         let fromAddress = paraTool.getPubKey(d[0]);
         let amountReceived = paraTool.dechexToInt(d[1]);
@@ -5057,6 +5176,7 @@ module.exports = class ChainParser {
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`currencies(Deposited)`, e.data)
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
+        let palletMethod = `${pallet}(${method})`
         let eventIndex = e.eventID.split('-')[3]
         let d = e.data;
         //let assetString = this.token_to_string(d[0]);
@@ -5065,7 +5185,7 @@ module.exports = class ChainParser {
         //let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
         let relayChain = indexer.relayChain
         let targetedSymbol = this.processXcmGenericCurrencyID(indexer, d[0]) //inferred approach
-        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "processXcmGenericCurrencyID", "currencies(Deposited)", d[0])
+        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "processXcmGenericCurrencyID", palletMethod, d[0])
 
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
@@ -5098,6 +5218,7 @@ module.exports = class ChainParser {
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`tokens(Deposited)`, e.data)
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
+        let palletMethod = `${pallet}(${method})`
         let eventIndex = e.eventID.split('-')[3]
         let d = e.data;
         //let assetString = this.token_to_string(d[0]);
@@ -5107,7 +5228,7 @@ module.exports = class ChainParser {
         let relayChain = indexer.relayChain
         //console.log(`${e.eventID} processXcmGenericCurrencyID asset=`,d[0])
         let targetedSymbol = this.processXcmGenericCurrencyID(indexer, d[0]) //inferred approach
-        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "processXcmGenericCurrencyID", "tokens(Deposited)", d[0])
+        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "processXcmGenericCurrencyID", palletMethod, d[0])
         let fromAddress = paraTool.getPubKey(d[1]);
         let amountReceived = paraTool.dechexToInt(d[2]);
         //console.log(`[${fromAddress}] ${assetString}`, amountReceived, `finalized=${finalized}`)
@@ -5153,6 +5274,7 @@ module.exports = class ChainParser {
 
         let candidate = false
         let [pallet, method] = indexer.parseEventSectionMethod(e)
+        let palletMethod = `${pallet}(${method})`
         let d = e.data;
         let fromAddress = paraTool.getPubKey(d[1])
         /*
@@ -5166,7 +5288,7 @@ module.exports = class ChainParser {
         */
         let relayChain = indexer.relayChain
         let targetedSymbol = this.processXcmGenericCurrencyID(indexer, d[0]) //inferred approach
-        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "processXcmGenericCurrencyID", "assets(Issued)", d[0])
+        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "processXcmGenericCurrencyID", palletMethod, d[0])
 
         //TODO: not sure here..
         //let assetString = this.processGenericCurrencyID(indexer, d[0]);

@@ -1280,9 +1280,15 @@ module.exports = class Indexer extends AssetManager {
                 // ["chainIDDest", "eventID"] + ["fromAddress", "extrinsicID", "blockNumberDest", "asset", "destTS", "amountReceived", "rawAsset", "sentAt", "msgHash", "addDT", "nativeAssetChain", "xcmInteriorKey"
                 //let nativeAssetChain = (r.nativeAssetChain != undefined) ? `'${r.nativeAssetChain}'` : `NULL`
                 let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `'${r.xcmInteriorKey}'` : `NULL`
+                let xcmTeleportFees = (r.xcmTeleportFees != undefined) ? `'${r.xcmTeleportFees}'` : `NULL`
+                let feeEventID = (r.feeEventID != undefined) ? `'${r.feeEventID}'` : `NULL`
+                let feeReceivingAddress = (r.feeReceivingAddress != undefined) ? `'${r.feeReceivingAddress}'` : `NULL`
+                let amountReaped = (r.amountReaped != undefined) ? `'${r.amountReaped}'` : `NULL`
+                let reaped = (r.reaped != undefined) ? `'${r.reaped}'` : `NULL`
+                let isFeeItem = (r.isFeeItem != undefined) ? `'${r.isFeeItem}'` : `NULL`
                 //["chainIDDest", "eventID"]
                 //["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"]
-                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.xcmSymbol}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.relayChain}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, xcmInteriorKey].join(",") + ")";
+                let t = "(" + [`'${r.chainIDDest}'`, `'${r.eventID}'`, `'${r.fromAddress}'`, `'${r.extrinsicID}'`, `'${r.blockNumberDest}'`, `'${r.xcmSymbol}'`, `'${r.destTS}'`, `'${r.amountReceived}'`, `'${r.relayChain}'`, `'${r.sentAt}'`, `'${r.msgHash}'`, `Now()`, xcmInteriorKey, xcmTeleportFees, feeEventID, feeReceivingAddress, amountReaped, reaped, isFeeItem].join(",") + ")";
 
                 if (r.finalized && (r.xcmSymbol) && this.validXCMSymbol(r.xcmSymbol, r.chainIDDest, "xcmtransfer", r)) {
                     xcmtransferdestcandidates.push(t);
@@ -1297,9 +1303,9 @@ module.exports = class Indexer extends AssetManager {
                     await this.upsertSQL({
                         "table": "xcmtransferdestcandidate",
                         "keys": ["chainIDDest", "eventID"],
-                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"],
+                        "vals": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey", "xcmTeleportFees", "feeEventID", "feeReceivingAddress", "amountReaped", "reaped", "isFeeItem"],
                         "data": xcmtransferdestcandidates,
-                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey"]
+                        "replace": ["fromAddress", "extrinsicID", "blockNumberDest", "symbol", "destTS", "amountReceived", "relayChain", "sentAt", "msgHash", "addDT", "xcmInteriorKey", "xcmTeleportFees", "feeEventID", "feeReceivingAddress", "amountReaped", "reaped", "isFeeItem"]
                     });
                 }
             } catch (err0) {
@@ -5155,7 +5161,11 @@ module.exports = class Indexer extends AssetManager {
         }
 
         if (!isSigned) {
-            this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, isTip, finalized);
+            let xcmCandidates = this.chainParser.processIncomingXCM(this, rExtrinsic, extrinsicID, eventsRaw, isTip, finalized);
+            for (const c of xcmCandidates){
+                console.log(`** Indexer caller=${c.caller}, candidate`, c.candidate)
+                this.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)
+            }
         }
         //console.log('hash!!', extrinsicHash, `isSigned=${isSigned}`, `${JSON.stringify(extrinsic.signature)}`, extrinsic.signature.signer)
 
