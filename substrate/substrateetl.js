@@ -228,22 +228,36 @@ module.exports = class SubstrateETL extends AssetManager {
         return (JSON.stringify(a));
     }
 
+    async pick_chainbalancecrawler() {
+	let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from chainbalancecrawler where hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 10 minute) order by lastDT DESC limit 1`;
+        let chains = await this.poolREADONLY.query(sql);
+	if ( chains.length == 0 ) {
+	    return [null, null];
+	}
+	// TODO: delete the record now?  or after completion
+	return [chains[0].chainID, chains[0].indexTS];
+    }
+    
     // pick a random chain to load yesterday for all chains
     async updateAddressBalances() {
-        // pick a chain that has not been STARTED recently
-        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where ( numAddresses = 0 or numAddresses is null ) and chainID in ( select chainID from chain where crawling = 1 ) and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 1 hour) 
-or lastUpdateAddressBalancesStartDT is Null ) and logDT >= date(date_sub(Now(), interval 8 day)) and logDT <= date(date_sub(Now(), interval 1 day)) and lastUpdateAddressBalancesAttempts <= 2 order by lastUpdateAddressBalancesAttempts, logDT desc, rand()`;
-	console.log(sql);
-        let chains = await this.pool.query(sql);
-
-        if (chains.length == 0) {
-            console.log(`No chain found`)
-            // TODO: since we loaded every chain from yesterday that we could, pick a chain where we load real time balances instead of loading yesterday
-            return false;
-        }
-        let chainID = chains[0].chainID;
-        let [logDT, hr] = paraTool.ts_to_logDT_hr(chains[0].indexTS);
-        sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}'`;
+	let [chainID, indexTS] = await this.pick_chainbalancecrawler();
+	if ( chainID == null ) {
+            // pick a chain that has not been STARTED recently
+            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where ( numAddresses = 0 or numAddresses is null ) and chainID in ( select chainID from chain where crawling = 1 ) and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 0 hour) 
+or lastUpdateAddressBalancesStartDT is Null ) and logDT >= date(date_sub(Now(), interval 8 day)) and logDT <= date(date_sub(Now(), interval 1 day)) and lastUpdateAddressBalancesAttempts <= 3 order by lastUpdateAddressBalancesAttempts, logDT desc, rand()`;
+	    console.log(sql);
+            let chains = await this.pool.query(sql);
+	    
+            if (chains.length == 0) {
+		console.log(`No chain found`)
+		// TODO: since we loaded every chain from yesterday that we could, pick a chain where we load real time balances instead of loading yesterday
+		return false;
+            }
+            chainID = chains[0].chainID;
+            indexTS = chains[0].indexTS;
+	}
+        let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+        let sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}'`;
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
         await this.update_address_balances_logDT(chainID, logDT);
@@ -856,14 +870,21 @@ or lastUpdateAddressBalancesStartDT is Null ) and logDT >= date(date_sub(Now(), 
             console.log(`system.account page: `, page++, last_key.toString(), "recs=", query.length, `Heap allocated ${gbRounded} GB`, query.length);
             // save last_key state in db and get out -- we will pick it up again
 
+	    
             let sql = `update blocklog set lastUpdateAddressBalancesLastKey = '${last_key.toString()}'  where chainID = ${chainID} and logDT = '${logDT}'`
             console.log(sql);
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
             if (last_key == "") done = true;
-            if (gbRounded > 2) {
-                console.log(`RETURNING with last key stored:`, last_key.toString());
-                return (false);
+            if (gbRounded > 1) {
+                console.log(`EXISTING with last key stored:`, last_key.toString());
+		// when we come back, we'll pick this one
+		// create table chainbalancecrawler ( chainID int, logDT date, hostname varchar(32), lastDT datetime, primary key (chainID, logDT, hostname) )
+		let sql1 = `insert into chainbalancecrawler (chainID, logDT, hostname, lastDT) values ('${chainID}', '${logDT}', '${this.hostname}', Now()) on duplicate key update lastDT = values(lastDT)`
+		console.log(sql1);
+		this.batchedSQL.push(sql1);
+		await this.update_batchedSQL();
+		process.exit(0);
             }
             rows = [];
         }
