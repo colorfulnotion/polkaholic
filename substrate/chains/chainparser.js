@@ -14,6 +14,7 @@ module.exports = class ChainParser {
     parserBlockHash = false;
     parserWatermark = 0;
     relayParentStateRoot = false;
+    author = false;
     paraStates = {}
     numParserErrors = 0;
     mpReceived = false;
@@ -24,6 +25,11 @@ module.exports = class ChainParser {
 
     setDebugLevel(debugLevel = paraTool.debugNoLog) {
         this.debugLevel = debugLevel
+    }
+
+    // set author
+    setAuthor(author = false) {
+        this.author = author
     }
 
     // set parser unix timestamp to record "realtime" cells in btAddress, btAsset properly
@@ -975,44 +981,86 @@ module.exports = class ChainParser {
         }
     }
 
-    processRawDestCandidates(rawCandidates, rawWithdrawCandidates) {
+    dedupeRawCandidates(rawCandidates) {
+        //remove dup token/currency events (22090 2686996)
+        let dedupedCandidates = []
+        let covered = {}
+        for (const rawCandidate of rawCandidates) {
+            let f = rawCandidate.candidate
+            let k = `${f.fromAddress}-${f.amountReceived}-${f.xcmSymbol}`
+            if (covered[k] == undefined) {
+                covered[k] = 1
+                dedupedCandidates.push(rawCandidate)
+            }
+        }
+        return dedupedCandidates
+    }
+
+    processRawDestCandidates(indexer, rawCandidates, rawWithdrawCandidates) {
         let candidates = []
-        let rawCandidateCnt = rawCandidates.length
+        let dedupedCandidates = this.dedupeRawCandidates(rawCandidates)
+        let rawCandidateCnt = dedupedCandidates.length
         if (rawCandidateCnt == 0) return candidates
 
-        let c1 = rawCandidates[rawCandidateCnt - 1].candidate
-        let c1_caller = rawCandidates[rawCandidateCnt - 1].caller
+        let c1 = dedupedCandidates[rawCandidateCnt - 1].candidate
+        let c1_caller = dedupedCandidates[rawCandidateCnt - 1].caller
         let xcmTeleportFees = c1.amountReceived
         let feeRecipient = c1.fromAddress
         let feeEventID = c1.eventID
         let feepayingSymbol = c1.xcmSymbol
-
+        let beneficiary = indexer.getBeneficiaryFromMsgHash(c1.msgHash)
+        let authorPubkey = (this.author) ? paraTool.getPubKey(this.author) : false
+        console.log(`[MsgHash ${c1.msgHash}], beneficiary=${beneficiary}`)
         if (rawCandidateCnt == 1) {
-            // Reap case 0x890a6807bd375ffbda017016002cfefb9f85aa4df19d5b27cf101119aca69cd2 (0 13209424)
-            // marking as null
-            c1.fromAddress = '0x'
-            c1.amountReceived = 0
-            // add new field
-            c1.feeEventID = feeEventID
-            c1.xcmTeleportFees = xcmTeleportFees
-            c1.feeReceivingAddress = feeRecipient
-            c1.isFeeItem = 1
-            c1.reaped = 1
-            c1.amountReaped = 0
-            if (rawWithdrawCandidates.length > 0) {
-                // assume the first rec is the deposit amount
-                let w0 = rawWithdrawCandidates[0].candidate
-                let amountReaped = w0.amountReceived - xcmTeleportFees
-                if (amountReaped > 0) c1.amountReaped = amountReaped
+            // Reap 0x890a6807bd375ffbda017016002cfefb9f85aa4df19d5b27cf101119aca69cd2 (0 13209424)
+            // Not reaped 0x5ff106dc2fd9cc6fca65a0c4675c2fe504d8c1e82a53e61bfe247f3966dc50fc (2006 2865334)
+            let reaped = false
+            /*
+            definition of reap:
+             - if authorPubkey is known, check authorPubkey is equal to feeRecipient
+             - check feeRecipient not equal to modlpy/trsry
+            */
+            let knownTreasury = ['0x6d6f646c70792f74727372790000000000000000000000000000000000000000', '0x6d6f646c70792f74727372790000000000000000']
+            if (beneficiary && beneficiary != feeRecipient) reaped = false
+            if (authorPubkey && authorPubkey == feeRecipient) reaped = true
+            if (knownTreasury.includes(feeRecipient)) reaped = true
+            if (reaped) {
+                // marking as null
+                c1.fromAddress = '0x'
+                c1.amountReceived = 0
+                // add new field
+                c1.feeEventID = feeEventID
+                c1.xcmTeleportFees = xcmTeleportFees
+                c1.feeReceivingAddress = feeRecipient
+                c1.isFeeItem = 1
+                c1.reaped = 1
+                c1.amountReaped = 0
+                if (rawWithdrawCandidates.length > 0) {
+                    // assume the first rec is the deposit amount
+                    let w0 = rawWithdrawCandidates[0].candidate
+                    let amountReaped = w0.amountReceived - xcmTeleportFees
+                    if (amountReaped > 0) c1.amountReaped = amountReaped
+                }
+            } else {
+                //no fee transfer 2006 2865334
+                let c0 = dedupedCandidates[rawCandidateCnt - 1].candidate
+                let c0_caller = dedupedCandidates[rawCandidateCnt - 1].caller
+                c0.feeEventID = feeEventID
+                c0.xcmTeleportFees = 0
+                c0.feeReceivingAddress = feeRecipient
+                c0.isFeeItem = 1
+                c0.reaped = 0
+                c0.amountReaped = 0
             }
+
             candidates.push({
                 candidate: c1,
                 caller: c1_caller
             })
         } else if (rawCandidateCnt == 2) {
             // Normal case - single asset 0x5e59a12ab1cc9229a14fc67d1f7f8303643ac2d1f6e0df611b6d71e9864f4b87 (2 16463036)
-            let c0 = rawCandidates[0].candidate
-            let c0_caller = rawCandidates[0].caller
+            let c0 = dedupedCandidates[0].candidate
+            let c0_caller = dedupedCandidates[0].caller
             if (c0.xcmSymbol == c1.xcmSymbol) {
                 c0.feeEventID = feeEventID
                 c0.xcmTeleportFees = xcmTeleportFees
@@ -1029,8 +1077,8 @@ module.exports = class ChainParser {
             // MultiAssets case 0x92bec041b54422d08e436be1a8db247d5f4466e20c299647405fed2261bc5ba1 (2004 2858049)
             //console.log(`[${feeEventID}] ${feepayingSymbol} feeRecipient=${feeRecipient}, xcmTeleportFees=${xcmTeleportFees}`)
             for (let i = 0; i < rawCandidateCnt - 1; i++) {
-                let c0 = rawCandidates[i].candidate
-                let c0_caller = rawCandidates[i].caller
+                let c0 = dedupedCandidates[i].candidate
+                let c0_caller = dedupedCandidates[i].caller
                 if (c0.xcmSymbol == feepayingSymbol) {
                     // fee paying.
                     c0.feeEventID = feeEventID
@@ -1133,7 +1181,7 @@ module.exports = class ChainParser {
                         }
                     }
                     if (rawCandidates.length >= 0) {
-                        xcmCandidates = this.processRawDestCandidates(rawCandidates, rawWithdrawCandidates)
+                        xcmCandidates = this.processRawDestCandidates(indexer, rawCandidates, rawWithdrawCandidates)
                     }
                     for (const c of candidates) {
                         //indexer.updateXCMTransferDestCandidate(c.candidate, c.caller, isTip, finalized)

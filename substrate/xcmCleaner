@@ -30,7 +30,7 @@ async function main() {
 	await manager.assetManagerInit();
 	let res = await manager.bulk_generate_XCMInfo(null, 1);
 	if ( res ) {
-	    process.exit(0);
+	    process.exit(1);
 	} else {
 	    process.exit(1);
 	}
@@ -41,8 +41,7 @@ async function main() {
 main()
     .then(() => {
         console.log("finishing...")
-
-        process.exit(0);
+        process.exit(1);
     })
     .catch((e) => {
         console.error('ERROR', e);

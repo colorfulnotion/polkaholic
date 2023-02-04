@@ -34,7 +34,7 @@ async function main() {
         await manager.xcmanalytics(chain, lookbackDays, forceRematch)
         let wsQueueLen = manager.getWSProviderQueueLen()
         console.log(`**** wsQueueLen=${wsQueueLen}`)
-        process.exit(0);
+        process.exit(1);
     }
 
     let startTS = manager.currentTS() - 600;
@@ -82,8 +82,7 @@ async function main() {
 main()
     .then(() => {
         console.log("finishing...")
-
-        process.exit(0);
+        process.exit(1);
     })
     .catch((e) => {
         console.error('ERROR', e);

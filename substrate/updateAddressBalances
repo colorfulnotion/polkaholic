@@ -24,7 +24,7 @@ async function main() {
 	    var manager = new SubstrateETL();
 	    let res = await manager.updateAddressBalances();
 	    if ( res == false ) {
-		await manager.sleep(30000);
+		process.exit(1);
 	    } else {
 		await manager.sleep(5000);
 	    }

@@ -228,20 +228,34 @@ module.exports = class SubstrateETL extends AssetManager {
         return (JSON.stringify(a));
     }
 
+    async pick_chainbalancecrawler() {
+        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from chainbalancecrawler as c where hostname = '${this.hostname}' and chainID not in ( select chainID from chainbalancecrawler where lastDT > date_sub(Now(), interval 5 minute) and hostname != '${this.hostname}' ) and lastDT > date_sub(Now(), interval 1 hour) order by lastDT DESC limit 1`;
+        let chains = await this.pool.query(sql);
+        if (chains.length == 0) {
+            return [null, null];
+        }
+        return [chains[0].chainID, chains[0].indexTS];
+    }
+
     // pick a random chain to load yesterday for all chains
     async updateAddressBalances() {
-        // pick a chain that has not been STARTED recently
-        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where chainID in ( select chainID from chain where crawling = 1 ) and lastUpdateAddressBalancesEndDT is null and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 1 hour) or lastUpdateAddressBalancesStartDT is Null ) and logDT >= date(date_sub(Now(), interval 8 day)) and logDT < date(date_sub(Now(), interval 1 day)) and lastUpdateAddressBalancesAttempts < 1 order by lastUpdateAddressBalancesAttempts, logDT desc, rand()`;
-        let chains = await this.pool.query(sql);
+        let [chainID, indexTS] = await this.pick_chainbalancecrawler();
+        if (chainID == null) {
+            // pick a chain that has not been STARTED/updated recently and hasn't been started  by some other op in the last hour
+            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where ( numAddressesLastUpdateDT is null or numAddressesLastUpdateDT < '2023-02-04' ) and chainID in ( select chainID from chain where crawling = 1 ) and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 10 minute) or lastUpdateAddressBalancesStartDT is Null ) and (logDT = last_day(logDT) or (logDT >= "2023-01-01" and logDT <= date(date_sub(Now(), interval 1 day))) ) and lastUpdateAddressBalancesAttempts <= 5 and chainID not in ( 2051, 2011, 22024, 22121 ) and chainID not in ( select chainID from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 1 hour) ) order by lastUpdateAddressBalancesAttempts, logDT desc, rand()`;
+            console.log(sql);
+            let chains = await this.pool.query(sql);
 
-        if (chains.length == 0) {
-            console.log(`No chain found`)
-            // TODO: since we loaded every chain from yesterday that we could, pick a chain where we load real time balances instead of loading yesterday
-            return false;
+            if (chains.length == 0) {
+                console.log(`No chain found`)
+                // TODO: since we loaded every chain from yesterday that we could, pick a chain where we load real time balances instead of loading yesterday
+                return false;
+            }
+            chainID = chains[0].chainID;
+            indexTS = chains[0].indexTS;
         }
-        let chainID = chains[0].chainID;
-        let [logDT, hr] = paraTool.ts_to_logDT_hr(chains[0].indexTS);
-        sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}'`;
+        let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+        let sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}'`;
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
         await this.update_address_balances_logDT(chainID, logDT);
@@ -249,33 +263,60 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async update_address_balances_logDT(chainID, logDT) {
-        let res0 = await this.updateNativeBalances(chainID, logDT);
-        if (res0 == false) {
-            return (false);
+        try {
+            let res0 = await this.updateNativeBalances(chainID, logDT);
+            if (res0 == false) {
+                return (false);
+            }
+            let res1 = await this.updateNonNativeBalances(chainID, logDT);
+            if (res1) {
+                await this.load_bqlogfn(chainID, logDT);
+            }
+            return (true);
+        } catch (err) {
+            console.log(err);
+            // make sure we can start over
+            await this.clean_chainbalancecrawler(logDT, chainID);
+            this.logger.error({
+                "op": "update_address_balances_logDT",
+                err
+            })
         }
-        let res1 = await this.updateNonNativeBalances(chainID, logDT);
-        if (res1) {
-            await this.load_bqlogfn(chainID, logDT);
-        }
-        return (true);
+    }
+
+    async clean_chainbalancecrawler(logDT, chainID) {
+        let sql = `delete from chainbalancecrawler where  (logDT = '${logDT}' and chainID = '${chainID}' and hostname = '${this.hostname}') or lastDT < date_sub(Now(), interval 1 hour)`;
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
     }
 
     async load_bqlogfn(chainID, logDT) {
-        try {
-            let relayChain = paraTool.getRelayChainByChainID(chainID)
-            let paraID = paraTool.getParaIDfromChainID(chainID)
-            let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${relayChain}.balances${paraID}' /tmp/balances${chainID}-${logDT}.json schema/substrateetl/balances.json`
-            console.log(cmd);
-            await exec(cmd);
+        let logDTp = logDT.replaceAll("-", "")
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let paraID = paraTool.getParaIDfromChainID(chainID)
+        let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${relayChain}.balances${paraID}$${logDTp}' /tmp/balances${chainID}-${logDT}.json schema/substrateetl/balances.json`
 
-            // mark that we're done
-            let sql_upd = `update blocklog set lastUpdateAddressBalancesEndDT = Now() where chainID = ${chainID} and logDT = '${logDT}'`;
-            console.log("updateAddressBalances FIN", sql_upd);
-            this.batchedSQL.push(sql_upd);
-            await this.update_batchedSQL();
+        console.log(cmd);
+        try {
+            await exec(cmd);
+            // do a confirmatory query to compute numAddresses and mark that we're done by updating lastUpdateAddressBalancesEndDT
+            let sql = `select count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} where date(ts) = '${logDT}'`;
+            let rows = await this.execute_bqJob(sql);
+            let row = rows.length > 0 ? rows[0] : null;
+            if (row && row["numAddresses"] > 0) {
+                let numAddresses = parseInt(row["numAddresses"], 10);
+                let sql_upd = `update blocklog set lastUpdateAddressBalancesEndDT = Now(), numAddresses = '${numAddresses}', numAddressesLastUpdateDT = Now() where chainID = ${chainID} and logDT = '${logDT}'`;
+                console.log("updateAddressBalances FIN", sql_upd);
+                this.batchedSQL.push(sql_upd);
+                await this.clean_chainbalancecrawler(logDT, chainID);
+            }
         } catch (err) {
             console.log(err);
-            // TODO: log to log explorer
+            this.logger.error({
+                "op": "load_bqlogfn",
+                err,
+                cmd
+            })
         }
     }
     async clean_bqlogfn(chainID, logDT) {
@@ -707,9 +748,18 @@ module.exports = class SubstrateETL extends AssetManager {
         return (true);
     }
 
+    async getLastKey(chainID, logDT) {
+        let chains = await this.pool.query(`select lastKey from chainbalancecrawler where chainID = '${chainID}' and logDT = '${logDT}' and hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 1 hour)`);
+        if (chains.length == 0) {
+            return "";
+        } else {
+            return chains[0].lastKey;
+        }
+    }
+
     async updateNativeBalances(chainID, logDT = null, perPagelimit = 1000) {
         await this.assetManagerInit();
-        let chains = await this.pool.query(`select chain.chainID, chain.id, chain.relayChain, chain.paraID, chain.chainName, chain.WSEndpoint, chain.numHolders, blocklog.lastUpdateAddressBalancesLastKey, unix_timestamp(Now()) - unix_timestamp(blocklog.lastUpdateAddressBalancesStartDT) secondsago from chain join blocklog on chain.chainID = blocklog.chainID where blocklog.chainID = ${chainID} and logDT = '${logDT}'`);
+        let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, numHolders from chain where chainID = '${chainID}'`);
         if (chains.length == 0) {
             console.log("No chain found ${chainID}")
             return false;
@@ -755,7 +805,7 @@ module.exports = class SubstrateETL extends AssetManager {
             ts: blockTS
         })
         let priceUSD = p && p.priceUSD ? p.priceUSD : 0;
-        let last_key = (chain.lastUpdateAddressBalancesLastKey.length > 0 && chain.secondsago < 7200) ? chain.lastUpdateAddressBalancesLastKey : "";
+        let last_key = await this.getLastKey(chainID, logDT);
         if (last_key == "") {
             await this.clean_bqlogfn(chainID, logDT);
             console.log("STARTING CLEAN");
@@ -766,6 +816,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let done = false;
         while (!done) {
             let apiAt = await api.at(finalizedBlockHash)
+
             let query = await apiAt.query.system.account.entriesPaged({
                 args: [],
                 pageSize: perPagelimit,
@@ -847,16 +898,16 @@ module.exports = class SubstrateETL extends AssetManager {
             const gbNow = mu[field] / 1024 / 1024 / 1024;
             const gbRounded = Math.round(gbNow * 100) / 100;
             console.log(`system.account page: `, page++, last_key.toString(), "recs=", query.length, `Heap allocated ${gbRounded} GB`, query.length);
-            // save last_key state in db and get out -- we will pick it up again
-
-            let sql = `update blocklog set lastUpdateAddressBalancesLastKey = '${last_key.toString()}'  where chainID = ${chainID} and logDT = '${logDT}'`
-            console.log(sql);
-            this.batchedSQL.push(sql);
+            // save last_key state in db and get out if memory is getting lost (>1GB heap) -- we will pick it up again
+            let sql1 = `insert into chainbalancecrawler (chainID, logDT, hostname, lastDT, lastKey) values ('${chainID}', '${logDT}', '${this.hostname}', Now(), '${last_key.toString()}') on duplicate key update lastDT = values(lastDT), lastKey = values(lastKey)`
+            console.log(sql1);
+            this.batchedSQL.push(sql1);
             await this.update_batchedSQL();
             if (last_key == "") done = true;
-            if (gbRounded > 2) {
-                console.log(`RETURNING with last key stored:`, last_key.toString());
-                return (false);
+            if (gbRounded > 1) {
+                // when we come back, we'll pick this one
+                console.log(`EXISTING with last key stored:`, last_key.toString());
+                process.exit(1);
             }
             rows = [];
         }
@@ -876,7 +927,7 @@ module.exports = class SubstrateETL extends AssetManager {
             rows = [];
 	    */
         }
-        let sql = `update blocklog set numNativeHolders = '${numHolders}', lastUpdateAddressBalancesLastKey = '' where chainID = ${chainID} and logDT = '${logDT}'`
+        let sql = `update blocklog set numNativeHolders = '${numHolders}' where chainID = ${chainID} and logDT = '${logDT}'`
         console.log(numHolders, sql);
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
@@ -1488,6 +1539,9 @@ module.exports = class SubstrateETL extends AssetManager {
                 for (const a of Object.keys(row)) {
                     r[a] = row[a] > 0 ? row[a] : 0;
                     vals.push(` ${a} = ${mysql.escape(row[a])}`);
+                    if (a == "numAddresses") {
+                        vals.push(` numAddressesLastUpdateDT = Now() `);
+                    }
                 }
             }
         }
@@ -1498,45 +1552,52 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async updateBlocklogBulk(chainID) {
+        let [today, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
         let project = this.project;
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
         let sqla = {
-            "extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics from ${project}.${relayChain}.extrinsics${paraID} group by logDT`,
-            "accountsactive": `select date(block_time) logDT, count(distinct signer_pub_key) as numAccountsActive from ${project}.${relayChain}.extrinsics${paraID} where signed`,
-            "events": `select date(block_time) logDT, count(*) as numEvents from substrate-etl.${relayChain}.events${paraID} group by logDT`,
-            "transfers": `select  date(block_time) logDT, count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers${paraID} group by logDT`,
-            "balances": `select count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} where date(ts) = '${logDT}'`,
-            "xcmtransfers0": `select  date(origination_ts) logDT, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where destination_para_id = ${paraID} group by logDT`,
-            "xcmtransfers1": `select date(origination_ts) as logDT, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} group by logDT`
+            "balances": `select date(ts) logDT, count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} group by logDT having numAddresses > 0 and logDT < "${today}" order by logDT`,
+            /*"extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics from ${project}.${relayChain}.extrinsics${paraID} group by logDT having logDT < "${today}" order by logDT`,
+            "accountsactive": `select date(block_time) logDT, count(distinct signer_pub_key) as numAccountsActive from ${project}.${relayChain}.extrinsics${paraID} where signed group by logDT having logDT < "${today}" order by logDT`,
+            "events": `select date(block_time) logDT, count(*) as numEvents from substrate-etl.${relayChain}.events${paraID} group by logDT order by logDT`,
+            "transfers": `select  date(block_time) logDT, count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers${paraID} group by logDT having logDT < "${today}" order by logDT`,
+            "xcmtransfers0": `select  date(origination_ts) logDT, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where destination_para_id = ${paraID} group by logDT having logDT < "${today}" order by logDT`,
+            "xcmtransfers1": `select date(origination_ts) as logDT, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} group by logDT having logDT < "${today}" order by logDT` */
         };
-        console.log(sqla);
+
         let r = {}
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
-            let rows = await this.execute_bqJob(sql);
-            let row = rows.length > 0 ? rows[0] : null;
-            if (row) {
-                let vals = [];
-                let logDT = null;
-                for (const a of Object.keys(row)) {
-                    if (a != 'logDT') {
-                        r[a] = row[a] ? row[a] : 0;
-                        vals.push(` ${a} = '${row[a]}'`);
-                    } else {
-                        logDT = row[a];
+            try {
+                let rows = await this.execute_bqJob(sql);
+                console.log(sql, rows.length, " rows");
+
+                for (const row of rows) {
+                    let vals = [];
+                    let logDT = null;
+                    for (const a of Object.keys(row)) {
+                        if (a != 'logDT') {
+                            r[a] = row[a] ? row[a] : 0;
+                            vals.push(` ${a} = '${row[a]}'`);
+                        } else {
+                            logDT = row[a].value;
+                        }
+                        if (a == "numAddresses") {
+                            vals.push(` numAddressesLastUpdateDT = Now() `);
+                        }
                     }
+                    let sql = `update blocklog set ` + vals.join(",") + `  where chainID = '${chainID}' and logDT = '${logDT}'`
+                    console.log(sql);
+                    this.batchedSQL.push(sql);
+                    await this.update_batchedSQL();
                 }
-                let sql = `update blocklog set ` + vals.join(",") + `  where chainID = '${chainID}' and logDT = '${logDT}'`
-                console.log(sql);
+            } catch (er) {
+                console.log(er);
             }
         }
-        console.log(sql)
-        this.batchedSQL.push(sql);
-        await this.update_batchedSQL();
-    }
-
-    async updateChainSummary() {
+        return (true);
+        // take the 7/30d/all time view 
         var ranges = [7, 30, 99999];
         for (const range of ranges) {
             let f = (range > 9999) ? "" : `${range}d`;

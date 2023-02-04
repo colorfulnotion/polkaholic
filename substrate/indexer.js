@@ -4,7 +4,6 @@ const path = require("path");
 const AssetManager = require("./assetManager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
-const Endpoints = require("./summary/endpoints");
 const mysql = require("mysql2");
 const Ably = require('ably');
 const {
@@ -1228,7 +1227,8 @@ module.exports = class Indexer extends AssetManager {
                         xcmInteriorKey,
                         innerCall,
                         xcmType,
-                        pendingXcmInfoBlob
+                        pendingXcmInfoBlob,
+                        `Now()`
                     ].join(",") + ")";
                     // CHECK: do we need isXcmTipSafe = (isSigned || finalized) ? true : false concept here to ensure that xcmtransfer records are inserted only when "safe"
                     if (r.msgHash == "0x" && !r.finalized) {
@@ -1249,10 +1249,10 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo", "xcmInfolastUpdateDT"],
                 "data": xcmtransfers,
                 "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"],
-                "replaceIfNull": ["xcmInfo", "msgHash"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
+                "replaceIfNull": ["xcmInfo", "msgHash", "xcmInfolastUpdateDT"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
             }, sqlDebug);
 
             let out = [];
@@ -1493,6 +1493,7 @@ module.exports = class Indexer extends AssetManager {
         this.wasmContractMap[wasmContract.extrinsicHash] = wasmContract
     }
 
+    // this is used for destination candidate beneficiary lookup
     updateXCMChannelMsg(xcmChannelMsg, blockNumber, blockTS) {
         let xcmID = xcmChannelMsg.msgIndex
         if (this.xcmeventsMap[xcmID] == undefined) {
@@ -2065,8 +2066,9 @@ module.exports = class Indexer extends AssetManager {
                                     xcmInfo.flightTime = this.getCurrentTS() - o.initiateTS;
                                     extra = `, flightTime = '${xcmInfo.flightTime}'`
                                 }
+                                let matched = finalized ? 4 : 3;
                                 // update matched and xcmInfo
-                                let sql = `update xcmtransfer set destStatus = ${destStatus}, xcmInfolastUpdateDT = Now(), teleportFee = ${mysql.escape(destination.teleportFee)}, teleportFeeUSD = ${mysql.escape(destination.teleportFeeUSD)}, amountReceived = ${mysql.escape(destination.amountReceived)}, amountReceivedUSD = ${mysql.escape(destination.amountReceivedUSD)}, executedEventID = ${mysql.escape(destination.eventID)}, xcmInfo = ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))} ${extra} where extrinsicHash = '${xcmtransfer.extrinsicHash}' and transferIndex = '${xcmtransfer.transferIndex}' and xcmIndex='${xcmtransfer.xcmIndex}'`
+                                let sql = `update xcmtransfer set matched = ${matched}, destStatus = ${destStatus}, xcmInfolastUpdateDT = Now(), teleportFee = ${mysql.escape(destination.teleportFee)}, teleportFeeUSD = ${mysql.escape(destination.teleportFeeUSD)}, amountReceived = ${mysql.escape(destination.amountReceived)}, amountReceivedUSD = ${mysql.escape(destination.amountReceivedUSD)}, executedEventID = ${mysql.escape(destination.eventID)}, xcmInfo = ${mysql.escape(JSON.stringify(xcmtransfer.xcmInfo))} ${extra} where extrinsicHash = '${xcmtransfer.extrinsicHash}' and transferIndex = '${xcmtransfer.transferIndex}' and xcmIndex='${xcmtransfer.xcmIndex}'`
                                 this.batchedSQL.push(sql);
                                 await this.update_batchedSQL();
                                 let xcmTransferHash = xcmtransfer.xcmtransferHash
@@ -2120,10 +2122,6 @@ module.exports = class Indexer extends AssetManager {
                                 if (existing_xcmInfo.origination.initiateTS) {
                                     existing_xcmInfo.flightTime = this.getCurrentTS() - existing_xcmInfo.origination.initiateTS;
                                 }
-                                this.logger.error({
-                                    "op": "process_ably_xcm_indexer_message:origf > destf",
-                                    existing_xcmInfo
-                                });
                                 await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, existing_xcmInfo, this.getCurrentTS());
                                 let xcmTransferHash = xcmtransfer.xcmtransferHash
                                 let extrinsicHash = xcmtransfer.extrinsicHash
@@ -2180,10 +2178,16 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest
     // this is send in real time (both unfinalized/finalized)
     updateXCMTransferDestCandidate(candidate, caller = false, isTip = false, finalized = false) {
         //potentially add sentAt here, but it's 2-4
+
+        if (candidate.reaped) {
+            // validate reap status..
+            let beneficiary = this.getBeneficiaryFromMsgHash(candidate.msgHash)
+        }
 
         let eventID = candidate.eventID
         let k = `${candidate.msgHash}-${candidate.amountReceived}` // it's nearly impossible to have collision even dropping the asset
@@ -3725,6 +3729,14 @@ module.exports = class Indexer extends AssetManager {
         let xcmKeys = Object.keys(this.xcmmsgMap)
         for (const tk of xcmKeys) {
             let xcm = this.xcmmsgMap[tk]
+            let cachedMsgHash = xcm.msgHash
+            if (cachedMsgHash == msgHash && xcm.beneficiaries != undefined) {
+                return xcm.beneficiaries.split('|')[0]
+            }
+        }
+        let xcmIDs = Object.keys(this.xcmeventsMap)
+        for (const xcmID of xcmIDs) {
+            let xcm = this.xcmeventsMap[xcmID]
             let cachedMsgHash = xcm.msgHash
             if (cachedMsgHash == msgHash && xcm.beneficiaries != undefined) {
                 return xcm.beneficiaries.split('|')[0]
@@ -6808,6 +6820,11 @@ module.exports = class Indexer extends AssetManager {
 
         // (0.c) derive/cache session validators - called once every ~ 2400 blocks
         await this.getBlockAuthor(this.api, block, isNewSession, sessionIndex)
+        if (block.author != undefined) {
+            this.chainParser.setAuthor(block.author)
+        } else {
+            this.chainParser.setAuthor(false)
+        }
 
         // NEW REQUIREMENT: must process extrinsics before evmTx
         // (0.d) decode block extrinsic (from the raw encoded bytes from crawlBlock)
@@ -8014,7 +8031,7 @@ module.exports = class Indexer extends AssetManager {
         return result;
     }
 
-    async update_chain_assets(chain, daysago = 2) {
+    async update_indexlog_hourly(chain, daysago = 2) {
         try {
             let chainID = chain.chainID;
             // optimization: bound this better?
@@ -8034,6 +8051,8 @@ module.exports = class Indexer extends AssetManager {
                 "data": out,
                 "replace": valstmp
             });
+            let sql = `update chain set lastUpdateChainAssetsTS = UNIX_TIMESTAMP(Now()) where chainID = ${chainID}`
+            this.batchedSQL.push(sql);
             return (true);
         } catch (err) {
             this.log_indexing_error(err, "update_chain_assets");

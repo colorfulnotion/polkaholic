@@ -9,6 +9,7 @@
 //  dump all xcmtransfers for a day:    dumpSubstrateETL polkadot xcmtransfers 2022-12-29
 //  dump all xcmtransfers in last year: dumpSubstrateETL polkadot xcmtransfers
 //  compute xcmteleporfees: dumpSubstrateETL polkadot xcmteleportfees
+//  update blocklog: dumpSubstrateETL blocklog 
 var SubstrateETL = require("./substrateetl");
 
 async function main() {
@@ -23,7 +24,7 @@ async function main() {
         }
         if (index == 3 && val.length > 0) {
             // TODO: use flags pkg instead
-            if (val == "xcmtransfers" || val == "chains" || val == "setup" || val == "xcmteleportfees") {
+            if (val == "xcmtransfers" || val == "chains" || val == "setup" || val == "xcmteleportfees" || val == "blocklog") {
                 paraID = val;
             } else {
                 paraID = parseInt(val, 10);
@@ -37,13 +38,15 @@ async function main() {
         }
     });
 
+    // TODO: use commander instead of this...
     var substrateetl = new SubstrateETL();
-
     if (paraID == "setup" && relayChain) {
         await substrateetl.setup_tables(relayChain, logDT);
     } else if (paraID == "xcmteleportfees" && relayChain) {
         let logDT = "2023-01-01"; // TODO
         await substrateetl.compute_xcmteleportfees(relayChain, logDT);
+    } else if (relayChain == "blocklog") {
+        await substrateetl.updateBlocklogBulk(paraID) // actually chainID
     } else if (paraID == "xcmtransfers" && relayChain) {
         if (logDT) {
             await substrateetl.dump_xcmtransfers(logDT, relayChain);
