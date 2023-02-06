@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
 
+const Ably = require('ably');
 const AssetManager = require("./assetManager");
 const PolkaholicDB = require("./polkaholicDB");
 const {
@@ -1272,6 +1273,18 @@ module.exports = class SubstrateETL extends AssetManager {
         return (daysago);
     }
 
+
+    async publish_crawlBlock(chainID, blockNumber) {
+        try {
+            let ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
+            await ably_client.connection.once('connected');
+            let ably_channel_xcmindexer = ably_client.channels.get("xcm-indexer");
+            ably_channel_xcmindexer.publish("xcm-indexer", { crawlBlock: true, chainID, blockNumber });
+        } catch (err) {
+	    console.log(err);
+        }
+    }
+
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot", isEVM = 0) {
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back
         if (isEVM) {
@@ -1339,6 +1352,7 @@ module.exports = class SubstrateETL extends AssetManager {
                     console.log("ERROR: MISSING hdr", row.id, sql0);
                     this.batchedSQL.push(sql0);
                     await this.update_batchedSQL()
+		    await this.publish_crawlBlock(chainID, bn);
                     continue;
                 }
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);

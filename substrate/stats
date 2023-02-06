@@ -1,10 +1,26 @@
--- TODO: prior to dumpsubstrateetl we need to crawlbackfill, then reindex the marked hours FIRST
+mysql> select loaded, blocklog.chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b, numBlocks from blocklog where chainID in ( select chainID from chain where crawling = 1 )
+and chainID not in ( 22110, 22121, 22100, 22004, 2011, 2046, 2043, 22084, 22015 ) having logDT >= '2022-01-01' and logDT < '2023-02-04' and chainID in ( 0, 2 ) and b <= -1;
++--------+---------+------------+----------+----------+------+-----------+
+| loaded | chainID | logDT      | startBN  | endBN    | b    | numBlocks |
++--------+---------+------------+----------+----------+------+-----------+
+|      0 |       0 | 2022-07-23 | 11280296 | 11294537 |   -1 |     14241 |
+|      0 |       0 | 2022-10-18 | 12526670 | 12541062 |   -1 |     14392 |
+|      0 |       0 | 2022-10-20 | 12555396 | 12569584 |   -1 |     14188 |
+|      0 |       0 | 2022-10-21 | 12569585 | 12583774 |   -1 |     14189 |
+|      0 |       0 | 2022-10-22 | 12583775 | 12597991 |   -1 |     14216 |
+|      0 |       0 | 2022-10-24 | 12612192 | 12626374 |   -1 |     14182 |
+|      0 |       0 | 2022-10-25 | 12626375 | 12640690 |   -2 |     14314 |
+|      0 |       0 | 2022-10-26 | 12640691 | 12655055 |   -1 |     14364 |
+
+
+
+-- TODO: process message
 -- TODO: indexblock decode problems on: 2034 hydradx, 22004 khala, 22124 amplitude
 
 -- block => indexlog => substrateetl
 insert ignore into indexlog (chainID, indexTS, logDT, hr, indexed, readyForIndexing)
-(select 2119, floor(unix_timestamp(blockDT)/3600)*3600 as indexTS, date(blockDT) as logDT, hour(blockDT) as hr, 0 as indexed, 1 as readyForIndexing
-from block22119 where blockDT >= '2022-01-21 00:00' and blockDT <= '2023-02-04 23:59:59' group by logDT, hr, indexTS);
+(select 2046, floor(unix_timestamp(blockDT)/3600)*3600 as indexTS, date(blockDT) as logDT, hour(blockDT) as hr, 0 as indexed, 1 as readyForIndexing
+from block2046 where blockDT >= '2022-01-21 00:00' and blockDT <= '2023-02-04 23:59:59' group by logDT, hr, indexTS) on duplicate key update readyForIndexing = values(readyForIndexing);
 
 update blocklog set loaded = 0 where numBlocks - ( endBN - startBN + 1 ) <= -1;
 
