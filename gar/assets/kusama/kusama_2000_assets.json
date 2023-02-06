@@ -254,7 +254,8 @@
         },
         "name": "Kintsugi Wrapped BTC",
         "symbol": "KBTC",
-        "decimals": 8
+        "decimals": 8,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000b\"}]"
     },
     {
         "asset": {
@@ -262,7 +263,8 @@
         },
         "name": "Kintsugi Native Token",
         "symbol": "KINT",
-        "decimals": 12
+        "decimals": 12,
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2092},{\"generalKey\":\"0x000c\"}]"
     },
     {
         "asset": {

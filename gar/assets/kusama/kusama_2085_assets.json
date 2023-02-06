@@ -17,7 +17,7 @@
         "symbol": "sKSM",
         "decimals": 12,
         "currencyID": "1000",
-        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2085},{\"generalKey\":\"0x734b534d\"}]"
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2085},{\"palletInstance\":6},{\"generalIndex\":1000}]"
     },
     {
         "asset": {

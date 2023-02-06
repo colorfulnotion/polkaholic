@@ -42,6 +42,7 @@
     "browser-resolve": "^2.0.0",
     "bunyan": "^1.8.15",
     "canvas": "^2.10.1",
+    "commander": "^10.0.0",
     "cookie-parser": "^1.4.6",
     "debug": "^4.3.4",
     "dotenv": "^16.0.1",

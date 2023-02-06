@@ -434,6 +434,15 @@
     },
     {
         "asset": {
+            "Token": "220204"
+        },
+        "name": "STATEMINE",
+        "symbol": "STM",
+        "decimals": 10,
+        "currencyID": "220204"
+    },
+    {
+        "asset": {
             "Token": "222"
         },
         "name": "Planet Neo Token",
@@ -1151,6 +1160,15 @@
         "symbol": "YAYOI",
         "decimals": 10,
         "currencyID": "841"
+    },
+    {
+        "asset": {
+            "Token": "862812"
+        },
+        "name": "Virto CUBO",
+        "symbol": "CUBO",
+        "decimals": 9,
+        "currencyID": "862812"
     },
     {
         "asset": {
