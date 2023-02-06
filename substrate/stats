@@ -1,0 +1,30 @@
+-- TODO: prior to dumpsubstrateetl we need to crawlbackfill, then reindex the marked hours FIRST
+-- TODO: indexblock decode problems on: 2034 hydradx, 22004 khala, 22124 amplitude
+
+-- block => indexlog => substrateetl
+insert ignore into indexlog (chainID, indexTS, logDT, hr, indexed, readyForIndexing)
+(select 2119, floor(unix_timestamp(blockDT)/3600)*3600 as indexTS, date(blockDT) as logDT, hour(blockDT) as hr, 0 as indexed, 1 as readyForIndexing
+from block22119 where blockDT >= '2022-01-21 00:00' and blockDT <= '2023-02-04 23:59:59' group by logDT, hr, indexTS);
+
+update blocklog set loaded = 0 where numBlocks - ( endBN - startBN + 1 ) <= -1;
+
+-- check indexing
+select loaded, blocklog.chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b, numBlocks from blocklog where
+chainID in ( select chainID from chain where crawling = 1 )  and chainID not in ( 22110, 22121, 22100, 22004, 2011, 2046, 2043, 22084, 22015 )
+having logDT >= '2022-01-01' and logDT < '2023-02-04' and b < -5;
+
+2043 OriginTrail reindex
+2046 darwinia backfill in process
+2011 equilibrium -- reindexing
+22015 integritee reindex
+22004 khala crawlBackfill requires huge backfill of 1.1MM blocks, doing the last 34K to cover these:
+22084 calamari no archive node
+22121 imbue no archive node
+
+--- once the above is filled in/fixed, find outliers on extrinsics, transfers, xcmtransfers using blocklogstats
+
+mysql> select blocklog.chainID, logDT, numExtrinsics, s.days, s.numExtrinsics_avg, s.numExtrinsics_std, numBlocks, s.numBlocks_avg, s.numBlocks_std from blocklog, blocklogstats s where last_day(blocklog.logDT) = s.monthDT and blocklog.chainID = s.chainID  and
+( ( blocklog.numExtrinsics < s.numExtrinsics_avg - 3*s.numExtrinsics_std  ) or ( blocklog.numBlocks < s.numBlocks_avg - 3*s.numBlocks_std  ) ) having logDT >= '2022-01-01';
+
+
+

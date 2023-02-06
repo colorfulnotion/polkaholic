@@ -6903,7 +6903,6 @@ module.exports = class Indexer extends AssetManager {
             chainID: chainID,
             blockNumber: blockNumber,
             relayBN: relayBN,
-            relayStateRoot: relayParentStateRoot,
             blockType: 'substrate'
         }
 
@@ -6937,42 +6936,6 @@ module.exports = class Indexer extends AssetManager {
         }
 
         this.hashesRowsToInsert.push(substrateBlockHashRec)
-
-        if (this.isRelayChain) {
-            //only write stateRoot for relaychain
-            let substrateStateRootRec = {
-                key: relayParentStateRoot,
-                data: {}, //feed/feedunfinalized
-            }
-            let blockfeedWithBlkHash = {
-                chainID: chainID,
-                blockNumber: blockNumber,
-                relayBN: relayBN,
-                relayStateRoot: relayParentStateRoot,
-                blockHash: blockHash,
-                blockType: 'substrate'
-            }
-            if (block.finalized) {
-                substrateStateRootRec.data = {
-                    feed: {
-                        stateroot: {
-                            value: JSON.stringify(blockfeedWithBlkHash),
-                            timestamp: blockTS * 1000000
-                        }
-                    }
-                }
-            } else {
-                substrateStateRootRec.data = {
-                    feedunfinalized: {
-                        stateroot: {
-                            value: JSON.stringify(blockfeedWithBlkHash),
-                            timestamp: blockTS * 1000000
-                        }
-                    }
-                }
-            }
-            this.hashesRowsToInsert.push(substrateStateRootRec)
-        }
 
         // (2) record block in BT chain${chainID} feed
         let cres = {
