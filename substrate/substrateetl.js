@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
 
+const Ably = require('ably');
 const AssetManager = require("./assetManager");
 const PolkaholicDB = require("./polkaholicDB");
 const {
@@ -134,19 +135,36 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async audit_random_substrateetl() {
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, chainID from blocklog where loaded = 1 and audited = 'Unknown' and logDT < date_sub(Now(), interval 1 day) order by rand() limit 100`
+    async audit_blocks() {
+	// 1. find problematic periods with a small number of records (
+	let sql = `select chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b from blocklog where chainID not in ( 22110, 22100, 0 ) and chainID > 21001 having logDT >= '2022-01-01' and b >= -30 and b < 0 order by chainID, logDT limit 500`
         let recs = await this.poolREADONLY.query(sql);
-        if (recs.length == 0) return ([null, null]);
+        if (recs.length == 0) return (false);
+	
+	// 2. within each, find anything missing in substrate-etl
+	let cnt = 0;
         for (const r of recs) {
-            let {
-                indexTS,
-                chainID
-            } = r;
-            let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+	    let chainID = r.chainID;
+	    let startBN = r.startBN;
+	    let endBN = r.endBN;
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
-            await this.audit_substrateetl(logDT, paraID, relayChain);
+	    let sqlQuery = `SELECT number FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE number >= ${startBN} and number <= ${endBN} order by number;`
+	    console.log(sqlQuery);
+	    let rows = await this.execute_bqJob(sqlQuery);
+	    let blocks = {};
+	    for (const row of rows) {
+		blocks[row.number] = 1;
+	    }
+	    for (let bn = startBN; bn <= endBN; bn++) {
+		if ( blocks[bn] == undefined ) {
+		    let crawlsql = `update block${chainID} set crawlBlock = 1 where blockNumber = ${bn}`;
+		    console.log(cnt, `: ${crawlsql}`);
+		    this.batchedSQL.push(sql);
+		}
+	    }
+	    await this.update_batchedSQL();
+	    cnt++;
         }
     }
 
@@ -1061,15 +1079,63 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
-    async dump_xcmtransfers_range(relayChain = "polkadot", range_days_ago = 2) {
-        let currTS = this.getCurrentTS();
-        range_days_ago = (relayChain == "kusama") ? 577 : 270;
-        //range_days_ago = 1;
-        for (let daysago = 0; daysago < range_days_ago; daysago++) {
-            let ts = currTS - 86400 * daysago;
-            let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
-            await this.dump_xcmtransfers(logDT, relayChain);
-        }
+    async dump_blocklogstats() {
+	var blocklogstats = ["numBlocks", "numExtrinsics", "numTransfers", "numSignedExtrinsics", "numAccountsActive", "numAddresses",
+			     "numXCMTransfersIn", "numXCMTransfersOut", "valXCMTransferIncomingUSD", "valXCMTransferOutgoingUSD","numAccountsTransfersIn", "numAccountsTransfersOut"
+			    ];
+	let keys = ["chainID", "monthDT"];
+	let vals = ["days"];
+	let groups = [`count(*) days`];
+	for (const s of blocklogstats) {
+	    groups.push(`round(avg(${s}), 1) ${s}_avg`);
+	    groups.push(`round(stddev(${s}), 1) ${s}_std`);
+	    vals.push(`${s}_avg`)
+	    vals.push(`${s}_std`)
+	}
+	let groupsstr = groups.join(",");
+	let sql = `select chainID, last_day(logDT) as monthDT, ${groupsstr}
+		 from blocklog
+		 where chainID in ( select chainID from chain where crawling = 1 ) and logDT < '2023-02-01' and logDT > '2020-01-01'
+		 group by chainID, monthDT having days > 10`;
+        let groupsRecs = await this.poolREADONLY.query(sql)
+	let data = [];
+	for ( const g of groupsRecs ) {
+	    let out = [];
+	    let month = g.monthDT.toISOString().split('T')[0];
+	    out.push(`'${g['chainID']}'`);
+	    out.push(`'${month}'`);
+	    for (const v of vals) {
+		out.push(`${mysql.escape(g[v])}`);
+	    }
+	    data.push(`(${out.join(",")})`);
+	}
+	await this.upsertSQL({
+	    "table": "blocklogstats",
+	    keys,
+	    vals,
+	    data,
+	    replace: vals
+        });
+    }
+    
+    async dump_xcmtransfers_range(relayChain = "polkadot", startLogDT = null) {
+        let ts = this.getCurrentTS();
+        if ( startLogDT == null ) {
+	    startLogDT = (relayChain == "kusama") ? "2021-07-01" : "2022-05-04";
+	}
+	try {
+            while ( true ) {
+		ts = ts - 86400;
+		let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
+		await this.dump_xcmtransfers(logDT, relayChain);
+		if ( logDT == startLogDT ) {
+		    return(true);
+		}
+            }
+	} catch (err) {
+	    console.log(err);
+	    return(false);
+	}
     }
 
     async dump_chains(relayChain = "polkadot") {
@@ -1123,7 +1189,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let tbl = "xcmtransfers";
         // 2. setup directories for tbls on date
         let dir = "/tmp";
-        let fn = path.join(dir, `${tbl}.json`)
+        let fn = path.join(dir, `${tbl}-${relayChain}.json`)
         let f = fs.openSync(fn, 'w', 0o666);
         let bqDataset = relayChain
         let logDTp = logDT.replaceAll("-", "")
@@ -1207,6 +1273,18 @@ module.exports = class SubstrateETL extends AssetManager {
         return (daysago);
     }
 
+
+    async publish_crawlBlock(chainID, blockNumber) {
+        try {
+            let ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
+            await ably_client.connection.once('connected');
+            let ably_channel_xcmindexer = ably_client.channels.get("xcm-indexer");
+            ably_channel_xcmindexer.publish("xcm-indexer", { crawlBlock: true, chainID, blockNumber });
+        } catch (err) {
+	    console.log(err);
+        }
+    }
+
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot", isEVM = 0) {
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back
         if (isEVM) {
@@ -1270,10 +1348,11 @@ module.exports = class SubstrateETL extends AssetManager {
                 let hdr = b.header;
                 if (!hdr || hdr.number == undefined) {
                     let bn = parseInt(row.id.substr(2), 16);
-                    let sql0 = `update block${chainID} set crawlBlock = 1 where blockNumber = ${bn} and attempted < 127`
+                    let sql0 = `update block${chainID} set crawlBlock = 1, attempted = 0 where blockNumber = ${bn} and attempted < 127`
                     console.log("ERROR: MISSING hdr", row.id, sql0);
                     this.batchedSQL.push(sql0);
                     await this.update_batchedSQL()
+		    await this.publish_crawlBlock(chainID, bn);
                     continue;
                 }
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
@@ -1524,7 +1603,6 @@ module.exports = class SubstrateETL extends AssetManager {
             "accountsactive": `select  count(distinct signer_pub_key) numAccountsActive from ${project}.${relayChain}.extrinsics${paraID} where signed and date(block_time) = '${logDT}'`,
             "events": `select count(*) as numEvents from substrate-etl.${relayChain}.events${paraID} where date(block_time) = '${logDT}'`,
             "transfers": `select count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers${paraID} where date(block_time) = '${logDT}'`,
-            //"balances":  `select count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} where date(ts) = '${logDT}'`,
             "xcmtransfers0": `select count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where destination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`,
             "xcmtransfers1": `select count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`
         };
@@ -1557,13 +1635,12 @@ module.exports = class SubstrateETL extends AssetManager {
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
         let sqla = {
-            "balances": `select date(ts) logDT, count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} group by logDT having numAddresses > 0 and logDT < "${today}" order by logDT`,
-            /*"extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics from ${project}.${relayChain}.extrinsics${paraID} group by logDT having logDT < "${today}" order by logDT`,
+            "extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics from ${project}.${relayChain}.extrinsics${paraID} group by logDT having logDT < "${today}" order by logDT`,
             "accountsactive": `select date(block_time) logDT, count(distinct signer_pub_key) as numAccountsActive from ${project}.${relayChain}.extrinsics${paraID} where signed group by logDT having logDT < "${today}" order by logDT`,
             "events": `select date(block_time) logDT, count(*) as numEvents from substrate-etl.${relayChain}.events${paraID} group by logDT order by logDT`,
             "transfers": `select  date(block_time) logDT, count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers${paraID} group by logDT having logDT < "${today}" order by logDT`,
             "xcmtransfers0": `select  date(origination_ts) logDT, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where destination_para_id = ${paraID} group by logDT having logDT < "${today}" order by logDT`,
-            "xcmtransfers1": `select date(origination_ts) as logDT, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} group by logDT having logDT < "${today}" order by logDT` */
+            "xcmtransfers1": `select date(origination_ts) as logDT, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} group by logDT having logDT < "${today}" order by logDT`
         };
 
         let r = {}

@@ -1237,7 +1237,7 @@ module.exports = class Crawler extends Indexer {
             let nmax = techniqueParams[2];
             let w = (nmax > 1) ? `and blockNumber % ${nmax} = ${n}` : "";
             let w2 = ` and blockNumber > ${chain.blocksCovered} - 5000000`
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 3 order by blockNumber desc limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 2 order by blockNumber desc limit 10000`
             console.log("X", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
@@ -1425,9 +1425,15 @@ module.exports = class Crawler extends Indexer {
         if (!(ts > 0)) return (false);
         let indexTS = Math.floor(ts / 3600) * 3600;
         if (indexTS == this.lastmarkedTS) return (false);
-        let sql = `update indexlog set indexed = 0 where chainID = '${chainID}' and indexTS = '${indexTS}'`;
+	let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+        this.upsertSQL({
+            "table": "indexlog",
+            "keys": ["chainID", "indexTS"],
+            "vals": ["logDT", "hr", "indexed"],
+            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', 0)`],
+            "replace": ["indexed"]
+        }, true);
         this.lastmarkedTS = indexTS;
-        this.batchedSQL.push(sql);
     }
 
 
