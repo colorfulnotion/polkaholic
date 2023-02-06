@@ -40,6 +40,8 @@ const {
 
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
+    publish = 0;
+
     constructor() {
         super("manager")
     }
@@ -111,7 +113,7 @@ module.exports = class SubstrateETL extends AssetManager {
         } else {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and chain.chainID not in ( 22110, 22100 )  and blocklog.loaded = 0 and logDT >= '2019-11-28' and logDT <= date(date_sub(Now(), interval 1 day)) ${w} order by attempted, logDT desc, rand() limit 1`
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and chain.chainID not in ( 22110, 22100 )  and blocklog.loaded = 0 and logDT >= '2021-12-18' and logDT <= date(date_sub(Now(), interval 1 day)) ${w} order by attempted, logDT desc, rand() limit 1`
         console.log("get_random_substrateetl", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
@@ -1273,25 +1275,38 @@ module.exports = class SubstrateETL extends AssetManager {
         return (daysago);
     }
 
-
     async publish_crawlBlock(chainID, blockNumber) {
         try {
             let ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
             await ably_client.connection.once('connected');
             let ably_channel_xcmindexer = ably_client.channels.get("xcm-indexer");
-            ably_channel_xcmindexer.publish("xcm-indexer", { crawlBlock: true, chainID, blockNumber });
+	    let crawlBlockMsg = { crawlBlock: true, chainID, blockNumber };
+            ably_channel_xcmindexer.publish("xcm-indexer", crawlBlockMsg);
+	    console.log("publish_crawlBlock", crawlBlockMsg);
         } catch (err) {
 	    console.log(err);
         }
     }
 
+    async mark_crawl_block(chainID, bn) {
+        let sql0 = `update block${chainID} set crawlBlock = 1, attempted = 0 where blockNumber = ${bn} and attempted < 127`
+        
+        this.batchedSQL.push(sql0);
+        await this.update_batchedSQL()
+	if ( this.publish < 20 ) {
+	    await this.publish_crawlBlock(chainID, bn);
+	    console.log("PUBLISH", chainID, bn);
+	    this.publish++;
+	}
+    }
+    
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot", isEVM = 0) {
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back
         if (isEVM) {
             tbls.push("evmtxs");
             tbls.push("evmtransfers");
         }
-        // 1. get bnStart, bnEnd for logDT
+	// 1. get bnStart, bnEnd for logDT
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let minLogDT = `${logDT} 00:00:00`;
         let maxLogDT = `${logDT} 23:59:59`;
@@ -1301,6 +1316,7 @@ module.exports = class SubstrateETL extends AssetManager {
             bnStart,
             bnEnd
         } = bnRanges[0];
+	let expected = {}
         // 2. setup directories for tbls on date
         let dir = "/tmp";
         let fn = {}
@@ -1327,11 +1343,12 @@ module.exports = class SubstrateETL extends AssetManager {
                 spec: specVersion.spec
             });
         }
-
         // 4. do table scan 50 blocks at a time
         let NL = "\r\n";
         let jmp = 50;
         let block_count = 0;
+	let found = {};
+	this.publish = 0;
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
@@ -1348,11 +1365,8 @@ module.exports = class SubstrateETL extends AssetManager {
                 let hdr = b.header;
                 if (!hdr || hdr.number == undefined) {
                     let bn = parseInt(row.id.substr(2), 16);
-                    let sql0 = `update block${chainID} set crawlBlock = 1, attempted = 0 where blockNumber = ${bn} and attempted < 127`
-                    console.log("ERROR: MISSING hdr", row.id, sql0);
-                    this.batchedSQL.push(sql0);
-                    await this.update_batchedSQL()
-		    await this.publish_crawlBlock(chainID, bn);
+		    console.log("ERROR: MISSING hdr", bn);
+		    await this.mark_crawl_block(chainID, bn);
                     continue;
                 }
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
@@ -1360,6 +1374,7 @@ module.exports = class SubstrateETL extends AssetManager {
                     console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
                     continue;
                 }
+		found[hdr.number] = true;
 
                 let spec_version = this.getSpecVersionForBlockNumber(chainID, hdr.number);
 
@@ -1565,7 +1580,16 @@ module.exports = class SubstrateETL extends AssetManager {
                 fs.writeSync(f["specversions"], JSON.stringify(s) + NL);
             })
         }
-
+	for ( let n=bnStart; n<=bnEnd; n++) {
+	    if ( found[n] == undefined || ( found[n] == false ) ) {
+		await this.mark_crawl_block(chainID, n);
+		console.log("mark_crawl_block ", n);
+	    }
+	}
+	if ( this.publish > 0 ) {
+	    console.log("PUBLISHED WORK: ", this.publish);
+	    return(false);
+	}
         // 5. write to bq
         try {
             for (const tbl of tbls) {
@@ -1608,7 +1632,7 @@ module.exports = class SubstrateETL extends AssetManager {
         };
         console.log(sqla);
         let r = {}
-        let vals = [];
+        let vals = [` loaded = 1 `];
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
             let rows = await this.execute_bqJob(sql);

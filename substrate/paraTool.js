@@ -2105,7 +2105,6 @@ module.exports = {
             }
             errorMap[errDetail.errorType.toLowerCase()] = errDetail
         }
-        //console.log(errorMap)
         let errPieces = errorDesc.split(':')
         let errorType = (errPieces.length == 2) ? errPieces[1] : 'NA'
         if (errorMap[errorType.toLowerCase()] != undefined) {

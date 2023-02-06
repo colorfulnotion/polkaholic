@@ -26,14 +26,16 @@ async function main() {
     await crawler.setupChainAndAPI(chainID);
     let blockHash = await crawler.getBlockHashFinalized(chainID, blockNumber)
     let t2 = null
-    /*{
+    if ( ! blockHash ) {
+	t2 = {
 	   chainID,
-       blockNumber,
-       crawlTrace: 1,
-       crawlBlockEVM: 1,
-       crawlReceiptsEVM: 1,
-       crawlTraceEVM: 1
-    }; */
+	    blockNumber,
+	  /*  crawlTrace: 1,
+	    crawlBlockEVM: 1,
+	    crawlReceiptsEVM: 1,
+	    crawlTraceEVM: 1 */
+	};
+    }
     if ( t2 ) {
         await crawler.crawl_block_trace(chain, t2)
     }

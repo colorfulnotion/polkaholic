@@ -1,46 +1,127 @@
-mysql> select loaded, blocklog.chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b, numBlocks from blocklog where chainID in ( select chainID from chain where crawling = 1 )
-and chainID not in ( 22110, 22121, 22100, 22004, 2011, 2046, 2043, 22084, 22015 ) having logDT >= '2022-01-01' and logDT < '2023-02-04' and chainID in ( 0, 2 ) and b <= -1;
-+--------+---------+------------+----------+----------+------+-----------+
-| loaded | chainID | logDT      | startBN  | endBN    | b    | numBlocks |
-+--------+---------+------------+----------+----------+------+-----------+
-|      0 |       0 | 2022-07-23 | 11280296 | 11294537 |   -1 |     14241 |
-|      0 |       0 | 2022-10-18 | 12526670 | 12541062 |   -1 |     14392 |
-|      0 |       0 | 2022-10-20 | 12555396 | 12569584 |   -1 |     14188 |
-|      0 |       0 | 2022-10-21 | 12569585 | 12583774 |   -1 |     14189 |
-|      0 |       0 | 2022-10-22 | 12583775 | 12597991 |   -1 |     14216 |
-|      0 |       0 | 2022-10-24 | 12612192 | 12626374 |   -1 |     14182 |
-|      0 |       0 | 2022-10-25 | 12626375 | 12640690 |   -2 |     14314 |
-|      0 |       0 | 2022-10-26 | 12640691 | 12655055 |   -1 |     14364 |
 
+-- Issue: 22004 khala undergoing backfill, 22084 calamari no archive node, 22121 imbue no archive node, 22110 mangatax+subsocialx 
+-- Issue: random indexblock block decode problems: 2034 hydradx, 22004 khala, 22124 amplitude
 
+-- outstanding chain days:
+update blocklog set loaded = 0 where numBlocks - ( endBN - startBN + 1 ) <= -1 and chainID not in ( 22110, 22121, 22100, 22004, 22084 );
+select loaded, blocklog.chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b, numBlocks from blocklog
+where chainID in ( select chainID from chain where crawling = 1 )
+ and chainID not in ( 22110, 22121, 22100, 22004, 22084 ) having logDT >= '2022-01-01' and logDT < '2023-02-04' and b <= -1 and loaded = 0;
 
--- TODO: process message
--- TODO: indexblock decode problems on: 2034 hydradx, 22004 khala, 22124 amplitude
-
--- block => indexlog => substrateetl
+-- manual blocklog => indexlog 
 insert ignore into indexlog (chainID, indexTS, logDT, hr, indexed, readyForIndexing)
 (select 2046, floor(unix_timestamp(blockDT)/3600)*3600 as indexTS, date(blockDT) as logDT, hour(blockDT) as hr, 0 as indexed, 1 as readyForIndexing
 from block2046 where blockDT >= '2022-01-21 00:00' and blockDT <= '2023-02-04 23:59:59' group by logDT, hr, indexTS) on duplicate key update readyForIndexing = values(readyForIndexing);
 
-update blocklog set loaded = 0 where numBlocks - ( endBN - startBN + 1 ) <= -1;
+--- once the above is filled in/fixed, compute blocklogstats + find outliers on extrinsics, transfers, xcmtransfers using blocklogstats
 
--- check indexing
-select loaded, blocklog.chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b, numBlocks from blocklog where
-chainID in ( select chainID from chain where crawling = 1 )  and chainID not in ( 22110, 22121, 22100, 22004, 2011, 2046, 2043, 22084, 22015 )
-having logDT >= '2022-01-01' and logDT < '2023-02-04' and b < -5;
-
-2043 OriginTrail reindex
-2046 darwinia backfill in process
-2011 equilibrium -- reindexing
-22015 integritee reindex
-22004 khala crawlBackfill requires huge backfill of 1.1MM blocks, doing the last 34K to cover these:
-22084 calamari no archive node
-22121 imbue no archive node
-
---- once the above is filled in/fixed, find outliers on extrinsics, transfers, xcmtransfers using blocklogstats
-
-mysql> select blocklog.chainID, logDT, numExtrinsics, s.days, s.numExtrinsics_avg, s.numExtrinsics_std, numBlocks, s.numBlocks_avg, s.numBlocks_std from blocklog, blocklogstats s where last_day(blocklog.logDT) = s.monthDT and blocklog.chainID = s.chainID  and
+select blocklog.chainID, logDT, numExtrinsics, s.days, s.numExtrinsics_avg, s.numExtrinsics_std, numBlocks, s.numBlocks_avg, s.numBlocks_std from blocklog, blocklogstats s where last_day(blocklog.logDT) = s.monthDT and blocklog.chainID = s.chainID  and
 ( ( blocklog.numExtrinsics < s.numExtrinsics_avg - 3*s.numExtrinsics_std  ) or ( blocklog.numBlocks < s.numBlocks_avg - 3*s.numBlocks_std  ) ) having logDT >= '2022-01-01';
 
+
+
+mysql> select loaded, blocklog.chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b, numBlocks from blocklog where chainID in ( select chainID from chain where crawling = 1 )  and chainID not in ( 22110,
+22121, 22100, 22004, 22084 ) having logDT >= '2022-01-01' and logDT < '2023-02-04' and b >= -5 and b <= -1 and loaded = 0;
++--------+---------+------------+----------+----------+-------+-----------+
+| loaded | chainID | logDT      | startBN  | endBN    | b     | numBlocks |
++--------+---------+------------+----------+----------+-------+-----------+
+|      0 |       0 | 2022-07-23 | 11280296 | 11294537 |    -1 |     14241 |
+|      0 |       0 | 2022-10-18 | 12526670 | 12541062 |    -1 |     14392 |
+|      0 |       0 | 2022-10-20 | 12555396 | 12569584 |    -1 |     14188 |
+|      0 |       0 | 2022-10-21 | 12569585 | 12583774 |    -1 |     14189 |
+|      0 |       0 | 2022-10-22 | 12583775 | 12597991 |    -1 |     14216 |
+|      0 |       0 | 2022-10-24 | 12612192 | 12626374 |    -1 |     14182 |
+|      0 |       0 | 2022-10-25 | 12626375 | 12640690 |    -2 |     14314 |
+|      0 |       0 | 2022-10-26 | 12640691 | 12655055 |    -1 |     14364 |
+|      0 |       0 | 2022-10-31 | 12712550 | 12726939 |    -4 |     14386 |
+|      0 |       0 | 2022-11-03 | 12755720 | 12770083 |    -1 |     14363 |
+|      0 |       0 | 2022-11-04 | 12770084 | 12784458 |    -1 |     14374 |
+|      0 |       0 | 2022-11-08 | 12827606 | 12841989 |    -2 |     14382 |
+|      0 |       0 | 2022-11-11 | 12870730 | 12885085 |    -2 |     14354 |
+|      0 |       0 | 2022-11-15 | 12928190 | 12942585 |    -2 |     14394 |
+|      0 |       0 | 2022-11-16 | 12942586 | 12956981 |    -1 |     14395 |
+|      0 |       0 | 2022-11-21 | 13014561 | 13028950 |    -2 |     14388 |
+|      0 |       0 | 2022-11-22 | 13028951 | 13043342 |    -2 |     14390 |
+|      0 |       0 | 2022-11-24 | 13057730 | 13072116 |    -2 |     14385 |
+|      0 |       0 | 2022-11-29 | 13129661 | 13144057 |    -1 |     14396 |
+|      0 |       0 | 2022-11-30 | 13144058 | 13158444 |    -2 |     14385 |
+|      0 |       0 | 2022-12-02 | 13172785 | 13187127 |    -3 |     14340 |
+|      0 |       0 | 2022-12-03 | 13187128 | 13201503 |    -2 |     14374 |
+|      0 |       0 | 2022-12-08 | 13259034 | 13273400 |    -2 |     14365 |
+|      0 |       0 | 2022-12-09 | 13273401 | 13287770 |    -4 |     14366 |
+|      0 |       0 | 2022-12-10 | 13287771 | 13302163 |    -1 |     14392 |
+|      0 |       0 | 2022-12-13 | 13330731 | 13344726 |    -1 |     13995 |
+|      0 |       0 | 2022-12-14 | 13344727 | 13358992 |    -1 |     14265 |
+|      0 |       0 | 2022-12-15 | 13358993 | 13373359 |    -2 |     14365 |
+|      0 |       0 | 2022-12-19 | 13416514 | 13430898 |    -2 |     14383 |
+|      0 |       0 | 2022-12-20 | 13430899 | 13445272 |    -2 |     14372 |
+|      0 |       0 | 2022-12-21 | 13445273 | 13459666 |    -1 |     14393 |
+|      0 |       0 | 2022-12-22 | 13459667 | 13474059 |    -1 |     14392 |
+|      0 |       0 | 2022-12-23 | 13474060 | 13488453 |    -2 |     14392 |
+|      0 |       0 | 2022-12-27 | 13531648 | 13546037 |    -1 |     14389 |
+|      0 |       0 | 2023-01-04 | 13646740 | 13661111 |    -1 |     14371 |
+|      0 |       0 | 2023-01-09 | 13718694 | 13733090 |    -3 |     14394 |
+|      0 |       0 | 2023-01-11 | 13747480 | 13761874 |    -1 |     14394 |
+|      0 |       0 | 2023-01-13 | 13776272 | 13790666 |    -1 |     14394 |
+|      0 |       2 | 2022-03-03 | 11639318 | 11653640 |    -8 |     14315 | kusama
+|      0 |       2 | 2022-03-04 | 11653641 | 11668001 |    -6 |     14355 |
+|      0 |       2 | 2022-09-29 | 14655063 | 14669444 |    -1 |     14381 |
+|      0 |       2 | 2022-09-30 | 14669445 | 14683828 |    -1 |     14383 |
+|      0 |       2 | 2022-10-01 | 14683829 | 14698208 |    -1 |     14379 |
+|      0 |       2 | 2022-10-04 | 14726983 | 14741359 |    -1 |     14376 |
+|      0 |       2 | 2022-10-06 | 14755742 | 14770116 |    -2 |     14373 |
+|      0 |       2 | 2022-10-13 | 14856463 | 14870853 |    -1 |     14390 |
+|      0 |       2 | 2022-10-15 | 14885243 | 14899639 |    -3 |     14394 |
+|      0 |       2 | 2022-10-17 | 14914028 | 14928411 |    -2 |     14382 |
+|      0 |       2 | 2022-10-18 | 14928412 | 14942786 |    -2 |     14373 |
+|      0 |       2 | 2022-10-19 | 14942787 | 14957162 |    -1 |     14375 |
+|      0 |       2 | 2022-10-20 | 14957163 | 14971546 |    -2 |     14382 |
+|      0 |       2 | 2022-10-24 | 15014700 | 15029089 |    -1 |     14389 |
+|      0 |       2 | 2022-10-25 | 15029090 | 15043470 |    -1 |     14380 |
+|      0 |       2 | 2022-10-28 | 15072229 | 15086614 |    -2 |     14384 |
+|      0 |       2 | 2022-11-03 | 15158527 | 15172908 |    -1 |     14381 |
+|      0 |       2 | 2022-11-05 | 15187258 | 15201645 |    -1 |     14387 |
+|      0 |       2 | 2022-11-08 | 15230417 | 15244802 |    -2 |     14384 |
+|      0 |       2 | 2022-11-09 | 15244803 | 15259189 |    -1 |     14386 |
+|      0 |       2 | 2022-11-10 | 15259190 | 15273568 |    -3 |     14376 |
+|      0 |       2 | 2022-11-11 | 15273569 | 15287956 |    -2 |     14386 |
+|      0 |       2 | 2022-11-12 | 15287957 | 15302327 |    -1 |     14370 |
+|      0 |       2 | 2022-11-15 | 15331105 | 15345491 |    -1 |     14386 |
+|      0 |       2 | 2022-11-16 | 15345492 | 15359871 |    -3 |     14377 |
+|      0 |       2 | 2022-11-17 | 15359872 | 15374224 |    -3 |     14350 |
+|      0 |       2 | 2022-11-19 | 15388557 | 15402906 |    -1 |     14349 |
+|      0 |       2 | 2022-11-20 | 15402907 | 15417270 |    -1 |     14363 |
+|      0 |    2004 | 2022-11-17 |  2313199 |  2320289 |    -1 |      7090 | shiden
+|      0 |    2004 | 2022-11-25 |  2370000 |  2377098 |    -1 |      7098 |
+|      0 |    2004 | 2022-12-02 |  2419599 |  2426691 |    -3 |      7090 |
+|      0 |    2004 | 2022-12-04 |  2433777 |  2440892 |    -2 |      7114 |
+|      0 |    2004 | 2022-12-20 |  2546952 |  2554048 |    -1 |      7096 |
+|      0 |    2011 | 2023-01-12 |  1498750 |  1505896 |   -89 |      7058 | equilibirum
+|      0 |    2011 | 2023-01-16 |  1527331 |  1534465 | -1087 |      6048 |
+|      0 |    2011 | 2023-01-17 |  1534466 |  1541565 |    -2 |      7098 |
+|      0 |    2011 | 2023-01-18 |  1541566 |  1548661 |  -377 |      6719 |
+|      0 |    2011 | 2023-01-20 |  1555817 |  1562962 |   -25 |      7121 |
+|      0 |    2011 | 2023-01-21 |  1562963 |  1570091 |   -87 |      7042 |
+|      0 |    2011 | 2023-01-22 |  1570092 |  1577226 |  -109 |      7026 |
+|      0 |    2011 | 2023-01-24 |  1584355 |  1591463 |  -211 |      6898 |
+|      0 |    2034 | 2022-12-02 |  1488683 |  1494181 |    -1 |      5498 | hydradx
+|      0 |    2034 | 2022-12-05 |  1505116 |  1510923 |    -2 |      5806 |
+|      0 |    2034 | 2022-12-08 |  1522534 |  1528355 |    -1 |      5821 |
+|      0 |    2034 | 2022-12-09 |  1528356 |  1534383 |    -1 |      6027 |
+|      0 |    2034 | 2022-12-12 |  1547081 |  1553362 |    -3 |      6279 |
+|      0 |    2034 | 2022-12-13 |  1553363 |  1559382 |    -5 |      6015 |
+|      0 |    2034 | 2022-12-21 |  1603017 |  1609290 |    -4 |      6270 |
+|      0 |    2034 | 2022-12-30 |  1659840 |  1666160 |    -1 |      6320 |
+|      0 |    2034 | 2023-01-04 |  1691274 |  1697701 |    -2 |      6426 |
+|      0 |    2034 | 2023-01-05 |  1697702 |  1704117 |    -7 |      6409 |
+|      0 |    2034 | 2023-01-06 |  1704118 |  1710624 |    -6 |      6501 |
+|      0 |    2034 | 2023-01-13 |  1748037 |  1754261 |    -1 |      6224 |
+|      0 |   22007 | 2022-12-28 |  3041425 |  3048486 |    -1 |      7061 | acala
+|      0 |   22023 | 2022-11-04 |  2914579 |  2921457 |    -4 |      6875 | basilisk
+|      0 |   22023 | 2022-12-05 |  3127917 |  3134868 |    -2 |      6950 |
+|      0 |   22023 | 2022-12-13 |  3178910 |  3185385 |    -2 |      6474 |
+|      0 |   22023 | 2022-12-16 |  3198607 |  3205202 |    -2 |      6594 |
++--------+---------+------------+----------+----------+-------+-----------+
+moonbeam doing general
 
 

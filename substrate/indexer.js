@@ -5,7 +5,6 @@ const AssetManager = require("./assetManager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 const mysql = require("mysql2");
-const Ably = require('ably');
 const {
     WebSocket
 } = require('ws');
@@ -1802,7 +1801,7 @@ module.exports = class Indexer extends AssetManager {
                                 amountReceived: 0,
                                 eventID: r.eventID,
                                 extrinsicID: r.extrinsicID,
-                                errorDesc: "AccountReaped:ReapedAtDestinationChain"
+                                errorDesc: "reaped:AccountReaped"
                             }
                         } else if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
                             let rat = r.amountReceived / amountSent; // old default
@@ -2089,31 +2088,7 @@ module.exports = class Indexer extends AssetManager {
         }
     }
     
-    async process_indexer_message(message) {
-        // if the incoming xcmtransfer is a chainIDDest matching our indexer's chainID, then record a starting balance in xcmtransfers_beneficiary
-	try {
-            let msg = message.data;
-            if (msg.beneficiary != undefined && (msg.chainIDDest == this.chainID)) {
-		await this.process_indexer_xcmtransfer(msg);
-	    } else if ( msg.crawlBlock != undefined && ( msg.chainID == this.chainID ) ) {
-		await this.process_indexer_crawlBlock(msg);
-	    }
-	} catch (err) {
-            this.logger.error({
-		"op": "process_indexer_message ERROR",
-		err
-            });
-	}
-    }
-
-    async process_indexer_crawlBlock(crawlBlock) {
-        this.logger.error({
-            "op": "process_indexer_crawlBlock ERROR",
-            crawlBlock
-        });
-    }
-	
-    async process_indexer_xcmtransfer(xcmtransfer) {
+    async process_indexer_xcmtransfer(chain, xcmtransfer) {
         try {
             if (xcmtransfer.beneficiary == undefined || xcmtransfer.xcmInfo == undefined ) return(false);
 	    if (xcmtransfer.chainIDDest != this.chainID) return(false);
@@ -2161,17 +2136,6 @@ module.exports = class Indexer extends AssetManager {
                 xcmtransfer
             });
         }
-    }
-
-    async setup_ably_client() {
-        this.ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
-        await this.ably_client.connection.once('connected');
-        this.ably_channel_xcmindexer = this.ably_client.channels.get("xcm-indexer");
-        this.ably_channel_xcminfo = this.ably_client.channels.get("xcminfo");
-        let indexer = this;
-        this.ably_channel_xcmindexer.subscribe(async function(message) {
-            await indexer.process_indexer_message(message);
-        });
     }
 
     publish_xcmtransfer(msg) {
