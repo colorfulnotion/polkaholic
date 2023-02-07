@@ -5,7 +5,6 @@ const AssetManager = require("./assetManager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 const mysql = require("mysql2");
-const Ably = require('ably');
 const {
     WebSocket
 } = require('ws');
@@ -1802,7 +1801,7 @@ module.exports = class Indexer extends AssetManager {
                                 amountReceived: 0,
                                 eventID: r.eventID,
                                 extrinsicID: r.extrinsicID,
-                                errorDesc: "AccountReaped:ReapedAtDestinationChain"
+                                errorDesc: "reaped:AccountReaped"
                             }
                         } else if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
                             let rat = r.amountReceived / amountSent; // old default
@@ -2089,67 +2088,54 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async process_ably_xcm_indexer_message(message) {
-        // if the incoming xcmtransfer is a chainIDDest matching our indexer's chainID, then record a starting balance in xcmtransfers_beneficiary
-        let xcmtransfer = message.data;
+    async process_indexer_xcmtransfer(chain, xcmtransfer) {
         try {
-            if (xcmtransfer.beneficiary != undefined && (xcmtransfer.chainIDDest == this.chainID)) {
-                let beneficiary = xcmtransfer.destAddress;
-                if (this.xcmtransfers_beneficiary[beneficiary] == undefined) {
-                    this.xcmtransfers_beneficiary[beneficiary] = {};
+            if (xcmtransfer.beneficiary == undefined || xcmtransfer.xcmInfo == undefined) return (false);
+            if (xcmtransfer.chainIDDest != this.chainID) return (false);
+            let beneficiary = xcmtransfer.destAddress;
+            let xcmInfo = xcmtransfer.xcmInfo;
+            if (this.xcmtransfers_beneficiary[beneficiary] == undefined) {
+                this.xcmtransfers_beneficiary[beneficiary] = {};
+            }
+            let xcmtransferHash = xcmtransfer.xcmtransferHash;
+            if (this.xcmtransfers_beneficiary[beneficiary][xcmtransferHash] == undefined) {
+                if (xcmtransfer.balances == undefined) {
+                    xcmtransfer.balances = {}
                 }
-                let xcmtransferHash = xcmtransfer.xcmtransferHash;
-                if (this.xcmtransfers_beneficiary[beneficiary][xcmtransferHash] == undefined) {
-                    if (xcmtransfer.balances == undefined) {
-                        xcmtransfer.balances = {}
-                    }
-                    this.xcmtransfers_beneficiary[beneficiary][xcmtransferHash] = xcmtransfer;
-                }
-                let xcmInfo = xcmtransfer.xcmInfo;
-                // if the origination chain has been finalized, we should mark it as such locally so that when we write destination info
+                this.xcmtransfers_beneficiary[beneficiary][xcmtransferHash] = xcmtransfer;
+            }
+            // if the origination chain has been finalized, we should mark it as such locally so that when we write destination info
 
-                if (xcmInfo && xcmInfo.origination && xcmInfo.origination.finalized) {
-                    let existing_xcmtransfer = this.xcmtransfers_beneficiary[beneficiary][xcmtransferHash];
-                    let existing_xcmInfo = existing_xcmtransfer.xcmInfo;
-                    if (existing_xcmInfo && existing_xcmInfo.origination) {
-                        if (xcmInfo.origination.msgHash && xcmInfo.origination.msgHash.length > 60) {
-                            existing_xcmInfo.origination.msgHash = xcmInfo.origination.msgHash;
-                        }
-                        if (!existing_xcmInfo.origination.finalized) {
-                            existing_xcmInfo.origination.finalized = true;
-                            if (existing_xcmInfo.destination && existing_xcmInfo.destination.finalized) {
-                                // destination chain was finalized BEFORE origination chain
-                                if (existing_xcmInfo.origination.initiateTS) {
-                                    existing_xcmInfo.flightTime = this.getCurrentTS() - existing_xcmInfo.origination.initiateTS;
-                                }
-                                await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, existing_xcmInfo, this.getCurrentTS());
-                                let xcmTransferHash = xcmtransfer.xcmtransferHash
-                                let extrinsicHash = xcmtransfer.extrinsicHash
-                                let msgHash = xcmtransfer.msgHash
-                                await this.publish_xcminfo(existing_xcmInfo);
+            if (xcmInfo && xcmInfo.origination && xcmInfo.origination.finalized) {
+                let existing_xcmtransfer = this.xcmtransfers_beneficiary[beneficiary][xcmtransferHash];
+                let existing_xcmInfo = existing_xcmtransfer.xcmInfo;
+                if (existing_xcmInfo && existing_xcmInfo.origination) {
+                    if (xcmInfo.origination.msgHash && xcmInfo.origination.msgHash.length > 60) {
+                        existing_xcmInfo.origination.msgHash = xcmInfo.origination.msgHash;
+                    }
+                    if (!existing_xcmInfo.origination.finalized) {
+                        existing_xcmInfo.origination.finalized = true;
+                        if (existing_xcmInfo.destination && existing_xcmInfo.destination.finalized) {
+                            // destination chain was finalized BEFORE origination chain
+                            if (existing_xcmInfo.origination.initiateTS) {
+                                existing_xcmInfo.flightTime = this.getCurrentTS() - existing_xcmInfo.origination.initiateTS;
                             }
+                            await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, existing_xcmInfo, this.getCurrentTS());
+                            let xcmTransferHash = xcmtransfer.xcmtransferHash
+                            let extrinsicHash = xcmtransfer.extrinsicHash
+                            let msgHash = xcmtransfer.msgHash
+                            await this.publish_xcminfo(existing_xcmInfo);
                         }
                     }
                 }
             }
         } catch (err) {
             this.logger.error({
-                "op": "process_ably_xcm_indexer_message ERROR",
+                "op": "process_indexer_xcmtransfer ERROR",
                 err,
                 xcmtransfer
             });
         }
-    }
-
-    async setup_ably_client() {
-        this.ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
-        await this.ably_client.connection.once('connected');
-        this.ably_channel_xcmindexer = this.ably_client.channels.get("xcm-indexer");
-        this.ably_channel_xcminfo = this.ably_client.channels.get("xcminfo");
-        let indexer = this;
-        this.ably_channel_xcmindexer.subscribe(async function(message) {
-            await indexer.process_ably_xcm_indexer_message(message);
-        });
     }
 
     publish_xcmtransfer(msg) {
@@ -6903,7 +6889,6 @@ module.exports = class Indexer extends AssetManager {
             chainID: chainID,
             blockNumber: blockNumber,
             relayBN: relayBN,
-            relayStateRoot: relayParentStateRoot,
             blockType: 'substrate'
         }
 
@@ -6937,42 +6922,6 @@ module.exports = class Indexer extends AssetManager {
         }
 
         this.hashesRowsToInsert.push(substrateBlockHashRec)
-
-        if (this.isRelayChain) {
-            //only write stateRoot for relaychain
-            let substrateStateRootRec = {
-                key: relayParentStateRoot,
-                data: {}, //feed/feedunfinalized
-            }
-            let blockfeedWithBlkHash = {
-                chainID: chainID,
-                blockNumber: blockNumber,
-                relayBN: relayBN,
-                relayStateRoot: relayParentStateRoot,
-                blockHash: blockHash,
-                blockType: 'substrate'
-            }
-            if (block.finalized) {
-                substrateStateRootRec.data = {
-                    feed: {
-                        stateroot: {
-                            value: JSON.stringify(blockfeedWithBlkHash),
-                            timestamp: blockTS * 1000000
-                        }
-                    }
-                }
-            } else {
-                substrateStateRootRec.data = {
-                    feedunfinalized: {
-                        stateroot: {
-                            value: JSON.stringify(blockfeedWithBlkHash),
-                            timestamp: blockTS * 1000000
-                        }
-                    }
-                }
-            }
-            this.hashesRowsToInsert.push(substrateStateRootRec)
-        }
 
         // (2) record block in BT chain${chainID} feed
         let cres = {

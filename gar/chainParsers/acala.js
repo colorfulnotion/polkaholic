@@ -81,7 +81,19 @@ module.exports = class AcalaParser extends ChainParser {
                 "Token": "KSM"
             },
             xcmInteriorKey: '[{"network":"kusama"},"here"]'
-        }
+        },
+        {
+            asset: {
+                "Token": "KINT"
+            },
+            xcmInteriorKey: '[{"network":"kusama"},{"parachain":2092},{"generalKey":"0x000c"}]'
+        },
+        {
+            asset: {
+                "Token": "KBTC"
+            },
+            xcmInteriorKey: '[{"network":"kusama"},{"parachain":2092},{"generalKey":"0x000b"}]'
+        },
         ]
     }
 

@@ -24,7 +24,7 @@ async function main() {
         }
         if (index == 3 && val.length > 0) {
             // TODO: use flags pkg instead
-            if (val == "xcmtransfers" || val == "chains" || val == "setup" || val == "xcmteleportfees" || val == "blocklog") {
+            if (val == "xcmtransfers" || val == "chains" || val == "setup" || val == "xcmteleportfees" || val == "blocklog" || val == "blocklogstats" || val == "auditblocks") {
                 paraID = val;
             } else {
                 paraID = parseInt(val, 10);
@@ -47,11 +47,15 @@ async function main() {
         await substrateetl.compute_xcmteleportfees(relayChain, logDT);
     } else if (relayChain == "blocklog") {
         await substrateetl.updateBlocklogBulk(paraID) // actually chainID
+    } else if (relayChain == "auditblocks") {
+        await substrateetl.audit_blocks();
+    } else if (relayChain == "blocklogstats") {
+        await substrateetl.dump_blocklogstats(paraID)
     } else if (paraID == "xcmtransfers" && relayChain) {
         if (logDT) {
             await substrateetl.dump_xcmtransfers(logDT, relayChain);
         } else {
-            await substrateetl.dump_xcmtransfers_range(relayChain, 400);
+            await substrateetl.dump_xcmtransfers_range(relayChain, null);
         }
     } else if (paraID == "chains" && relayChain) {
         await substrateetl.dump_chains(relayChain);

@@ -1,0 +1,46 @@
+
+
+## Ongoing issues: Missing Archive nodes
+
+## Khala Kusama 2004
+
+Backfill in progress, but decoding issues expected
+
+## Mangatax Kusama 2110
+
+Finalization
+
+## Calamari Kusama 2084
+
+No archive node
+
+## Imbue Kusama 2121
+
+No archive node
+
+## Subsocialx 2100
+
+No archive node
+
+## 2022 Decoding issues
+
+## 2021 Minor Decoding Issues
+
+### Shiden (Kusama ParaID 2007)
+* 2021: Many blocks (1000s) prior to 2021-11-28 SmartContract decode indexBlock 22007 731690
+
+### Altair (Kusama paraID 2088)
+* 2021-10-13 Block 20955 indexBlock 22088 90522
+
+### Basilisk Kusama ParaID 2090
+* 2021-10-14 Block 129442 indexBlock 22090 129442
+* 2021-12-05 Block 395401 indexBlock 22090 395401
+
+### Kintsugi Kusama ParaID 2092
+* 2021-10-14 Blocks 2496, 2502, 2536    
+* 2021-10-21 Blocks 15319, 15447, 15461 
+
+### Kilt Kusama ParaID 2086 => Polkadot 2086 
+* 2021-10-28 (Sept+Oct 10-12/day)       
+
+
