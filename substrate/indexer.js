@@ -29,7 +29,7 @@ module.exports = class Indexer extends AssetManager {
     evmTxRowsToInsert = [];
     blockRowsToInsert = [];
     addressStorage = {};
-    historyMap = {};
+
     addressExtrinsicMap = {};
     pendingExtrinsic = {};
 
@@ -546,11 +546,7 @@ module.exports = class Indexer extends AssetManager {
         this.addressStorage[accKey][assetChainEncoded] = rec
 
         // ex: {"Token":"KSM"}#2#0x000b3563
-        let historyKey = paraTool.make_addressHistory_rowKey(accKey, ts)
-        if (this.historyMap[historyKey] == undefined) {
-            this.historyMap[historyKey] = {};
-        }
-        this.historyMap[historyKey][assetChainEncoded] = rec
+        // let historyKey = paraTool.make_addressHistory_rowKey(accKey, ts)
         // The above enables access to an account history for all assets like this:
         // 1. For all assetChains, get "realtime" columns -- each column will have the LATEST state of the account's holding of assetChain, eg {"Token":"KSM"}#2
         // 2. For each assetChain, HISTORICAL info can be obtained with a prefix read  ${address}#{"Token":"KSM"}#2#0x12344321 ...
@@ -743,7 +739,7 @@ module.exports = class Indexer extends AssetManager {
 
         let addressStorageStartTS = new Date().getTime();
         try {
-            await Promise.all([this.flush_historyMap(), this.flush_addressStorage(), this.flushCrowdloans()]);
+            await Promise.all([this.flush_addressStorage(), this.flushCrowdloans()]);
         } catch (err) {
             this.log_indexing_error(err, "flush");
         }
@@ -1066,34 +1062,6 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    // write historyMap to tblHistory
-    async flush_historyMap() {
-        let batchSize = 512;
-        try {
-            let [tblName, tblHistory] = this.get_btTableHistory()
-            let rows = [];
-            for (const historyKey of Object.keys(this.historyMap)) {
-                let r = {
-                    key: historyKey,
-                    data: {
-                        history: this.historyMap[historyKey] // already in string form
-                    }
-                }
-                rows.push(r);
-                if (rows.length > batchSize) {
-                    await this.insertBTRows(tblHistory, rows, tblName);
-                    rows = [];
-                }
-            }
-            if (rows.length > 0) {
-                await this.insertBTRows(tblHistory, rows, tblName);
-            }
-            this.historyMap = {}
-            // console.log("writing historyMap DONE");
-        } catch (err) {
-            this.log_indexing_error(err, "flush_historyMap");
-        }
-    }
 
     clip_string(inp, maxLen = 64) {
         if (inp == undefined) {

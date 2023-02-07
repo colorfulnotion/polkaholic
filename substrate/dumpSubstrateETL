@@ -10,6 +10,7 @@
 //  dump all xcmtransfers in last year: dumpSubstrateETL polkadot xcmtransfers
 //  compute xcmteleporfees: dumpSubstrateETL polkadot xcmteleportfees
 //  update blocklog: dumpSubstrateETL blocklog 
+//  update blocklog: dumpSubstrateETL blocklogstats
 var SubstrateETL = require("./substrateetl");
 
 async function main() {

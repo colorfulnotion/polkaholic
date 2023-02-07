@@ -4347,29 +4347,6 @@ module.exports = class Query extends AssetManager {
                         err
                     });
                 }
-            } else if (tableName == "addresshistory") {
-                try {
-                    let [tblName, tblHistory] = this.get_btTableHistory();
-                    [rows] = await tblHistory.getRows({
-                        start: startRow,
-                        end: address + "#ZZZ",
-                        filter: [{
-                            family: families,
-                            cellLimit: 1
-                        }],
-                        limit: maxRows + 1
-                    });
-                } catch (err) {
-                    if (err.code == 404) {
-                        throw Error(`Account not found ${address}`)
-                    }
-                    this.logger.error({
-                        "op": "query.getAccount",
-                        address,
-                        accountGroup,
-                        err
-                    });
-                }
             } else if (tableName == "hashes") {
 
                 const filter = [{

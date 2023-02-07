@@ -1369,7 +1369,7 @@ module.exports = class Crawler extends Indexer {
             let startingBlock = parseInt(syncState.startingBlock.toString(), 10);
             //console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
-            let startBN = chain.blocksFinalized - 7000000 // dont do  a full table scan for chain 0/2 anymore 150000*6=10 days should be enough...
+            let startBN = chain.blocksFinalized - 50000 // dont do  a full table scan
             let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and attempted < ${maxTraceAttempts} and blockNumber > ${startBN} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} limit 5000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
