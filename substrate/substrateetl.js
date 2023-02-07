@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
 
+const Ably = require('ably');
 const AssetManager = require("./assetManager");
 const PolkaholicDB = require("./polkaholicDB");
 const {
@@ -30,6 +31,7 @@ const mysql = require("mysql2");
 const fs = require("fs");
 const axios = require("axios");
 const paraTool = require("./paraTool");
+const uiTool = require("./uiTool");
 const util = require('util');
 const exec = util.promisify(require("child_process").exec);
 const path = require('path');
@@ -39,11 +41,11 @@ const {
 
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
+    publish = 0;
+
     constructor() {
         super("manager")
     }
-
-    irregularFeeUSDThreshold = 5 //consider feeUSD above this threshold "Irregular" -  historically feeUSD should be lower than the ED
 
     // all bigquery tables are date-partitioned except 2 for now: chains and specversions
     partitioned_table(tbl) {
@@ -110,7 +112,7 @@ module.exports = class SubstrateETL extends AssetManager {
         } else {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and chain.chainID not in ( 22110, 22100 )  and blocklog.loaded = 0 and logDT >= '2019-11-28' and logDT <= date(date_sub(Now(), interval 1 day)) ${w} order by attempted, logDT desc, rand() limit 1`
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID  and blocklog.loaded = 0 and logDT >= '2022-04-01' and attempted < 10 and logDT <= date(date_sub(Now(), interval 1 day)) ${w} order by attempted, logDT desc, rand() limit 1`
         console.log("get_random_substrateetl", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
@@ -134,19 +136,36 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async audit_random_substrateetl() {
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, chainID from blocklog where loaded = 1 and audited = 'Unknown' and logDT < date_sub(Now(), interval 1 day) order by rand() limit 100`
+    async audit_blocks() {
+        // 1. find problematic periods with a small number of records (
+        let sql = `select chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b from blocklog where chainID not in ( 22110, 22100, 0 ) and chainID > 21001 having logDT >= '2022-01-01' and b >= -30 and b < 0 order by chainID, logDT limit 500`
         let recs = await this.poolREADONLY.query(sql);
-        if (recs.length == 0) return ([null, null]);
+        if (recs.length == 0) return (false);
+
+        // 2. within each, find anything missing in substrate-etl
+        let cnt = 0;
         for (const r of recs) {
-            let {
-                indexTS,
-                chainID
-            } = r;
-            let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+            let chainID = r.chainID;
+            let startBN = r.startBN;
+            let endBN = r.endBN;
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
-            await this.audit_substrateetl(logDT, paraID, relayChain);
+            let sqlQuery = `SELECT number FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE number >= ${startBN} and number <= ${endBN} order by number;`
+            console.log(sqlQuery);
+            let rows = await this.execute_bqJob(sqlQuery);
+            let blocks = {};
+            for (const row of rows) {
+                blocks[row.number] = 1;
+            }
+            for (let bn = startBN; bn <= endBN; bn++) {
+                if (blocks[bn] == undefined) {
+                    let crawlsql = `update block${chainID} set crawlBlock = 1 where blockNumber = ${bn}`;
+                    console.log(cnt, `: ${crawlsql}`);
+                    this.batchedSQL.push(sql);
+                }
+            }
+            await this.update_batchedSQL();
+            cnt++;
         }
     }
 
@@ -1061,14 +1080,323 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
-    async dump_xcmtransfers_range(relayChain = "polkadot", range_days_ago = 2) {
-        let currTS = this.getCurrentTS();
-        range_days_ago = (relayChain == "kusama") ? 577 : 270;
-        //range_days_ago = 1;
-        for (let daysago = 0; daysago < range_days_ago; daysago++) {
-            let ts = currTS - 86400 * daysago;
-            let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
-            await this.dump_xcmtransfers(logDT, relayChain);
+    async dump_blocklogstats() {
+        let birthDT = '2019-11-01';
+        let sql_tally = `insert into blocklogstats ( chainID, monthDT, startDT, endDT, startBN, endBN, numBlocks_missing, numBlocks_total) (select chainID, LAST_DAY(logDT) monthDT, min(logDT), max(logDT), min(startBN) startBN, max(endBN) endBN, sum(( endBN - startBN + 1 ) - numBlocks) as numBlocks_missing, sum(numBlocks) numBlocks_total from blocklog where chainID in ( select chainID from chain where crawling = 1 ) and logDT >= '${birthDT}' group by chainID, monthDT having monthDT <= Last_day(Date(Now()))) on duplicate key update startDT = values(startDT), endDT = values(endDT), startBN  = values(startBN), endBN = values(endBN), numBlocks_missing = values(numBlocks_missing), numBlocks_total = values(numBlocks_total)`;
+        this.batchedSQL.push(sql_tally);
+        await this.update_batchedSQL();
+        console.log(sql_tally);
+
+        var blocklogstats = ["numBlocks", "numExtrinsics", "numTransfers", "numSignedExtrinsics", "numAccountsActive", "numAddresses",
+            "numXCMTransfersIn", "numXCMTransfersOut", "valXCMTransferIncomingUSD", "valXCMTransferOutgoingUSD", "numAccountsTransfersIn", "numAccountsTransfersOut"
+        ];
+        let keys = ["chainID", "monthDT"];
+        let vals = ["days"];
+        let groups = [`count(*) days`];
+        for (const s of blocklogstats) {
+            groups.push(`round(sum(${s}),2) ${s}_sum`);
+            groups.push(`round(min(${s}),2) ${s}_min`);
+            groups.push(`round(max(${s}),2) ${s}_max`);
+            groups.push(`round(avg(${s}),2) ${s}_avg`);
+            groups.push(`stddev(${s}) ${s}_std`);
+            vals.push(`${s}_min`)
+            vals.push(`${s}_max`)
+            vals.push(`${s}_sum`)
+            vals.push(`${s}_avg`)
+            vals.push(`${s}_std`)
+        }
+        let groupsstr = groups.join(",");
+        let sql = `select chainID, last_day(logDT) as monthDT, ${groupsstr} from blocklog where chainID in ( select chainID from chain where crawling = 1 ) and logDT <= date(Last_day(Now())) and logDT > '2019-01-01' group by chainID, monthDT having days > 0`;
+        let groupsRecs = await this.poolREADONLY.query(sql)
+        let data = [];
+
+
+        for (const g of groupsRecs) {
+            let out = [];
+            let month = g.monthDT.toISOString().split('T')[0];
+            out.push(`'${g['chainID']}'`);
+            out.push(`'${month}'`);
+            for (const v of vals) {
+                out.push(`${mysql.escape(g[v])}`);
+            }
+            data.push(`(${out.join(",")})`);
+        }
+        await this.upsertSQL({
+            "table": "blocklogstats",
+            keys,
+            vals,
+            data,
+            replace: vals
+        });
+        console.log("updated", data.length, " blocklogstats recs");
+
+        sql_tally = `select relayChain, chainID, chainName, paraID, crawling, id, crawlingStatus from chain where active=1`;
+        let tallyRecs = await this.poolREADONLY.query(sql_tally);
+	let chains = {};
+	let relayChain_chains = { polkadot: 0, kusama : 0 };
+	for (const r of tallyRecs) {
+	    chains[r.chainID] = r;
+	    relayChain_chains[r.relayChain]++;
+	}
+
+        // generate substrate-etl README.md summarizing all chains
+        sql_tally = `select chain.relayChain, count(distinct paraID) numChains, max(endDT) endDT, round(sum(numBlocks_total)) numBlocks_total, 
+round(sum(( endBN - startBN + 1) - numBlocks_total)) as numBlocks_missing 
+from blocklogstats join chain on blocklogstats.chainID = chain.chainID  where monthDT >= "${birthDT}" and chain.relayChain in ("polkadot", "kusama") and 
+monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by relayChain order by relayChain desc`;
+        tallyRecs = await this.poolREADONLY.query(sql_tally);
+        let s = [];
+	s.push(`# substrate-etl Network Coverage (All-time)\r\n\r\nSource: [Polkaholic.io](https://polkaholic.io)\r\n\r\n`);
+	s.push(`| Chain            | End Date | # Chains | # Blocks  | # Missing |`);
+	s.push(`| ---------------- | -------- | -------- | --------- | --------- |`);
+        for (const r of tallyRecs) {
+            let desc = `[${r.relayChain}](/substrate-etl/${r.relayChain})`
+            let endDT = r.endDT ? r.endDT.toISOString().split('T')[0] : "";
+            let numBlocks_total = r.numBlocks_total ? parseInt(r.numBlocks_total, 10).toLocaleString('en-US') : "";
+            let numBlocks_missing = r.numBlocks_missing ? parseInt(r.numBlocks_missing, 10).toLocaleString('en-US') : "";
+            let numChains = r.numChains ? r.numChains.toLocaleString('en-US') : "";
+	    let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing/r.numBlocks_total).toLocaleString(undefined,{style: 'percent', minimumFractionDigits:2})  + ")" : "";
+            s.push(`| ${desc} | ${endDT} | ${numChains} indexed out of ${relayChain_chains[r.relayChain]} | ${numBlocks_total} | ${numBlocks_missing} ${percent_missing} |`)
+	}
+
+        let NL = "\r\n";
+        let dir = "../substrate-etl"
+	
+        sql_tally = `select chain.chainID, chain.id, chain.relayChain, chain.paraID, chain.chainName, min(startDT) startDT, max(endDT) endDT, min(startBN) startBN, max(endBN) endBN, sum(numBlocks_total) numBlocks_total, 
+sum(( endBN - startBN + 1) - numBlocks_total) as numBlocks_missing, 
+Round(sum(numExtrinsics_avg)) as numSignedExtrinsics, 
+Round(max(numAccountsActive_avg)) as numAccountsActive, 
+Round(max(numAddresses_avg)) as numAddresses, 
+sum(if(issues is not null, 1, 0)) as numIssues, 
+chain.crawlingStatus 
+from blocklogstats join chain on blocklogstats.chainID = chain.chainID where monthDT >= "${birthDT}" and chain.relayChain in ("polkadot", "kusama") and 
+monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID order by relayChain desc, paraID asc`;
+        console.log(sql_tally);
+        tallyRecs = await this.poolREADONLY.query(sql_tally);
+        let o = {};
+        for (const r of tallyRecs) {
+	    let relayChain = r.relayChain;
+	    if ( o[relayChain] == undefined ) {
+		o[relayChain] = [];
+		o[relayChain].push(`# substrate-etl ${relayChain} Network-wide Summary (All-time)\r\n\r\nSource: [Polkaholic.io](https://polkaholic.io)\r\n\r\n`);
+		o[relayChain].push(`| Chain            | Start Date | End Date | Start Block | End Block | # Blocks | # Missing | # Addresses with Balances | Crawling Status |`);
+		o[relayChain].push(`| ---------------- | ---------- | ---------| ----------- | --------- | -------- | --------- | ------------------------- | --------------- |`);
+	    }
+            let desc = `[${r.chainName} Para ID ${r.paraID}](/substrate-etl/${r.relayChain}/${r.paraID}-${r.id})`
+            let startDT = r.startDT ? r.startDT.toISOString().split('T')[0] : "";
+            let endDT = r.endDT ? r.endDT.toISOString().split('T')[0] : "";
+            let startBN = r.startBN ? r.startBN.toLocaleString('en-US') : "";
+            let endBN = r.endBN ? r.endBN.toLocaleString('en-US').toLocaleString('en-US') : "";
+            let numBlocks_total = r.numBlocks_total ? r.numBlocks_total.toLocaleString('en-US') : "";
+            let numBlocks_missing = r.numBlocks_missing ? r.numBlocks_missing.toLocaleString('en-US') : "";
+	    let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing/r.endBN).toLocaleString(undefined,{style: 'percent', minimumFractionDigits:2})  + ")" : "";
+            let numAddresses = r.numAddresses ? r.numAddresses.toLocaleString('en-US') : "";
+	    console.log(relayChain, numBlocks_missing, numBlocks_total);
+            o[relayChain].push(`| ${desc} | ${startDT} | ${endDT} | ${startBN} | ${endBN} | ${numBlocks_total} | ${numBlocks_missing} ${percent_missing} | ${numAddresses} | ${r.crawlingStatus} |`)
+	    chains[r.chainID].covered = true;
+        }
+
+	for (const chainID of Object.keys(chains)) {
+	    if ( chains[chainID].covered == undefined ) {
+		let c = chains[chainID];
+		let desc = c.crawling > 0 ? "active and onboarding" : "active but not being indexed";
+		o[c.relayChain].push(`* *${c.chainName}* Para ID ${desc}; ${c.crawlingStatus}`);
+	    }
+	}
+	let fn = path.join(dir, `README.md`);
+        let f = fs.openSync(fn, 'w', 0o666);
+        fs.writeSync(f, s.join(NL) + NL);
+        console.log("generated", fn);
+	for (const relayChain of Object.keys(o)) {
+            let fn = path.join(dir, relayChain, `README.md`);
+            let f = fs.openSync(fn, 'w', 0o666);
+            fs.writeSync(f, o[relayChain].join(NL) + NL);
+            console.log("generated", fn);
+	}
+
+        sql_tally = `select chain.chainID, chain.relayChain, chain.paraID, chain.id, chain.chainName, startDT, endDT, startBN, endBN, numBlocks_total,
+( endBN - startBN + 1) - numBlocks_total as numBlocks_missing, 
+numSignedExtrinsics_sum as numSignedExtrinsics, 
+round(numAccountsActive_avg) as numAccountsActive, 
+round(numAddresses_max) as numAddresses, 
+issues,
+chain.crawlingStatus 
+from blocklogstats join chain on blocklogstats.chainID = chain.chainID where monthDT >= "${birthDT}" and monthDT <= last_day(date(date_sub(Now(), interval 10 day))) and chain.relayChain in ("polkadot", "kusama") order by relayChain desc, paraID asc, monthDT desc`;
+        tallyRecs = await this.poolREADONLY.query(sql_tally);
+        let prevChainID = null;
+        let prevStartBN = null;
+
+        let j = {};
+        let docs = {};
+        let fn_chain = {};
+        for (const r of tallyRecs) {
+            let chainID = r.chainID;
+            let id = r.id;
+            let paraID = r.paraID;
+            let relayChain = r.relayChain;
+            if (j[chainID] == undefined) {
+                let subdir = path.join(dir, relayChain, `${paraID}-${id}`);
+                if (!fs.existsSync(subdir)) {
+                    fs.mkdirSync(subdir, {
+                        recursive: true
+                    });
+                }
+                fn_chain[chainID] = path.join(subdir, `README.md`);
+                j[chainID] = [];
+                let desc = `# ${r.chainName} substrate-etl Summary (Monthly)\r\n\r\n_Source_: [${r.id}.polkaholic.io](https://${r.id}.polkaholic.io)\r\n\r\n*Relay Chain*: ${r.relayChain}\r\n*Para ID*: ${r.paraID}\r\n`;
+                if (r.crawlingStatus) desc += `Status: ${r.crawlingStatus}`
+                desc += `\r\n\r\n`
+                j[chainID].push(desc);
+                j[chainID].push(`| Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |`);
+                j[chainID].push(`| ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |`);
+                docs[chainID] = [];
+                docs[chainID].push(`\r\n## # Blocks\r\n\`\`\`\r\nSELECT LAST_DAY( date(block_time)) as monthDT, Min(date(block_time)) startBN, max(date(block_time)) endBN, min(number) minBN, max(number) maxBN, count(*) numBlocks, max(number)-min(number)+1-count(*) as numBlocks_missing FROM \`substrate-etl.${relayChain}.blocks${paraID}\` group by monthDT order by monthDT desc\`\`\`\r\n`);
+            }
+            let startDT = r.startDT ? r.startDT.toISOString().split('T')[0] : "";
+            let endDT = r.endDT ? r.endDT.toISOString().split('T')[0] : "";
+            let desc = `${startDT} to ${endDT}`;
+            let startBN = r.startBN ? r.startBN.toLocaleString('en-US') : "";
+            let endBN = r.endBN ? r.endBN.toLocaleString('en-US') : "";
+            let numBlocks_total = r.numBlocks_total ? r.numBlocks_total.toLocaleString('en-US') : "";
+            let numBlocks_missing = r.numBlocks_missing ? r.numBlocks_missing.toLocaleString('en-US') : "none";
+	    let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing/(r.endBN - r.startBN)).toLocaleString(undefined,{style: 'percent', minimumFractionDigits:2})  + ")" : "";
+            if (prevChainID == chainID) {
+                if (prevStartBN && (prevStartBN != (r.endBN + 1)) && (prevStartBN > r.endBN)) {
+                    // var signedBlock = await api.rpc.chain.getBlock(blockHash);
+                    console.log("BROKEN MONTHLY CHAIN -- ", chainID, desc, prevStartBN, r.endBN + 1);
+                    numBlocks_missing = " **BROKEN**";
+                }
+                prevStartBN = r.startBN;
+            } else {
+                prevStartBN = null;
+            }
+            prevChainID = chainID;
+            let numSignedExtrinsics = r.numSignedExtrinsics ? r.numSignedExtrinsics.toLocaleString('en-US') : ""
+            let numAccountsActive = r.numAccountsActive ? r.numAccountsActive.toLocaleString('en-US') : "";
+            let numAddresses = r.numAddresses ? r.numAddresses.toLocaleString('en-US') : "";
+            let issues = r.issues ? r.issues : "-";
+            let url = `/substrate-etl/${relayChain}/${paraID}-${id}/${endDT}.md`
+            j[chainID].push(`| [${desc}](${url}) | ${startBN} | ${endBN} | ${numBlocks_total} | ${numBlocks_missing} ${percent_missing} | ${numSignedExtrinsics} | ${numAccountsActive} | ${numAddresses} | ${issues} | `)
+        }
+
+        for (const chainID of Object.keys(j)) {
+            j[chainID] = j[chainID].concat(docs[chainID]);
+            console.log("writing", fn_chain[chainID]);
+            let f = fs.openSync(fn_chain[chainID], 'w', 0o666);
+            fs.writeSync(f, j[chainID].join(NL) + NL);
+        }
+        prevChainID = null;
+        prevStartBN = null;
+        sql_tally = `select chain.chainID, chain.relayChain, chain.paraID, chain.id, chain.chainName, logDT, last_day(logDT) as monthDT, startBN, endBN, numBlocks,
+( endBN - startBN + 1) - numBlocks as numBlocks_missing, 
+blocklog.numSignedExtrinsics, 
+blocklog.numAccountsActive, 
+blocklog.numAddresses, 
+blocklog.numEvents,
+blocklog.numTransfers,   
+blocklog.valueTransfersUSD,
+blocklog.numXCMTransfersIn,
+blocklog.numXCMTransfersOut,
+blocklog.valXCMTransferIncomingUSD,
+blocklog.valXCMTransferOutgoingUSD,
+blocklog.numAccountsTransfersIn,
+blocklog.numAccountsTransfersOut,
+chain.crawlingStatus 
+from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date(date_sub(Now(), interval 1 day)) and chain.relayChain in ("polkadot", "kusama") and logDT >= "${birthDT}" order by relayChain desc, paraID asc, logDT desc`;
+        tallyRecs = await this.poolREADONLY.query(sql_tally);
+        j = {};
+        fn_chain = {};
+        for (const r of tallyRecs) {
+            let chainID = r.chainID;
+            let id = r.id;
+            let monthDT = r.monthDT.toISOString().split('T')[0];
+            let paraID = r.paraID;
+            let k = `${chainID}-${monthDT}`;
+            let relayChain = r.relayChain;
+            if (j[k] == undefined) {
+                let subdir = path.join(dir, relayChain, `${paraID}-${id}`);
+                if (!fs.existsSync(subdir)) {
+                    fs.mkdirSync(subdir, {
+                        recursive: true
+                    });
+                }
+                fn_chain[k] = path.join(subdir, `${monthDT}.md`);
+                j[k] = [];
+                docs[k] = [];
+                let desc = `# ${r.chainName} substrate-etl Summary (Daily)\r\n\r\n_Source_: [${r.id}.polkaholic.io](https://${r.id}.polkaholic.io)\r\n\r\n*Relay Chain*: ${r.relayChain}\r\n*Para ID*: ${r.paraID}\r\n`;
+                if (r.crawlingStatus) desc += `Status: ${r.crawlingStatus}`
+                desc += `\r\n\r\n`
+                j[k].push(desc);
+                j[k].push(`### Daily Summary for Month ending in ${monthDT}\r\n\r\n`);
+                j[k].push(`| Date | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts | # Addresses with Balances | # Events | # Transfers | # XCM Transfers In | # XCM Transfers Out |`);
+                j[k].push(`| ---- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------- | ------------------------- | -------- | ----------- | ------------------ | ------------------- |`);
+
+                docs[k].push(`\r\n## Substrate-etl Queries:\r\nYou can generate the above summary data using the following queries using the public dataset \`substrate-etl\` in Google BigQuery:\r\n\r\n`);
+
+                docs[k].push(`### Blocks\r\n\`\`\`\r\nSELECT date(block_time) as logDT, MIN(number) startBN, MAX(number) endBN, COUNT(*) numBlocks FROM \`substrate-etl.${relayChain}.blocks${paraID}\`  where LAST_DAY(date(block_time)) = "${monthDT}" group by logDT order by logDT\r\n\`\`\`\r\n\r\n`);
+                docs[k].push(`### Signed Extrinsics\r\n\`\`\`\r\nSELECT date(block_time) as logDT, COUNT(*) numSignedExtrinsics FROM \`substrate-etl.${relayChain}.extrinsics${paraID}\`  where signed and LAST_DAY(date(block_time)) = "${monthDT}" group by logDT order by logDT\r\n\`\`\`\r\n\r\n`);
+                docs[k].push(`### Active Accounts\r\n\`\`\`\r\nSELECT date(block_time) as logDT, COUNT(distinct signer_pub_key) numAccountsActive FROM \`substrate-etl.${relayChain}.extrinsics${paraID}\` where signed and LAST_DAY(date(block_time)) = "${monthDT}" group by logDT order by logDT\r\n\`\`\`\r\n\r\n`);
+                docs[k].push(`### Addresses:\r\n\`\`\`\r\nSELECT date(ts) as logDT, COUNT(distinct address_pubkey) numAddress FROM \`substrate-etl.polkadot.balances${paraID}\` LAST_DAY(date(block_time)) = "${monthDT}" group by logDT\`\`\`\r\n`);
+            }
+            let logDT = r.logDT ? r.logDT.toISOString().split('T')[0] : "";
+            let startBN = r.startBN ? r.startBN.toLocaleString('en-US') : "";
+            let endBN = r.endBN ? r.endBN.toLocaleString('en-US') : "";
+            let issues = r.issues ? r.issues : "-";
+            let valueTransfersUSD = r.valueTransfersUSD > 0 ? `(${uiTool.currencyFormat(r.valueTransfersUSD)})` : ""
+            let numBlocks = r.numBlocks ? r.numBlocks.toLocaleString('en-US') : "";
+            let numBlocks_missing = r.numBlocks_missing ? r.numBlocks_missing.toLocaleString('en-US') : "none";
+	    let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing/(r.endBN - r.startBN)).toLocaleString(undefined,{style: 'percent', minimumFractionDigits:2})  + ")" : "";
+            let numSignedExtrinsics = r.numSignedExtrinsics ? r.numSignedExtrinsics.toLocaleString('en-US') : "";
+            let numAccountsActive = r.numAccountsActive ? r.numAccountsActive.toLocaleString('en-US') : "";
+            let numAddresses = r.numAddresses ? r.numAddresses.toLocaleString('en-US') : ""
+            let numEvents = r.numEvents ? r.numEvents.toLocaleString('en-US') : "";
+            let numTransfers = r.numTransfers ? r.numTransfers.toLocaleString('en-US') : "";
+            let numXCMTransfersIn = r.numXCMTransfersIn ? r.numXCMTransfersIn.toLocaleString('en-US') : "";
+            let numXCMTransfersOut = r.numXCMTransfersOut ? r.numXCMTransfersOut.toLocaleString('en-US') : "";
+            let valXCMTransferIncomingUSD = r.valXCMTransferIncomingUSD > 0 ? `(${uiTool.currencyFormat(r.valXCMTransferIncomingUSD)})` : ""
+            let valXCMTransferOutgoingUSD = r.valXCMTransferOutgoingUSD > 0 ? `(${uiTool.currencyFormat(r.valXCMTransferOutgoingUSD)})` : ""
+            if (prevChainID == chainID) {
+                if (prevStartBN && (prevStartBN != (r.endBN + 1)) && (r.endBN < prevStartBN)) {
+                    let sql = `update blocklog set loaded = 0 where chainID = ${chainID} and (logDT = '${logDT}' or logDT = Date(date_add("${logDT}", interval 1 day)))`;
+                    let sqldiff = (r.endBN && prevStartBN && prevStartBN - r.endBN < 50000) ? `update block${chainID} set crawlBlock = 1, attempted = 0 where ( blockNumber > ${r.endBN} and blockNumber < ${prevStartBN} ) and blockHash is null` : null;
+                    if (sqldiff) {
+                        this.batchedSQL.push(sqldiff);
+                    }
+                    this.batchedSQL.push(sql);
+                    await this.update_batchedSQL();
+                    console.log("BROKEN DAILY CHAIN -- ", chainID, logDT, sql, "DIFF: ", sqldiff);
+                    numBlocks_missing = " **BROKEN**";
+                }
+            }
+            j[k].push(`| ${logDT} | ${startBN} | ${endBN} | ${numBlocks} | ${numBlocks_missing} ${percent_missing} | ${numSignedExtrinsics} | ${numAccountsActive} | ${numAddresses} | ${numEvents} | ${numTransfers} ${valueTransfersUSD} | ${numXCMTransfersIn} ${valXCMTransferIncomingUSD} | ${numXCMTransfersOut} ${valXCMTransferOutgoingUSD} |`)
+            prevStartBN = r.startBN;
+            prevChainID = chainID;
+        }
+        for (const k of Object.keys(j)) {
+            j[k] = j[k].concat(docs[k]);
+            console.log("writing", fn_chain[k]);
+            let f = fs.openSync(fn_chain[k], 'w', 0o666);
+            fs.writeSync(f, j[k].join(NL) + NL);
+        }
+    }
+
+    async dump_xcmtransfers_range(relayChain = "polkadot", startLogDT = null) {
+        let ts = this.getCurrentTS();
+        if (startLogDT == null) {
+            startLogDT = (relayChain == "kusama") ? "2021-07-01" : "2022-05-04";
+        }
+        try {
+            while (true) {
+                ts = ts - 86400;
+                let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
+                await this.dump_xcmtransfers(logDT, relayChain);
+                if (logDT == startLogDT) {
+                    return (true);
+                }
+            }
+        } catch (err) {
+            console.log(err);
+            return (false);
         }
     }
 
@@ -1123,7 +1451,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let tbl = "xcmtransfers";
         // 2. setup directories for tbls on date
         let dir = "/tmp";
-        let fn = path.join(dir, `${tbl}.json`)
+        let fn = path.join(dir, `${tbl}-${relayChain}.json`)
         let f = fs.openSync(fn, 'w', 0o666);
         let bqDataset = relayChain
         let logDTp = logDT.replaceAll("-", "")
@@ -1207,6 +1535,35 @@ module.exports = class SubstrateETL extends AssetManager {
         return (daysago);
     }
 
+    async publish_crawlBlock(chainID, blockNumber) {
+        try {
+            let ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
+            await ably_client.connection.once('connected');
+            let ably_channel_xcmindexer = ably_client.channels.get("xcm-indexer");
+            let crawlBlockMsg = {
+                crawlBlock: true,
+                chainID,
+                blockNumber
+            };
+            ably_channel_xcmindexer.publish("xcm-indexer", crawlBlockMsg);
+            console.log("publish_crawlBlock", crawlBlockMsg);
+        } catch (err) {
+            console.log(err);
+        }
+    }
+
+    async mark_crawl_block(chainID, bn) {
+        let sql0 = `update block${chainID} set crawlBlock = 1, attempted = 0 where blockNumber = ${bn} and attempted < 127`
+
+        this.batchedSQL.push(sql0);
+        await this.update_batchedSQL()
+        if (this.publish < 100 && false) { // disabled
+            await this.publish_crawlBlock(chainID, bn);
+            console.log("./indexBlock", chainID, bn);
+            this.publish++;
+        }
+    }
+
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot", isEVM = 0) {
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back
         if (isEVM) {
@@ -1223,6 +1580,7 @@ module.exports = class SubstrateETL extends AssetManager {
             bnStart,
             bnEnd
         } = bnRanges[0];
+        let expected = {}
         // 2. setup directories for tbls on date
         let dir = "/tmp";
         let fn = {}
@@ -1249,11 +1607,12 @@ module.exports = class SubstrateETL extends AssetManager {
                 spec: specVersion.spec
             });
         }
-
         // 4. do table scan 50 blocks at a time
         let NL = "\r\n";
         let jmp = 50;
         let block_count = 0;
+        let found = {};
+        this.publish = 0;
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
@@ -1266,21 +1625,20 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const row of rows) {
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
+                let bn = parseInt(row.id.substr(2), 16);
 
                 let hdr = b.header;
                 if (!hdr || hdr.number == undefined) {
-                    let bn = parseInt(row.id.substr(2), 16);
-                    let sql0 = `update block${chainID} set crawlBlock = 1 where blockNumber = ${bn} and attempted < 127`
-                    console.log("ERROR: MISSING hdr", row.id, sql0);
-                    this.batchedSQL.push(sql0);
-                    await this.update_batchedSQL()
+                    await this.mark_crawl_block(chainID, bn);
                     continue;
                 }
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
                 if (logDT != logDT0) {
                     console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
+                    await this.mark_crawl_block(chainID, bn);
                     continue;
                 }
+                found[hdr.number] = true;
 
                 let spec_version = this.getSpecVersionForBlockNumber(chainID, hdr.number);
 
@@ -1449,7 +1807,11 @@ module.exports = class SubstrateETL extends AssetManager {
                 // write extrinsics
                 if (block.extrinsic_count > 0) {
                     extrinsics.forEach((e) => {
-                        fs.writeSync(f["extrinsics"], JSON.stringify(e) + NL);
+			if ( typeof e.section == "string" && typeof e.method == "string" ) {
+                            fs.writeSync(f["extrinsics"], JSON.stringify(e) + NL);
+			} else {
+			    console.log(`update chain${chainID} set crawlBlock = 1, attempted=0  where blockNumber = ${e.block_number};`);
+			}
                     });
                 }
                 // write transfers
@@ -1486,7 +1848,16 @@ module.exports = class SubstrateETL extends AssetManager {
                 fs.writeSync(f["specversions"], JSON.stringify(s) + NL);
             })
         }
-
+        for (let n = bnStart; n <= bnEnd; n++) {
+            if (found[n] == undefined || (found[n] == false)) {
+                await this.mark_crawl_block(chainID, n);
+            }
+        }
+	/*
+	  // Use this to not publish with any block issue
+        if (this.publish > 0) {
+            return (false);
+        } */
         // 5. write to bq
         try {
             for (const tbl of tbls) {
@@ -1496,15 +1867,17 @@ module.exports = class SubstrateETL extends AssetManager {
                 if (tbl == "specversions") {
                     cmd = `bq load  --project_id=${this.project} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 }
-                console.log(cmd);
-                await exec(cmd);
+                try {
+		    console.log(cmd);
+                    await exec(cmd);
+		} catch (err) {
+		    console.log(err);
+		}
             }
             let sql = `insert into blocklog (logDT, chainID, startBN, endBN, numBlocks, loadDT, loaded,  audited) values ('${logDT}', '${chainID}', '${bnStart}', '${bnEnd}', '${block_count}', Now(), 1, 'Unknown') on duplicate key update loadDT = values(loadDT), startBN = values(startBN), endBN = values(endBN), numBlocks = values(numBlocks), loaded = values(loaded), audited = values(audited)`
             console.log(sql);
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
-
-
         } catch (e) {
             console.log(e);
         }
@@ -1524,13 +1897,12 @@ module.exports = class SubstrateETL extends AssetManager {
             "accountsactive": `select  count(distinct signer_pub_key) numAccountsActive from ${project}.${relayChain}.extrinsics${paraID} where signed and date(block_time) = '${logDT}'`,
             "events": `select count(*) as numEvents from substrate-etl.${relayChain}.events${paraID} where date(block_time) = '${logDT}'`,
             "transfers": `select count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers${paraID} where date(block_time) = '${logDT}'`,
-            //"balances":  `select count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} where date(ts) = '${logDT}'`,
             "xcmtransfers0": `select count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where destination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`,
             "xcmtransfers1": `select count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`
         };
         console.log(sqla);
         let r = {}
-        let vals = [];
+        let vals = [` loaded = 1 `];
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
             let rows = await this.execute_bqJob(sql);
@@ -1557,13 +1929,12 @@ module.exports = class SubstrateETL extends AssetManager {
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
         let sqla = {
-            "balances": `select date(ts) logDT, count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} group by logDT having numAddresses > 0 and logDT < "${today}" order by logDT`,
-            /*"extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics from ${project}.${relayChain}.extrinsics${paraID} group by logDT having logDT < "${today}" order by logDT`,
+            "extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics from ${project}.${relayChain}.extrinsics${paraID} group by logDT having logDT < "${today}" order by logDT`,
             "accountsactive": `select date(block_time) logDT, count(distinct signer_pub_key) as numAccountsActive from ${project}.${relayChain}.extrinsics${paraID} where signed group by logDT having logDT < "${today}" order by logDT`,
             "events": `select date(block_time) logDT, count(*) as numEvents from substrate-etl.${relayChain}.events${paraID} group by logDT order by logDT`,
             "transfers": `select  date(block_time) logDT, count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers${paraID} group by logDT having logDT < "${today}" order by logDT`,
             "xcmtransfers0": `select  date(origination_ts) logDT, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where destination_para_id = ${paraID} group by logDT having logDT < "${today}" order by logDT`,
-            "xcmtransfers1": `select date(origination_ts) as logDT, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} group by logDT having logDT < "${today}" order by logDT` */
+            "xcmtransfers1": `select date(origination_ts) as logDT, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} group by logDT having logDT < "${today}" order by logDT`
         };
 
         let r = {}

@@ -328,7 +328,7 @@ module.exports = class XCMCleaner extends Query {
                 return {
                     bn: m.blockNumberDest,
                     amountReceived: 0,
-                    errorDesc: "AccountReaped:ReapedAtDestinationChain",
+                    errorDesc: "fail:AccountReaped",
                     confidence: 1,
                     amountSent,
                     eventID: m.eventID,
