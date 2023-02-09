@@ -1805,9 +1805,9 @@ module.exports = class Query extends AssetManager {
                         d.xcmInfo = c.xcmInfo
                         return d;
                     } else if (isExtrinsicXcm) {
-                        let [traceID] = await this.getTraceXCMInfo(txHash)
-                        if (traceID != undefined) d.traceID = traceID
-                        console.log(`${txHash} is extrinsicXcm! traceID=${traceID}`)
+                        //let [traceID] = await this.getTraceXCMInfo(txHash)
+                        //if (traceID != undefined) d.traceID = traceID
+                        //console.log(`${txHash} is extrinsicXcm! traceID=${traceID}`)
                     }
                     return d;
                 } catch (err) {

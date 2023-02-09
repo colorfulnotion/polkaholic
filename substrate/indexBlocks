@@ -24,7 +24,7 @@ async function main() {
     await crawler.setupChainAndAPI(chainID);
     let w = chainIDs ? ` and chainID in (${chainIDs})` : "";
 
-    let targetSQL = `select sectionMethod, extrinsicHash, symbol, chainID, chainIDDest, from_unixtime(sourceTS), errorDesc, blockNumber from xcmtransfer where sourceTS > UNIX_TIMESTAMP("2023-01-30") and symbol is null and destStatus = -1 and incomplete = 0 and chainIDDest < 40000 ${w} order by sourceTS desc;`;
+    let targetSQL = `select blockNumber, xcmIndex, extrinsicHash, chainID, chainIDDest, amountSentUSD, amountReceived, amountReceivedUSD, symbol, from_unixtime(sourceTS), destStatus from xcmtransfer where symbol is null and chainID in ( select chainID from chain where crawling = 1 )  limit 5000`;
     let recs = await crawler.poolREADONLY.query(targetSQL);
     let targetMap = {}
     for (let i = 0; i < recs.length; i++) {
@@ -58,7 +58,7 @@ async function main() {
             let b = blocks[i]
             console.log(`[chainID:${chainID}] [${i+1}/${blocks.length}] indexBlocks [${b.extrinsicID}] [${b.extrinsicHash}] blkHash=${b.blockHash}`)
             await ccrawler.index_block(chain, b.blockNumber, b.blockHash);
-            let sql = `update xcmtransfer set xcmInfoAudited = 0 where extrinsicHash = '${b.extrinsicHash}' and blockNumber = '${b.blockNumber}'`
+            let sql = `update xcmtransfer set xcmInfoAudited = -2 where extrinsicHash = '${b.extrinsicHash}' and blockNumber = '${b.blockNumber}'`
             ccrawler.batchedSQL.push(sql);
             await ccrawler.update_batchedSQL();
         }

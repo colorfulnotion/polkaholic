@@ -953,25 +953,10 @@ module.exports = class SubstrateETL extends AssetManager {
         return (true);
     }
 
-    async compute_xcmteleportfees(relayChain, logDT = '2023-01-01') {
-        let bsql = `SELECT destination_para_id, destination_teleport_fee_symbol, count(*) cnt, avg(destination_teleport_fee) avg_fee, avg(destination_teleport_fee_usd) avgfeeusd  FROM \`substrate-etl.${relayChain}.xcmtransfers\` WHERE DATE(origination_ts) >= "${logDT}" and origination_is_fee_item and destination_teleport_fee_usd < 1 group by destination_para_id, destination_teleport_fee_symbol having count(*) > 10 and avg_fee > 0 order by destination_para_id, cnt desc LIMIT 10000`
-        console.log(bsql);
-        let rows = await this.execute_bqJob(bsql);
-        let vals = ["teleportFee"];
-        let out = [];
-        for (const r of rows) {
-            let chainID = paraTool.getChainIDFromParaIDAndRelayChain(r.destination_para_id, relayChain);
-            console.log(chainID, r);
-            out.push(`('${chainID}', '${r.destination_teleport_fee_symbol}', '${r.avg_fee}')`);
-        }
-        await this.upsertSQL({
-            "table": "xcmteleportfees",
-            "keys": ["chainIDDest", "symbol"],
-            "vals": vals,
-            "data": out,
-            "replace": vals
-        });
-
+    async compute_teleportfees(relayChain, logDT = '2023-01-01') {
+        let sql = `insert into teleportfees ( symbol, chainIDDest, teleportFeeDecimals_avg, teleportFeeDecimals_std, teleportFeeDecimals_avg_imperfect, teleportFeeDecimals_std_imperfect) (select symbol, chainIDDest, avg(teleportFeeDecimals) teleportFeeDecimals_avg, if(std(teleportFeeDecimals)=0, avg(teleportFeeDecimals)*.2, std(teleportFeeDecimals)) as teleportFeeDecimals_std, avg(amountSentDecimals - amountReceivedDecimals), std(amountSentDecimals - amountReceivedDecimals) from xcmtransfer where amountSentDecimals > amountReceivedDecimals and teleportFeeDecimals is not null and teleportFeeDecimals > 0 and confidence = 1 and  isFeeItem and sourceTS > unix_timestamp("2022-01-01") group by symbol, chainIDDest) on duplicate key update teleportFeeDecimals_avg = values(teleportFeeDecimals_avg), teleportFeeDecimals_std = values(teleportFeeDecimals_std), teleportFeeDecimals_avg_imperfect = values(teleportFeeDecimals_avg_imperfect), teleportFeeDecimals_std_imperfect = values(teleportFeeDecimals_std_imperfect)`
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
     }
 
     async audit_substrateetl(logDT = null, paraID = -1, relayChain = null) {
@@ -1348,7 +1333,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 docs[k].push(`### Blocks\r\n\`\`\`\r\nSELECT date(block_time) as logDT, MIN(number) startBN, MAX(number) endBN, COUNT(*) numBlocks FROM \`substrate-etl.${relayChain}.blocks${paraID}\`  where LAST_DAY(date(block_time)) = "${monthDT}" group by logDT order by logDT\r\n\`\`\`\r\n\r\n`);
                 docs[k].push(`### Signed Extrinsics\r\n\`\`\`\r\nSELECT date(block_time) as logDT, COUNT(*) numSignedExtrinsics FROM \`substrate-etl.${relayChain}.extrinsics${paraID}\`  where signed and LAST_DAY(date(block_time)) = "${monthDT}" group by logDT order by logDT\r\n\`\`\`\r\n\r\n`);
                 docs[k].push(`### Active Accounts\r\n\`\`\`\r\nSELECT date(block_time) as logDT, COUNT(distinct signer_pub_key) numAccountsActive FROM \`substrate-etl.${relayChain}.extrinsics${paraID}\` where signed and LAST_DAY(date(block_time)) = "${monthDT}" group by logDT order by logDT\r\n\`\`\`\r\n\r\n`);
-                docs[k].push(`### Addresses:\r\n\`\`\`\r\nSELECT date(ts) as logDT, COUNT(distinct address_pubkey) numAddress FROM \`substrate-etl.polkadot.balances${paraID}\` LAST_DAY(date(block_time)) = "${monthDT}" group by logDT\`\`\`\r\n`);
+                docs[k].push(`### Addresses:\r\n\`\`\`\r\nSELECT date(ts) as logDT, COUNT(distinct address_pubkey) numAddress FROM \`substrate-etl.polkadot.balances${paraID}\` where LAST_DAY(date(ts)) = "${monthDT}" group by logDT\`\`\`\r\n`);
             }
             let logDT = r.logDT ? r.logDT.toISOString().split('T')[0] : "";
             let startBN = r.startBN ? r.startBN.toLocaleString('en-US') : "";

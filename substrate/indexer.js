@@ -1201,9 +1201,9 @@ module.exports = class Indexer extends AssetManager {
                     let xcmType = (r.xcmType != undefined) ? `'${r.xcmType}'` : 'xcmtransfer'
                     let pendingXcmInfoStr = (r.xcmInfo != undefined) ? JSON.stringify(r.xcmInfo) : false
                     let pendingXcmInfoBlob = (pendingXcmInfoStr != false) ? mysql.escape(pendingXcmInfoStr) : 'NULL'
-
+                    let destAddress = (r.destAddress) ? `${mysql.escape(r.destAddress)}` : `NULL`
                     //["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"]
-                    //["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"]
+                    //["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "amountSentDecimals", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"]
                     let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`,
                         `'${r.transferIndex}'`, `'${r.xcmIndex}'`,
                         `'${r.chainID}'`,
@@ -1213,10 +1213,11 @@ module.exports = class Indexer extends AssetManager {
                         xcmSymbol,
                         `'${r.sourceTS}'`,
                         `'${r.amountSent}'`,
+                        `'${r.amountSent}'`, // TODO: divide by decimals and make this float, add USD
                         `'${r.relayChain}'`,
                         `'${r.paraID}'`,
                         `'${r.paraIDDest}'`,
-                        `'${r.destAddress}'`,
+                        destAddress,
                         `'${r.sectionMethod}'`,
                         `'${r.incomplete}'`,
                         `'${r.isFeeItem}'`,
@@ -1247,10 +1248,10 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo", "xcmInfolastUpdateDT"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSentDecimals", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo", "xcmInfolastUpdateDT"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"],
-                "replaceIfNull": ["xcmInfo", "msgHash", "xcmInfolastUpdateDT"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"],
+                "replaceIfNull": ["xcmInfo", "msgHash", "xcmInfolastUpdateDT", "amountSentDecimals", "amountSent"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
             }, sqlDebug);
 
             let out = [];
@@ -5237,10 +5238,10 @@ module.exports = class Indexer extends AssetManager {
                         delete rExtrinsic.xcmIndex
                         this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
                         let cachedXcms2 = rExtrinsic.xcms // via args
-                        if (cachedXcms2 != undefined && Array.isArray(cachedXcms2) && cachedXcms2.length > 0 && cachedXcms2.length == cachedXcms.length){
-                            for (let i = 0; i < cachedXcms2.length; i++){
+                        if (cachedXcms2 != undefined && Array.isArray(cachedXcms2) && cachedXcms2.length > 0 && cachedXcms2.length == cachedXcms.length) {
+                            for (let i = 0; i < cachedXcms2.length; i++) {
                                 let cachedXcm2 = cachedXcms2[i]
-                                if (cachedXcm2.destAddress){
+                                if (cachedXcm2.destAddress) {
                                     cachedXcms[i].destAddress = cachedXcm2.destAddress
                                 }
                             }

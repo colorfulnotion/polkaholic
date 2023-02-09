@@ -45,7 +45,7 @@ async function main() {
         await substrateetl.setup_tables(relayChain, logDT);
     } else if (paraID == "xcmteleportfees" && relayChain) {
         let logDT = "2023-01-01"; // TODO
-        await substrateetl.compute_xcmteleportfees(relayChain, logDT);
+        await substrateetl.compute_teleportfees(relayChain, logDT);
     } else if (relayChain == "blocklog") {
         await substrateetl.updateBlocklogBulk(paraID) // actually chainID
     } else if (relayChain == "auditblocks") {
