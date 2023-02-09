@@ -968,7 +968,7 @@ module.exports = class ChainParser {
         }
     }
 
-    processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, finalized = false) {
+    processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
         let module_section = extrinsic.section;
         let module_method = extrinsic.method;
         let section_method = `${module_section}:${module_method}`
@@ -977,7 +977,7 @@ module.exports = class ChainParser {
             this.processValidationData(indexer, extrinsic, extrinsicID, events, finalized)
         } else if (section_method == 'paraInherent:enter') {
             //console.log(`[${extrinsic.extrinsicID}] ${section_method} found`)
-            this.processParainherentEnter(indexer, extrinsic, extrinsicID, events, finalized)
+            this.processParainherentEnter(indexer, extrinsic, extrinsicID, events, isTip, finalized)
         }
     }
 
@@ -1114,7 +1114,7 @@ module.exports = class ChainParser {
         //console.log(`[${extrinsicID}] processIncomingXCM start`, `mpReceived=${this.mpReceived}`)
 
         //step0. parse incoming messages (raw)
-        this.processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, finalized)
+        this.processIncomingXCMMessages(indexer, extrinsic, extrinsicID, events, isTip, finalized)
 
         //step1. parse incoming transfer heuristically
         for (let i = 0; i < events.length; i++) {
@@ -1198,7 +1198,7 @@ module.exports = class ChainParser {
 
     //channelMsgIndex: extrinsicID-mpType-receiverChainID-senderChainID-msgIdx
     //mpType: ump(para->relay)
-    processParainherentEnter(indexer, extrinsic, extrinsicID, events, finalized = false) {
+    processParainherentEnter(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
         /*
         "params": {
           "data": {
@@ -1286,31 +1286,39 @@ module.exports = class ChainParser {
         // destSentAt correspond to parainclusion(CandidateIncluded) at sent
         // backedCandidate.relayParent is same as source 'sentAt'!
         try {
-            /*
-            console.log(`im here processParainherentEnter`)
+            let blockNumber = this.parserBlockNumber
+            let activeChains = []
             let parainclusionCandidateBackedList = events.filter((ev) => {
                 return this.paraInclusionCandidateBackedFilter(`${ev.section}(${ev.method})`);
             })
             let parainclusionCandidateIncludedList = events.filter((ev) => {
                 return this.paraInclusionCandidateIncludedFilter(`${ev.section}(${ev.method})`);
             })
-            for (const parainclusionCandidateBacked of parainclusionCandidateBackedList){
-                 let backedCandidate = parainclusionCandidateBacked.data[0].descriptor
-                 let relayParent = backedCandidate.relayParent
-                 if (indexer.trailingBlockHashs[relayParent] != undefined){
-                     backedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
-                 }
-                 console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] backedCandidate`, backedCandidate)
+            for (const parainclusionCandidateBacked of parainclusionCandidateBackedList) {
+                let backedCandidate = parainclusionCandidateBacked.data[0].descriptor
+                let chainID = paraTool.getChainIDFromParaIDAndRelayChain(backedCandidate.paraId, indexer.relayChain)
+                let relayParent = backedCandidate.relayParent
+                /*
+                if (indexer.trailingBlockHashs[relayParent] != undefined){
+                    backedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
+                }
+                */
+                activeChains.push(chainID)
+                //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${chainID}] backedCandidate`, backedCandidate)
             }
-            for (const parainclusionCandidateIncluded of parainclusionCandidateIncludedList){
-                 let includedCandidate = parainclusionCandidateIncluded.data[0].descriptor
-                 let relayParent = includedCandidate.relayParent
-                 if (indexer.trailingBlockHashs[relayParent] != undefined){
-                     includedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
-                 }
-                 console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] includedCandidate`, includedCandidate)
+            for (const parainclusionCandidateIncluded of parainclusionCandidateIncludedList) {
+                let includedCandidate = parainclusionCandidateIncluded.data[0].descriptor
+                let chainID = paraTool.getChainIDFromParaIDAndRelayChain(includedCandidate.paraId, indexer.relayChain)
+                let relayParent = includedCandidate.relayParent
+                /*
+                if (indexer.trailingBlockHashs[relayParent] != undefined){
+                    includedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
+                }
+                */
+                activeChains.push(chainID)
+                //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${chainID}] includedCandidate`, includedCandidate)
             }
-            */
+            indexer.updateActiveParachains(activeChains, isTip, finalized)
         } catch (err) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processParainherentEnter event error`, err)
         }

@@ -1132,12 +1132,15 @@ module.exports = class SubstrateETL extends AssetManager {
 
         sql_tally = `select relayChain, chainID, chainName, paraID, crawling, id, crawlingStatus from chain where active=1`;
         let tallyRecs = await this.poolREADONLY.query(sql_tally);
-	let chains = {};
-	let relayChain_chains = { polkadot: 0, kusama : 0 };
-	for (const r of tallyRecs) {
-	    chains[r.chainID] = r;
-	    relayChain_chains[r.relayChain]++;
-	}
+        let chains = {};
+        let relayChain_chains = {
+            polkadot: 0,
+            kusama: 0
+        };
+        for (const r of tallyRecs) {
+            chains[r.chainID] = r;
+            relayChain_chains[r.relayChain]++;
+        }
 
         // generate substrate-etl README.md summarizing all chains
         sql_tally = `select chain.relayChain, count(distinct paraID) numChains, max(endDT) endDT, round(sum(numBlocks_total)) numBlocks_total, 
@@ -1146,22 +1149,25 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID  where mo
 monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by relayChain order by relayChain desc`;
         tallyRecs = await this.poolREADONLY.query(sql_tally);
         let s = [];
-	s.push(`# substrate-etl Network Coverage (All-time)\r\n\r\nSource: [Polkaholic.io](https://polkaholic.io)\r\n\r\n`);
-	s.push(`| Chain            | End Date | # Chains | # Blocks  | # Missing |`);
-	s.push(`| ---------------- | -------- | -------- | --------- | --------- |`);
+        s.push(`# substrate-etl Network Coverage (All-time)\r\n\r\nSource: [Polkaholic.io](https://polkaholic.io)\r\n\r\n`);
+        s.push(`| Chain            | End Date | # Chains | # Blocks  | # Missing |`);
+        s.push(`| ---------------- | -------- | -------- | --------- | --------- |`);
         for (const r of tallyRecs) {
             let desc = `[${r.relayChain}](/substrate-etl/${r.relayChain})`
             let endDT = r.endDT ? r.endDT.toISOString().split('T')[0] : "";
             let numBlocks_total = r.numBlocks_total ? parseInt(r.numBlocks_total, 10).toLocaleString('en-US') : "";
             let numBlocks_missing = r.numBlocks_missing ? parseInt(r.numBlocks_missing, 10).toLocaleString('en-US') : "";
             let numChains = r.numChains ? r.numChains.toLocaleString('en-US') : "";
-	    let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing/r.numBlocks_total).toLocaleString(undefined,{style: 'percent', minimumFractionDigits:2})  + ")" : "";
+            let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing / r.numBlocks_total).toLocaleString(undefined, {
+                style: 'percent',
+                minimumFractionDigits: 2
+            }) + ")" : "";
             s.push(`| ${desc} | ${endDT} | ${numChains} indexed out of ${relayChain_chains[r.relayChain]} | ${numBlocks_total} | ${numBlocks_missing} ${percent_missing} |`)
-	}
+        }
 
         let NL = "\r\n";
         let dir = "../substrate-etl"
-	
+
         sql_tally = `select chain.chainID, chain.id, chain.relayChain, chain.paraID, chain.chainName, min(startDT) startDT, max(endDT) endDT, min(startBN) startBN, max(endBN) endBN, sum(numBlocks_total) numBlocks_total, 
 sum(( endBN - startBN + 1) - numBlocks_total) as numBlocks_missing, 
 Round(sum(numExtrinsics_avg)) as numSignedExtrinsics, 
@@ -1175,13 +1181,13 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID ord
         tallyRecs = await this.poolREADONLY.query(sql_tally);
         let o = {};
         for (const r of tallyRecs) {
-	    let relayChain = r.relayChain;
-	    if ( o[relayChain] == undefined ) {
-		o[relayChain] = [];
-		o[relayChain].push(`# substrate-etl ${relayChain} Network-wide Summary (All-time)\r\n\r\nSource: [Polkaholic.io](https://polkaholic.io)\r\n\r\n`);
-		o[relayChain].push(`| Chain            | Start Date | End Date | Start Block | End Block | # Blocks | # Missing | # Addresses with Balances | Crawling Status |`);
-		o[relayChain].push(`| ---------------- | ---------- | ---------| ----------- | --------- | -------- | --------- | ------------------------- | --------------- |`);
-	    }
+            let relayChain = r.relayChain;
+            if (o[relayChain] == undefined) {
+                o[relayChain] = [];
+                o[relayChain].push(`# substrate-etl ${relayChain} Network-wide Summary (All-time)\r\n\r\nSource: [Polkaholic.io](https://polkaholic.io)\r\n\r\n`);
+                o[relayChain].push(`| Chain            | Start Date | End Date | Start Block | End Block | # Blocks | # Missing | # Addresses with Balances | Crawling Status |`);
+                o[relayChain].push(`| ---------------- | ---------- | ---------| ----------- | --------- | -------- | --------- | ------------------------- | --------------- |`);
+            }
             let desc = `[${r.chainName} Para ID ${r.paraID}](/substrate-etl/${r.relayChain}/${r.paraID}-${r.id})`
             let startDT = r.startDT ? r.startDT.toISOString().split('T')[0] : "";
             let endDT = r.endDT ? r.endDT.toISOString().split('T')[0] : "";
@@ -1189,30 +1195,33 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID ord
             let endBN = r.endBN ? r.endBN.toLocaleString('en-US').toLocaleString('en-US') : "";
             let numBlocks_total = r.numBlocks_total ? r.numBlocks_total.toLocaleString('en-US') : "";
             let numBlocks_missing = r.numBlocks_missing ? r.numBlocks_missing.toLocaleString('en-US') : "";
-	    let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing/r.endBN).toLocaleString(undefined,{style: 'percent', minimumFractionDigits:2})  + ")" : "";
+            let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing / r.endBN).toLocaleString(undefined, {
+                style: 'percent',
+                minimumFractionDigits: 2
+            }) + ")" : "";
             let numAddresses = r.numAddresses ? r.numAddresses.toLocaleString('en-US') : "";
-	    console.log(relayChain, numBlocks_missing, numBlocks_total);
+            console.log(relayChain, numBlocks_missing, numBlocks_total);
             o[relayChain].push(`| ${desc} | ${startDT} | ${endDT} | ${startBN} | ${endBN} | ${numBlocks_total} | ${numBlocks_missing} ${percent_missing} | ${numAddresses} | ${r.crawlingStatus} |`)
-	    chains[r.chainID].covered = true;
+            chains[r.chainID].covered = true;
         }
 
-	for (const chainID of Object.keys(chains)) {
-	    if ( chains[chainID].covered == undefined ) {
-		let c = chains[chainID];
-		let desc = c.crawling > 0 ? "active and onboarding" : "active but not being indexed";
-		o[c.relayChain].push(`* *${c.chainName}* Para ID ${desc}; ${c.crawlingStatus}`);
-	    }
-	}
-	let fn = path.join(dir, `README.md`);
+        for (const chainID of Object.keys(chains)) {
+            if (chains[chainID].covered == undefined) {
+                let c = chains[chainID];
+                let desc = c.crawling > 0 ? "active and onboarding" : "active but not being indexed";
+                o[c.relayChain].push(`* *${c.chainName}* Para ID ${desc}; ${c.crawlingStatus}`);
+            }
+        }
+        let fn = path.join(dir, `README.md`);
         let f = fs.openSync(fn, 'w', 0o666);
         fs.writeSync(f, s.join(NL) + NL);
         console.log("generated", fn);
-	for (const relayChain of Object.keys(o)) {
+        for (const relayChain of Object.keys(o)) {
             let fn = path.join(dir, relayChain, `README.md`);
             let f = fs.openSync(fn, 'w', 0o666);
             fs.writeSync(f, o[relayChain].join(NL) + NL);
             console.log("generated", fn);
-	}
+        }
 
         sql_tally = `select chain.chainID, chain.relayChain, chain.paraID, chain.id, chain.chainName, startDT, endDT, startBN, endBN, numBlocks_total,
 ( endBN - startBN + 1) - numBlocks_total as numBlocks_missing, 
@@ -1259,7 +1268,10 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
             let endBN = r.endBN ? r.endBN.toLocaleString('en-US') : "";
             let numBlocks_total = r.numBlocks_total ? r.numBlocks_total.toLocaleString('en-US') : "";
             let numBlocks_missing = r.numBlocks_missing ? r.numBlocks_missing.toLocaleString('en-US') : "none";
-	    let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing/(r.endBN - r.startBN)).toLocaleString(undefined,{style: 'percent', minimumFractionDigits:2})  + ")" : "";
+            let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing / (r.endBN - r.startBN)).toLocaleString(undefined, {
+                style: 'percent',
+                minimumFractionDigits: 2
+            }) + ")" : "";
             if (prevChainID == chainID) {
                 if (prevStartBN && (prevStartBN != (r.endBN + 1)) && (prevStartBN > r.endBN)) {
                     // var signedBlock = await api.rpc.chain.getBlock(blockHash);
@@ -1345,7 +1357,10 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let valueTransfersUSD = r.valueTransfersUSD > 0 ? `(${uiTool.currencyFormat(r.valueTransfersUSD)})` : ""
             let numBlocks = r.numBlocks ? r.numBlocks.toLocaleString('en-US') : "";
             let numBlocks_missing = r.numBlocks_missing ? r.numBlocks_missing.toLocaleString('en-US') : "none";
-	    let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing/(r.endBN - r.startBN)).toLocaleString(undefined,{style: 'percent', minimumFractionDigits:2})  + ")" : "";
+            let percent_missing = r.numBlocks_missing > 0 ? "(" + Number(r.numBlocks_missing / (r.endBN - r.startBN)).toLocaleString(undefined, {
+                style: 'percent',
+                minimumFractionDigits: 2
+            }) + ")" : "";
             let numSignedExtrinsics = r.numSignedExtrinsics ? r.numSignedExtrinsics.toLocaleString('en-US') : "";
             let numAccountsActive = r.numAccountsActive ? r.numAccountsActive.toLocaleString('en-US') : "";
             let numAddresses = r.numAddresses ? r.numAddresses.toLocaleString('en-US') : ""
@@ -1807,11 +1822,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 // write extrinsics
                 if (block.extrinsic_count > 0) {
                     extrinsics.forEach((e) => {
-			if ( typeof e.section == "string" && typeof e.method == "string" ) {
+                        if (typeof e.section == "string" && typeof e.method == "string") {
                             fs.writeSync(f["extrinsics"], JSON.stringify(e) + NL);
-			} else {
-			    console.log(`update chain${chainID} set crawlBlock = 1, attempted=0  where blockNumber = ${e.block_number};`);
-			}
+                        } else {
+                            console.log(`update chain${chainID} set crawlBlock = 1, attempted=0  where blockNumber = ${e.block_number};`);
+                        }
                     });
                 }
                 // write transfers
@@ -1853,7 +1868,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 await this.mark_crawl_block(chainID, n);
             }
         }
-	/*
+        /*
 	  // Use this to not publish with any block issue
         if (this.publish > 0) {
             return (false);
@@ -1868,11 +1883,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     cmd = `bq load  --project_id=${this.project} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 }
                 try {
-		    console.log(cmd);
+                    console.log(cmd);
                     await exec(cmd);
-		} catch (err) {
-		    console.log(err);
-		}
+                } catch (err) {
+                    console.log(err);
+                }
             }
             let sql = `insert into blocklog (logDT, chainID, startBN, endBN, numBlocks, loadDT, loaded,  audited) values ('${logDT}', '${chainID}', '${bnStart}', '${bnEnd}', '${block_count}', Now(), 1, 'Unknown') on duplicate key update loadDT = values(loadDT), startBN = values(startBN), endBN = values(endBN), numBlocks = values(numBlocks), loaded = values(loaded), audited = values(audited)`
             console.log(sql);

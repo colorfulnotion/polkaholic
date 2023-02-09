@@ -7,7 +7,7 @@ Source: [Polkaholic.io](https://polkaholic.io)
 | ---------------- | ---------- | ---------| ----------- | --------- | -------- | --------- | ------------------------- | --------------- |
 | [Kusama Para ID 0](/substrate-etl/kusama/0-kusama) | 2019-11-28 | 2023-01-31 | 1 | 16,437,638 | 16437638 | 0  | 281,483 |  |
 | [Statemine Para ID 1000](/substrate-etl/kusama/1000-statemine) | 2020-01-01 | 2023-01-31 | 1 | 3,796,174 | 3796168 | 6 (0.00%) | 51,965 |  |
-| [Encointer Para ID 1001](/substrate-etl/kusama/1001-encointer) | 2022-01-09 | 2023-01-31 | 1 | 2,190,831 | 2179704 | 11127 (0.51%) | 878 | Only partially indexed: Old decoding errors |
+| [Encointer Para ID 1001](/substrate-etl/kusama/1001-encointer) | 2022-01-09 | 2023-01-31 | 1 | 2,190,831 | 2179804 | 11027 (0.50%) | 878 | Only partially indexed: Old decoding errors |
 | [BridgeHub Para ID 1002](/substrate-etl/kusama/1002-bridgehub) | 2023-01-19 | 2023-01-31 | 1 | 86,879 | 86879 | 0  | 4 |  |
 | [Karura Para ID 2000](/substrate-etl/kusama/2000-karura) | 2021-06-22 | 2023-01-31 | 1 | 3,607,764 | 3607764 | 0  | 94,457 |  |
 | [Bifrost-Kusama Para ID 2001](/substrate-etl/kusama/2001-bifrost-ksm) | 2021-07-20 | 2023-01-31 | 1 | 3,444,039 | 3444039 | 0  | 101,038 |  |
@@ -39,9 +39,9 @@ Source: [Polkaholic.io](https://polkaholic.io)
 | [Listen Para ID 2118](/substrate-etl/kusama/2118-listen) | 2022-06-27 | 2023-01-31 | 1 | 1,391,876 | 1391876 | 0  | 2,053 |  |
 | [Bajun Network Para ID 2119](/substrate-etl/kusama/2119-bajun) | 2022-06-30 | 2023-01-31 | 1 | 1,397,501 | 1397501 | 0  | 3,932 |  |
 | [Imbue Network Para ID 2121](/substrate-etl/kusama/2121-imbue) | 2022-06-27 | 2023-01-31 | 1 | 1,379,485 | 1375465 | 4020 (0.29%) | 326 | Only partial index available: Archive node unavailable |
-| [GM Parachain Para ID 2123](/substrate-etl/kusama/2123-gm) | 2022-10-26 | 2023-01-17 | 392,561 | 823,883 | 207465 | 1188 (0.14%) | 9,098 | Only partial index available: Onboarding |
+| [GM Parachain Para ID 2123](/substrate-etl/kusama/2123-gm) | 2022-10-26 | 2023-01-17 | 392,561 | 827,654 | 207467 | 4957 (0.60%) | 9,098 | Only partial index available: Onboarding |
 | [Amplitude Para ID 2124](/substrate-etl/kusama/2124-amplitude) | 2022-08-11 | 2023-01-31 | 1 | 972,506 | 972506 | 0  | 727 |  |
-| [InvArch Tinkernet Para ID 2125](/substrate-etl/kusama/2125-tinkernet) | 2022-09-23 | 2023-01-30 | 244,956 | 1,090,694 | 844411 | 1328 (0.12%) | 1,851 | Only partial index available: Onboarding |
+| [InvArch Tinkernet Para ID 2125](/substrate-etl/kusama/2125-tinkernet) | 2022-09-23 | 2023-01-30 | 244,956 | 1,090,694 | 844511 | 1228 (0.11%) | 1,851 | Only partial index available: Onboarding |
 | [Snow Para ID 2129](/substrate-etl/kusama/2129-snow) | 2022-10-26 | 2023-01-30 | 218,593 | 872,871 | 436148 | 91926 (10.53%) | 5,499 | Only partial index available: Onboarding |
 | [DAO IPCI Para ID 2222](/substrate-etl/kusama/2222-daoipci) | 2022-10-10 | 2023-01-31 | 1 | 606,517 | 606517 | 0  | 890 |  |
 * *subzero* Para ID active and onboarding; Only partial index available: Onboarding

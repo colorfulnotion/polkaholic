@@ -54,6 +54,7 @@ module.exports = class Indexer extends AssetManager {
     currentSessionValidators = [];
     currentSessionIndex = -1;
 
+    activeParachains = []; //track active parachains
     trailingBlockHashs = {};
     multisigMap = {};
     proxyMap = {};
@@ -723,12 +724,42 @@ module.exports = class Indexer extends AssetManager {
         this.resetHashRowStat()
     }
 
+    updateActiveParachains(activeChains, isTip = false, finalized = false) {
+        this.activeParachains = activeChains
+    }
+
+    async flush_active_chains() {
+        let activeChainIDs = this.activeParachains
+        // `update chain set active = 1 where chainID in ('${activeParachains.join("','")}')`
+        let recs = []
+        for (const activeChainID of activeChainIDs) {
+            let c = `('${activeChainID}', '1')`
+            recs.push(c)
+        }
+        let sqlDebug = true
+        await this.upsertSQL({
+            "table": `chain`,
+            "keys": ["chainID"],
+            "vals": ["active"],
+            "data": recs,
+            "replace": ["active"]
+        }, sqlDebug);
+        this.activeParachains = []
+        await this.update_batchedSQL()
+    }
+
     async flush(ts = false, lastBlockNumber = 1, isFullPeriod = false, isTip = false) {
         if (ts == false) {
             console.log("FLUSHSHORT FAILURE: MISSING ts")
         }
         this.showCurrentMemoryUsage()
-
+        let paraID = paraTool.getParaIDfromChainID(this.chainID)
+        let bn = this.chainParser.parserBlockNumber
+        let updateFrequency = 100 // every 10min
+        if (paraID == 0 && (isTip && bn % updateFrequency == 0)) {
+            // updating every 10 mins
+            await this.flush_active_chains()
+        }
         await this.flushWSProviderQueue();
         let immediateFlushStartTS = new Date().getTime();
         await this.immediateFlushBlockAndAddressExtrinsics(isTip)
@@ -4806,6 +4837,7 @@ module.exports = class Indexer extends AssetManager {
             }
             extrinsicHashRec.data["feedpending"] = hashrec
             this.hashesRowsToInsert.push(extrinsicHashRec)
+
             //console.log(`processed pendingTX ${extrinsicHash} (signer:${signer}, nonce:${nonce})`)
             //console.log(feed)
         } catch (err) {
@@ -5367,12 +5399,24 @@ module.exports = class Indexer extends AssetManager {
             } else {
                 extrinsicHashRec.data["feedunfinalized"] = hashrec
             }
-            this.hashesRowsToInsert.push(extrinsicHashRec)
+            if (this.skip_hashes_write(isSigned, extrinsicID, exSection, exMethod)) {
+                // skip writing big extrinsics to hashes table since no one searches for them
+            } else {
+                this.hashesRowsToInsert.push(extrinsicHashRec)
+            }
         } catch (err) {
             this.log_indexing_error(err, "processBlock")
         }
 
         return (rExtrinsic);
+    }
+    skip_hashes_write(isSigned, extrinsicID, exSection, exMethod) {
+        if (isSigned) return (false);
+        if (!(extrinsicID.includes("-1") || extrinsicID.includes("-0"))) return (false);
+        if (exSection == "paraInherent" && exMethod == "enter") return (true);
+        if (exSection == "parachainSystem" && exMethod == "setValidationData") return (true);
+        if (exSection == "timestamp" && exMethod == "set") return (true);
+        return (false);
     }
 
     async buildPendingXcmInfo(xcmtransfer, extrinsic, originationFinalized) {
