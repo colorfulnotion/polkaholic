@@ -1123,17 +1123,20 @@ module.exports = class ChainParser {
         }
         if (this.mpReceived) {
             let idxKeys = Object.keys(this.mpReceivedHashes)
+            console.log(`[${extrinsicID}] idxKeys`, idxKeys)
             let prevIdx = 0;
 
             //TODO: blacklist: author, 0x6d6f646c70792f74727372790000000000000000 (modlpy/trsry)
             //conjecture: the last event prior to msgHash is typically the "fee" event either going to blockproducer or trsry
             for (const idxKey of idxKeys) {
-                this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx)
+                //let initialStartIdx = parseInt(prevIdx)
+                //let idealStartIdx = this.computeIncomingXCMStart(events, initialStartIdx, endIdx)
+                this.mpReceivedHashes[idxKey].startIdx = parseInt(prevIdx) //MK want better startIdx here
                 this.mpReceivedHashes[idxKey].endIdx = parseInt(idxKey)
+
                 let mpState = this.mpReceivedHashes[idxKey]
                 let eventRange = events.slice(mpState.startIdx, mpState.endIdx)
                 let eventRangeLengthWithFee = eventRange.length
-                let eventRangeLengthWithoutFee = eventRange.length - 1 // remove the fee event here
                 //let lastEvent = eventRange[-1]
                 for (let i = 0; i < eventRange.length; i++) {
                     let ev = eventRange[i]
@@ -1148,6 +1151,12 @@ module.exports = class ChainParser {
                         mpState.eventID = ev.eventID // update eventID with AssetsTrapped
                         this.mpReceivedHashes[idxKey] = mpState
                         console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
+                    }
+                    if (this.xcmStartFilter(`${ev.section}(${ev.method})`)){
+                        mpState.startIdx += i
+                        console.log(`detected idealStart eventID=${ev.eventID}, adjustedIdx=${i}, updateEventRange[${mpState.startIdx, mpState.endIdx}]`)
+                        eventRange = events.slice(mpState.startIdx, mpState.endIdx)
+                        eventRangeLengthWithFee = eventRange.length
                     }
                 }
                 //console.log(`mpReceived [${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] range=[${mpState.startIdx},${mpState.endIdx})`, mpState)
@@ -3658,6 +3667,17 @@ module.exports = class ChainParser {
     xcmAssetTrapFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
         if (palletMethod == "xcmPallet(AssetsTrapped)") {
+            return true
+        } else {
+            return false;
+        }
+    }
+
+    xcmStartFilter(palletMethod) {
+        //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
+        if (palletMethod == "parachainSystem(DownwardMessagesReceived)") {
+            return true
+        } else if (palletMethod == "ump(UpwardMessagesReceived)"){
             return true
         } else {
             return false;
