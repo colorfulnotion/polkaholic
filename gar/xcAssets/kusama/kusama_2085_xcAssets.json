@@ -218,7 +218,7 @@
         "relayChain": "kusama",
         "symbol": "sKSM",
         "decimals": 12,
-        "interiorType": "x2",
+        "interiorType": "x3",
         "xcmV1Standardized": [
             {
                 "network": "kusama"
@@ -227,20 +227,26 @@
                 "parachain": 2085
             },
             {
-                "generalKey": "0x734b534d"
+                "palletInstance": 6
+            },
+            {
+                "generalIndex": 1000
             }
         ],
-        "xcmV1MultiLocationByte": "0x01020095200610734b534d",
+        "xcmV1MultiLocationByte": "0x0103009520040605a10f",
         "xcmV1MultiLocation": {
             "v1": {
                 "parents": 1,
                 "interior": {
-                    "x2": [
+                    "x3": [
                         {
                             "parachain": 2085
                         },
                         {
-                            "generalKey": "0x734b534d"
+                            "palletInstance": 6
+                        },
+                        {
+                            "generalIndex": 1000
                         }
                     ]
                 }

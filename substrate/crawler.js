@@ -65,6 +65,7 @@ const {
 const mysql = require("mysql2");
 const Indexer = require("./indexer");
 const paraTool = require("./paraTool");
+const Ably = require('ably');
 
 const maxTraceAttempts = 10;
 const minCrawlTracesToActivateRPCBackfill = 1;
@@ -311,7 +312,6 @@ module.exports = class Crawler extends Indexer {
             // 1. get the block, ALWAYS
             let [signedBlock, events] = await this.crawlBlock(this.api, blockHash);
             let blockTS = signedBlock.blockTS;
-
             // 1.a get evmBlock, if web3Api is set
             let evmBlock = false
             let evmReceipts = false
@@ -356,7 +356,7 @@ module.exports = class Crawler extends Indexer {
             let traceType = crawlTrace ? "state_traceBlock" : false
             let success = await this.save_block_trace(chain.chainID, block, blockHash, events, trace, true, traceType, evmBlock, evmReceipts, evmTrace);
             if (success) {
-                return [t, block, events, trace, evmBlock, evmReceipts];
+                return [t, block, events, trace, evmBlock, evmReceipts, blockHash];
             }
         } catch (err) {
             this.logger.warn({
@@ -366,7 +366,7 @@ module.exports = class Crawler extends Indexer {
                 "err": err
             })
         }
-        return [t, false, false, false];
+        return [t, false, false, false, false, false, false];
     }
 
     // crawl_trace fetches a block
@@ -1237,7 +1237,7 @@ module.exports = class Crawler extends Indexer {
             let nmax = techniqueParams[2];
             let w = (nmax > 1) ? `and blockNumber % ${nmax} = ${n}` : "";
             let w2 = ` and blockNumber > ${chain.blocksCovered} - 5000000`
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 3 order by blockNumber desc limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 2 order by blockNumber desc limit 10000`
             console.log("X", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
@@ -1369,7 +1369,7 @@ module.exports = class Crawler extends Indexer {
             let startingBlock = parseInt(syncState.startingBlock.toString(), 10);
             //console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
-            let startBN = chain.blocksFinalized - 7000000 // dont do  a full table scan for chain 0/2 anymore 150000*6=10 days should be enough...
+            let startBN = chain.blocksFinalized - 50000 // dont do  a full table scan
             let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and attempted < ${maxTraceAttempts} and blockNumber > ${startBN} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} limit 5000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
@@ -1425,9 +1425,15 @@ module.exports = class Crawler extends Indexer {
         if (!(ts > 0)) return (false);
         let indexTS = Math.floor(ts / 3600) * 3600;
         if (indexTS == this.lastmarkedTS) return (false);
-        let sql = `update indexlog set indexed = 0 where chainID = '${chainID}' and indexTS = '${indexTS}'`;
+        let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
+        this.upsertSQL({
+            "table": "indexlog",
+            "keys": ["chainID", "indexTS"],
+            "vals": ["logDT", "hr", "indexed"],
+            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', 0)`],
+            "replace": ["indexed"]
+        }, true);
         this.lastmarkedTS = indexTS;
-        this.batchedSQL.push(sql);
     }
 
 
@@ -1467,6 +1473,7 @@ module.exports = class Crawler extends Indexer {
 
     async crawlBlock(api, blockHash) {
         const signedBlock = await api.rpc.chain.getBlock(blockHash);
+
         let eventsRaw = await api.query.system.events.at(blockHash);
         let events = eventsRaw.map((e) => {
             let eh = e.event.toHuman();
@@ -1501,6 +1508,9 @@ module.exports = class Crawler extends Indexer {
         }
         if (this.chainID == 22007 && blockNumber < 195653) {
             block.blockTS = Math.round(blockNumber * 19.2191 + 1625570874)
+        }
+        if (this.chainID == 1000 && blockNumber < 305204) {
+            block.blockTS = Math.round(blockNumber * 12.17112 + 1636071000)
         }
         // NOTE: does not have block.{number, hash} set
         return [block, events];
@@ -1637,8 +1647,8 @@ module.exports = class Crawler extends Indexer {
             "keys": ["chainID"],
             "vals": ["id", "relaychain", "paraID", "website", "WSEndpoint", "WSEndpoint2", "WSEndpoint3"],
             "data": newParas,
-            "replace": ["id", "relaychain", "paraID", "website"],
-            "replaceIfNull": ["WSEndpoint", "WSEndpoint2", "WSEndpoint3"],
+            "replace": ["id", "paraID", "website"],
+            "replaceIfNull": ["relaychain", "WSEndpoint", "WSEndpoint2", "WSEndpoint3"],
         }, true);
         this.logger.info({
             "op": "crawl_parachains_chainUpdate",
@@ -1927,6 +1937,66 @@ module.exports = class Crawler extends Indexer {
         }
     }
 
+    async setup_ably_client(chain) {
+        // TODO: bring key in from config, change
+        this.ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
+        await this.ably_client.connection.once('connected');
+        this.ably_channel_xcmindexer = this.ably_client.channels.get("xcm-indexer");
+        this.ably_channel_xcminfo = this.ably_client.channels.get("xcminfo");
+        let crawler = this;
+        this.ably_channel_xcmindexer.subscribe(async function(message) {
+            await crawler.process_indexer_message(chain, message);
+        });
+    }
+
+    async process_indexer_message(chain, message) {
+        // if the incoming xcmtransfer is a chainIDDest matching our indexer's chainID, then record a starting balance in xcmtransfers_beneficiary
+        try {
+            let msg = message.data;
+            if (msg.beneficiary != undefined && (msg.chainIDDest == this.chainID)) {
+                await this.process_indexer_xcmtransfer(chain, msg);
+            } else if (msg.crawlBlock != undefined && (msg.chainID == this.chainID)) {
+                await this.process_indexer_crawlBlock(chain, msg);
+            }
+        } catch (err) {
+            this.logger.error({
+                "op": "process_indexer_message ERROR",
+                err
+            });
+        }
+    }
+
+    async process_indexer_crawlBlock(chain, crawlBlock) {
+        try {
+            let blockNumber = crawlBlock.blockNumber;
+            if (chain.isEVM) {
+                crawlBlock.crawlBlockEVM = 1;
+                crawlBlock.crawlReceiptsEVM = 1;
+                crawlBlock.crawlTraceEVM = 1;
+            }
+            await this.crawl_block_trace(chain, crawlBlock)
+            let blockHash = await this.getBlockHashFinalized(chain.chainID, blockNumber);
+            this.logger.error({
+                "op": "process_indexer_crawlBlock READY",
+                crawlBlock,
+                blockHash,
+                chain
+            });
+            let res = await this.index_block(chain, blockNumber, blockHash);
+            this.logger.error({
+                "op": "process_indexer_crawlBlock SUCC",
+                blockNumber,
+                blockHash,
+                res
+            });
+        } catch (err) {
+            this.logger.error({
+                "op": "process_indexer_crawlBlock ERROR",
+                crawlBlock,
+                chain
+            });
+        }
+    }
 
     async crawlBlocks(chainID) {
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
@@ -1935,7 +2005,7 @@ module.exports = class Crawler extends Indexer {
         // Subscribe to chain updates and log the current block number on update.
         let chain = await this.setupChainAndAPI(chainID);
         await this.check_chain_endpoint_correctness(chain);
-        await this.setup_ably_client();
+        await this.setup_ably_client(chain);
 
         await this.setup_chainParser(chain, paraTool.debugNoLog, true);
         if (chain.WSEndpointSelfHosted == 1) {

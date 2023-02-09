@@ -188,7 +188,7 @@ module.exports = class PolkaholicDB {
         const instanceName = this.GC_BIGTABLE_INSTANCE;
         const tableAddressExtrinsic = "addressextrinsic";
         const tableAccountRealtime = "accountrealtime";
-        const tableAccountHistory = "accounthistory";
+
         const tableEVMTx = "evmtx";
         const tableHashes = "hashes";
         const tableAddress = "address";
@@ -198,7 +198,7 @@ module.exports = class PolkaholicDB {
         this.btHashes = this.instance.table(tableHashes);
         this.btEVMTx = this.instance.table(tableEVMTx);
         this.btAccountRealtime = this.instance.table(tableAccountRealtime);
-        this.btAccountHistory = this.instance.table(tableAccountHistory);
+
         this.btAPIKeys = this.instance.table(tableAPIKeys);
     }
 
@@ -216,9 +216,6 @@ module.exports = class PolkaholicDB {
     get_btTableRealtime() {
 
         return ["accountrealtime", this.btAccountRealtime];
-    }
-    get_btTableHistory() {
-        return ["accounthistory", this.btAccountHistory];
     }
 
     async release(msDelay = 1000) {

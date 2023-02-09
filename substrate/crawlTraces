@@ -31,6 +31,15 @@ async function main() {
 	    var crawler = new Crawler();
 	    await crawler.assetManagerInit();
             await crawler.crawlTracesRandom();
+
+	    const mu = process.memoryUsage();
+            let field = "heapUsed";
+            const gbNow = mu[field] / 1024 / 1024 / 1024;
+            const gbRounded = Math.round(gbNow * 100) / 100;
+            console.log(`Heap allocated ${gbRounded} GB`);
+	    if ( gbRounded > 1 ) {
+		process.exit(1);
+	    }
             await crawler.release(5000);
         } while (true);
     }

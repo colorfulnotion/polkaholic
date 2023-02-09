@@ -341,13 +341,14 @@ module.exports = class AstarParser extends ChainParser {
                 if (module_method == 'transact') {
                     let isEthereumXCM = this.etherumXCMFilter(indexer, args, feed.events)
                     if (isEthereumXCM) {
-                        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] EthereumXCM found`, args)
                         let methodID = args.methodID
+                        if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${methodID}] EthereumXCM found`, args)
                         let outgoingXcmList4 = false
                         if (this.xcmTransferMethodList.includes(methodID)) {
+                            if (this.debugLevel >= paraTool.debugInfo) console.log(`Astar Xcmtransfer func Found [${methodID}] [${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${methodID}] found!!`)
                             outgoingXcmList4 = this.processOutgoingEthereumAssetWithdraw(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
                         } else if (this.xcmTransactorMethodList.includes(methodID)) {
-                            //console.log(`Astar Remote Execution [${methodID}] [${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] found!!`)
+                            if (this.debugLevel >= paraTool.debugInfo) console.log(`Astar Remote Execution [${methodID}] [${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${methodID}] found!!`)
                             //outgoingXcmList4 = this.processOutgoingEthereumRemoteExecution(indexer, extrinsic, feed, fromAddress, section_method, args.decodedEvmInput)
                         }
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`astar processOutgoingXCM ethereum [methodID=${methodID}]`, outgoingXcmList4)
@@ -422,6 +423,7 @@ module.exports = class AstarParser extends ChainParser {
                     //console.log(`output >>`, JSON.stringify(output, null, 2))
                     if (output != undefined) {
                         args.decodedEvmInput = output
+                        args.methodID = txMethodID
                     }
                     return true
                 }
@@ -599,7 +601,7 @@ module.exports = class AstarParser extends ChainParser {
                         xcmType: "xcmtransfer",
                     }
                     //if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
-                    //console.log(`processOutgoingEthereumAssetWithdraw`, r)
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processOutgoingEthereumAssetWithdraw`, r)
                     extrinsic.xcms.push(r)
                     outgoingEtherumXCM.push(r)
                 } else {
