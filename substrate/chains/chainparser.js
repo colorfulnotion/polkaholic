@@ -1294,29 +1294,29 @@ module.exports = class ChainParser {
             let parainclusionCandidateIncludedList = events.filter((ev) => {
                 return this.paraInclusionCandidateIncludedFilter(`${ev.section}(${ev.method})`);
             })
-            for (const parainclusionCandidateBacked of parainclusionCandidateBackedList){
-                 let backedCandidate = parainclusionCandidateBacked.data[0].descriptor
-                 let chainID = paraTool.getChainIDFromParaIDAndRelayChain(backedCandidate.paraId, indexer.relayChain)
-                 let relayParent = backedCandidate.relayParent
-                 /*
-                 if (indexer.trailingBlockHashs[relayParent] != undefined){
-                     backedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
-                 }
-                 */
-                 activeChains.push(chainID)
-                 //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${chainID}] backedCandidate`, backedCandidate)
+            for (const parainclusionCandidateBacked of parainclusionCandidateBackedList) {
+                let backedCandidate = parainclusionCandidateBacked.data[0].descriptor
+                let chainID = paraTool.getChainIDFromParaIDAndRelayChain(backedCandidate.paraId, indexer.relayChain)
+                let relayParent = backedCandidate.relayParent
+                /*
+                if (indexer.trailingBlockHashs[relayParent] != undefined){
+                    backedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
+                }
+                */
+                activeChains.push(chainID)
+                //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${chainID}] backedCandidate`, backedCandidate)
             }
-            for (const parainclusionCandidateIncluded of parainclusionCandidateIncludedList){
-                 let includedCandidate = parainclusionCandidateIncluded.data[0].descriptor
-                 let chainID = paraTool.getChainIDFromParaIDAndRelayChain(includedCandidate.paraId, indexer.relayChain)
-                 let relayParent = includedCandidate.relayParent
-                 /*
-                 if (indexer.trailingBlockHashs[relayParent] != undefined){
-                     includedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
-                 }
-                 */
-                 activeChains.push(chainID)
-                 //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${chainID}] includedCandidate`, includedCandidate)
+            for (const parainclusionCandidateIncluded of parainclusionCandidateIncludedList) {
+                let includedCandidate = parainclusionCandidateIncluded.data[0].descriptor
+                let chainID = paraTool.getChainIDFromParaIDAndRelayChain(includedCandidate.paraId, indexer.relayChain)
+                let relayParent = includedCandidate.relayParent
+                /*
+                if (indexer.trailingBlockHashs[relayParent] != undefined){
+                    includedCandidate.sentAt2 = indexer.trailingBlockHashs[relayParent]
+                }
+                */
+                activeChains.push(chainID)
+                //console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${chainID}] includedCandidate`, includedCandidate)
             }
             indexer.updateActiveParachains(activeChains, isTip, finalized)
         } catch (err) {

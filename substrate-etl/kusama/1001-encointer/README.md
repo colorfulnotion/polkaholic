@@ -9,7 +9,7 @@ Status: Only partially indexed: Old decoding errors
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
-| [2023-01-01 to 2023-01-31](/substrate-etl/kusama/1001-encointer/2023-01-31.md) | 1,972,773 | 2,190,831 | 211,302 | 6,757 (3.10%) |  |  | 900 | - | 
+| [2023-01-01 to 2023-01-31](/substrate-etl/kusama/1001-encointer/2023-01-31.md) | 1,972,773 | 2,190,831 | 211,402 | 6,657 (3.05%) | 2 |  | 900 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/kusama/1001-encointer/2022-12-31.md) | 1,791,307 | 1,972,772 | 180,844 | 622 (0.34%) | 5 |  | 863 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/kusama/1001-encointer/2022-11-30.md) | 1,580,907 | 1,791,306 | 209,719 | 681 (0.32%) | 73 | 1 | 825 | - | 
 | [2022-10-01 to 2022-10-31](/substrate-etl/kusama/1001-encointer/2022-10-31.md) | 1,364,286 | 1,580,906 | 216,221 | 400 (0.18%) | 126 | 1 | 720 | - | 
