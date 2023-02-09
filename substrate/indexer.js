@@ -5232,9 +5232,20 @@ module.exports = class Indexer extends AssetManager {
                     }
                     //destAddress is missing from events
                     if (fallbackRequired) {
+                        let cachedXcms = rExtrinsic.xcms // via events
                         delete rExtrinsic.xcms
                         delete rExtrinsic.xcmIndex
                         this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
+                        let cachedXcms2 = rExtrinsic.xcms // via args
+                        if (cachedXcms2 != undefined && Array.isArray(cachedXcms2) && cachedXcms2.length > 0 && cachedXcms2.length == cachedXcms.length){
+                            for (let i = 0; i < cachedXcms2.length; i++){
+                                let cachedXcm2 = cachedXcms2[i]
+                                if (cachedXcm2.destAddress){
+                                    cachedXcms[i].destAddress = cachedXcm2.destAddress
+                                }
+                            }
+                            rExtrinsic.xcms = cachedXcms
+                        }
                     }
                 }
                 if (rExtrinsic.xcmIndex != undefined) {
@@ -5458,6 +5469,7 @@ module.exports = class Indexer extends AssetManager {
 
 
             let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
+            console.log(`symbolRelayChain=${symbolRelayChain}`, assetInfo)
             let amountSent = x.amountSent
             if (assetInfo) {
                 x.decimals = assetInfo.decimals;
