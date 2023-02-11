@@ -8,8 +8,9 @@
 //  dump paraID 2000 for specific day:  dumpSubstrateETL polkadot 2000 2022-12-29
 //  dump all xcmtransfers for a day:    dumpSubstrateETL polkadot xcmtransfers 2022-12-29
 //  dump all xcmtransfers in last year: dumpSubstrateETL polkadot xcmtransfers
+//  dump account matrics in last year: dumpSubstrateETL polkadot accountmatrics
 //  compute xcmteleporfees: dumpSubstrateETL polkadot xcmteleportfees
-//  update blocklog: dumpSubstrateETL blocklog 
+//  update blocklog: dumpSubstrateETL blocklog
 //  update blocklog: dumpSubstrateETL blocklogstats
 var SubstrateETL = require("./substrateetl");
 
@@ -25,7 +26,7 @@ async function main() {
         }
         if (index == 3 && val.length > 0) {
             // TODO: use flags pkg instead
-            if (val == "xcmtransfers" || val == "chains" || val == "setup" || val == "xcmteleportfees" || val == "blocklog" || val == "blocklogstats" || val == "auditblocks") {
+            if (val == "xcmtransfers" || val == "chains" || val == "setup" || val == "xcmteleportfees" || val == "blocklog" || val == "blocklogstats" || val == "auditblocks" || val == "accountmatrics") {
                 paraID = val;
             } else {
                 paraID = parseInt(val, 10);
@@ -57,6 +58,12 @@ async function main() {
             await substrateetl.dump_xcmtransfers(logDT, relayChain);
         } else {
             await substrateetl.dump_xcmtransfers_range(relayChain, null);
+        }
+    } else if (paraID == "accountmatrics" && relayChain) {
+        if (logDT) {
+            await substrateetl.dump_account_matrics(logDT, relayChain);
+        } else {
+            await substrateetl.dump_account_matrics_range(relayChain, null);
         }
     } else if (paraID == "chains" && relayChain) {
         await substrateetl.dump_chains(relayChain);
