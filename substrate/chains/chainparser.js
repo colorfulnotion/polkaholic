@@ -1151,7 +1151,7 @@ module.exports = class ChainParser {
                         this.mpReceivedHashes[idxKey] = mpState
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${this.parserBlockNumber}] [${this.parserBlockHash}] [${mpState.msgHash}] [${ev.eventID}] asset trapped!`)
                     }
-                    if (this.xcmStartFilter(`${ev.section}(${ev.method})`)){
+                    if (this.xcmStartFilter(`${ev.section}(${ev.method})`)) {
                         mpState.startIdx += i
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`detected idealStart eventID=${ev.eventID}, adjustedIdx=${i}, updateEventRange[${mpState.startIdx}, ${mpState.endIdx}]`)
                         eventRange = events.slice(mpState.startIdx, mpState.endIdx)
@@ -2303,7 +2303,7 @@ module.exports = class ChainParser {
                     xcmType: "xcmtransfer",
                 }
                 if (msgHashCandidate) r.msgHash = msgHashCandidate //try adding msgHashCandidate if available (may have mismatch)
-                if (!targetedSymbol || !targetedXcmInteriorKey){
+                if (!targetedSymbol || !targetedXcmInteriorKey) {
                     if (this.debugLevel >= paraTool.debugTracing) console.log(`processOutgoingXTokensEvent missing`, r)
                 }
                 //outgoingXTokens.push(r)
@@ -3678,7 +3678,7 @@ module.exports = class ChainParser {
     xcmStartFilter(palletMethod) {
         if (palletMethod == "parachainSystem(DownwardMessagesReceived)") {
             return true
-        } else if (palletMethod == "ump(UpwardMessagesReceived)"){
+        } else if (palletMethod == "ump(UpwardMessagesReceived)") {
             return true
         } else {
             return false;

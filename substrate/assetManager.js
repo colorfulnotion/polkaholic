@@ -748,11 +748,14 @@ module.exports = class AssetManager extends PolkaholicDB {
         }
 
         // load a model of expectedTeleportFee by chainID-chainIDDest-symbol in assetManager, use teleportFeeChainSymbol
-        let xcmTeleportFeeRecs = await this.poolREADONLY.query("select chainIDDest, symbol, xcmTeleportFees from xcmteleportfees");
+        let xcmTeleportFeeRecs = await this.poolREADONLY.query("select chainIDDest, symbol, ROUND(teleportFeeDecimals_avg_imperfect) as teleportFeeDecimals_avg, ROUND(teleportFeeDecimals_std_imperfect) as teleportFeeDecimals_std from teleportfees");
         for (let i = 0; i < xcmTeleportFeeRecs.length; i++) {
             let r = xcmTeleportFeeRecs[i];
             let k = `${r.chainIDDest}-${r.symbol}`;
-            this.xcmTeleportFees[k] = r.xcmTeleportFees
+            this.xcmTeleportFees[k] = {
+                teleportFeeDecimals_avg: r.teleportFeeDecimals_avg,
+                teleportFeeDecimals_std: r.teleportFeeDecimals_std
+            };
         }
 
         //console.log(this.expectedTeleportFee)
