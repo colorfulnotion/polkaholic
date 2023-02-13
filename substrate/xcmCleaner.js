@@ -235,52 +235,52 @@ module.exports = class XCMCleaner extends Query {
     }
 
     compute_confidence(xcmTeleportFees, amountReceived, amountSent) {
-	try {
-	    
-	    if ( xcmTeleportFees ) {
-		let avg = parseInt(xcmTeleportFees.teleportFeeDecimals_avg, 10);
-		let std = parseInt(xcmTeleportFees.teleportFeeDecimals_std, 10);
-		if ( std == 0 ) std = avg * .2;
-		let diff = amountSent - (amountReceived  + avg);
-		
-		// ===> compute_confidence snt 1045038690560.000000000000000000 rcv 1015819382911 sum 1015819382911 83662580 diff -101581937246144970000 avg 83662580 std 19932769 x= -509622806226.8828
-		let x = Math.abs(diff / (std+1));
-		// ===> compute_confidence snt 1045038690560.000000000000000000 rcv 1015819382911 avg 83662580 std 19932769 x= -509622806226.8828
-		console.log("===> compute_confidence", "snt", amountSent, "rcv", amountReceived, "diff", diff, "avg", avg, "std", std, "x=", x);
-		// TODO: fill this in with analytic model based on x
-		
-		if ( x < 0.1 ) {
-		    return .95
-		} else if ( x < 0.5 ) {
-		    return .9
-		} else if ( x < 1.0 ) {
-		    return .8
-		} else if ( x < 1.5 ) {
-		    return .7
-		} else if ( x < 2.0 ) {
-		    return .6
-		} else if ( x < 3.0 ) {
-		    return .5
-		}
-	    } 
-	    // give up
-	    let rat = amountReceived / amountSent
-	    if ( amountSent >= amountReceived && ( amountReceived / amountSent > 0 ) ) {
-		return rat;
-	    }
-	    
-	} catch (e) {
-	    console.log(e);
-	}
-	return 0
+        try {
+
+            if (xcmTeleportFees) {
+                let avg = parseInt(xcmTeleportFees.teleportFeeDecimals_avg, 10);
+                let std = parseInt(xcmTeleportFees.teleportFeeDecimals_std, 10);
+                if (std == 0) std = avg * .2;
+                let diff = amountSent - (amountReceived + avg);
+
+                // ===> compute_confidence snt 1045038690560.000000000000000000 rcv 1015819382911 sum 1015819382911 83662580 diff -101581937246144970000 avg 83662580 std 19932769 x= -509622806226.8828
+                let x = Math.abs(diff / (std + 1));
+                // ===> compute_confidence snt 1045038690560.000000000000000000 rcv 1015819382911 avg 83662580 std 19932769 x= -509622806226.8828
+                console.log("===> compute_confidence", "snt", amountSent, "rcv", amountReceived, "diff", diff, "avg", avg, "std", std, "x=", x);
+                // TODO: fill this in with analytic model based on x
+
+                if (x < 0.1) {
+                    return .95
+                } else if (x < 0.5) {
+                    return .9
+                } else if (x < 1.0) {
+                    return .8
+                } else if (x < 1.5) {
+                    return .7
+                } else if (x < 2.0) {
+                    return .6
+                } else if (x < 3.0) {
+                    return .5
+                }
+            }
+            // give up
+            let rat = amountReceived / amountSent
+            if (amountSent >= amountReceived && (amountReceived / amountSent > 0)) {
+                return rat;
+            }
+
+        } catch (e) {
+            console.log(e);
+        }
+        return 0
     }
 
     match_balance_adjustment(balances_currencies, amountSent, blocks, xcmTeleportFees, sourceTS) {
         let prevFree = null;
         let prevBN = 1;
         let changes = [];
-        if ( ! balances_currencies ) return null;
-	for (const currencyID of Object.keys(balances_currencies)) {
+        if (!balances_currencies) return null;
+        for (const currencyID of Object.keys(balances_currencies)) {
             let balances = balances_currencies[currencyID];
             for (const bn of Object.keys(balances)) {
                 let free = balances[bn];
@@ -289,25 +289,25 @@ module.exports = class XCMCleaner extends Query {
                     let amountReceived = diff;
                     let confidence = this.compute_confidence(xcmTeleportFees, amountReceived, amountSent);
                     if (confidence > .20) {
-			let ts = null;
-			for (const b of blocks) {
-			    if (bn == b.blockNumber) {
-				ts = b.blockTS;
-			    }
-			}
+                        let ts = null;
+                        for (const b of blocks) {
+                            if (bn == b.blockNumber) {
+                                ts = b.blockTS;
+                            }
+                        }
                         changes.push({
                             currencyID,
                             blockNumber: bn,
-			    eventID: null,
-			    extrinsicID: null,
+                            eventID: null,
+                            extrinsicID: null,
                             prevFree,
                             free,
                             amountReceivedDecimals: diff,
-			    teleportFeeDecimals: null,
-			    feeReceivingAddress: null,
+                            teleportFeeDecimals: null,
+                            feeReceivingAddress: null,
                             feeEventID: null,
-			    secondsFromSource: ts - sourceTS,
-			    ts,
+                            secondsFromSource: ts - sourceTS,
+                            ts,
                             confidence,
                             amountSent
                         });
@@ -320,7 +320,7 @@ module.exports = class XCMCleaner extends Query {
         // find the change in balance that matches amountSent best, along with a "confidence" level
         if (changes.length > 0) {
             changes.sort(function compareFn(a, b) {
-		return 100000 * (a.secondsFromSourceTS - b.secondsFromSourceTS) + ( b.confidence - a.confidence )
+                return 100000 * (a.secondsFromSourceTS - b.secondsFromSourceTS) + (b.confidence - a.confidence)
             });
             let best = changes[0];
             let bn = best.bn;
@@ -378,7 +378,7 @@ module.exports = class XCMCleaner extends Query {
         return [];
     }
 
-    async searchSubstrateETLEvents(perfect_match, chainIDDest, sourceTS, destAddress, symbol, amountSentDecimals, xcmTeleportFees = null) {
+    async searchSubstrateETLEvents(perfect_match, chainIDDest, sourceTS, destAddress, symbol, amountSentDecimals, xcmTeleportFees = null, decimals = null) {
         let relayChain = paraTool.getRelayChainByChainID(chainIDDest)
         let paraID = paraTool.getParaIDfromChainID(chainIDDest);
 
@@ -391,12 +391,12 @@ module.exports = class XCMCleaner extends Query {
             let [logDT2, hr2] = paraTool.ts_to_logDT_hr(sourceTS + 86400);
             q = `  or DATE(block_time) = \"${logDT2}\"`;
         }
-        let sqlQuery = `SELECT event_id, extrinsic_id, block_number, section, method, UNIX_SECONDS(block_time) as ts, data FROM \`substrate-etl.${relayChain}.events${paraID}\` WHERE ( DATE(block_time) = \"${logDT}\" ${q} ) and block_time >= TIMESTAMP_SECONDS(${sourceTS}) and block_time < TIMESTAMP_SECONDS(${sourceTS+180}) and section in ("tokens", "balances", "currencies", "assets") `;
+        let sqlQuery = `SELECT event_id, extrinsic_id, block_number, section, method, UNIX_SECONDS(block_time) as ts, data FROM \`substrate-etl.${relayChain}.events${paraID}\` WHERE ( DATE(block_time) = \"${logDT}\" ${q} ) and block_time >= TIMESTAMP_SECONDS(${sourceTS}) and block_time < TIMESTAMP_SECONDS(${sourceTS+180}) and section in ("tokens", "balances", "currencies", "assets", "eqBalances")`;
         console.log("substrate-etl search....", sqlQuery);
         // run query, get events matching destAddress
         let rows = this.cachedRows ? this.cachedRows : await this.execute_bqJob(sqlQuery);
-	this.cachedRows = rows;
-	console.log("***** searchSubstrateETLEvents", perfect_match, rows.length);
+        this.cachedRows = rows;
+        console.log("***** searchSubstrateETLEvents", perfect_match, rows);
         let amounts = {};
         let events = {};
         let feeEvents = {};
@@ -411,12 +411,27 @@ module.exports = class XCMCleaner extends Query {
             let bn = r.block_number;
             let data = JSON.parse(r.data);
             if (Array.isArray(data)) {
-                if ((section == "tokens" && method == "Deposited") || (section == "balances" && method == "Deposit") || (section == "currencies" && method == "Deposited") || (section == "assets" && method == "Issued")) {
+                if ((section == "tokens" && method == "Deposited") || (section == "balances" && method == "Deposit") || (section == "currencies" && method == "Deposited") || (section == "assets" && method == "Issued") || (section == "eqBalances")) {
                     let asset = null;
                     let addr_ss58 = null;
                     let amountReceivedDecimals = null;
+                    let func = null;
                     // TODO: bring in symbol
-                    if (((section == "tokens" && method == "Deposited") || (section == "currencies" && method == "Deposited") || (section == "assets" && method == "Issued")) && data.length == 3) {
+                    if (((section == "eqBalances")) && data.length == 4) {
+                        func = data[3];
+                        if (func == "XcmTransfer" || func == "XcmPayment") {
+                            addr_ss58 = data[0];
+                            asset = data[1]; // currencyID
+                            amountReceivedDecimals = paraTool.dechexToInt(data[2]);
+                            if (decimals > 9) {
+                                let factor = decimals - 9;
+                                amountReceivedDecimals *= 10 ** (factor);
+                            } else if (decimals < 9) {
+                                let factor = 9 - decimals;
+                                amountReceivedDecimals /= 10 ** (factor);
+                            }
+                        }
+                    } else if (((section == "tokens" && method == "Deposited") || (section == "currencies" && method == "Deposited") || (section == "assets" && method == "Issued")) && data.length == 3) {
                         asset = data[0];
                         addr_ss58 = data[1];
                         amountReceivedDecimals = paraTool.dechexToInt(data[2]);
@@ -426,7 +441,6 @@ module.exports = class XCMCleaner extends Query {
                     }
                     if (addr_ss58) {
                         let addr_pubkey = paraTool.getPubKey(addr_ss58);
-			// console.log("EVENT", bn, eventID, amountReceivedDecimals, section, method, addr_pubkey, "FINDING", destAddress_pubkey);
                         let e = {
                             eventID,
                             extrinsicID,
@@ -455,7 +469,7 @@ module.exports = class XCMCleaner extends Query {
                 }
             }
         }
-	console.log("***** searchSubstrateETLEvents DONE found matches", beneficiary_matches);
+        console.log("***** searchSubstrateETLEvents DONE found matches", beneficiary_matches);
         if (beneficiary_matches == 0) return (null);
         // if we have some beneficiary matches in events, then load up from xcmtransferdestevent to make sure we don't match to old events in the process below
         let matchedEventID = {}
@@ -466,92 +480,95 @@ module.exports = class XCMCleaner extends Query {
         }
         // now, match beneficary events in "events" to fee events in "feeEvents" with the same blockNumber -- where the sum has to be EXACT
         let matches = [];
-	if ( perfect_match == true ) {
+        if (perfect_match == true) {
             for (const bn of Object.keys(events)) {
-		for (const beneficiaryEvent of events[bn]) {
+                for (const beneficiaryEvent of events[bn]) {
                     let eventID = beneficiaryEvent.eventID;
                     let extrinsicID = beneficiaryEvent.extrinsicID;
                     let ts = beneficiaryEvent.ts;
                     if (matchedEventID[eventID] == undefined) {
-			// NOTE: there may not be a fee event because 100% is received, and some other part of the xcmtransfer covers the fee
-			if (beneficiaryEvent.amountReceivedDecimals == amountSentDecimals) {
+                        // NOTE: there may not be a fee event because 100% is received, and some other part of the xcmtransfer covers the fee
+                        if (beneficiaryEvent.amountReceivedDecimals == amountSentDecimals) {
                             matches.push({
-				blockNumber: beneficiaryEvent.blockNumber,
-				eventID,
-				extrinsicID,
-				amountReceivedDecimals: beneficiaryEvent.amountReceivedDecimals,
-				teleportFeeDecimals: 0,
-				feeReceivingAddress: null,
-				feeEventID: null,
-				distance: 0,
-				confidence: 1,
-				secondsFromSourceTS: ts - sourceTS,
-				ts
+                                blockNumber: beneficiaryEvent.blockNumber,
+                                eventID,
+                                extrinsicID,
+                                amountReceivedDecimals: beneficiaryEvent.amountReceivedDecimals,
+                                teleportFeeDecimals: 0,
+                                feeReceivingAddress: null,
+                                feeEventID: null,
+                                distance: 0,
+                                confidence: 1,
+                                secondsFromSourceTS: ts - sourceTS,
+                                ts
                             })
-			} else if (feeEvents[bn] != undefined) {
+                        } else if (feeEvents[bn] != undefined) {
                             for (const feeEvent of feeEvents[bn]) {
-				let feeEventID = feeEvent.eventID;
-				if (matchedEventID[eventID] == undefined) {
+                                let feeEventID = feeEvent.eventID;
+                                console.log("feeEvent", feeEvent, "beneficaryEvent", beneficiaryEvent, "asd", amountSentDecimals);
+                                if (matchedEventID[eventID] == undefined) {
                                     let sum = feeEvent.amountReceivedDecimals + beneficiaryEvent.amountReceivedDecimals;
-                                    if (sum == amountSentDecimals) {
-					let eventID_idx = this.get_eventIndex(eventID);
-					let feeEventID_idx = this.get_eventIndex(feeEventID);
-					if (eventID_idx != null && feeEventID_idx != null) {
+                                    let diff = Math.abs(sum - amountSentDecimals);
+                                    console.log("**** ", sum, "diff", diff);
+                                    if (sum == amountSentDecimals || (chainIDDest == 2011 && diff <= 1000)) {
+                                        let eventID_idx = this.get_eventIndex(eventID);
+                                        let feeEventID_idx = this.get_eventIndex(feeEventID);
+                                        if (eventID_idx != null && feeEventID_idx != null) {
                                             let distance = Math.abs(feeEventID_idx - eventID_idx);
                                             matches.push({
-						blockNumber: beneficiaryEvent.blockNumber,
-						eventID,
-						extrinsicID,
-						amountReceivedDecimals: beneficiaryEvent.amountReceivedDecimals,
-						teleportFeeDecimals: feeEvent.amountReceivedDecimals,
-						feeReceivingAddress: feeEvent.addr_pubkey,
-						feeEventID,
-						distance,
-						confidence: 1,
-						secondsFromSourceTS: ts - sourceTS,
-						ts
+                                                blockNumber: beneficiaryEvent.blockNumber,
+                                                eventID,
+                                                extrinsicID,
+                                                amountReceivedDecimals: beneficiaryEvent.amountReceivedDecimals,
+                                                teleportFeeDecimals: feeEvent.amountReceivedDecimals,
+                                                feeReceivingAddress: feeEvent.addr_pubkey,
+                                                feeEventID,
+                                                distance,
+                                                confidence: 1,
+                                                secondsFromSourceTS: ts - sourceTS,
+                                                ts
                                             })
-					}
-					console.log(beneficiaryEvent.amountReceivedDecimals, "FEE", feeEventID, feeEvent.amountReceivedDecimals, "failed")
+                                        }
+                                        console.log(beneficiaryEvent.amountReceivedDecimals, "FEE", feeEventID, feeEvent.amountReceivedDecimals, "failed")
                                     }
-				}
+                                }
                             }
-			}
+                        }
                     }
-		}
+                }
             }
-	} else {
+        } else {
             for (const bn of Object.keys(events)) {
-		for (const beneficiaryEvent of events[bn]) {
+                for (const beneficiaryEvent of events[bn]) {
                     let eventID = beneficiaryEvent.eventID;
                     let extrinsicID = beneficiaryEvent.extrinsicID;
                     let ts = beneficiaryEvent.ts;
                     if (matchedEventID[eventID] == undefined) {
-			// NOTE: there may not be a fee event because 100% is received, and some other part of the xcmtransfer covers the fee
+                        // NOTE: there may not be a fee event because 100% is received, and some other part of the xcmtransfer covers the fee
                         let match = {
-			    blockNumber: beneficiaryEvent.blockNumber,
-			    eventID,
-			    extrinsicID,
-			    amountReceivedDecimals: beneficiaryEvent.amountReceivedDecimals,
-			    teleportFeeDecimals: null,
-			    feeReceivingAddress: null,
-			    feeEventID: null,
-			    distance: 0,
-			    confidence: this.compute_confidence(xcmTeleportFees, beneficiaryEvent.amountReceivedDecimals, amountSentDecimals),
-			    secondsFromSourceTS: ts - sourceTS,
-			    ts
+                            blockNumber: beneficiaryEvent.blockNumber,
+                            eventID,
+                            extrinsicID,
+                            amountReceivedDecimals: beneficiaryEvent.amountReceivedDecimals,
+                            teleportFeeDecimals: null,
+                            feeReceivingAddress: null,
+                            feeEventID: null,
+                            distance: 0,
+                            confidence: this.compute_confidence(xcmTeleportFees, beneficiaryEvent.amountReceivedDecimals, amountSentDecimals),
+                            secondsFromSourceTS: ts - sourceTS,
+                            ts
                         }
-			matches.push(match)
-			console.log("IMPERFECT MATCH", match);
-		    }
-		}
+                        matches.push(match)
+                        console.log("IMPERFECT MATCH", match);
+                    }
+                }
             }
-	}
+        }
         // sort by (a) secondsFromSourceTS then (b) distances (distance 1 is best)
         matches.sort(function(a, b) {
-            return 10000000 * ( b.confidence - a.confidence ) + 100000 * (a.secondsFromSourceTS - b.secondsFromSourceTS) + ( a.distance - b.distance );
+            return 10000000 * (b.confidence - a.confidence) + 100000 * (a.secondsFromSourceTS - b.secondsFromSourceTS) + (a.distance - b.distance);
         })
-        if (matches.length > 0 && (matches[0].confidence > 0) ) {
+        if (matches.length > 0 && (matches[0].confidence > 0)) {
             return (matches[0]);
         }
         return null;
@@ -588,7 +605,7 @@ module.exports = class XCMCleaner extends Query {
             sql += ` and ( fromAddress = '${fromAddress}' or reaped > 0 )`;
         }
         let messages = this.cachedMessages ? this.cachedMessages : await this.poolREADONLY.query(sql)
-	this.cachedMessages = messages;
+        this.cachedMessages = messages;
         let changes = [];
         for (const m of messages) {
             let amountReceived = parseInt(m.amountReceived, 10);
@@ -621,8 +638,8 @@ module.exports = class XCMCleaner extends Query {
                         extrinsicID: m.extrinsicID,
                         ts: m.destTS
                     };
-                } else if ( perfect_match == false && xcmTeleportFees ) {
-		    changes.push({
+                } else if (perfect_match == false && xcmTeleportFees) {
+                    changes.push({
                         blockNumber: m.blockNumberDest,
                         amountReceivedDecimals: m.amountReceived,
                         teleportFeeDecimals: m.xcmTeleportFees,
@@ -643,9 +660,9 @@ module.exports = class XCMCleaner extends Query {
             changes.sort(function compareFn(a, b) {
                 return b.confidence - a.confidence
             });
-            if ( changes[0].confidence > 0.5 ) {
-		return changes[0];
-	    }
+            if (changes[0].confidence > 0.5) {
+                return changes[0];
+            }
         }
         // new
         if (msgHash && msgHash.length > 4) {
@@ -733,13 +750,13 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         };
         let q = await this.computePriceUSD(inp)
         if (!inp.decimals) {
-	    console.log("NO DECIMALS", inp);
+            console.log("NO DECIMALS", inp);
             let sql_final = `update xcmtransfer set  matchAttempts = matchAttempts + 1, matchAttemptDT = Now() where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
             this.batchedSQL.push(sql_final);
             await this.update_batchedSQL();
             return (false);
         }
-
+        let decimals = inp.decimals;
         let xcmInfo = {
             symbol: xcm.symbol,
             priceUSD: xcm.priceUSD,
@@ -794,7 +811,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         xcmInfo.origination.method = xcmMethod;
         try {
             console.log("xcm.amountSent", xcm.amountSent, "Dest", xcm.destAddress, invalid_dest_address);
-            if ((xcmInfo.destination.chainID == 2011 || xcmInfo.destination.chainID == 22024 || xcmInfo.destination.chainID == -1 || invalid_dest_address || xcmInfo.symbol == null)) {
+            if ((xcmInfo.destination.chainID == -1 || invalid_dest_address || xcmInfo.symbol == null)) {
                 xcmInfo.destination.executionStatus = "unknown";
                 let sql_final = `update xcmtransfer set xcmInfoAudited = 1, matchAttempts = 5, destStatus = -1, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
                 console.log("ABANDON", sql_final);
@@ -802,35 +819,35 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 await this.update_batchedSQL();
                 return xcmInfo;
             }
-	    // WATERFALL match criteria: search db, substrateetl, then rpc endpoint 
-	    this.cachedMessages = null;
-	    this.cachedRows = null;
+            // WATERFALL match criteria: search db, substrateetl, then rpc endpoint 
+            this.cachedMessages = null;
+            this.cachedRows = null;
             let best = null;
             let destAddress = paraTool.getPubKey(xcm.destAddress);
             let sentAt = xcmInfo.relayChain && xcmInfo.relayChain.sentAt ? xcmInfo.relayChain.sentAt : null;
 
-	    // perfect matching: first with xcmtransferdestcandidate, then with substrateetl
+            // perfect matching: first with xcmtransferdestcandidate, then with substrateetl
             best = await this.searchXCMTransferDestCandidate(true, xcm.msgHash, xcm.sourceTS, xcm.amountSent, destAddress, xcm.chainID, xcm.chainIDDest, xcm.sentAt);
-            if (best == null && xcm.sourceTS < this.currentTS() - 86400 ) {
-                best = await this.searchSubstrateETLEvents(true, xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol, xcm.amountSent);
+            if (best == null && xcm.sourceTS < this.currentTS() - 86400) {
+                best = await this.searchSubstrateETLEvents(true, xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol, xcm.amountSent, null, decimals);
             }
-	    // imperfect matching: first with xcmtransferdestcandidate, then with substrateetl, but only if we have an existing xcmTeleportFees model
-	    if ( best == null ) {
-		let xcmTeleportFees = this.getXCMTeleportFees(xcm.chainIDDest, xcm.symbol);
-		if ( this.cachedMessages && this.cachedMessages.length > 0 ) {
-		    best = await this.searchXCMTransferDestCandidate(false, xcm.msgHash, xcm.sourceTS, xcm.amountSent, destAddress, xcm.chainID, xcm.chainIDDest, xcm.sentAt, xcmTeleportFees);
-		}
-		if ( best == null && this.cachedRows && this.cachedRows.length > 0 ) {
-		    best = await this.searchSubstrateETLEvents(false, xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol, xcm.amountSent, xcmTeleportFees);
-		}
-		// if still no good match, then use API endpoint to search for balance changes
-		if (best == null ) {
-		    // this only opens API if needed
-		    let [balances, blocks] = await this.searchDestinationChainBalances(xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol);
-		    best = this.match_balance_adjustment(balances, xcm.amountSent, blocks, xcmTeleportFees, xcm.sourceTS);
-		}
-	    }
-	    
+            // imperfect matching: first with xcmtransferdestcandidate, then with substrateetl, but only if we have an existing xcmTeleportFees model
+            if (best == null) {
+                let xcmTeleportFees = this.getXCMTeleportFees(xcm.chainIDDest, xcm.symbol);
+                if (this.cachedMessages && this.cachedMessages.length > 0) {
+                    best = await this.searchXCMTransferDestCandidate(false, xcm.msgHash, xcm.sourceTS, xcm.amountSent, destAddress, xcm.chainID, xcm.chainIDDest, xcm.sentAt, xcmTeleportFees);
+                }
+                if (best == null && this.cachedRows && this.cachedRows.length > 0) {
+                    best = await this.searchSubstrateETLEvents(false, xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol, xcm.amountSent, xcmTeleportFees, decimals);
+                }
+                // if still no good match, then use API endpoint to search for balance changes
+                if (best == null) {
+                    // this only opens API if needed
+                    let [balances, blocks] = await this.searchDestinationChainBalances(xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol);
+                    best = this.match_balance_adjustment(balances, xcm.amountSent, blocks, xcmTeleportFees, xcm.sourceTS);
+                }
+            }
+
             if (best) {
                 inp.ts = best.ts;
                 q = await this.computePriceUSD(inp)
@@ -856,22 +873,25 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                         feeReceivingAddress = best.feeReceivingAddress;
                         feeEventID = best.feeEventID;
                         xcmInfo.destination.amountReceived = best.amountReceivedDecimals / 10 ** inp.decimals;
-                        if ( teleportFeeDecimals ) {
-			    xcmInfo.destination.teleportFee = best.teleportFeeDecimals / 10 ** inp.decimals;
-			} else {
-			    xcmInfo.destination.teleportFee = ( xcm.amountSentDecimals - best.amountReceivedDecimals ) / 10 ** inp.decimals;
-			}
+                        if (teleportFeeDecimals) {
+                            xcmInfo.destination.teleportFee = best.teleportFeeDecimals / 10 ** inp.decimals;
+                        } else {
+                            xcmInfo.destination.teleportFee = (xcm.amountSentDecimals - best.amountReceivedDecimals) / 10 ** inp.decimals;
+                        }
                         if (q && q.priceUSD) {
                             xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
                             xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
                             xcmInfo.destination.teleportFeeUSD = q.priceUSD * xcmInfo.destination.teleportFee;
-                            if (xcmInfo.destination.teleportFeeUSD > 25) {
-                                destStatus = -1;
+                            if (xcmInfo.destination.teleportFeeUSD > 10) {
+                                // could be multi hop, don't pollute the result
+                                xcmInfo.destination.teleportFee = null;
+                                xcmInfo.destination.teleportFeeUSD = null;
                             }
                             xcmInfo.priceUSD = q.priceUSD;
                         } else {
                             xcmInfo.priceUSD = 0;
                         }
+                        console.log("BEST is...", best, inp);
                         xcmInfo.destination.confidence = best.confidence;
                         if (destStatus == 1) {
                             xcmInfo.destination.executionStatus = "success";
@@ -963,7 +983,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
     async bulk_generate_XCMInfo(chainIDDest = null, limit = 1000) {
         let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and destStatus = -1  and sourceTS > UNIX_TIMESTAMP("2023-02-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and matchAttempts <= 2 and symbol is not null and matchAttemptDT < date_sub(Now(), interval 2 minute)  ${w} order by matchAttempts asc, sourceTS desc limit ${limit}`;
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2021-02-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and matchAttempts <= 2 and symbol is not null and matchAttemptDT < date_sub(Now(), interval 2 minute)  ${w} order by matchAttempts asc, sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
         let extrinsic = {};

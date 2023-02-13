@@ -9,8 +9,9 @@ Status: No Public Websocket Endpoint available: Not indexing yet.
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-08 to 2023-02-13](/substrate-etl/kusama/2116-tanganika/2023-02-13.md) | 1,401,932 | 1,430,409 | 28,478 | none  | 379 | 49 |  | - | 
 | [2023-01-23 to 2023-01-24](/substrate-etl/kusama/2116-tanganika/2023-01-24.md) | 1,283,096 | 1,296,404 | 13,309 | none  | 149 | 46 |  | - | 
-| [2022-12-01 to 2022-12-13](/substrate-etl/kusama/2116-tanganika/2022-12-13.md) | 935,791 | 1,009,889 | 74,036 | 63 (0.09%) | 1,090 | 48 | 3,213 | - | 
+| [2022-12-01 to 2022-12-13](/substrate-etl/kusama/2116-tanganika/2022-12-13.md) | 935,791 | 1,009,889 | 74,036 |  **BROKEN** (0.09%) | 1,090 | 48 | 3,213 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/kusama/2116-tanganika/2022-11-30.md) | 770,800 | 935,790 | 162,603 | 2,388 (1.45%) | 2,504 | 44 | 3,057 | - | 
 | [2022-10-01 to 2022-10-31](/substrate-etl/kusama/2116-tanganika/2022-10-31.md) | 557,446 | 770,799 | 213,354 | none  | 2,405 | 35 | 3,033 | - | 
 | [2022-09-01 to 2022-09-30](/substrate-etl/kusama/2116-tanganika/2022-09-30.md) | 363,896 | 557,445 | 193,550 | none  | 1,421 | 24 | 2,749 | - | 

@@ -9,6 +9,7 @@ _Source_: [bifrost-ksm.polkaholic.io](https://bifrost-ksm.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/kusama/2001-bifrost-ksm/2023-02-13.md) | 3,444,040 | 3,528,774 | 84,643 | 92 (0.11%) | 21,117 | 216 | 101,362 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/kusama/2001-bifrost-ksm/2023-01-31.md) | 3,225,421 | 3,444,039 | 218,619 | none  | 43,582 | 168 | 101,184 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/kusama/2001-bifrost-ksm/2022-12-31.md) | 3,014,958 | 3,225,420 | 210,463 | none  | 30,796 | 115 | 100,939 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/kusama/2001-bifrost-ksm/2022-11-30.md) | 2,804,503 | 3,014,957 | 210,455 | none  | 23,381 | 117 | 100,775 | - | 

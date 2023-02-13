@@ -9,6 +9,7 @@ _Source_: [crab.polkaholic.io](https://crab.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/kusama/2105-crab/2023-02-13.md) | 1,626,478 | 1,654,603 | 28,126 | none  | 60 | 1 | 53 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/kusama/2105-crab/2023-01-31.md) | 1,485,472 | 1,626,477 | 141,006 | none  | 200 | 1 | 52 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/kusama/2105-crab/2022-12-31.md) | 1,301,385 | 1,485,471 | 184,087 | none  | 138 | 1 | 52 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/kusama/2105-crab/2022-11-30.md) | 1,121,318 | 1,301,384 | 180,067 | none  | 306 | 2 | 52 | - | 

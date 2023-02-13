@@ -9,6 +9,7 @@ _Source_: [turing.polkaholic.io](https://turing.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/kusama/2114-turing/2023-02-13.md) | 1,865,173 | 1,949,451 | 84,279 | none  | 828 | 53 | 7,573 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/kusama/2114-turing/2023-01-31.md) | 1,648,489 | 1,865,172 | 216,684 | none  | 11,432 | 209 | 7,476 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/kusama/2114-turing/2022-12-31.md) | 1,440,187 | 1,648,488 | 208,302 | none  | 3,717 | 47 | 1,716 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/kusama/2114-turing/2022-11-30.md) | 1,239,418 | 1,440,186 | 200,769 | none  | 1,747 | 42 | 1,694 | - | 

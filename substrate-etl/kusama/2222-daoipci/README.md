@@ -9,6 +9,7 @@ _Source_: [daoipci.polkaholic.io](https://daoipci.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/kusama/2222-daoipci/2023-02-13.md) | 606,518 | 691,923 | 85,406 | none  |  |  | 890 | - | 
 | [2023-01-09 to 2023-01-31](/substrate-etl/kusama/2222-daoipci/2023-01-31.md) | 447,086 | 606,517 | 159,432 | none  | 2 |  | 890 | - | 
 | [2022-12-01 to 2022-12-13](/substrate-etl/kusama/2222-daoipci/2022-12-13.md) | 365,650 | 447,085 | 81,436 | none  | 10 |  | 890 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/kusama/2222-daoipci/2022-11-30.md) | 153,070 | 365,649 | 212,580 | none  | 82 | 1 | 890 | - | 

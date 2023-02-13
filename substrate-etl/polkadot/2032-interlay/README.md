@@ -9,6 +9,7 @@ _Source_: [interlay.polkaholic.io](https://interlay.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/polkadot/2032-interlay/2023-02-13.md) | 2,071,448 | 2,148,105 | 76,658 | none  | 16,329 | 134 | 11,148 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/polkadot/2032-interlay/2023-01-31.md) | 1,876,892 | 2,071,447 | 194,556 | none  | 43,634 | 147 | 11,058 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/polkadot/2032-interlay/2022-12-31.md) | 1,679,375 | 1,876,891 | 197,517 | none  | 46,349 | 140 | 10,820 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/polkadot/2032-interlay/2022-11-30.md) | 1,487,751 | 1,679,374 | 191,624 | none  | 41,201 | 164 | 10,632 | - | 
