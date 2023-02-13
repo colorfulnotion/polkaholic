@@ -9,6 +9,7 @@ _Source_: [shadow.polkaholic.io](https://shadow.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/kusama/2012-shadow/2023-02-13.md) | 2,234,526 | 2,319,211 | 84,686 | none  | 331 | 7 | 3,188 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/kusama/2012-shadow/2023-01-31.md) | 2,016,763 | 2,234,525 | 217,763 | none  | 201 | 3 | 1,728 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/kusama/2012-shadow/2022-12-31.md) | 1,807,325 | 2,016,762 | 209,438 | none  | 166 | 2 | 1,716 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/kusama/2012-shadow/2022-11-30.md) | 1,602,760 | 1,807,324 | 204,565 | none  | 158 | 3 | 1,695 | - | 

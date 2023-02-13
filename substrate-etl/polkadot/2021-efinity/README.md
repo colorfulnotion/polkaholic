@@ -9,6 +9,7 @@ _Source_: [efinity.polkaholic.io](https://efinity.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/polkadot/2021-efinity/2023-02-13.md) | 2,089,532 | 2,162,205 | 72,674 | none  | 1,124 | 31 | 16,064 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/polkadot/2021-efinity/2023-01-31.md) | 1,895,402 | 2,089,531 | 194,130 | none  | 3,132 | 22 | 15,989 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/polkadot/2021-efinity/2022-12-31.md) | 1,689,841 | 1,895,401 | 205,561 | none  | 9,933 | 16 | 15,846 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/polkadot/2021-efinity/2022-11-30.md) | 1,489,730 | 1,689,840 | 200,111 | none  | 1,325 | 17 | 15,760 | - | 

@@ -9,6 +9,7 @@ _Source_: [kusama.polkaholic.io](https://kusama.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/kusama/0-kusama/2023-02-13.md) | 16,437,639 | 16,610,076 | 172,362 | 76 (0.04%) | 272,482 | 1,385 | 284,211 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/kusama/0-kusama/2023-01-31.md) | 15,992,891 | 16,437,638 | 444,748 | none  | 521,615 | 1,259 | 282,168 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/kusama/0-kusama/2022-12-31.md) | 15,560,701 | 15,992,890 | 432,190 | none  | 283,936 | 1,274 | 280,798 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/kusama/0-kusama/2022-11-30.md) | 15,129,763 | 15,560,700 | 430,938 | none  | 542,445 | 1,708 | 278,785 | - | 

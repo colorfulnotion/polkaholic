@@ -9,6 +9,7 @@ _Source_: [hydradx.polkaholic.io](https://hydradx.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/polkadot/2034-hydradx/2023-02-13.md) | 1,868,702 | 1,943,881 | 75,180 | none  | 6,328 | 138 | 23,240 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/polkadot/2034-hydradx/2023-01-31.md) | 1,672,353 | 1,868,701 | 196,349 | none  | 33,155 | 202 | 23,205 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/polkadot/2034-hydradx/2022-12-31.md) | 1,483,335 | 1,672,352 | 189,018 | none  | 1,135 | 22 | 22,542 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/polkadot/2034-hydradx/2022-11-30.md) | 1,326,016 | 1,483,334 | 157,319 | none  | 1,154 | 20 | 22,421 | - | 

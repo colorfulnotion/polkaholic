@@ -9,6 +9,7 @@ _Source_: [litentry.polkaholic.io](https://litentry.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/polkadot/2013-litentry/2023-02-13.md) | 1,587,337 | 1,672,785 | 85,449 | none  | 1,935 | 80 | 4,762 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/polkadot/2013-litentry/2023-01-31.md) | 1,365,864 | 1,587,336 | 221,473 | none  | 4,495 | 74 | 4,751 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/polkadot/2013-litentry/2022-12-31.md) | 1,144,608 | 1,365,863 | 221,256 | none  | 3,865 | 64 | 4,741 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/polkadot/2013-litentry/2022-11-30.md) | 930,803 | 1,144,607 | 213,805 | none  | 2,549 | 36 | 4,720 | - | 

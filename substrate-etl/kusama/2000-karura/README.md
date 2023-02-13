@@ -9,6 +9,7 @@ _Source_: [karura.polkaholic.io](https://karura.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/kusama/2000-karura/2023-02-13.md) | 3,607,765 | 3,692,653 | 84,889 | none  | 21,072 | 181 | 94,934 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/kusama/2000-karura/2023-01-31.md) | 3,389,850 | 3,607,764 | 217,915 | none  | 51,356 | 164 | 94,704 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/kusama/2000-karura/2022-12-31.md) | 3,179,458 | 3,389,849 | 210,392 | none  | 40,476 | 151 | 94,197 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/kusama/2000-karura/2022-11-30.md) | 2,969,258 | 3,179,457 | 210,200 | none  | 68,151 | 200 | 93,716 | - | 

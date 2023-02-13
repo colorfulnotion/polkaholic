@@ -9,6 +9,7 @@ _Source_: [parallel.polkaholic.io](https://parallel.polkaholic.io)
 
 | Month | Start Block | End Block | # Blocks | # Missing | # Signed Extrinsics (total) | # Active Accounts (avg) | # Addresses with Balances (max) | Issues |
 | ----- | ----------- | --------- | -------- | --------- | --------------------------- | ----------------------- | ------------------------------- | ------ |
+| [2023-02-01 to 2023-02-13](/substrate-etl/polkadot/2012-parallel/2023-02-13.md) | 2,799,332 | 2,884,783 | 85,447 | 5 (0.01%) | 71,745 | 407 | 47,087 | - | 
 | [2023-01-01 to 2023-01-31](/substrate-etl/polkadot/2012-parallel/2023-01-31.md) | 2,578,329 | 2,799,331 | 221,003 | none  | 183,405 | 433 | 46,950 | - | 
 | [2022-12-01 to 2022-12-31](/substrate-etl/polkadot/2012-parallel/2022-12-31.md) | 2,357,760 | 2,578,328 | 220,569 | none  | 176,326 | 435 | 46,490 | - | 
 | [2022-11-01 to 2022-11-30](/substrate-etl/polkadot/2012-parallel/2022-11-30.md) | 2,143,686 | 2,357,759 | 214,074 | none  | 217,849 | 575 | 46,079 | - | 
