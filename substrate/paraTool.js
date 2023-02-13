@@ -695,7 +695,7 @@ function getChainIDFromParaIDAndRelayChain(paraID, relayChain = 'polkadot') {
     // kilt spiritnet chainID 22086 is now paraID 2086 on polkadot
     if (paraID == 2086 && relayChain == "polkadot") return (22086);
     // subsocial chainID 22110 is now paraID 2101 on polkadot
-    if (paraID == 2101 && relayChain == "polkadot") return (22110);
+    if (paraID == 2101 && relayChain == "polkadot") return (22100);
 
     let relayChainID = getRelayChainID(relayChain)
     let paraIDExtra = getParaIDExtra(relayChain)

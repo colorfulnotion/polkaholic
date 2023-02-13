@@ -2849,10 +2849,22 @@ module.exports = class ChainParser {
                             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV1ConcreteFungible error. expecting array`, JSON.stringify(v1_id_concrete_interiorVal))
                         }
                         v1_id_concrete_interiorVal = new_v1_id_concrete_interiorVal
+                        let interiorVStr0 = JSON.stringify(v1_id_concrete_interiorVal)
+                        if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint)) {
+                            if (interiorVStr0.includes("generalIndex") && !interiorVStr0.includes("palletInstance")){
+                                //Pad palletInstance for RMRK/USDT
+                                let padded_interiorV0 = [expandedParachainPiece, {
+                                    palletInstance: 50
+                                }, v1_id_concrete_interiorVal[1]]
+                                console.log(`pad!! original`, v1_id_concrete_interiorVal)
+                                v1_id_concrete_interiorVal = padded_interiorV0
+                            }
+                        }
                     }
 
                     let interiorVStr = JSON.stringify(v1_id_concrete_interiorVal)
                     let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
+                    if (xcmInteriorKey == '[{"parachain":1000},{"parent":null}]~kusama') xcmInteriorKey = 'here~kusama'
                     //console.log(`!!!IM here xcmInteriorKey=${xcmInteriorKey}`)
                     let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                     if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
@@ -2944,6 +2956,15 @@ module.exports = class ChainParser {
                             new_interiorV0.push(expandedParachainPiece)
                             new_interiorV0.push(interiorV0)
                             interiorVStr = JSON.stringify(new_interiorV0)
+                            if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint)) {
+                                // pad palletInstance
+                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")){
+                                    console.log(`pad!! original`, new_interiorV0)
+                                    interiorVStr = JSON.stringify([expandedParachainPiece, {
+                                        palletInstance: 50
+                                    }, interiorV0])
+                                }
+                            }
                         }
                         break;
                     default:
@@ -2969,13 +2990,16 @@ module.exports = class ChainParser {
                                 new_interiorV0.push(interiorV0Piece)
                             }
                             interiorVStr = JSON.stringify(new_interiorV0)
-                            if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint) && (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance"))) {
+                            if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint)) {
                                 // pad palletInstance
-                                console.log(`pad!! original`, new_interiorV0)
-                                let padded_interiorV0 = [expandedParachainPiece, {
-                                    palletInstance: 50
-                                }, new_interiorV0[1]]
-                                console.log(`pad!! padded_interiorV0`, new_interiorV0)
+                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")){
+                                    //console.log(`pad!! original`, new_interiorV0)
+                                    let padded_interiorV0 = [expandedParachainPiece, {
+                                        palletInstance: 50
+                                    }, new_interiorV0[1]]
+                                    //console.log(`pad!! padded_interiorV0`, padded_interiorV0)
+                                    interiorVStr = JSON.stringify(padded_interiorV0)
+                                }
                             }
                         } else {
                             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible unknown fungibleAsset type [${xType}]`, JSON.stringify(interiorV0, null, 2))
@@ -2984,15 +3008,18 @@ module.exports = class ChainParser {
                 }
                 //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible derived interiorVStr [${xType}] ${JSON.stringify(interiorV0)} -> ${interiorVStr}`)
                 let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain)
+                if (xcmInteriorKey == '[{"parachain":1000},{"parent":null}]~kusama') xcmInteriorKey = 'here~kusama'
                 let cachedXcmAssetInfo = indexer.getXcmAssetInfoByInteriorkey(xcmInteriorKey)
                 //console.log(`[${xcmInteriorKey}] cachedXcmAssetInfo`, cachedXcmAssetInfo)
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     targetedAsset = cachedXcmAssetInfo.asset
+                    if (!targetedAsset && cachedXcmAssetInfo.symbol != undefined){
+                        targetSymbol = cachedXcmAssetInfo.symbol
+                    }
                     //rawTargetedAsset = cachedXcmAssetInfo.asset
                     if (cachedXcmAssetInfo.xcmchainID == 1000 || cachedXcmAssetInfo.xcmchainID == 21000) {
                         targetSymbol = cachedXcmAssetInfo.symbol
                     }
-
                     //if (this.debugLevel >= paraTool.debugVerbose) console.log(`xcmInteriorKey ${xcmInteriorKey} Found -> targetSymbol=${targetSymbol} (${relayChain})`)
                 } else {
                     //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processV0ConcreteFungible cachedXcmAssetInfo lookup failed! [${xType}]`, xcmInteriorKey)
