@@ -1,52 +1,67 @@
-[
-  {
-    "mode": "REQUIRED",
-    "name": "token_address",
-    "type": "STRING"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "from_address",
-    "type": "STRING"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "to_address",
-    "type": "STRING"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "value",
-    "type": "FLOAT"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "value_usd",
-    "type": "FLOAT"
-  },
-  {
-    "mode": "REQUIRED",
-    "name": "transaction_hash",
-    "type": "STRING"
-  },
-  {
-    "mode": "REQUIRED",
-    "name": "block_timestamp",
-    "type": "TIMESTAMP"
-  },
-  {
-    "mode": "REQUIRED",
-    "name": "block_number",
-    "type": "INTEGER"
-  },
-  {
-    "mode": "REQUIRED",
-    "name": "block_hash",
-    "type": "STRING"
-  },
-  {
-    "mode": "REQUIRED",
-    "name": "transfer_type",
-    "type": "STRING"
-  }
+[{
+        "mode": "REQUIRED",
+        "name": "token_address",
+        "type": "STRING",
+        "description": "ERC20 token address"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "from_address",
+        "type": "STRING",
+        "description": "Address of the sender"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "to_address",
+        "type": "STRING",
+        "description": "Address of the receiver"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "value",
+        "type": "INTEGER",
+        "description": "Amount of tokens transferred (ERC20) / id of the token transferred (ERC721). Use safe_cast for casting to NUMERIC or FLOAT64"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "value_usd",
+        "type": "FLOAT",
+        "description": ""
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "transaction_hash",
+        "type": "STRING",
+        "description": "Transaction hash"
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "log_index",
+        "type": "INTEGER",
+        "description": "Log index in the transaction receipt"
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "block_timestamp",
+        "type": "TIMESTAMP",
+        "description": "Timestamp of the block where this transfer was in"
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "block_number",
+        "type": "INTEGER",
+        "description": "Block number where this transfer was in"
+    },
+    {
+        "mode": "REQUIRED",
+        "name": "block_hash",
+        "type": "STRING",
+        "description": "Hash of the block where this transfer was in"
+    },
+    {
+        "mode": "NULLABLE",
+        "name": "transfer_type",
+        "type": "STRING",
+        "description": "Transfer Type (ERC20, ERC721)"
+    }
 ]
