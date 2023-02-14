@@ -1800,17 +1800,31 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
 
                         let transfers = tx.transfers;
                         transfers.forEach((t) => {
+                            let transferType = t.type
+                            let tokenIDs = null
+                            let tokenValues = null
+                            let operator = null
+                            let value = t.value
+                            if (transferType == "ERC1155"){
+                                tokenIDs = t.tokenIds
+                                tokenValues = t.values
+                                operator = t.operator
+                                value = null
+                            }
                             let evmtransfer = {
                                 token_address: t.tokenAddress,
                                 from_address: t.from,
                                 to_address: t.to,
-                                value: t.value,
+                                value: value,
+                                operator: operator,
+                                token_ids: tokenIDs,
+                                token_values: tokenValues,
                                 transaction_hash: tx.transactionHash,
-                                //log_index: 0,
+                                log_index: (tx.logIndex != undefined)? tx.logIndex : -1,
                                 block_timestamp: tx.timestamp,
                                 block_number: tx.blockNumber,
                                 block_hash: tx.blockHash ? tx.blockHash : "",
-                                transfer_type: t.type,
+                                transfer_type: transferType,
                             }
                             evmtransfers.push(evmtransfer);
                         });
