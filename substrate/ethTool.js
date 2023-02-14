@@ -573,6 +573,8 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     maxPriorityFeePerGas: tip that goes to miner
     maxFeePerGas: max amount user is willing to pay. if baseFeePerGas+maxPriorityFeePerGas >=maxFeePerGas, maxPriorityFeePerGas is set to maxFeePerGas-baseFeePerGas
     txSaving: maxFeePerGas - (maxPriorityFeePerGas+maxFeePerGas)
+
+    // max_fee_per_gas, max_priority_fee_per_gas, receipt_effective_gas_price
     */
     let gWei = 10 ** 9
     let ether = 10 ** 18
@@ -592,6 +594,8 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     let maxPriorityFeePerGas = (dTxn.maxPriorityFeePerGas != undefined) ? paraTool.dechexToInt(dTxn.maxPriorityFeePerGas) : 0
     //console.log(`dReceipt effectiveGasPrice`, paraTool.dechexToInt(dReceipt.effectiveGasPrice))
     let baseFeePerGas = (dTxn.maxPriorityFeePerGas != undefined) ? paraTool.dechexToInt(dReceipt.effectiveGasPrice) : 0 //paraTool.dechexToInt("0x174876e800")
+    let effectiveGasPrice = paraTool.dechexToInt(dReceipt.effectiveGasPrice)
+    let cumulativeGasUsed = paraTool.dechexToInt(dReceipt.cumulativeGasUsed)
     let burnedFee = gasUsed * baseFeePerGas
     let txnSaving = (maxFeePerGas - baseFeePerGas) * gasUsed
     if (gasPrice >= baseFeePerGas) {
@@ -619,9 +623,11 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         txnSaving: txnSaving / ether,
         gasLimit: gasLimit,
         gasUsed: gasUsed,
+        cumulativeGasUsed: cumulativeGasUsed,
         maxFeePerGas: maxFeePerGas / gWei,
         maxPriorityFeePerGas: maxPriorityFeePerGas / gWei,
         baseFeePerGas: baseFeePerGas / gWei,
+        effectiveGasPrice: effectiveGasPrice / gWei,
         gasPrice: gasPrice / gWei,
         nonce: dTxn.nonce,
         accessList: null,
@@ -629,6 +635,8 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         decodedInput: dTxn.decodedInput,
         decodedLogs: dReceipt.decodedLogs,
     }
+    //console.log(`${fTxn.transactionHash} txn`, fTxn)
+    //console.log(`${fTxn.transactionHash} receipt`, dReceipt)
     if (dTxn.isConnectedCall != undefined) {
         fTxn.isConnectedCall = dTxn.isConnectedCall
     }

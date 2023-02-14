@@ -1955,8 +1955,6 @@ module.exports = class Crawler extends Indexer {
             let msg = message.data;
             if (msg.beneficiary != undefined && (msg.chainIDDest == this.chainID)) {
                 await this.process_indexer_xcmtransfer(chain, msg);
-            } else if (msg.crawlBlock != undefined && (msg.chainID == this.chainID)) {
-                await this.process_indexer_crawlBlock(chain, msg);
             }
         } catch (err) {
             this.logger.error({
