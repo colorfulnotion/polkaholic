@@ -1787,6 +1787,7 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                             //1559 (as gWei)
                             evmtx.max_fee_per_gas = tx.maxFeePerGas * gWei
                             evmtx.max_priority_fee_per_gas = tx.maxPriorityFeePerGas * gWei
+                            evmtx.txn_saving = (tx.txn_saving != undefined)? tx.txn_saving * ether : 0
                         }
                         // use the value directly after reindexing
                         if (tx.cumulativeGasUsed){
