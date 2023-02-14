@@ -36,13 +36,23 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "gas",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "gas_price",
-    "type": "FLOAT"
+    "type": "INTEGER"
   },
   {
     "mode": "NULLABLE",
     "name": "input",
     "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "receipt_cumulative_gas_used",
+    "type": "INTEGER"
   },
   {
     "mode": "NULLABLE",
@@ -52,6 +62,11 @@
   {
     "mode": "NULLABLE",
     "name": "receipt_contract_address",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "receipt_effective_gas_price",
     "type": "STRING"
   },
   {
@@ -93,6 +108,21 @@
     "mode": "NULLABLE",
     "name": "base_fee_per_gas",
     "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "receipt_root",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "max_fee_per_gas",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "max_priority_fee_per_gas",
+    "type": "INTEGER"
   },
   {
     "mode": "REQUIRED",

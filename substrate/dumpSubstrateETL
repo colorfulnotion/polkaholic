@@ -11,7 +11,7 @@
 //  dump account matrics in last year: dumpSubstrateETL polkadot accountmatrics
 //  compute xcmteleporfees: dumpSubstrateETL polkadot xcmteleportfees
 //  update blocklog: dumpSubstrateETL blocklog
-//  update blocklog: dumpSubstrateETL blocklogstats
+//  update blocklog: dumpSubstrateETL polkaholic
 var SubstrateETL = require("./substrateetl");
 
 async function main() {
@@ -51,8 +51,8 @@ async function main() {
         await substrateetl.updateBlocklogBulk(paraID) // actually chainID
     } else if (relayChain == "auditblocks") {
         await substrateetl.audit_blocks();
-    } else if (relayChain == "blocklogstats") {
-        await substrateetl.dump_blocklogstats(paraID)
+    } else if (relayChain == "polkaholic") {
+        await substrateetl.dump_substrateetl_polkaholic()
     } else if (paraID == "xcmtransfers" && relayChain) {
         if (logDT) {
             await substrateetl.dump_xcmtransfers(logDT, relayChain);
@@ -70,6 +70,7 @@ async function main() {
     } else if (paraID >= 0 && logDT && relayChain) {
         await substrateetl.dump_substrateetl(logDT, paraID, relayChain, isEVM);
     } else {
+	let tally = 0;
         while (true) {
             let x = await substrateetl.get_random_substrateetl(logDT, paraID, relayChain);
             let _logDT = x.logDT;
@@ -79,6 +80,11 @@ async function main() {
             if (_logDT && (_paraID >= 0) && _relayChain) {
                 await substrateetl.dump_substrateetl(_logDT, _paraID, _relayChain, _isEVM);
                 await substrateetl.sleep(1000);
+		tally++;
+		if ( tally > 20 ) {
+		    await substrateetl.dump_substrateetl_polkaholic()
+		    tally = 0;
+		}
             } else {
                 await substrateetl.sleep(10000);
             }
