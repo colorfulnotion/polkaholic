@@ -49,12 +49,17 @@ module.exports = class SubstrateETL extends AssetManager {
     // all bigquery tables are date-partitioned except 2 for now: chains and specversions
     partitioned_table(tbl) {
         switch (tbl) {
-            case "chains":
-            case "specversions":
-                return (false);
-                break;
+	case "balances":
+	    return "ts";
+	case "evmtxs":
+	case "evmtransfers":
+	    return "block_timestamp";
+        case "chains":
+        case "specversions":
+            return (null);
+            break;
         }
-        return (true);
+        return "block_time";
     }
 
     // sets up system tables (independent of paraID) and paraID specific tables
@@ -76,23 +81,27 @@ module.exports = class SubstrateETL extends AssetManager {
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers"]
         let p = (chainID) ? ` and chainID = ${chainID} ` : ""
         let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
-        let recs = await this.poolREADONLY.query(sql);
+
+	console.log(sql);
+	let recs = await this.poolREADONLY.query(sql);
         for (const rec of recs) {
             let chainID = parseInt(rec.chainID, 10);
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             //console.log(" --- ", chainID, paraID, relayChain);
             for (const tbl of tbls) {
-                let fld = tbl == "balances" ? "ts" : "block_time";
-                let p = (this.partitioned_table(tbl)) ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
+                let fld = this.partitioned_table(tbl);
+                let p =  fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
                 let cmd = `bq mk  --project_id=substrate-etl  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
                 if ((tbl == "evmtxs" || tbl == "evmtransfers") && rec.isEVM == 0) {
-                    cmd = null;
+//                    cmd = null;
                 }
                 try {
                     if (cmd) {
                         console.log(cmd);
-                        await exec(cmd);
+			if ((tbl == "evmtxs")) {
+			    await exec(cmd);
+			}
                     }
                 } catch (e) {
                     console.log(e);
