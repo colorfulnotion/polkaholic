@@ -1754,9 +1754,9 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                             transaction_index: tx.transactionIndex,
                             from_address: tx.from,
                             to_address: tx.to,
-                            value: tx.value * ether,
+                            value: paraTool.floatToInt(tx.value * ether),
                             gas: tx.gasLimit,
-                            gas_price: tx.gasPrice * gWei,
+                            gas_price: paraTool.floatToInt(tx.gasPrice * gWei),
                             input: tx.input,
                             receipt_cumulative_gas_used: cumulative_gas_used,
                             receipt_gas_used: gasUsed, // receipt_gas_used
@@ -1785,16 +1785,16 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                         }
                         if (txType == 2){
                             //1559 (as gWei)
-                            evmtx.max_fee_per_gas = tx.maxFeePerGas * gWei
-                            evmtx.max_priority_fee_per_gas = tx.maxPriorityFeePerGas * gWei
-                            evmtx.txn_saving = (tx.txn_saving != undefined)? tx.txn_saving * ether : 0
+                            evmtx.max_fee_per_gas = paraTool.floatToInt(tx.maxFeePerGas * gWei)
+                            evmtx.max_priority_fee_per_gas = paraTool.floatToInt(tx.maxPriorityFeePerGas * gWei)
+                            evmtx.txn_saving = (tx.txn_saving != undefined)? paraTool.floatToInt(tx.txn_saving * ether) : 0
                         }
                         // use the value directly after reindexing
                         if (tx.cumulativeGasUsed){
                             evmtx.receipt_cumulative_gas_used = tx.cumulativeGasUsed
                         }
                         if (tx.effectiveGasPrice){
-                            evmtx.receipt_effective_gas_price = tx.effectiveGasPrice * gWei
+                            evmtx.receipt_effective_gas_price = paraTool.floatToInt(tx.effectiveGasPrice * gWei)
                         }
                         evmtxs.push(evmtx);
 
