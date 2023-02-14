@@ -1211,6 +1211,16 @@ async function processReceipts(evmReceipts, contractABIs, contractABISignatures)
     }
     */
     console.log(`raw evmReceipts`, evmReceipts)
+    let logIndexCnt = 0
+    for (let i = 0; i < evmReceipts.length; i++) {
+         let evmReceipt = evmReceipts[i]
+         for (let j = 0; j < evmReceipt.logs; i++) {
+             evmReceipt.logs[j].logIndex = logIndexCnt
+             logIndexCnt++
+         }
+         evmReceipts[i] = evmReceipt
+    }
+    console.log(`raw evmReceipts +++`, evmReceipts)
     let recptAsync = await evmReceipts.map(async (receipt) => {
         try {
             return decodeReceipt(receipt, contractABIs, contractABISignatures)
@@ -1221,6 +1231,7 @@ async function processReceipts(evmReceipts, contractABIs, contractABISignatures)
     });
     let decodedReceiptsRes = await Promise.all(recptAsync);
     for (const dReceipt of decodedReceiptsRes) {
+        let decodedLogs = dReceipt.decodedLogs
         decodedReceipts.push(dReceipt)
     }
     console.log(`decodeReceipts`, decodedReceipts)
@@ -1492,7 +1503,7 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
             decodeStatus: 'success',
             address: decodedLog.address,
             transactionLogIndex: log.transactionLogIndex,
-            logIndex: null,
+            logIndex: log.logIndex,
             data: log.data,
             topics: log.topics,
             signature: eventSignature,
@@ -1510,7 +1521,7 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
             decodeStatus: 'error',
             address: log.address,
             transactionLogIndex: log.transactionLogIndex,
-            logIndex: null,
+            logIndex: log.logIndex,
             data: log.data,
             topics: log.topics
         }
@@ -1531,7 +1542,7 @@ function decode_event(log, eventAbIStr, eventSignature, abiDecoder) {
             decodeStatus: 'success',
             address: decodedLog.address,
             transactionLogIndex: log.transactionLogIndex,
-            logIndex: null,
+            logIndex: log.logIndex,
             data: log.data,
             topics: log.topics,
             signature: eventSignature,
@@ -1596,7 +1607,7 @@ function decode_log(log, contractABIs, contractABISignatures) {
         decodeStatus: 'unknown',
         address: log.address,
         transactionLogIndex: log.transactionLogIndex,
-        logIndex: null,
+        logIndex: log.logIndex,
         data: log.data,
         topics: log.topics
     }
