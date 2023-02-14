@@ -1204,13 +1204,7 @@ async function processTranssctions(txns, contractABIs, contractABISignatures) {
 
 async function processReceipts(evmReceipts, contractABIs, contractABISignatures) {
     let decodedReceipts = []
-    /*
-    for (const receipt of evmReceipts) {
-        let decodedReceipt = decodeReceipt(receipt, contractABIs, contractABISignatures)
-        decodedReceipts.push(decodedReceipt)
-    }
-    */
-    console.log(`raw evmReceipts`, evmReceipts)
+    // add logIndex to receipts
     let logIndexCnt = 0
     for (let i = 0; i < evmReceipts.length; i++) {
          let evmReceipt = evmReceipts[i]
@@ -1220,7 +1214,6 @@ async function processReceipts(evmReceipts, contractABIs, contractABISignatures)
          }
          evmReceipts[i] = evmReceipt
     }
-    console.log(`raw evmReceipts +++`, evmReceipts)
     let recptAsync = await evmReceipts.map(async (receipt) => {
         try {
             return decodeReceipt(receipt, contractABIs, contractABISignatures)
@@ -1414,7 +1407,9 @@ function categorizeTokenTransfers(dLog) {
                     from: dEvents[0].value,
                     to: dEvents[1].value,
                     value: dEvents[2].value,
-                    tokenAddress: dLog.address
+                    valueRaw: dEvents[2].value,
+                    tokenAddress: dLog.address,
+                    logIndex: dLog.logIndex
                 }
                 return erc20Transfer
                 break;
@@ -1426,7 +1421,9 @@ function categorizeTokenTransfers(dLog) {
                     from: dEvents[0].value,
                     to: dEvents[1].value,
                     tokenId: dEvents[2].value,
-                    tokenAddress: dLog.address
+                    valueRaw: dEvents[2].value,
+                    tokenAddress: dLog.address,
+                    logIndex: dLog.logIndex
                 }
                 return er721Transfer
                 break;
@@ -1453,7 +1450,8 @@ function categorizeTokenTransfers(dLog) {
                     tokenIds: [dEvents[3].value],
                     values: [dEvents[4].value],
                     tokenAddress: dLog.address,
-                    isBatch: false
+                    isBatch: false,
+                    logIndex: dLog.logIndex
                 }
                 return er1151SingleTransfer
                 break;
@@ -1480,7 +1478,8 @@ function categorizeTokenTransfers(dLog) {
                     tokenIds: dEvents[3].value,
                     values: dEvents[4].value,
                     tokenAddress: dLog.address,
-                    isBatch: true
+                    isBatch: true,
+                    logIndex: dLog.logIndex
                 }
                 return er1151BatchTransfer
                 break;
