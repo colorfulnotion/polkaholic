@@ -1151,7 +1151,7 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by relayChain 
         }
 
         let NL = "\r\n";
-        let dir = "../../substrate-etl"
+        let dir = "../substrate-etl"
 
         sql_tally = `select chain.chainID, chain.id, chain.relayChain, chain.paraID, chain.chainName, min(startDT) startDT, max(endDT) endDT, min(startBN) startBN, max(endBN) endBN, sum(numBlocks_total) numBlocks_total,
 sum(( endBN - startBN + 1) - numBlocks_total) as numBlocks_missing,
@@ -1208,7 +1208,7 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID ord
             console.log("generated", fn);
         }
 
-        sql_tally = `select chain.chainID, chain.relayChain, chain.paraID, chain.id, chain.chainName, startDT, endDT, startBN, endBN, numBlocks_total, monthDT,
+        sql_tally = `select chain.chainID, chain.relayChain, chain.paraID, chain.id, chain.chainName, startDT, endDT, startBN, endBN, numBlocks_total,
 ( endBN - startBN + 1) - numBlocks_total as numBlocks_missing,
 numSignedExtrinsics_sum as numSignedExtrinsics,
 round(numAccountsActive_avg) as numAccountsActive,
@@ -1248,7 +1248,6 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
             }
             let startDT = r.startDT ? r.startDT.toISOString().split('T')[0] : "";
             let endDT = r.endDT ? r.endDT.toISOString().split('T')[0] : "";
-            let monthDT = r.monthDT ? r.monthDT.toISOString().split('T')[0] : "";
             let desc = `${startDT} to ${endDT}`;
             let startBN = r.startBN ? r.startBN.toLocaleString('en-US') : "";
             let endBN = r.endBN ? r.endBN.toLocaleString('en-US') : "";
@@ -1273,7 +1272,7 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
             let numAccountsActive = r.numAccountsActive ? r.numAccountsActive.toLocaleString('en-US') : "";
             let numAddresses = r.numAddresses ? r.numAddresses.toLocaleString('en-US') : "";
             let issues = r.issues ? r.issues : "-";
-            let url = `/substrate-etl/${relayChain}/${paraID}-${id}/${monthDT}.md`
+            let url = `/substrate-etl/${relayChain}/${paraID}-${id}/${endDT}.md`
             j[chainID].push(`| [${desc}](${url}) | ${startBN} | ${endBN} | ${numBlocks_total} | ${numBlocks_missing} ${percent_missing} | ${numSignedExtrinsics} | ${numAccountsActive} | ${numAddresses} | ${issues} | `)
         }
 
@@ -1693,17 +1692,13 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let minLogDT = `${logDT} 00:00:00`;
         let maxLogDT = `${logDT} 23:59:59`;
-        let sql1 = `select blockNumber, blockHash, parentHash from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}' order by blockDT`
-        console.log(sql1);
+        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}'`
+	console.log(sql1);
         let bnRanges = await this.poolREADONLY.query(sql1)
-	let blockHashes = {};
-	let bnStart = bnRanges[0].blockNumber;
-	let bnEnd = bnRanges[bnRanges.length-1].blockNumber;
-	for (const b of bnRanges) {
-	    blockHashes[b.blockNumber] = b.blockHash;
-	}
-	console.log("BH", blockHashes);
-
+        let {
+            bnStart,
+            bnEnd
+        } = bnRanges[0];
         let expected = {}
         // 2. setup directories for tbls on date
         let dir = "/tmp";
@@ -1747,9 +1742,9 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                 end: end
             });
             for (const row of rows) {
-                let bn = parseInt(row.id.substr(2), 16);
-                let r = this.build_block_from_row(row, blockHashes[bn]);
+                let r = this.build_block_from_row(row);
                 let b = r.feed;
+                let bn = parseInt(row.id.substr(2), 16);
 
                 let hdr = b.header;
                 if (!hdr || hdr.number == undefined) {
@@ -1788,11 +1783,32 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                 let evmtxs = [];
                 let evmtransfers = [];
                 if (r.evmFullBlock) {
-
-
+                    let gWei = 10 ** 9
+                    let ether = 10 ** 18
+                    let cumulative_gas_used = 0;
                     let eb = r.evmFullBlock;
+                    /*
+                    value: value / ether,
+                    txType: dTxn.type,
+                    fee: fee / ether,
+                    burnedFee: burnedFee / ether,
+                    txnSaving: txnSaving / ether,
+                    gasLimit: gasLimit,
+                    gasUsed: gasUsed,
+                    cumulativeGasUsed: cumulativeGasUsed,
+                    maxFeePerGas: maxFeePerGas / gWei,
+                    maxPriorityFeePerGas: maxPriorityFeePerGas / gWei,
+                    effectiveGasPrice: effectiveGasPrice / gWei,
+                    baseFeePerGas: baseFeePerGas / gWei,
+                    gasPrice: gasPrice / gWei,
+
+                    the following values in are stored in terms of gWei: maxFeePerGas, maxPriorityFeePerGas, effectiveGasPrice, gasPrice (extra: baseFeePerGas)
+                    the following values in are stored in terms of ether: value (extra: fee, burnedFee, txnSaving)
+                    */
                     eb.transactions.forEach((tx) => {
                         let i = tx.decodedInput ? tx.decodedInput : null;
+                        let gasUsed = tx.gasUsed ?  tx.gasUsed : 0
+                        cumulative_gas_used += gasUsed
                         let evmtx = {
                             //id: id,
                             //para_id: paraID,
@@ -1802,28 +1818,44 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                             from_address: tx.from,
                             to_address: tx.to,
                             value: tx.value,
-                            // gas: gas provided by the sender
+                            gas: tx.gasLimit,
                             gas_price: tx.gasPrice,
                             input: tx.input,
-                            // receipt_cumulative_gas_used
-                            receipt_gas_used: tx.gasUsed, // receipt_gas_used
+                            receipt_cumulative_gas_used: cumulative_gas_used,
+                            receipt_gas_used: gasUsed, // receipt_gas_used
                             receipt_contract_address: tx.creates ? tx.creates : null,
-                            // receipt_root
+                            // receipt_root (irrelevant val from pre Byzantium)
                             receipt_status: tx.status ? 1 : 0,
                             block_timestamp: tx.timestamp,
                             block_number: tx.blockNumber,
                             block_hash: tx.blockHash,
+                            max_fee_per_gas: null,
+                            max_priority_fee_per_gas: null,
+                            receipt_effective_gas_price: null,
                             // max_fee_per_gas, max_priority_fee_per_gas, receipt_effective_gas_price
                             fee: tx.fee,
                             burned_fee: tx.burnedFee,
                             gas_limit: tx.gasLimit,
-                            base_fee_per_gas: tx.baseFeePerGas,
+                            base_fee_per_gas: tx.baseFeePerGas, // this is not real value
                             extrinsic_id: tx.substrate ? tx.substrate.extrinsicID : null,
                             extrinsic_hash: tx.substrate ? tx.substrate.extrinsicHash : null,
                             transaction_type: tx.txType ? tx.txType : -1,
                             method_id: i && i.methodID ? i.methodID : null,
                             signature: i && i.signature ? i.signature : null,
                             params: i && i.params ? i.params : null
+                        }
+                        if (tx.transaction_type == 2){
+                            //1559 (as gWei)
+                            tx.max_fee_per_gas = tx.maxFeePerGas
+                            tx.max_priority_fee_per_gas = tx.maxPriorityFeePerGas
+                            //tx.receipt_effective_gas_price = tx.baseFeePerGas
+                        }
+                        // use the value directly after reindexing
+                        if (tx.cumulativeGasUsed){
+                            tx.receipt_cumulative_gas_used = tx.cumulativeGasUsed
+                        }
+                        if (tx.effectiveGasPrice){
+                            tx.receipt_effective_gas_price = tx.effectiveGasPrice
                         }
                         evmtxs.push(evmtx);
 
