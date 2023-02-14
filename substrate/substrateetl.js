@@ -1741,7 +1741,7 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                     the following values in are stored in terms of ether: value (extra: fee, burnedFee, txnSaving)
                     */
                     eb.transactions.forEach((tx) => {
-                        console.log(`tx!! ${tx.effectiveGasPrice}`, tx)
+                        //console.log(`tx!! ${tx.effectiveGasPrice}`, tx)
                         let i = tx.decodedInput ? tx.decodedInput : null;
                         let gasUsed = tx.gasUsed ?  tx.gasUsed : 0
                         let txType = (tx.txType != undefined)? tx.txType : -1
@@ -1778,7 +1778,7 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
 //                            base_fee_per_gas: tx.baseFeePerGas, // this is not real value
                             extrinsic_id: tx.substrate ? tx.substrate.extrinsicID : null,
                             extrinsic_hash: tx.substrate ? tx.substrate.extrinsicHash : null,
-                            assess_list: tx.assess_list ? tx.assess_list : null,
+                            access_list: (tx.accessList != undefined) ? tx.accessList : null,
                             method_id: i && i.methodID ? i.methodID : null,
                             signature: i && i.signature ? i.signature : null,
                             params: i && i.params ? i.params : null
