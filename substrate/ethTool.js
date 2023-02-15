@@ -576,6 +576,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
 
     // max_fee_per_gas, max_priority_fee_per_gas, receipt_effective_gas_price
     */
+    //console.log(`dReceipt`, dReceipt)
     let gWei = 10 ** 9
     let ether = 10 ** 18
     let value = paraTool.dechexToInt(dTxn.value)
@@ -1203,12 +1204,16 @@ async function processTranssctions(txns, contractABIs, contractABISignatures) {
 
 async function processReceipts(evmReceipts, contractABIs, contractABISignatures) {
     let decodedReceipts = []
-    /*
-    for (const receipt of evmReceipts) {
-        let decodedReceipt = decodeReceipt(receipt, contractABIs, contractABISignatures)
-        decodedReceipts.push(decodedReceipt)
+    // add logIndex to receipts
+    let logIndexCnt = 0
+    for (let i = 0; i < evmReceipts.length; i++) {
+         let evmReceipt = evmReceipts[i]
+         for (let j = 0; j < evmReceipt.logs; i++) {
+             evmReceipt.logs[j].logIndex = logIndexCnt
+             logIndexCnt++
+         }
+         evmReceipts[i] = evmReceipt
     }
-    */
     let recptAsync = await evmReceipts.map(async (receipt) => {
         try {
             return decodeReceipt(receipt, contractABIs, contractABISignatures)
@@ -1219,8 +1224,10 @@ async function processReceipts(evmReceipts, contractABIs, contractABISignatures)
     });
     let decodedReceiptsRes = await Promise.all(recptAsync);
     for (const dReceipt of decodedReceiptsRes) {
+        let decodedLogs = dReceipt.decodedLogs
         decodedReceipts.push(dReceipt)
     }
+    //console.log(`decodeReceipts`, decodedReceipts)
     return decodedReceipts
 }
 
@@ -1400,7 +1407,9 @@ function categorizeTokenTransfers(dLog) {
                     from: dEvents[0].value,
                     to: dEvents[1].value,
                     value: dEvents[2].value,
-                    tokenAddress: dLog.address
+                    valueRaw: dEvents[2].value,
+                    tokenAddress: dLog.address,
+                    logIndex: dLog.logIndex
                 }
                 return erc20Transfer
                 break;
@@ -1412,7 +1421,9 @@ function categorizeTokenTransfers(dLog) {
                     from: dEvents[0].value,
                     to: dEvents[1].value,
                     tokenId: dEvents[2].value,
-                    tokenAddress: dLog.address
+                    valueRaw: dEvents[2].value,
+                    tokenAddress: dLog.address,
+                    logIndex: dLog.logIndex
                 }
                 return er721Transfer
                 break;
@@ -1439,7 +1450,8 @@ function categorizeTokenTransfers(dLog) {
                     tokenIds: [dEvents[3].value],
                     values: [dEvents[4].value],
                     tokenAddress: dLog.address,
-                    isBatch: false
+                    isBatch: false,
+                    logIndex: dLog.logIndex
                 }
                 return er1151SingleTransfer
                 break;
@@ -1466,7 +1478,8 @@ function categorizeTokenTransfers(dLog) {
                     tokenIds: dEvents[3].value,
                     values: dEvents[4].value,
                     tokenAddress: dLog.address,
-                    isBatch: true
+                    isBatch: true,
+                    logIndex: dLog.logIndex
                 }
                 return er1151BatchTransfer
                 break;
@@ -1489,6 +1502,7 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
             decodeStatus: 'success',
             address: decodedLog.address,
             transactionLogIndex: log.transactionLogIndex,
+            logIndex: log.logIndex,
             data: log.data,
             topics: log.topics,
             signature: eventSignature,
@@ -1506,6 +1520,7 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
             decodeStatus: 'error',
             address: log.address,
             transactionLogIndex: log.transactionLogIndex,
+            logIndex: log.logIndex,
             data: log.data,
             topics: log.topics
         }
@@ -1526,6 +1541,7 @@ function decode_event(log, eventAbIStr, eventSignature, abiDecoder) {
             decodeStatus: 'success',
             address: decodedLog.address,
             transactionLogIndex: log.transactionLogIndex,
+            logIndex: log.logIndex,
             data: log.data,
             topics: log.topics,
             signature: eventSignature,
@@ -1536,7 +1552,7 @@ function decode_event(log, eventAbIStr, eventSignature, abiDecoder) {
         abiDecoder.discardNonDecodedLogs()
         let topic0 = log.topics[0]
         let topicLen = log.topics.length
-        console.log(`fallback decode txHash=${log.transactionHash} LogIndex=${log.transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
+        console.log(`fallback decode txHash=${log.transactionHash} transactionLogIndex=${log.transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
         return decode_event_fresh(log, eventAbIStr, eventSignature)
     }
 }
@@ -1590,6 +1606,7 @@ function decode_log(log, contractABIs, contractABISignatures) {
         decodeStatus: 'unknown',
         address: log.address,
         transactionLogIndex: log.transactionLogIndex,
+        logIndex: log.logIndex,
         data: log.data,
         topics: log.topics
     }

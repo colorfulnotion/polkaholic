@@ -1818,8 +1818,11 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                     the following values in are stored in terms of ether: value (extra: fee, burnedFee, txnSaving)
                     */
                     eb.transactions.forEach((tx) => {
+                        //console.log(`tx!! ${tx.effectiveGasPrice}`, tx)
                         let i = tx.decodedInput ? tx.decodedInput : null;
-                        let gasUsed = tx.gasUsed ? tx.gasUsed : 0
+                        let gasUsed = tx.gasUsed ?  tx.gasUsed : 0
+                        let txType = (tx.txType != undefined)? tx.txType : -1
+
                         cumulative_gas_used += gasUsed
                         let evmtx = {
                             //id: id,
@@ -1829,9 +1832,9 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                             transaction_index: tx.transactionIndex,
                             from_address: tx.from,
                             to_address: tx.to,
-                            value: tx.value,
+                            value: paraTool.floatToInt(tx.value * ether),
                             gas: tx.gasLimit,
-                            gas_price: tx.gasPrice,
+                            gas_price: paraTool.floatToInt(tx.gasPrice * gWei),
                             input: tx.input,
                             receipt_cumulative_gas_used: cumulative_gas_used,
                             receipt_gas_used: gasUsed, // receipt_gas_used
@@ -1843,47 +1846,65 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                             block_hash: tx.blockHash,
                             max_fee_per_gas: null,
                             max_priority_fee_per_gas: null,
+                            transaction_type: txType,
                             receipt_effective_gas_price: null,
-                            // max_fee_per_gas, max_priority_fee_per_gas, receipt_effective_gas_price
+
+                            // polkaholic new fields
                             fee: tx.fee,
+                            txn_saving: null,
                             burned_fee: tx.burnedFee,
-                            gas_limit: tx.gasLimit,
-                            base_fee_per_gas: tx.baseFeePerGas, // this is not real value
+//                            base_fee_per_gas: tx.baseFeePerGas, // this is not real value
                             extrinsic_id: tx.substrate ? tx.substrate.extrinsicID : null,
                             extrinsic_hash: tx.substrate ? tx.substrate.extrinsicHash : null,
-                            transaction_type: tx.txType ? tx.txType : -1,
+                            access_list: (tx.accessList != undefined) ? tx.accessList : null,
                             method_id: i && i.methodID ? i.methodID : null,
                             signature: i && i.signature ? i.signature : null,
                             params: i && i.params ? i.params : null
                         }
-                        if (tx.transaction_type == 2) {
+                        if (txType == 2){
+
                             //1559 (as gWei)
-                            tx.max_fee_per_gas = tx.maxFeePerGas
-                            tx.max_priority_fee_per_gas = tx.maxPriorityFeePerGas
-                            //tx.receipt_effective_gas_price = tx.baseFeePerGas
+                            evmtx.max_fee_per_gas = paraTool.floatToInt(tx.maxFeePerGas * gWei)
+                            evmtx.max_priority_fee_per_gas = paraTool.floatToInt(tx.maxPriorityFeePerGas * gWei)
+                            evmtx.txn_saving = (tx.txn_saving != undefined)? paraTool.floatToInt(tx.txn_saving * ether) : 0
                         }
                         // use the value directly after reindexing
-                        if (tx.cumulativeGasUsed) {
-                            tx.receipt_cumulative_gas_used = tx.cumulativeGasUsed
+                        if (tx.cumulativeGasUsed){
+                            evmtx.receipt_cumulative_gas_used = tx.cumulativeGasUsed
                         }
-                        if (tx.effectiveGasPrice) {
-                            tx.receipt_effective_gas_price = tx.effectiveGasPrice
+                        if (tx.effectiveGasPrice){
+                            evmtx.receipt_effective_gas_price = paraTool.floatToInt(tx.effectiveGasPrice * gWei)
+
                         }
                         evmtxs.push(evmtx);
 
                         let transfers = tx.transfers;
                         transfers.forEach((t) => {
+                            let transferType = t.type
+                            let tokenIDs = null
+                            let tokenValues = null
+                            let operator = null
+                            let value = t.value
+                            if (transferType == "ERC1155"){
+                                tokenIDs = t.tokenIds
+                                tokenValues = t.values
+                                operator = t.operator
+                                value = null
+                            }
                             let evmtransfer = {
                                 token_address: t.tokenAddress,
                                 from_address: t.from,
                                 to_address: t.to,
-                                value: t.value,
+                                value: value,
+                                operator: operator,
+                                token_ids: tokenIDs,
+                                token_values: tokenValues,
                                 transaction_hash: tx.transactionHash,
-                                //log_index: 0,
+                                log_index: (tx.logIndex != undefined)? tx.logIndex : -1,
                                 block_timestamp: tx.timestamp,
                                 block_number: tx.blockNumber,
                                 block_hash: tx.blockHash ? tx.blockHash : "",
-                                transfer_type: t.type,
+                                transfer_type: transferType,
                             }
                             evmtransfers.push(evmtransfer);
                         });
