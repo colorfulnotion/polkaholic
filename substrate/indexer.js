@@ -8287,12 +8287,13 @@ module.exports = class Indexer extends AssetManager {
         let xcmReadyForIndexing = (this.isRelayChain && indexed) ? 1 : 0;
         let numIndexingWarns = this.numIndexingWarns;
         let elapsedSeconds = (new Date().getTime() - indexStartTS) / 1000
+	let indexlogvals = ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing", "lastAttemptEndDT", "lastAttemptHostname"];
         await this.upsertSQL({
             "table": "indexlog",
             "keys": ["chainID", "indexTS"],
-            "vals": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"],
-            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', '${indexed}', 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}', 0, '${xcmReadyForIndexing}')`],
-            "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"]
+            "vals": indexlogvals,
+            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', '${indexed}', 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}', 0, '${xcmReadyForIndexing}', Now(), '${this.hostname}')`],
+            "replace": indexlogvals
         });
 
         await this.upsertSQL({
