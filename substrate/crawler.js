@@ -1130,7 +1130,7 @@ module.exports = class Crawler extends Indexer {
                 let jmp = eventsperblock > 0 ? Math.round(7200 / eventsperblock) : 50;
                 if (jmp < 10) jmp = 10;
                 // increment attempted, which generally will mean some other indexer won't attempt the same thing until its the last unprocessed hour
-                let sql0 = `update indexlog set attempted = attempted + 1, lastAttemptStartDT = Now() where chainID = '${chain.chainID}' and indexTS = ${indexlogs[i].indexTS}`
+                let sql0 = `update indexlog set attempted = attempted + 1, lastAttemptStartDT = Now(), lastAttemptHostname = '${this.hostname}' where chainID = '${chain.chainID}' and indexTS = ${indexlogs[i].indexTS}`
                 this.batchedSQL.push(sql0);
                 await this.update_batchedSQL();
                 try {

@@ -283,6 +283,62 @@ let chains = [
         "ss58Format": 18
     },
     {
+        "chainID": 1001,
+        "paraID": 1001,
+        "id": "collectives",
+        "iconUrl": "https://cdn.polkaholic.io/bridgehub.svg",
+        "chainName": "Collectives",
+        "ss58Format": 0
+    },
+    {
+        "chainID": 2048,
+        "paraID": 2048,
+        "id": "bitgreen",
+        "iconUrl": "https://cdn.polkaholic.io/bitgreen.png",
+        "chainName": "Bitgreen",
+        "ss58Format": 2106
+    },
+    {
+        "chainID": 2051,
+        "paraID": 2051,
+        "id": "ajuna",
+        "iconUrl": "https://cdn.polkaholic.io/ajuna.png",
+        "chainName": "Ajuna",
+        "ss58Format": 1328
+    },
+    {
+        "chainID": 2091,
+        "paraID": 2091,
+        "id": "frequency",
+        "iconUrl": "https://cdn.polkaholic.io/frequency.svg",
+        "chainName": "Frequency",
+        "ss58Format": 90
+    },
+    {
+        "chainID": 22086,
+        "paraID": 2086,
+        "id": "spiritnet",
+        "iconUrl": "https://cdn.polkaholic.io/kilt.png",
+        "chainName": "KILT Spiritnet",
+        "ss58Format": 38
+    },
+    {
+        "chainID": 22100,
+        "paraID": 2100,
+        "id": "subsocialx",
+        "iconUrl": "https://cdn.polkaholic.io/subsocial.svg",
+        "chainName": "SubsocialX",
+        "ss58Format": 28
+    },
+    {
+        "chainID": 2094,
+        "paraID": 2094,
+        "id": "pendulum",
+        "iconUrl": "https://cdn.polkaholic.io/pendulum.svg",
+        "chainName": "Pendulum",
+        "ss58Format": 56
+    },
+    {
         "isRelayChain": true,
         "chainID": 2,
         "paraID": 0,
@@ -380,14 +436,6 @@ let chains = [
         "ss58Format": 2092
     },
     {
-        "chainID": 22086,
-        "paraID": 2086,
-        "id": "spiritnet",
-        "iconUrl": "https://cdn.polkaholic.io/kilt.png",
-        "chainName": "KILT Spiritnet",
-        "ss58Format": 38
-    },
-    {
         "chainID": 22090,
         "paraID": 2090,
         "id": "basilisk",
@@ -480,7 +528,7 @@ let chains = [
         "paraID": 2123,
         "id": "gm",
         "iconUrl": "https://cdn.polkaholic.io/gm.png",
-        "chainName": "GM Parachain",
+        "chainName": "GM",
         "ss58Format": 7013
     },
     {
@@ -596,14 +644,6 @@ let chains = [
         "ss58Format": 69
     },
     {
-        "chainID": 22100,
-        "paraID": 2100,
-        "id": "subsocialx",
-        "iconUrl": "https://cdn.polkaholic.io/subsocial.svg",
-        "chainName": "SubsocialX",
-        "ss58Format": 28
-    },
-    {
         "chainID": 22110,
         "paraID": 2110,
         "id": "mangatax",
@@ -611,35 +651,30 @@ let chains = [
         "chainName": "Mangata",
         "ss58Format": 42
     },
-   {
-        "isRelayChain": true,
-        "chainID": 60000,
-        "paraID": 0,
-        "id": "moonbase-relay",
-        "iconUrl": "https://cdn.polkaholic.io/moonbase_alpha.png",
-        "chainName": "moonbase-relay",
+    {
+        "chainID": 22124,
+        "paraID": 2124,
+        "id": "amplitude",
+        "iconUrl": "https://cdn.polkaholic.io/amplitude.svg",
+        "chainName": "Amplitude",
+        "ss58Format": 57
+    },
+    {
+        "chainID": 21002,
+        "paraID": 1002,
+        "id": "bridgehub",
+        "iconUrl": "https://cdn.polkaholic.io/bridgehub.svg",
+        "chainName": "Bridgehub",
+        "ss58Format": 2
+    },
+    {
+        "chainID": 22236,
+        "paraID": 2236,
+        "id": "subzero",
+        "iconUrl": "https://cdn.polkaholic.io/subzero.svg",
+        "chainName": "subzero",
         "ss58Format": 42
-    },
-    {
-        "chainID": 61000,
-        "paraID": 1000,
-        "id": "moonbase-alpha",
-        "iconUrl": "https://cdn.polkaholic.io/moonbase_alpha.png",
-        "chainName": "Moonbase Alpha",
-        "ss58Format": 1287,
-        "isEVM": 1,
-        "hasSystemContracts": 1
-    },
-    {
-        "chainID": 60888,
-        "paraID": 888,
-        "id": "moonbase-beta",
-        "iconUrl": "https://cdn.polkaholic.io/moonbase_alpha.png",
-        "chainName": "Moonbase Beta",
-        "ss58Format": 1288,
-        "isEVM": 1,
-        "hasSystemContracts": 1
-    },
+    }
   ]
 
   let selchain = "all";
@@ -907,7 +942,7 @@ let chains = [
 	</script>
       	<% for ( const c of chains ) { %>
           <% if ( c.isRelayChain ) {
-              let relay = `${c.chainName.replace('-relay', '')} & Parachain`
+              let relay = `${c.chainName.replace('-relay', '')} & Parachains`
                %>
               <br>
               <h6><%= relay %></h6>

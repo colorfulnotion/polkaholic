@@ -3453,7 +3453,7 @@ module.exports = class Indexer extends AssetManager {
         } catch (err) {
             o.pk = "err";
             pk = "err"
-            this.numIndexingErrors++;
+            this.numIndexingWarns++;
         }
 
         // parse value
@@ -3672,7 +3672,7 @@ module.exports = class Indexer extends AssetManager {
             console.log(`parse_trace_from_auto error [${decoratedKey}]`, err.toString())
             o.pk = "err";
             pk = "err"
-            this.numIndexingErrors++;
+            this.numIndexingWarns++;
         }
 
         // parse value
@@ -7925,10 +7925,10 @@ module.exports = class Indexer extends AssetManager {
 
             // errors, warns within this block ..
             let numIndexingErrors = this.numIndexingErrors;
-            if (this.chainParser) {
-                numIndexingErrors += this.chainParser.numParserErrors;
-            }
             let numIndexingWarns = this.numIndexingWarns;
+            if (this.chainParser) {
+                numIndexingWarns += this.chainParser.numParserErrors;
+            }
             this.sendManagerStat(numIndexingErrors, numIndexingWarns, elapsedTS)
             return (r.xcmMeta);
         } catch (err) {
@@ -8278,21 +8278,23 @@ module.exports = class Indexer extends AssetManager {
 
         // record a record in indexlog
         let numIndexingErrors = this.numIndexingErrors;
-        if (this.chainParser) {
-            numIndexingErrors += this.chainParser.numParserErrors;
+        let numIndexingWarns = this.numIndexingWarns;
+	if (this.chainParser) {
+            numIndexingWarns += this.chainParser.numParserErrors;
         }
         let indexed = (numIndexingErrors == 0) ? 1 : 0;
         // mark relaychain period's xcmIndexed = 0 and xcmReadyForIndexing = 1 if indexing is successful and without errors.
         // this signals that the record is reeady for indexReindexXcm
         let xcmReadyForIndexing = (this.isRelayChain && indexed) ? 1 : 0;
-        let numIndexingWarns = this.numIndexingWarns;
+        
         let elapsedSeconds = (new Date().getTime() - indexStartTS) / 1000
+	let indexlogvals = ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing", "lastAttemptEndDT", "lastAttemptHostname"];
         await this.upsertSQL({
             "table": "indexlog",
             "keys": ["chainID", "indexTS"],
-            "vals": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"],
-            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', '${indexed}', 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}', 0, '${xcmReadyForIndexing}')`],
-            "replace": ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing"]
+            "vals": indexlogvals,
+            "data": [`('${chainID}', '${indexTS}', '${logDT}', '${hr}', Now(), '${elapsedSeconds}', '${indexed}', 1, '${this.specVersion}', 1, '${numIndexingErrors}', '${numIndexingWarns}', 0, '${xcmReadyForIndexing}', Now(), '${this.hostname}')`],
+            "replace": indexlogvals
         });
 
         await this.upsertSQL({

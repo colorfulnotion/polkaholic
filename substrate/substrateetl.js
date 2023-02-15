@@ -111,7 +111,7 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
-    async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null, lookbackDays = 3) {
+    async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null, lookbackDays = 3000) {
 
         let w = "";
         if (paraID >= 0 && relayChain) {
@@ -120,7 +120,7 @@ module.exports = class SubstrateETL extends AssetManager {
         } else {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID  and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and attempted < 2 and ( logDT <= date(date_sub(Now(), interval 0 day)) or (logDT = date(Now()) and loadDT < date_sub(Now(), interval 1 hour) ) )  ${w} order by attempted, logDT desc, rand() limit 1`
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and attempted < 2 and ( logDT <= date(date_sub(Now(), interval 0 day)) or (logDT = date(Now()) and loadDT < date_sub(Now(), interval 1 hour) ) ) ${w} order by attempted, logDT desc, rand() limit 1`;
         console.log("get_random_substrateetl", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
@@ -144,6 +144,45 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
+    async audit_fix(chainID = null) {
+	let w = chainID >= 0 ? ` and chainID = '${chainID}'` : "";
+        // 1. find problematic periods with a small number of records (
+        let sql = `select CONVERT(auditFailures using utf8) as failures, chainID from blocklogstats where audited in ( 'Failure' ) ${w} order by chainID, monthDT`
+	console.log(sql);
+        let recs = await this.poolREADONLY.query(sql);
+        if (recs.length == 0) return (false);
+	for ( const f of recs ) {
+	    let failures = JSON.parse(f.failures)
+	    if ( failures.errors && failures.errors.length > 0 ) {
+		for (const bn of failures.errors) {
+		    let paraID = paraTool.getParaIDfromChainID(f.chainID);
+		    let relayChain = paraTool.getRelayChainByChainID(f.chainID);
+		    // remove old blocks
+		    if ( false ) {
+			console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(bn-1)}`)
+			console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(bn)}`)
+			console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(bn+1)}`)
+		    } else {
+/*			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn-1}';`);
+			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn}';`);
+			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn+1}';`); */
+			console.log(`./indexBlock  ${f.chainID} ${bn-1}`);
+			console.log(`./indexBlock  ${f.chainID} ${bn}`);
+			console.log(`./indexBlock  ${f.chainID} ${bn+1}`);
+		    }
+		    // dump day into bigquery
+		    console.log(`-- select blockDT, Month(blockDT), blockNumber from block${f.chainID} where blockNumber = "${bn}"`);
+		    console.log(`./dumpSubstrateETL ${relayChain} ${paraID} [LOGDT]`);
+		    console.log("");
+		    // reaudit the month
+		    //console.log(`-- update blocklogstats set audited = 'Unknown' where chainID = ${f.chainID} and monthDT = [MONTHDT]`)
+		    //console.log(`./dumpSubstrateETL auditblocks ${f.chainID}`);
+		}
+	    }
+	}
+	
+    }
+    
     async audit_blocks(chainID = null) {
         // 1. find problematic periods with a small number of records (
         let w = chainID ? ` and chainID = ${chainID}` : ""

@@ -49,6 +49,8 @@ async function main() {
         await substrateetl.compute_teleportfees(relayChain, logDT);
     } else if (relayChain == "blocklog") {
         await substrateetl.updateBlocklogBulk(paraID) // actually chainID
+    } else if (relayChain == "auditfix") {
+        await substrateetl.audit_fix(paraID); // actually chainID
     } else if (relayChain == "auditblocks") {
         await substrateetl.audit_blocks(paraID); // actually chainID
     } else if (relayChain == "polkaholic") {

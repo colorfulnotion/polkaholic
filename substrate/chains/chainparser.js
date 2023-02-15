@@ -5383,6 +5383,80 @@ module.exports = class ChainParser {
         return [false, false]
     }
 
+    processAssetsIssuedSignal(indexer, extrinsicID, e, mpState, finalized = false) {
+        /*
+        data": [
+          101,
+          "p8DR3iQJe3tN8RXizq3TnH3LfHCU7e7PNQ9zTwfAj7RFzExL9",
+          96000000
+        ]
+        data: [
+          '0xa922fef94566104a6e5a35a4fcddaa9f',
+          '0x21E67e31Cd2FbE33DA93443B93507841C657C044',
+          144975036571423
+        ]
+        */
+        //console.log(`assets(Issued) detected`, e)
+
+        let candidate = false
+        let [pallet, method] = indexer.parseEventSectionMethod(e)
+        let palletMethod = `${pallet}(${method})`
+        let d = e.data;
+        let fromAddress = paraTool.getPubKey(d[1])
+        /*
+        let assetIDWithComma = paraTool.toNumWithComma(paraTool.dechexAssetID(d[0]))
+        let assetID = this.cleanedAssetID(assetIDWithComma)
+        let parsedAsset = {
+            Token: assetID
+        }
+        let rawAssetString = this.token_to_string(parsedAsset);
+        */
+        let relayChain = indexer.relayChain
+        let targetedSymbol = this.processXcmGenericCurrencyID(indexer, d[0]) //inferred approach
+        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "processXcmGenericCurrencyID", palletMethod, d[0])
+
+        //TODO: not sure here..
+        //let assetString = this.processGenericCurrencyID(indexer, d[0]);
+        //let rawAssetString = this.processRawGenericCurrencyID(indexer, d[0]);
+        //let parsedAsset = JSON.parse(assetString)
+        // let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
+        if (targetedSymbol != undefined && targetedSymbol != false) {
+            let amountReceived = paraTool.dechexToInt(d[2])
+            /*
+            let rAasset = {
+                Token: assetInfo.symbol
+            }
+            let assetString = this.token_to_string(rAasset);
+            let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
+            */
+            let eventIndex = e.eventID.split('-')[3]
+            //if (this.debugLevel >= paraTool.debugTracing) console.log(`processAssetIssued`, fromAddress, amountReceived, targetedSymbol)
+            if (paraTool.validAmount(amountReceived)) {
+                let caller = `generic processIncomingAssetSignal assets:Issued`
+                candidate = {
+                    chainIDDest: indexer.chainID,
+                    eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
+                    extrinsicID: extrinsicID,
+                    pallet: pallet,
+                    method: method,
+                    fromAddress: fromAddress,
+                    blockNumberDest: this.parserBlockNumber,
+                    sentAt: this.parserWatermark,
+                    relayChain: relayChain,
+                    xcmSymbol: targetedSymbol,
+                    xcmInteriorKey: targetedXcmInteriorKey,
+                    destTS: this.parserTS,
+                    amountReceived: amountReceived,
+                    msgHash: mpState.msgHash,
+                }
+                return [candidate, caller]
+            } else {
+                // TODO: log
+            }
+        }
+        return [false, false]
+    }
+    
     processEqBalanceSignal(indexer, extrinsicID, e, mpState, finalized = false) {
         /*
         data": [
