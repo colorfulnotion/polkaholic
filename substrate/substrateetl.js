@@ -144,34 +144,58 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async audit_blocks() {
+    async audit_blocks(chainID = null) {
         // 1. find problematic periods with a small number of records (
-        let sql = `select chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b from blocklog where chainID not in ( 22110, 22100, 0 ) and chainID > 21001 having logDT >= '2022-01-01' and b >= -30 and b < 0 order by chainID, logDT limit 500`
+        let w = chainID ? ` and chainID = ${chainID}` : ""
+        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where audited in ( 'Unknown' )  ${w} order by chainID, monthDT`
+	console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
 
         // 2. within each, find anything missing in substrate-etl
         let cnt = 0;
         for (const r of recs) {
+	    console.log(r);
             let chainID = r.chainID;
             let startBN = r.startBN;
             let endBN = r.endBN;
-            let paraID = paraTool.getParaIDfromChainID(chainID);
+            let startDT = r.startDT ? r.startDT.toISOString().split('T')[0] : "2020-01-01";
+	    let endDT = r.endDT ? r.endDT.toISOString().split('T')[0] : "2029-01-01";
+	    let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
-            let sqlQuery = `SELECT number FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE number >= ${startBN} and number <= ${endBN} order by number;`
-            console.log(sqlQuery);
+	    let monthDT = r.monthDT ? r.monthDT.toISOString().split('T')[0] : "";
+            let sqlQuery = `SELECT number, \`hash\` as block_hash, parent_hash FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE Date(block_time) >= '${startDT}' and Date(block_time) <= '${endDT}' and number >= ${startBN} and number <= ${endBN} order by number;`
+	    console.log(sqlQuery);
             let rows = await this.execute_bqJob(sqlQuery);
             let blocks = {};
+	    let prevHash = null;
+	    let prevBN = null
+	    let gaps = [];
+	    let errors = [];
             for (const row of rows) {
+		if ( prevBN && row.number != prevBN + 1 ) {
+		    gaps.push([prevBN + 1, row.number - 1]);
+		} else if ( prevHash && row.parent_hash != prevHash ) {
+		    errors.push(row.number);
+		}
                 blocks[row.number] = 1;
+		prevBN = row.number;
+		prevHash = row.block_hash;
             }
-            for (let bn = startBN; bn <= endBN; bn++) {
-                if (blocks[bn] == undefined) {
-                    let crawlsql = `update block${chainID} set crawlBlock = 1 where blockNumber = ${bn}`;
-                    console.log(cnt, `: ${crawlsql}`);
-                    this.batchedSQL.push(sql);
-                }
-            }
+	    let audited = 'Unknown'
+	    let failures = "";
+	    if ( gaps.length > 0 || errors.length > 0 ) {
+		audited = "Failure";
+		failures = JSON.stringify({gaps, errors})
+		if ( failures.length > 65000 ) {
+		    failures = JSON.stringify({  gaps_length: gaps.length, errors_length: errors.length })
+		}
+	    } else {
+		audited = "Success"
+	    }
+	    let sql = `update blocklogstats set audited = '${audited}', auditDT = Now(), auditFailures = ${mysql.escape(failures)} where chainID = ${chainID} and monthDT = "${monthDT}"`;
+	    console.log(sql);
+	    this.batchedSQL.push(sql);
             await this.update_batchedSQL();
             cnt++;
         }
