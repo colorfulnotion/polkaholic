@@ -2857,7 +2857,7 @@ module.exports = class ChainParser {
                         v1_id_concrete_interiorVal = new_v1_id_concrete_interiorVal
                         let interiorVStr0 = JSON.stringify(v1_id_concrete_interiorVal)
                         if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint)) {
-                            if (interiorVStr0.includes("generalIndex") && !interiorVStr0.includes("palletInstance")){
+                            if (interiorVStr0.includes("generalIndex") && !interiorVStr0.includes("palletInstance")) {
                                 //Pad palletInstance for RMRK/USDT
                                 let padded_interiorV0 = [expandedParachainPiece, {
                                     palletInstance: 50
@@ -2964,7 +2964,7 @@ module.exports = class ChainParser {
                             interiorVStr = JSON.stringify(new_interiorV0)
                             if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint)) {
                                 // pad palletInstance
-                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")){
+                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")) {
                                     console.log(`pad!! original`, new_interiorV0)
                                     interiorVStr = JSON.stringify([expandedParachainPiece, {
                                         palletInstance: 50
@@ -2998,7 +2998,7 @@ module.exports = class ChainParser {
                             interiorVStr = JSON.stringify(new_interiorV0)
                             if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint)) {
                                 // pad palletInstance
-                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")){
+                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")) {
                                     //console.log(`pad!! original`, new_interiorV0)
                                     let padded_interiorV0 = [expandedParachainPiece, {
                                         palletInstance: 50
@@ -3019,7 +3019,7 @@ module.exports = class ChainParser {
                 //console.log(`[${xcmInteriorKey}] cachedXcmAssetInfo`, cachedXcmAssetInfo)
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     targetedAsset = cachedXcmAssetInfo.asset
-                    if (!targetedAsset && cachedXcmAssetInfo.symbol != undefined){
+                    if (!targetedAsset && cachedXcmAssetInfo.symbol != undefined) {
                         targetSymbol = cachedXcmAssetInfo.symbol
                     }
                     //rawTargetedAsset = cachedXcmAssetInfo.asset
@@ -5495,7 +5495,7 @@ module.exports = class ChainParser {
         let candidateType = d[3]
         let decimals = 9
         let targetedSymbol = false
-        if (eqAssetMap[currencyID] != undefined){
+        if (eqAssetMap[currencyID] != undefined) {
             decimals = eqAssetMap[currencyID].decimals
             targetedSymbol = eqAssetMap[currencyID].symbol
         }
