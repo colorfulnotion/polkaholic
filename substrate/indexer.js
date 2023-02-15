@@ -1806,6 +1806,17 @@ module.exports = class Indexer extends AssetManager {
                         } else if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
                             let rat = r.amountReceived / amountSent; // old default
                             let ratRequirement = (r.isFeeItem) ? .9 : .97;
+                            if (this.chainID == 2011) {
+                                this.logger.error({
+                                    op: "search_xcmtransferdestcandidate:EQUILIBRIUM",
+                                    rat,
+                                    amountReceived: r.amountReceived,
+                                    xcmTeleportFees: r.xcmTeleportFees,
+                                    amountSent,
+                                    r,
+                                    xcmtransfer
+                                });
+                            }
                             if (r.xcmTeleportFees) { // new approach
                                 if ((r.xcmTeleportFees + r.amountReceived) <= amountSent) {
                                     rat = (r.xcmTeleportFees + r.amountReceived) / amountSent;

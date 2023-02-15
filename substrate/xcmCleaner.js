@@ -844,25 +844,25 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             }
             // imperfect matching: first with xcmtransferdestcandidate, then with substrateetl, but only if we have an existing xcmTeleportFees model
             if (best == null) {
-		let xcmTeleportFees = this.getXCMTeleportFees(xcm.chainIDDest, xcm.symbol);
-		if (this.cachedMessages && this.cachedMessages.length > 0) {
+                let xcmTeleportFees = this.getXCMTeleportFees(xcm.chainIDDest, xcm.symbol);
+                if (this.cachedMessages && this.cachedMessages.length > 0) {
                     best = await this.searchXCMTransferDestCandidate(false, xcm.msgHash, xcm.sourceTS, xcm.amountSent, destAddress, xcm.chainID, xcm.chainIDDest, xcm.sentAt, xcmTeleportFees);
-		}
-		if (best == null && this.cachedRows && this.cachedRows.length > 0) {
+                }
+                if (best == null && this.cachedRows && this.cachedRows.length > 0) {
                     best = await this.searchSubstrateETLEvents(false, xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol, xcm.amountSent, xcmTeleportFees, decimals);
-		}
-		// if still no good match, then use API endpoint to search for balance changes
-		if (best == null) {
+                }
+                // if still no good match, then use API endpoint to search for balance changes
+                if (best == null) {
                     // this only opens API if needed
                     let [balances, blocks] = await this.searchDestinationChainBalances(xcm.chainIDDest, xcm.sourceTS, xcm.destAddress, xcm.symbol);
                     best = this.match_balance_adjustment(balances, xcm.amountSent, blocks, xcmTeleportFees, xcm.sourceTS);
-		}
+                }
             }
-	    
+
             if (best) {
-		inp.ts = best.ts;
-		q = await this.computePriceUSD(inp)
-		if (inp.decimals) {
+                inp.ts = best.ts;
+                q = await this.computePriceUSD(inp)
+                if (inp.decimals) {
                     // if symbol is known we can compute this
                     xcmInfo.destination.blockNumber = parseInt(best.bn, 10);
                     let destStatus = 1;
@@ -874,179 +874,179 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                     let feeReceivingAddress = '';
                     let confidence = null;
                     if (best.errorDesc) {
-			xcmInfo.destination.error = paraTool.getXCMErrorDescription(best.errorDesc);
-			xcmInfo.destination.executionStatus = "failed";
-			xcmInfo.destination.amountReceivedUSD = 0;
-                    destStatus = 0;
-                } else {
-                    amountReceivedDecimals = best.amountReceivedDecimals;
-                    teleportFeeDecimals = best.teleportFeeDecimals;
-                    feeReceivingAddress = best.feeReceivingAddress;
-                    feeEventID = best.feeEventID;
-                    xcmInfo.destination.amountReceived = best.amountReceivedDecimals / 10 ** inp.decimals;
-                    if (teleportFeeDecimals) {
-                        xcmInfo.destination.teleportFee = best.teleportFeeDecimals / 10 ** inp.decimals;
+                        xcmInfo.destination.error = paraTool.getXCMErrorDescription(best.errorDesc);
+                        xcmInfo.destination.executionStatus = "failed";
+                        xcmInfo.destination.amountReceivedUSD = 0;
+                        destStatus = 0;
                     } else {
-                        xcmInfo.destination.teleportFee = (xcm.amountSentDecimals - best.amountReceivedDecimals) / 10 ** inp.decimals;
-                    }
-                    if (q && q.priceUSD) {
-                        xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
-                        xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
-                        xcmInfo.destination.teleportFeeUSD = q.priceUSD * xcmInfo.destination.teleportFee;
-                        if (xcmInfo.destination.teleportFeeUSD > 10) {
-                            // could be multi hop, don't pollute the result
+                        amountReceivedDecimals = best.amountReceivedDecimals;
+                        teleportFeeDecimals = best.teleportFeeDecimals;
+                        feeReceivingAddress = best.feeReceivingAddress;
+                        feeEventID = best.feeEventID;
+                        xcmInfo.destination.amountReceived = best.amountReceivedDecimals / 10 ** inp.decimals;
+                        if (teleportFeeDecimals) {
+                            xcmInfo.destination.teleportFee = best.teleportFeeDecimals / 10 ** inp.decimals;
+                        } else {
+                            xcmInfo.destination.teleportFee = (xcm.amountSentDecimals - best.amountReceivedDecimals) / 10 ** inp.decimals;
+                        }
+                        if (q && q.priceUSD) {
+                            xcmInfo.origination.amountSentUSD = q.priceUSD * xcmInfo.origination.amountSent;
+                            xcmInfo.destination.amountReceivedUSD = q.priceUSD * xcmInfo.destination.amountReceived;
+                            xcmInfo.destination.teleportFeeUSD = q.priceUSD * xcmInfo.destination.teleportFee;
+                            if (xcmInfo.destination.teleportFeeUSD > 10) {
+                                // could be multi hop, don't pollute the result
+                                xcmInfo.destination.teleportFee = null;
+                                xcmInfo.destination.teleportFeeUSD = null;
+                            }
+                            xcmInfo.priceUSD = q.priceUSD;
+                        } else {
+                            xcmInfo.priceUSD = 0;
+                        }
+                        console.log("BEST is...", best, inp);
+                        xcmInfo.destination.confidence = best.confidence;
+                        if (destStatus == 1) {
+                            xcmInfo.destination.executionStatus = "success";
+                            if (best.extrinsicID) {
+                                matchedExtrinsicID = best.extrinsicID;
+                                xcmInfo.destination.extrinsicID = matchedExtrinsicID;
+                            }
+                            if (best.feeEventID) {
+                                feeEventID = best.feeEventID;
+                                feeReceivingAddress = best.feeReceivingAddress;
+                                xcmInfo.destination.feeEventID = best.feeEventID;
+                                xcmInfo.destination.feeReceivingAddress = best.feeReceivingAddress;
+                            }
+                            xcmInfo.destination.blockNumber = best.blockNumber;
+                            xcmInfo.destination.ts = best.ts;
+                            xcmInfo.destination.confidence = best.confidence;
+                            confidence = best.confidence;
+                        } else {
+                            xcmInfo.destination.amountReceived = 0;
+                            xcmInfo.destination.amountReceivedUSD = 0;
+                            xcmInfo.destination.executionStatus = "unknown";
+                            xcmInfo.destination.blockNumber = null;
                             xcmInfo.destination.teleportFee = null;
                             xcmInfo.destination.teleportFeeUSD = null;
                         }
-                        xcmInfo.priceUSD = q.priceUSD;
-                    } else {
-                        xcmInfo.priceUSD = 0;
+                        console.log(xcmInfo);
                     }
-                    console.log("BEST is...", best, inp);
-                    xcmInfo.destination.confidence = best.confidence;
-                    if (destStatus == 1) {
-                        xcmInfo.destination.executionStatus = "success";
-                        if (best.extrinsicID) {
-                            matchedExtrinsicID = best.extrinsicID;
-                            xcmInfo.destination.extrinsicID = matchedExtrinsicID;
-                        }
-                        if (best.feeEventID) {
-                            feeEventID = best.feeEventID;
-                            feeReceivingAddress = best.feeReceivingAddress;
-                            xcmInfo.destination.feeEventID = best.feeEventID;
-                            xcmInfo.destination.feeReceivingAddress = best.feeReceivingAddress;
-                        }
-                        xcmInfo.destination.blockNumber = best.blockNumber;
-                        xcmInfo.destination.ts = best.ts;
-                        xcmInfo.destination.confidence = best.confidence;
-                        confidence = best.confidence;
-                    } else {
-                        xcmInfo.destination.amountReceived = 0;
-                        xcmInfo.destination.amountReceivedUSD = 0;
-                        xcmInfo.destination.executionStatus = "unknown";
-                        xcmInfo.destination.blockNumber = null;
-                        xcmInfo.destination.teleportFee = null;
-                        xcmInfo.destination.teleportFeeUSD = null;
+                    if (best.eventID) {
+                        matchedEventID = best.eventID;
+                        xcmInfo.destination.eventID = matchedEventID;
                     }
-                    console.log(xcmInfo);
-                }
-                if (best.eventID) {
-                    matchedEventID = best.eventID;
-                    xcmInfo.destination.eventID = matchedEventID;
-                }
-                let sql_final = `update xcmtransfer set xcmInfoAudited = 1, matched = 99, destStatus = ${destStatus}, amountSentDecimals = amountSent, amountReceived = '${xcmInfo.destination.amountReceived}', amountReceivedDecimals = ${mysql.escape(amountReceivedDecimals)}, amountReceivedUSD = '${xcmInfo.destination.amountReceivedUSD}', teleportFee = ${mysql.escape(xcmInfo.destination.teleportFee)}, teleportFeeDecimals = ${mysql.escape(teleportFeeDecimals)}, teleportFeeUSD = ${mysql.escape(xcmInfo.destination.teleportFeeUSD)}, matchedExtrinsicID = '${matchedExtrinsicID}', matchedEventID = '${matchedEventID}', feeEventID = ${mysql.escape(feeEventID)}, feeReceivingAddress = ${mysql.escape(feeReceivingAddress)}, confidence = ${mysql.escape(confidence)}, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
-                console.log(sql_final);
-                this.batchedSQL.push(sql_final);
-                await this.update_batchedSQL();
+                    let sql_final = `update xcmtransfer set xcmInfoAudited = 1, matched = 99, destStatus = ${destStatus}, amountSentDecimals = amountSent, amountReceived = '${xcmInfo.destination.amountReceived}', amountReceivedDecimals = ${mysql.escape(amountReceivedDecimals)}, amountReceivedUSD = '${xcmInfo.destination.amountReceivedUSD}', teleportFee = ${mysql.escape(xcmInfo.destination.teleportFee)}, teleportFeeDecimals = ${mysql.escape(teleportFeeDecimals)}, teleportFeeUSD = ${mysql.escape(xcmInfo.destination.teleportFeeUSD)}, matchedExtrinsicID = '${matchedExtrinsicID}', matchedEventID = '${matchedEventID}', feeEventID = ${mysql.escape(feeEventID)}, feeReceivingAddress = ${mysql.escape(feeReceivingAddress)}, confidence = ${mysql.escape(confidence)}, xcmInfolastUpdateDT = Now(), xcmInfo = ${mysql.escape(JSON.stringify(xcmInfo))} where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+                    console.log(sql_final);
+                    this.batchedSQL.push(sql_final);
+                    await this.update_batchedSQL();
 
-                // if its a recent match (within 5m), send to xcminfo channel and record in xcmtransferslog
-                let currTS = this.getCurrentTS();
-                if (currTS - xcm.sourceTS < 300) {
-                    await this.publish_xcminfo(xcmInfo);
-                    // record in xcmtransferslog
-                    let stage = 'DestinationFinalized';
-                    let vals = ["extrinsicHash", "transferIndex", "xcmIndex", "msgHash", "transactionHash", "symbol", "sourceTS", "chainID", "chainIDDest", "xcmInfo", "isSigned", "section", "method", "addTS", "lastUpdateTS"];
-                    let transactionHash = xcmInfo.origination.transactionHash ? xcmInfo.origination.transactionHash : null;
-                    let txHash = transactionHash ? transactionHash : extrinsicHash;
-                    let xcmtransferkey = `${txHash}${xcmIndex}${transferIndex}`
-                    let xcmtransferHash = paraTool.twox_128(xcmtransferkey);
-                    let out = `('${xcmtransferHash}', '${stage}', '${extrinsicHash}', '${transferIndex}', '${xcmIndex}', ${mysql.escape(xcm.msgHash)}, ${mysql.escape(transactionHash)}, '${xcm.symbol}', '${xcm.sourceTS}', '${xcm.chainID}', '${xcm.chainIDDest}', ${mysql.escape(JSON.stringify(xcmInfo))}, '2', ${mysql.escape(xcmSection)}, ${mysql.escape(xcmMethod)}, '${currTS}', '${currTS}')`;
-                    await this.upsertSQL({
-                        "table": "xcmtransferslog",
-                        "keys": ["xcmtransferhash", "stage"],
-                        "vals": vals,
-                        "data": [out],
-                        "replace": ["lastUpdateTS", "isSigned"]
-                    });
+                    // if its a recent match (within 5m), send to xcminfo channel and record in xcmtransferslog
+                    let currTS = this.getCurrentTS();
+                    if (currTS - xcm.sourceTS < 300) {
+                        await this.publish_xcminfo(xcmInfo);
+                        // record in xcmtransferslog
+                        let stage = 'DestinationFinalized';
+                        let vals = ["extrinsicHash", "transferIndex", "xcmIndex", "msgHash", "transactionHash", "symbol", "sourceTS", "chainID", "chainIDDest", "xcmInfo", "isSigned", "section", "method", "addTS", "lastUpdateTS"];
+                        let transactionHash = xcmInfo.origination.transactionHash ? xcmInfo.origination.transactionHash : null;
+                        let txHash = transactionHash ? transactionHash : extrinsicHash;
+                        let xcmtransferkey = `${txHash}${xcmIndex}${transferIndex}`
+                        let xcmtransferHash = paraTool.twox_128(xcmtransferkey);
+                        let out = `('${xcmtransferHash}', '${stage}', '${extrinsicHash}', '${transferIndex}', '${xcmIndex}', ${mysql.escape(xcm.msgHash)}, ${mysql.escape(transactionHash)}, '${xcm.symbol}', '${xcm.sourceTS}', '${xcm.chainID}', '${xcm.chainIDDest}', ${mysql.escape(JSON.stringify(xcmInfo))}, '2', ${mysql.escape(xcmSection)}, ${mysql.escape(xcmMethod)}, '${currTS}', '${currTS}')`;
+                        await this.upsertSQL({
+                            "table": "xcmtransferslog",
+                            "keys": ["xcmtransferhash", "stage"],
+                            "vals": vals,
+                            "data": [out],
+                            "replace": ["lastUpdateTS", "isSigned"]
+                        });
+                    }
+                    if (destStatus == 1 && teleportFeeDecimals) { // only store "perfect" data
+                        // store the match in xcmtransferdestevent, so that we don't match the same event twice
+                        let valsevent = ["extrinsicID", "chainIDDest", "beneficiary", "blockNumber", "symbol", "relayChain", "destTS", "amountReceivedDecimals", "teleportFeesDecimals", "feeReceivingAddress", "feeEventID", "addDT"]
+                        let outevent = `('${matchedEventID}', '${matchedExtrinsicID}', '${xcm.chainIDDest}', '${destAddress}', ${mysql.escape(xcmInfo.destination.blockNumber)}, '${xcm.symbol}', '${xcm.relayChain}', ${mysql.escape(xcmInfo.destination.ts)}, ${mysql.escape(amountReceivedDecimals)}, ${mysql.escape(teleportFeeDecimals)}, ${mysql.escape(feeReceivingAddress)}, ${mysql.escape(feeEventID)}, Now() )`;
+                        await this.upsertSQL({
+                            "table": "xcmtransferdestevent",
+                            "keys": ["eventID"],
+                            "vals": valsevent,
+                            "data": [outevent],
+                            "replace": valsevent
+                        });
+                        console.log("xcmInfo", JSON.stringify(xcmInfo, null, 4));
+                    }
+                    return xcmInfo;
                 }
-                if (destStatus == 1 && teleportFeeDecimals) { // only store "perfect" data
-                    // store the match in xcmtransferdestevent, so that we don't match the same event twice
-                    let valsevent = ["extrinsicID", "chainIDDest", "beneficiary", "blockNumber", "symbol", "relayChain", "destTS", "amountReceivedDecimals", "teleportFeesDecimals", "feeReceivingAddress", "feeEventID", "addDT"]
-                    let outevent = `('${matchedEventID}', '${matchedExtrinsicID}', '${xcm.chainIDDest}', '${destAddress}', ${mysql.escape(xcmInfo.destination.blockNumber)}, '${xcm.symbol}', '${xcm.relayChain}', ${mysql.escape(xcmInfo.destination.ts)}, ${mysql.escape(amountReceivedDecimals)}, ${mysql.escape(teleportFeeDecimals)}, ${mysql.escape(feeReceivingAddress)}, ${mysql.escape(feeEventID)}, Now() )`;
-                    await this.upsertSQL({
-                        "table": "xcmtransferdestevent",
-                        "keys": ["eventID"],
-                        "vals": valsevent,
-                        "data": [outevent],
-                        "replace": valsevent
-                    });
-                    console.log("xcmInfo", JSON.stringify(xcmInfo, null, 4));
-                }
-                return xcmInfo;
             }
+        } catch (e) {
+            console.log(e);
         }
-    } catch (e) {
-        console.log(e);
-    }
-    let sql_final = `update xcmtransfer set xcmInfoAudited = -5, matchAttempts = matchAttempts + 1, matchAttemptDT = Now() where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
-    console.log(sql_final);
-    this.batchedSQL.push(sql_final);
-    await this.update_batchedSQL();
-    return (false);
-}
-
-get_confidence(xcmInfo) {
-    if (xcmInfo.destination && xcmInfo.destination.confidence) {
-        return xcmInfo.destination.confidence
-    }
-    return 0;
-}
-
-async bulk_generate_XCMInfo(chainIDDest = null, limit = 1000) {
-    let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-    let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and xcmInfoAudited = -2 and sourceTS > UNIX_TIMESTAMP("2021-02-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and matchAttempts <= 2 and symbol is not null and matchAttemptDT < date_sub(Now(), interval 2 minute)  ${w} order by matchAttempts asc, sourceTS desc limit ${limit}`;
-    console.log(sql);
-    let extrinsics = await this.pool.query(sql);
-    let extrinsic = {};
-    let extrinsicconfidence = {};
-    let results = {};
-    if (extrinsics.length == 0) {
+        let sql_final = `update xcmtransfer set xcmInfoAudited = -5, matchAttempts = matchAttempts + 1, matchAttemptDT = Now() where extrinsicHash = '${extrinsicHash}' and xcmIndex = '${xcmIndex}' and transferIndex = '${transferIndex}'`
+        console.log(sql_final);
+        this.batchedSQL.push(sql_final);
+        await this.update_batchedSQL();
         return (false);
     }
-    for (const e of extrinsics) {
-        try {
-            let xcmInfo = await this.generate_extrinsic_XCMInfo(e.extrinsicHash, e.transferIndex, e.xcmIndex);
-            if (results[e.extrinsicHash] == undefined) {
-                results[e.extrinsicHash] = [xcmInfo];
-                extrinsic[e.extrinsicHash] = e;
-                extrinsicconfidence[e.extrinsicHash] = this.get_confidence(xcmInfo);
-            } else {
-                let confidence = this.get_confidence(xcmInfo)
-                if (confidence > extrinsicconfidence[e.extrinsicHash]) {
-                    extrinsicconfidence[e.extrinsicHash] = confidence;
-                }
-            }
-        } catch (err) {
-            console.log(err);
+
+    get_confidence(xcmInfo) {
+        if (xcmInfo.destination && xcmInfo.destination.confidence) {
+            return xcmInfo.destination.confidence
         }
+        return 0;
     }
 
-    let hashesRowsToInsert = [];
-    for (const extrinsicHash of Object.keys(extrinsicconfidence)) {
-        let confidence = extrinsicconfidence[extrinsicHash]; // store confidence in xcmtransfer
-        let e = extrinsic[extrinsicHash];
-        let extrinsicID = e.extrinsicID;
-        let sourceTS = e.sourceTS;
-        let hashrec = {};
-        let col = extrinsicID
-        let xcmInfo = results[extrinsicHash];
-        hashrec[col] = {
-            value: (xcmInfo.length == 1) ? JSON.stringify(xcmInfo[0]) : JSON.stringify(xcmInfo),
-            timestamp: sourceTS * 1000000
-        };
-        let extrinsicHashRec = {
-            key: extrinsicHash,
-            data: {},
-        };
-        extrinsicHashRec.data["xcminfofinalized"] = hashrec;
-        hashesRowsToInsert.push(extrinsicHashRec);
-    }
+    async bulk_generate_XCMInfo(chainIDDest = null, limit = 1000) {
+        let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2021-02-01") and sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and matchAttempts <= 2 and symbol is not null and matchAttemptDT < date_sub(Now(), interval 2 minute)  ${w} order by matchAttempts asc, sourceTS desc limit ${limit}`;
+        console.log(sql);
+        let extrinsics = await this.pool.query(sql);
+        let extrinsic = {};
+        let extrinsicconfidence = {};
+        let results = {};
+        if (extrinsics.length == 0) {
+            return (false);
+        }
+        for (const e of extrinsics) {
+            try {
+                let xcmInfo = await this.generate_extrinsic_XCMInfo(e.extrinsicHash, e.transferIndex, e.xcmIndex);
+                if (results[e.extrinsicHash] == undefined) {
+                    results[e.extrinsicHash] = [xcmInfo];
+                    extrinsic[e.extrinsicHash] = e;
+                    extrinsicconfidence[e.extrinsicHash] = this.get_confidence(xcmInfo);
+                } else {
+                    let confidence = this.get_confidence(xcmInfo)
+                    if (confidence > extrinsicconfidence[e.extrinsicHash]) {
+                        extrinsicconfidence[e.extrinsicHash] = confidence;
+                    }
+                }
+            } catch (err) {
+                console.log(err);
+            }
+        }
 
-    if (hashesRowsToInsert.length > 0) {
-        await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+        let hashesRowsToInsert = [];
+        for (const extrinsicHash of Object.keys(extrinsicconfidence)) {
+            let confidence = extrinsicconfidence[extrinsicHash]; // store confidence in xcmtransfer
+            let e = extrinsic[extrinsicHash];
+            let extrinsicID = e.extrinsicID;
+            let sourceTS = e.sourceTS;
+            let hashrec = {};
+            let col = extrinsicID
+            let xcmInfo = results[extrinsicHash];
+            hashrec[col] = {
+                value: (xcmInfo.length == 1) ? JSON.stringify(xcmInfo[0]) : JSON.stringify(xcmInfo),
+                timestamp: sourceTS * 1000000
+            };
+            let extrinsicHashRec = {
+                key: extrinsicHash,
+                data: {},
+            };
+            extrinsicHashRec.data["xcminfofinalized"] = hashrec;
+            hashesRowsToInsert.push(extrinsicHashRec);
+        }
+
+        if (hashesRowsToInsert.length > 0) {
+            await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+        }
+        return (true);
     }
-    return (true);
-}
 
 
 }

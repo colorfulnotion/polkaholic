@@ -554,7 +554,7 @@ module.exports = class AstarParser extends ChainParser {
                 let rawAssetID = `${params.asset_id[i]}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
                 if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
                 let targetedSymbol = (rawAssetID.includes("native")) ? indexer.getNativeSymbol() : this.processXcmGenericCurrencyID(indexer, rawAssetID)
-                if (rawAssetID == 0 && chainID == paraTool.chainIDAstar){
+                if (rawAssetID == 0 && chainID == paraTool.chainIDAstar) {
                     targetedSymbol = "ASTR"
                 }
                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "astar processOutgoingEthereumAssetWithdraw", rawAssetID)

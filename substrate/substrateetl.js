@@ -49,15 +49,15 @@ module.exports = class SubstrateETL extends AssetManager {
     // all bigquery tables are date-partitioned except 2 for now: chains and specversions
     partitioned_table(tbl) {
         switch (tbl) {
-	case "balances":
-	    return "ts";
-	case "evmtxs":
-	case "evmtransfers":
-	    return "block_timestamp";
-        case "chains":
-        case "specversions":
-            return (null);
-            break;
+            case "balances":
+                return "ts";
+            case "evmtxs":
+            case "evmtransfers":
+                return "block_timestamp";
+            case "chains":
+            case "specversions":
+                return (null);
+                break;
         }
         return "block_time";
     }
@@ -82,8 +82,8 @@ module.exports = class SubstrateETL extends AssetManager {
         let p = (chainID) ? ` and chainID = ${chainID} ` : ""
         let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
 
-	console.log(sql);
-	let recs = await this.poolREADONLY.query(sql);
+        console.log(sql);
+        let recs = await this.poolREADONLY.query(sql);
         for (const rec of recs) {
             let chainID = parseInt(rec.chainID, 10);
             let paraID = paraTool.getParaIDfromChainID(chainID);
@@ -91,17 +91,17 @@ module.exports = class SubstrateETL extends AssetManager {
             //console.log(" --- ", chainID, paraID, relayChain);
             for (const tbl of tbls) {
                 let fld = this.partitioned_table(tbl);
-                let p =  fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
+                let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
                 let cmd = `bq mk  --project_id=substrate-etl  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
                 if ((tbl == "evmtxs" || tbl == "evmtransfers") && rec.isEVM == 0) {
-//                    cmd = null;
+                    //                    cmd = null;
                 }
                 try {
                     if (cmd) {
                         console.log(cmd);
-			if ((tbl == "evmtxs")) {
-			    await exec(cmd);
-			}
+                        if ((tbl == "evmtxs")) {
+                            await exec(cmd);
+                        }
                     }
                 } catch (e) {
                     console.log(e);
@@ -144,34 +144,64 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async audit_blocks() {
+    async audit_blocks(chainID = null) {
         // 1. find problematic periods with a small number of records (
-        let sql = `select chainID, logDT, startBN, endBN, numBlocks - ( endBN - startBN + 1 ) as b from blocklog where chainID not in ( 22110, 22100, 0 ) and chainID > 21001 having logDT >= '2022-01-01' and b >= -30 and b < 0 order by chainID, logDT limit 500`
+        let w = chainID ? ` and chainID = ${chainID}` : ""
+        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where audited in ( 'Unknown' )  ${w} order by chainID, monthDT`
+        console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
 
         // 2. within each, find anything missing in substrate-etl
         let cnt = 0;
         for (const r of recs) {
+            console.log(r);
             let chainID = r.chainID;
             let startBN = r.startBN;
             let endBN = r.endBN;
+            let startDT = r.startDT ? r.startDT.toISOString().split('T')[0] : "2020-01-01";
+            let endDT = r.endDT ? r.endDT.toISOString().split('T')[0] : "2029-01-01";
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
-            let sqlQuery = `SELECT number FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE number >= ${startBN} and number <= ${endBN} order by number;`
+            let monthDT = r.monthDT ? r.monthDT.toISOString().split('T')[0] : "";
+            let sqlQuery = `SELECT number, \`hash\` as block_hash, parent_hash FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE Date(block_time) >= '${startDT}' and Date(block_time) <= '${endDT}' and number >= ${startBN} and number <= ${endBN} order by number;`
             console.log(sqlQuery);
             let rows = await this.execute_bqJob(sqlQuery);
             let blocks = {};
+            let prevHash = null;
+            let prevBN = null
+            let gaps = [];
+            let errors = [];
             for (const row of rows) {
-                blocks[row.number] = 1;
-            }
-            for (let bn = startBN; bn <= endBN; bn++) {
-                if (blocks[bn] == undefined) {
-                    let crawlsql = `update block${chainID} set crawlBlock = 1 where blockNumber = ${bn}`;
-                    console.log(cnt, `: ${crawlsql}`);
-                    this.batchedSQL.push(sql);
+                if (prevBN && row.number != prevBN + 1) {
+                    gaps.push([prevBN + 1, row.number - 1]);
+                } else if (prevHash && row.parent_hash != prevHash) {
+                    errors.push(row.number);
                 }
+                blocks[row.number] = 1;
+                prevBN = row.number;
+                prevHash = row.block_hash;
             }
+            let audited = 'Unknown'
+            let failures = "";
+            if (gaps.length > 0 || errors.length > 0) {
+                audited = "Failure";
+                failures = JSON.stringify({
+                    gaps,
+                    errors
+                })
+                if (failures.length > 65000) {
+                    failures = JSON.stringify({
+                        gaps_length: gaps.length,
+                        errors_length: errors.length
+                    })
+                }
+            } else {
+                audited = "Success"
+            }
+            let sql = `update blocklogstats set audited = '${audited}', auditDT = Now(), auditFailures = ${mysql.escape(failures)} where chainID = ${chainID} and monthDT = "${monthDT}"`;
+            console.log(sql);
+            this.batchedSQL.push(sql);
             await this.update_batchedSQL();
             cnt++;
         }
@@ -1135,8 +1165,7 @@ module.exports = class SubstrateETL extends AssetManager {
         }
 
         // generate summary[relayChain] map
-	let summary = {
-	};
+        let summary = {};
         sql_tally = `select chain.relayChain, count(distinct paraID) numChains, max(endDT) endDT, round(sum(numBlocks_total)) numBlocks_total,
 round(sum(( endBN - startBN + 1) - numBlocks_total)) as numBlocks_missing
 from blocklogstats join chain on blocklogstats.chainID = chain.chainID  where monthDT >= "${birthDT}" and chain.relayChain in ("polkadot", "kusama") and
@@ -1147,7 +1176,15 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by relayChain 
             let numBlocks_total = r.numBlocks_total ? parseInt(r.numBlocks_total, 10) : 0;
             let numBlocks_missing = r.numBlocks_missing ? parseInt(r.numBlocks_missing, 10) : 0;
             let numChains = r.numChains ? r.numChains : 0;
-            summary[r.relayChain] = {relayChain: r.relayChain, endDT, numChains, numBlocks_total, numBlocks_missing, missing: [], chains: []}
+            summary[r.relayChain] = {
+                relayChain: r.relayChain,
+                endDT,
+                numChains,
+                numBlocks_total,
+                numBlocks_missing,
+                missing: [],
+                chains: []
+            }
         }
 
         sql_tally = `select chain.chainID, chain.id, chain.paraID, chain.relayChain, chain.paraID, chain.chainName, min(startDT) startDT, max(endDT) endDT, min(startBN) startBN, max(endBN) endBN, sum(numBlocks_total) numBlocks_total,
@@ -1164,7 +1201,10 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID ord
         for (const r of tallyRecs) {
             let relayChain = r.relayChain;
             if (summary[relayChain] == undefined) {
-                summary[relayChain] = {chains: [], missing: []};
+                summary[relayChain] = {
+                    chains: [],
+                    missing: []
+                };
             }
             let desc = `[${r.chainName} Para ID ${r.paraID}](/substrate-etl/${r.relayChain}/${r.paraID}-${r.id})`
             let startDT = r.startDT ? r.startDT.toISOString().split('T')[0] : "";
@@ -1174,22 +1214,22 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID ord
             let numBlocks_total = r.numBlocks_total ? parseInt(r.numBlocks_total, 10) : 0;
             let numBlocks_missing = r.numBlocks_missing ? parseInt(r.numBlocks_missing, 10) : 0;
             let numAddresses = r.numAddresses ? parseInt(r.numAddresses, 10) : 0;
-	    let url = `https://cdn.polkaholic.io/substrate-etl/${r.relayChain}/${r.paraID}.json`
+            let url = `https://cdn.polkaholic.io/substrate-etl/${r.relayChain}/${r.paraID}.json`
             summary[relayChain].chains.push({
-		id: r.id,
-		chainID: r.chainID,
-		paraID: r.paraID,
-		chainName: r.chainName,
-		startDT,
-		endDT,
-		startBN,
-		endBN,
-		numBlocks_total,
-		numBlocks_missing,
-		numAddresses,
-		crawlingStatus: r.crawlingStatus,
-		url
-	    })
+                id: r.id,
+                chainID: r.chainID,
+                paraID: r.paraID,
+                chainName: r.chainName,
+                startDT,
+                endDT,
+                startBN,
+                endBN,
+                numBlocks_total,
+                numBlocks_missing,
+                numAddresses,
+                crawlingStatus: r.crawlingStatus,
+                url
+            })
             chains[r.chainID].covered = true;
         }
 
@@ -1197,10 +1237,14 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID ord
             if (chains[chainID].covered == undefined) {
                 let c = chains[chainID];
                 let desc = c.crawling > 0 ? "active and onboarding" : "active but not being indexed";
-                summary[c.relayChain].missing.push({chainName: c.chainName, paraID: c.paraID, crawlingStatus: c.crawlingStatus});
+                summary[c.relayChain].missing.push({
+                    chainName: c.chainName,
+                    paraID: c.paraID,
+                    crawlingStatus: c.crawlingStatus
+                });
             }
         }
-	let dir = "/tmp/substrate-etl";
+        let dir = "/tmp/substrate-etl";
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, {
                 recursive: true
@@ -1209,7 +1253,7 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID ord
         let f = fs.openSync(path.join(dir, "polkaholic.json"), 'w', 0o666);
         fs.writeSync(f, JSON.stringify(summary));
 
-	// now for each chain, generate monthly then daily summary
+        // now for each chain, generate monthly then daily summary
         sql_tally = `select chain.chainID, chain.relayChain, chain.paraID, chain.id, chain.chainName, monthDT, startDT, endDT, startBN, endBN, numBlocks_total,
 ( endBN - startBN + 1) - numBlocks_total as numBlocks_missing,
 numSignedExtrinsics_sum as numSignedExtrinsics,
@@ -1223,7 +1267,7 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
         let docs = {};
         let fn_chain = {};
         for (const r of tallyRecs) {
-	    let chainName = r.chainName;
+            let chainName = r.chainName;
             let chainID = r.chainID;
             let id = r.id;
             let paraID = r.paraID;
@@ -1236,13 +1280,17 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
                     });
                 }
                 fn_chain[chainID] = path.join(subdir, `${paraID}.json`);
-                j[chainID] = {chain: {
-		    chainName,
-		    chainID,
-		    id,
-		    paraID,
-		    relayChain
-		}, monthly: [], daily: []};
+                j[chainID] = {
+                    chain: {
+                        chainName,
+                        chainID,
+                        id,
+                        paraID,
+                        relayChain
+                    },
+                    monthly: [],
+                    daily: []
+                };
             }
             let monthDT = r.monthDT ? r.monthDT.toISOString().split('T')[0] : "";
             let startDT = r.startDT ? r.startDT.toISOString().split('T')[0] : "";
@@ -1253,10 +1301,22 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
             let numBlocks_missing = r.numBlocks_missing ? parseInt(r.numBlocks_missing, 10) : 0;
             prevChainID = chainID;
             let numSignedExtrinsics = r.numSignedExtrinsics ? parseInt(r.numSignedExtrinsics, 10) : 0;
-            let numAccountsActive = r.numAccountsActive ? parseInt(r.numAccountsActive, 10) : 0 ;
+            let numAccountsActive = r.numAccountsActive ? parseInt(r.numAccountsActive, 10) : 0;
             let numAddresses = r.numAddresses ? parseInt(r.numAddresses, 10) : 0;
             let issues = r.issues ? r.issues : "";
-            j[chainID].monthly.push({monthDT, startDT, endDT, startBN, endBN, numBlocks_total, numBlocks_missing, numSignedExtrinsics, numAccountsActive, numAddresses, issues});
+            j[chainID].monthly.push({
+                monthDT,
+                startDT,
+                endDT,
+                startBN,
+                endBN,
+                numBlocks_total,
+                numBlocks_missing,
+                numSignedExtrinsics,
+                numAccountsActive,
+                numAddresses,
+                issues
+            });
         }
 
         prevChainID = null;
@@ -1314,11 +1374,28 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     numBlocks_missing = null;
                 }
             }
-            if ( j[chainID] ) {
-		j[chainID].daily.push({logDT, monthDT, startBN, endBN, numBlocks, numBlocks_missing, numSignedExtrinsics, numAccountsActive, numAddresses, numEvents, numTransfers, valueTransfersUSD, numXCMTransfersIn, valXCMTransferIncomingUSD, numXCMTransfersOut, valXCMTransferOutgoingUSD});
-	    } else {
-		console.log("MISSING", chainID);
-	    }
+            if (j[chainID]) {
+                j[chainID].daily.push({
+                    logDT,
+                    monthDT,
+                    startBN,
+                    endBN,
+                    numBlocks,
+                    numBlocks_missing,
+                    numSignedExtrinsics,
+                    numAccountsActive,
+                    numAddresses,
+                    numEvents,
+                    numTransfers,
+                    valueTransfersUSD,
+                    numXCMTransfersIn,
+                    valXCMTransferIncomingUSD,
+                    numXCMTransfersOut,
+                    valXCMTransferOutgoingUSD
+                });
+            } else {
+                console.log("MISSING", chainID);
+            }
             prevStartBN = r.startBN;
             prevChainID = chainID;
         }
@@ -1327,15 +1404,15 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let f = fs.openSync(fn_chain[chainID], 'w', 0o666);
             fs.writeSync(f, JSON.stringify(j[chainID]));
         }
-	if ( invalidate ) {
-	    let cmd = `gcloud compute url-maps invalidate-cdn-cache cdn-polkaholic-io  --path "/substrate-etl/*"`;
-	    console.log(cmd);
+        if (invalidate) {
+            let cmd = `gcloud compute url-maps invalidate-cdn-cache cdn-polkaholic-io  --path "/substrate-etl/*"`;
+            console.log(cmd);
             await exec(cmd);
-	}
-	let cmd = `gsutil -m -h "Cache-Control: public, max-age=60" cp -r /tmp/substrate-etl gs://cdn.polkaholic.io/`
-	console.log(cmd);
+        }
+        let cmd = `gsutil -m -h "Cache-Control: public, max-age=60" cp -r /tmp/substrate-etl gs://cdn.polkaholic.io/`
+        console.log(cmd);
         await exec(cmd);
-	
+
     }
 
     async dump_xcmtransfers_range(relayChain = "polkadot", startLogDT = null) {
@@ -1430,13 +1507,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
         // load new accounts
         let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
-        let logYYYYMMDD = logDT.replaceAll('-','')
+        let logYYYYMMDD = logDT.replaceAll('-', '')
         let currDT = logDT
-        let [prevDT, _] = paraTool.ts_to_logDT_hr(logTS-86400)
+        let [prevDT, _] = paraTool.ts_to_logDT_hr(logTS - 86400)
 
         let paraIDs = [0] //TODO get all paraID here
 
-        for (const paraID of paraIDs){
+        for (const paraID of paraIDs) {
             /* New User (by account)
             WITH prevDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-08" group by address_ss58),
             currDay AS (SELECT address_ss58 FROM, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58)
@@ -1510,7 +1587,7 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
             cmds.push(cmd4)
 
         }
-        for (const cmd of cmds){
+        for (const cmd of cmds) {
             //await exec(cmd);
         }
     }
@@ -1628,7 +1705,7 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
         let minLogDT = `${logDT} 00:00:00`;
         let maxLogDT = `${logDT} 23:59:59`;
         let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}'`
-	console.log(sql1);
+        console.log(sql1);
         let bnRanges = await this.poolREADONLY.query(sql1)
         let {
             bnStart,
@@ -1745,6 +1822,7 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                         let i = tx.decodedInput ? tx.decodedInput : null;
                         let gasUsed = tx.gasUsed ?  tx.gasUsed : 0
                         let txType = (tx.txType != undefined)? tx.txType : -1
+
                         cumulative_gas_used += gasUsed
                         let evmtx = {
                             //id: id,
@@ -1784,6 +1862,7 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                             params: i && i.params ? i.params : null
                         }
                         if (txType == 2){
+
                             //1559 (as gWei)
                             evmtx.max_fee_per_gas = paraTool.floatToInt(tx.maxFeePerGas * gWei)
                             evmtx.max_priority_fee_per_gas = paraTool.floatToInt(tx.maxPriorityFeePerGas * gWei)
@@ -1795,6 +1874,7 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                         }
                         if (tx.effectiveGasPrice){
                             evmtx.receipt_effective_gas_price = paraTool.floatToInt(tx.effectiveGasPrice * gWei)
+
                         }
                         evmtxs.push(evmtx);
 
@@ -1969,7 +2049,7 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
         } */
         // 5. write to bq
         try {
-	    let numSubstrateETLLoadErrors = 0;
+            let numSubstrateETLLoadErrors = 0;
             for (const tbl of tbls) {
                 fs.closeSync(f[tbl]);
                 let logDTp = logDT.replaceAll("-", "")
@@ -1981,12 +2061,12 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
                     console.log(cmd);
                     await exec(cmd);
                 } catch (err) {
-		    numSubstrateETLLoadErrors++;
+                    numSubstrateETLLoadErrors++;
                     console.log(err);
                 }
             }
             let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
-	    let loaded = ( logDT == todayDT ) ? 0 : 1;
+            let loaded = (logDT == todayDT) ? 0 : 1;
             let sql = `insert into blocklog (logDT, chainID, startBN, endBN, numBlocks, loadDT, loaded, attempted, numSubstrateETLLoadErrors) values ('${logDT}', '${chainID}', '${bnStart}', '${bnEnd}', '${block_count}', Now(), ${loaded}, '0', '${numSubstrateETLLoadErrors}') on duplicate key update loadDT = values(loadDT), startBN = values(startBN), endBN = values(endBN), numBlocks = values(numBlocks), loaded = values(loaded), attempted = values(attempted), numSubstrateETLLoadErrors = values(numSubstrateETLLoadErrors)`
             console.log(sql);
             this.batchedSQL.push(sql);
