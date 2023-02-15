@@ -576,7 +576,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
 
     // max_fee_per_gas, max_priority_fee_per_gas, receipt_effective_gas_price
     */
-    console.log(`dReceipt`, dReceipt)
+    //console.log(`dReceipt`, dReceipt)
     let gWei = 10 ** 9
     let ether = 10 ** 18
     let value = paraTool.dechexToInt(dTxn.value)
@@ -1227,7 +1227,7 @@ async function processReceipts(evmReceipts, contractABIs, contractABISignatures)
         let decodedLogs = dReceipt.decodedLogs
         decodedReceipts.push(dReceipt)
     }
-    console.log(`decodeReceipts`, decodedReceipts)
+    //console.log(`decodeReceipts`, decodedReceipts)
     return decodedReceipts
 }
 
