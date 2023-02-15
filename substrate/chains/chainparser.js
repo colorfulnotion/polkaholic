@@ -1923,6 +1923,12 @@ module.exports = class ChainParser {
                     [candidate, caller] = this.processAssetsIssuedSignal(indexer, extrinsicID, e, mpState, finalized)
                 }
                 break;
+            case 'eqBalances(Deposit)':
+                // parallel/moonbeam/astar format
+                if (this.mpReceived) {
+                    [candidate, caller] = this.processEqBalancesSignal(indexer, extrinsicID, e, mpState, finalized)
+                }
+                break;
             default:
                 break;
         }
@@ -2851,7 +2857,7 @@ module.exports = class ChainParser {
                         v1_id_concrete_interiorVal = new_v1_id_concrete_interiorVal
                         let interiorVStr0 = JSON.stringify(v1_id_concrete_interiorVal)
                         if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint)) {
-                            if (interiorVStr0.includes("generalIndex") && !interiorVStr0.includes("palletInstance")){
+                            if (interiorVStr0.includes("generalIndex") && !interiorVStr0.includes("palletInstance")) {
                                 //Pad palletInstance for RMRK/USDT
                                 let padded_interiorV0 = [expandedParachainPiece, {
                                     palletInstance: 50
@@ -2958,7 +2964,7 @@ module.exports = class ChainParser {
                             interiorVStr = JSON.stringify(new_interiorV0)
                             if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint)) {
                                 // pad palletInstance
-                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")){
+                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")) {
                                     console.log(`pad!! original`, new_interiorV0)
                                     interiorVStr = JSON.stringify([expandedParachainPiece, {
                                         palletInstance: 50
@@ -2992,7 +2998,7 @@ module.exports = class ChainParser {
                             interiorVStr = JSON.stringify(new_interiorV0)
                             if ((indexer.chainID == paraTool.chainIDStatemine || indexer.chainID == paraTool.chainIDStatemint)) {
                                 // pad palletInstance
-                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")){
+                                if (interiorVStr.includes("generalIndex") && !interiorVStr.includes("palletInstance")) {
                                     //console.log(`pad!! original`, new_interiorV0)
                                     let padded_interiorV0 = [expandedParachainPiece, {
                                         palletInstance: 50
@@ -3013,7 +3019,7 @@ module.exports = class ChainParser {
                 //console.log(`[${xcmInteriorKey}] cachedXcmAssetInfo`, cachedXcmAssetInfo)
                 if (cachedXcmAssetInfo != undefined && cachedXcmAssetInfo.nativeAssetChain != undefined) {
                     targetedAsset = cachedXcmAssetInfo.asset
-                    if (!targetedAsset && cachedXcmAssetInfo.symbol != undefined){
+                    if (!targetedAsset && cachedXcmAssetInfo.symbol != undefined) {
                         targetSymbol = cachedXcmAssetInfo.symbol
                     }
                     //rawTargetedAsset = cachedXcmAssetInfo.asset
@@ -5377,7 +5383,7 @@ module.exports = class ChainParser {
         return [false, false]
     }
 
-    processAssetsIssuedSignal(indexer, extrinsicID, e, mpState, finalized = false) {
+    processEqBalanceSignal(indexer, extrinsicID, e, mpState, finalized = false) {
         /*
         data": [
           101,
@@ -5443,6 +5449,94 @@ module.exports = class ChainParser {
                     destTS: this.parserTS,
                     amountReceived: amountReceived,
                     msgHash: mpState.msgHash,
+                }
+                return [candidate, caller]
+            } else {
+                // TODO: log
+            }
+        }
+        return [false, false]
+    }
+
+    processEqBalancesSignal(indexer, extrinsicID, e, mpState, finalized = false) {
+        /*
+        2011-1731397-0-3
+        data: [
+          "cg5aZF2X3nFrzL7Wch4XoNqJXyczHDmfofK8MKweGkF2WN4Jf",
+          6582132,
+          16436554,
+          "XcmPayment" // "XcmTransfer"
+        ]
+        */
+        let eqAssetMap = JSON.parse('{"25969":{"symbol":"EQ","assetId":"25969","decimals":9},"6382433":{"symbol":"ACA","assetId":"6382433","decimals":12},"6450786":{"symbol":"BNB","assetId":"6450786","decimals":9},"6450787":{"symbol":"BNC","assetId":"6450787","decimals":12},"6517365":{"symbol":"CRU","assetId":"6517365","decimals":12},"6582132":{"symbol":"DOT","assetId":"6582132","decimals":10},"6648164":{"symbol":"EQD","assetId":"6648164","decimals":9},"1634956402":{"symbol":"ASTR","assetId":"1634956402","decimals":18},"1635087204":{"symbol":"AUSD","assetId":"1635087204","decimals":12},"1651864420":{"symbol":"BUSD","assetId":"1651864420","decimals":9},"1735159154":{"symbol":"GLMR","assetId":"1735159154","decimals":18},"1768060003":{"symbol":"IBTC","assetId":"1768060003","decimals":8},"1768846450":{"symbol":"INTR","assetId":"1768846450","decimals":10},"1819309104":{"symbol":"LPT0","assetId":"1819309104","decimals":9},"1819309105":{"symbol":"LPT1","assetId":"1819309105","decimals":9},"1885434465":{"symbol":"PARA","assetId":"1885434465","decimals":12},"1970496628":{"symbol":"USDT","assetId":"1970496628","decimals":6},"2019848052":{"symbol":"XDOT","assetId":"2019848052","decimals":9},"426883035443":{"symbol":"CD613","assetId":"426883035443","decimals":10},"426883100980":{"symbol":"CD714","assetId":"426883100980","decimals":10},"426883166517":{"symbol":"CD815","assetId":"426883166517","decimals":10},"435694104436":{"symbol":"EQDOT","assetId":"435694104436","decimals":9},"470171350120":{"symbol":"MXETH","assetId":"470171350120","decimals":18},"517081101362":{"symbol":"XDOT2","assetId":"517081101362","decimals":9},"517081101363":{"symbol":"XDOT3","assetId":"517081101363","decimals":9},"120364133999715":{"symbol":"MXUSDC","assetId":"120364133999715","decimals":6},"120364166444131":{"symbol":"MXWBTC","assetId":"120364166444131","decimals":8}}')
+
+        let candidate = false
+        let [pallet, method] = indexer.parseEventSectionMethod(e)
+        let palletMethod = `${pallet}(${method})`
+        let d = e.data;
+        let fromAddress = paraTool.getPubKey(d[0])
+        /*
+        let assetIDWithComma = paraTool.toNumWithComma(paraTool.dechexAssetID(d[0]))
+        let assetID = this.cleanedAssetID(assetIDWithComma)
+
+        let parsedAsset = {
+            Token: assetID
+        }
+        let rawAssetString = this.token_to_string(parsedAsset);
+        */
+        let relayChain = indexer.relayChain
+        let currencyID = d[1]
+        /*
+        let targetedSymbol = this.processXcmGenericCurrencyID(indexer, currencyID) //inferred approach
+        let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_signal(targetedSymbol, "processXcmGenericCurrencyID", palletMethod, currencyID)
+        */
+        let targetedXcmInteriorKey = false
+        let amountReceivedDecimals = paraTool.dechexToInt(d[2]);
+        let candidateType = d[3]
+        let decimals = 9
+        let targetedSymbol = false
+        if (eqAssetMap[currencyID] != undefined) {
+            decimals = eqAssetMap[currencyID].decimals
+            targetedSymbol = eqAssetMap[currencyID].symbol
+        }
+        if (decimals > 9) {
+            let factor = decimals - 9;
+            amountReceivedDecimals *= 10 ** (factor);
+        } else if (decimals < 9) {
+            let factor = 9 - decimals;
+            amountReceivedDecimals /= 10 ** (factor);
+        }
+        console.log(`currencyID=${currencyID}, decimals=${decimals}, symbol=${targetedSymbol}`)
+        if (targetedSymbol != undefined && targetedSymbol != false) {
+            let amountReceived = paraTool.dechexToInt(d[2])
+
+            /*
+            let rAasset = {
+                Token: assetInfo.symbol
+            }
+            let assetString = this.token_to_string(rAasset);
+            let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, assetString, rawAssetString)
+            */
+            let eventIndex = e.eventID.split('-')[3]
+            if (this.debugLevel >= paraTool.debugInfo) console.log(`processAssetIssued`, fromAddress, amountReceived, targetedSymbol)
+            if (paraTool.validAmount(amountReceivedDecimals)) {
+                let caller = `generic processIncomingAssetSignal eqBalances:Deposit`
+                candidate = {
+                    chainIDDest: indexer.chainID,
+                    eventID: `${indexer.chainID}-${extrinsicID}-${eventIndex}`,
+                    extrinsicID: extrinsicID,
+                    pallet: pallet,
+                    method: method,
+                    fromAddress: fromAddress,
+                    blockNumberDest: this.parserBlockNumber,
+                    sentAt: this.parserWatermark,
+                    relayChain: relayChain,
+                    xcmSymbol: targetedSymbol,
+                    xcmInteriorKey: targetedXcmInteriorKey,
+                    destTS: this.parserTS,
+                    amountReceived: amountReceivedDecimals,
+                    msgHash: mpState.msgHash,
+                    candidateType: candidateType
                 }
                 return [candidate, caller]
             } else {
