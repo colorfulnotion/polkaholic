@@ -12,6 +12,7 @@
 //  compute xcmteleporfees: dumpSubstrateETL polkadot xcmteleportfees
 //  update blocklog: dumpSubstrateETL blocklog
 //  update blocklog: dumpSubstrateETL polkaholic
+
 var SubstrateETL = require("./substrateetl");
 
 async function main() {

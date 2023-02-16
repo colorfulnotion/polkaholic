@@ -121,7 +121,7 @@
     {
         "mode": "NULLABLE",
         "name": "receipt_effective_gas_price",
-        "type": "STRING",
+        "type": "INTEGER",
         "description": "The actual value per gas deducted from the senders account. Replacement of gas_price after EIP-1559"
     },
     {

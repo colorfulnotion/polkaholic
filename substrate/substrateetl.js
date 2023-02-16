@@ -147,13 +147,29 @@ module.exports = class SubstrateETL extends AssetManager {
     async audit_fix(chainID = null) {
 	let w = chainID >= 0 ? ` and chainID = '${chainID}'` : "";
         // 1. find problematic periods with a small number of records (
-        let sql = `select CONVERT(auditFailures using utf8) as failures, chainID from blocklogstats where audited in ( 'Failure' ) ${w} order by chainID, monthDT`
+        let sql = `select CONVERT(auditFailures using utf8) as failures, chainID, monthDT from blocklogstats where audited in ( 'Failure' ) ${w} order by chainID, monthDT`
 	console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
 	for ( const f of recs ) {
 	    let failures = JSON.parse(f.failures)
+	    if ( failures.gaps && failures.gaps.length > 0 && false ) {
+		for (const gap of failures.gaps) {
+		    let startBN = gap[0];
+		    let endBN = gap[1];
+		    if ( false && endBN - startBN >= 500 && endBN - startBN < 5000 ) {
+			let sql = `update block${f.chainID} set crawlBlock = 1, attempted = 0 where blockNumber >= ${startBN} and blockNumber <= ${endBN};`
+			//console.log(sql);
+			this.batchedSQL.push(sql);
+			await this.update_batchedSQL()
+		    } else {
+			//console.log(gap);
+		    }
+		}
+	    }
+	    
 	    if ( failures.errors && failures.errors.length > 0 ) {
+		console.log("FAILURES", f);
 		for (const bn of failures.errors) {
 		    let paraID = paraTool.getParaIDfromChainID(f.chainID);
 		    let relayChain = paraTool.getRelayChainByChainID(f.chainID);
@@ -163,9 +179,9 @@ module.exports = class SubstrateETL extends AssetManager {
 			console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(bn)}`)
 			console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(bn+1)}`)
 		    } else {
-/*			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn-1}';`);
-			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn}';`);
-			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn+1}';`); */
+//			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn-1}';`);
+//			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn}';`);
+//			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn+1}';`); 
 			console.log(`./indexBlock  ${f.chainID} ${bn-1}`);
 			console.log(`./indexBlock  ${f.chainID} ${bn}`);
 			console.log(`./indexBlock  ${f.chainID} ${bn+1}`);
@@ -180,13 +196,13 @@ module.exports = class SubstrateETL extends AssetManager {
 		}
 	    }
 	}
-	
+
     }
-    
+
     async audit_blocks(chainID = null) {
         // 1. find problematic periods with a small number of records (
         let w = chainID ? ` and chainID = ${chainID}` : ""
-        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where audited in ( 'Unknown' )  ${w} order by chainID, monthDT`
+        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where audited in ( 'Unknown', 'Failure' )  ${w} order by chainID, monthDT`
         console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
@@ -1375,7 +1391,7 @@ blocklog.valXCMTransferOutgoingUSD,
 blocklog.numAccountsTransfersIn,
 blocklog.numAccountsTransfersOut,
 chain.crawlingStatus
-from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date(date_sub(Now(), interval 1 day)) and chain.relayChain in ("polkadot", "kusama") and logDT >= "${birthDT}" order by relayChain desc, paraID asc, logDT desc`;
+from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date(Now()) and chain.relayChain in ("polkadot", "kusama") and logDT >= "${birthDT}" order by relayChain desc, paraID asc, logDT desc`;
         tallyRecs = await this.poolREADONLY.query(sql_tally);
         for (const r of tallyRecs) {
             let chainID = r.chainID;
@@ -1520,16 +1536,17 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     // '2022-02-17', 22 -> 1645135200
     //logDT_hr_to_ts: function logDT_hr_to_ts(logDT, hr)
 
-    async dump_account_matrics_range(relayChain = "polkadot", startLogDT = null) {
+    async dump_account_matrics_range(relayChain = "polkadot", startLogDT = null, paraID = 'all', isDry = true) {
         let ts = this.getCurrentTS();
         if (startLogDT == null) {
-            startLogDT = (relayChain == "kusama") ? "2021-07-01" : "2022-05-04";
+            //startLogDT = (relayChain == "kusama") ? "2021-07-01" : "2022-05-04";
+            startLogDT = "2023-02-01"
         }
         try {
             while (true) {
                 ts = ts - 86400;
                 let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
-                await this.dump_account_matrics(logDT, relayChain);
+                await this.dump_account_matrics(logDT, relayChain, paraID = 'all', isDry);
                 if (logDT == startLogDT) {
                     return (true);
                 }
@@ -1540,94 +1557,122 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-    async dump_account_matrics(logDT = "2023-02-01", relayChain = "polkadot") {
+    async dump_account_matrics(logDT = "2023-02-01", relayChain = "polkadot", paraID = 'all', isDry = true) {
 
-        let cmds = []
+        console.log(`dump_account_matrics logDT=${logDT}, ${relayChain}-${paraID}, isDry=${isDry}`)
+        let bqjobs = []
 
         // load new accounts
         let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
         let logYYYYMMDD = logDT.replaceAll('-', '')
-        let currDT = logDT
-        let [prevDT, _] = paraTool.ts_to_logDT_hr(logTS - 86400)
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
+        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
 
-        let paraIDs = [0] //TODO get all paraID here
+        let paraIDs = []
+        if (paraID == 'all'){
+            let sql = `select id, chainName, paraID, symbol, ss58Format from chain where crawling = 1 and relayChain = '${relayChain}' order by paraID`
+            let chainsRecs = await this.poolREADONLY.query(sql)
+            for (const chainsRec of chainsRecs){
+                paraIDs.push(chainsRec.paraID)
+            }
+            console.log(`${paraIDs.length} active ${relayChain} chains [${paraIDs}]`)
+            //paraIDs = [0] // TODO: disable for testing
+        }else{
+            paraIDs.push(paraID)
+        }
+
+        let accountTbls = ["new", "old", "reaped", "active", "passive"]
 
         for (const paraID of paraIDs) {
-            /* New User (by account)
-            WITH prevDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-08" group by address_ss58),
-            currDay AS (SELECT address_ss58 FROM, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58)
-            SELECT address_ss58 FROM currDay where address_ss58 not in (select address_ss58 from prevDay);
-            */
-            let tblName = "accountsnew"
-            let targetSQL = `WITH prevDay AS (SELECT address_ss58, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58),
-         currDay AS (SELECT address_ss58, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58)
-    SELECT address_ss58, ts FROM currDay where address_ss58 not in (select address_ss58 from prevDay)`
-            let partitionedFld = 'ts'
-            let cmd0 = `bq query --destination_table '${relayChain}.${tblName}${paraID}$${logYYYYMMDD}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${targetSQL}'`;
-            console.log(`New User \n`, cmd0);
-            cmds.push(cmd0)
+            for (const tbl of accountTbls){
+                let tblName = `accounts${tbl}`
+                let destinationTbl = `${relayChain}.${tblName}${paraID}$${logYYYYMMDD}`
+                let targetSQL, partitionedFld, cmd;
+                switch (tbl) {
+                    case "new":
+                    /* New User (by account)
+                    WITH prevDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-08" group by address_ss58),
+                    currDay AS (SELECT address_ss58 FROM, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58)
+                    SELECT address_ss58 FROM currDay where address_ss58 not in (select address_ss58 from prevDay);
+                    */
+                        targetSQL = `WITH prevDay AS (SELECT address_ss58, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58),
+                            currDay AS (SELECT address_ss58, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58)
+                            SELECT address_ss58, ts FROM currDay where address_ss58 not in (select address_ss58 from prevDay)`
+                        partitionedFld = 'ts'
+                        cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                        bqjobs.push({paraID: paraID, tbl: tblName, destinationTbl: destinationTbl, cmd: cmd})
+                        break;
 
-            /* Old User (by account)
-            WITH prevDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-08" group by address_ss58),
-            currDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58)
-            SELECT address_ss58 FROM currDay where address_ss58 in (select address_ss58 from prevDay);
-            */
-            tblName = "accountsold"
-            targetSQL = `WITH prevDay AS (SELECT address_ss58, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58),
-         currDay AS (SELECT address_ss58, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58)
-    SELECT address_ss58, ts FROM prevDay where address_ss58 in (select address_ss58 from currDay)`
-            partitionedFld = 'ts'
-            let cmd1 = `bq query --destination_table '${relayChain}.${tblName}${paraID}$${logYYYYMMDD}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${targetSQL}'`;
-            console.log(`Old User \n`, cmd1);
-            cmds.push(cmd1)
+                    case "old":
+                    /* Old User (by account)
+                    WITH prevDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-08" group by address_ss58),
+                    currDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58)
+                    SELECT address_ss58 FROM currDay where address_ss58 in (select address_ss58 from prevDay);
+                    */
+                        targetSQL = `WITH prevDay AS (SELECT address_ss58, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58),
+                            currDay AS (SELECT address_ss58, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58)
+                            SELECT address_ss58, ts FROM prevDay where address_ss58 in (select address_ss58 from currDay)`
+                        partitionedFld = 'ts'
+                        cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                        //bqjobs.push({paraID: paraID, tbl: tblName, destinationTbl: destinationTbl, cmd: cmd})
+                        break;
 
-            /* Reaped Account (by probably need a flag for native chainAsset)
-            WITH prevDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-08" group by address_ss58),
-            currDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58)
-            SELECT address_ss58 FROM currDay where address_ss58 not in (select address_ss58 from prevDay);
-            */
-            tblName = "accountsreaped"
-            targetSQL = `WITH prevDay AS (SELECT address_ss58, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58),
-         currDay AS (SELECT address_ss58, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58)
-    SELECT address_ss58, ts FROM prevDay where address_ss58 not in (select address_ss58 from currDay)`
-            partitionedFld = 'ts'
-            let cmd2 = `bq query --destination_table '${relayChain}.${tblName}${paraID}$${logYYYYMMDD}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${targetSQL}'`;
-            console.log(`Reaped User \n`, cmd2);
-            cmds.push(cmd2)
+                    case "reaped":
+                    /* Reaped Account (by probably need a flag for native chainAsset)
+                    WITH prevDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-08" group by address_ss58),
+                    currDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58)
+                    SELECT address_ss58 FROM currDay where address_ss58 not in (select address_ss58 from prevDay);
+                    */
+                        targetSQL = `WITH prevDay AS (SELECT address_ss58, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58),
+                     currDay AS (SELECT address_ss58, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58)
+                SELECT address_ss58, ts FROM prevDay where address_ss58 not in (select address_ss58 from currDay)`
+                        partitionedFld = 'ts'
+                        cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                        bqjobs.push({paraID: paraID, tbl: tblName, destinationTbl: destinationTbl, cmd: cmd})
+                        break;
 
-            /* Active account (user + system)
-            SELECT ss58, max(accountType) as accountType from (WITH activeUserAccount AS (SELECT DISTINCT(signer_ss58) as ss58, "User" as accountType, Max(block_time) as block_time FROM `substrate-etl.polkadot.extrinsics0` WHERE DATE(block_time) = "2023-02-08" and signed = true group by ss58),
-activeSystemAccount AS (SELECT DISTINCT(author_ss58) as ss58 , "System" as accountType, Max(block_time) as block_time FROM `substrate-etl.polkadot.blocks0` WHERE DATE(block_time) = "2023-02-08" group by ss58)
-SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeSystemAccount group by ss58 UNION ALL (SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeUserAccount group by ss58)) group by ss58
-            */
-            tblName = "accountsactive"
-            targetSQL = `SELECT ss58, max(accountType) as accountType from (WITH activeUserAccount AS (SELECT DISTINCT(signer_ss58) as ss58, "User" as accountType, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.extrinsics${paraID}\` WHERE DATE(block_time) = "${currDT}" and signed = true group by ss58),
-            activeSystemAccount AS (SELECT DISTINCT(author_ss58) as ss58 , "System" as accountType, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE DATE(block_time) = "${currDT}" group by ss58)
-            SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeSystemAccount group by ss58 UNION ALL (SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeUserAccount group by ss58)) group by ss58`
-            partitionedFld = 'block_time'
-            let cmd3 = `bq query --destination_table '${relayChain}.${tblName}${paraID}$${logYYYYMMDD}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${targetSQL}'`;
-            console.log(`Active User \n`, cmd3);
-            cmds.push(cmd3)
+                    case "active":
+                    /* Active account (user + system)
+                    SELECT ss58, max(accountType) as accountType from (WITH activeUserAccount AS (SELECT DISTINCT(signer_ss58) as ss58, "User" as accountType, Max(block_time) as block_time FROM `substrate-etl.polkadot.extrinsics0` WHERE DATE(block_time) = "2023-02-08" and signed = true group by ss58),
+                    activeSystemAccount AS (SELECT DISTINCT(author_ss58) as ss58 , "System" as accountType, Max(block_time) as block_time FROM `substrate-etl.polkadot.blocks0` WHERE DATE(block_time) = "2023-02-08" group by ss58)
+                    SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeSystemAccount group by ss58 UNION ALL (SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeUserAccount group by ss58)) group by ss58
+                    */
+                        targetSQL = `SELECT ss58, max(accountType) as accountType, Max(blockTime) as block_time from (WITH activeUserAccount AS (SELECT DISTINCT(signer_ss58) as ss58, "User" as accountType, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.extrinsics${paraID}\` WHERE DATE(block_time) = "${currDT}" and signed = true group by ss58),
+                        activeSystemAccount AS (SELECT DISTINCT(author_ss58) as ss58 , "System" as accountType, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE DATE(block_time) = "${currDT}" group by ss58)
+                        SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeSystemAccount group by ss58 UNION ALL (SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeUserAccount group by ss58)) group by ss58 order by ss58`
+                        partitionedFld = 'block_time'
+                        cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                        bqjobs.push({paraID: paraID, tbl: tblName, destinationTbl: destinationTbl, cmd: cmd})
+                        break;
 
-            /* Passive Account
-            WITH AcctiveAccount AS  (SELECT ss58, max(accountType) as accountType from (WITH activeUserAccount AS (SELECT DISTINCT(signer_ss58) as ss58, "User" as accountType, Max(block_time) as block_time FROM `substrate-etl.polkadot.extrinsics0` WHERE DATE(block_time) = "2023-02-08" and signed = true group by ss58),activeSystemAccount AS (SELECT DISTINCT(author_ss58) as ss58 , "System" as accountType, Max(block_time) as block_time FROM `substrate-etl.polkadot.blocks0` WHERE DATE(block_time) = "2023-02-08" group by ss58)
-            SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeSystemAccount group by ss58 UNION ALL (SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeUserAccount group by ss58)) group by ss58),
-            TransferAccount AS (SELECT DISTINCT(ss58), Max(block_time) as block_time FROM  (SELECT DISTINCT(to_ss58) AS ss58, Max(block_time) as block_time FROM `substrate-etl.polkadot.transfers0` WHERE DATE(block_time) = "2023-02-08" group by ss58 union all SELECT DISTINCT(from_ss58) AS ss58, Max(block_time) as block_time FROM `substrate-etl.polkadot.transfers0` WHERE DATE(block_time) = "2023-02-08" group by ss58) group by ss58)
-            SELECT ss58,  Max(block_time) as block_time from TransferAccount where ss58 not in (select ss58 from AcctiveAccount) group by ss58;
-            */
-            tblName = "accountspassive"
-            targetSQL = `WITH AcctiveAccount AS  (SELECT ss58, max(accountType) as accountType from (WITH activeUserAccount AS (SELECT DISTINCT(signer_ss58) as ss58, "User" as accountType, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.extrinsics${paraID}\` WHERE DATE(block_time) = "2023-02-08" and signed = true group by ss58),activeSystemAccount AS (SELECT DISTINCT(author_ss58) as ss58 , "System" as accountType, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE DATE(block_time) = "${currDT}" group by ss58)
-            SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeSystemAccount group by ss58 UNION ALL (SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeUserAccount group by ss58)) group by ss58),
-            TransferAccount AS (SELECT DISTINCT(ss58), Max(block_time) as block_time FROM  (SELECT DISTINCT(to_ss58) AS ss58, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.transfers${paraID}\` WHERE DATE(block_time) = "${currDT}" group by ss58 union all SELECT DISTINCT(from_ss58) AS ss58, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.transfers${paraID}\` WHERE DATE(block_time) = "${currDT}" group by ss58) group by ss58)
-            SELECT ss58,  Max(block_time) as block_time from TransferAccount where ss58 not in (select ss58 from AcctiveAccount) group by ss58;`
-            partitionedFld = 'block_time'
-            let cmd4 = `bq query --destination_table '${relayChain}.${tblName}${paraID}$${logYYYYMMDD}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${targetSQL}'`;
-            console.log(`Passive User \n`, cmd4);
-            cmds.push(cmd4)
+                    case "passive":
+                    /* Passive Account
+                    WITH AcctiveAccount AS  (SELECT ss58, max(accountType) as accountType from (WITH activeUserAccount AS (SELECT DISTINCT(signer_ss58) as ss58, "User" as accountType, Max(block_time) as block_time FROM `substrate-etl.polkadot.extrinsics0` WHERE DATE(block_time) = "2023-02-08" and signed = true group by ss58),activeSystemAccount AS (SELECT DISTINCT(author_ss58) as ss58 , "System" as accountType, Max(block_time) as block_time FROM `substrate-etl.polkadot.blocks0` WHERE DATE(block_time) = "2023-02-08" group by ss58)
+                    SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeSystemAccount group by ss58 UNION ALL (SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeUserAccount group by ss58)) group by ss58),
+                    TransferAccount AS (SELECT DISTINCT(ss58), Max(block_time) as block_time FROM  (SELECT DISTINCT(to_ss58) AS ss58, Max(block_time) as block_time FROM `substrate-etl.polkadot.transfers0` WHERE DATE(block_time) = "2023-02-08" group by ss58 union all SELECT DISTINCT(from_ss58) AS ss58, Max(block_time) as block_time FROM `substrate-etl.polkadot.transfers0` WHERE DATE(block_time) = "2023-02-08" group by ss58) group by ss58)
+                    SELECT ss58,  Max(block_time) as block_time from TransferAccount where ss58 not in (select ss58 from AcctiveAccount) group by ss58;
+                    */
+                        targetSQL = `WITH AcctiveAccount AS  (SELECT ss58, max(accountType) as accountType from (WITH activeUserAccount AS (SELECT DISTINCT(signer_ss58) as ss58, "User" as accountType, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.extrinsics${paraID}\` WHERE DATE(block_time) = "2023-02-08" and signed = true group by ss58),activeSystemAccount AS (SELECT DISTINCT(author_ss58) as ss58 , "System" as accountType, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE DATE(block_time) = "${currDT}" group by ss58)
+                        SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeSystemAccount group by ss58 UNION ALL (SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM activeUserAccount group by ss58)) group by ss58),
+                        TransferAccount AS (SELECT DISTINCT(ss58), Max(block_time) as block_time FROM  (SELECT DISTINCT(to_ss58) AS ss58, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.transfers${paraID}\` WHERE DATE(block_time) = "${currDT}" group by ss58 union all SELECT DISTINCT(from_ss58) AS ss58, Max(block_time) as block_time FROM \`substrate-etl.${relayChain}.transfers${paraID}\` WHERE DATE(block_time) = "${currDT}" group by ss58) group by ss58)
+                        SELECT ss58,  Max(block_time) as block_time from TransferAccount where ss58 not in (select ss58 from AcctiveAccount) group by ss58;`
+                        partitionedFld = 'block_time'
+                        cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                        bqjobs.push({paraID: paraID, tbl: tblName, destinationTbl: destinationTbl, cmd: cmd})
+                        break;
 
+                    default:
+
+                }
+            }
         }
-        for (const cmd of cmds) {
-            //await exec(cmd);
+        for (const bqjob of bqjobs) {
+            if (isDry){
+                console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+            }else{
+                console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                await exec(bqjob.cmd);
+            }
         }
     }
 
@@ -2130,8 +2175,16 @@ SELECT ss58, max(accountType) as accountType, Max(block_time) as blockTime FROM 
             "events": `select count(*) as numEvents from substrate-etl.${relayChain}.events${paraID} where date(block_time) = '${logDT}'`,
             "transfers": `select count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers${paraID} where date(block_time) = '${logDT}'`,
             "xcmtransfers0": `select count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where destination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`,
-            "xcmtransfers1": `select count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`
-        };
+            "xcmtransfers1": `select count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`,
+            "accountsnew": `select count(*) as numNewAccounts from substrate-etl.${relayChain}.accountsnew${paraID} where date(ts) = '${logDT}'`,
+            "accountsreaped": `select count(*) as numReapedAccounts from substrate-etl.${relayChain}.accountsreaped${paraID} where date(ts) = '${logDT}'`,
+            "accountsactive": `select count(*) as numActiveAccounts, sum(if(accountType = "System", 1, 0)) as numActiveSystemAccounts, sum(if(accountType = "User", 1, 0)) as numActiveUserAccounts from substrate-etl.${relayChain}.accountsactive${paraID} where date(block_time) = '${logDT}'`,
+            "accountspassive": `select count(*) as numPassiveAccounts from substrate-etl.${relayChain}.accountspassive${paraID} where date(block_time) = '${logDT}'`,
+	}
+	if ( chainID == 2004 || chainID == 22023 || chainID == 2006 || chainID == 22007 ) {
+            sqla["evmtxs"] =`select count(*) as numTransactionsEVM, sum(if(transaction_type = 2, 1, 0)) numTransactionsEVM1559, sum(if(receipt_contract_address is not null, 1, 0)) numEVMContractsCreated, sum(if(transaction_type = 0, 1, 0)) numTransactionsEVMLegacy, avg(gas_price / 1000000000) as gasPrice, sum(if(max_fee_per_gas is not null, max_fee_per_gas/ 1000000000, 0)) / sum(if(max_fee_per_gas is not null, 1, 0)) maxFeePerGas, sum(if(max_priority_fee_per_gas is not null, max_priority_fee_per_gas/ 1000000000, 0)) / sum(if(max_priority_fee_per_gas is not null, 1, 0)) maxPriorityFeePerGas, sum(fee) as evmFee, sum(burned_fee) as evmBurnedFee from substrate-etl.${relayChain}.evmtxs${paraID} where date(block_timestamp) = '${logDT}'`,
+            sqla["evmtransfers"] = `select count(*) as numEVMTransfers, sum(if(transfer_type = 'ERC20', 1, 0)) numERC20Transfers, sum(if(transfer_type = 'ERC721', 1, 0)) numERC721Transfers, sum(if(transfer_type = 'ERC1155', 1, 0)) numERC1155Transfers from substrate-etl.${relayChain}.evmtransfers${paraID} where date(block_timestamp) = '${logDT}'`
+        }
         console.log(sqla);
         let r = {}
         let vals = [` loaded = 1 `];

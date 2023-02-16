@@ -1243,7 +1243,7 @@ module.exports = class Indexer extends AssetManager {
                     }
                 }
             }
-            let sqlDebug = true
+            let sqlDebug = false
             this.xcmtransfer = {};
             await this.upsertSQL({
                 "table": "xcmtransfer",
@@ -1312,43 +1312,6 @@ module.exports = class Indexer extends AssetManager {
             }
         }
 
-        let xcmViolationKeys = Object.keys(this.xcmViolation)
-        //console.log(`xcmViolationKeys`, xcmViolationKeys)
-        if (xcmViolationKeys.length > 0) {
-            let xcmViolationRecs = [];
-            for (let i = 0; i < xcmViolationKeys.length; i++) {
-                let v = this.xcmViolation[xcmViolationKeys[i]];
-                let chainIDDest = (v.chainIDDest != undefined) ? `'${v.chainIDDest}'` : `NULL`
-                let errorcase = (v.errorcase != undefined && v.errorcase != "") ? `'${v.errorcase}'` : `NULL`
-                //MK: send violation here
-                if (isTip) {
-                    //console.log(`[Delay=${this.chainParser.parserBlockNumber-v.sourceBlocknumber}]  send xcmViolation [${this.chainID}-${v.sourceBlocknumber}] (instructionHash:${v.instructionHash}), isTip=${isTip}`)
-                }
-                //["chainID", "instructionHash", "sourceBlocknumber"]
-                //["chainIDDest", "violationType", "parser", "caller", "errorcase", "instruction", "sourceTS", "indexDT"]
-                let t = "(" + [`'${v.chainID}'`, `'${v.instructionHash}'`, `'${v.sourceBlocknumber}'`,
-                    chainIDDest, `'${v.violationType}'`, `'${v.parser}'`, `'${v.caller}'`, errorcase, `'${v.instruction}'`, `'${v.sourceTS}'`, `Now()`
-                ].join(",") + ")";
-                xcmViolationRecs.push(t);
-            }
-            this.xcmViolation = {};
-            let sqlDebug = true
-            try {
-                // these events we can't say for sure without matching to recent sends
-                if (xcmViolationRecs.length > 0) {
-                    let vals = ["chainIDDest", "violationType", "parser", "caller", "errorcase", "instruction", "sourceTS", "indexDT"]
-                    await this.upsertSQL({
-                        "table": "xcmViolation",
-                        "keys": ["chainID", "instructionHash", "sourceBlocknumber"],
-                        "vals": vals,
-                        "data": xcmViolationRecs,
-                        "replace": vals
-                    }, sqlDebug);
-                }
-            } catch (err1) {
-                console.log(err1);
-            }
-        }
     }
 
     fixOutgoingUnknownSentAt(sentAt, finalized = false) {
@@ -1806,17 +1769,6 @@ module.exports = class Indexer extends AssetManager {
                         } else if ((beneficiary == r.fromAddress) && (amountSent >= r.amountReceived)) {
                             let rat = r.amountReceived / amountSent; // old default
                             let ratRequirement = (r.isFeeItem) ? .9 : .97;
-                            if (this.chainID == 2011) {
-                                this.logger.error({
-                                    op: "search_xcmtransferdestcandidate:EQUILIBRIUM",
-                                    rat,
-                                    amountReceived: r.amountReceived,
-                                    xcmTeleportFees: r.xcmTeleportFees,
-                                    amountSent,
-                                    r,
-                                    xcmtransfer
-                                });
-                            }
                             if (r.xcmTeleportFees) { // new approach
                                 if ((r.xcmTeleportFees + r.amountReceived) <= amountSent) {
                                     rat = (r.xcmTeleportFees + r.amountReceived) / amountSent;
@@ -7789,7 +7741,7 @@ module.exports = class Indexer extends AssetManager {
         if (r.trace) traceAvailable = true
         if (r.events) eventAvailable = true
 
-        console.log(`[${blkNum}] [${blkHash}] Trace?${traceAvailable}, Events?${eventAvailable} , currTS=${this.getCurrentTS()}`)
+        //console.log(`[${blkNum}] [${blkHash}] Trace?${traceAvailable}, Events?${eventAvailable} , currTS=${this.getCurrentTS()}`)
         if (blockAvailable && traceAvailable) {
             // setup ParserContext here
 
@@ -8273,7 +8225,7 @@ module.exports = class Indexer extends AssetManager {
         let finalFlushStartTS = new Date().getTime();
         await this.flush(indexTS, currPeriod.endBN, true, false); //ts, bn, isFullPeriod, isTip
         let finalFlushTS = (new Date().getTime() - finalFlushStartTS) / 1000
-        if (this.debugLevel >= paraTool.debugVerbose) console.log("index_blocks_period: total flush(a-f)", finalFlushTS);
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log("index_blocks_period: total flush(a-f)", finalFlushTS);
         this.showTimeUsage()
 
         // record a record in indexlog
