@@ -1560,7 +1560,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 paraIDs.push(chainsRec.paraID)
             }
             console.log(`${paraIDs.length} active ${relayChain} chains [${paraIDs}]`)
-            paraIDs = [0] // TODO: disable for testing
+            //paraIDs = [0] // TODO: disable for testing
         }else{
             paraIDs.push(paraID)
         }
@@ -1607,7 +1607,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     currDay AS (SELECT address_ss58, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58)
                     SELECT address_ss58 FROM currDay where address_ss58 not in (select address_ss58 from prevDay);
                     */
-                        targetSQL = `WITH prevDay AS (SELECT address_ss58, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58),
+                        targetSQL = `WITH prevDay AS (SELECT address_ss58, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58),
                      currDay AS (SELECT address_ss58, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58)
                 SELECT address_ss58, ts FROM prevDay where address_ss58 not in (select address_ss58 from currDay)`
                         partitionedFld = 'ts'
