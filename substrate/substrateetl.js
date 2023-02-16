@@ -182,7 +182,7 @@ module.exports = class SubstrateETL extends AssetManager {
                     } else {
                         //			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn-1}';`);
                         //			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn}';`);
-                        //			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn+1}';`); 
+                        //			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn+1}';`);
                         console.log(`./indexBlock  ${f.chainID} ${bn-1}`);
                         console.log(`./indexBlock  ${f.chainID} ${bn}`);
                         console.log(`./indexBlock  ${f.chainID} ${bn+1}`);
@@ -1556,7 +1556,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     // '2022-02-17', 22 -> 1645135200
     //logDT_hr_to_ts: function logDT_hr_to_ts(logDT, hr)
 
-    async dump_account_matrics_range(relayChain = "polkadot", startLogDT = null, paraID = 'all', isDry = true) {
+    async dump_account_metrics_range(relayChain = "polkadot", startLogDT = null, paraID = 'all', isDry = true) {
         let ts = this.getCurrentTS();
         if (startLogDT == null) {
             //startLogDT = (relayChain == "kusama") ? "2021-07-01" : "2022-05-04";
@@ -1566,7 +1566,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             while (true) {
                 ts = ts - 86400;
                 let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
-                await this.dump_account_matrics(logDT, relayChain, paraID = 'all', isDry);
+                await this.dump_account_metrics(logDT, relayChain, paraID = 'all', isDry);
                 if (logDT == startLogDT) {
                     return (true);
                 }
@@ -1577,9 +1577,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-    async dump_account_matrics(logDT = "2023-02-01", relayChain = "polkadot", paraID = 'all', isDry = true) {
+    async dump_account_metrics(logDT = "2023-02-01", relayChain = "polkadot", paraID = 'all', isDry = true) {
 
-        console.log(`dump_account_matrics logDT=${logDT}, ${relayChain}-${paraID}, isDry=${isDry}`)
+        console.log(`dump_account_metrics logDT=${logDT}, ${relayChain}-${paraID}, isDry=${isDry}`)
         let bqjobs = []
 
         // load new accounts
@@ -1825,6 +1825,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             tbls.push("evmtransfers");
         }
         // 1. get bnStart, bnEnd for logDT
+        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
+        let logYYYYMMDD = logDT.replaceAll('-', '')
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
+        logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
+
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let minLogDT = `${logDT} 00:00:00`;
         let maxLogDT = `${logDT} 23:59:59`;
@@ -2172,8 +2177,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             return (false);
         } */
         // 5. write to bq
+        let numSubstrateETLLoadErrors = 0;
         try {
-            let numSubstrateETLLoadErrors = 0;
             for (const tbl of tbls) {
                 fs.closeSync(f[tbl]);
                 let logDTp = logDT.replaceAll("-", "")
@@ -2197,6 +2202,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             await this.update_batchedSQL();
         } catch (e) {
             console.log(e);
+        }
+        if (numSubstrateETLLoadErrors == 0){
+            try {
+                await this.dump_account_metrics(logDT, relayChain, paraID, false)
+            }catch(e){
+                console.log(`dump_account_metrics error`, e)
+            }
         }
         try {
             await this.update_blocklog(chainID, logDT);
