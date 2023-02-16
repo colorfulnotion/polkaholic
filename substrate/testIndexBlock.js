@@ -54,18 +54,52 @@ async function main() {
             WSEndpoint: "wss://spiritnet.kilt.io/",
             blocks: {
                 // Oct 2021
-                //131016: "OK",
-                312216: "OK",
+                131016: "OK",
+                // 312216: "OK",
                 //  2022
-                //2484577: "OK"
+                2484577: "OK"
             }
         },
+        //Other decoding failures
+	kintsugi: { 
+	    chainID: 22092,
+	    WSEndpoint: "wss://api-kusama.interlay.io/parachain",
+	    blocks: {
+		// 2023-02-16 23:40:41             VEC: Unable to decode on index 2 createType(ExtrinsicV4):: createType(ExtrinsicSignatureV4):: decodeU8aStruct: failed at 0xb083c6fb6f8501c3ecf1ec94b099a3f7… on signer (index 1/5): {"_enum":{"Id":"AccountId","Index":"Compact<AccountIndex>","Raw":"Bytes","Address32":"H256","Address20":"H160"}}:: Unable to create Enum via index 176, in Id, Index, Raw, Address32, Address20
+		// 2023-02-16 23:40:41        RPC-CORE: getBlock(hash?: BlockHash): SignedBlock:: createType(SignedBlock):: Struct: failed on block: {"header":"Header","extrinsics":"Vec<Extrinsic>"}:: Struct: failed on extrinsics: Vec<Extrinsic>:: createType(ExtrinsicV4):: createType(ExtrinsicSignatureV4):: decodeU8aStruct: failed at 0xb083c6fb6f8501c3ecf1ec94b099a3f7… on signer (index 1/5): {"_enum":{"Id":"AccountId","Index":"Compact<AccountIndex>","Raw":"Bytes","Address32":"H256","Address20":"H160"}}:: Unable to create Enum via index 176, in Id, Index, Raw, Address32, Address20
 
-        //Minor cases: 
-        // 22092-kintsugi - 8 blocks
-        // 22088-altair: 2 blocks
-        // 22090-basilisk: 2 blocks
-        // 21000-statemine: 6 blocks
+		2496: "0x2c4cfcd4f2ace08d27fb3bc7989d3232cdedc87555101901541811ee236da16e",// ./indexBlock 22092 2496
+		2502 : "0x9795656ddb04372186597470fd97fc5269874bc72513560236d4f1906a54a1bf",
+		2536 : "0xd9c6cf48d5b3a8374911f7bf7c2ca43327568081ccc5c170f5fa6e262d8764e7",
+		15447 : "0x51969b8aab9f11258fbb3984370d47f323c3ece35650c71863d6ae834c339ff4",
+		15461: "0xcce558b9335740394d28d9fdeb563c016117e8d5d1d7aa9fd676c43aeffbb16e",		// ./indexBlock 22092 15461
+		16513: "0x8860bee2251313010a72ecdfae66fd9acc18eacb67c643045f6cff7f92eafc6d",		// ./indexBlock 22092 16513
+		16526: "0xc59781ce10619b58b0fc72ed753516188014cf8f132420dabe4533cfe7ac84c9"		// ./indexBlock 22092 16526
+	    }
+	},
+	altair: {
+	    chainID: 22088,
+	    WSEndpoint: "wss://fullnode.altair.centrifuge.io",
+	    blocks: {
+		90522: "0x16bc296309ed89fbd01647ce47d3f3bd1417bdae0c5d5b414f24355952afe241",		// ./indexBlock 22088 90522
+		90523: "0x1f09ee546ad46c41c07267e3b8d9675bcea1ad59f360124d6f48642b851af1b3"		// ./indexBlock 22088 90523
+	    }
+	},
+	basilisk: {
+            chainID: 22090,
+	    WSEndpoint: "ws://basilisk-internal.polkaholic.io:9944",
+	    blocks: {
+		129442: "0xd2f7d49b5c822d2efbce33bc1499c477a715241cb6cc38bdae90eb32b25560b2",	// ./indexBlock 22090 129442
+		395401: "0xa61e5c775ea335206c50d6b6ce0617c08352eab2750cb890fffbacca66b07435"	// ./indexBlock 22090 395401
+	    }
+	},
+	statemine: {
+	    chainID: 21000,
+	    WSEndpoint: "ws://statemine-internal.polkaholic.io:9944",
+	    blocks: {
+		// TODO: 6 blocks
+	    }
+	}
     }
 
     let testcase = testcases.kilt;
@@ -91,17 +125,17 @@ async function main() {
     });
     console.log(`You are connected to chain ${chainID} endpoint=${WSEndpoint} Test cases: `, JSON.stringify(blocks));
     for (const bn of Object.keys(blocks)) {
-        //let blockHash = blocks[bn];
-        let header = await api.rpc.chain.getBlockHash(bn);
+        let header = await api.rpc.chain.getBlockHash(parseInt(bn, 10));
         let blockHash = header.toHex();
-
         // get the block
         try {
             const signedBlock = await api.rpc.chain.getBlock(blockHash);
             console.log("SUCCESS on rpc.chain.getBlock", chainID, bn, blockHash);
         } catch (err) {
-            console.log("// getBlock Failure");
-            console.log(bn, `: "${blockHash}",`);
+            console.log("FAILURE", bn, `: "${blockHash}",`);
+	    //console.log(api.rpc.chain);
+	    //const hdr = await api.rpc.chain.getHeader(blockHash);
+            //console.log("BACKUP: ", hdr);
         }
     }
 }
