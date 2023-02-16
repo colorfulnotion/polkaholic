@@ -147,13 +147,29 @@ module.exports = class SubstrateETL extends AssetManager {
     async audit_fix(chainID = null) {
 	let w = chainID >= 0 ? ` and chainID = '${chainID}'` : "";
         // 1. find problematic periods with a small number of records (
-        let sql = `select CONVERT(auditFailures using utf8) as failures, chainID from blocklogstats where audited in ( 'Failure' ) ${w} order by chainID, monthDT`
+        let sql = `select CONVERT(auditFailures using utf8) as failures, chainID, monthDT from blocklogstats where audited in ( 'Failure' ) ${w} order by chainID, monthDT`
 	console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
 	for ( const f of recs ) {
 	    let failures = JSON.parse(f.failures)
+	    if ( failures.gaps && failures.gaps.length > 0 && false ) {
+		for (const gap of failures.gaps) {
+		    let startBN = gap[0];
+		    let endBN = gap[1];
+		    if ( false && endBN - startBN >= 500 && endBN - startBN < 5000 ) {
+			let sql = `update block${f.chainID} set crawlBlock = 1, attempted = 0 where blockNumber >= ${startBN} and blockNumber <= ${endBN};`
+			//console.log(sql);
+			this.batchedSQL.push(sql);
+			await this.update_batchedSQL()
+		    } else {
+			//console.log(gap);
+		    }
+		}
+	    }
+	    
 	    if ( failures.errors && failures.errors.length > 0 ) {
+		console.log("FAILURES", f);
 		for (const bn of failures.errors) {
 		    let paraID = paraTool.getParaIDfromChainID(f.chainID);
 		    let relayChain = paraTool.getRelayChainByChainID(f.chainID);
@@ -163,9 +179,9 @@ module.exports = class SubstrateETL extends AssetManager {
 			console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(bn)}`)
 			console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(bn+1)}`)
 		    } else {
-/*			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn-1}';`);
-			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn}';`);
-			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn+1}';`); */
+//			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn-1}';`);
+//			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn}';`);
+//			console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${bn+1}';`); 
 			console.log(`./indexBlock  ${f.chainID} ${bn-1}`);
 			console.log(`./indexBlock  ${f.chainID} ${bn}`);
 			console.log(`./indexBlock  ${f.chainID} ${bn+1}`);
@@ -186,7 +202,7 @@ module.exports = class SubstrateETL extends AssetManager {
     async audit_blocks(chainID = null) {
         // 1. find problematic periods with a small number of records (
         let w = chainID ? ` and chainID = ${chainID}` : ""
-        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where audited in ( 'Unknown' )  ${w} order by chainID, monthDT`
+        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where audited in ( 'Unknown', 'Failure' )  ${w} order by chainID, monthDT`
         console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
@@ -1375,7 +1391,7 @@ blocklog.valXCMTransferOutgoingUSD,
 blocklog.numAccountsTransfersIn,
 blocklog.numAccountsTransfersOut,
 chain.crawlingStatus
-from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date(date_sub(Now(), interval 1 day)) and chain.relayChain in ("polkadot", "kusama") and logDT >= "${birthDT}" order by relayChain desc, paraID asc, logDT desc`;
+from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date(Now()) and chain.relayChain in ("polkadot", "kusama") and logDT >= "${birthDT}" order by relayChain desc, paraID asc, logDT desc`;
         tallyRecs = await this.poolREADONLY.query(sql_tally);
         for (const r of tallyRecs) {
             let chainID = r.chainID;
