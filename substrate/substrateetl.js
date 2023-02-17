@@ -1420,7 +1420,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 if (prevStartBN && (prevStartBN != (r.endBN + 1)) && (r.endBN < prevStartBN)) {
                     let sql = `update blocklog set loaded = 0 where chainID = ${chainID} and (logDT = '${logDT}' or logDT = Date(date_add("${logDT}", interval 1 day)))`;
                     let sqldiff = (r.endBN && prevStartBN && prevStartBN - r.endBN < 50000) ? `update block${chainID} set crawlBlock = 1, attempted = 0 where ( blockNumber > ${r.endBN} and blockNumber < ${prevStartBN} ) and blockHash is null` : null;
-                    if (sqldiff) {
+                    if (sqldiff && false) {
                         this.batchedSQL.push(sqldiff);
                     }
                     this.batchedSQL.push(sql);

@@ -84,7 +84,7 @@ async function main() {
                 await substrateetl.dump_substrateetl(_logDT, _paraID, _relayChain, _isEVM);
                 await substrateetl.sleep(1000);
                 tally++;
-                if (tally > 20) {
+                if (tally > 25) {
                     await substrateetl.dump_substrateetl_polkaholic()
                     tally = 0;
                 }
