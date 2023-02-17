@@ -2331,6 +2331,33 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         } catch (e) {
             console.log(e);
         }
+        // load evmholders changes
+        if (numSubstrateETLLoadErrors == 0 && isEVM){
+            try {
+                /*
+                With incomingTransfer as (SELECT token_address, to_address as account_address, concat(token_address, to_address) account_token, sum(CAST(value AS BIGNUMERIC)) as value, sum(CAST(value AS BIGNUMERIC)) as valuein, sum(0) as valueOut, count(*) valueCnt, min(block_timestamp) as ts from `substrate-etl.polkadot.evmtransfers2004` WHERE DATE(block_timestamp) = "2023-02-17" and transfer_type = 'ERC20' group by token_address, account_address, account_token),
+                outgoingTransfers as (SELECT token_address, from_address as account_address, concat(token_address, from_address) account_token, sum(-CAST(value AS BIGNUMERIC)) as value, sum(0) as valuein, sum(-CAST(value AS BIGNUMERIC)) as valueOut, count(*) valueCnt,  min(block_timestamp) as ts from `substrate-etl.polkadot.evmtransfers2004` WHERE DATE(block_timestamp) = "2023-02-17" and transfer_type = 'ERC20' group by token_address, account_address, account_token),
+                transfersCombined as (Select * from incomingTransfer union all select * from outgoingTransfers order by account_address)
+                select token_address, account_address, sum(value) as value, sum(valuein) as receivedValue, sum(valueout) as sentValue, sum(valueCnt) as transferCnt,  min(ts) as ts from transfersCombined group by token_address, account_address order by token_address
+                */
+                let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
+                let datasetID = 'dotsama'
+                let tblName = `evmholders${chainID}`
+                let partitionedFld = `ts`
+                let destinationTbl = `${datasetID}.${tblName}$${logYYYYMMDD}`
+                let targetSQL = `With incomingTransfer as (SELECT token_address, to_address as account_address, concat(token_address, to_address) account_token, sum(CAST(value AS BIGNUMERIC)) as value, sum(CAST(value AS BIGNUMERIC)) as valuein, sum(0) as valueOut, count(*) valueCnt, min(block_timestamp) as ts from \`substrate-etl.${relayChain}.evmtransfers${paraID}\` WHERE DATE(block_timestamp) = "${logDT}" and transfer_type = "ERC20" group by token_address, account_address, account_token),
+outgoingTransfers as (SELECT token_address, from_address as account_address, concat(token_address, from_address) account_token, sum(-CAST(value AS BIGNUMERIC)) as value, sum(0) as valuein, sum(-CAST(value AS BIGNUMERIC)) as valueOut, count(*) valueCnt, min(block_timestamp) as ts from \`substrate-etl.${relayChain}.evmtransfers${paraID}\` WHERE DATE(block_timestamp) = "${logDT}" and transfer_type = "ERC20" group by token_address, account_address, account_token),
+transfersCombined as (Select * from incomingTransfer union all select * from outgoingTransfers order by account_address)
+select token_address, account_address, sum(value) as value, sum(valuein) as receivedValue, sum(valueout) as sentValue, sum(valueCnt) as transferCnt , min(ts) as ts from transfersCombined group by token_address, account_address order by token_address`
+                partitionedFld = 'ts'
+                let bqCmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                console.log(`${tblName}***\n\n${bqCmd}`)
+                await exec(bqCmd);
+            }catch(e){
+                console.log(`evmholders error`, e)
+            }
+        }
+        // load account metrics
         if (numSubstrateETLLoadErrors == 0){
             try {
                 await this.dump_account_metrics(logDT, relayChain, paraID, false)
