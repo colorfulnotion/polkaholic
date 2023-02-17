@@ -991,6 +991,14 @@ from chain where chainID = '${chainID}' limit 1`);
                 types: typesDef.typeBundleForPolkadot.types
             });
             console.log(`You are connected to KILT chain ${chainID} endpoint=${endpoint} with types but not rpc`);
+        } else if ( (chainID == paraTool.chainIDEncointer)) {
+            const typesDef = require("@encointer/types")
+            api = await ApiPromise.create({
+                provider: provider,
+                types: typesDef.typeBundleForPolkadot.types
+            });
+            console.log(`You are connected to ENCOINTER chain ${chainID} endpoint=${endpoint} with types but not rpc`);
+	    
         } else if ( (chainID == paraTool.chainIDAstar || chainID == paraTool.chainIDShiden || chainID == paraTool.chainIDShibuya)) {
 	    // const options = require("@astar-network/astar-api");
             api = await ApiPromise.create({

@@ -1,6 +1,5 @@
 async function main() {
 
-    const typesDef = require("@phala/typedefs");
     let testcases = {
         shiden: {
             chainID: 22007,
@@ -103,7 +102,7 @@ async function main() {
 	}
     }
 
-    let testcase = testcases.khala;
+    let testcase = testcases.encointer;
     let chainID = testcase.chainID;
     let WSEndpoint = testcase.WSEndpoint;
     let blocks = testcase.blocks;
@@ -134,7 +133,11 @@ async function main() {
 		"PalletDappsStakingEraRewardAndStake":{"rewards":"Balance","staked":"Balance"},
 		 "EraIndex":"u32"};
     } else if ( chainID == 22004 ) {
+	const typesDef = require("@phala/typedefs");
 	types = typesDef.typesChain.Khala;
+    } else if ( chainID == 21001 ) {
+	const typesDef = require("@encointer/types")
+	types = typesDef.default.types;
     }
     let api = await ApiPromise.create({
         provider: provider,
