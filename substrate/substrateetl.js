@@ -1577,7 +1577,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-    async dump_dotsamat_metrics_range(startLogDT = null, isDry = true) {
+    async dump_dotsama_metrics_range(startLogDT = null, isDry = true) {
         let ts = this.getCurrentTS();
         if (startLogDT == null) {
             //startLogDT = (relayChain == "kusama") ? "2021-07-01" : "2022-05-04";
@@ -1944,6 +1944,31 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let sql0 = `update block${chainID} set crawlBlock = 1, attempted = 0 where blockNumber = ${bn} and attempted < 127`
         this.batchedSQL.push(sql0);
         await this.update_batchedSQL()
+    }
+
+    async dump_substrateetl_range(paraID = 2000, relayChain = "polkadot", isEVM = 0, startLogDT = null) {
+        let ts = this.getCurrentTS();
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(ts);
+        if (startLogDT == null) {
+            startLogDT = (relayChain == "kusama") ? "2023-01-01" : "2023-01-01";
+        }
+        console.log(`dump_substrateetl_range, paraID=${paraID}, relayChain=${relayChain}, isEVM=${isEVM}, startLogDT=${startLogDT}, currDT=${currDT}`)
+        let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0)
+        let [startDT, _s] = paraTool.ts_to_logDT_hr(startLogTS);
+        try {
+            while (true) {
+                ts = ts - 86400;
+                let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
+                console.log(`dump_substrateetl logDT=${logDT}, paraID=${paraID}, relayChain=${relayChain}, isEVM=${isEVM}`)
+                await this.dump_substrateetl(logDT, paraID, relayChain, isEVM)
+                if (startDT == logDT) {
+                    return (true);
+                }
+            }
+        } catch (err) {
+            console.log(err);
+            return (false);
+        }
     }
 
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot", isEVM = 0) {
