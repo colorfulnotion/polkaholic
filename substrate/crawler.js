@@ -359,7 +359,7 @@ module.exports = class Crawler extends Indexer {
                 return [t, block, events, trace, evmBlock, evmReceipts, blockHash];
             }
         } catch (err) {
-	    console.log(err);
+            console.log(err);
             this.logger.warn({
                 "op": "crawl_block_trace",
                 "chainID": chain.chainID,
@@ -1474,12 +1474,12 @@ module.exports = class Crawler extends Indexer {
 
     async crawlBlock(api, blockHash) {
         const signedBlock = await api.rpc.chain.getBlock(blockHash);
-	let eventsRaw = [];
-	try {
+        let eventsRaw = [];
+        try {
             eventsRaw = await api.query.system.events.at(blockHash);
-	} catch ( err ) {
-            console.log(err); 
-	}
+        } catch (err) {
+            console.log(err);
+        }
         let events = eventsRaw.map((e) => {
             let eh = e.event.toHuman();
             let ej = e.event.toJSON();

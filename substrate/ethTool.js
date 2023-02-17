@@ -1207,12 +1207,12 @@ async function processReceipts(evmReceipts, contractABIs, contractABISignatures)
     // add logIndex to receipts
     let logIndexCnt = 0
     for (let i = 0; i < evmReceipts.length; i++) {
-         let evmReceipt = evmReceipts[i]
-         for (let j = 0; j < evmReceipt.logs; i++) {
-             evmReceipt.logs[j].logIndex = logIndexCnt
-             logIndexCnt++
-         }
-         evmReceipts[i] = evmReceipt
+        let evmReceipt = evmReceipts[i]
+        for (let j = 0; j < evmReceipt.logs; i++) {
+            evmReceipt.logs[j].logIndex = logIndexCnt
+            logIndexCnt++
+        }
+        evmReceipts[i] = evmReceipt
     }
     let recptAsync = await evmReceipts.map(async (receipt) => {
         try {

@@ -5456,7 +5456,7 @@ module.exports = class ChainParser {
         }
         return [false, false]
     }
-    
+
     processEqBalanceSignal(indexer, extrinsicID, e, mpState, finalized = false) {
         /*
         data": [
