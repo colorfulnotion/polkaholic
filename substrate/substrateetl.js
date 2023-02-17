@@ -153,17 +153,18 @@ module.exports = class SubstrateETL extends AssetManager {
         if (recs.length == 0) return (false);
         for (const f of recs) {
             let failures = JSON.parse(f.failures)
-            if (failures.gaps && failures.gaps.length > 0 && false) {
+            if (failures.gaps && failures.gaps.length > 0) {
                 for (const gap of failures.gaps) {
                     let startBN = gap[0];
                     let endBN = gap[1];
-                    if (false && endBN - startBN >= 500 && endBN - startBN < 5000) {
-                        let sql = `update block${f.chainID} set crawlBlock = 1, attempted = 0 where blockNumber >= ${startBN} and blockNumber <= ${endBN};`
-                        //console.log(sql);
+                    // attempted > 100 == don't try again, its been audited (missing timestamps, has decoding errors etc.)
+                    let sql = `update block${f.chainID} set crawlBlock = 1, attempted = 0 where blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 100;`
+                    if (endBN - startBN < 50) { // 50 blocks * 6-12bps = 5-10mins
+                        console.log("EXECUTING: ", sql);
                         this.batchedSQL.push(sql);
                         await this.update_batchedSQL()
                     } else {
-                        //console.log(gap);
+                        console.log("RECOMMENDING: ", sql);
                     }
                 }
             }
@@ -487,6 +488,15 @@ module.exports = class SubstrateETL extends AssetManager {
         const provider = new WsProvider(wsEndpoint);
         const api = await ApiPromise.create({
             provider
+        });
+        let disconnectedCnt = 0;
+        provider.on('disconnected', () => {
+            disconnectedCnt++;
+            console.log(`*CHAIN API DISCONNECTED [DISCONNECTIONS=${disconnectedCnt}]`, chainID);
+            if (disconnectedCnt > 5) {
+                console.log(`*CHAIN API DISCONNECTION max reached!`, chainID);
+                process.exit(1);
+            }
         });
         let bqlogfn = logDT ? this.get_bqlogfn(chainID, logDT) : null;
         const rawChainInfo = await api.registry.getChainProperties()
@@ -887,9 +897,19 @@ module.exports = class SubstrateETL extends AssetManager {
         let wsEndpoint = chain.WSEndpoint;
         let prev_numHolders = chain.numHolders;
         const provider = new WsProvider(wsEndpoint);
+        let disconnectedCnt = 0;
+        provider.on('disconnected', () => {
+            disconnectedCnt++;
+            console.log(`*CHAIN API DISCONNECTED [DISCONNECTIONS=${disconnectedCnt}]`, chainID);
+            if (disconnectedCnt > 5) {
+                console.log(`*CHAIN API DISCONNECTION max reached!`, chainID);
+                process.exit(1);
+            }
+        });
         const api = await ApiPromise.create({
             provider
         });
+
         const rawChainInfo = await api.registry.getChainProperties()
         var chainInfo = JSON.parse(rawChainInfo);
         const prefix = chainInfo.ss58Format
@@ -1419,11 +1439,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             if (prevChainID == chainID) {
                 if (prevStartBN && (prevStartBN != (r.endBN + 1)) && (r.endBN < prevStartBN)) {
                     let sql = `update blocklog set loaded = 0 where chainID = ${chainID} and (logDT = '${logDT}' or logDT = Date(date_add("${logDT}", interval 1 day)))`;
-                    let sqldiff = (r.endBN && prevStartBN && prevStartBN - r.endBN < 50000) ? `update block${chainID} set crawlBlock = 1, attempted = 0 where ( blockNumber > ${r.endBN} and blockNumber < ${prevStartBN} ) and blockHash is null` : null;
-                    if (sqldiff && false) {
+                    let sqldiff = (r.endBN && prevStartBN && prevStartBN - r.endBN < 500) ? `update block${chainID} set crawlBlock = 1, attempted = 0 where ( blockNumber > ${r.endBN} and blockNumber < ${prevStartBN} ) and blockHash is null and attempted < 100` : null;
+                    if (sqldiff) {
                         this.batchedSQL.push(sqldiff);
-			this.batchedSQL.push(sql);
-			await this.update_batchedSQL();
+                        this.batchedSQL.push(sql);
+                        await this.update_batchedSQL();
                     }
                     console.log("BROKEN DAILY CHAIN -- ", chainID, logDT, sql, "DIFF: ", sqldiff);
                     numBlocks_missing = null;
