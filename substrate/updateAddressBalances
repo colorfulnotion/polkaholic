@@ -3,7 +3,7 @@
 var SubstrateETL = require("./substrateetl");
 var paraTool = require("./paraTool");
 async function main() {
-    let chainID = -1;
+    let chainID = null;
     let logDT = null;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
