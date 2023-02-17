@@ -85,13 +85,28 @@ class SubstrateETLCLI {
         }
     }
 
+    async dotsamametrics(opt) {
+        //console.log(o)
+        let { logDT } = opt;
+        let isRange = (logDT == 'range')? true : false
+        let isDryRun = (opt.dry)? true : false
+        var substrateetl = new SubstrateETL();
+        if (isRange){
+            await substrateetl.dump_dotsama_metrics_range(isDryRun);
+        }else if (logDT){
+            await substrateetl.dump_dotsamat_metrics(logDT,isDryRun);
+        }else{
+            console.log(`logDT missing`)
+        }
+    }
+
     async dumpsubstrateetl(opt) {
         //console.log(o)
         let { relaychain, paraID, logDT, chainID } = opt;
         let relayChain = relaychain
         let isRange = (logDT == 'range')? true : false
         let isDryRun = (opt.dry)? true : false
-        let isEvm = false
+        let isEVM = false
         //suppress paraID, relayChain when chainID is set
         if (chainID != undefined && paraTool.isNumeric(chainID)){
             chainID =  parseInt(chainID)
@@ -250,6 +265,17 @@ async function main() {
         let dumpcli = new SubstrateETLCLI();
         await dumpcli.deletetables(opt);
     });
+
+    //./dumpETL dotsamametrics -dt 20230201
+    program.command('dotsamametrics')
+    .description(`Generate Dotsam aggregates`)
+    .option('-dt, --logDT <logDT>', `LogDT in YYYYMMDD. If not specified, generate logs for all days since 2023-02-01`, '2023-02-01')
+    .option('-d, --dry', `dry run the cmd without updating`, false)
+    .action(async (opt) => {
+        let dumpcli = new SubstrateETLCLI();
+        await dumpcli.dotsamametrics(opt);
+    });
+
     await program.parseAsync(process.argv);
 }
 
