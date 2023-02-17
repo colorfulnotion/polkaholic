@@ -330,7 +330,7 @@ module.exports = class Crawler extends Indexer {
                     if (!evmBlock) evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
                     evmReceipts = await ethTool.crawlEvmReceipts(this.web3Api, evmBlock)
                 }
-                if (crawlTraceEVM && (chainID == 2004 || chainID == 22003)) {
+                if (crawlTraceEVM && (this.chainID == 2004 || this.chainID == 22003)) {
                     if (!evmBlock) evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
                     evmTrace = await this.crawlEvmTrace(chain, bn);
                 }
@@ -359,6 +359,7 @@ module.exports = class Crawler extends Indexer {
                 return [t, block, events, trace, evmBlock, evmReceipts, blockHash];
             }
         } catch (err) {
+	    console.log(err);
             this.logger.warn({
                 "op": "crawl_block_trace",
                 "chainID": chain.chainID,

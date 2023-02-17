@@ -949,7 +949,7 @@ from chain where chainID = '${chainID}' limit 1`);
                 provider: provider,
                 types: typesDef
             });
-        } else if (chainID == paraTool.chainIDPhala) {
+        } else if (chainID == paraTool.chainIDKhala || chainID == paraTool.chainIDPhala ) {
             const typesDef = require("@phala/typedefs");
             api = await ApiPromise.create({
                 provider: provider,
@@ -991,12 +991,23 @@ from chain where chainID = '${chainID}' limit 1`);
                 types: typesDef.typeBundleForPolkadot.types
             });
             console.log(`You are connected to KILT chain ${chainID} endpoint=${endpoint} with types but not rpc`);
-        } else if (false && (chainID == paraTool.chainIDAstar || chainID == paraTool.chainIDShiden || chainID == paraTool.chainIDShibuya)) {
-            const options = require("@astar-network/astar-api");
-            api = await ApiPromise.create(options({
-                provider
-            }));
-            console.log(`You are connected to ASTAR/SHIDEN chain ${chainID} endpoint=${endpoint} with options`);
+        } else if ( (chainID == paraTool.chainIDAstar || chainID == paraTool.chainIDShiden || chainID == paraTool.chainIDShibuya)) {
+	    // const options = require("@astar-network/astar-api");
+            api = await ApiPromise.create({
+                provider,
+		types: {"Keys":"AccountId",
+			"Address":"MultiAddress",
+			"LookupSource":"MultiAddress",
+			"AmountOf":"Amount",
+			"Amount":"i128",
+			"SmartContract":{"_enum":{"Evm":"H160","Wasm":"AccountId"}},
+			"EraStakingPoints":{"total":"Balance","stakers":"BTreeMap<AccountId, Balance>","formerStakedEra":"EraIndex","claimedRewards":"Balance"},
+			"PalletDappsStakingEraStakingPoints":{"total":"Balance","stakers":"BTreeMap<AccountId, Balance>","formerStakedEra":"EraIndex","claimedRewards":"Balance"},
+			"EraRewardAndStake":{"rewards":"Balance","staked":"Balance"},
+			"PalletDappsStakingEraRewardAndStake":{"rewards":"Balance","staked":"Balance"},
+			"EraIndex":"u32"}
+            });
+	    console.log(`You are connected to ASTAR/SHIDEN chain ${chainID} endpoint=${endpoint} with options`);
         } else if (chainID == paraTool.chainIDMoonbeam) {
             const typesBundlePre900 = require("moonbeam-types-bundle");
             api = await ApiPromise.create({

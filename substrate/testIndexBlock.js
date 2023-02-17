@@ -1,5 +1,6 @@
 async function main() {
 
+    const typesDef = require("@phala/typedefs");
     let testcases = {
         shiden: {
             chainID: 22007,
@@ -102,8 +103,7 @@ async function main() {
 	}
     }
 
-    let testcase = testcases.kilt;
-
+    let testcase = testcases.khala;
     let chainID = testcase.chainID;
     let WSEndpoint = testcase.WSEndpoint;
     let blocks = testcase.blocks;
@@ -120,8 +120,25 @@ async function main() {
     } = require('@polkadot/types');
     const provider = new WsProvider(WSEndpoint);
 
+    let types = {}
+    if ( chainID == 22007 ) {
+	types = {"Keys":"AccountId",
+		"Address":"MultiAddress",
+		"LookupSource":"MultiAddress",
+		"AmountOf":"Amount",
+		"Amount":"i128",
+		"SmartContract":{"_enum":{"Evm":"H160","Wasm":"AccountId"}},
+		"EraStakingPoints":{"total":"Balance","stakers":"BTreeMap<AccountId, Balance>","formerStakedEra":"EraIndex","claimedRewards":"Balance"},
+		"PalletDappsStakingEraStakingPoints":{"total":"Balance","stakers":"BTreeMap<AccountId, Balance>","formerStakedEra":"EraIndex","claimedRewards":"Balance"},
+		"EraRewardAndStake":{"rewards":"Balance","staked":"Balance"},
+		"PalletDappsStakingEraRewardAndStake":{"rewards":"Balance","staked":"Balance"},
+		 "EraIndex":"u32"};
+    } else if ( chainID == 22004 ) {
+	types = typesDef.typesChain.Khala;
+    }
     let api = await ApiPromise.create({
-        provider: provider
+        provider: provider,
+	types
     });
     console.log(`You are connected to chain ${chainID} endpoint=${WSEndpoint} Test cases: `, JSON.stringify(blocks));
     for (const bn of Object.keys(blocks)) {
