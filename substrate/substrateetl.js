@@ -341,8 +341,10 @@ module.exports = class SubstrateETL extends AssetManager {
         return (JSON.stringify(a));
     }
 
-    async pick_chainbalancecrawler() {
-        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from chainbalancecrawler as c where hostname = '${this.hostname}' and chainID not in ( select chainID from chainbalancecrawler where lastDT > date_sub(Now(), interval 5 minute) and hostname != '${this.hostname}' ) and lastDT > date_sub(Now(), interval 1 hour) order by lastDT DESC limit 1`;
+    async pick_chainbalancecrawler(specific_chainID = null) {
+	let w = ( specific_chainID ) ? ` and chainID = '${specific_chainID}' ` : "";
+        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from chainbalancecrawler as c where hostname = '${this.hostname}' and chainID not in ( select chainID from chainbalancecrawler where lastDT > date_sub(Now(), interval 5 minute) and hostname != '${this.hostname}' ) and lastDT > date_sub(Now(), interval 1 hour) ${w} order by lastDT DESC limit 1`;
+	console.log("SSS", sql);
         let chains = await this.pool.query(sql);
         if (chains.length == 0) {
             return [null, null];
@@ -351,12 +353,13 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     // pick a random chain to load yesterday for all chains
-    async updateAddressBalances() {
-        let [chainID, indexTS] = await this.pick_chainbalancecrawler();
+    async updateAddressBalances(specific_chainID = null) {
+        let [chainID, indexTS] = await this.pick_chainbalancecrawler(specific_chainID);
         if (chainID == null) {
+	    let w = ( specific_chainID ) ? ` and chainID = '${specific_chainID}' ` : "";
             // pick a chain that has not been STARTED/updated recently and hasn't been started  by some other op in the last hour
-            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where ( numAddressesLastUpdateDT is null or numAddressesLastUpdateDT < '2023-02-04' ) and chainID in ( select chainID from chain where crawling = 1 ) and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 10 minute) or lastUpdateAddressBalancesStartDT is Null ) and (logDT = last_day(logDT) or (logDT >= "2023-01-01" and logDT <= date(date_sub(Now(), interval 1 day))) ) and lastUpdateAddressBalancesAttempts <= 5 and chainID not in ( 2051, 2011, 22024, 22121 ) and chainID not in ( select chainID from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 1 hour) ) order by lastUpdateAddressBalancesAttempts, logDT desc, rand()`;
-            console.log(sql);
+            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where ( numAddressesLastUpdateDT is null ) and chainID in ( select chainID from chain where crawling = 1 and WSEndpointArchive = 1 ) and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 10 minute) or lastUpdateAddressBalancesStartDT is Null ) and (logDT = last_day(logDT) or (logDT >= "2023-01-01" and logDT <= date(date_sub(Now(), interval 1 day))) ) and lastUpdateAddressBalancesAttempts <= 5 and chainID not in ( select chainID from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 1 hour) ) ${w} order by lastUpdateAddressBalancesAttempts, logDT desc, rand()`;
+            console.log("TTT", sql);
             let chains = await this.pool.query(sql);
 
             if (chains.length == 0) {
@@ -397,6 +400,25 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
+    getMinMaxNumAddresses(chainID, logDT) {
+	const defaultMinNumAddresses = 1
+	const defaultMaxNumAddresses = 30000;
+	const stdTolerance = 2;
+	const fractionTolerance = .25;
+        let sql = `select round(numAddresses_avg - numAddresses_std*${stdTolerance}) as min_numAddresses, round(numAddresses_avg + numAddresses_std*${stdTolerance}+numAddresses_avg*${fractionTolerance}) max_numAddresses from blocklogstats where chainID = ${chainID} and (monthDT = last_day("${logDT}") or monthDT = last_day(date_sub(Now(), interval 28 day))) order by min_numAddresses asc limit 1`;
+	let recs = this.poolREADONLY.query(sql);
+	if ( recs.length == 0 ) {
+	    return [defaultMinNumAddresses, defaultMaxNumAddresses];
+	}
+	let min_numAddresses = recs[0].min_numAddresses;
+	let max_numAddresses = recs[0].max_numAddresses;
+	if ( max_numAddresses < defaultMaxNumAddresses ) {
+	    max_numAddresses = defaultMaxNumAddresses;
+	}
+	return [min_numAddresses, max_numAddresses];
+    }
+
+    
     async clean_chainbalancecrawler(logDT, chainID) {
         let sql = `delete from chainbalancecrawler where  (logDT = '${logDT}' and chainID = '${chainID}' and hostname = '${this.hostname}') or lastDT < date_sub(Now(), interval 1 hour)`;
         this.batchedSQL.push(sql);
@@ -416,10 +438,11 @@ module.exports = class SubstrateETL extends AssetManager {
             let sql = `select count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} where date(ts) = '${logDT}'`;
             let rows = await this.execute_bqJob(sql);
             let row = rows.length > 0 ? rows[0] : null;
-            if (row && row["numAddresses"] > 0) {
+	    let [min_numAddresses, max_numAddresses] = await this.getMinMaxNumAddresses(chainID, logDT);
+            if (row && ( row["numAddresses"] >= min_numAddresses ) && ( row["numAddresses"] <= max_numAddresses ) ) {
                 let numAddresses = parseInt(row["numAddresses"], 10);
                 let sql_upd = `update blocklog set lastUpdateAddressBalancesEndDT = Now(), numAddresses = '${numAddresses}', numAddressesLastUpdateDT = Now() where chainID = ${chainID} and logDT = '${logDT}'`;
-                console.log("updateAddressBalances FIN", sql_upd);
+                console.log("updateAddressBalances", "min", min_numAddresses, "max", max_numAddresses, sql_upd);
                 this.batchedSQL.push(sql_upd);
                 await this.clean_chainbalancecrawler(logDT, chainID);
             }
