@@ -6301,7 +6301,7 @@ module.exports = class Indexer extends AssetManager {
             if (index >= 0) {
                 let eventID = `${this.chainID}-${blockNumber}-${index}-${j}`
                 let event = this.parseEvent(e.event, eventID, api); // this is the apiAt
-                if (event) {
+                if (event[index] != undefined) {
                     events[index].push(event)
                 }
             }
@@ -7644,9 +7644,10 @@ module.exports = class Indexer extends AssetManager {
         } catch (e) {
             // try fallback here
             console.log(`failed with specV=${this.specVersion} [${r.block.number} ${r.block.hash}]`)
-            let chain = await this.setupChainAndAPI(this.chainID); //not sure
-            await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
-            signedBlock2 = this.apiAt.registry.createType('SignedBlock', blk);
+            //let chain = await this.setupChainAndAPI(this.chainID); //not sure
+            //await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
+            //signedBlock2 = this.api.registry.createType('SignedBlock', blk);
+            signedBlock2 = await this.api.rpc.chain.getBlock(r.hash);
         }
         // signedBlock2.block.extrinsics.forEach((ex, index) => {  console.log(index, ex.hash.toHex());    });
         return signedBlock2
@@ -8231,16 +8232,16 @@ module.exports = class Indexer extends AssetManager {
         // record a record in indexlog
         let numIndexingErrors = this.numIndexingErrors;
         let numIndexingWarns = this.numIndexingWarns;
-	if (this.chainParser) {
+        if (this.chainParser) {
             numIndexingWarns += this.chainParser.numParserErrors;
         }
         let indexed = (numIndexingErrors == 0) ? 1 : 0;
         // mark relaychain period's xcmIndexed = 0 and xcmReadyForIndexing = 1 if indexing is successful and without errors.
         // this signals that the record is reeady for indexReindexXcm
         let xcmReadyForIndexing = (this.isRelayChain && indexed) ? 1 : 0;
-        
+
         let elapsedSeconds = (new Date().getTime() - indexStartTS) / 1000
-	let indexlogvals = ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing", "lastAttemptEndDT", "lastAttemptHostname"];
+        let indexlogvals = ["logDT", "hr", "indexDT", "elapsedSeconds", "indexed", "readyForIndexing", "specVersion", "bqExists", "numIndexingErrors", "numIndexingWarns", "xcmIndexed", "xcmReadyForIndexing", "lastAttemptEndDT", "lastAttemptHostname"];
         await this.upsertSQL({
             "table": "indexlog",
             "keys": ["chainID", "indexTS"],

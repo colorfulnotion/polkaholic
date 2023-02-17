@@ -311,6 +311,7 @@ module.exports = class Crawler extends Indexer {
 
             // 1. get the block, ALWAYS
             let [signedBlock, events] = await this.crawlBlock(this.api, blockHash);
+
             let blockTS = signedBlock.blockTS;
             // 1.a get evmBlock, if web3Api is set
             let evmBlock = false
@@ -329,12 +330,11 @@ module.exports = class Crawler extends Indexer {
                     if (!evmBlock) evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
                     evmReceipts = await ethTool.crawlEvmReceipts(this.web3Api, evmBlock)
                 }
-                if (crawlTraceEVM) {
+                if (crawlTraceEVM && (this.chainID == 2004 || this.chainID == 22003)) {
                     if (!evmBlock) evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
                     evmTrace = await this.crawlEvmTrace(chain, bn);
                 }
             }
-
             // to avoid 'hash' error, we create the a new block copy without decoration and add hash in
             let block = JSON.parse(JSON.stringify(signedBlock));
             block.number = paraTool.dechexToInt(block.header.number);
@@ -359,6 +359,7 @@ module.exports = class Crawler extends Indexer {
                 return [t, block, events, trace, evmBlock, evmReceipts, blockHash];
             }
         } catch (err) {
+            console.log(err);
             this.logger.warn({
                 "op": "crawl_block_trace",
                 "chainID": chain.chainID,
@@ -1473,8 +1474,12 @@ module.exports = class Crawler extends Indexer {
 
     async crawlBlock(api, blockHash) {
         const signedBlock = await api.rpc.chain.getBlock(blockHash);
-
-        let eventsRaw = await api.query.system.events.at(blockHash);
+        let eventsRaw = [];
+        try {
+            eventsRaw = await api.query.system.events.at(blockHash);
+        } catch (err) {
+            console.log(err);
+        }
         let events = eventsRaw.map((e) => {
             let eh = e.event.toHuman();
             let ej = e.event.toJSON();
