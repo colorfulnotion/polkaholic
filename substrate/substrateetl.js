@@ -120,7 +120,7 @@ module.exports = class SubstrateETL extends AssetManager {
         } else {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and attempted < 2 and ( logDT <= date(date_sub(Now(), interval 0 day)) or (logDT = date(Now()) and loadDT < date_sub(Now(), interval 1 hour) ) ) ${w} order by attempted, logDT desc, rand() limit 1`;
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and attempted < 2 and ( logDT <= date(date_sub(Now(), interval 0 day)) or (logDT = date(Now()) and loadDT < date_sub(Now(), interval 1 hour) ) ) and loadDT < date_sub(Now(), interval 12 hour) ${w} order by attempted, logDT asc, rand() limit 1`;
         console.log("get_random_substrateetl", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
@@ -1422,9 +1422,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     let sqldiff = (r.endBN && prevStartBN && prevStartBN - r.endBN < 50000) ? `update block${chainID} set crawlBlock = 1, attempted = 0 where ( blockNumber > ${r.endBN} and blockNumber < ${prevStartBN} ) and blockHash is null` : null;
                     if (sqldiff && false) {
                         this.batchedSQL.push(sqldiff);
+			this.batchedSQL.push(sql);
+			await this.update_batchedSQL();
                     }
-                    this.batchedSQL.push(sql);
-                    await this.update_batchedSQL();
                     console.log("BROKEN DAILY CHAIN -- ", chainID, logDT, sql, "DIFF: ", sqldiff);
                     numBlocks_missing = null;
                 }
