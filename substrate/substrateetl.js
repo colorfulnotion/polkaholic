@@ -400,18 +400,18 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
-    getMinMaxNumAddresses(chainID, logDT) {
+    async getMinMaxNumAddresses(chainID, logDT) {
 	const defaultMinNumAddresses = 1
 	const defaultMaxNumAddresses = 30000;
 	const stdTolerance = 2;
 	const fractionTolerance = .25;
         let sql = `select round(numAddresses_avg - numAddresses_std*${stdTolerance}) as min_numAddresses, round(numAddresses_avg + numAddresses_std*${stdTolerance}+numAddresses_avg*${fractionTolerance}) max_numAddresses from blocklogstats where chainID = ${chainID} and (monthDT = last_day("${logDT}") or monthDT = last_day(date_sub(Now(), interval 28 day))) order by min_numAddresses asc limit 1`;
-	let recs = this.poolREADONLY.query(sql);
+	let recs = await this.poolREADONLY.query(sql);
 	if ( recs.length == 0 ) {
 	    return [defaultMinNumAddresses, defaultMaxNumAddresses];
 	}
-	let min_numAddresses = recs[0].min_numAddresses;
-	let max_numAddresses = recs[0].max_numAddresses;
+	let min_numAddresses = recs[0].min_numAddresses ? recs[0].min_numAddresses : defaultMinNumAddresses;
+	let max_numAddresses = recs[0].max_numAddresses ? recs[0].max_numAddresses : defaultMaxNumAddresses;
 	if ( max_numAddresses < defaultMaxNumAddresses ) {
 	    max_numAddresses = defaultMaxNumAddresses;
 	}

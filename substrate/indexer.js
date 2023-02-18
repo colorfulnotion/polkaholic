@@ -7644,10 +7644,10 @@ module.exports = class Indexer extends AssetManager {
         } catch (e) {
             // try fallback here
             console.log(`failed with specV=${this.specVersion} [${r.block.number} ${r.block.hash}]`)
-            let chain = await this.setupChainAndAPI(this.chainID); //not sure
-            await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
-            signedBlock2 = this.api.registry.createType('SignedBlock', blk);
-            //signedBlock2 = await this.api.rpc.chain.getBlock(r.hash);
+            //let chain = await this.setupChainAndAPI(this.chainID); //not sure
+            //await this.initApiAtStorageKeys(chain, r.block.hash, r.block.number)
+            //signedBlock2 = this.api.registry.createType('SignedBlock', blk);
+            signedBlock2 = await this.api.rpc.chain.getBlock(r.hash);
         }
         // signedBlock2.block.extrinsics.forEach((ex, index) => {  console.log(index, ex.hash.toHex());    });
         return signedBlock2

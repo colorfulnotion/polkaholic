@@ -936,12 +936,13 @@ from chain where chainID = '${chainID}' limit 1`);
                 types: typesDef.index.types,
                 rpc: typesDef.index.rpc
             });
-        } else if (chainID == paraTool.chainIDCrustShadow) {
+        } else if (chainID == paraTool.chainIDCrustShadow || chainID == 2008 ) {
             const typesDef = require("@crustio/type-definitions");
+	    console.log(typesDef.types);
             api = await ApiPromise.create({
                 provider: provider,
-                typesBundle: typesDef.typesBundleForPolkadot,
-                rpc: typesDef.typesBundleForPolkadot.spec.crust.rpc
+                types: typesDef.types
+                ///rpc: typesDef.typesBundleForPolkadot.spec.crust.rpc
             });
         } else if (chainID == paraTool.chainIDDarwiniaCrab) {
             const typesDef = require("@darwinia/types");
@@ -995,7 +996,7 @@ from chain where chainID = '${chainID}' limit 1`);
             const typesDef = require("@encointer/types")
             api = await ApiPromise.create({
                 provider: provider,
-                types: typesDef.typeBundleForPolkadot.types
+                types: typesDef.default.types
             });
             console.log(`You are connected to ENCOINTER chain ${chainID} endpoint=${endpoint} with types but not rpc`);
 
