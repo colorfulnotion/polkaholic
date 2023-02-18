@@ -418,7 +418,7 @@ module.exports = class SubstrateETL extends AssetManager {
 	return [min_numAddresses, max_numAddresses];
     }
 
-    
+
     async clean_chainbalancecrawler(logDT, chainID) {
         let sql = `delete from chainbalancecrawler where  (logDT = '${logDT}' and chainID = '${chainID}' and hostname = '${this.hostname}') or lastDT < date_sub(Now(), interval 1 hour)`;
         this.batchedSQL.push(sql);
@@ -1857,13 +1857,26 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 }
             }
         }
+        let errloadCnt = 0
         for (const bqjob of bqjobs) {
-            if (isDry) {
-                console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
-            } else {
-                console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
-                await exec(bqjob.cmd);
+            try {
+                if (isDry) {
+                    console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                } else {
+                    console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                    await exec(bqjob.cmd);
+                }
+            } catch (e){
+                errloadCnt++
             }
+        }
+        if (errloadCnt == 0 && !isDry){
+            //update loadAccountMetricsDT, loadedAccountMetrics
+            let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
+            let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=NOW() where chainID = '${}'`
+            console.log(`loadAccountMetrics sql`, sql_upd)
+            //this.batchedSQL.push(sql_upd);
+            //await this.update_batchedSQL();
         }
     }
 
@@ -2450,11 +2463,17 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
             let row = rows.length > 0 ? rows[0] : null;
             if (row) {
                 for (const a of Object.keys(row)) {
+
                     r[a] = row[a] > 0 ? row[a] : 0;
                     vals.push(` ${a} = ${mysql.escape(row[a])}`);
                     if (a == "numAddresses") {
                         vals.push(` numAddressesLastUpdateDT = Now() `);
                     }
+                }
+                //TODO: check obviously incrroect recrods
+                if (r["numNewAccounts"] > 3000 ||  r["numReapedAccounts"] > 1000){
+                    if (r["numNewAccounts"] == undefined) delete r.numNewAccounts
+                    if (r["numReapedAccounts"] == undefined) delete r.numReapedAccounts
                 }
             }
         }
