@@ -1517,6 +1517,9 @@ module.exports = class Crawler extends Indexer {
         if (this.chainID == 1000 && blockNumber < 305204) {
             block.blockTS = Math.round(blockNumber * 12.17112 + 1636071000)
         }
+        if (this.chainID == 21000 && blockNumber < 66687) {
+            block.blockTS = Math.round(blockNumber * 12 + 1621934316)
+        }
         // NOTE: does not have block.{number, hash} set
         return [block, events];
     }

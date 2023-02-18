@@ -3,8 +3,8 @@
 var SubstrateETL = require("./substrateetl");
 var paraTool = require("./paraTool");
 async function main() {
-    let chainID = -1;
-    let logDT = "2023-01-31";
+    let chainID = null;
+    let logDT = null;
     process.argv.forEach(function(val, index, array) {
         if (index == 2 && val.length > 0) {
             chainID = parseInt(val, 10);
@@ -13,16 +13,20 @@ async function main() {
             logDT = val;
         }
     });
-    if ( chainID >= 0 ) {
+    if ( chainID >= 0 && logDT ) {
 	var manager = new SubstrateETL();
 	let done = false;
+	/*if ( logDT == null ) {
+	    let [yesterdayDT, _] = paraTool.ts_to_logDT_hr(manager.getCurrentTS() - 86400);
+	    logDT = yesterdayDT;
+	} */
 	do {
 	    done = await manager.update_address_balances_logDT(chainID, logDT);
 	} while ( ! done ) 
     } else {
 	while ( 1 ) {
 	    var manager = new SubstrateETL();
-	    let res = await manager.updateAddressBalances();
+	    let res = await manager.updateAddressBalances(chainID);
 	    if ( res == false ) {
 		process.exit(1);
 	    } else {

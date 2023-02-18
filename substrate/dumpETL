@@ -8,42 +8,196 @@
 //  dump paraID 2000 for specific day:  dumpSubstrateETL polkadot 2000 2022-12-29
 //  dump all xcmtransfers for a day:    dumpSubstrateETL polkadot xcmtransfers 2022-12-29
 //  dump all xcmtransfers in last year: dumpSubstrateETL polkadot xcmtransfers
-//  dump account matrics in last year: dumpSubstrateETL polkadot accountmatrics
+//  dump account metrics in last year: dumpSubstrateETL polkadot accountmetrics
 //  compute xcmteleporfees: dumpSubstrateETL polkadot xcmteleportfees
 //  update blocklog: dumpSubstrateETL blocklog
 //  update blocklog: dumpSubstrateETL polkaholic
 
+const util = require('util');
+const exec = util.promisify(require("child_process").exec);
 const { Command } = require('commander');
 const fs = require('fs');
 var SubstrateETL = require("./substrateetl");
 var paraTool = require("./paraTool");
 
 class SubstrateETLCLI {
-    async accountmatrics(opt) {
+
+    async getAlltables(filter='accounts'){
+        let relayChains = ['kusama', 'polkadot']
+        let bqCmds = []
+        let fullTableIDs = []
+        for (const rc of relayChains){
+            let bqCmd = `bq ls --max_results 1000 --project_id="substrate-etl" --dataset_id="${rc}" --format=json`
+            let res = await exec(bqCmd)
+            try {
+                if (res.stdout && res.stderr == ''){
+                    let tbls = JSON.parse(res.stdout)
+                    for (const tbl of tbls){
+                        let fullTableID = tbl.id
+                        //console.log(`fullTableID`, fullTableID)
+                        if (fullTableID.includes(filter)){
+                            fullTableIDs.push(fullTableID)
+                        }
+                    }
+                    //console.log(`r`, r)
+                }
+            } catch (e){
+                console.log(`getAlltables err`, e)
+            }
+        }
+        //console.log(`fullTableIDs`, fullTableIDs)
+        return fullTableIDs
+    }
+
+    async accountmetrics(opt) {
         //console.log(o)
-        let { relaychain, paraID, logDT } = opt;
+        let { relaychain, paraID, logDT, chainID } = opt;
         let relayChain = relaychain
         let isRange = (logDT == 'range')? true : false
         let isDryRun = (opt.dry)? true : false
-        switch (relaychain) {
+        //suppress paraID, relayChain when chainID is set
+        if (chainID != undefined && paraTool.isNumeric(chainID)){
+            chainID =  parseInt(chainID)
+            paraID = false;
+            relayChain = false;
+            paraID = `${paraTool.getParaIDfromChainID(chainID)}`
+            relayChain = paraTool.getRelayChainByChainID(chainID)
+            console.log(`chainID=${chainID}, relayChain=${relayChain}, paraID=${paraID}`)
+        }else if (!paraTool.isNumeric(paraID) && paraID != 'all'){
+            console.log(`Invalid paraID args:${paraID}`)
+            return
+        }
+        switch (relayChain) {
             case 'kusama':
             case 'polkadot':
                 break;
             default:
-                console.log(`Unsupported relaychain ${relaychain}.`)
+                console.log(`Unsupported relaychain ${relayChain}.`)
                 return;
-        }
-        if (!paraTool.isNumeric(paraID) && paraID != 'all'){
-            console.log(`Invalid paraID args:${paraID}`)
-            return
         }
         var substrateetl = new SubstrateETL();
         if (isRange){
-            await substrateetl.dump_account_matrics_range(relayChain, null, paraID, isDryRun);
+            await substrateetl.dump_account_metrics_range(relayChain, null, paraID, isDryRun);
         }else if (logDT){
-            await substrateetl.dump_account_matrics(logDT, relayChain, paraID, isDryRun);
+            await substrateetl.dump_account_metrics(logDT, relayChain, paraID, isDryRun);
         }else{
             console.log(`logDT missing`)
+        }
+    }
+
+    async dotsamametrics(opt) {
+        //console.log(o)
+        let { logDT } = opt;
+        let isRange = (logDT == 'range')? true : false
+        let isDryRun = (opt.dry)? true : false
+        var substrateetl = new SubstrateETL();
+        if (isRange){
+            await substrateetl.dump_dotsama_metrics_range(isDryRun);
+        }else if (logDT){
+            await substrateetl.dump_dotsamat_metrics(logDT,isDryRun);
+        }else{
+            console.log(`logDT missing`)
+        }
+    }
+
+    async dumpsubstrateetl(opt) {
+        //console.log(o)
+        let { relaychain, paraID, logDT, chainID, isrange } = opt;
+        let relayChain = relaychain
+        //let isRange = (logDT == 'range')? true : false
+        let isDryRun = (opt.dry)? true : false
+        let isRange = (opt.isrange)? true : false
+        if (logDT == 'range'){
+            console.log(`Invalid logDT ${logDT}`)
+            return
+        }
+        let isEVM = false
+        //suppress paraID, relayChain when chainID is set
+        if (chainID != undefined && paraTool.isNumeric(chainID)){
+            chainID =  parseInt(chainID)
+            paraID = false;
+            relayChain = false;
+            paraID = `${paraTool.getParaIDfromChainID(chainID)}`
+            relayChain = paraTool.getRelayChainByChainID(chainID)
+            console.log(`chainID=${chainID}, relayChain=${relayChain}, paraID=${paraID}`)
+        }else if (!paraTool.isNumeric(paraID) && paraID != 'random'){
+            console.log(`Invalid paraID args:${paraID}`)
+            return
+        }
+        switch (relayChain) {
+            case 'kusama':
+                if (paraID == '2007' || paraID == '2023'){
+                    isEVM = true
+                }
+            case 'polkadot':
+                if (paraID == '2004' || paraID == '2006'){
+                    isEVM = true
+                }
+                break;
+            default:
+                console.log(`Unsupported relaychain ${relayChain}.`)
+                return;
+        }
+        var substrateetl = new SubstrateETL();
+        if (paraID == 'random'){
+            let tally = 0;
+            while (true) {
+                let x = await substrateetl.get_random_substrateetl(logDT, paraID, relayChain);
+                let _logDT = x.logDT;
+                let _paraID = x.paraID;
+                let _relayChain = x.relayChain;
+                let _isEVM = x.isEVM;
+                if (_logDT && (_paraID >= 0) && _relayChain) {
+                    await substrateetl.dump_substrateetl(_logDT, _paraID, _relayChain, _isEVM);
+                    await substrateetl.sleep(1000);
+                    tally++;
+                    if (tally > 20) {
+                        await substrateetl.dump_substrateetl_polkaholic()
+                        tally = 0;
+                    }
+                } else {
+                    await substrateetl.sleep(10000);
+                }
+            }
+        }else if (isRange){
+            await substrateetl.dump_substrateetl_range(parseInt(paraID), relayChain, isEVM, logDT);
+        }else if (logDT){
+            if (paraTool.isNumeric(paraID)){
+                await substrateetl.dump_substrateetl(logDT, parseInt(paraID), relayChain, isEVM);
+            }else{
+                //TODO:
+                console.log(`TODO: the all cases`)
+            }
+        }else{
+            console.log(`logDT missing`)
+        }
+    }
+
+
+    async showtables(opt) {
+        let { filter } = opt;
+        if (filter == "NA") filter = ''
+        //var substrateetl = new SubstrateETL();
+        let fullTableIDs = await this.getAlltables(filter)
+        console.log(`Matche Table[${fullTableIDs.length}]`)
+        for (const fullTableID of fullTableIDs){
+            console.log(fullTableID)
+        }
+    }
+
+    async deletetables(opt) {
+        let { filter } = opt;
+        if (filter == "NA"){
+            console.log("NOT ALLOWED")
+            process.exit(1)
+        }
+        //var substrateetl = new SubstrateETL();
+        let fullTableIDs = await this.getAlltables(filter)
+        let bqCmds = []
+        for (const fullTableID of fullTableIDs){
+            let bqCmd = `bq rm -f ${fullTableID}`
+            bqCmds.push(bqCmd)
+            console.log(bqCmd)
         }
     }
 }
@@ -56,16 +210,77 @@ async function main() {
 	.description('dump substrate ETL')
 	.version(`${cli_version}`);
 
-    program.command('accountmatrics')
+    /*
+    Dump account metric for a paraID given specific date
+    ./dumpETL accountmetrics -r polkadot -p 2004 -dt 20230202
+
+    Dump account metric for relaychain's all paraIDs given specific date
+    ./dumpETL accountmetrics -r polkadot -p all -dt 20230202
+    */
+    program.command('accountmetrics')
 	.description('Dump accuntmetric for a chain')
+    .option('-c, --chainID <chainID>', 'Target chainID. If set, bypass --relaychain --paraID args', null)
 	.option('-r, --relaychain <relaychain>', 'relaychain (polkadot or kusama)', 'polkadot')
     .option('-p, --paraID <paraID>', `Targeted paraID (relaychain itself is identified using paraID=0). If not specified, crawl for all reachable parachains.`, 'all')
     .option('-dt, --logDT <logDT>', `LogDT in YYYYMMDD. If not specified, generate logs for all days since 2023-02-01`, '2023-02-01')
     .option('-d, --dry', `dry run the cmd without updating`, false)
 	.action(async (opt) => {
 	    let dumpcli = new SubstrateETLCLI();
-	    await dumpcli.accountmatrics(opt);
+	    await dumpcli.accountmetrics(opt);
 	});
+
+
+    /*
+    dump substrateetl for a random parachain
+    ./dumpETL substrateetl -r polkadot
+
+    dump substrateetl for a paraID given specific date
+    ./dumpETL substrateetl -r polkadot -p 2004 -dt 20230202
+
+    */
+    program.command('substrateetl')
+    .description(`Dump substrate etl (blocks, extrinsics, events, transfers, logs) for a chain. Additionally, (evmtxs, evmtransfers) for evm chain`)
+    .option('-c, --chainID <chainID>', 'Target chainID. If set, bypass --relaychain --paraID args', null)
+    .option('-r, --relaychain <relaychain>', 'relaychain (polkadot or kusama)', 'polkadot')
+    .option('-p, --paraID <paraID>', `Targeted paraID (relaychain itself is identified using paraID=0). If not specified, crawl for a random parachains.`, 'random')
+    .option('-e, --isEvm', `Flag if it's evm chain`, true)
+    .option('-a, --isrange', `Flag if it's range`, false)
+    .option('-dt, --logDT <logDT>', `LogDT in YYYYMMDD. If not specified, generate logs for all days since 2023-02-01`, '2023-02-01')
+    .option('-d, --dry', `dry run the cmd without updating`, false)
+    .action(async (opt) => {
+        let dumpcli = new SubstrateETLCLI();
+        await dumpcli.dumpsubstrateetl(opt);
+    });
+
+
+    //./dumpETL showtables -f accounts
+    program.command('showtables')
+    .description(`Show all substrate etl tables`)
+    .option('-f, --filter <filter>', `filter to use`, 'NA')
+    .action(async (opt) => {
+        let dumpcli = new SubstrateETLCLI();
+        await dumpcli.showtables(opt);
+    });
+
+    //will only generate cmd. must mannually run it
+    //./dumpETL deletetables -f accounts
+    program.command('deletetables')
+    .description(`Generate delete cmd for matching substarte etl tables`)
+    .option('-f, --filter <filter>', `filter to use`, 'NA')
+    .action(async (opt) => {
+        let dumpcli = new SubstrateETLCLI();
+        await dumpcli.deletetables(opt);
+    });
+
+    //./dumpETL dotsamametrics -dt 20230201
+    program.command('dotsamametrics')
+    .description(`Generate Dotsam aggregates`)
+    .option('-dt, --logDT <logDT>', `LogDT in YYYYMMDD. If not specified, generate logs for all days since 2023-02-01`, '2023-02-01')
+    .option('-d, --dry', `dry run the cmd without updating`, false)
+    .action(async (opt) => {
+        let dumpcli = new SubstrateETLCLI();
+        await dumpcli.dotsamametrics(opt);
+    });
 
     await program.parseAsync(process.argv);
 }

@@ -6301,7 +6301,7 @@ module.exports = class Indexer extends AssetManager {
             if (index >= 0) {
                 let eventID = `${this.chainID}-${blockNumber}-${index}-${j}`
                 let event = this.parseEvent(e.event, eventID, api); // this is the apiAt
-                if (event[index] != undefined) {
+                if (events[index] != undefined) {
                     events[index].push(event)
                 }
             }
