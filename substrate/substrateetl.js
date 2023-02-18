@@ -1873,7 +1873,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         if (errloadCnt == 0 && !isDry){
             //update loadAccountMetricsDT, loadedAccountMetrics
             let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
-            let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=NOW() where chainID = '${}'`
+            let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=NOW() where chainID = '${chainID}'`
             console.log(`loadAccountMetrics sql`, sql_upd)
             //this.batchedSQL.push(sql_upd);
             //await this.update_batchedSQL();
