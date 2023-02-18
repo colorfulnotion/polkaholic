@@ -936,9 +936,9 @@ from chain where chainID = '${chainID}' limit 1`);
                 types: typesDef.index.types,
                 rpc: typesDef.index.rpc
             });
-        } else if (chainID == paraTool.chainIDCrustShadow || chainID == 2008 ) {
+        } else if (chainID == paraTool.chainIDCrustShadow || chainID == 2008) {
             const typesDef = require("@crustio/type-definitions");
-	    console.log(typesDef.types);
+            console.log(typesDef.types);
             api = await ApiPromise.create({
                 provider: provider,
                 types: typesDef.types

@@ -1459,31 +1459,6 @@ module.exports = class AssetManager extends PolkaholicDB {
         return [false, null];
     }
 
-    async updateXCMTransfer(lookback = 720) {
-
-        let xcmtransfers = await this.poolREADONLY.query(`select extrinsicHash, transferIndex, extrinsicID, sourceTS, asset, rawAsset, nativeAssetChain, chainID, chainIDDest, amountSent, amountReceived from xcmtransfer where sourceTS > UNIX_TIMESTAMP(date_sub(Now(), interval ${lookback} day)) and ( amountSentUSD = 0 or amountReceived = 0 ) and incomplete = 0 order by sourceTS desc limit 1000000`);
-        //console.log(`xcm sql`, xcmtransfers)
-        let out = [];
-        for (const xcm of xcmtransfers) {
-            let p = await this.computePriceUSD({
-                xcmInteriorKey: xcm.xcmInteriorKey,
-                ts: xcm.sourceTS
-            });
-            if (p) {
-                let priceUSD = p.priceUSD;
-                xcm.amountSent = parseFloat(xcm.amountSent) / 10 ** decimals;
-                xcm.amountReceived = parseFloat(xcm.amountReceived) / 10 ** decimals;
-                let amountSentUSD = (xcm.amountSent > 0) ? priceUSD * xcm.amountSent : 0;
-                let amountReceivedUSD = (xcm.amountReceived > 0) ? priceUSD * xcm.amountReceived : 0;
-                console.log(xcm.asset, xcm.rawAsset, xcm.chainID, xcm.chainIDDest, decimals, priceUSD, xcm.amountSent, amountSentUSD, xcm.amountReceived, amountReceivedUSD);
-                let sql = `update xcmtransfer set amountSentUSD = '${amountSentUSD}', amountReceivedUSD = '${amountReceivedUSD}', priceUSD='${priceUSD}' where extrinsicHash = '${xcm.extrinsicHash}' and transferIndex = '${xcm.transferIndex}'`
-                this.batchedSQL.push(sql);
-                await this.update_batchedSQL();
-            }
-            console.log(`XCM Asset Not found chainID=${chainID}, asset=${asset}, rawAsset=${rawAsset}`)
-        }
-    }
-
 
     async getCDPExchangeRates(cdpBSAsset, chainID, ts) {
         let tsInt = parseInt(ts, 10);
