@@ -1729,6 +1729,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
         let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
 
+        let isMissing = false
         let paraIDs = []
         if (paraID == 'all') {
             let sql = `select id, chainName, paraID, symbol, ss58Format from chain where crawling = 1 and relayChain = '${relayChain}' order by paraID`
@@ -1745,6 +1746,24 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let accountTbls = ["new", "old", "reaped", "active", "passive"]
 
         for (const paraID of paraIDs) {
+            let chainID = paraTool.getChainIDFromParaIDAndRelayChain(parseInt(paraID), relayChain)
+            let validateSQL0 = `select numAddresses from blocklog where logDT = date(date_sub("${logDT}", INTERVAL 1 DAY)) and chainID="${chainID}"` // prevDay
+            let validateSQL1 = `select numAddresses from blocklog where logDT = date(date_sub("${logDT}", INTERVAL 0 DAY)) and chainID="${chainID}"` // currDay
+            let prevVrecs = await this.poolREADONLY.query(validateSQL0)
+            let currVrecs = await this.poolREADONLY.query(validateSQL1)
+            for (const prevVrec of prevVrecs) {
+                if (prevVrec.numAddresses == undefined) isMissing = true
+            }
+            for (const currVrec of currVrecs) {
+                if (currVrec.numAddresses == undefined) isMissing = true
+            }
+            if (isMissing){
+                //update loadAccountMetricsDT, loadedAccountMetrics
+                console.log(`chain=${chainID} ${logDT} MISSING BALANCE!`)
+                let sql_upd = `update blocklog set loadedAccountMetrics = 0, loadAccountMetricsDT=NULL where chainID = '${chainID}' and logDT = '${logDT}'`
+                this.batchedSQL.push(sql_upd);
+                continue
+            }
             for (const tbl of accountTbls){
                 let datasetID = `${relayChain}`
                 let tblName = `accounts${tbl}`
@@ -1763,6 +1782,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         partitionedFld = 'ts'
                         cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                         bqjobs.push({
+                            chainID: chainID,
                             paraID: paraID,
                             tbl: tblName,
                             destinationTbl: destinationTbl,
@@ -1781,7 +1801,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, ts FROM prevDay where address_ss58 in (select address_ss58 from currDay) order by address_pubkey`
                         partitionedFld = 'ts'
                         cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
-                        //bqjobs.push({paraID: paraID, tbl: tblName, destinationTbl: destinationTbl, cmd: cmd})
+                        //bqjobs.push({chainID: chainID, paraID: paraID, tbl: tblName, destinationTbl: destinationTbl, cmd: cmd})
                         break;
 
                     case "reaped":
@@ -1796,6 +1816,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         partitionedFld = 'ts'
                         cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                         bqjobs.push({
+                            chainID: chainID,
                             paraID: paraID,
                             tbl: tblName,
                             destinationTbl: destinationTbl,
@@ -1817,6 +1838,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         partitionedFld = 'ts'
                         cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                         bqjobs.push({
+                            chainID: chainID,
                             paraID: paraID,
                             tbl: tblName,
                             destinationTbl: destinationTbl,
@@ -1845,6 +1867,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         partitionedFld = 'ts'
                         cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                         bqjobs.push({
+                            chainID: chainID,
                             paraID: paraID,
                             tbl: tblName,
                             destinationTbl: destinationTbl,
@@ -1856,28 +1879,28 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
                 }
             }
-        }
-        let errloadCnt = 0
-        for (const bqjob of bqjobs) {
-            try {
-                if (isDry) {
-                    console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
-                } else {
-                    console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
-                    await exec(bqjob.cmd);
+            let errloadCnt = 0
+            for (const bqjob of bqjobs) {
+                try {
+                    if (isDry) {
+                        console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                    } else {
+                        console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                        await exec(bqjob.cmd);
+                    }
+                } catch (e){
+                    errloadCnt++
                 }
-            } catch (e){
-                errloadCnt++
             }
+            if (errloadCnt == 0 && !isDry){
+                //update loadAccountMetricsDT, loadedAccountMetrics
+                let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=NOW() where chainID = '${chainID}' and logDT = '${logDT}'`
+                this.batchedSQL.push(sql_upd);
+            }
+            bqjobs = []
         }
-        if (errloadCnt == 0 && !isDry){
-            //update loadAccountMetricsDT, loadedAccountMetrics
-            let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
-            let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=NOW() where chainID = '${chainID}'`
-            console.log(`loadAccountMetrics sql`, sql_upd)
-            //this.batchedSQL.push(sql_upd);
-            //await this.update_batchedSQL();
-        }
+        await this.update_batchedSQL();
+        return isMissing
     }
 
     async dump_xcmtransfers(logDT = "2022-12-29", relayChain = "polkadot") {
@@ -2419,21 +2442,22 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
             }
         }
         // load account metrics
+        let isMissing = false
         if (numSubstrateETLLoadErrors == 0){
             try {
-                await this.dump_account_metrics(logDT, relayChain, paraID, false)
+                isMissing = await this.dump_account_metrics(logDT, relayChain, paraID, false)
             }catch(e){
                 console.log(`dump_account_metrics error`, e)
             }
         }
         try {
-            await this.update_blocklog(chainID, logDT);
+            await this.update_blocklog(chainID, logDT, isMissing);
         } catch (e) {
             console.log(e)
         }
     }
 
-    async update_blocklog(chainID, logDT) {
+    async update_blocklog(chainID, logDT, isMissing = false) {
         let project = this.project;
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
@@ -2444,10 +2468,12 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
             "transfers": `select count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers${paraID} where date(block_time) = '${logDT}'`,
             "xcmtransfers0": `select count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where destination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`,
             "xcmtransfers1": `select count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`,
-            "accountsnew": `select count(*) as numNewAccounts from substrate-etl.${relayChain}.accountsnew${paraID} where date(ts) = '${logDT}'`,
-            "accountsreaped": `select count(*) as numReapedAccounts from substrate-etl.${relayChain}.accountsreaped${paraID} where date(ts) = '${logDT}'`,
-            "accountsactive": `select count(*) as numActiveAccounts, sum(if(accountType = "System", 1, 0)) as numActiveSystemAccounts, sum(if(accountType = "User", 1, 0)) as numActiveUserAccounts from substrate-etl.${relayChain}.accountsactive${paraID} where date(ts) = '${logDT}'`,
-            "accountspassive": `select count(*) as numPassiveAccounts from substrate-etl.${relayChain}.accountspassive${paraID} where date(ts) = '${logDT}'`
+        }
+        if (!isMissing){
+            sqla["accountsnew"] = `select count(*) as numNewAccounts from substrate-etl.${relayChain}.accountsnew${paraID} where date(ts) = '${logDT}'`
+            sqla["accountsreaped"] = `select count(*) as numReapedAccounts from substrate-etl.${relayChain}.accountsreaped${paraID} where date(ts) = '${logDT}'`
+            sqla["accountsactive"] = `select count(*) as numActiveAccounts, sum(if(accountType = "System", 1, 0)) as numActiveSystemAccounts, sum(if(accountType = "User", 1, 0)) as numActiveUserAccounts from substrate-etl.${relayChain}.accountsactive${paraID} where date(ts) = '${logDT}'`
+            sqla["accountspassive"] =  `select count(*) as numPassiveAccounts from substrate-etl.${relayChain}.accountspassive${paraID} where date(ts) = '${logDT}'`
         }
         let evmChains = [paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDAstar, paraTool.chainIDShiden]
 	    if (evmChains.includes(chainID)) {
