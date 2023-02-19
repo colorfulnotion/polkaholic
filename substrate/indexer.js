@@ -7989,8 +7989,6 @@ module.exports = class Indexer extends AssetManager {
                 "data": out,
                 "replace": valstmp
             });
-            let sql = `update chain set lastUpdateChainAssetsTS = UNIX_TIMESTAMP(Now()) where chainID = ${chainID}`
-            this.batchedSQL.push(sql);
             return (true);
         } catch (err) {
             this.log_indexing_error(err, "update_chain_assets");
@@ -8250,11 +8248,12 @@ module.exports = class Indexer extends AssetManager {
             "replace": indexlogvals
         });
 
+        let updateAddressBalanceStatus = (chain.WSEndpointArchive == 1) ? "Ready" : "Ignore";
         await this.upsertSQL({
             "table": "blocklog",
             "keys": ["chainID", "logDT"],
-            "vals": ["loaded", "audited"],
-            "data": [`('${chainID}', '${logDT}', '0', 'Unknown')`],
+            "vals": ["loaded", "audited", "updateAddressBalanceStatus"],
+            "data": [`('${chainID}', '${logDT}', '0', 'Unknown', '${updateAddressBalanceStatus}')`],
             "replace": ["loaded", "audited"]
         });
 

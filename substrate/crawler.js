@@ -1228,7 +1228,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     // for any missing blocks/traces, this refetches the dataset
-    async crawlBackfill(chain, techniqueParams = ["mod", 0, 1], wsBackfill = false) {
+    async crawlBackfill(chain, techniqueParams = ["mod", 0, 1], lookbackBlocks = 50000, wsBackfill = false) {
         let chainID = chain.chainID;
         let sql = false;
         let extraflds = (chain.isEVM > 0) ? " crawlBlockEVM, crawlReceiptsEVM, " : "";
@@ -1237,14 +1237,14 @@ module.exports = class Crawler extends Indexer {
             let n = techniqueParams[1];
             let nmax = techniqueParams[2];
             let w = (nmax > 1) ? `and blockNumber % ${nmax} = ${n}` : "";
-            let w2 = ` and blockNumber > ${chain.blocksCovered} - 5000000`
+            let w2 = ` and blockNumber > ${chain.blocksCovered} - ${lookbackBlocks}`
             sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 2 order by blockNumber desc limit 10000`
-            console.log("X", sql);
+            console.log("lookback", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
             let endBN = techniqueParams[2];
             sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 3 order by blockNumber desc limit 10000`
-            console.log("Y", sql);
+            console.log("lookback", sql);
         }
         let tasks = await this.poolREADONLY.query(sql);
         if (tasks.length == 0) return (false);

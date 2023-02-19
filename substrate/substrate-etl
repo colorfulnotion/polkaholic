@@ -1,0 +1,285 @@
+#!/usr/bin/env node
+ // Usage:
+
+const util = require('util');
+const exec = util.promisify(require("child_process").exec);
+const {
+    Command
+} = require('commander');
+const fs = require('fs');
+var SubstrateETL = require("./substrateetl");
+const Crawler = require("./crawler");
+const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
+
+function myParseInt(value, dummyPrevious) {
+    const parsedValue = parseInt(value, 10);
+    if (isNaN(parsedValue)) {
+        throw new commander.InvalidArgumentError('Not a number.');
+    }
+    return parsedValue;
+}
+
+async function main() {
+    let cli_version = '0.1.0'
+    const program = new Command();
+    program
+        .name('substrate-etl')
+        .description('Manage polkaholic export to BigQuery substrate-etl project')
+        .version(`${cli_version}`);
+
+    program.command('dump')
+        .description("Stream data out to Bigquery")
+        .option('-r, --relayChain <relayChain>', 'Relay chain', null)
+        .option('-p, --paraID <paraID>', 'Para ID', myParseInt)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            let logDT = opt.logDT;
+            let paraID = opt.paraID;
+            let relayChain = opt.relayChain;
+            if (logDT && paraID && relayChain) {
+                await substrateetl.dump_substrateetl(logDT, paraID, relayChain);
+		process.exit(0);
+            }
+            let tally = 0;
+            while (true) {
+                let x = await substrateetl.get_random_substrateetl(logDT, paraID, relayChain);
+                let _logDT = x.logDT;
+                let _paraID = x.paraID;
+                let _relayChain = x.relayChain;
+                tally++;
+                if (_logDT && (_paraID >= 0) && _relayChain) {
+                    await substrateetl.dump_substrateetl(_logDT, _paraID, _relayChain);
+                    await substrateetl.sleep(1000);
+                    console.log("TALLY", tally)
+                    if (tally >= 25) {
+                        await substrateetl.dump_substrateetl_polkaholic()
+                        tally = 0;
+                    }
+                    if (_paraID == 0) {
+                        await substrateetl.dump_xcmtransfers_range(relayChain, null);
+                    }
+                } else {
+                    await substrateetl.sleep(20000);
+                }
+            }
+        })
+
+    program.command('accountmetrics')
+        .description('Dump account metrics for a chain')
+        .usage("-r polkadot -p 2004 --logDT 2023-02-02")
+        .option('-r, --relayChain <relayChain>', 'Relay chain', null)
+        .option('-p, --paraID <paraID>', 'Para ID', myParseInt)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-d, --dry', `dry run the cmd without updating`, false)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            let relayChain = opt.relayChain;
+            let paraID = opt.paraID;
+            let logDT = opt.logDT;
+            let dry = opt.dry;
+            if (logDT && paraID && relayChain) {
+                await substrateetl.dump_accountmetrics(relayChain, paraID, logDT, dry);
+                process.exit(0);
+            }
+            let tally = 0;
+            while (true) {
+                let x = await substrateetl.get_random_accountmetrics_ready(relayChain, paraID);
+                let _logDT = x.logDT;
+                let _paraID = x.paraID;
+                let _relayChain = x.relayChain;
+                tally++;
+                if (_logDT && (_paraID >= 0) && _relayChain) {
+                    await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT, dry);
+                    await substrateetl.sleep(1000);
+                } else {
+                    await substrateetl.sleep(20000);
+                }
+            }
+        });
+
+    program.command('networkmetrics')
+        .description(`Generate Network metrics (dotsama)`)
+        .usage("-l 2023-02-01 -n dotsama")
+        .option('-n, --network <network>', `Network (e.g. dotsama, ethereum, polygon)`, 'dotsama')
+        .option('-l, --logDT <logDT>', `LogDT in YYYY-MM-DD form`, null)
+        .option('-d, --dry', `dry run the cmd without updating`, false)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            let network = opt.network;
+            let logDT = opt.logDT;
+            let dry = opt.dry;
+            if (logDT && network) {
+                await substrateetl.dump_networkmetrics(network, logDT, dry);
+            }
+            while (true) {
+                let x = await substrateetl.get_random_networkmetrics_ready();
+                let _network = x.network;
+                let _logDT = x.logDT;
+                if (_logDT && _network) {
+                    await substrateetl.dump_networkmetrics(_network, _logDT, dry);
+                    await substrateetl.sleep(1000);
+                    // await substrateetl.dump_cdn_substrateetl_networkmetrics()
+                } else {
+                    await substrateetl.sleep(20000);
+                }
+            }
+
+            await substrateetl.networkmetrics(logDT);
+            process.exit(0);
+        });
+
+    program.command('updatebalances')
+        .description(`Update Balances for some chain`)
+        .option('-c, --chainID <chainID>', 'ChainID to update balances', myParseInt)
+        .option('-l, --logDT <logDT>', 'Date to update', null)
+        .action(async (opt) => {
+            chainID = opt.chainID ? opt.chainID : null;
+            logDT = opt.logDT ? opt.logDT : null;
+
+            if (chainID >= 0 && logDT) {
+                var manager = new SubstrateETL();
+                let done = false;
+                let startTS = manager.getCurrentTS();
+                do {
+                    done = await manager.update_address_balances_logDT(chainID, logDT, startTS);
+                } while (!done)
+            } else {
+                while (1) {
+                    var manager = new SubstrateETL();
+                    let res = await manager.updateAddressBalances(chainID);
+                    if (res == false) {
+                        process.exit(1);
+                    } else {
+                        await manager.sleep(5000);
+                    }
+                }
+            }
+        });
+
+    program.command('blocklog')
+        .description(`Crawl Chain for any missing blocks`)
+        .option('-c, --chainID <chainID>', 'ChainID', myParseInt)
+        .option('-l, --logDT <logDT>', 'Date to recompute blocklog')
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            if (opt.logDT && opt.chainID) {
+                await substrateetl.update_blocklog(opt.chainID, opt.logDT);
+            } else if (opt.chainID) {
+                await substrateetl.update_blocklog_bulk(opt.chainID);
+            } else {
+                while (1) {
+                    await substrateetl.updateBlocklogBulk();
+                    await substrateetl.sleep(1000);
+                }
+            }
+            process.exit(0);
+        });
+
+    program.command('auditfix')
+        .description("Set up crawlBackfill workload for the results of an audit for a specific chain")
+        .usage("-c 2004")
+        .option('-c, --chainID <chainID>', 'ChainID', myParseInt, null)
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            await substrateetl.audit_fix(opt.chainID);
+            process.exit(0);
+        })
+
+    program.command('auditblocks')
+        .description("Audit blocks")
+        .usage("-c 2004")
+        .option('-c, --chainID <chainID>', 'ChainID', myParseInt, null)
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            await substrateetl.audit_blocks(opt.chainID);
+            process.exit(0);
+        })
+
+    program.command('xcmtransfers')
+        .usage("polkadot -l 2023-02-01")
+        .description("Dump xcmtransfers of relay chain")
+        .argument('<relayChain>', 'Relay chain (polkadot or kusama)')
+        .option("-l, --logDT <logDT>", "Oldest date to dump", "2023-02-01") // TODO: make it 7-10 days ago
+        .action(async (relayChain, opt) => {
+            let logDT = opt.logDT ? opt.logDT : "2023-02-10";
+            var substrateetl = new SubstrateETL();
+            await substrateetl.dump_xcmtransfers_range(relayChain, logDT);
+            process.exit(0);
+        })
+
+    program.command('polkaholic')
+        .description("Dump polkaholic.json (for export)")
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            await substrateetl.dump_substrateetl_polkaholic()
+            //await substrateetl.dump_chains(relayChain);
+            process.exit(0);
+        })
+
+    program.command('setuptables')
+        .description("Setup BigQuery tables for new relaychain/paraID")
+        .usage("2002")
+        .argument('<chainID>', 'Chain ID', myParseInt)
+        .action(async (chainID, opt) => {
+            var substrateetl = new SubstrateETL();
+            await substrateetl.setup_tables(chainID);
+            process.exit(0);
+        })
+
+    program.command('showtables')
+        .usage("-f accounts")
+        .description(`Show all substrate etl tables`)
+        .option('-f, --filter <filter>', `filter to use`, 'NA')
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            let {
+                filter
+            } = opt;
+            if (filter == "NA") filter = ''
+            let fullTableIDs = await substrateetl.getAlltables(filter)
+            console.log(`Matched Table[${fullTableIDs.length}]`)
+            for (const fullTableID of fullTableIDs) {
+                console.log(fullTableID)
+            }
+            process.exit(0);
+        });
+
+    program.command('deletetables')
+        .usage("-f accounts")
+        .description(`Generate delete cmd for matching substarte etl tables (Note: will only generate commands, you must manually run them)`)
+        .option('-f, --filter <filter>', `filter to use`, 'NA')
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            let {
+                filter
+            } = opt;
+            if (filter == "NA") {
+                console.log("NOT ALLOWED")
+                process.exit(1)
+            }
+            //var substrateetl = new SubstrateETL();
+            let fullTableIDs = await this.getAlltables(filter)
+            let bqCmds = []
+            for (const fullTableID of fullTableIDs) {
+                let bqCmd = `bq rm -f ${fullTableID}`
+                bqCmds.push(bqCmd)
+                console.log(bqCmd)
+            }
+            process.exit(0);
+        });
+
+
+
+    await program.parseAsync(process.argv);
+}
+
+main()
+    .then(() => {
+        // do not process.exit(0) here
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
