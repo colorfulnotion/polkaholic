@@ -1,0 +1,201 @@
+#!/usr/bin/env node
+
+const {
+    Command
+} = require('commander');
+const paraTool = require("./paraTool");
+const XCMManager = require("./xcmmanager");
+
+function myParseInt(value, dummyPrevious) {
+    const parsedValue = parseInt(value, 10);
+    if (isNaN(parsedValue)) {
+        throw new commander.InvalidArgumentError('Not a number.');
+    }
+    return parsedValue;
+}
+
+async function main() {
+    let cli_version = '0.1.0'
+    const program = new Command();
+    program
+        .name('xcmindexer')
+        .description('Polkaholic XCM Indexer')
+        .version(`${cli_version}`);
+
+    program.command('xcmmessages')
+        .description(`Match XCM Messages across origination and destination chain`)
+        .option('-l, --lookbackDays', '# of days to lookback', 0)
+        .option('-f, --forceRematch', 'force rematch (1=yes, default=0)', 0)
+        .action(async (opts) => {
+            // Usage:  xcmmatch [lookbackDays] [rematch]
+            let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
+            var debugLevel = paraTool.debugErrorOnly
+            if (isDevelopment) {
+                debugLevel = paraTool.debugTracing
+                console.log(`[isDevelopment:${isDevelopment}] debugLevel: ${debugLevel}`)
+            }
+            let lookbackDays = parseInt(opts.lookbackdays, 10);
+            let forceRematch = parseInt(opts.forceRematch, 10);
+            let lastUpdateTS = 0;
+            var manager = new XCMManager();
+            manager.setDebugLevel(debugLevel)
+
+            await manager.xcm_init()
+            await manager.assetManagerInit();
+            let chain = await manager.getChain(2);
+            await manager.setupAPI(chain);
+
+            if (lookbackDays > 0) {
+                await manager.xcmanalytics(chain, lookbackDays, forceRematch)
+                let wsQueueLen = manager.getWSProviderQueueLen()
+                console.log(`**** wsQueueLen=${wsQueueLen}`)
+                process.exit(1);
+            }
+            let startTS = manager.currentTS() - 600;
+            const lookbackSeconds = 120;
+            let numRecs = 0;
+            let lastGeneralUpdateTS = manager.getCurrentTS();
+            do {
+                // startTS that comes back is the last message unix timestamp
+                [numRecs, startTS] = await manager.xcmanalytics_period(chain, startTS - 120);
+                let wsQueueLen = manager.getWSProviderQueueLen()
+                console.log("***** numRecs ", numRecs, `startTS = ${startTS}`, `wsQueueLen=${wsQueueLen}`)
+                if (numRecs == 0 && wsQueueLen == 0) {
+                    // this polls every like 1s for a new xcmmessage after startTS, and returns with the timestamp of the first message seen, which is used to start the next process
+                    await manager.waitForNewXCMMessage(startTS);
+                } else {
+                    console.log(`xcmTransfers=[${numRecs}],wsQueueLen=${wsQueueLen}`)
+                    //await manager.flushWSProviderQueue();
+                    await manager.sleep(1000);
+                }
+
+                let lastUpdateTSAgo = manager.getCurrentTS() - lastUpdateTS
+                if (lastUpdateTSAgo > 600) {
+                    //update once every 600s
+                    console.log(`update assetManager now`)
+                    lastUpdateTS = manager.getCurrentTS()
+                    await manager.assetManagerInit();
+                    let lastGeneralUpdateTSAgo = manager.getCurrentTS() - lastGeneralUpdateTS
+                    if (lastGeneralUpdateTSAgo > 3600) {
+                        console.log(`[${manager.getCurrentTS()}] update_xcmlogs ...`)
+                        await manager.update_xcmlogs(1);
+                        console.log(`[${manager.getCurrentTS()}] updateXcAssetContractAddr ...`)
+                        await manager.updateXcAssetContractAddr()
+                        console.log(`[${manager.getCurrentTS()}] updateXcmTransferRoute ...`)
+                        await manager.updateXcmTransferRoute();
+                        console.log(`[${manager.getCurrentTS()}] updateHrmpChannelEvents ...`)
+                        await manager.updateHrmpChannelEvents();
+                        lastGeneralUpdateTS = manager.getCurrentTS();
+                        console.log(`[${manager.getCurrentTS()}] update DONE`)
+                    }
+                }
+            } while (true);
+        })
+
+    program.command('xcmtransfer')
+        .description(`Find matches for a chainID/extrinsicHash or across the whole system`)
+        .usage("-c 2000")
+        .option('-c, --chainID <chainID>', 'ChainID', null)
+        .option('-h, --extrinsicHash <extrinsicHash>', 'ExtrinsicHash', null)
+        .option('-t, --transferIndex <transferIndex>', 'Transfer Index', 0, myParseInt)
+        .option('-x, --xcmIndex <xcmIndex>', 'XCM Message Index', 0, myParseInt)
+        .option('-l, --lookbackDays <lookbackDays>', 'Lookback days', 7, myParseInt)
+        .action(async (opt) => {
+            var XCMCleaner = require("./xcmCleaner.js");
+            var manager = new XCMCleaner();
+            await manager.assetManagerInit();
+            if (opt.extrinsicHash) {
+                let transferIndex = opt.transferIndex;
+                let xcmIndex = opt.xcmIndex;
+                await manager.assetManagerInit();
+                await manager.generate_extrinsic_XCMInfo(extrinsicHash, transferIndex, xcmIndex);
+                process.exit(0);
+            } else if (opt.chainID != undefined) {
+                let lookbackDays = opt.lookbackDays;
+                await manager.bulk_generate_XCMInfo(chainID, lookbackDays, 1000);
+                process.exit(0);
+            } else {
+                while (1) {
+                    var manager = new XCMCleaner();
+                    await manager.assetManagerInit();
+                    let res = await manager.bulk_generate_XCMInfo(null, 1, 1);
+                    await manager.sleep(2000)
+                }
+            }
+        })
+
+
+    program.command('reindex')
+        .description(`Rewrite BigTable column data with latest xcmInfo info`)
+        .option('-l <lookbackDays>', '# of days to lookback', 1, myParseInt)
+        .action(async (opts) => {
+            var manager = new XCMManager();
+            await manager.xcm_init()
+            await manager.assetManagerInit();
+            await manager.xcmReanalytics(lookbackDays)
+            process.exit(0);
+        });
+
+    program.command('xcmgarload')
+        .description(`XCM GAR Loader`)
+        .option('-r, --relayChain <relayChain>', 'Relay Chain to load', "polkadot")
+        .action(async (opt) => {
+            let relayChain = opt.relayChain;
+            var XCMGARLoadManager = require("./xcmgarloadmanager");
+            var xcmgarlm = new XCMGARLoadManager();
+            let xcRegistryRaw = xcmgarlm.readJSONFn(relaychain, 'xcmRegistry')
+            let xcRegistryNew = xcmgarlm.transformXcGarRegistry(xcRegistryRaw)
+            //console.log(`xcRegistryNew`, xcRegistryNew)
+            let xcRegistryOld = await xcmgarlm.init_xcm_asset_old(relaychain)
+            //console.log(`xcRegistryOld`, xcRegistryOld)
+            let [xcRegistryNewOnly, xcRegistryOldOnly, identicalXcRegsitry, diffXcRefistry] = xcmgarlm.compareXcRegistry(xcRegistryNew, xcRegistryOld)
+            await xcmgarlm.flushXcmAssetGar(xcRegistryNew)
+            process.exit(0);
+        });
+
+    program.command('xcmgarloadasset')
+        .description(`XCM GAR Asset Loader`)
+        .option('-r, --relayChain <relayChain>', 'Relay Chain to load', "polkadot")
+        .option('-p, --paraID <paraID>', 'paraID', "all")
+        .action(async (opt) => {
+            let relayChain = opt.relayChain;
+            let targetedParaID = opts.paraID ? opts.paraID : "all";
+            var XCMGARLoadManager = require("./xcmgarloadmanager");
+            var xcmgarlm = new XCMGARLoadManager();
+            var chainAssetFiles = xcmgarlm.readFilelist(targetedRelaychain)
+            console.log(`chainAssetFiles`, chainAssetFiles)
+            let globalAsetMap = {}
+            for (const chainAssetFn of chainAssetFiles) {
+                let r = xcmgarlm.readParachainFiles(targetedRelaychain, chainAssetFn)
+                if (targetedParaID == 'all' || targetedParaID == `${r.paraID}`) {
+                    let assetMap = xcmgarlm.transformParachainAssets(r)
+                    for (const assetChain of Object.keys(assetMap)) {
+                        globalAsetMap[assetChain] = assetMap[assetChain]
+                    }
+                }
+            }
+            console.log(`[${targetedRelaychain}-${targetedParaID}]`, globalAsetMap)
+
+            let cachedParachainAssetsMap = await xcmgarlm.init_parachain_asset_old(targetedRelaychain, targetedParaID)
+            console.log(`cachedParachainAssetsMap[${Object.keys(cachedParachainAssetsMap).length}]`, Object.keys(cachedParachainAssetsMap))
+
+            let [newParaAssetOnly, oldParaAssetOnly, identicalParaAssets, diffParaAssets] = xcmgarlm.compareParachainAssets(globalAsetMap, cachedParachainAssetsMap)
+            let newParaAssetkeys = Object.keys(newParaAssetOnly)
+            let oldParaAssetkeys = Object.keys(oldParaAssetOnly)
+            let identicalParaAssetKeys = Object.keys(identicalParaAssets)
+            let diffParaAssetsKeys = Object.keys(diffParaAssets)
+            await xcmgarlm.flushParachainAssets(globalAsetMap, newParaAssetkeys)
+            process.exit(0);
+        });
+
+    await program.parseAsync(process.argv);
+}
+
+main()
+    .then(() => {
+        // Do not process.exit(0) here
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

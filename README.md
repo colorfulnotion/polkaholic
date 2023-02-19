@@ -3,7 +3,13 @@
 Polkaholic.io indexes Polkadot, Kusama and their Substrate based parachains, and exposes a
 multi-chain block explorer at https://polkaholic.io powered by APIs https://api.polkaholic.io.
 
-## Running the Polkaholic.io Block explorer
+The Polkaholic index is fully available in BigQuery via [substrate-etl](https://github.com/colorfulnotion/substrate-etl)
+and covers 70 chains:
+* [Polkadot](https://github.com/colorfulnotion/substrate-etl/polkadot)
+* [Kusama](https://github.com/colorfulnotion/substrate-etl/kusama)
+* [Summary](https://github.com/colorfulnotion/substrate-etl/SUMMARY.md)
+
+## Running the Polkaholic.io Indexer + Block explorer
 
 Assuming the indexer has been set up (see "Set up Indexing"), to run the polkaholic.io Block explorer:
 ```
@@ -16,19 +22,25 @@ To use your local index, set `POLKAHOLIC_API_URL` in your environment
 # node api.js
 ```
 
+The `substrate-etl` is the recommended route for access to the Polkaholic Index
+
 ## Set up Indexing
 
-The polkaholic index is stored in mysql, BigTable and BigQuery, where we make heavy use of Google Cloud.
+A following 3 commands compose the Polkaholic Indexer: (documented [here](https://github.com/colorfulnotion/polkaholic/tree/main/substrate)
 
-Setup of the backend tables:
+* `polkaholic` - indexes individual Substrate chains
+* `xcmindexer` - indexes XCM activity between chains, and imports [XCM Global Asset Registry](https://github.com/colorfulnotion/xcm-global-registry) data
+* `substrate-etl` - exports Polkaholic data to public [substrate-etl](https://github.com/colorfulnotion/substrate-etl) dataset
+
+The polkaholic index is stored in mysql BigTable, and is set up with:
 
 * mysql (5.7): substrate/schema/polkaholic.sql
-* BigQuery: substrate/cbt.sh
-* BigTable: substrate/bq/bq.sh
+* BigTable: substrate/cbt/cbt.sh
 
-The PolkaholicDB class manages the connections to the above tables with a `POLKAHOLIC_DB` variable (see
+The `PolkaholicDB` class manages the connections to the above tables with a `POLKAHOLIC_DB` variable (see
 also `POLKAHOLIC_DB_REPLICA`, which support multiple replicas in load balanced instance groups in 3+ regions).
 managing "ini" file credentials in one place:
+
 ```
 [client]
 host = polkaholic
@@ -49,10 +61,17 @@ bigtableCluster = polkaholic
 storageBucket = polkaholic
 ```
 
-Each chain's blocks are stored in a `block${chainID}` table in mysql and a BigTable `chain${chainID}`,
-with the state of the chain kept in a single record in the `chain` table.  ChainIDs are 0 + 2 for Polkadot and Kusama, and then `paraID` and `paraID + 20000` for Polkadot parachains and Kusama parachains.
+Each chain's blocks are stored in a `block${chainID}` table in mysql
+and a BigTable `chain${chainID}`, with the state of the chain kept in
+a single record in the `chain` table.  ChainIDs are 0 + 2 for Polkadot
+and Kusama, and then `paraID` and `paraID + 20000` for Polkadot
+parachains and Kusama parachains (mostly..exceptions are for chains like Kilt
+and Subsocial).
 
-Indexing is managed with `crawlBlocks ${chainID}` -- to kick off indexing of a chain, you will need to add a record into the `chain` table with a valid WSEndpoint (e.g. wss://rpc.polkadot.io)
+Indexing is managed with `polkaholic crawlblocks ${chainID}` -- to
+kick off indexing of a chain, you will need to add a record into the
+`chain` table with a valid WSEndpoint (e.g. wss://rpc.polkadot.io)
+
 ```
 mysql> select * from chain where chainID = 0 \G
 *************************** 1. row ***************************
@@ -76,10 +95,15 @@ mysql> select * from chain where chainID = 0 \G
                      website: https://polkadot.network
                  coingeckoID: polkadot
 ```
-Then run `crawlBlocks 0`, which will fill up the `block${chainID}` table and `chain${chainID}` BigTable.  (Polkaholic runs 2-3 crawler services for each chain for redundancy.)
-While most parachains support `subscribeStorage` to support the fetching of traces, most public endpoints do not support "unsafe" trace calls.  All gaps in traces have to be covered using our internal nodes (currently 10-12)  and onfinality nodes.  However, onfinality does not have 100% coverage of all parachains so some chains have only partial indexes.  New parachains tend to need a few weeks.
 
-Because not
+Then run `polkaholic crawlblocks 0`, which will fill up the
+`block${chainID}` table and `chain${chainID}` BigTable.  (Polkaholic
+runs 2 crawler services for every chain for redundancy.)  While most
+parachains support `subscribeStorage` to support the fetching of
+traces, most public endpoints do not support "unsafe" trace calls.
+All gaps in traces have to be covered using our internal nodes
+(currently 20) and snapshots of 25-30 additional chain instances.
+
 The end setup for mysql:
 ```
 mysql> show tables;
@@ -155,8 +179,6 @@ mysql> show tables;
 BigTable:
 ```
 # cbt ls
-2022/07/09 10:55:56 -creds flag unset, will use gcloud credential
-accounthistory
 accountrealtime
 addressextrinsic
 apikeys
@@ -166,23 +188,15 @@ chain2
 chain2000
 ...
 hashes
-```
-BigQuery:
-```
-# bq ls polkaholic
-   tableId     Type    Labels   Time Partitioning   Clustered Fields  
- ------------ ------- -------- ------------------- ------------------
-  events       TABLE            DAY (field: ts)                       
-  evmtxs       TABLE            DAY (field: ts)                       
-  extrinsics   TABLE            DAY (field: ts)                       
-  rewards      TABLE            DAY (field: ts)                       
-  transfers    TABLE            DAY (field: ts)                       
-  xcm          TABLE            DAY                                 
+...
 ```
 
-The crawling service listens for new blocks and storage events over WebSockets (`ws://`).  It should be run on at least 2 nodes and is managed with a service powered by `crawlBlocks ${chainID}`.
+The crawling service listens for new blocks and storage events over
+WebSockets (`wss://`).  It should be run on at least 2 nodes and is
+managed with a service powered by `polkaholic crawlblocks ${chainID}`.
 
 The WS-based crawler stores all blocks and trace data in BigTable tables `chain${chainID}` using 6 column families:
+
 ```
 # cbt ls chain0
 Family Name	GC Policy
@@ -191,20 +205,21 @@ blockraw	versions() > 1
 events		versions() > 1
 feed	   	versions() > 1
 finalized	versions() > 1
-n		      versions() > 1
-trace		  versions() > 1
+n		versions() > 1
+trace		versions() > 1
 ````
+
+Chains with EVM support (Moonbeam, Astar, ...) have additional columns.
 
 Block numbers are keyed by 8 digit hex (instead of decimal) to support prefix scans by the indexer.
 
-* The `subscribeStorage` events result in a call to fetch the block and turn it _manually_ into sidecar compatible form, resulting in cells in both the `block` and `trace` column family with a call to `processBlock` and `processTrace`.
+* The `subscribeStorage` events result in a call to fetch the block and turn it _manually_ into sidecar compatible form, resulting in cells in both the `block` and `trace` column family by the indexing process, 
 * The `subscribeFinalizedHeads` events result in cells in only the `finalized` column family.  Multiple block candidates at a given height result in multiple columns, but when a block is finalized, other non-finalized candidates are deleted.
 
-Here is the crawlBlocks process on chain 8 (karura), run _manually_ on one node:
+Here is the crawlblocks process on chain 2000 (acala), run _manually_ on one node:
 ```
-# root@moonriver:~/go/src/github.com/colorfulnotion/polkaholic/substrate# ./crawlBlocks 2000
+# # ./polkaholic crawlblocks 2000
 chain API connected 2000
-2022-07-09 11:42:51        API/INIT: RPC methods not decorated: evm_blockLimits
 You are connected to ACALA chain 2000 endpoint=... with types + rpc + signedExt
 ...
 subscribeStorage Acala bn=1396814 0x0d5aaa4b68bce292eafe392b52870a13d0e3f416beb86b69b6d6c90185049c03: cbt read chain2000 prefix=0x0015504e
@@ -232,76 +247,70 @@ Here is a single block for chain 2000:
   trace:0x7414093b4997ab781fd2e01e4a502c5c48e58ba0cff565a6864220366196009e @ 2022/07/09-11:43:18.000000
     "[{\"k\":\"0x027a4e29b47efb389eca0f0ba7a8d619057d256c2b189477f5441f02ad1f0fd6\",\"v\":null},{\"k\":\"0x15464cac3378d46f113cd5b7a4d71c8436cf781e2bdd3b2fe1ce339b2858e5682f857e6151a46fd95ac09ed30bf9c17475373689bb8965cf5c3cd9cff1894f407310acd892d4f165\",\"v\":\"0x100a000000\"},{\"k\":\"0x1da53b775b270400e7e61ed5cbc5a146c726478796bad0b9cabd7481dbe64983\",\"v\":null},{\"k\":\"0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac\",\"v\":\"0x104c501500\"},{\"k\":\"0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850\",\"v\":\"0x100c000000\"},{\"k\":\"0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96\",\"v\":\"0x60a8f44824000000000000000000000000708435b502000000\"},{\"k\":\"0x26aa394eea5630...
 ```
+
 The above log shows how to inspect with `cbt` on the command line.
 In most cases there will be multiple cells for `finalized` due to multiple indexers, but any row with a `finalized` cell should have only one block/trace matching column.
 
-The tip of each crawled chain is held in the `chain` table in the `blocksCovered` column.
+The tip of each crawled chain is held in the `chain` table in the `blocksCovered` and `blocksFinalized` column.
 ```
-mysql> select chainID, chainName, lastCrawlDT, blocksCovered from chain where crawling = 1;
-+---------+---------------------+---------------------+---------------+
-| chainID | chainName           | lastCrawlDT         | blocksCovered |
-+---------+---------------------+---------------------+---------------+
-|       0 | Polkadot            | 2022-07-09 18:55:00 |      11092883 |
-|       2 | Kusama              | 2022-07-09 18:55:06 |      13489228 |
-|    1000 | Statemint           | 2022-07-09 18:55:02 |       1662966 |
-|    2000 | Acala               | 2022-07-09 18:55:01 |       1396867 |
-|    2002 | Clover              | 2022-07-09 18:54:50 |       1331088 |
+mysql> select chainID, chainName, blocksFinalized, blocksCovered from chain where crawling = 1;
++---------+---------------------+-----------------+---------------+
+| chainID | chainName           | blocksFinalized | blocksCovered |
++---------+---------------------+-----------------+---------------+
+|       0 | Polkadot            |        14321625 |      14321627 |
+|       2 | Kusama              |        16709278 |      16709281 |
+|    1000 | Statemint           |         3248772 |       3248774 |
+|    1001 | Collectives         |          644977 |        644977 |
+|    2000 | Acala               |         2983362 |       2983364 |
+|    2002 | Clover              |         2899160 |       2899160 |
+|    2004 | Moonbeam            |         2984929 |       2984931 |
+|    2006 | Astar               |         2979581 |       2979583 |
 ...
 ```
 
-At the end of each hour, for each chain, an hourly index is built from JSON files that is loaded into the above BigQuery tables with `indexChain`.
+### Backfill of Blocks and Traces + Other Processes
 
-### Backfill of Blocks and Traces
+The crawling service is not perfect due to missing blocks, RPC
+connectivity issues, unavailability of archive nodes, bootnodes, bad
+code pushes, and general system failures.  Thus the `polkaholic
+auditchain` script identifies missing blocks and traces, whereas
+`polkaholic backfill` and `polkaholic crawltraces` scripts crawl the
+blocks + traces that are missing.  Both these `auditchain` and
+`backfill` process are covered systematically with an hourly
+`indexchain` process to fill any gaps, which minimizes the need for
+human interventions.
 
-The crawling service is NOT perfect due to missing traces or connectivity issues.
-The `auditChain` script identifies missing blocks and traces, whereas the `crawlBackfill` and `crawlTraces` scripts crawl the blocks + traces that are missing.  
-
-Because no public WSEndpoints exist that support 'unsafe' traces (that are not obtained from `subscribeStorage`),
-we use `chain.WSBackfill` and `chain.RPCBackfill` to refer to internal full nodes and temporary onfinality nodes.
-Onfinality does a wonderful job with their "Lightning sync" and maintaining the latest releases for dozens of chains.  
-
-### Other Processes
-
-The following script are put in cron jobs:
+The following operations are put in regular cron jobs / services:
 ```
-* dumpSubstrateETL - hourly/daily -- updates the BigQuery tables
-* getPricefeed - 3-5 mins -- fetches the latest prices from the coingecko API
-* updateXCMTransfer - 3-5 mins - fills in some data in the xcmtransfer table
-* updateIdentity0, updateIdentity2 - daily -- fetches new identities from Polkadot and Kusama
+* `polkaholic pricefeed` (every 5 mins) -- fetches the latest prices from the coingecko API
+* `polkaholic updateassetpricelog` (every 5 mins) -- fetches the latest prices from top defi chains: moonbeam, astar, ...
+* `polkaholic identity` -- fetches new identities from Polkadot and Kusama
+* `xcmindexer xcmmessages` -- matches outgoing and incoming XCM messages
+* `xcmindexer xcmtransfer` -- matches outgoing XCM transfers and incoming asset signals
+* `xcmindexer xcmgarload` -- loads [XCM Global Asset Registry](https://github.com/colorfulnotion/xcm-global-registry)
+* `substrate-etl dump` -- exports to [substrate-etl](https://github.com/colorfulnotion/substrate-etl)
 ```
+
 At present, we manually:
-* acquire WSEndpoints from polkadot.js.org and attempt to update `summary/endpoints.js` with `updateEndpoints`
-* manually updated chain.prefix
-* supervise `computePriceUSDPaths`
-* supervise onfinality fetches of missing blocks (for new chains) with `crawlBackfill` + trace data with `crawlTraces`, `crawlBackfill`
-* supervise reindexes with `indexReindex`
+* maintain chain.WSEndpoint using endpoints from polkadot.js.org for new chains
+* supervise `xcmgar` imports from [XCM Global Asset Registry](https://github.com/colorfulnotion/substrate-etl)
+* supervise `substrate-etl` exports into publicly available BigQuery [polkadot](https://github.com/colorfulnotion/substrate-etl/polkadot) and [kusama](https://github.com/colorfulnotion/substrate-etl/kusama) datasets 
+* solve issues reported by parachain teams and Polkadot ecosystem leadership
 
 ### Google Cloud Deployment
 
-At present, 44 chains are crawled/indexed by 10 nodes (4 core, 16GB), where each of the 10 nodes are running 8-10 services (running `crawlBlocks` and `indexChain`) _and_ one of the top 10 chains.  Ansible is used with auto generated YAML (see `yaml`) with `generateCrawlerYAML` and deployment is managed with `Makefile`:
-* `make indexers` - updates 10 indexers
-* `make ui` - updates US/AS/EU endpoints
+At present, 70 chains are crawled/indexed by 20 nodes (4 core, 16GB), where each of the 20 nodes are running 8-10 services on average (running `crawlblocks` and `indexchain`) _and_ one of the top 20 chains.  
+Ansible is used with auto generated YAML (see `yaml`) with `generateCrawlerYAML` and deployment is managed with `Makefile`:
+* `make indexers` - updates 20 indexers
+* `make ui` - updates US/AS/EU endpoints powering https://polkaholic.io 
 
-### Size of Index
-
-The current size of the index (as of July 9, 2022) is:
-* mysql - 109GB (master only, not including 3+ replicas)
-* BigTable - 5.4TB (US based)
-* BigQuery - 331G (US based)
-
-```
-mysql> select relaychain, round(sum(blocksFinalized)/1000000,1) as blocksMM from chain where  lastCrawlDT > date_sub(Now(), interval 1 day) group by relaychain;             
-+------------+----------+
-| relaychain | blocksMM |
-+------------+----------+
-| kusama     |     41.3 |
-| polkadot   |     25.0 |
-+------------+----------+
-```
+The current size of the index (as of February 19, 2022) is:
+* mysql - 171GB (master only, not including 3 replicas)
+* BigTable - 7.8TB (US based)
 
 Other:
-* Backup is done on mysql via GCP
-* Backup of BigTable is done with a script generated by `backupChains`
+* Mysql Backup is automated on mysql via GCP Cloud SQL
+* Backup of BigTable is done with `polkaholic backupchains`
 
 ## Contributing
 

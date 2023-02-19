@@ -163,6 +163,61 @@ module.exports = class Manager extends AssetManager {
         return rows;
     }
 
+    async indexBlocks(chainIDs) {
+        var Crawler = require("./crawler");
+        const ethTool = require("./ethTool");
+        const paraTool = require("./paraTool");
+        let crawler = new Crawler();
+        crawler.setDebugLevel(paraTool.debugTracing)
+
+        let chainID = 2000;
+        let chain = await crawler.getChain(chainID);
+        await crawler.setupAPI(chain);
+        await crawler.assetManagerInit();
+        await crawler.setupChainAndAPI(chainID);
+        let w = chainIDs ? ` and chainID in (${chainIDs})` : "";
+
+        let targetSQL = `select blockNumber, xcmIndex, extrinsicHash, chainID, chainIDDest, amountSentUSD, amountReceived, amountReceivedUSD, symbol, from_unixtime(sourceTS), destStatus from xcmtransfer where symbol is null and chainID in ( select chainID from chain where crawling = 1 )  limit 5000`;
+        let recs = await crawler.poolREADONLY.query(targetSQL);
+        let targetMap = {}
+        for (let i = 0; i < recs.length; i++) {
+            let m = recs[i]
+            let chainID = m.chainID
+            let extrinsicID = m.extrinsicID
+            let extrinsicHash = m.extrinsicHash
+            let blockNumber = m.blockNumber
+            let blockHash = await crawler.getBlockHashFinalized(chainID, blockNumber)
+            let r = {
+                blockNumber: blockNumber,
+                blockHash: blockHash,
+                extrinsicHash: extrinsicHash,
+                extrinsicID: extrinsicID,
+            }
+            if (targetMap[chainID] == undefined) targetMap[chainID] = []
+            targetMap[chainID].push(r)
+            //console.log(`[${i+1}/${recs.length}] indexBlocks [${extrinsicID}] [${extrinsicHash}] blkHash=${blockHash}`)
+            //await crawler.index_block(chain, blockNumber, blockHash);
+        }
+        for (const chainID of Object.keys(targetMap)) {
+            let blocks = targetMap[chainID]
+            console.log(`[chainID:${chainID}] len=${blocks.length}`)
+            let ccrawler = new Crawler();
+            ccrawler.setDebugLevel(paraTool.debugTracing)
+            let chain = await crawler.getChain(chainID);
+            await ccrawler.setupAPI(chain);
+            await ccrawler.assetManagerInit();
+            await ccrawler.setupChainAndAPI(chainID);
+            for (let i = 0; i < blocks.length; i++) {
+                let b = blocks[i]
+                console.log(`[chainID:${chainID}] [${i+1}/${blocks.length}] indexBlocks [${b.extrinsicID}] [${b.extrinsicHash}] blkHash=${b.blockHash}`)
+                await ccrawler.index_block(chain, b.blockNumber, b.blockHash);
+                let sql = `update xcmtransfer set xcmInfoAudited = -2 where extrinsicHash = '${b.extrinsicHash}' and blockNumber = '${b.blockNumber}'`
+                ccrawler.batchedSQL.push(sql);
+                await ccrawler.update_batchedSQL();
+            }
+        }
+    }
+
     async write_btHashes_rows(rows, min, ctx = "") {
         if (rows.length > min) {
             try {
