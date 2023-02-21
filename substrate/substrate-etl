@@ -40,7 +40,7 @@ async function main() {
             let relayChain = opt.relayChain;
             if (logDT && paraID && relayChain) {
                 await substrateetl.dump_substrateetl(logDT, paraID, relayChain);
-		process.exit(0);
+                process.exit(0);
             }
             let tally = 0;
             while (true) {
@@ -169,10 +169,8 @@ async function main() {
             } else if (opt.chainID) {
                 await substrateetl.update_blocklog_bulk(opt.chainID);
             } else {
-                while (1) {
-                    await substrateetl.updateBlocklogBulk();
-                    await substrateetl.sleep(1000);
-                }
+                await substrateetl.updateBlocklogBulk();
+                await substrateetl.sleep(1000);
             }
             process.exit(0);
         });
@@ -214,7 +212,7 @@ async function main() {
         .option("-f, --fix", "Fix gaps", false)
         .action(async (opt) => {
             var substrateetl = new SubstrateETL();
-	    let fix = opt.fix;
+            let fix = opt.fix;
             await substrateetl.dump_substrateetl_polkaholic(fix)
             process.exit(0);
         })

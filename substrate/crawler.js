@@ -1191,15 +1191,6 @@ module.exports = class Crawler extends Indexer {
         await this.indexChain(chain, lookbackBackfillDays, audit, backfill, write_bq_log);
         await this.update_batchedSQL();
 
-        if (this.currentTS() - chain.lastUpdateChainAssetsTS >= 3600) {
-            let updateChainAssetStartTS = new Date().getTime();
-            await this.update_indexlog_hourly(chain)
-            let updateChainAssetTS = (new Date().getTime() - updateChainAssetStartTS) / 1000
-            if (chain.isEVM > 0 && (chain.evmRPC)) { //  moonbeam, moonriver, astar, shiden, clover ... where clover has an evmRPC external endpoint
-                await this.updateERC20TokenSupply(chain); // 5mins
-            }
-            await this.updateSpecVersions(chain);
-        }
 
         return (true);
     }
@@ -1299,8 +1290,8 @@ module.exports = class Crawler extends Indexer {
         await this.update_batchedSQL();
     }
 
-    async getNumRecentCrawlTraces(chain, lookback) {
-        var sql = `select count(*) as numRecentCrawlTraces from block${chain.chainID} where crawlTrace > 0 and length(blockHash) > 0 and blockDT >= date_sub(Now(), interval ${lookback} DAY) and attempted < ${maxTraceAttempts} order by crawlTrace desc,attempted, blockNumber desc limit 1000`;
+    async getNumRecentCrawlTraces(chain, lookbackBlocks = 14000) {
+        var sql = `select count(*) as numRecentCrawlTraces from block${chain.chainID} b, chain c where crawlTrace > 0 and length(blockHash) > 0 and blockNumber >= c.blocksFinalized - ${lookbackBlocks} and c.chainID = ${chain.chainID} and attempted < ${maxTraceAttempts} order by crawlTrace desc,attempted, blockNumber desc limit 1000`;
         let result = await this.poolREADONLY.query(sql);
 
         if (result.length > 0) {
@@ -1358,7 +1349,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     // for any missing traces, this refetches the dataset
-    async crawlTraces(chainID, techniqueParams = ["mod", 0, 1], lookback = 7) {
+    async crawlTraces(chainID, techniqueParams = ["mod", 0, 1], lookbackBlocks = 500000) {
         let chain = await this.setupChainAndAPI(chainID, true, true);
         await this.check_chain_endpoint_correctness(chain);
 
@@ -1370,7 +1361,7 @@ module.exports = class Crawler extends Indexer {
             let startingBlock = parseInt(syncState.startingBlock.toString(), 10);
             //console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
-            let startBN = chain.blocksFinalized - 50000 // dont do  a full table scan
+            let startBN = chain.blocksFinalized - lookbackBlocks;
             let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and attempted < ${maxTraceAttempts} and blockNumber > ${startBN} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} limit 5000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
@@ -1415,7 +1406,7 @@ module.exports = class Crawler extends Indexer {
                 this.batchedSQL.push(`update chain set traceTSLast = UNIX_TIMESTAMP(Now()) where chainID = ${chainID}`)
                 await this.update_batchedSQL();
             }
-            let numRecentCrawlTraces = await this.getNumRecentCrawlTraces(chain, lookback);
+            let numRecentCrawlTraces = await this.getNumRecentCrawlTraces(chain, lookbackBlocks);
             console.log("crawlTraces numRecentCrawlTraces=", numRecentCrawlTraces)
             if (numRecentCrawlTraces < 3) done = true;
         } while (!done);
@@ -1459,7 +1450,8 @@ module.exports = class Crawler extends Indexer {
         return (trace);
     }
 
-    markFinalizedReadyForIndexing(chainID, blockTS) {
+    async markFinalizedReadyForIndexing(chain, blockTS) {
+        let chainID = chain.chainID;
         let indexTS = (Math.floor(blockTS / 3600)) * 3600;
         let prevTS = (Math.floor(blockTS / 3600) - 1) * 3600;
         if (!this.readyForIndexing[prevTS]) {
@@ -1467,6 +1459,22 @@ module.exports = class Crawler extends Indexer {
             let [logDT, hr] = paraTool.ts_to_logDT_hr(prevTS);
             var sql = `insert into indexlog (chainID, indexTS, logDT, hr, readyForIndexing) values ('${chainID}', '${prevTS}', '${logDT}', '${hr}', 1) on duplicate key update readyForIndexing = values(readyForIndexing);`;
             this.batchedSQL.push(sql);
+
+            if (hr == 23) { // since we finalized the last hour, we can kick off fetching end of day balances
+                let updateAddressBalanceStatus = "Ready"; // Don't need to ignore if WSEndpointArchive = 1, since we have 128 blocks history?
+                await this.upsertSQL({
+                    "table": "blocklog",
+                    "keys": ["chainID", "logDT"],
+                    "vals": ["loaded", "audited", "updateAddressBalanceStatus"],
+                    "data": [`('${chainID}', '${logDT}', '0', 'Unknown', '${updateAddressBalanceStatus}')`],
+                    "replace": ["loaded", "audited"]
+                });
+            }
+            await this.update_indexlog_hourly(chain)
+            if (chain.isEVM > 0 && (chain.evmRPC)) {
+                await this.updateERC20TokenSupply(chain);
+            }
+            await this.updateSpecVersions(chain);
             return (true);
         }
         return (false);
@@ -1867,7 +1875,7 @@ module.exports = class Crawler extends Indexer {
                 let sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, fees, blockDT, crawlBlock, crawlTrace ${eflds}) values ('${bn}', '${finalizedHash}', '${parentHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', FROM_UNIXTIME('${blockTS}'), '${crawlBlock}', '${crawlTrace}' ${evals}) on duplicate key update blockHash=values(blockHash), parentHash = values(parentHash), blockDT=values(blockDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), fees = values(fees), crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace) ${eupds}`;
                 this.batchedSQL.push(sql);
                 // mark that the PREVIOUS hour is ready for indexing, since this block is FINALIZED, so that continuously running "indexChain" job can index the newly finalized hour
-                this.markFinalizedReadyForIndexing(chainID, blockTS);
+                await this.markFinalizedReadyForIndexing(chain, blockTS);
                 let sql2 = `insert into chain ( chainID, blocksCovered, blocksFinalized, lastFinalizedDT ) values ( '${chainID}', '${bn}', '${bn}', Now() ) on duplicate key update blocksFinalized = values(blocksFinalized), lastFinalizedDT = values(lastFinalizedDT), blocksCovered = IF( blocksCovered < values(blocksFinalized), values(blocksFinalized), blocksCovered )`
                 this.batchedSQL.push(sql2);
                 if (bn % 5000 == indexUpdateInterval) {

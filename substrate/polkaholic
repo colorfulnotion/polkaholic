@@ -43,34 +43,16 @@ async function main() {
         .argument('<chainID>', 'ChainID to crawl traces for', myParseInt)
         .option('-n <n>', 'Shard #', 0, myParseInt)
         .option('-m, --nmax <nmax>', 'Shard Max', 1, myParseInt)
-        .option('--lookbackDays <lookbackDays>', 'Lookback days', 10, myParseInt)
+        .option('--lookbackBlocks <lookbackBlocks>', 'Lookback blocks', 14000, myParseInt)
         .action(async (chainID, opt) => {
-            let lookback = (Math.random() < .01) ? 7 : 1;
             let n = opt.n;
             let m = opt.nmax;
-            let lookbackDays = opt.lookbackDays;
-            if (chainID >= 0) {
-                var crawler = new Crawler();
-                await crawler.assetManagerInit();
-                await crawler.crawlTraces(chainID, ["mod", n, m], lookback);
-                await crawler.release(5000);
-            } else {
-                do {
-                    var crawler = new Crawler();
-                    await crawler.assetManagerInit();
-                    await crawler.crawlTracesRandom();
-
-                    const mu = process.memoryUsage();
-                    let field = "heapUsed";
-                    const gbNow = mu[field] / 1024 / 1024 / 1024;
-                    const gbRounded = Math.round(gbNow * 100) / 100;
-                    console.log(`Heap allocated ${gbRounded} GB`);
-                    if (gbRounded > 1) {
-                        process.exit(1);
-                    }
-                    await crawler.release(5000);
-                } while (true);
-            }
+            let lookbackBlocks = opt.lookbackBlocks;
+            var crawler = new Crawler();
+            await crawler.assetManagerInit();
+            await crawler.crawlTraces(chainID, ["mod", n, m], lookbackBlocks);
+            await crawler.release(5000);
+            process.exit(0);
         })
 
     program.command('indexchain')
