@@ -1389,16 +1389,16 @@ module.exports = class SubstrateETL extends AssetManager {
 
         // mark anything in blocklog.accountMetricsStatus="Audited" if "AuditRequested" and the numAccountsActive data is reasonable in the same way -- the rest will need manual review
         let sql_audit_accountmetrics = `update blocklog, blocklogstats as s set accountMetricsStatus = 'Audited' where blocklog.chainID = s.chainID and LAST_DAY(blocklog.logDT) = s.monthDT and
- accountMetricsStatus = "AuditRequired" and logDT < date(Now()) and logDT >= '${balanceStartDT}' and 
+ accountMetricsStatus = "AuditRequired" and logDT < date(Now()) and logDT >= '${balanceStartDT}' and
  ( numActiveAccounts > s.numActiveAccounts_avg - s.numActiveAccounts_std * 2 or numActiveAccounts > s.numActiveAccounts_avg * .7) and
  ( numActiveAccounts < s.numActiveAccounts_avg + s.numActiveAccounts_std*2 or numActiveAccounts < s.numActiveAccounts_avg * 1.3)`;
         this.batchedSQL.push(sql_audit);
         await this.update_batchedSQL();
 
         // mark a day as being Ready for account metrics computation if (a) the previous day and the day are both "Audited" (b) its "NotReady"
-        let sql_ready = `update blocklog t, blocklog as p set t.accountMetricsStatus = "Ready" where p.logDT = date_sub(t.logDT, INTERVAL 1 day) and                                p.accountMetricsStatus in ( "Ready", "Audited", "AuditRequired" ) and 
+        let sql_ready = `update blocklog t, blocklog as p set t.accountMetricsStatus = "Ready" where p.logDT = date_sub(t.logDT, INTERVAL 1 day) and                                p.accountMetricsStatus in ( "Ready", "Audited", "AuditRequired" ) and
   t.accountMetricsStatus = "NotReady" and
-  p.updateAddressBalanceStatus = "Audited" and 
+  p.updateAddressBalanceStatus = "Audited" and
   t.updateAddressBalanceStatus in ("AuditRequired", "Audited" ) and
   t.logDT >= "${balanceStartDT}"`;
         this.batchedSQL.push(sql_ready);
@@ -1621,7 +1621,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             if (prevChainID == chainID) {
                 if (prevStartBN && (prevStartBN != (r.endBN + 1)) && (r.endBN < prevStartBN)) {
                     let sql = `update blocklog set loaded = 0 where chainID = ${chainID} and (logDT = '${logDT}' or logDT = Date(date_add("${logDT}", interval 1 day))) and ( LAST_DAY(logDT) = LAST_DAY(Now()) or LAST_DAY(logDT) = LAST_DAY(Date_sub(Now(), interval 1 day)) ) `;
-		    this.batchedSQL.push(sql);
+		            this.batchedSQL.push(sql);
                     await this.update_batchedSQL();
 
                     console.log(`BROKEN DAILY CHAIN @ ${chainID} ${logDT} FIX:`, sql);
@@ -1855,6 +1855,35 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
     }
 
+    getLogDTRange(startLogDT = null, endLogDT = null, isAscending = true){
+        let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0)
+        let [startDT, _] = paraTool.ts_to_logDT_hr(startLogTS);
+        if (startLogDT == null) {
+            //startLogDT = (relayChain == "kusama") ? "2021-07-01" : "2022-05-04";
+            startLogDT = "2023-02-01"
+        }
+        let ts = this.getCurrentTS();
+        if (endLogDT != undefined) {
+            let endTS = paraTool.logDT_hr_to_ts(endLogDT, 0) + 86400
+            if (ts > endTS) ts = endTS
+        }
+        let logDTRange = []
+        while (true) {
+            ts = ts - 86400;
+            let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
+            logDTRange.push(logDT)
+            if (logDT == startDT) {
+                 break;
+            }
+        }
+        if (isAscending){
+            return logDTRange.reverse();
+        }else{
+            return logDTRange
+        }
+    }
+
+
     async dump_accountmetrics(relayChain, paraID, logDT, isDry = true) {
 
         console.log(`dump_accountmetrics logDT=${logDT}, ${relayChain}-${paraID}, isDry=${isDry}`)
@@ -1879,7 +1908,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             paraIDs.push(paraID)
         }
 
-        let accountTbls = ["new", "old", "reaped", "active", "passive"]
+        let accountTbls = ["new", "old", "reaped", "assetreaped", "active", "passive"]
 
 
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
@@ -1930,8 +1959,28 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                        SELECT "2000" as para_id, "polkadot" as relay_chain, address_ss58, address_pubkey, ts FROM currDay where address_ss58 not in (select address_ss58 from prevDay);
                     */
                     targetSQL = `WITH prevDay AS (SELECT address_ss58, address_pubkey, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58, address_pubkey),
-                     currDay AS (SELECT address_ss58, address_pubkey, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58, address_pubkey)
-                SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, ts FROM prevDay where address_ss58 not in (select address_ss58 from currDay) order by address_pubkey`
+                                currDay AS (SELECT address_ss58, address_pubkey, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58, address_pubkey)
+                                SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, ts FROM prevDay where address_ss58 not in (select address_ss58 from currDay) order by address_pubkey`
+                    partitionedFld = 'ts'
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    bqjobs.push({
+                        chainID: chainID,
+                        paraID: paraID,
+                        tbl: tblName,
+                        destinationTbl: destinationTbl,
+                        cmd: cmd
+                    })
+                    break;
+
+                case "assetreaped":
+                    /*
+                    WITH prevDay AS (SELECT address_ss58, address_pubkey, asset, concat(address_ss58, asset) address_asset, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-08" group by address_ss58, address_pubkey, asset),
+                    currDay AS (SELECT address_ss58, address_pubkey, asset, concat(address_ss58, asset) address_asset, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58, address_pubkey, asset)
+                    SELECT "2000" as para_id, "polkadot" as relay_chain, address_ss58, address_pubkey, asset, ts  FROM currDay where address_asset not in (select address_asset from prevDay) order by address_asset;
+                    */
+                    targetSQL = `WITH prevDay AS (SELECT address_ss58, address_pubkey, asset, concat(address_ss58, asset) address_asset, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58, address_pubkey, asset),
+                                currDay AS (SELECT address_ss58, address_pubkey, asset, concat(address_ss58, asset) address_asset, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58, address_pubkey, asset)
+                                SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, asset, ts FROM prevDay where address_asset not in (select address_asset from currDay) order by address_asset`
                     partitionedFld = 'ts'
                     cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
@@ -1970,9 +2019,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                    WITH AcctiveAccount AS (SELECT address_ss58, max(accountType) as accountType from
                    (WITH activeUserAccount AS (SELECT signer_ss58 as address_ss58, signer_pub_key as address_pubkey, "User" as accountType, Max(block_time) as block_time FROM `substrate-etl.kusama.extrinsics2004` WHERE DATE(block_time) = "2023-02-01" and signed = true group by address_ss58, address_pubkey),
                    activeSystemAccount AS (SELECT author_ss58 as address_ss58, author_pub_key as address_pubkey, "System" as accountType, Max(block_time) as block_time FROM `substrate-etl.kusama.blocks2004` WHERE DATE(block_time) = "2023-02-01" group by address_ss58, address_pubkey) SELECT address_ss58, address_pubkey, max(accountType) as accountType, Max(block_time) as blockTime FROM activeSystemAccount group by address_ss58, address_pubkey UNION ALL (SELECT address_ss58, address_pubkey, max(accountType) as accountType, Max(block_time) as blockTime FROM activeUserAccount group by address_ss58, address_pubkey)) group by address_ss58, address_pubkey),
-		   
+
                    TransferAccount AS (SELECT address_ss58, address_pubkey, Max(block_time) as block_time FROM (SELECT to_ss58 AS address_ss58, to_pub_key as address_pubkey, Max(block_time) as block_time FROM `substrate-etl.kusama.transfers2004` WHERE DATE(block_time) = "2023-02-01" group by address_ss58, address_pubkey union all SELECT from_ss58 AS address_ss58, from_pub_key as address_pubkey, Max(block_time) as block_time FROM `substrate-etl.kusama.transfers2004` WHERE DATE(block_time) = "2023-02-01" group by address_ss58, address_pubkey) group by address_ss58, address_pubkey)
-		   
+
                    SELECT "2000" as para_id, "polkadot" as relay_chain, address_ss58, address_pubkey, Max(block_time) as ts from TransferAccount where address_ss58 not in (select address_ss58 from AcctiveAccount) and address_ss58 is not null group by address_ss58, address_pubkey, para_id, relay_chain order by address_pubkey;
                 */
                     targetSQL = ` WITH AcctiveAccount AS (SELECT address_ss58, max(accountType) as accountType from
