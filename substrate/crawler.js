@@ -1299,8 +1299,8 @@ module.exports = class Crawler extends Indexer {
         await this.update_batchedSQL();
     }
 
-    async getNumRecentCrawlTraces(chain, lookback) {
-        var sql = `select count(*) as numRecentCrawlTraces from block${chain.chainID} where crawlTrace > 0 and length(blockHash) > 0 and blockDT >= date_sub(Now(), interval ${lookback} DAY) and attempted < ${maxTraceAttempts} order by crawlTrace desc,attempted, blockNumber desc limit 1000`;
+    async getNumRecentCrawlTraces(chain, lookbackBlocks = 14000) {
+        var sql = `select count(*) as numRecentCrawlTraces from block${chain.chainID} b, chain c where crawlTrace > 0 and length(blockHash) > 0 and blockNumber >= c.blocksFinalized - ${lookbackBlocks} and c.chainID = ${chain.chainID} and attempted < ${maxTraceAttempts} order by crawlTrace desc,attempted, blockNumber desc limit 1000`;
         let result = await this.poolREADONLY.query(sql);
 
         if (result.length > 0) {
@@ -1358,7 +1358,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     // for any missing traces, this refetches the dataset
-    async crawlTraces(chainID, techniqueParams = ["mod", 0, 1], lookback = 7) {
+    async crawlTraces(chainID, techniqueParams = ["mod", 0, 1], lookbackBlocks = 500000) {
         let chain = await this.setupChainAndAPI(chainID, true, true);
         await this.check_chain_endpoint_correctness(chain);
 
@@ -1370,7 +1370,7 @@ module.exports = class Crawler extends Indexer {
             let startingBlock = parseInt(syncState.startingBlock.toString(), 10);
             //console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
 
-            let startBN = chain.blocksFinalized - 50000 // dont do  a full table scan
+            let startBN = chain.blocksFinalized - lookbackBlocks;
             let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and attempted < ${maxTraceAttempts} and blockNumber > ${startBN} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} limit 5000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
@@ -1415,7 +1415,7 @@ module.exports = class Crawler extends Indexer {
                 this.batchedSQL.push(`update chain set traceTSLast = UNIX_TIMESTAMP(Now()) where chainID = ${chainID}`)
                 await this.update_batchedSQL();
             }
-            let numRecentCrawlTraces = await this.getNumRecentCrawlTraces(chain, lookback);
+            let numRecentCrawlTraces = await this.getNumRecentCrawlTraces(chain, lookbackBlocks);
             console.log("crawlTraces numRecentCrawlTraces=", numRecentCrawlTraces)
             if (numRecentCrawlTraces < 3) done = true;
         } while (!done);

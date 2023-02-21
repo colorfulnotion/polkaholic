@@ -207,14 +207,14 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async audit_fix(chainID = null, monthDT = null) {
-	let w = [];
-	if ( chainID >= 0 ) {
-	    w.push(`chainID = '${chainID}'`);
-	}
-	if ( monthDT  ) {
-	    w.push(`monthDT = '${monthDT}'`);
-	}
-	let wstr = ( w.length > 0 ) ? ` and ${w.join(" and ")}` : "";
+        let w = [];
+        if (chainID >= 0) {
+            w.push(`chainID = '${chainID}'`);
+        }
+        if (monthDT) {
+            w.push(`monthDT = '${monthDT}'`);
+        }
+        let wstr = (w.length > 0) ? ` and ${w.join(" and ")}` : "";
         // 1. find problematic periods with a small number of records (
         let sql = `select CONVERT(auditFailures using utf8) as failures, chainID, monthDT from blocklogstats where audited in ( 'Failure' ) ${wstr} order by chainID, monthDT`
         console.log(sql);
@@ -244,19 +244,19 @@ module.exports = class SubstrateETL extends AssetManager {
                     let paraID = paraTool.getParaIDfromChainID(f.chainID);
                     let relayChain = paraTool.getRelayChainByChainID(f.chainID);
                     // remove old blocks
-		    for (let n = bn-1; n <= bn+1; n++) {
+                    for (let n = bn - 1; n <= bn + 1; n++) {
                         console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(n)}`)
                         console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${n}';`);
                         console.log(`./polkaholic indexblock ${f.chainID} ${n}`);
-		    }
+                    }
                     // dump day into bigquery
-		    let sql = `select UNIX_TIMESTAMP(blockDT) as blockTS from block${f.chainID} where blockNumber = "${bn}"`;
-		    let q = await this.poolREADONLY.query(sql);
-		    if ( q.length > 0 ) {
-			let [logDT, _] = paraTool.ts_to_logDT_hr(q[0].blockTS)
-			console.log(`./substrate-etl dump -rc ${relayChain} -p ${paraID} -l ${logDT}`);
-		    }
-		    console.log("");
+                    let sql = `select UNIX_TIMESTAMP(blockDT) as blockTS from block${f.chainID} where blockNumber = "${bn}"`;
+                    let q = await this.poolREADONLY.query(sql);
+                    if (q.length > 0) {
+                        let [logDT, _] = paraTool.ts_to_logDT_hr(q[0].blockTS)
+                        console.log(`./substrate-etl dump -rc ${relayChain} -p ${paraID} -l ${logDT}`);
+                    }
+                    console.log("");
                 }
             }
         }
@@ -324,9 +324,9 @@ module.exports = class SubstrateETL extends AssetManager {
             await this.update_batchedSQL();
             cnt++;
 
-	    if ( fix ) {
-		await this.audit_fix(chainID, monthDT);
-	    }
+            if (fix) {
+                await this.audit_fix(chainID, monthDT);
+            }
         }
     }
 
@@ -1561,8 +1561,8 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
             prevChainID = chainID;
             let numSignedExtrinsics = r.numSignedExtrinsics ? parseInt(r.numSignedExtrinsics, 10) : 0;
             let numAccountsActive = r.numAccountsActive ? parseInt(r.numAccountsActive, 10) : 0;
-	    let numPassiveAccounts = r.yr >= 2023 && r.numPassiveAccounts ? parseInt(r.numPassiveAccounts, 10) : null;
-	    let numNewAccounts = r.yr >= 2023 && r.numNewAccounts ? parseInt(r.numNewAccounts, 10) : null;
+            let numPassiveAccounts = r.yr >= 2023 && r.numPassiveAccounts ? parseInt(r.numPassiveAccounts, 10) : null;
+            let numNewAccounts = r.yr >= 2023 && r.numNewAccounts ? parseInt(r.numNewAccounts, 10) : null;
             let numAddresses = r.numAddresses ? parseInt(r.numAddresses, 10) : 0;
             let issues = r.issues ? r.issues : "";
             j[chainID].monthly.push({
@@ -1630,13 +1630,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let valXCMTransferOutgoingUSD = r.valXCMTransferOutgoingUSD > 0 ? r.valXCMTransferOutgoingUSD : 0
             if (prevChainID == chainID) {
                 if (prevStartBN && (prevStartBN != (r.endBN + 1)) && (r.endBN < prevStartBN)) {
-		    if ( fix ) {
-			let sql = `update blocklog set loaded = 0 where chainID = ${chainID} and (logDT = '${logDT}' or logDT = Date(date_add("${logDT}", interval 1 day))) and ( LAST_DAY(logDT) = LAST_DAY(Now()) or LAST_DAY(logDT) = LAST_DAY(Date_sub(Now(), interval 1 day)) ) `;
-			this.batchedSQL.push(sql);
-			await this.update_batchedSQL();
-			
-			console.log(`BROKEN DAILY CHAIN @ ${chainID} ${logDT} FIX:`, sql);
-		    }
+                    if (fix) {
+                        let sql = `update blocklog set loaded = 0 where chainID = ${chainID} and (logDT = '${logDT}' or logDT = Date(date_add("${logDT}", interval 1 day))) and ( LAST_DAY(logDT) = LAST_DAY(Now()) or LAST_DAY(logDT) = LAST_DAY(Date_sub(Now(), interval 1 day)) ) `;
+                        this.batchedSQL.push(sql);
+                        await this.update_batchedSQL();
+
+                        console.log(`BROKEN DAILY CHAIN @ ${chainID} ${logDT} FIX:`, sql);
+                    }
                     numBlocks_missing = null;
                 }
             }
@@ -1858,6 +1858,10 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 }
             } catch (e) {
                 errloadCnt++
+                this.logger.error({
+                    "op": "dump_networkmetrics",
+                    err
+                })
             }
         }
 
@@ -1893,7 +1897,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             paraIDs.push(paraID)
         }
 
-        let accountTbls = ["new", "old", "reaped", "active", "passive"]
+        let accountTbls = ["new", "old", "reaped", "assetreaped", "active", "passive"]
 
 
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
@@ -1957,6 +1961,25 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     })
                     break;
 
+                case "assetreaped":
+                    /*
+                      WITH prevDay AS (SELECT address_ss58, address_pubkey, asset, concat(address_ss58, asset) address_asset, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-08" group by address_ss58, address_pubkey, asset),
+                      currDay AS (SELECT address_ss58, address_pubkey, asset, concat(address_ss58, asset) address_asset, max(ts) as ts FROM `substrate-etl.polkadot.balances2000` WHERE DATE(ts) = "2023-02-09" group by address_ss58, address_pubkey, asset)
+                      SELECT "2000" as para_id, "polkadot" as relay_chain, address_ss58, address_pubkey, asset, ts  FROM currDay where address_asset not in (select address_asset from prevDay) order by address_asset;
+                    */
+                    targetSQL = `WITH prevDay AS (SELECT address_ss58, address_pubkey, asset, concat(address_ss58, asset) address_asset, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${prevDT}" group by address_ss58, address_pubkey, asset),
+                                currDay AS (SELECT address_ss58, address_pubkey, asset, concat(address_ss58, asset) address_asset, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58, address_pubkey, asset)
+                                SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, asset, ts FROM prevDay where address_asset not in (select address_asset from currDay) order by address_asset`
+                    partitionedFld = 'ts'
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    bqjobs.push({
+                        chainID: chainID,
+                        paraID: paraID,
+                        tbl: tblName,
+                        destinationTbl: destinationTbl,
+                        cmd: cmd
+                    })
+                    break;
                 case "active":
                     /* Active account (user + system)
                        SELECT "2000" as para_id, "polkadot" as relay_chain, address_ss58, address_pubkey, max(accountType) as accountType, Max(blockTime) as ts from
@@ -2023,6 +2046,10 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 }
             } catch (e) {
                 errloadCnt++
+                this.logger.error({
+                    "op": "dump_accountmetrics",
+                    err
+                })
             }
         }
         if (errloadCnt == 0 && !isDry) {
@@ -2224,7 +2251,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             if (bn1 > bnEnd) bn1 = bnEnd;
             let start = paraTool.blockNumberToHex(bn0);
             let end = paraTool.blockNumberToHex(bn1);
-	    console.log("FETCHING", bn0, bn1);
+            console.log("FETCHING", bn0, bn1);
             let [rows] = await tableChain.getRows({
                 start: start,
                 end: end
@@ -2233,7 +2260,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
                 let bn = parseInt(row.id.substr(2), 16);
-		console.log("processing:", bn);
+                console.log("processing:", bn);
 
                 let hdr = b.header;
                 if (!hdr || hdr.number == undefined) {
