@@ -4310,7 +4310,8 @@ module.exports = class Indexer extends AssetManager {
             fee: 0,
             success: 1,
             err: null,
-            isEVM: false
+            isEVM: false,
+            confidence: 0,
         }
         let evmStatus = {
             from: null,
@@ -4355,7 +4356,7 @@ module.exports = class Indexer extends AssetManager {
                             let withdrawTxFee = paraTool.dechexToInt(data[2])
                             if (!isUnsignedHead && signer == data[1] && isNativeToken) {
                                 withdrawFee = withdrawTxFee
-                                //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
+                                //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}, evt=`, evt)
                                 res.fee = withdrawFee
                             }
                         } catch (e) {
@@ -4370,7 +4371,7 @@ module.exports = class Indexer extends AssetManager {
                             let withdrawTxFee = paraTool.dechexToInt(data[1])
                             if (!isUnsignedHead && signer == data[0]) {
                                 withdrawFee = withdrawTxFee
-                                //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
+                                //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
                                 res.fee = withdrawFee
                             }
                         } catch (e) {
@@ -4410,8 +4411,20 @@ module.exports = class Indexer extends AssetManager {
                             let actualTip = paraTool.dechexToInt(data[2])
                             let actualSurplus = paraTool.dechexToInt(data[3])
                             let fee = actualFee + actualSurplus - actualTip
-                            //console.log(`[${extrinsicID}] ${extrinsicHash} [${data[0]}] actualFee=${actualFee}, actualTip=${actualTip}, actualSurplus=${actualSurplus}, fee=${fee}`)
+                            //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] actualFee=${actualFee}, actualTip=${actualTip}, actualSurplus=${actualSurplus}, fee=${fee}`)
                             res.fee = fee
+                            res.confidence = 1
+                        } catch (e) {
+                            console.log('unable to compute treasury fees!!', data, e)
+                        }
+                    }else if (data != undefined && Array.isArray(data) && data.length == 3){
+                        try {
+                            let actualFee = paraTool.dechexToInt(data[1])
+                            let actualTip = paraTool.dechexToInt(data[2])
+                            let fee = actualFee //- actualTip
+                            //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] actualFee=${actualFee}, actualTip=${actualTip}, fee=${fee}`)
+                            res.fee = fee
+                            res.confidence = 1
                         } catch (e) {
                             console.log('unable to compute treasury fees!!', data, e)
                         }
@@ -4494,7 +4507,9 @@ module.exports = class Indexer extends AssetManager {
             //res.fee = depositFeeList[depositFeeList.length - 1]
             //console.log(`[${extrinsicID}] ${extrinsicHash} potential XCM fee=${res.fee}, depositFeeList=${depositFeeList}`)
         }
-        if (withdrawFee == 0 && !isUnsignedHead) {
+        if (res.confidence = 1){
+            //USE transactionPayment:TransactionFeePaid if available
+        }else if (withdrawFee == 0 && !isUnsignedHead) {
             // unusual extrinsic - (1) not paid by native token? (2) xcmPallet (3) partially paid?
             // use the highest fee computed
             res.fee = Math.max(withdrawFee, totalDepositFee, treasuryFee)
@@ -5006,6 +5021,7 @@ module.exports = class Indexer extends AssetManager {
         }
 
         let res = this.checkExtrinsicStatusAndFee(api, extrinsic, extrinsicHash, extrinsicID, isSigned, signer)
+        //console.log(`***extrinsicHash=${extrinsicHash}, extrinsicID=${extrinsicID}, res`, res)
         let chainDecimal = this.getChainDecimal(this.chainID)
         if (isSigned) {
             extrinsic.signature.tip = extrinsic.signature.tip / 10 ** chainDecimal
