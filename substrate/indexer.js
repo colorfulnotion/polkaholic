@@ -4328,6 +4328,7 @@ module.exports = class Indexer extends AssetManager {
         let extrinsicSectionMethod = `${exp}:${exm}`
         //let isUnsignedHead = (extrinsicSectionMethod == 'parachainSystem:setValidationData' || extrinsicSectionMethod == 'paraInherent:enter' || extrinsicSectionMethod == 'timestamp:set')? true : false
         let isUnsignedHead = !isSigned
+        let isFirstBalancesWithdraw = false
         for (const evt of parsedEvents) {
             let data = JSON.parse(JSON.stringify(evt.data))
             let dataType = evt.dataType
@@ -4370,9 +4371,14 @@ module.exports = class Indexer extends AssetManager {
                         try {
                             let withdrawTxFee = paraTool.dechexToInt(data[1])
                             if (!isUnsignedHead && signer == data[0]) {
-                                withdrawFee = withdrawTxFee
+                                if (!isFirstBalancesWithdraw){
+                                    withdrawFee = withdrawTxFee
+                                    res.fee = withdrawFee
+                                    isFirstBalancesWithdraw = true
+                                }else{
+                                    console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] skip duplicate=${withdrawTxFee}, evt=`, evt)
+                                }
                                 //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
-                                res.fee = withdrawFee
                             }
                         } catch (e) {
                             console.log('unable to compute Withdraw fees!!', data, e)
