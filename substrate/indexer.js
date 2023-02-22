@@ -4376,7 +4376,7 @@ module.exports = class Indexer extends AssetManager {
                                     res.fee = withdrawFee
                                     isFirstBalancesWithdraw = true
                                 }else{
-                                    console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] skip duplicate=${withdrawTxFee}, evt=`, evt)
+                                    //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] skip duplicate=${withdrawTxFee}, evt=`, evt)
                                 }
                                 //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
                             }
@@ -5615,6 +5615,20 @@ module.exports = class Indexer extends AssetManager {
                     ts: null,
                     finalized: false,
                     executionStatus: "pending",
+                }
+            }
+            if (xcmInfo.origination != undefined){
+                if (xcmInfo.origination.txFee != undefined && xcmInfo.origination.amountSent != undefined && xcmInfo.origination.txFee == xcmInfo.origination.amountSent){
+                    console.log(`buildPendingXcmInfo txfee error`, xcmInfo)
+                    this.logger.error({
+                        "op": "buildPendingXcmInfo",
+                        "chainID": this.chainID,
+                        "extrinsic": extrinsic,
+                        "xcmInfo": xcmInfo,
+                        "err": `txFee Error`
+                    })
+                }else{
+                    //console.log(`buildPendingXcmInfo txfee ok`, xcmInfo)
                 }
             }
             if (this.debugLevel > paraTool.debugInfo) console.log(`synthetic xcmInfo [${x.extrinsicHash}]`, xcmInfo)
