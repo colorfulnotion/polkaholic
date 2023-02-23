@@ -1523,7 +1523,7 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by relayChain 
 		summary[r.relayChain].assets.push(a);
 	    }
 	    // prep the data for the {polkadot,kusama}/assets/DOT.json -- which will show the holder distribution across chains for the most recent day where we have all chain data
-	    let sql_assetschain = `select a.symbol, a.chainID, a.numHolders, a.free, a.freeUSD, a.reserved, a.reservedUSD, a.miscFrozen, a.miscFrozenUSD, a.frozenUSD, a.priceUSD, chain.paraID, chain.id, chain.chainName from assetholderchain a, chain where a.chainID = chain.chainID and logDT = '${logDT}' and a.chainID in ( select chainID from chain where relayChain = '${r.relayChain}' ) order by a.freeUSD desc, a.numHolders desc`
+	    let sql_assetschain = `select a.symbol, a.chainID, a.asset, a.numHolders, a.free, a.freeUSD, a.reserved, a.reservedUSD, a.miscFrozen, a.miscFrozenUSD, a.frozenUSD, a.priceUSD, chain.paraID, chain.id, chain.chainName from assetholderchain a, chain where a.chainID = chain.chainID and logDT = '${logDT}' and a.chainID in ( select chainID from chain where relayChain = '${r.relayChain}' ) order by a.freeUSD desc, a.numHolders desc`
             let assetChainRecs = await this.poolREADONLY.query(sql_assetschain);
 	    for (const a of assetChainRecs) {
 		let paraID = paraTool.getParaIDfromChainID(a.chainID);
