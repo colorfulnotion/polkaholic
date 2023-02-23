@@ -1296,6 +1296,66 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
+    async dump_substrateetl_assets() {
+	const relayChains = ["polkadot", "kusama"];
+
+	for ( const relayChain of relayChains )  {
+	    // 1. Generate system tables:
+	    let sql = {
+		"chains": `select paraID, chainName, id, ss58_prefix from chain where relayChain = '${relayChain}'`,
+		"xcmasset": `select xcmInteriorKey, symbol, decimals, xcmChainID from xcmasset where isXCMAsset = 1 and xcmChainID in ( select chainID from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' )`,
+		"asset": 	`select chainID, asset, currencyID, xcmInteriorKey, symbol, decimals, xcContractAddress from asset where asset not like '0x%' and chainID in ( select chainID from chain where ( crawling = 1 or active = 1 ) and relayChain = ${relayChain} )`,
+	    };
+	    // 2. Generate assetholder tables from balances
+	    let sqla = {
+		// (a) group by symbol in "{relaychain}.assetholder" across the network
+		"assetholderrelaychain": `select date(ts) as logDT, symbol, count(distinct para_id) numChains, count(distinct address_pubkey) numHolders, sum(free) free, sum(free_usd) freeUSD, sum(reserved) reserved, sum(reserved_usd) reservedUSD, sum(misc_frozen) miscFrozen, sum(misc_frozen_usd) miscFrozenUSD, sum(frozen) frozen, sum(frozen_usd) frozenUSD, avg(price_usd) priceUSD from \`substrate-etl.${relayChain}.balances*\` where Date(ts) >= "2023-01-01" group by logDT, symbol order by symbol, logDT`,
+		// (b) group by symbol/asset in "{relaychain}.assetholder{paraID}" for a specific balances table
+		"assetholderchain": `select date(ts) as logDT, symbol, asset, para_id, count(distinct address_pubkey) numHolders, sum(free) free, sum(free_usd) freeUSD, sum(reserved) reserved, sum(reserved_usd) reservedUSD, sum(misc_frozen) miscFrozen, sum(misc_frozen_usd) miscFrozenUSD, sum(frozen) frozen, sum(frozen_usd) frozenUSD, avg(price_usd) priceUSD from \`substrate-etl.${relayChain}.balances*\` where Date(ts) >= "2023-01-01"  group by logDT, symbol, asset, para_id`
+            }
+            let r = {}
+            for (const k of Object.keys(sqla)) {
+		let sql = sqla[k];
+		console.log("dump_substrateetl_assets", k, sql);
+		let rows = await this.execute_bqJob(sql);
+		let keys = [];
+		let vals = [];
+		let data = [];
+		for ( const row of rows ) {
+                    if ( k == "assetholderrelaychain" ) {
+			let logDT = row.logDT.value;
+			let symbol = row.symbol;
+			let out = `('${logDT}', '${symbol}', '${relayChain}', ${mysql.escape(row.numChains)}, ${mysql.escape(row.numHolders)}, ${mysql.escape(row.free)}, ${mysql.escape(row.reserved)}, ${mysql.escape(row.miscFrozen)}, ${mysql.escape(row.frozen)},
+				   ${mysql.escape(row.freeUSD)}, ${mysql.escape(row.reservedUSD)}, ${mysql.escape(row.miscFrozenUSD)}, ${mysql.escape(row.frozenUSD)}, ${mysql.escape(row.priceUSD)})`
+			keys = ["logDT", "symbol", "relayChain"];
+			vals = ["numChains", "numHolders", "free", "reserved", "miscFrozen", "frozen", "freeUSD", "reservedUSD", "miscFrozenUSD", "frozenUSD", "priceUSD"]
+			data.push(out);
+		    } else if ( k == "assetholderchain" ) {
+			let logDT = row.logDT.value;
+			let symbol = row.symbol;
+			let paraID = parseInt(row.para_id, 10);
+			let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+			let out = `('${logDT}', '${symbol}', '${chainID}', ${mysql.escape(row.asset)}, ${mysql.escape(row.numHolders)}, ${mysql.escape(row.free)}, ${mysql.escape(row.reserved)}, ${mysql.escape(row.miscFrozen)}, ${mysql.escape(row.frozen)},
+				   ${mysql.escape(row.freeUSD)}, ${mysql.escape(row.reservedUSD)}, ${mysql.escape(row.miscFrozenUSD)}, ${mysql.escape(row.frozenUSD)}, ${mysql.escape(row.priceUSD)})`
+			keys = ["logDT", "symbol", "chainID"];
+			vals = ["asset", "numHolders", "free", "reserved", "miscFrozen", "frozen", "freeUSD", "reservedUSD", "miscFrozenUSD", "frozenUSD", "priceUSD"]
+			if ( symbol.length < 32 ) {
+			    data.push(out);
+			}
+		    }
+		}
+		await this.upsertSQL({
+		    "table": k,
+		    keys,
+		    vals,
+		    data,
+		    replace: vals
+		});
+            }
+	}
+	
+    }
+
     async dump_substrateetl_polkaholic(fix = false, invalidate = false) {
         let birthDT = '2019-11-01';
         let sql_tally = `insert into blocklogstats ( chainID, monthDT, startDT, endDT, startBN, endBN, numBlocks_missing, numBlocks_total) (select chainID, LAST_DAY(logDT) monthDT, min(logDT), max(logDT), min(startBN) startBN, max(endBN) endBN, sum(( endBN - startBN + 1 ) - numBlocks) as numBlocks_missing, sum(numBlocks) numBlocks_total from blocklog where chainID in ( select chainID from chain where crawling = 1 ) and logDT >= '${birthDT}' group by chainID, monthDT having monthDT <= Last_day(Date(Now()))) on duplicate key update startDT = values(startDT), endDT = values(endDT), startBN  = values(startBN), endBN = values(endBN), numBlocks_missing = values(numBlocks_missing), numBlocks_total = values(numBlocks_total)`;
@@ -1419,10 +1479,17 @@ module.exports = class SubstrateETL extends AssetManager {
         for (const r of tallyRecs) {
             chains[r.chainID] = r;
             relayChain_chains[r.relayChain]++;
-        }
 
+        }
+	
+	let sql_lastmetricDT = `select max(logDT) as logDT from networklog where networkmetricsStatus in ('Audited', 'AuditRequired') limit 1`;
+        let metricRecs = await this.poolREADONLY.query(sql_lastmetricDT);
+	let metricsDT = metricRecs[0].logDT.toISOString().split('T')[0];
+	
         // generate summary[relayChain] map
-        let summary = {};
+        let summary = {}; // going out to polkaholic.json
+	let assets = {};  // going out to individual files like polkadot/assets/DOT.json, one for each symbol
+	let chainassets = {};  // going out to individual files like polkadot/0-assets.json, one for each paraID
         sql_tally = `select chain.relayChain, count(distinct paraID) numChains, max(endDT) endDT, round(sum(numBlocks_total)) numBlocks_total,
 round(sum(( endBN - startBN + 1) - numBlocks_total)) as numBlocks_missing
 from blocklogstats join chain on blocklogstats.chainID = chain.chainID  where monthDT >= "${birthDT}" and chain.relayChain in ("polkadot", "kusama") and
@@ -1440,9 +1507,39 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by relayChain 
                 numBlocks_total,
                 numBlocks_missing,
                 missing: [],
-                chains: []
+                chains: [],
+		assets: []
             }
+	    assets[r.relayChain] = {};
+	    chainassets[r.relayChain] = {};
+	    // add assets for each relay chain from "assetholderrelaychain" to appear in the above summary for the relayChain
+	    let sql_assets = `select logDT, symbol, numHolders, numChains, free, freeUSD, reserved, reservedUSD, miscFrozen, miscFrozenUSD, frozenUSD, priceUSD from assetholderrelaychain where logDT = '${metricsDT}' and relayChain = '${r.relayChain}' order by freeUSD desc, numHolders desc`
+            let assetRecs = await this.poolREADONLY.query(sql_assets);
+	    let logDT = null;
+	    for (const a of assetRecs) {
+		logDT = a.logDT.toISOString().split('T')[0];
+		a.url = `https://cdn.polkaholic.io/substrate-etl/${r.relayChain}/assets/${encodeURIComponent(a.symbol)}.json`;
+		console.log("ASSET", a.url);
+		summary[r.relayChain].assets.push(a);
+	    }
+	    // prep the data for the {polkadot,kusama}/assets/DOT.json -- which will show the holder distribution across chains for the most recent day where we have all chain data
+	    let sql_assetschain = `select a.symbol, a.chainID, a.numHolders, a.free, a.freeUSD, a.reserved, a.reservedUSD, a.miscFrozen, a.miscFrozenUSD, a.frozenUSD, a.priceUSD, chain.paraID, chain.id, chain.chainName from assetholderchain a, chain where a.chainID = chain.chainID and logDT = '${logDT}' and a.chainID in ( select chainID from chain where relayChain = '${r.relayChain}' ) order by a.freeUSD desc, a.numHolders desc`
+            let assetChainRecs = await this.poolREADONLY.query(sql_assetschain);
+	    for (const a of assetChainRecs) {
+		let paraID = paraTool.getParaIDfromChainID(a.chainID);
+		if ( assets[r.relayChain][a.symbol] == undefined ) {
+		    assets[r.relayChain][a.symbol] = {
+			chains: []
+		    };
+		}
+		if ( chainassets[r.relayChain][paraID] == undefined ) {
+		    chainassets[r.relayChain][paraID] = []
+		}
+		assets[r.relayChain][a.symbol].chains.push(a);
+		chainassets[r.relayChain][paraID].push(a);
+	    }
         }
+
 
         sql_tally = `select chain.chainID, chain.id, chain.paraID, chain.relayChain, chain.paraID, chain.chainName, min(startDT) startDT, max(endDT) endDT, min(startBN) startBN, max(endBN) endBN, sum(numBlocks_total) numBlocks_total,
 sum(( endBN - startBN + 1) - numBlocks_total) as numBlocks_missing,
@@ -1546,6 +1643,7 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
                         paraID,
                         relayChain
                     },
+		    assets: chainassets[relayChain][paraID],
                     monthly: [],
                     daily: []
                 };
@@ -1581,6 +1679,21 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
             });
         }
 
+	for ( const relayChain of Object.keys(assets) ) {
+	    for ( const symbol of Object.keys(assets[relayChain]) ) {
+                let subdir = path.join(dir, relayChain, "assets");
+                if (!fs.existsSync(subdir)) {
+                    fs.mkdirSync(subdir, {
+                        recursive: true
+                    });
+                }
+		let fn = path.join(subdir, `${encodeURIComponent(symbol)}.json`);
+		console.log(fn);
+		let f = fs.openSync(fn, 'w', 0o666);
+		fs.writeSync(f, JSON.stringify(assets[relayChain][symbol]));
+	    }
+	}
+	
         prevChainID = null;
         prevStartBN = null;
         sql_tally = `select chain.chainID, chain.relayChain, chain.paraID, chain.id, chain.chainName, logDT, last_day(logDT) as monthDT, Year(logDT) as yr, startBN, endBN, numBlocks,
@@ -1672,6 +1785,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             fs.writeSync(f, JSON.stringify(j[chainID]));
         }
 
+	
         let sql_networks = `select network, logDT, numAddresses, numReapedAccounts, numActiveAccounts, numNewAccounts from networklog where networkMetricsStatus in ("Audited", "AuditRequired") order by network, logDT desc`
         let recs = await this.poolREADONLY.query(sql_networks);
         summary = {}
@@ -1692,6 +1806,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 numReapedAccounts: r.numReapedAccounts
             });
         }
+
 
         f = fs.openSync(path.join(dir, "networks.json"), 'w', 0o666);
         fs.writeSync(f, JSON.stringify(summary));

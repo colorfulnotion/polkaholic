@@ -217,6 +217,14 @@ async function main() {
             process.exit(0);
         })
 
+    program.command('assets')
+        .description("Dump assets + assetholders summary")
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            await substrateetl.dump_substrateetl_assets()
+            process.exit(0);
+        })
+
     program.command('setuptables')
         .description("Setup BigQuery tables for new relaychain/paraID")
         .usage("2002")
