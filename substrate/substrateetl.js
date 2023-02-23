@@ -1296,22 +1296,39 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
-    async dump_substrateetl_assets() {
+    async dump_substrateetl_chainassets(startDT = "2023-02-18") {
 	const relayChains = ["polkadot", "kusama"];
 
 	for ( const relayChain of relayChains )  {
 	    // 1. Generate system tables:
-	    let sql = {
-		"chains": `select paraID, chainName, id, ss58_prefix from chain where relayChain = '${relayChain}'`,
-		"xcmasset": `select xcmInteriorKey, symbol, decimals, xcmChainID from xcmasset where isXCMAsset = 1 and xcmChainID in ( select chainID from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' )`,
-		"asset": 	`select chainID, asset, currencyID, xcmInteriorKey, symbol, decimals, xcContractAddress from asset where asset not like '0x%' and chainID in ( select chainID from chain where ( crawling = 1 or active = 1 ) and relayChain = ${relayChain} )`,
+	    let sqls = {
+		"chains": `select id, chainName as chain_name, paraID para_id, ss58Format as ss58_prefix, symbol from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' order by para_id`,
+		"xcmassets": `select xcmInteriorKey as xcm_interior_key, symbol, decimals, xcmChainID as para_id from xcmasset where isXCMAsset = 1 and xcmChainID in ( select chainID from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' )`,
+		"assets": `select chain.paraID as para_id, asset.asset, asset.currencyID as currency_id, asset.xcmInteriorKey as xcm_interior_key, asset.symbol, asset.decimals, asset.xcContractAddress as xc_contract_address
+ from asset join chain on asset.chainID = chain.chainID where asset.asset not like '0x%' and asset.chainID in ( select chainID from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' ) and asset.symbol is not null and asset.decimals is not null`,
 	    };
+
+	    for ( const tbl of Object.keys(sqls) ) {
+		let sql = sqls[tbl];
+		let recs = await this.poolREADONLY.query(sql)
+		let dir = "/tmp";
+		let fn = path.join(dir, `${relayChain}-${tbl}.json`)
+		let f = fs.openSync(fn, 'w', 0o666);
+		let fulltbl = `${this.project}:${relayChain}.${tbl}`;
+		for (const c of recs) {
+		    fs.writeSync(f, JSON.stringify(c) + "\r\n");
+		}
+		let cmd = `bq load  --project_id=${this.project} --max_bad_records=1 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${fulltbl}' ${fn} schema/substrateetl/${tbl}.json`;
+		console.log(cmd);
+		//await exec(cmd);
+	    }
+	    
 	    // 2. Generate assetholder tables from balances
 	    let sqla = {
 		// (a) group by symbol in "{relaychain}.assetholder" across the network
-		"assetholderrelaychain": `select date(ts) as logDT, symbol, count(distinct para_id) numChains, count(distinct address_pubkey) numHolders, sum(free) free, sum(free_usd) freeUSD, sum(reserved) reserved, sum(reserved_usd) reservedUSD, sum(misc_frozen) miscFrozen, sum(misc_frozen_usd) miscFrozenUSD, sum(frozen) frozen, sum(frozen_usd) frozenUSD, avg(price_usd) priceUSD from \`substrate-etl.${relayChain}.balances*\` where Date(ts) >= "2023-01-01" group by logDT, symbol order by symbol, logDT`,
+		"assetholderrelaychain": `select date(ts) as logDT, symbol, count(distinct para_id) numChains, count(distinct address_pubkey) numHolders, sum(free) free, sum(free_usd) freeUSD, sum(reserved) reserved, sum(reserved_usd) reservedUSD, sum(misc_frozen) miscFrozen, sum(misc_frozen_usd) miscFrozenUSD, sum(frozen) frozen, sum(frozen_usd) frozenUSD, avg(price_usd) priceUSD from \`substrate-etl.${relayChain}.balances*\` where Date(ts) >= "${startDT}" group by logDT, symbol order by symbol, logDT`,
 		// (b) group by symbol/asset in "{relaychain}.assetholder{paraID}" for a specific balances table
-		"assetholderchain": `select date(ts) as logDT, symbol, asset, para_id, count(distinct address_pubkey) numHolders, sum(free) free, sum(free_usd) freeUSD, sum(reserved) reserved, sum(reserved_usd) reservedUSD, sum(misc_frozen) miscFrozen, sum(misc_frozen_usd) miscFrozenUSD, sum(frozen) frozen, sum(frozen_usd) frozenUSD, avg(price_usd) priceUSD from \`substrate-etl.${relayChain}.balances*\` where Date(ts) >= "2023-01-01"  group by logDT, symbol, asset, para_id`
+		"assetholderchain": `select date(ts) as logDT, symbol, asset, para_id, count(distinct address_pubkey) numHolders, sum(free) free, sum(free_usd) freeUSD, sum(reserved) reserved, sum(reserved_usd) reservedUSD, sum(misc_frozen) miscFrozen, sum(misc_frozen_usd) miscFrozenUSD, sum(frozen) frozen, sum(frozen_usd) frozenUSD, avg(price_usd) priceUSD from \`substrate-etl.${relayChain}.balances*\` where Date(ts) >= "${startDT}"  group by logDT, symbol, asset, para_id`
             }
             let r = {}
             for (const k of Object.keys(sqla)) {
@@ -1846,44 +1863,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-    async dump_chains(relayChain = "polkadot") {
-        let sql = `select id, chainName, paraID, symbol, ss58Format from chain where crawling = 1 and relayChain = '${relayChain}' order by paraID`
-        let chainsRecs = await this.poolREADONLY.query(sql)
-        let tbl = "chains";
-        // 2. setup directories for tbls on date
-        let dir = "/tmp";
-        let fn = path.join(dir, `${tbl}.json`)
-        let f = fs.openSync(fn, 'w', 0o666);
-        let bqDataset = relayChain
-        // 3. do tablescan for bnStart to bnEnd
-        let chains = chainsRecs.map((c) => {
-            return {
-                para_id: c.paraID,
-                id: c.id,
-                chain_name: c.chainName,
-                symbol: c.symbol,
-                ss58_prefix: c.ss58Format
-            }
-        });
-        let NL = "\r\n";
-
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "specversions"];
-        console.log("|chain|blocks|extrinsics|events|transfers|logs|specversions");
-        console.log("|-----|------|----------|------|---------|----|------------");
-        chains.forEach((c) => {
-            fs.writeSync(f, JSON.stringify(c) + NL);
-            let sa = [];
-            sa.push(`${c.para_id} - ${c.id}|`)
-            for (const tbl of tbls) {
-                let fulltbl = `${project}:${relayChain}.${tbl}${c.para_id}`;
-                sa.push(`${fulltbl}|`)
-            }
-            console.log(sa.join(""));
-        });
-        let cmd = `bq load  --project_id=${this.project} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/${tbl}.json`;
-        console.log(cmd);
-        await exec(cmd);
-    }
 
     async update_networklog(network, logDT) {
         let project = this.project;

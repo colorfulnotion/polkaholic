@@ -217,11 +217,11 @@ async function main() {
             process.exit(0);
         })
 
-    program.command('assets')
-        .description("Dump assets + assetholders summary")
+    program.command('chainassets')
+        .description("Dump chain assets + assetholders summary")
         .action(async (opt) => {
             var substrateetl = new SubstrateETL();
-            await substrateetl.dump_substrateetl_assets()
+            await substrateetl.dump_substrateetl_chainassets()
             process.exit(0);
         })
 
