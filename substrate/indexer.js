@@ -8071,6 +8071,11 @@ module.exports = class Indexer extends AssetManager {
         let specVersion = false
         let traceParseTS = this.getTraceParseTS()
 
+        if ((hr == 23) || (hr < 6)) {
+            let sql = (hr == 23) ? `update blocklog set updateAddressBalanceStatus = "Ready" where updateAddressBalanceStatus = "NotReady" and chainID = '${chainID}' and logDT = '${logDT}'` : `update blocklog set updateAddressBalanceStatus = "Ready" where updateAddressBalanceStatus = "NotReady" and chainID = '${chainID}' and logDT = date_sub('${logDT}', interval 1 day)`;
+            this.batchedSQL.push(sql);
+
+        }
 
         await this.setup_chainParser(chain, this.debugLevel);
         this.resetErrorWarnings()

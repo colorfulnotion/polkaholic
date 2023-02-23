@@ -5466,7 +5466,7 @@ module.exports = class Query extends AssetManager {
             throw new paraTool.InvalidError(`Invalid chain: ${chainID_or_chainName}`)
         }
         try {
-            var sql = `select logDT, UNIX_TIMESTAMP(logDT) as logTS, startBN, endBN, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD, numTransactionsEVM, numAccountsActive, numAddresses, fees, numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from blocklog where chainID = '${chainID}' and logDT >= date_sub(Now(), interval ${lookback} DAY) order by logDT desc`;
+            var sql = `select logDT, UNIX_TIMESTAMP(logDT) as logTS, startBN, endBN, numExtrinsics, numEvents, numTransfers, numSignedExtrinsics, valueTransfersUSD, numTransactionsEVM, numActiveAccounts, numPassiveAccounts, numNewAccounts, numReapedAccounts, numAddresses, fees, numXCMTransfersIn, numXCMTransfersOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from blocklog where chainID = '${chainID}' and logDT >= date_sub(Now(), interval ${lookback} DAY) order by logDT desc`;
             let recs = await this.poolREADONLY.query(sql);
             for (let i = 0; i < recs.length; i++) {
                 let [logDT, _] = paraTool.ts_to_logDT_hr(recs[i].logTS);

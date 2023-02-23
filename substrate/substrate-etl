@@ -59,6 +59,15 @@ async function main() {
                     }
                     if (_paraID == 0) {
                         await substrateetl.dump_xcmtransfers_range(relayChain, null);
+                        await substrateetl.update_xcmtransfers_summary(relayChain, logDT);
+                        let x = await substrateetl.get_random_networkmetrics_ready();
+                        let _network = x.network;
+                        let _logDT = x.logDT;
+                        if (_logDT && _network) {
+                            let [weekagoDT, _] = paraTool.ts_to_logDT_hr(substrateetl.getCurrentTS() - 86400 * 7);
+                            await substrateetl.dump_networkmetrics(_network, _logDT, dry);
+                            await substrateetl.dump_substrateetl_chainassets(weekagoDT)
+                        }
                     }
                 } else {
                     await substrateetl.sleep(20000);
@@ -119,14 +128,13 @@ async function main() {
                 let _logDT = x.logDT;
                 if (_logDT && _network) {
                     await substrateetl.dump_networkmetrics(_network, _logDT, dry);
+
                     await substrateetl.sleep(1000);
                     // await substrateetl.dump_cdn_substrateetl_networkmetrics()
                 } else {
                     await substrateetl.sleep(20000);
                 }
             }
-
-            await substrateetl.networkmetrics(logDT);
             process.exit(0);
         });
 
@@ -150,7 +158,10 @@ async function main() {
                     var manager = new SubstrateETL();
                     let res = await manager.updateAddressBalances(chainID);
                     if (res == false) {
-                        process.exit(1);
+                        const gbRounded = this.gb_heap_used();
+                        if (gbRounded > .8) {
+                            process.exit(1);
+                        }
                     } else {
                         await manager.sleep(5000);
                     }
@@ -199,11 +210,13 @@ async function main() {
         .usage("polkadot -l 2023-02-01")
         .description("Dump xcmtransfers of relay chain")
         .argument('<relayChain>', 'Relay chain (polkadot or kusama)')
-        .option("-l, --logDT <logDT>", "Oldest date to dump", "2023-02-01") // TODO: make it 7-10 days ago
+        .option("-l, --logDT <logDT>", "Oldest date to dump", null)
         .action(async (relayChain, opt) => {
-            let logDT = opt.logDT ? opt.logDT : "2023-02-10";
             var substrateetl = new SubstrateETL();
+            let [weekagoDT, _] = paraTool.ts_to_logDT_hr(substrateetl.getCurrentTS() - 86400 * 7);
+            let logDT = opt.logDT ? opt.logDT : weekagoDT;
             await substrateetl.dump_xcmtransfers_range(relayChain, logDT);
+            await substrateetl.update_xcmtransfers_summary(relayChain, logDT);
             process.exit(0);
         })
 
@@ -214,6 +227,20 @@ async function main() {
             var substrateetl = new SubstrateETL();
             let fix = opt.fix;
             await substrateetl.dump_substrateetl_polkaholic(fix)
+            let x = await substrateetl.get_random_networkmetrics_ready();
+            let _network = x.network;
+            let _logDT = x.logDT;
+            if (_logDT && _network) {
+                await substrateetl.dump_networkmetrics(_network, _logDT, dry);
+            }
+            process.exit(0);
+        })
+
+    program.command('chainassets')
+        .description("Dump chain assets + assetholders summary")
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            await substrateetl.dump_substrateetl_chainassets()
             process.exit(0);
         })
 
