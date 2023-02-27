@@ -1178,7 +1178,7 @@ module.exports = class Crawler extends Indexer {
         // pick a chainID that the node is also crawling
         let hostname = this.hostname;
         var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 and attempted < 3 and chainID in ( select chainID from chainhostnameendpoint where hostname = '${hostname}' ) group by chainID having count(*) < 200 order by rand() desc`;
-
+        console.log(sql);
         var chains = await this.poolREADONLY.query(sql);
 
         if (chains.length < 1) {

@@ -58,18 +58,16 @@ async function main() {
 
     program.command('indexchain')
         .description(`Index Specific Chain or random chain`)
-        .usage("2004")
-        .option('-c, --chainID <chainID>', 'ChainID to index', myParseInt)
-        .action(async (chainID, opt) => {
-            if (chainID >= 0) {
-                let chain = await crawler.getChain(chainID);
-                await crawler.indexChain(chain, 60, true, true);
-                await crawler.sleep(3 * 1000);
-                process.exit(0);
-            } else {
+        .usage("-c 2004")
+        .option('-c, --chainID <chainID>', 'ChainID to index', myParseInt, null)
+        .action(async (opt) => {
+            let chainID = opt.chainID;
+            console.log(`******* indexchain chainID=${chainID} opt`, opt)
+            if (chainID == null) {
                 do {
                     let crawler = new Crawler();
                     await crawler.assetManagerInit();
+                    console.log("RANDOM");
                     let indexed = await crawler.indexChainRandom();
                     if (indexed) {
                         await crawler.release(3 * 1000);
@@ -77,6 +75,12 @@ async function main() {
                         await crawler.release(20 * 1000);
                     }
                 } while (true);
+            } else {
+                var crawler = new Crawler();
+                let chain = await crawler.getChain(chainID);
+                await crawler.indexChain(chain, 60, true, true);
+                await crawler.sleep(3 * 1000);
+                process.exit(0);
             }
         })
 
@@ -261,14 +265,15 @@ async function main() {
         .description(`Update Asset Prices from coingecko`)
         .option('-s, --startDT <startDT>', 'Start Date', null)
         .option('-e, --endDT <endDT>', 'End Date', null)
+        .option('--symbol <symbol>', 'Symbol', null)
         .action(async (opt) => {
             var PriceManager = require("./priceManager");
             let manager = new PriceManager();
             await manager.init();
             if (opt.startDT && opt.endDT) {
-                let startTS = paraTool.logDT_hr_to_ts(log.startDT, 0);
-                let endTS = paraTool.logDT_hr_to_ts(log.endDT, 0);
-                await manager.getCoinPricesRange(startTS, endTS);
+                let startTS = paraTool.logDT_hr_to_ts(opt.startDT, 0);
+                let endTS = paraTool.logDT_hr_to_ts(opt.endDT, 0);
+                await manager.getCoinPricesRange(startTS, endTS, opt.symbol);
             } else {
                 await manager.getCoinPrices(0);
             }
@@ -289,8 +294,7 @@ async function main() {
             var Manager = require("./manager");
             var manager = new Manager();
             await manager.mapChains((c) => {
-                console.log(`./polkaholic auditchain ${c.chainID};`)
-                console.log(`./polkaholic backfill ${c.chainID};`)
+                console.log(`./substrate-etl blocklog ${c.chainID};`)
             });
             process.exit(0);
         })

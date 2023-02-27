@@ -1202,6 +1202,13 @@ module.exports = class Indexer extends AssetManager {
                     let pendingXcmInfoStr = (r.xcmInfo != undefined) ? JSON.stringify(r.xcmInfo) : false
                     let pendingXcmInfoBlob = (pendingXcmInfoStr != false) ? mysql.escape(pendingXcmInfoStr) : 'NULL'
                     let destAddress = (r.destAddress) ? `${mysql.escape(r.destAddress)}` : `NULL`
+                    let originationTxFee = (r.xcmInfo != undefined && r.xcmInfo.origination != undefined && r.xcmInfo.origination.txFee != undefined) ? `'${r.xcmInfo.origination.txFee}'` : `NULL`
+                    if (originationTxFee == 'NULL' && r.xcmInfo != undefined && r.xcmInfo.origination != undefined && r.xcmInfo.origination.transactionHash != undefined) {
+                        let evmTxHash = r.xcmInfo.origination.transactionHash
+                        let extRes = this.extrinsicEvmMap[evmTxHash]
+                        console.log(`extRes`, extRes)
+                        if (extRes.txFee != undefined) originationTxFee = extRes.txFee
+                    }
                     //["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"]
                     //["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "amountSentDecimals", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"]
                     let t = "(" + [`'${r.extrinsicHash}'`, `'${r.extrinsicID}'`,
@@ -1227,7 +1234,8 @@ module.exports = class Indexer extends AssetManager {
                         innerCall,
                         xcmType,
                         pendingXcmInfoBlob,
-                        `Now()`
+                        `Now()`,
+                        originationTxFee
                     ].join(",") + ")";
                     // CHECK: do we need isXcmTipSafe = (isSigned || finalized) ? true : false concept here to ensure that xcmtransfer records are inserted only when "safe"
                     if (r.msgHash == "0x" && !r.finalized) {
@@ -1248,9 +1256,9 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSentDecimals", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo", "xcmInfolastUpdateDT"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSentDecimals", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo", "xcmInfolastUpdateDT", "txFee"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType"],
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "txFee"],
                 "replaceIfNull": ["xcmInfo", "msgHash", "xcmInfolastUpdateDT", "amountSentDecimals", "amountSent"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
             }, sqlDebug);
 
@@ -4371,11 +4379,11 @@ module.exports = class Indexer extends AssetManager {
                         try {
                             let withdrawTxFee = paraTool.dechexToInt(data[1])
                             if (!isUnsignedHead && signer == data[0]) {
-                                if (!isFirstBalancesWithdraw){
+                                if (!isFirstBalancesWithdraw) {
                                     withdrawFee = withdrawTxFee
                                     res.fee = withdrawFee
                                     isFirstBalancesWithdraw = true
-                                }else{
+                                } else {
                                     //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] skip duplicate=${withdrawTxFee}, evt=`, evt)
                                 }
                                 //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
@@ -5039,7 +5047,8 @@ module.exports = class Indexer extends AssetManager {
             // add extrinsicEvmMap here to link evmTX <=> substrateTX
             this.extrinsicEvmMap[evmTxHash] = {
                 extrinsicID: extrinsicID,
-                extrinsicHash: extrinsicHash
+                extrinsicHash: extrinsicHash,
+                evmTxFee: null,
             }
         }
 
@@ -5437,6 +5446,14 @@ module.exports = class Indexer extends AssetManager {
             // looks up assetInfo
             let symbolRelayChain = paraTool.makeAssetChain(x.xcmSymbol, x.relayChain);
             let sourceTxFee = (extrinsic.fee != undefined && extrinsic.fee > 0) ? extrinsic.fee : null //can't do evm fee for now
+            console.log(`evmTransactionHash`, evmTransactionHash)
+            if (evmTransactionHash != undefined && sourceTxFee == undefined) {
+                //TODO: need to extend indexer as query in order to support evmtx lookup
+                /*
+                let evmTx = await this.getTransaction(evmTransactionHash)
+                if (evmTx.fee != undefined) sourceTxFee = evmTx.txFee
+                */
+            }
             let sourceTxFeeUSD = null
             let sourceChainSymbol = this.getChainSymbol(x.chainID)
             if (sourceTxFee != undefined) {
@@ -5617,8 +5634,8 @@ module.exports = class Indexer extends AssetManager {
                     executionStatus: "pending",
                 }
             }
-            if (xcmInfo.origination != undefined){
-                if (xcmInfo.origination.txFee != undefined && xcmInfo.origination.amountSent != undefined && xcmInfo.origination.txFee == xcmInfo.origination.amountSent){
+            if (xcmInfo.origination != undefined) {
+                if (xcmInfo.origination.txFee != undefined && xcmInfo.origination.amountSent != undefined && xcmInfo.origination.txFee == xcmInfo.origination.amountSent) {
                     console.log(`buildPendingXcmInfo txfee error`, xcmInfo)
                     this.logger.error({
                         "op": "buildPendingXcmInfo",
@@ -5627,7 +5644,7 @@ module.exports = class Indexer extends AssetManager {
                         "xcmInfo": xcmInfo,
                         "err": `txFee Error`
                     })
-                }else{
+                } else {
                     //console.log(`buildPendingXcmInfo txfee ok`, xcmInfo)
                 }
             }
@@ -6231,6 +6248,8 @@ module.exports = class Indexer extends AssetManager {
         if (extRes !== undefined) { // && finalized // REVIEW
             tx['substrate'] = extRes
             syntheticExtrinsicID = extRes.extrinsicID
+            extRes.txFee = tx.fee
+            this.extrinsicEvmMap[evmTxHash] = extRes
         }
         if (tx.from != undefined) {
             let fromAddress = tx.from.toLowerCase()

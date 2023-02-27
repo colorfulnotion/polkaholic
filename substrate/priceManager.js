@@ -936,8 +936,11 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         return false;
     }
 
-    async getCoinPricesRange(startTS, endTS) {
-        var coingeckoIDs = await this.poolREADONLY.query(`select coingeckoID, symbol, relayChain from xcmasset where coingeckoID is not null and length(coingeckoID) > 0 and coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) order by coingeckoLastUpdateDT limit 1000`);
+    async getCoinPricesRange(startTS, endTS, symbol = null) {
+        let w = symbol ? ` and symbol = '${symbol}'` : "and ( coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) or  coingeckoLastUpdateDTcoingeckoID is null )";
+        let sql = `select coingeckoID, symbol, relayChain from xcmasset where length(coingeckoID) > 0  ${w} order by coingeckoLastUpdateDT limit 1000`
+        console.log(sql);
+        var coingeckoIDs = await this.poolREADONLY.query(sql);
         console.log(`getCoinPricesRange ${coingeckoIDs.length}`)
         let batchSize = 86400 * 30
         for (let currDailyTS = startTS; currDailyTS < endTS; currDailyTS += batchSize) {

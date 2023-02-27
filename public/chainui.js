@@ -1388,6 +1388,11 @@ function showchainlog(chainID, address) {
         order: [
             [0, "desc"]
         ],
+        pageLength: 50,
+        lengthMenu: [
+            [10, 25, 50, 100],
+            [10, 25, 50, 100]
+        ],
         columnDefs: [{
             "className": "dt-right",
             "targets": [6, 7, 10, 11]
@@ -1404,7 +1409,23 @@ function showchainlog(chainID, address) {
                 return data;
             }
         }, {
-            data: 'numAccountsActive',
+            data: 'numActiveAccounts',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'numPassiveAccounts',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data;
+                }
+                return data;
+            }
+        }, {
+            data: 'numNewAccounts',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     return data;
@@ -1490,22 +1511,6 @@ function showchainlog(chainID, address) {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     return currencyFormat(data);
-                }
-                return data;
-            }
-        }, {
-            data: 'numXCMMessagesIn',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-                    return data;
-                }
-                return data;
-            }
-        }, {
-            data: 'numXCMMessagesOut',
-            render: function(data, type, row, meta) {
-                if (type == 'display') {
-                    return data;
                 }
                 return data;
             }

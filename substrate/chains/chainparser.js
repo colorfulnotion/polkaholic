@@ -2460,7 +2460,7 @@ module.exports = class ChainParser {
                             xcmInteriorKey: targetedXcmInteriorKey,
                             xcmType: "xcmtransfer",
                         }
-                        if (targetedXcmInteriorKey){
+                        if (targetedXcmInteriorKey) {
                             r.xcmInteriorKey = targetedXcmInteriorKey
                         }
                         //console.log("processOutgoingXTransfer xTransfer", r);
