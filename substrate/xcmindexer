@@ -101,10 +101,12 @@ async function main() {
         .option('-x, --xcmIndex <xcmIndex>', 'XCM Message Index', 0, myParseInt)
         .option('-l, --lookbackDays <lookbackDays>', 'Lookback days', 7, myParseInt)
         .action(async (opt) => {
+            console.log(`xcmtransfer opt`, opt)
             var XCMCleaner = require("./xcmCleaner.js");
             var manager = new XCMCleaner();
             await manager.assetManagerInit();
             if (opt.extrinsicHash) {
+                let extrinsicHash = opt.extrinsicHash;
                 let transferIndex = opt.transferIndex;
                 let xcmIndex = opt.xcmIndex;
                 await manager.assetManagerInit();

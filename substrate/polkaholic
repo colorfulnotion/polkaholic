@@ -5,6 +5,7 @@ const {
     InvalidArgumentError
 } = require('commander');
 const Crawler = require("./crawler");
+const Manager = require("./manager");
 const paraTool = require("./paraTool");
 
 function myParseInt(value, dummyPrevious) {
@@ -206,8 +207,12 @@ async function main() {
         .description(`Index Blocks with SQL`)
         .usage("2011")
         .argument('<chainIDs>', 'ChainIDs (comma-separated)', myParseInt)
-        .action(async (chainIDs, opts) => {
-            await manager.indexBlocks(chainIDs);
+        .option('-s, --sql <targetSQL>', 'Target SQL', null)
+        .action(async (chainIDs, opt) => {
+            console.log(`indexblocks opt`, opt)
+            let manager = new Manager()
+            let targetSQL = opt.sql;
+            await manager.indexBlocks(chainIDs, targetSQL);
             process.exit(0);
         })
 

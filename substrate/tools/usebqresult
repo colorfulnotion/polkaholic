@@ -1,0 +1,66 @@
+#!/usr/bin/env node
+ // Usage:  updateSpecVersions [chainID]
+
+ const util = require('util');
+ const exec = util.promisify(require('child_process').exec);
+ const fs = require('fs');
+ const path = require("path");
+ const Crawler = require("../crawler");
+
+ //root/go/src/github.com/colorfulnotion/polkaholic/substrate/kusama_error.json
+ //root/go/src/github.com/colorfulnotion/polkaholic/substrate/polkadot_error.json
+ function readJSONFn(fnDirFn = '/root/go/src/github.com/colorfulnotion/polkaholic/substrate/kusama_error.json') {
+     let jsonObj = false
+     try {
+         //fnDirFn = path.join(fnDir, fn)
+         const fnContent = fs.readFileSync(fnDirFn, 'utf8');
+         jsonObj = JSON.parse(fnContent)
+     } catch (err) {
+         console.log(err, "readJSONFn", fnDirFn);
+         return false
+     }
+     return jsonObj
+ }
+
+async function main() {
+    let fn = "/root/go/src/github.com/colorfulnotion/polkaholic/substrate/kusama_error.json";
+    process.argv.forEach(function(val, index, array) {
+        if (index == 2 && val.length > 0) {
+            fn = val;
+        }
+    });
+    let crawler = new Crawler();
+    let res = readJSONFn(fn)
+    let cnt = 0
+    let extrinsicHashes = []
+    for (const r of res){
+        extrinsicHashes.push(r.extrinsichash)
+        cnt++
+        if (cnt >= 100){
+            let extrinsicHashesStr = `"${extrinsicHashes.join('","')}"`
+            let sql = `update xcmtransfer set xcmInfoAudited = -123 where extrinsicHash in (${extrinsicHashesStr})`
+            console.log(sql)
+            crawler.batchedSQL.push(sql);
+            extrinsicHashes = []
+            cnt = 0
+        }
+    }
+    if (cnt > 0){
+        let extrinsicHashesStr = `"${extrinsicHashes.join('","')}"`
+        let sql = `update xcmtransfer set xcmInfoAudited = -123 where extrinsicHash in (${extrinsicHashesStr})`
+        console.log(sql)
+        crawler.batchedSQL.push(sql);
+    }
+    await crawler.update_batchedSQL(true);
+    console.log(`ok`)
+    //console.log(`res`, res)
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

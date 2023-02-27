@@ -2460,25 +2460,23 @@ module.exports = class ChainParser {
                             xcmInteriorKey: targetedXcmInteriorKey,
                             xcmType: "xcmtransfer",
                         }
-                        let [isXCMAssetFound, standardizedXCMInfo] = indexer.getStandardizedXCMAssetInfo(indexer.chainID, asset, rawAsset)
-                        if (isXCMAssetFound) {
-                            if (standardizedXCMInfo.nativeAssetChain != undefined) r.nativeAssetChain = standardizedXCMInfo.nativeAssetChain
-                            if (standardizedXCMInfo.xcmInteriorKey != undefined) r.xcmInteriorKey = standardizedXCMInfo.xcmInteriorKey
+                        if (targetedXcmInteriorKey){
+                            r.xcmInteriorKey = targetedXcmInteriorKey
                         }
-                        //console.log("processOutgoingXTokens xTokens", r);
+                        //console.log("processOutgoingXTransfer xTransfer", r);
                         outgoingXTransfer.push(r)
                         extrinsic.xcms.push(r)
                     } else {
-                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTransfer xTokens unknown asset/amountSent`);
+                        if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] processOutgoingXTransfer xTokens unknown asset/amountSent`);
                     }
                 }
 
             } else {
                 // TODO: tally errors in logger
-                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processOutgoingXTransfer Unknown`, `module:${section_method}`);
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processOutgoingXTransfer Unknown`, `module:${section_method}`);
             }
         } catch (e) {
-            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXTransfer error`, e)
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXTransfer error`, e)
         }
         return outgoingXTransfer;
     }
