@@ -261,14 +261,15 @@ async function main() {
         .description(`Update Asset Prices from coingecko`)
         .option('-s, --startDT <startDT>', 'Start Date', null)
         .option('-e, --endDT <endDT>', 'End Date', null)
+        .option('--symbol <symbol>', 'Symbol', null)
         .action(async (opt) => {
             var PriceManager = require("./priceManager");
             let manager = new PriceManager();
             await manager.init();
             if (opt.startDT && opt.endDT) {
-                let startTS = paraTool.logDT_hr_to_ts(log.startDT, 0);
-                let endTS = paraTool.logDT_hr_to_ts(log.endDT, 0);
-                await manager.getCoinPricesRange(startTS, endTS);
+                let startTS = paraTool.logDT_hr_to_ts(opt.startDT, 0);
+                let endTS = paraTool.logDT_hr_to_ts(opt.endDT, 0);
+                await manager.getCoinPricesRange(startTS, endTS, opt.symbol);
             } else {
                 await manager.getCoinPrices(0);
             }
@@ -289,8 +290,7 @@ async function main() {
             var Manager = require("./manager");
             var manager = new Manager();
             await manager.mapChains((c) => {
-                console.log(`./polkaholic auditchain ${c.chainID};`)
-                console.log(`./polkaholic backfill ${c.chainID};`)
+                console.log(`./substrate-etl blocklog ${c.chainID};`)
             });
             process.exit(0);
         })
