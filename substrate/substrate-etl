@@ -158,13 +158,12 @@ async function main() {
                     var manager = new SubstrateETL();
                     let res = await manager.updateAddressBalances(chainID);
                     if (res == false) {
-                        const gbRounded = this.gb_heap_used();
+                        const gbRounded = manager.gb_heap_used();
                         if (gbRounded > .8) {
                             process.exit(1);
                         }
-                    } else {
-                        await manager.sleep(5000);
                     }
+                    await manager.sleep(5000);
                 }
             }
         });
@@ -231,7 +230,7 @@ async function main() {
             let _network = x.network;
             let _logDT = x.logDT;
             if (_logDT && _network) {
-                await substrateetl.dump_networkmetrics(_network, _logDT, dry);
+                await substrateetl.dump_networkmetrics(_network, _logDT);
             }
             process.exit(0);
         })
