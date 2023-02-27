@@ -4371,11 +4371,11 @@ module.exports = class Indexer extends AssetManager {
                         try {
                             let withdrawTxFee = paraTool.dechexToInt(data[1])
                             if (!isUnsignedHead && signer == data[0]) {
-                                if (!isFirstBalancesWithdraw){
+                                if (!isFirstBalancesWithdraw) {
                                     withdrawFee = withdrawTxFee
                                     res.fee = withdrawFee
                                     isFirstBalancesWithdraw = true
-                                }else{
+                                } else {
                                     //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] skip duplicate=${withdrawTxFee}, evt=`, evt)
                                 }
                                 //console.log(`pallet_method=${pallet_method} [${extrinsicID}] ${extrinsicHash} [${data[0]}] withdrawFee=${withdrawTxFee}`)
@@ -5617,8 +5617,8 @@ module.exports = class Indexer extends AssetManager {
                     executionStatus: "pending",
                 }
             }
-            if (xcmInfo.origination != undefined){
-                if (xcmInfo.origination.txFee != undefined && xcmInfo.origination.amountSent != undefined && xcmInfo.origination.txFee == xcmInfo.origination.amountSent){
+            if (xcmInfo.origination != undefined) {
+                if (xcmInfo.origination.txFee != undefined && xcmInfo.origination.amountSent != undefined && xcmInfo.origination.txFee == xcmInfo.origination.amountSent) {
                     console.log(`buildPendingXcmInfo txfee error`, xcmInfo)
                     this.logger.error({
                         "op": "buildPendingXcmInfo",
@@ -5627,7 +5627,7 @@ module.exports = class Indexer extends AssetManager {
                         "xcmInfo": xcmInfo,
                         "err": `txFee Error`
                     })
-                }else{
+                } else {
                     //console.log(`buildPendingXcmInfo txfee ok`, xcmInfo)
                 }
             }
