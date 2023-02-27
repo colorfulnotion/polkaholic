@@ -163,7 +163,7 @@ module.exports = class Manager extends AssetManager {
         return rows;
     }
 
-    async indexBlocks(chainIDs) {
+    async indexBlocks(chainIDs, tSQL = null) {
         var Crawler = require("./crawler");
         const ethTool = require("./ethTool");
         const paraTool = require("./paraTool");
@@ -178,6 +178,10 @@ module.exports = class Manager extends AssetManager {
         let w = chainIDs ? ` and chainID in (${chainIDs})` : "";
 
         let targetSQL = `select blockNumber, xcmIndex, extrinsicHash, chainID, chainIDDest, amountSentUSD, amountReceived, amountReceivedUSD, symbol, from_unixtime(sourceTS), destStatus from xcmtransfer where symbol is null and chainID in ( select chainID from chain where crawling = 1 )  limit 5000`;
+        if (tSQL != undefined) {
+            targetSQL = tSQL
+        }
+        console.log(`targetSQL`, targetSQL)
         let recs = await crawler.poolREADONLY.query(targetSQL);
         let targetMap = {}
         for (let i = 0; i < recs.length; i++) {
