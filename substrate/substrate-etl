@@ -58,16 +58,18 @@ async function main() {
                         tally = 0;
                     }
                     if (_paraID == 0) {
-                        await substrateetl.dump_xcmtransfers_range(relayChain, null);
-                        await substrateetl.update_xcmtransfers_summary(relayChain, logDT);
-                        let x = await substrateetl.get_random_networkmetrics_ready();
-                        let _network = x.network;
-                        let _logDT = x.logDT;
-                        if (_logDT && _network) {
-                            let [weekagoDT, _] = paraTool.ts_to_logDT_hr(substrateetl.getCurrentTS() - 86400 * 7);
-                            await substrateetl.dump_networkmetrics(_network, _logDT, dry);
-                            await substrateetl.dump_substrateetl_chainassets(weekagoDT)
-                        }
+                        await substrateetl.dump_xcmtransfers_range(_relayChain, null);
+                        await substrateetl.update_xcmtransfers_summary(_relayChain, _logDT);
+                        {
+			    let x = await substrateetl.get_random_networkmetrics_ready();
+                            let _network = x.network;
+                            let _logDT = x.logDT;
+                            if (_logDT && _network) {
+				let [weekagoDT, _] = paraTool.ts_to_logDT_hr(substrateetl.getCurrentTS() - 86400 * 7);
+				await substrateetl.dump_networkmetrics(_network, _logDT);
+				await substrateetl.dump_substrateetl_chainassets(weekagoDT)
+                            }
+			}
                     }
                 } else {
                     await substrateetl.sleep(20000);

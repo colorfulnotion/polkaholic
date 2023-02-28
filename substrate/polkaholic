@@ -62,6 +62,7 @@ async function main() {
         .option('-c, --chainID <chainID>', 'ChainID to index', myParseInt)
         .action(async (chainID, opt) => {
             if (chainID >= 0) {
+                let crawler = new Crawler();
                 let chain = await crawler.getChain(chainID);
                 await crawler.indexChain(chain, 60, true, true);
                 await crawler.sleep(3 * 1000);
