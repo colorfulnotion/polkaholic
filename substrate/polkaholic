@@ -59,9 +59,11 @@ async function main() {
     program.command('indexchain')
         .description(`Index Specific Chain or random chain`)
         .usage("2004")
-        .option('-c, --chainID <chainID>', 'ChainID to index', myParseInt)
+        .argument('<chainID>', 'ChainID to index', myParseInt)
         .action(async (chainID, opt) => {
+            console.log(`indexchain chainID=${chainID} opt`, opt)
             if (chainID >= 0) {
+                var crawler = new Crawler();
                 let chain = await crawler.getChain(chainID);
                 await crawler.indexChain(chain, 60, true, true);
                 await crawler.sleep(3 * 1000);
