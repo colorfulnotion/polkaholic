@@ -7922,7 +7922,7 @@ module.exports = class Indexer extends AssetManager {
                 blockTS = this.synthetic_blockTS(this.chainID, blockNumber);
             }
             if (!parentHash) {
-                console.log("missing parentHash", blockNumber, r.block.header);
+                console.log(`missing parentHash! bn=${blockNumber}`, r.block, r.block.header);
             } else if (blockTS) {
                 let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', FROM_UNIXTIME('${feedTS}'), 0)`
                 statRows.push(sql);
@@ -8171,7 +8171,9 @@ module.exports = class Indexer extends AssetManager {
                     let rowData = row.data;
                     if (rowData["finalized"]) {
                         this.timeStat.getRuntimeVersion++
-                        for (const blockHash of Object.keys(rowData["finalized"])) {
+                        let blockHashes = Object.keys(rowData["finalized"])
+                        console.log(`bn=${bn}, blockHashes=${blockHashes}`)
+                        for (const blockHash of Object.keys(blockHashes)) {
                             let _specVersion = await this.initApiAtStorageKeys(chain, blockHash, bn);
                             if (_specVersion != undefined) {
                                 startSpecVersion = _specVersion;
@@ -8240,7 +8242,7 @@ module.exports = class Indexer extends AssetManager {
                         blockTS = this.synthetic_blockTS(this.chainID, blockNumber);
                     }
                     if (!parentHash) {
-                        console.log("missing parentHash", blockNumber, r.block.header);
+                        console.log(`missing parentHash* bn=${blockNumber}`, r.block, r.block.header);
                     } else if (blockTS) {
                         let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${numTraceRecords}', FROM_UNIXTIME('${feedTS}'), 0)`
                         statRows.push(sql);
