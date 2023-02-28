@@ -1917,6 +1917,8 @@ module.exports = class Crawler extends Indexer {
                     } catch (e1) {}
 
                 }
+            }else{
+                if (this.debugLevel > paraTool.debugVerbose) console.log(`!!!! processFinalizedHead bn=${bn}, finalizedHash=${finalizedHash}, parentHash=${parentHash}, isTip=${isTip}, blockTS missing`)
             }
         } catch (err) {
             if (err.toString().includes("disconnected")) {
@@ -2040,6 +2042,13 @@ module.exports = class Crawler extends Indexer {
             this.lastEventReceivedTS = this.getCurrentTS(); // if no event received in 5mins, restart
             let bn = parseInt(header.number.toString(), 10);
             let finalizedHash = header.hash.toString();
+            if (chainID == paraTool.chainIDMangataX){
+                let trueFinalizedHash = await this.api.rpc.chain.getBlockHash(header.number);
+                if (finalizedHash != trueFinalizedHash){
+                    //if (this.debugLevel > paraTool.debugInfo) console.log(`subscribeFinalizedHeads updateFinalizedHash=${trueFinalizedHash}(was:${finalizedHash})`)
+                    finalizedHash = trueFinalizedHash.toHex()
+                }
+            }
             let parentHash = header.parentHash.toString();
             let subscribeFinalizedHeadsMsg = {
                 "bn": bn,
@@ -2057,7 +2066,6 @@ module.exports = class Crawler extends Indexer {
             while (this.finalizedHashes[b] == undefined && (b > bMin)) {
                 let bHeader = await this.api.rpc.chain.getHeader(bHash);
                 let bparentHash = bHeader.parentHash.toString();
-                //console.log("processFinalizedHead", b, bHash, bparentHash)
                 this.finalizedHashes[b] = bHash;
                 queue.push({
                     b,
@@ -2067,6 +2075,7 @@ module.exports = class Crawler extends Indexer {
                 b--;
                 bHash = bparentHash;
             }
+            if (this.debugLevel > paraTool.debugVerbose) console.log(`finalized queue`, queue)
             for (let i = 0; i < queue.length; i++) {
                 let q = queue[i];
                 await this.processFinalizedHead(chain, chainID, q.b, q.bHash, q.bparentHash, true); // it's safe to pass true here. lastCrawlBN will prevent update using older state
@@ -2111,7 +2120,6 @@ module.exports = class Crawler extends Indexer {
                     block.number = paraTool.dechexToInt(block.header.number);
                     block.hash = blockHash;
                     block.blockTS = blockTS;
-
                     let blockNumber = block.number;
                     let subscribeStorageMsg = {
                         "bn": blockNumber,
@@ -2139,6 +2147,8 @@ module.exports = class Crawler extends Indexer {
                                     trace = events;
                                 }
                             }
+                        }else{
+                            if (this.debugLevel > paraTool.debugVerbose) console.log(`BN#${block.number} ${blockHash} no traceBlock!`)
                         }
                     } else {
                         trace = await this.dedupChanges(results.changes);
@@ -2218,6 +2228,8 @@ module.exports = class Crawler extends Indexer {
 
                             //console.log(`****** subscribeStorage ${chain.chainName} bn=${blockNumber} ${blockHash}: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(parseInt(blockNumber, 10)));
                             await this.update_batchedSQL();
+                        }else{
+                            if (this.debugLevel > paraTool.debugErrorOnly) console.log(`BN#${block.number} ${blockHash} blockTS missing!!!`)
                         }
                     } else {
                         this.logger.warn({
