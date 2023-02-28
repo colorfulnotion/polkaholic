@@ -833,6 +833,12 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
     }
     output.chainID = chainID
     output.decodedInput = decodedTxnInput
+    output.signature = {
+        r: txn.r,
+        s: txn.s,
+        v: txn.v
+    }
+    console.log(`txn=${txn.hash} (${txn.raw}) rsv, r=${txn.r}, s=${txn.s}, v=${txn.v}`)
     try {
         if (txn.r && txn.s) {
             if (txn.r.length == 66 && txn.s.length == 66) {
