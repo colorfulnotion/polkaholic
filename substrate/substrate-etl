@@ -58,8 +58,8 @@ async function main() {
                         tally = 0;
                     }
                     if (_paraID == 0) {
-                        await substrateetl.dump_xcmtransfers_range(_relayChain, null);
-                        await substrateetl.update_xcmtransfers_summary(_relayChain, _logDT); {
+                        await substrateetl.dump_xcm_range(_relayChain, null);
+                        await substrateetl.update_xcm_summary(_relayChain, _logDT); {
                             let x = await substrateetl.get_random_networkmetrics_ready();
                             let _network = x.network;
                             let _logDT = x.logDT;
@@ -217,8 +217,8 @@ async function main() {
             var substrateetl = new SubstrateETL();
             let [weekagoDT, _] = paraTool.ts_to_logDT_hr(substrateetl.getCurrentTS() - 86400 * 7);
             let logDT = opt.logDT ? opt.logDT : weekagoDT;
-            await substrateetl.dump_xcmtransfers_range(relayChain, logDT);
-            await substrateetl.update_xcmtransfers_summary(relayChain, logDT);
+            await substrateetl.dump_xcm_range(relayChain, logDT);
+            await substrateetl.update_xcm_summary(relayChain, logDT);
             process.exit(0);
         })
 

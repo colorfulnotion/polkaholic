@@ -1915,7 +1915,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
     }
 
-    async dump_xcmtransfers_range(relayChain = "polkadot", startLogDT = null) {
+    async dump_xcm_range(relayChain = "polkadot", startLogDT = null) {
         let ts = this.getCurrentTS();
         let hr = 0;
         if (startLogDT == null) {
@@ -1926,7 +1926,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             while (true) {
                 ts = ts - 86400;
                 let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
-                await this.dump_xcmtransfers(relayChain, logDT);
+                await this.dump_xcm(relayChain, logDT);
                 if (logDT == startLogDT) {
                     return (true);
                 }
@@ -2356,7 +2356,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         return true
     }
 
-    async dump_xcmtransfers(relayChain = "polkadot", logDT = "2022-12-29") {
+    async dump_xcm(relayChain = "polkadot", logDT = "2022-12-29") {
 
         // incomplete = 1: failed on origination chain
         // incomplete = 0: msgSent!
@@ -2443,14 +2443,46 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let cmd = `bq load --project_id=${this.project} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
         console.log(cmd);
         await exec(cmd);
-    }
 
-    async update_xcmtransfers_summary(relayChain, logDT) {
+	// same as above, except for xcm dataset 
+        let sql_xcm = `select msgHash, chainID, chainIDDest, relayedAt, includedAt, msgType, blockTS, msg, msgHex, version from xcm where blockTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and blockTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' order by blockTS;`
+        let xcmRecs = await this.poolREADONLY.query(sql_xcm)
+        tbl = "xcm";
+        fn = path.join(dir, `${tbl}-${relayChain}.json`)
+        f = fs.openSync(fn, 'w', 0o666);
+        let xcm = [];
+        xcmRecs.forEach((x) => {
+            try {
+                let xcm = {
+		    msg_hash: x.msgHash,
+		    origination_para_id: paraTool.getParaIDfromChainID(x.chainID),
+		    destination_para_id: paraTool.getParaIDfromChainID(x.chainIDDest),
+		    relayed_at: x.relayedAt,
+		    included_at: x.includedAt,
+		    msg_type: x.msgType,
+		    origination_ts: x.blockTS,
+		    msg: JSON.stringify(x.msg),
+		    msg_hex: x.msgHex,
+		    version: x.version
+                }
+		fs.writeSync(f, JSON.stringify(xcm) + NL);
+            } catch (e) {
+                console.log(e)
+            }
+        });
+        cmd = `bq load --project_id=${this.project} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+        console.log(cmd);
+        await exec(cmd);
+    }
+    
+    async update_xcm_summary(relayChain, logDT) {
         let [today, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
         let project = this.project;
         let sqla = {
             "xcmtransfers0": `select  date(origination_ts) logDT, destination_para_id as paraID, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by destination_para_id, logDT having logDT < "${today}" order by logDT`,
             "xcmtransfers1": `select date(origination_ts) as logDT, origination_para_id as paraID, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by origination_para_id, logDT having logDT < "${today}" order by logDT`,
+            "xcm0": `select  date(origination_ts) logDT, destination_para_id as paraID, count(*) as numXCMMessagesIn from substrate-etl.${relayChain}.xcm where DATE(origination_ts) >= "${logDT}" group by destination_para_id, logDT having logDT < "${today}" order by logDT`,
+            "xcm1": `select date(origination_ts) as logDT, origination_para_id as paraID, count(*) as numXCMMessagesOut from substrate-etl.${relayChain}.xcm where DATE(origination_ts) >= "${logDT}" group by origination_para_id, logDT having logDT < "${today}" order by logDT`,
         }
 
         let r = {}
@@ -2469,7 +2501,11 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         sql = `update blocklog set numXCMTransfersIn = ${mysql.escape(row.numXCMTransfersIn)}, valXCMTransferIncomingUSD = ${mysql.escape(row.valXCMTransferIncomingUSD)} where chainID = '${chainID}' and logDT = '${logDTa}'`
                     } else if (k == "xcmtransfers1") {
                         sql = `update blocklog set numXCMTransfersOut = ${mysql.escape(row.numXCMTransfersOut)}, valXCMTransferOutgoingUSD = ${mysql.escape(row.valXCMTransferOutgoingUSD)} where chainID = '${chainID}' and logDT = '${logDTa}'`
-                    }
+                    } else if ( k == "xcm0" ) {
+                        sql = `update blocklog set numXCMMessagesIn = ${mysql.escape(row.numXCMMessagesIn)} where chainID = '${chainID}' and logDT = '${logDTa}'`
+		    } else if ( k == "xcm1" ) {
+                        sql = `update blocklog set numXCMMessagesOut = ${mysql.escape(row.numXCMMessagesOut)} where chainID = '${chainID}' and logDT = '${logDTa}'`
+		    }
                     if (sql) {
                         console.log(sql);
                         this.batchedSQL.push(sql);
