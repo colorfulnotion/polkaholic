@@ -1514,6 +1514,22 @@ function showchainlog(chainID, address) {
                 }
                 return data;
             }
+        }, {
+            data: 'numXCMMessagesIn',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data
+                }
+                return data;
+            }
+        }, {
+            data: 'numXCMMessagesOut',
+            render: function(data, type, row, meta) {
+                if (type == 'display') {
+                    return data
+                }
+                return data;
+            }
         }]
     });
     loadData2(pathParams, tableName, true)

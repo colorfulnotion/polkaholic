@@ -208,14 +208,15 @@ async function main() {
             process.exit(0);
         })
 
-    program.command('xcmtransfers')
+    program.command('xcm')
         .usage("polkadot -l 2023-02-01")
-        .description("Dump xcmtransfers of relay chain")
+        .description("Dump xcm + xcm transfers of relay chain")
         .argument('<relayChain>', 'Relay chain (polkadot or kusama)')
         .option("-l, --logDT <logDT>", "Oldest date to dump", null)
         .action(async (relayChain, opt) => {
             var substrateetl = new SubstrateETL();
             let [weekagoDT, _] = paraTool.ts_to_logDT_hr(substrateetl.getCurrentTS() - 86400 * 7);
+            weekagoDT = "2022-08-01" // temporary
             let logDT = opt.logDT ? opt.logDT : weekagoDT;
             await substrateetl.dump_xcm_range(relayChain, logDT);
             await substrateetl.update_xcm_summary(relayChain, logDT);

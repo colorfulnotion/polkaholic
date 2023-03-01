@@ -73,7 +73,7 @@ Commands:
   dotsamametrics [options]             Generate Dotsam aggregates
   auditfix [options]                   Set up crawlBackfill workload for the results of an audit for a specific chain
   auditblocks [options]                Audit blocks
-  xcmtransfers [options] <relayChain>  Dump xcmtransfers of relay chain
+  xcm [options] <relayChain>           Dump xcmtransfers of relay chain
   polkaholic                           Dump polkaholic.json (for export)
   setuptables <relayChain> <paraID>    Setup BigQuery tables for new relaychain/paraID
   showtables [options]                 Show all substrate etl tables

@@ -6564,50 +6564,52 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async process_rcxcm(xcmList) {
-	let relayChain = null;
-	if ( this.chainID == 0 ) relayChain = "polkadot";
-	if ( this.chainID == 2 ) relayChain = "kusama";
+        let relayChain = null;
+        if (this.chainID == 0) relayChain = "polkadot";
+        if (this.chainID == 2) relayChain = "kusama";
         let out = [];
-	let rows = [];
+        let rows = [];
         for (const x of xcmList) {
             try {
                 let isFinalized = (x.finalized) ? 1 : 0
                 out.push(`('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayChain}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(x.msg))}, '${x.msgHex}', ${mysql.escape(x.path)}, '${x.version}', ${mysql.escape(x.beneficiaries)}, Now(), ${isFinalized})`)
-		if ( relayChain && false ) { // disabled due to missing insertId support
-		    let insertId = `${x.msgHash}-${x.includedAt}-${x.chainID}-${x.chainIDDest}`;
-		    let xcm = {
-			insertId: insertId,
-			msg_hash: x.msgHash,
-			origination_para_id: paraTool.getParaIDfromChainID(x.chainID),
-			destination_para_id: paraTool.getParaIDfromChainID(x.chainIDDest),
-			relayed_at: x.relayedAt,
-			included_at: x.includedAt,
-			msg_type: x.msgType,
-			origination_ts: x.blockTS,
-			msg: JSON.stringify(x.msg),
-			msg_hex: x.msgHex,
-			version: x.version
-		    }
-		    rows.push( xcm ) 
-		}
+                if (relayChain && false) { // disabled due to missing insertId support
+                    let insertId = `${x.msgHash}-${x.includedAt}-${x.chainID}-${x.chainIDDest}`;
+                    let xcm = {
+                        insertId: insertId,
+                        msg_hash: x.msgHash,
+                        origination_para_id: paraTool.getParaIDfromChainID(x.chainID),
+                        destination_para_id: paraTool.getParaIDfromChainID(x.chainIDDest),
+                        relayed_at: x.relayedAt,
+                        included_at: x.includedAt,
+                        msg_type: x.msgType,
+                        origination_ts: x.blockTS,
+                        msg: JSON.stringify(x.msg),
+                        msg_hex: x.msgHex,
+                        version: x.version
+                    }
+                    rows.push(xcm)
+                }
             } catch (err) {
                 console.log("process_rcxcm", err);
             }
-	}
-	try {
-	    if (rows.length > 0) {
-		const {BigQuery} = require('@google-cloud/bigquery');
-		const bigquery = new BigQuery({
-		    projectId: 'substrate-etl'
-		});
-		await bigquery
-		    .dataset(relayChain)
-		    .table("xcm")
-		    .insert(rows);
-	    }
-	} catch (err) {
-	    console.log("process_rcxcm STREAMING INSERT", err, JSON.stringify(err));
-	}
+        }
+        try {
+            if (rows.length > 0) {
+                const {
+                    BigQuery
+                } = require('@google-cloud/bigquery');
+                const bigquery = new BigQuery({
+                    projectId: 'substrate-etl'
+                });
+                await bigquery
+                    .dataset(relayChain)
+                    .table("xcm")
+                    .insert(rows);
+            }
+        } catch (err) {
+            console.log("process_rcxcm STREAMING INSERT", err, JSON.stringify(err));
+        }
         let vals = ["relayChain", "relayedBlockHash", "relayedAt", "includedAt", "msgType", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT", "finalized"]
         let sqlDebug = false
         await this.upsertSQL({
