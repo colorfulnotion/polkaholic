@@ -40,6 +40,44 @@
     {
         "paraID": 2001,
         "relayChain": "kusama",
+        "symbol": "vBNC",
+        "decimals": 12,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "network": "kusama"
+            },
+            {
+                "parachain": 2001
+            },
+            {
+                "generalKey": "0x0101"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200451f06080101",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2001
+                        },
+                        {
+                            "generalKey": "0x0101"
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "23",
+        "source": [
+            "2110"
+        ]
+    },
+    {
+        "paraID": 2001,
+        "relayChain": "kusama",
         "symbol": "vKSM",
         "decimals": 12,
         "interiorType": "x2",
@@ -71,6 +109,44 @@
             }
         },
         "asset": "15",
+        "source": [
+            "2110"
+        ]
+    },
+    {
+        "paraID": 2001,
+        "relayChain": "kusama",
+        "symbol": "ZLK",
+        "decimals": 18,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "network": "kusama"
+            },
+            {
+                "parachain": 2001
+            },
+            {
+                "generalKey": "0x0207"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200451f06080207",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2001
+                        },
+                        {
+                            "generalKey": "0x0207"
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "26",
         "source": [
             "2110"
         ]

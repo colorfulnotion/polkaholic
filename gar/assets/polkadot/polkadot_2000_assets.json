@@ -64,6 +64,15 @@
     },
     {
         "asset": {
+            "ForeignAsset": "10"
+        },
+        "name": "Unique Network",
+        "symbol": "UNQ",
+        "decimals": 18,
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2037}]"
+    },
+    {
+        "asset": {
             "ForeignAsset": "2"
         },
         "name": "Astar Native Token",

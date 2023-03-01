@@ -21,6 +21,16 @@
     },
     {
         "asset": {
+            "Token": "85534404031760856987006367174489651085"
+        },
+        "name": "xc-ALAN",
+        "symbol": "ALAN",
+        "decimals": 18,
+        "currencyID": "85534404031760856987006367174489651085",
+        "xcmInteriorKey": "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":1000},{\"palletInstance\":48},{\"accountKey20\":{\"network\":{\"any\":null},\"key\":\"0x9133c5a22024118804089f1fb752b7b2ce2a6351\"}}]"
+    },
+    {
+        "asset": {
             "Token": "DEV"
         },
         "name": "DEV",

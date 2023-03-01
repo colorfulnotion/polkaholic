@@ -32,7 +32,7 @@
         },
         "name": "BRZ Token",
         "symbol": "BRZ",
-        "decimals": 18,
+        "decimals": 6,
         "currencyID": "1000"
     },
     {

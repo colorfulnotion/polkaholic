@@ -16,10 +16,10 @@
                 "palletInstance": 50
             },
             {
-                "generalKey": "0x31393834"
+                "generalIndex": 1984
             }
         ],
-        "xcmV1MultiLocationByte": "0x010300a10f0432061031393834",
+        "xcmV1MultiLocationByte": "0x010300a10f043205011f",
         "xcmV1MultiLocation": {
             "v1": {
                 "parents": 1,
@@ -32,7 +32,7 @@
                             "palletInstance": 50
                         },
                         {
-                            "generalKey": "0x31393834"
+                            "generalIndex": 1984
                         }
                     ]
                 }

@@ -51,6 +51,16 @@
     },
     {
         "asset": {
+            "ForeignAsset": "6"
+        },
+        "name": "sKSM",
+        "symbol": "SKSM",
+        "decimals": 12,
+        "currencyID": "6",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2085},{\"palletInstance\":6},{\"generalIndex\":1000}]"
+    },
+    {
+        "asset": {
             "Token": "DOT"
         },
         "name": "DOT",

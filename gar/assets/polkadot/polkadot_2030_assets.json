@@ -44,6 +44,14 @@
     },
     {
         "asset": {
+            "Token2": "4"
+        },
+        "name": "Filecoin Network Token",
+        "symbol": "FIL",
+        "decimals": 18
+    },
+    {
+        "asset": {
             "VSBond2": "02000613"
         },
         "name": "vsBOND-DOT-2000-6-13",

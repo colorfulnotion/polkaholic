@@ -258,6 +258,16 @@
     },
     {
         "asset": {
+            "Token": "18446744073709551630"
+        },
+        "name": "HydraDX",
+        "symbol": "HDX",
+        "decimals": 12,
+        "currencyID": "18446744073709551630",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2034},{\"generalIndex\":0}]"
+    },
+    {
+        "asset": {
             "Token": "340282366920938463463374607431768211455"
         },
         "name": "Polkadot",

@@ -70,6 +70,16 @@
     },
     {
         "asset": {
+            "Token": "8"
+        },
+        "name": "PHA",
+        "symbol": "PHA",
+        "decimals": 12,
+        "currencyID": "8",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2035}]"
+    },
+    {
+        "asset": {
             "Token": "HDX"
         },
         "name": "HDX",

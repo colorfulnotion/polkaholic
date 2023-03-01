@@ -386,5 +386,37 @@
         "source": [
             "2000"
         ]
+    },
+    {
+        "paraID": 2037,
+        "relayChain": "polkadot",
+        "symbol": "UNQ",
+        "decimals": 18,
+        "interiorType": "x1",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2037
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010100d51f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2037
+                    }
+                }
+            }
+        },
+        "asset": {
+            "ForeignAsset": "10"
+        },
+        "source": [
+            "2000"
+        ]
     }
 ]

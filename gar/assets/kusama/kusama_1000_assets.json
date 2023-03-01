@@ -947,6 +947,15 @@
     },
     {
         "asset": {
+            "Token": "61"
+        },
+        "name": "CRYPTONITAS",
+        "symbol": "CRY",
+        "decimals": 12,
+        "currencyID": "61"
+    },
+    {
+        "asset": {
             "Token": "64"
         },
         "name": "oh!",
@@ -1169,6 +1178,15 @@
         "symbol": "CUBO",
         "decimals": 9,
         "currencyID": "862812"
+    },
+    {
+        "asset": {
+            "Token": "863012"
+        },
+        "name": "VIrto COP",
+        "symbol": "VCOP",
+        "decimals": 2,
+        "currencyID": "863012"
     },
     {
         "asset": {

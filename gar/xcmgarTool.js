@@ -415,4 +415,7 @@ module.exports = {
     isNumeric: function(x) {
         return isNumeric(x)
     },
+    bnToHex: function(x) {
+        return bnToHex(x)
+    },
 };

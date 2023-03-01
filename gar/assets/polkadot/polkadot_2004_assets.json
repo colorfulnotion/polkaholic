@@ -101,6 +101,36 @@
     },
     {
         "asset": {
+            "Token": "228256396637196286254896220398224702687"
+        },
+        "name": "Ethereum",
+        "symbol": "xcETH.multi",
+        "decimals": 18,
+        "currencyID": "228256396637196286254896220398224702687",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":108},{\"generalIndex\":\"0xabb8953ac77edece4a6e251a849c7cdf\"}]"
+    },
+    {
+        "asset": {
+            "Token": "270195117769614861929703564202131636628"
+        },
+        "name": "Raresama POOP",
+        "symbol": "POOP",
+        "decimals": 18,
+        "currencyID": "270195117769614861929703564202131636628",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":108},{\"generalIndex\":\"0xcb45afd30a637967995394cc88c0c194\"}]"
+    },
+    {
+        "asset": {
+            "Token": "278750993613512357835566279094880339619"
+        },
+        "name": "Wrapped BTC",
+        "symbol": "xcWBTC.multi",
+        "decimals": 8,
+        "currencyID": "278750993613512357835566279094880339619",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":108},{\"generalIndex\":\"0xd1b57d12738e41eae0124e285e5e86a3\"}]"
+    },
+    {
+        "asset": {
             "Token": "311091173110107856861649819128533077277"
         },
         "name": "Tether USD",
@@ -118,6 +148,16 @@
         "decimals": 12,
         "currencyID": "32615670524745285411807346420584982855",
         "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2012},{\"generalKey\":\"0x50415241\"}]"
+    },
+    {
+        "asset": {
+            "Token": "337110116006454532607322340792629567158"
+        },
+        "name": "USD Coin",
+        "symbol": "xcUSDC.multi",
+        "decimals": 6,
+        "currencyID": "337110116006454532607322340792629567158",
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":2004},{\"palletInstance\":108},{\"generalIndex\":\"0xfd9d0bf45a2947a519a741c4b9e99eb6\"}]"
     },
     {
         "asset": {

@@ -1073,6 +1073,115 @@
         ]
     },
     {
+        "paraID": 2110,
+        "relayChain": "moonbase",
+        "symbol": "MGX",
+        "decimals": 18,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "named": "0x6d6f6f6e62617365"
+            },
+            {
+                "parachain": 2110
+            },
+            {
+                "generalKey": "0x00000000"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200f920061000000000",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2110
+                        },
+                        {
+                            "generalKey": "0x00000000"
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "337673893687553151312436182236099273778",
+        "contractAddress": "0xfffffffffe09a0571a1429289ce14057bb486432",
+        "source": [
+            "1000"
+        ]
+    },
+    {
+        "paraID": 2114,
+        "relayChain": "moonbase",
+        "symbol": "TUR",
+        "decimals": 10,
+        "interiorType": "x1",
+        "xcmV1Standardized": [
+            {
+                "named": "0x6d6f6f6e62617365"
+            },
+            {
+                "parachain": 2114
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x0101000921",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2114
+                    }
+                }
+            }
+        },
+        "asset": "133300872918374599700079037156071917454",
+        "contractAddress": "0xffffffff6448d0746f2a66342b67ef9caf89478e",
+        "source": [
+            "1000"
+        ]
+    },
+    {
+        "paraID": 2125,
+        "relayChain": "moonbase",
+        "symbol": "TNKR",
+        "decimals": 12,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "named": "0x6d6f6f6e62617365"
+            },
+            {
+                "parachain": 2125
+            },
+            {
+                "generalIndex": 0
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x01020035210500",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2125
+                        },
+                        {
+                            "generalIndex": 0
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "138512078356357941985706694377215053953",
+        "contractAddress": "0xffffffff683474b842852111cc31d470bd8f5081",
+        "source": [
+            "1000"
+        ]
+    },
+    {
         "paraID": 888,
         "relayChain": "moonbase",
         "symbol": "BetaDev",

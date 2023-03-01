@@ -53,7 +53,7 @@ Options:
 # generate polkadot xcmRegistry
 ./xcmgar registry -r polkadot -p all
 
-# generate polkadot xcmRegistry
+# generate kusama xcmRegistry
 ./xcmgar registry -r kusama -p all
 ```
 

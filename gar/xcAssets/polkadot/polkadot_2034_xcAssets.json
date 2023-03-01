@@ -214,5 +214,35 @@
         "source": [
             "2034"
         ]
+    },
+    {
+        "paraID": 2035,
+        "relayChain": "polkadot",
+        "symbol": "PHA",
+        "decimals": 12,
+        "interiorType": "x1",
+        "xcmV1Standardized": [
+            {
+                "network": "polkadot"
+            },
+            {
+                "parachain": 2035
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010100cd1f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2035
+                    }
+                }
+            }
+        },
+        "asset": "8",
+        "source": [
+            "2034"
+        ]
     }
 ]

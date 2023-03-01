@@ -204,5 +204,51 @@
         "source": [
             "2092"
         ]
+    },
+    {
+        "paraID": 2085,
+        "relayChain": "kusama",
+        "symbol": "SKSM",
+        "decimals": 12,
+        "interiorType": "x3",
+        "xcmV1Standardized": [
+            {
+                "network": "kusama"
+            },
+            {
+                "parachain": 2085
+            },
+            {
+                "palletInstance": 6
+            },
+            {
+                "generalIndex": 1000
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x0103009520040605a10f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 2085
+                        },
+                        {
+                            "palletInstance": 6
+                        },
+                        {
+                            "generalIndex": 1000
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": {
+            "ForeignAsset": "6"
+        },
+        "source": [
+            "2092"
+        ]
     }
 ]

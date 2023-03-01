@@ -9,7 +9,7 @@
         "currencyID": {
             "ForeignAsset": "1"
         },
-        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalKey\":\"0x31393834\"}]"
+        "xcmInteriorKey": "[{\"network\":\"polkadot\"},{\"parachain\":1000},{\"palletInstance\":50},{\"generalIndex\":1984}]"
     },
     {
         "asset": {

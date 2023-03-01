@@ -34,14 +34,24 @@ class XCMGlobalAssetRegistryCLI {
             let singleChainkey = `${targetedRelaychain}-${targetedParaID}`
             supportedChainKeys = [singleChainkey]
         }
+        xcmgarm.loadCachedRegistry(targetedRelaychain)
         let failedChainkeys = (initType == 'serial')? await xcmgarm.serialCrawlerInit(supportedChainKeys) : await xcmgarm.batchCrawlerInit(supportedChainKeys)
-        console.log(`failedChainkeys`, failedChainkeys)
+        console.log(`failedChains[${failedChainkeys.length}]`, failedChainkeys)
+        let reachableChainkeys = supportedChainKeys.filter(x => !failedChainkeys.includes(x))
+        console.log(`reachableChainkeys[${reachableChainkeys.length}]`, reachableChainkeys)
+        //console.log(`supportedChainKeys[${supportedChainKeys.length}]`, supportedChainKeys)
         for (const chainkey of supportedChainKeys){
-            let crawler = await xcmgarm.getCrawler(chainkey)
-            if (crawler){
-                await xcmgarm.crawlRegistry(crawler)
+            if (failedChainkeys.includes(chainkey)){
+                xcmgarm.useCachedAsset(chainkey)
+                xcmgarm.useCachedXcmAsset(chainkey)
+            }else{
+                let crawler = await xcmgarm.getCrawler(chainkey)
+                if (crawler){
+                    await xcmgarm.crawlRegistry(crawler)
+                }
             }
         }
+
         let chainAssetMap = xcmgarm.getChainAssetMap()
         let xcmAssetMap = xcmgarm.getXcmAssetMap()
         console.log(`AssetMap`, chainAssetMap)

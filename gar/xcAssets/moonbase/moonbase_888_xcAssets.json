@@ -82,5 +82,60 @@
         "source": [
             "888"
         ]
+    },
+    {
+        "paraID": 1000,
+        "relayChain": "moonbase",
+        "symbol": "ALAN",
+        "decimals": 18,
+        "interiorType": "x3",
+        "xcmV1Standardized": [
+            {
+                "named": "0x6d6f6f6e62617365"
+            },
+            {
+                "parachain": 1000
+            },
+            {
+                "palletInstance": 48
+            },
+            {
+                "accountKey20": {
+                    "network": {
+                        "any": null
+                    },
+                    "key": "0x9133c5a22024118804089f1fb752b7b2ce2a6351"
+                }
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010300a10f043003009133c5a22024118804089f1fb752b7b2ce2a6351",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 1000
+                        },
+                        {
+                            "palletInstance": 48
+                        },
+                        {
+                            "accountKey20": {
+                                "network": {
+                                    "any": null
+                                },
+                                "key": "0x9133c5a22024118804089f1fb752b7b2ce2a6351"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "asset": "85534404031760856987006367174489651085",
+        "contractAddress": "0xffffffff405953b645c61b0f5ffb28df2b39b78d",
+        "source": [
+            "888"
+        ]
     }
 ]

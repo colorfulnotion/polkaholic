@@ -115,6 +115,50 @@
             1000
         ]
     },
+    "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2125},{\"generalIndex\":0}]": {
+        "paraID": 2125,
+        "relayChain": "moonbase",
+        "symbol": "TNKR",
+        "decimals": 12,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "named": "0x6d6f6f6e62617365"
+            },
+            {
+                "parachain": 2125
+            },
+            {
+                "generalIndex": 0
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x01020035210500",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2125
+                        },
+                        {
+                            "generalIndex": 0
+                        }
+                    ]
+                }
+            }
+        },
+        "xcContractAddress": {
+            "1000": "0xffffffff683474b842852111cc31d470bd8f5081"
+        },
+        "xcCurrencyID": {
+            "1000": "138512078356357941985706694377215053953"
+        },
+        "confidence": 1,
+        "source": [
+            1000
+        ]
+    },
     "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":1001},{\"palletInstance\":50},{\"generalIndex\":1}]": {
         "paraID": 1001,
         "relayChain": "moonbase",
@@ -201,6 +245,42 @@
             1000
         ]
     },
+    "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2114}]": {
+        "paraID": 2114,
+        "relayChain": "moonbase",
+        "symbol": "TUR",
+        "decimals": 10,
+        "interiorType": "x1",
+        "xcmV1Standardized": [
+            {
+                "named": "0x6d6f6f6e62617365"
+            },
+            {
+                "parachain": 2114
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x0101000921",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2114
+                    }
+                }
+            }
+        },
+        "xcContractAddress": {
+            "1000": "0xffffffff6448d0746f2a66342b67ef9caf89478e"
+        },
+        "xcCurrencyID": {
+            "1000": "133300872918374599700079037156071917454"
+        },
+        "confidence": 1,
+        "source": [
+            1000
+        ]
+    },
     "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2011},{\"generalKey\":\"0x657164\"}]": {
         "paraID": 2011,
         "relayChain": "moonbase",
@@ -239,6 +319,50 @@
         },
         "xcCurrencyID": {
             "1000": "187224307232923873519830480073807488153"
+        },
+        "confidence": 1,
+        "source": [
+            1000
+        ]
+    },
+    "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":2110},{\"generalKey\":\"0x00000000\"}]": {
+        "paraID": 2110,
+        "relayChain": "moonbase",
+        "symbol": "MGX",
+        "decimals": 18,
+        "interiorType": "x2",
+        "xcmV1Standardized": [
+            {
+                "named": "0x6d6f6f6e62617365"
+            },
+            {
+                "parachain": 2110
+            },
+            {
+                "generalKey": "0x00000000"
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010200f920061000000000",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x2": [
+                        {
+                            "parachain": 2110
+                        },
+                        {
+                            "generalKey": "0x00000000"
+                        }
+                    ]
+                }
+            }
+        },
+        "xcContractAddress": {
+            "1000": "0xfffffffffe09a0571a1429289ce14057bb486432"
+        },
+        "xcCurrencyID": {
+            "1000": "337673893687553151312436182236099273778"
         },
         "confidence": 1,
         "source": [
@@ -1259,6 +1383,66 @@
         "confidence": 1,
         "source": [
             1000
+        ]
+    },
+    "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":1000},{\"palletInstance\":48},{\"accountKey20\":{\"network\":{\"any\":null},\"key\":\"0x9133c5a22024118804089f1fb752b7b2ce2a6351\"}}]": {
+        "paraID": 1000,
+        "relayChain": "moonbase",
+        "symbol": "ALAN",
+        "decimals": 18,
+        "interiorType": "x3",
+        "xcmV1Standardized": [
+            {
+                "named": "0x6d6f6f6e62617365"
+            },
+            {
+                "parachain": 1000
+            },
+            {
+                "palletInstance": 48
+            },
+            {
+                "accountKey20": {
+                    "network": {
+                        "any": null
+                    },
+                    "key": "0x9133c5a22024118804089f1fb752b7b2ce2a6351"
+                }
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x010300a10f043003009133c5a22024118804089f1fb752b7b2ce2a6351",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x3": [
+                        {
+                            "parachain": 1000
+                        },
+                        {
+                            "palletInstance": 48
+                        },
+                        {
+                            "accountKey20": {
+                                "network": {
+                                    "any": null
+                                },
+                                "key": "0x9133c5a22024118804089f1fb752b7b2ce2a6351"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "xcContractAddress": {
+            "888": "0xffffffff405953b645c61b0f5ffb28df2b39b78d"
+        },
+        "xcCurrencyID": {
+            "888": "85534404031760856987006367174489651085"
+        },
+        "confidence": 1,
+        "source": [
+            888
         ]
     },
     "[{\"named\":\"0x6d6f6f6e62617365\"},{\"parachain\":1000},{\"palletInstance\":3}]": {

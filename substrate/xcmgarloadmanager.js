@@ -464,13 +464,18 @@ module.exports = class XCMGARLoadManager extends AssetManager {
     +-----------------------+--------------+------+-----+---------+-------+
     */
 
-    async flushXcmAssetGar(xcRegistryNew) {
+    async flushXcmAssetGar(xcRegistryNew, filterList = false, isDry = true, targetTable = 'xcmassetgar') {
         // flush new xc Registry into
+        if (targetTable != 'xcmassetgar' && targetTable != 'xcmasset'){
+            console.log(`Invalid targetTable=${targetTable}`)
+            return
+        }
         let xcmtransferKeys = Object.keys(xcRegistryNew)
         console.log(`xcmtransferKeys[${xcmtransferKeys.length}]`, xcmtransferKeys)
         if (xcmtransferKeys.length > 0) {
             let xcmAssets = [];
             for (let i = 0; i < xcmtransferKeys.length; i++) {
+                let xcmtransferKey = xcmtransferKeys[i]
                 let r = xcRegistryNew[xcmtransferKeys[i]];
                 //["xcmInteriorKey", "symbol", "relayChain"]
                 // ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parents"]
@@ -479,23 +484,40 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 ].join(",") + ")";
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} >>>`, t)
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} res`, r)
-                xcmAssets.push(t);
-
+                if (filterList) {
+                    if (filterList.includes(xcmtransferKey)) {
+                        xcmAssets.push(t);
+                    }
+                } else {
+                    xcmAssets.push(t);
+                }
             }
-            let sqlDebug = true
-            await this.upsertSQL({
-                "table": "xcmassetgar",
-                "keys": ["xcmInteriorKey"],
-                "vals": ["symbol", "relayChain", "xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
-                "data": xcmAssets,
-                "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
-                "replaceIfNull": ["symbol"]
-            }, sqlDebug);
+            if (xcmAssets.length > 0 && isDry){
+                console.log('new xcm registry detected', xcmAssets)
+                process.exit(1, 'new xcm registry detected')
+            }
+            if (xcmAssets.length > 0){
+                let sqlDebug = true
+                await this.upsertSQL({
+                    "table": targetTable,
+                    "keys": ["xcmInteriorKey"],
+                    "vals": ["symbol", "relayChain", "xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
+                    "data": xcmAssets,
+                    "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
+                    "replaceIfNull": ["symbol"]
+                }, sqlDebug);
+            }else{
+                console.log(`No new registry detected`)
+            }
         }
     }
 
-    async flushParachainAssets(assetMap, filterList = false) {
+    async flushParachainAssets(assetMap, filterList = false, isDry = true, targetTable = 'assetgar') {
         // flush new xc Registry into
+        if (targetTable != 'assetgar' && targetTable != 'asset'){
+            console.log(`Invalid targetTable=${targetTable}`)
+            return
+        }
         let assetMapKey = Object.keys(assetMap)
         console.log(`flushParachainAssets, filterList[${filterList.length}]`, filterList)
         if (assetMapKey.length > 0) {
@@ -520,17 +542,23 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                     assets.push(a)
                 }
             }
-            console.log(`sql`, assets)
-            //return
-            let sqlDebug = true
-            await this.upsertSQL({
-                "table": "assetgar",
-                "keys": ["asset", "chainID"],
-                "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"],
-                "data": assets,
-                "replaceIfNull": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"]
-            }, sqlDebug);
-            await this.update_batchedSQL()
+            if (assets.length > 0 && isDry){
+                console.log('new asset detected', assets)
+                process.exit(1, 'new asset detected')
+            }
+            if (assets.length > 0){
+                let sqlDebug = true
+                await this.upsertSQL({
+                    "table": targetTable,
+                    "keys": ["asset", "chainID"],
+                    "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"],
+                    "data": assets,
+                    "replaceIfNull": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"]
+                }, sqlDebug);
+                await this.update_batchedSQL()
+            }else{
+                console.log(`No new asset detected`)
+            }
         }
     }
 }

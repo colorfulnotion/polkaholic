@@ -81,6 +81,16 @@
     },
     {
         "asset": {
+            "Token": "8"
+        },
+        "name": "Shiden",
+        "symbol": "SDN",
+        "decimals": 18,
+        "currencyID": "8",
+        "xcmInteriorKey": "[{\"network\":\"kusama\"},{\"parachain\":2007}]"
+    },
+    {
+        "asset": {
             "Token": "TUR"
         },
         "name": "TUR",

@@ -170,6 +170,36 @@
         ]
     },
     {
+        "paraID": 2007,
+        "relayChain": "kusama",
+        "symbol": "SDN",
+        "decimals": 18,
+        "interiorType": "x1",
+        "xcmV1Standardized": [
+            {
+                "network": "kusama"
+            },
+            {
+                "parachain": 2007
+            }
+        ],
+        "xcmV1MultiLocationByte": "0x0101005d1f",
+        "xcmV1MultiLocation": {
+            "v1": {
+                "parents": 1,
+                "interior": {
+                    "x1": {
+                        "parachain": 2007
+                    }
+                }
+            }
+        },
+        "asset": "8",
+        "source": [
+            "2114"
+        ]
+    },
+    {
         "paraID": 2085,
         "relayChain": "kusama",
         "symbol": "HKO",
