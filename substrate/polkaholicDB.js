@@ -1002,42 +1002,53 @@ from chain where chainID = '${chainID}' limit 1`);
 
         } else if ((chainID == paraTool.chainIDAstar || chainID == paraTool.chainIDShiden || chainID == paraTool.chainIDShibuya)) {
             // const options = require("@astar-network/astar-api");
+            const typesBundle = {
+                spec: {
+                    shiden: {
+                        types: [{
+                            // on all versions
+                            minmax: [0, undefined],
+                            types: {
+                                Keys: 'AccountId',
+                                Address: 'MultiAddress',
+                                LookupSource: 'MultiAddress',
+                                AmountOf: 'Amount',
+                                Amount: 'i128',
+                                SmartContract: {
+                                    _enum: {
+                                        Evm: 'H160',
+                                        Wasm: 'AccountId'
+                                    }
+                                },
+                                EraStakingPoints: {
+                                    total: 'Balance',
+                                    stakers: 'BTreeMap<AccountId, Balance>',
+                                    formerStakedEra: 'EraIndex',
+                                    claimedRewards: 'Balance'
+                                },
+                                PalletDappsStakingEraStakingPoints: {
+                                    total: 'Balance',
+                                    stakers: 'BTreeMap<AccountId, Balance>',
+                                    formerStakedEra: 'EraIndex',
+                                    claimedRewards: 'Balance'
+                                },
+                                EraRewardAndStake: {
+                                    rewards: 'Balance',
+                                    staked: 'Balance'
+                                },
+                                PalletDappsStakingEraRewardAndStake: {
+                                    rewards: 'Balance',
+                                    staked: 'Balance'
+                                },
+                                EraIndex: 'u32'
+                            }
+                        }]
+                    }
+                }
+            };
             api = await ApiPromise.create({
                 provider,
-                types: {
-                    "Keys": "AccountId",
-                    "Address": "MultiAddress",
-                    "LookupSource": "MultiAddress",
-                    "AmountOf": "Amount",
-                    "Amount": "i128",
-                    "SmartContract": {
-                        "_enum": {
-                            "Evm": "H160",
-                            "Wasm": "AccountId"
-                        }
-                    },
-                    "EraStakingPoints": {
-                        "total": "Balance",
-                        "stakers": "BTreeMap<AccountId, Balance>",
-                        "formerStakedEra": "EraIndex",
-                        "claimedRewards": "Balance"
-                    },
-                    "PalletDappsStakingEraStakingPoints": {
-                        "total": "Balance",
-                        "stakers": "BTreeMap<AccountId, Balance>",
-                        "formerStakedEra": "EraIndex",
-                        "claimedRewards": "Balance"
-                    },
-                    "EraRewardAndStake": {
-                        "rewards": "Balance",
-                        "staked": "Balance"
-                    },
-                    "PalletDappsStakingEraRewardAndStake": {
-                        "rewards": "Balance",
-                        "staked": "Balance"
-                    },
-                    "EraIndex": "u32"
-                }
+                typesBundle
             });
             console.log(`You are connected to ASTAR/SHIDEN chain ${chainID} endpoint=${endpoint} with options`);
         } else if (chainID == paraTool.chainIDMoonbeam) {

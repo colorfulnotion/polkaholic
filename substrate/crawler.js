@@ -1589,10 +1589,10 @@ module.exports = class Crawler extends Indexer {
 
     async crawl_parachains(chainID = 2) {
         let allEndPoints = Endpoints.getAllEndpoints();
-        console.log(`allEndPoints len=${Object.keys(allEndPoints).length}`, allEndPoints)
+        //console.log(`allEndPoints len=${Object.keys(allEndPoints).length}`, allEndPoints)
 
         let knownParachains = await this.getKnownParachains()
-        console.log(`knownParachains len=${Object.keys(knownParachains).length}`, knownParachains)
+        //console.log(`knownParachains len=${Object.keys(knownParachains).length}`, knownParachains)
 
         let chain = await this.setupChainAndAPI(chainID);
         let relaychain = (chainID == paraTool.chainIDPolkadot) ? 'polkadot' : 'kusama'
@@ -1615,7 +1615,7 @@ module.exports = class Crawler extends Indexer {
             this.paraIDs.push(paraID);
 
             if (targetEndpoint == undefined) {
-                console.log(`*** ${fullparaID} NOT FOUND!!!`)
+                //console.log(`*** ${fullparaID} NOT FOUND!!!`)
             } else {
                 para_name = targetEndpoint.id
                 //console.log(`${fullparaID} [${para_name}] found`)
@@ -1650,12 +1650,8 @@ module.exports = class Crawler extends Indexer {
             "data": paraIDs,
             "replace": ["relaychain", "paratype"],
             "replaceIfNull": ["lastUpdateDT"],
-        }, true);
-        this.logger.info({
-            "op": "crawl_parachains",
-            "chainID": chainID
         });
-        console.log(`crawl_parachains relayChain=${relaychain} len=${paraIDs.length}`)
+        //console.log(`crawl_parachains relayChain=${relaychain} len=${paraIDs.length}`)
 
         //console.log(`newParas`, newParas)
         await this.upsertSQL({
@@ -1665,12 +1661,7 @@ module.exports = class Crawler extends Indexer {
             "data": newParas,
             "replace": ["id", "paraID", "website"],
             "replaceIfNull": ["relaychain", "WSEndpoint", "WSEndpoint2", "WSEndpoint3"],
-        }, true);
-        this.logger.info({
-            "op": "crawl_parachains_chainUpdate",
-            "chainID": chainID
         });
-        console.log(`new paraUpdates relayChain=${relaychain} len=${newParas.length}`)
         this.readyToCrawlParachains = false;
     }
 
