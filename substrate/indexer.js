@@ -7966,7 +7966,7 @@ module.exports = class Indexer extends AssetManager {
             if (!parentHash) {
                 console.log(`missing parentHash! bn=${blockNumber}`, r.block, r.block.header);
             } else if (blockTS) {
-                let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', FROM_UNIXTIME('${feedTS}'), 0)`
+                let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}')`
                 statRows.push(sql);
             }
             this.dump_update_block_stats(chain.chainID, statRows, indexTS)
@@ -8153,9 +8153,9 @@ module.exports = class Indexer extends AssetManager {
         let traceParseTS = this.getTraceParseTS()
 
         if ((hr == 23) || (hr < 6)) {
-            let sql = (hr == 23) ? `update blocklog set updateAddressBalanceStatus = "Ready" where updateAddressBalanceStatus = "NotReady" and chainID = '${chainID}' and logDT = '${logDT}'` : `update blocklog set updateAddressBalanceStatus = "Ready" where updateAddressBalanceStatus = "NotReady" and chainID = '${chainID}' and logDT = date_sub('${logDT}', interval 1 day)`;
+            let sql = (hr == 23) ? `update blocklog set updateAddressBalanceStatus = "Ready" where updateAddressBalanceStatus = "NotReady" and chainID = '${chainID}' and logDT = '${logDT}'` : `update blocklog set updateAddressBalanceStatus = "Ready" where updateAddressBalanceStatus = "NotReady" and chainID = '${chainID}' and logDT = date(date_sub('${logDT}', interval 1 day))`;
             this.batchedSQL.push(sql);
-
+            await this.update_batchedSQL();
         }
 
         await this.setup_chainParser(chain, this.debugLevel);
@@ -8275,6 +8275,7 @@ module.exports = class Indexer extends AssetManager {
                     let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
                     let numTraceRecords = blockStats && blockStats.numTraceRecords ? blockStats.numTraceRecords : 0;
                     let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
+                    let fees = blockStats && blockStats.fees ? blockStats.fees : 0
                     this.setLoggingContext({
                         chainID: chain.chainID,
                         blockNumber
@@ -8286,7 +8287,7 @@ module.exports = class Indexer extends AssetManager {
                     if (!parentHash) {
                         console.log(`missing parentHash* bn=${blockNumber}`, r.block, r.block.header);
                     } else if (blockTS) {
-                        let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${numTraceRecords}', FROM_UNIXTIME('${feedTS}'), 0)`
+                        let sql = `('${blockNumber}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}')`
                         statRows.push(sql);
                     }
                     if (r != undefined) r = null
@@ -8440,9 +8441,9 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": `block${chainID}`,
                 "keys": ["blockNumber"],
-                "vals": ["blockHash", "parentHash", "blockDT", "numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "numTraceRecords", "lastFeedDT", "crawlFeed"],
+                "vals": ["blockHash", "parentHash", "blockDT", "numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "fees"],
                 "data": statRows.slice(i, j),
-                "replace": ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "blockHash", "parentHash", "numTraceRecords", "lastFeedDT", "crawlFeed"],
+                "replace": ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "blockHash", "parentHash", "fees"],
                 "replaceIfNull": ["blockDT"]
             });
         }

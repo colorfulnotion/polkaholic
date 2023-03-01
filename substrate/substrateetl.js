@@ -172,7 +172,7 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null, lookbackDays = 3000) {
+    async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null, lookbackDays = 365) {
 
         let w = "";
         if (paraID >= 0 && relayChain) {
@@ -182,7 +182,7 @@ module.exports = class SubstrateETL extends AssetManager {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
 
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and attempted < 15 and ( logDT <= date(date_sub(Now(), interval 1 day)) or (logDT = date(Now()) and ( loadDT < date_sub(Now(), interval 2 hour) or loadDT is null ) ) ) and ( loadDT < date_sub(Now(), interval 30 minute) or loadDT is null ) ${w} order by rand() limit 1`;
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), POW(5, attempted) MINUTE) ) and ( logDT <= date(date_sub(Now(), interval 1 day)) or logDT = date(Now()) ) ${w} order by rand() limit 1`;
         console.log("get_random_substrateetl", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
@@ -195,7 +195,7 @@ module.exports = class SubstrateETL extends AssetManager {
         [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
         paraID = paraTool.getParaIDfromChainID(chainID);
         relayChain = paraTool.getRelayChainByChainID(chainID);
-        let sql0 = `update blocklog set attempted = attempted + 1 where chainID = '${chainID}' and logDT = '${logDT}'`
+        let sql0 = `update blocklog set attempted = attempted + 1, loadAttemptDT = Now() where chainID = '${chainID}' and logDT = '${logDT}'`
         this.batchedSQL.push(sql0);
         await this.update_batchedSQL();
         return {
@@ -534,20 +534,15 @@ module.exports = class SubstrateETL extends AssetManager {
             let sql_upd = `update blocklog set lastUpdateAddressBalancesEndDT = Now(), numAddresses = '${numAddresses}', numAddressesLastUpdateDT = Now(), updateAddressBalanceStatus = 'AuditRequired' where chainID = ${chainID} and logDT = '${logDT}'`;
             console.log("updateAddressBalances", "min", min_numAddresses, "max", max_numAddresses, sql_upd);
             this.batchedSQL.push(sql_upd);
-            console.log(1, logDT);
+
             let [todayDT, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
-            console.log(2, todayDT);
             let [yesterdayDT, __] = paraTool.ts_to_logDT_hr(this.getCurrentTS() - 86400);
-            console.log(3, yesterdayDT);
             if ((logDT == yesterdayDT) || (logDT == todayDT)) {
                 let sql_numHolders = `update chain set numHolders = '${numAddresses}' where chainID = '${chainID}'`
-                console.log(4, sql_numHolders);
                 this.batchedSQL.push(sql_numHolders);
             }
             await this.update_batchedSQL();
-            console.log(5);
             await this.clean_chainbalancecrawler(logDT, chainID);
-            console.log(6);
         } catch (err) {
             console.log(err);
             this.logger.error({
@@ -1043,14 +1038,20 @@ module.exports = class SubstrateETL extends AssetManager {
         const prefix = chainInfo.ss58Format
 
         // update total issuances
-        let totalIssuance = decimals ? await api.query.balances.totalIssuance() / 10 ** decimals : null;
-        if (totalIssuance) {
-            let sql_totalIssuance = `update chain set totalIssuance = '${totalIssuance}' where chainID = '${chainID}'`
-            console.log(sql_totalIssuance);
-            this.batchedSQL.push(sql_totalIssuance);
-            await this.update_batchedSQL();
-        } else {
-            console.log("NO totalIssuance", totalIssuance);
+        try {
+            if (api.query.balances && api.query.balances.totalIssuance) {
+                let totalIssuance = decimals ? await api.query.balances.totalIssuance() / 10 ** decimals : null;
+                if (totalIssuance) {
+                    let sql_totalIssuance = `update chain set totalIssuance = '${totalIssuance}' where chainID = '${chainID}'`
+                    console.log(sql_totalIssuance);
+                    this.batchedSQL.push(sql_totalIssuance);
+                    await this.update_batchedSQL();
+                } else {
+                    console.log("NO totalIssuance", totalIssuance);
+                }
+            }
+        } catch (e) {
+            console.log(e);
         }
 
         let numHolders = 0; // we can't tally like this.
@@ -1987,7 +1988,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         await this.update_batchedSQL();
     }
 
-    async dump_networkmetrics(network, logDT, isDry) {
+    async dump_networkmetrics(network, logDT, isDry = false) {
         if (network != "dotsama") {
             // not covering other networks yet
             return (false);
@@ -2013,8 +2014,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
  UNION ALL
  (SELECT address_pubkey, 0 as polkadot_active_cnt, count(distinct(para_id)) kusama_active_cnt FROM \`substrate-etl.kusama.accountsactive*\`
  WHERE DATE(ts) = "${currDT}" group by address_pubkey))
-select address_pubkey, TIMESTAMP_SECONDS(${logTS}) as ts, sum(polkadot_active_cnt) polkadot_active_cnt, sum(kusama_active_cnt) kusama_active_cnt from pk
-group by address_pubkey`
+ select address_pubkey, TIMESTAMP_SECONDS(${logTS}) as ts, sum(polkadot_active_cnt) polkadot_active_cnt, sum(kusama_active_cnt) kusama_active_cnt from pk
+ group by address_pubkey`
 
                     partitionedFld = 'ts'
                     cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
@@ -2152,7 +2153,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             paraIDs.push(chainsRec.paraID)
             isEVMparaID[chainsRec.paraID] = chainsRec.isEVM;
         }
-        console.log(`isEVMparaID`, isEVMparaID)
         console.log(`${paraIDs.length} active ${relayChain} chains [${paraIDs}]`)
 
         let accountTbls = ["new", "old", "reaped", "assetreaped", "active", "passive"]
@@ -2678,14 +2678,15 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
                 let bn = parseInt(row.id.substr(2), 16);
-                console.log("processing:", bn);
+                let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
+                console.log("processing:", bn, b.blockTS, logDT0, hr);
 
                 let hdr = b.header;
                 if (!hdr || hdr.number == undefined) {
+                    console.log("PROBLEM");
                     //await this.mark_crawl_block(chainID, bn);
                     continue;
                 }
-                let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
                 if (logDT != logDT0) {
                     console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
                     //await this.mark_crawl_block(chainID, bn);
@@ -3189,10 +3190,6 @@ let topNgroups = ["balanceUSD", "numChains", "numAssets", "numTransfersIn", "avg
         }
 */
     }
-
-
-
-
 
     async getAlltables(filter = 'accounts') {
         let relayChains = ['kusama', 'polkadot']

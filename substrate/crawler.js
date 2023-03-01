@@ -1117,7 +1117,7 @@ module.exports = class Crawler extends Indexer {
                 w = ` and round(indexTS/3600) % ${nmax} = ${n}`;
             }
         }
-        var sql = `select chainID, indexTS from indexlog where indexed = 0 and readyForIndexing = 1 and chainID = '${chain.chainID}' and indexTS < UNIX_TIMESTAMP(Now()) - 3600 and attempted < 1 ${w} order by attempted, indexTS`;
+        var sql = `select chainID, indexTS from indexlog where indexed = 0 and readyForIndexing = 1 and chainID = '${chain.chainID}' and indexTS < UNIX_TIMESTAMP(Now()) - 3600 and ( lastAttemptStartDT is null or lastAttemptStartDT < date_sub(Now(), interval POW(5, attempted) MINUTE) ) ${w} order by attempted, indexTS`;
         var indexlogs = await this.pool.query(sql);
         if (indexlogs.length == 0) {
             console.log(`indexChain ${chain.chainID}: no work to do`, sql)
@@ -1177,7 +1177,7 @@ module.exports = class Crawler extends Indexer {
     async indexChainRandom(lookbackBackfillDays = 60, audit = true, backfill = true, write_bq_log = true, update_chain_assets = true) {
         // pick a chainID that the node is also crawling
         let hostname = this.hostname;
-        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 and attempted < 3 and chainID in ( select chainID from chainhostnameendpoint where hostname = '${hostname}' ) group by chainID having count(*) < 200 order by rand() desc`;
+        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 and ( lastAttemptStartDT is null or lastAttemptStartDT < date_sub(Now(), interval POW(5, attempted) MINUTE) )  and chainID in ( select chainID from chainhostnameendpoint where hostname = '${hostname}' ) group by chainID having count(*) < 200 order by rand() desc`;
         console.log(sql);
         var chains = await this.poolREADONLY.query(sql);
 
@@ -1229,12 +1229,12 @@ module.exports = class Crawler extends Indexer {
             let nmax = techniqueParams[2];
             let w = (nmax > 1) ? `and blockNumber % ${nmax} = ${n}` : "";
             let w2 = ` and blockNumber > ${chain.blocksCovered} - ${lookbackBlocks}`
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and attempted < 2 order by blockNumber desc limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and ( attemptedDT is null or attemptedDT < Date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 10000`
             console.log("lookback", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
             let endBN = techniqueParams[2];
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 3 order by blockNumber desc limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and ( attemptedDT is null  or attemptedDT < date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 10000`
             console.log("lookback", sql);
         }
         let tasks = await this.poolREADONLY.query(sql);
@@ -1278,7 +1278,7 @@ module.exports = class Crawler extends Indexer {
                     }
                 }
                 if (flds.length == 0) {
-                    flds.push(`attempted = ${t.attempted + 1}`); // check this for 2021 (efinity)
+                    flds.push(`attempted = ${t.attempted + 1}`);
                 }
                 let sql = `update block${chainID} set ${flds.join(", ")} where blockNumber = '${t.blockNumber}'`;
                 this.batchedSQL.push(sql)
@@ -1291,7 +1291,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     async getNumRecentCrawlTraces(chain, lookbackBlocks = 14000) {
-        var sql = `select count(*) as numRecentCrawlTraces from block${chain.chainID} b, chain c where crawlTrace > 0 and length(blockHash) > 0 and blockNumber >= c.blocksFinalized - ${lookbackBlocks} and c.chainID = ${chain.chainID} and attempted < ${maxTraceAttempts} order by crawlTrace desc,attempted, blockNumber desc limit 1000`;
+        var sql = `select count(*) as numRecentCrawlTraces from block${chain.chainID} b, chain c where crawlTrace > 0 and length(blockHash) > 0 and blockNumber >= c.blocksFinalized - ${lookbackBlocks} and c.chainID = ${chain.chainID} and attempted < 3 order by crawlTrace desc,attempted, blockNumber desc limit 1000`;
         let result = await this.poolREADONLY.query(sql);
 
         if (result.length > 0) {
@@ -1336,7 +1336,7 @@ module.exports = class Crawler extends Indexer {
                         this.mark_indexlog_dirty(chainID, t_trace.blockTS)
                         this.batchedSQL.push(sql)
                     } else {
-                        let sql = `update block${chainID} set attempted = attempted + 1 where blockNumber = ${t.blockNumber}`
+                        let sql = `update block${chainID} set attempted = attempted + 1, attemptedDT = Now() where blockNumber = ${t.blockNumber}`
                         this.batchedSQL.push(sql)
                     }
                     return
@@ -1398,7 +1398,7 @@ module.exports = class Crawler extends Indexer {
                         this.mark_indexlog_dirty(chainID, t.blockTS)
                         this.batchedSQL.push(sql)
                     } else {
-                        let sql = `update block${chainID} set attempted = attempted + 1 where blockNumber = ${t.blockNumber}`
+                        let sql = `update block${chainID} set attempted = attempted + 1, attemptedDT = Now() where blockNumber = ${t.blockNumber}`
                         this.batchedSQL.push(sql)
                     }
                     return
