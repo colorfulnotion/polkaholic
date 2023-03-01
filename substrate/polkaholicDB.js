@@ -1178,10 +1178,10 @@ from chain where chainID = '${chainID}' limit 1`);
             let blkhashes = Object.keys(columnFamily)
 
             //TODO: remove the incorret finalizedhash here
-            if (blkhashes.length == 1){
+            if (blkhashes.length == 1) {
                 r.blockHash = blkhashes[0];
                 r.finalized = true;
-            }else{
+            } else {
                 //use the correct finalized hash by checking and see if we can find the proper blockrow
                 console.log(`ERROR: multiple finalized blkhashes found ${blkhashes}`)
                 this.logger.error({
