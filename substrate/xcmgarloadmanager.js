@@ -2,6 +2,7 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const path = require("path");
+const fetch = require("node-fetch");
 const AssetManager = require("./assetManager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
@@ -21,9 +22,23 @@ const {
     StorageKey
 } = require('@polkadot/types');
 
+
+const xcmgarSourceURL = 'https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry/metadata/xcmgar.json'
+
 module.exports = class XCMGARLoadManager extends AssetManager {
 
     knownEvmChains = [paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDMoonbaseBeta, paraTool.chainIDMoonbaseAlpha, paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDShibuya]
+
+    // Defining async function
+    async fetchxcmgar() {
+        // Storing response
+        const response = await fetch(xcmgarSourceURL);
+
+        // Storing data in form of JSON
+        var data = await response.json();
+        console.log(`xcmgarSourceURL res`, data);
+        return data
+    }
 
     readJSONFn(relayChain = 'polkadot', fExt = 'xcmRegistry') {
         const logDir = "../gar"
@@ -58,30 +73,6 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             return false
         }
         return files
-    }
-
-    readParachainFiles(relayChain = 'polkadot', fn = 'polkadot_2000_assets.json', fExt = 'assets') {
-        const logDir = "../gar"
-        let fnDir = path.join(logDir, fExt, relayChain);
-        let pieces = fn.split('_')
-        let paraID = paraTool.dechexToInt(pieces[1])
-        let fnDirFn = false
-        let jsonObj = false
-        try {
-            fnDirFn = path.join(fnDir, fn)
-            const fnContent = fs.readFileSync(fnDirFn, 'utf8');
-            jsonObj = JSON.parse(fnContent)
-        } catch (err) {
-            console.log(err, "readParachainAssets", fnDirFn);
-            return false
-        }
-        let r = {
-            chainkey: `${relayChain}-${paraID}`,
-            chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-            paraID: paraID,
-            assets: jsonObj
-        }
-        return r
     }
 
     categorizeAssetType(assetName, assetSymbol, chainID) {

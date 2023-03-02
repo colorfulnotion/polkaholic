@@ -178,11 +178,25 @@ async function main() {
             let targetedRelaychain = opt.relayChain;
             let targetedParaID = opt.paraID ? opt.paraID : "all";
             var xcmgarlm = new XCMGARLoadManager();
-            var chainAssetFiles = xcmgarlm.readFilelist(targetedRelaychain)
-            console.log(`chainAssetFiles`, chainAssetFiles)
+            let registryJSON = await xcmgarlm.fetchxcmgar()
+            console.log(`registryJSON***`, registryJSON)
             let globalAsetMap = {}
-            for (const chainAssetFn of chainAssetFiles) {
-                let r = xcmgarlm.readParachainFiles(targetedRelaychain, chainAssetFn)
+            let chainAssets = false
+            try {
+                chainAssets = registryJSON['assets'][targetedRelaychain]
+            } catch (err){
+                console.log(`registry.json load error`, err)
+                process.exit(0)
+            }
+            for (const chainAsset of chainAssets){
+                let relayChain = chainAsset.relayChain
+                let paraID = chainAsset.paraID
+                let r = {
+                    chainkey: `${relayChain}-${paraID}`,
+                    chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
+                    paraID: paraID,
+                    assets: chainAsset.data
+                }
                 if (targetedParaID == 'all' || targetedParaID == `${r.paraID}`) {
                     let assetMap = xcmgarlm.transformParachainAssets(r)
                     for (const assetChain of Object.keys(assetMap)) {
@@ -190,6 +204,7 @@ async function main() {
                     }
                 }
             }
+
             console.log(`[${targetedRelaychain}-${targetedParaID}]`, globalAsetMap)
 
             let cachedParachainAssetsMap = await xcmgarlm.init_parachain_asset_old(targetedRelaychain, targetedParaID)
