@@ -13,6 +13,12 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "name",
+    "type": "STRING",
+    "description": "Simple name of asset, if provided"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "currency_id",
     "type": "STRING",
     "description": "Currency ID / Asset ID of asset, if provided in assets, tokens or some other chain pallet"
