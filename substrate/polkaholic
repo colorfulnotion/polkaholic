@@ -44,13 +44,14 @@ async function main() {
         .argument('<chainID>', 'ChainID to crawl traces for', myParseInt)
         .option('-n <n>', 'Shard #', 0, myParseInt)
         .option('-m, --nmax <nmax>', 'Shard Max', 1, myParseInt)
-        .option('--lookbackBlocks <lookbackBlocks>', 'Lookback blocks', 14000, myParseInt)
+        .option('--lookbackBlocks <lookbackBlocks>', 'Lookback blocks', null, myParseInt)
         .action(async (chainID, opt) => {
-            let n = opt.n;
-            let m = opt.nmax;
-            let lookbackBlocks = opt.lookbackBlocks;
             var crawler = new Crawler();
             await crawler.assetManagerInit();
+            let n = opt.n;
+            let m = opt.nmax;
+            let lookbackBlocks = opt.lookbackBlocks ? opt.lookbackBlocks : await crawler.getChainLookbackBlocks(chainID);
+            console.log("HEY", lookbackBlocks);
             await crawler.crawlTraces(chainID, ["mod", n, m], lookbackBlocks);
             await crawler.release(5000);
             process.exit(0);
@@ -170,8 +171,8 @@ async function main() {
             }
             if (t2) {
                 let x = await crawler.crawl_block_trace(chain, t2)
-                blockHash = x[6];
-                console.log("XXXX", blockHash);
+                blockHash = x.blockHash;
+                console.log("blockHash: ", blockHash);
             }
             await crawler.index_block(chain, blockNumber, blockHash);
             process.exit(0);

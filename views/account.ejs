@@ -224,8 +224,7 @@ let tabs = [
 { title: "Crowdloans", target: "crowdloans" },
 { title: "Feeds", target: "feed" },
 { title: "Multisig/Proxy/Related", target: "related" },
-{ title: "SS58 Address", target: "ss58h160" },
-{ title: "Chart", target: "history" }
+{ title: "SS58 Address", target: "ss58h160" }
 ];
 
 for (let i=0; i<tabs.length; i++) {
@@ -262,9 +261,6 @@ for (let i=0; i<tabs.length; i++) {
 <% } %>
 
   </div>
-  <div class="tab-pane" id="history" role="tabpanel" aria-labelledby="history-tab">
-    <div id="container" class="chart"></div>
-  </div>
   <div class="tab-pane" id="extrinsics" role="tabpanel" aria-labelledby="extrinsics-tab">
     <table id="tableextrinsics" class="display" style='width: 100%'>
       <thead>
@@ -291,18 +287,6 @@ for (let i=0; i<tabs.length; i++) {
           <th><%- include("tooltip", {k: "valueusd"}) %>Amount (USD)</th>
           <th><%- include("tooltip", {k: "txtimestamp"}) %>Date</th>
           <th><%- include("tooltip", {k: "chain"}) %>Chain</th>
-        </tr>
-      </thead>
-    </table>
-  </div>
-  <div class="tab-pane" id="history" role="tabpanel" aria-labelledby="history-tab">
-    <table id="tablehistory" class="display" style='width: 100%'>
-      <thead>
-        <tr class="tableheader">
-          <th>Chain</th>
-          <th>Assets</th>
-          <th>History</th>
-          <th>Chain</th>
         </tr>
       </thead>
     </table>

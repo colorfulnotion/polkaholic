@@ -182,7 +182,7 @@ module.exports = class SubstrateETL extends AssetManager {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
 
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), POW(5, attempted) MINUTE) ) and ( logDT <= date(date_sub(Now(), interval 1 day)) or logDT = date(Now()) ) ${w} order by rand() limit 1`;
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and ( logDT <= date(date_sub(Now(), interval 1 day)) or logDT = date(Now()) ) ${w} order by rand() limit 1`;
         console.log("get_random_substrateetl", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
@@ -228,7 +228,7 @@ module.exports = class SubstrateETL extends AssetManager {
                     let endBN = gap[1];
                     // attempted > 100 == don't try again, its been audited (missing timestamps, has decoding errors etc.)
                     let sql = `update block${f.chainID} set crawlBlock = 1, attempted = 0 where blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 100;`
-                    if (endBN - startBN < 10000) { // 50 blocks * 6-12bps = 5-10mins
+                    if (endBN - startBN < 5000) { // 50 blocks * 6-12bps = 5-10mins
                         console.log("EXECUTING: ", sql);
                         this.batchedSQL.push(sql);
                         await this.update_batchedSQL()
@@ -239,22 +239,18 @@ module.exports = class SubstrateETL extends AssetManager {
             }
 
             if (failures.errors && failures.errors.length > 0) {
-                console.log("FAILURES", f);
+                const tableChain = this.getTableChain(chainID);
                 for (const bn of failures.errors) {
                     let paraID = paraTool.getParaIDfromChainID(f.chainID);
                     let relayChain = paraTool.getRelayChainByChainID(f.chainID);
-                    // remove old blocks
+                    // redo in runs of 3
                     for (let n = bn - 1; n <= bn + 1; n++) {
-                        console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(n)}`)
-                        console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${n}';`);
-                        console.log(`./polkaholic indexblock ${f.chainID} ${n}`);
-                    }
-                    // dump day into bigquery
-                    let sql = `select UNIX_TIMESTAMP(blockDT) as blockTS from block${f.chainID} where blockNumber = "${bn}"`;
-                    let q = await this.poolREADONLY.query(sql);
-                    if (q.length > 0) {
-                        let [logDT, _] = paraTool.ts_to_logDT_hr(q[0].blockTS)
-                        console.log(`./substrate-etl dump -rc ${relayChain} -p ${paraID} -l ${logDT}`);
+                        let rowId = paraTool.blockNumberToHex(n);
+                        tableChain.row(rowId).delete();
+                        let sql = `update block${f.chainID} set crawlBlock=1, attempted = 0 where blockNumber = '${n}' and attempted < 100;`;
+                        console.log("DELETED:", rowId, " recrawling", sql, `./polkaholic indexblock ${f.chainID} ${n}`);
+                        this.batchedSQL.push(sql);
+                        await this.update_batchedSQL()
                     }
                     console.log("");
                 }
@@ -265,8 +261,8 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async audit_blocks(chainID = null, fix = true) {
         // 1. find problematic periods with a small number of records (
-        let w = chainID ? ` and chainID = ${chainID}` : ""
-        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where ( monthDT = last_day(Date(Now())) or monthDT = last_day(date_sub(Now(), interval 1 day)) ) and (auditDT is Null or auditDT < date_sub(Now(), interval 1 day ) or audited in ( 'Unknown', 'Failure' ) )  ${w}  order by auditDT`
+        let w = chainID != null ? ` and chainID = ${chainID}` : " and (auditDT is Null or auditDT < date_sub(Now(), interval 10 hour))  "
+        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where monthDT >= last_day(date_sub(Now(), interval 90 day)) and audited in ( 'Unknown', 'Failure' )   ${w}  order by auditDT`
         console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
@@ -329,7 +325,6 @@ module.exports = class SubstrateETL extends AssetManager {
             }
         }
     }
-
 
     async execute_bqJob(sqlQuery, fn = false) {
         // run bigquery job with suitable credentials
@@ -416,14 +411,6 @@ module.exports = class SubstrateETL extends AssetManager {
         if (chains.length == 0) {
             return [null, null, null];
         }
-        // check for attempts being too high
-        let sql2 = `select lastUpdateAddressBalancesAttempts from blocklog where  chainID = '${chains[0].chainID}' and logDT = '${chains[0].logDT}'`
-        let checks = await this.pool.query(sql2);
-        if (checks.length > 0) {
-            if (checks[0].lastUpdateAddressBalancesAttempts > 15) { // give up
-                return [null, null, null];
-            }
-        }
         return [chains[0].chainID, chains[0].indexTS, chains[0].startTS];
     }
 
@@ -434,7 +421,7 @@ module.exports = class SubstrateETL extends AssetManager {
         if (chainID == null) {
             let w = (specific_chainID) ? ` and chainID = '${specific_chainID}' ` : "";
             // pick a chain that has been marked Ready ( all blocks finalized ), and no other node is working on
-            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where updateAddressBalanceStatus = "Ready" and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 10 minute) or lastUpdateAddressBalancesStartDT is Null ) and lastUpdateAddressBalancesAttempts <= 5 and chainID not in ( select chainID from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 1 hour) ) ${w} order by logDT desc, rand()`;
+            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where updateAddressBalanceStatus = "Ready" and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 5+POW(2, lastUpdateAddressBalancesAttempts) MINUTE) or lastUpdateAddressBalancesStartDT is Null ) and chainID not in ( select chainID from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 1 hour) ) and logDT >= '2023-01-01' ${w} order by logDT desc, rand()`;
             console.log("updateAddressBalances", sql);
             let chains = await this.pool.query(sql);
 
@@ -1181,8 +1168,12 @@ module.exports = class SubstrateETL extends AssetManager {
             if (last_key == "") done = true;
             if (gbRounded > 1) {
                 // when we come back, we'll pick this one
-                console.log(`EXISTING with last key stored:`, last_key.toString());
-                process.exit(1);
+                console.log(`EXITING with last key stored:`, last_key.toString());
+		// update lastUpdateAddressBalancesAttempts back to 0
+                let sql = `update blocklog set lastUpdateAddressBalancesAttempts = 1 where logDT = '${logDT}' and chainID = '${chainID}'`;
+		this.batchedSQL.push(sql1);
+		await this.update_batchedSQL();
+		process.exit(1);
             }
             rows = [];
         }
@@ -1329,31 +1320,127 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
-    async dump_substrateetl_chainassets(startDT = "2023-02-18") {
+    lookup_xcmRegistry_xcmInteriorKey(xcmRegistry, relayChain, para_id, symbol) {
+        for (const r of xcmRegistry) {
+            if (r.relayChain == relayChain) {
+                for (const xcmInteriorKey of Object.keys(r.data)) {
+                    let c = r.data[xcmInteriorKey];
+                    if ((c.paraID == para_id || c.source.includes(para_id)) && c.symbol == symbol) {
+                        return xcmInteriorKey;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    xcmgar_assets(chains, relayChain, xcmRegistry) {
+        let out = [];
+        for (const c of chains) {
+            let para_id = c.paraID;
+            let chain_name = c.id;
+            for (const a of c.data) {
+                let o = {
+                    para_id,
+                    chain_name,
+                    asset: JSON.stringify(a.asset),
+                    name: a.name,
+                    symbol: a.symbol,
+                    decimals: a.decimals
+                }
+                // add xcm_interior_key using para_id / symbol combination
+                let xcmInteriorKey = this.lookup_xcmRegistry_xcmInteriorKey(xcmRegistry, relayChain, para_id, a.symbol)
+                if (xcmInteriorKey) {
+                    o.xcm_interior_key = xcmInteriorKey
+                }
+                out.push(o)
+            }
+        }
+        return (out);
+    }
+
+    xcmgar_xcmassets(xcmRegistry, relayChain) {
+        let out = [];
+        for (const registry of xcmRegistry) {
+            if (registry.relayChain == relayChain) {
+                for (const xcmInteriorKey of Object.keys(registry.data)) {
+                    let a = registry.data[xcmInteriorKey];
+                    let o = {
+                        xcm_interior_key: xcmInteriorKey,
+                        para_id: a.paraID,
+                        chain_name: a.nativeChainID,
+                        symbol: a.symbol,
+                        decimals: a.decimals,
+                        interior_type: a.interiorType,
+                        xcm_v1_multilocation_byte: a.xcmV1MultiLocationByte,
+                        xcm_v1_multilocation: JSON.stringify(a.xcmV1MultiLocation),
+                        xc_currency_id: JSON.stringify(a.xcCurrencyID),
+                        confidence: a.confidence,
+                        source: JSON.stringify(a.source)
+                    }
+                    if (Object.keys(a.xcContractAddress).length) {
+                        o.xc_contract_address = JSON.stringify(a.xcContractAddress);
+                    }
+                    out.push(o);
+                }
+            }
+        }
+        return (out);
+    }
+
+    async dump_substrateetl_xcmgar(startDT = "2023-02-18") {
         const relayChains = ["polkadot", "kusama"];
+
+        // fetch xcmgar data 
+        const axios = require("axios");
+        let url = "https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry@main/metadata/xcmgar.json";
+        let assets = null;
+        let xcmRegistry = null;
+
+        let dir = "/tmp";
+        try {
+            const resp = await axios.get(url);
+            assets = resp.data.assets;
+            xcmRegistry = resp.data.xcmRegistry;
+	    
+            if (assets && xcmRegistry) {
+                // copy to  gs://cdn.polkaholic.io/substrate-etl/xcmgar.json
+                let fn = path.join(dir, `xcmgar.json`)
+                let f = fs.openSync(fn, 'w', 0o666);
+                fs.writeSync(f, JSON.stringify(resp.data));
+                let cmd = `gsutil -m -h "Cache-Control: public, max-age=60" cp -r ${fn} gs://cdn.polkaholic.io/substrate-etl/xcmgar.json`
+                console.log(cmd);
+                await exec(cmd);
+            }
+        } catch (err) {
+            console.log(err);
+        }
 
         for (const relayChain of relayChains) {
             // 1. Generate system tables:
-            let sqls = {
-                "chains": `select id, chainName as chain_name, paraID para_id, ss58Format as ss58_prefix, symbol, isEVM as is_evm, isWASM as is_wasm from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' order by para_id`,
-                "xcmassets": `select xcmInteriorKey as xcm_interior_key, symbol, decimals, xcmChainID as para_id from xcmasset where isXCMAsset = 1 and xcmChainID in ( select chainID from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' )`,
-                "assets": `select chain.paraID as para_id, asset.asset, asset.currencyID as currency_id, asset.xcmInteriorKey as xcm_interior_key, asset.symbol, asset.decimals, asset.xcContractAddress as xc_contract_address
- from asset join chain on asset.chainID = chain.chainID where asset.asset not like '0x%' and asset.chainID in ( select chainID from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' ) and asset.symbol is not null and asset.decimals is not null`,
-            };
-
-            for (const tbl of Object.keys(sqls)) {
-                let sql = sqls[tbl];
-                let recs = await this.poolREADONLY.query(sql)
-                let dir = "/tmp";
+            let system_tables = ["chains", "xcmassets", "assets"];
+            for (const tbl of system_tables) {
                 let fn = path.join(dir, `${relayChain}-${tbl}.json`)
                 let f = fs.openSync(fn, 'w', 0o666);
                 let fulltbl = `${this.project}:${relayChain}.${tbl}`;
-                for (const c of recs) {
-                    if (tbl == "chains") { // int=>bool conversion
+                if (tbl == "chains") {
+                    let sql = `select id, chainName as chain_name, paraID para_id, ss58Format as ss58_prefix, symbol, isEVM as is_evm, isWASM as is_wasm from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' order by para_id`;
+                    let recs = await this.poolREADONLY.query(sql)
+                    for (const c of recs) {
                         c.is_evm = (c.is_evm == 1) ? true : false;
                         c.is_wasm = (c.is_wasm == 1) ? true : false;
+                        fs.writeSync(f, JSON.stringify(c) + "\r\n");
                     }
-                    fs.writeSync(f, JSON.stringify(c) + "\r\n");
+                } else if (tbl == "xcmassets") {
+                    let xcmassets = this.xcmgar_xcmassets(xcmRegistry, relayChain);
+                    for (const c of xcmassets) {
+                        fs.writeSync(f, JSON.stringify(c) + "\r\n");
+                    }
+                } else if (tbl == "assets") {
+                    let out = this.xcmgar_assets(assets[relayChain], relayChain, xcmRegistry);
+                    for (const c of out) {
+                        fs.writeSync(f, JSON.stringify(c) + "\r\n");
+                    }
                 }
                 let cmd = `bq load  --project_id=${this.project} --max_bad_records=1 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${fulltbl}' ${fn} schema/substrateetl/${tbl}.json`;
                 console.log(cmd);
@@ -1406,7 +1493,6 @@ module.exports = class SubstrateETL extends AssetManager {
                 });
             }
         }
-
     }
 
     async dump_substrateetl_polkaholic(fix = false, invalidate = false) {
@@ -1517,11 +1603,6 @@ module.exports = class SubstrateETL extends AssetManager {
   t.updateAddressBalanceStatus in ("AuditRequired", "Audited") and
   t.logDT >= "${balanceStartDT}"`;
         this.batchedSQL.push(sql_ready);
-        await this.update_batchedSQL();
-
-        // add new network logs -- TODO: remove AuditRequired
-        let sql_networklog = `insert ignore into networklog ( network, logDT, networkMetricsStatus ) (select "dotsama", logDT, "Ready" from blocklog where logDT >= "${balanceStartDT}" group by logDT having sum(if(accountMetricsStatus in ("Audited", "AuditRequired"), 1, 0)) = sum(if(accountMetricsStatus!="Ignore", 1, 0)) )`
-        this.batchedSQL.push(sql_networklog);
         await this.update_batchedSQL();
 
         sql_tally = `select relayChain, chainID, chainName, paraID, crawling, id, crawlingStatus from chain where active=1`;
@@ -1988,13 +2069,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         await this.update_batchedSQL();
     }
 
-    async dump_networkmetrics(network, logDT, isDry = false) {
+    async dump_networkmetrics(network, logDT) {
         if (network != "dotsama") {
             // not covering other networks yet
             return (false);
         }
 
-        console.log(`dump_networkmetrics logDT=${logDT}, isDry=${isDry}`)
+        console.log(`dump_networkmetrics logDT=${logDT}`)
         let datasetID = 'dotsama'
         let bqjobs = []
         let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
@@ -2110,6 +2191,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             }
         }
         let errloadCnt = 0;
+        let isDry = false;
         for (const bqjob of bqjobs) {
             try {
                 if (isDry) {
@@ -2133,9 +2215,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
     }
 
-    async dump_accountmetrics(relayChain, paraID, logDT, isDry = true) {
-
-        console.log(`dump_accountmetrics logDT=${logDT}, ${relayChain}-${paraID}, isDry=${isDry}`)
+    async dump_accountmetrics(relayChain, paraID, logDT) {
+        console.log(`dump_accountmetrics logDT=${logDT}, ${relayChain}-${paraID}`)
         let bqjobs = []
 
         // load new accounts
@@ -2340,6 +2421,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             }
         }
         let errloadCnt = 0
+        let isDry = false;
         for (const bqjob of bqjobs) {
             try {
                 if (isDry) {
@@ -2361,6 +2443,12 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             //update loadAccountMetricsDT, loadedAccountMetrics, accountMetricsStatus to "AuditRequired"
             let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=Now(), accountMetricsStatus = "AuditRequired" where chainID = '${chainID}' and logDT = '${logDT}'`
             this.batchedSQL.push(sql_upd);
+
+            // add new network logs -- TODO: remove AuditRequired
+            let sql_networklog = `insert ignore into networklog ( network, logDT, networkMetricsStatus ) (select "dotsama", logDT, "Ready" from blocklog where logDT >= "${balanceStartDT}" group by logDT having sum(if(accountMetricsStatus in ("Audited", "AuditRequired"), 1, 0)) = sum(if(accountMetricsStatus!="Ignore", 1, 0)) )`
+            this.batchedSQL.push(sql_networklog);
+            await this.update_batchedSQL();
+	    
         }
         bqjobs = []
 
@@ -2679,17 +2767,14 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let b = r.feed;
                 let bn = parseInt(row.id.substr(2), 16);
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
-                console.log("processing:", bn, b.blockTS, logDT0, hr);
-
+                //console.log("processing:", bn, b.blockTS, logDT0, hr);
                 let hdr = b.header;
-                if (!hdr || hdr.number == undefined) {
-                    console.log("PROBLEM");
-                    //await this.mark_crawl_block(chainID, bn);
-                    continue;
-                }
-                if (logDT != logDT0) {
-                    console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
-                    //await this.mark_crawl_block(chainID, bn);
+		if ( r.fork || (!hdr || hdr.number == undefined) || (logDT != logDT0) ) {
+                    let rowId = paraTool.blockNumberToHex(bn);
+		    if ( r.fork ) console.log("FORK!!!! DELETE ", bn, rowId);
+                    if ( (!hdr || hdr.number == undefined) ) console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
+                    if ( logDT != logDT0 ) console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
+                    await tableChain.row(rowId).delete();
                     continue;
                 }
                 found[hdr.number] = true;

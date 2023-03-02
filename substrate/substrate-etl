@@ -66,19 +66,19 @@ async function main() {
                             if (_logDT && _network) {
                                 let [weekagoDT, _] = paraTool.ts_to_logDT_hr(substrateetl.getCurrentTS() - 86400 * 7);
                                 await substrateetl.dump_networkmetrics(_network, _logDT);
-                                await substrateetl.dump_substrateetl_chainassets(weekagoDT)
+                                await substrateetl.dump_substrateetl_xcmgar(weekagoDT)
                             }
                         }
                     }
-		}
-		if ( tally % 10 == 0 ) {
+                }
+                if (tally % 10 == 0) {
                     let x = await substrateetl.get_random_accountmetrics_ready(relayChain, paraID);
                     let _logDT = x.logDT;
                     let _paraID = x.paraID;
                     let _relayChain = x.relayChain;
                     tally++;
                     if (_logDT && (_paraID >= 0) && _relayChain) {
-                        await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT, dry);
+                        await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT);
                         await substrateetl.sleep(1000);
                     } else {
                         await substrateetl.sleep(5000);
@@ -127,7 +127,7 @@ async function main() {
                     await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT, dry);
                     await substrateetl.sleep(1000);
                 } else {
-                    await substrateetl.sleep(20000);
+		    process.exit(0);
                 }
             }
         });
@@ -152,11 +152,9 @@ async function main() {
                 let _logDT = x.logDT;
                 if (_logDT && _network) {
                     await substrateetl.dump_networkmetrics(_network, _logDT, dry);
-
                     await substrateetl.sleep(1000);
-                    // await substrateetl.dump_cdn_substrateetl_networkmetrics()
                 } else {
-                    await substrateetl.sleep(20000);
+		    process.exit(0);
                 }
             }
             process.exit(0);
@@ -164,7 +162,7 @@ async function main() {
 
     program.command('updatebalances')
         .description(`Update Balances for some chain`)
-        .option('-c, --chainID <chainID>', 'ChainID to update balances', myParseInt)
+        .option('-c, --chainID <chainID>', 'ChainID to update balances', null, myParseInt)
         .option('-l, --logDT <logDT>', 'Date to update', null)
         .option('--endDT <endDT>', 'For multi-day ranges', null)
         .option('--startTS <startTS>', 'To resume long-running update balances', null)
@@ -173,7 +171,7 @@ async function main() {
             let logDT = opt.logDT ? opt.logDT : null;
             let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
 
-            if (chainID >= 0) {
+            if (chainID != null) {
                 if (endDT && logDT) {
                     var manager = new SubstrateETL();
                     let done = false;
@@ -280,11 +278,11 @@ async function main() {
             process.exit(0);
         })
 
-    program.command('chainassets')
-        .description("Dump chain assets + assetholders summary")
+    program.command('xcmgar')
+        .description("Dump chains, assets + xcmassets data")
         .action(async (opt) => {
             var substrateetl = new SubstrateETL();
-            await substrateetl.dump_substrateetl_chainassets()
+            await substrateetl.dump_substrateetl_xcmgar()
             process.exit(0);
         })
 

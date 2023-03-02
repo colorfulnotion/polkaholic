@@ -1,5 +1,6 @@
 const Crawler = require("./crawler");
 const xcmgarTool = require("./xcmgarTool");
+const xcmgarFileMngr = require("./xcmgarFileManager");
 const endpoints = require("./endpoints");
 
 //const SampleParser = require("./chainParsers/custom_parser_template") // fork this file to include new chain parser
@@ -35,6 +36,7 @@ module.exports = class XCMGlobalAssetRegistryManager {
 
     fnDirFn = {};
     publicEndpointsMap = {};
+    allEndpointsMap = {};
     validParachains = [];
     knownParathreads = [];
     chainAPIs = {} // chainkey -> {crawler, ... }
@@ -42,6 +44,10 @@ module.exports = class XCMGlobalAssetRegistryManager {
     chainAssetMap = {};
     xcmAssetMap = {};
     chainXcmAssetMap = {};
+
+    cachedChainAssetMap = {};
+    cachedXcmAssetMap = {};
+
     relaychain = false;
     debugLevel;
 
@@ -51,10 +57,33 @@ module.exports = class XCMGlobalAssetRegistryManager {
         }
     }
 
-    readJSONFn(relayChain, fExt = 'endpoint') {
-        const logDir = "./"
-        let fnDir = path.join(logDir, fExt);
-        let fn = `${relayChain}_${fExt}.json`
+    /*
+    readFilelist(relayChain = 'polkadot', fExt = 'assets') {
+        const logDir = ""
+        let fnDir = path.join(logDir, fExt, relayChain);
+        if (fExt == 'xcmRegistry'){
+            fnDir = path.join(logDir, fExt);
+        }
+        let fn = ``
+        let fnDirFn = false
+        let files = false
+        try {
+            fnDirFn = path.join(fnDir, fn)
+            files = fs.readdirSync(fnDirFn, 'utf8');
+        } catch (err) {
+            console.log(err, "readJSONFn", fnDirFn);
+            return false
+        }
+        return files
+    }
+
+    readParachainFiles(relayChain = 'polkadot', fn = 'polkadot_2000_assets.json') {
+        const logDir = ""
+        let pieces = fn.split('_')
+        let paraID = xcmgarTool.dechexToInt(pieces[1])
+        let fExt = pieces[2].split('.')[0]
+        let chainkey = `${relayChain}-${paraID}`
+        let fnDir = path.join(logDir, fExt, relayChain);
         let fnDirFn = false
         let jsonObj = false
         try {
@@ -62,153 +91,91 @@ module.exports = class XCMGlobalAssetRegistryManager {
             const fnContent = fs.readFileSync(fnDirFn, 'utf8');
             jsonObj = JSON.parse(fnContent)
         } catch (err) {
-            console.log(err, "readJSONFn", fnDirFn);
-            return false
+            console.log(err, "readParachainAssets", fnDirFn);
+            return [false, false]
         }
-        return jsonObj
+        let assetMap = {}
+        if (fExt == 'assets'){
+            for (const a of jsonObj){
+                let rawAsset = a.asset
+                let assetString = JSON.stringify(rawAsset)
+                if (a.xcmInteriorKey != undefined) a.xcmInteriorKeyV1 = xcmgarTool.convertXcmInteriorKeyV2toV1(a.xcmInteriorKey)
+                let assetChain = xcmgarTool.makeAssetChain(assetString, chainkey)
+                delete a.asset
+                assetMap[assetChain] = a
+            }
+        }else if (fExt == 'xcAssets'){
+            for (const x of jsonObj){
+                let xcmInteriorKeyV2 = JSON.stringify(x.xcmV1Standardized)
+                //Add back the removed fields: xcCurrencyID, xcContractAddress, source, confidence
+                x.xcCurrencyID = {}
+                x.xcContractAddress = {}
+                x.source = [paraID]
+                x.confidence = 1
+                x.xcCurrencyID[paraID] = x.asset
+                if (x.contractAddress != undefined){
+                    x.xcContractAddress[paraID] = x.contractAddress
+                    delete x.contractAddress
+                }
+                delete x.Asset
+                assetMap[xcmInteriorKeyV2] = x
+            }
+        }
+        return [chainkey, assetMap]
+    }
+    */
+
+    loadCachedRegistry(relayChain = 'polkadot'){
+        let assetList = xcmgarFileMngr.readFilelist(relayChain, 'assets')
+        for (const aFn of assetList){
+            let [chainkey, assetMap] = xcmgarFileMngr.readParachainFiles(relayChain, aFn)
+            if (chainkey && assetMap){
+                //load cache
+                this.cachedChainAssetMap[chainkey] = assetMap
+            }
+        }
+        let xcAssetList = xcmgarFileMngr.readFilelist(relayChain, 'xcAssets')
+        for (const xcFn of xcAssetList){
+            let [chainkey, xcAssetMap] = xcmgarFileMngr.readParachainFiles(relayChain, xcFn)
+            if (chainkey && xcAssetMap){
+                //load cache
+                this.cachedXcmAssetMap[chainkey] = xcAssetMap
+            }
+        }
+        //console.log(`cachedChainAssetMap`, this.cachedChainAssetMap)
+        //console.log(`cachedXcmAssetMap`, this.cachedXcmAssetMap)
     }
 
-    //asset/{relaychain}/{relaychain_paraID_fExt}
-    async writeParaJSONFn(relayChain, paraID, fExt = 'assets', jsonObj = {}) {
-        let jsonStr = JSON.stringify(jsonObj, null, 4)
-        if (jsonObj == undefined) {
-            console.log(`jsonObj missing`)
-            return false
-        }
-        const logDir = "./"
-        let fn = `${relayChain}_${paraID}_${fExt}.json`
-        let fnDirFn = false
-        try {
-            // create fnDir directory
-            let fnDir = path.join(logDir, fExt, relayChain);
-            if (!fs.existsSync(fnDir)) {
-                await fs.mkdirSync(fnDir);
-            }
-            // set up fnDir fn  (deleting old file if exists)
-            try {
-                fnDirFn = path.join(fnDir, fn);
-                //console.log("****open_file****", fnDirFn);
-                await fs.closeSync(fs.openSync(fnDirFn, 'w'));
-            } catch (err) {
-                console.log(`❌ Error setting up ${fnDir}`, err);
-                process.exit(0)
-            }
-        } catch (err0) {
-            console.log(`❌ Error Opening ${fn}:`, err0);
-            process.exit(0)
-        }
-        try {
-            await fs.appendFileSync(fnDirFn, jsonStr);
-        } catch (err1) {
-            console.log(`❌ Error writing ${fnDirFn}:`, err1);
-            process.exit(0)
-        }
-        switch (fExt) {
-            case 'assets':
-                let assetCnt = jsonObj.length
-                console.log(`✅ Success: ${relayChain}-${paraID} Local Asset Registry (Found:${assetCnt}) cached @\n    ${fnDirFn}`)
-                break;
-            case 'xcAssets':
-                let xcAssetCnt = jsonObj.length
-                console.log(`✅ Success: ${relayChain}-${paraID} XCM/MultiLocation Registry (Found:${xcAssetCnt}) cached @\n    ${fnDirFn}`)
-                break;
-            default:
-                console.log(`✅ Success: ${relayChain}-${paraID} cached @n    ${fnDirFn}`)
-        }
-    }
-
-    async writeJSONFn(relayChain, fExt = 'publicEndpoints', jsonObj = {}) {
-        let jsonStr = JSON.stringify(jsonObj, null, 4)
-        if (jsonObj == undefined) {
-            console.log(`jsonObj missing`)
-            return false
-        }
-        const logDir = "./"
-        let fn = `${relayChain}_${fExt}.json`
-        let fnDirFn = false
-        try {
-            // create fnDir directory
-            let fnDir = path.join(logDir, fExt);
-            if (!fs.existsSync(fnDir)) {
-                await fs.mkdirSync(fnDir);
-            }
-            // set up fnDir fn  (deleting old file if exists)
-            try {
-                fnDirFn = path.join(fnDir, fn);
-                //console.log("****open_file****", fnDirFn);
-                await fs.closeSync(fs.openSync(fnDirFn, 'w'));
-            } catch (err) {
-                console.log(`❌ Error setting up ${fnDir}`, err);
-                process.exit(0)
-            }
-        } catch (err0) {
-            console.log(`❌ Error Opening ${fn}:`, err0);
-            process.exit(0)
-        }
-        try {
-            //console.log("***** write_json ***** ", fnDirFn)
-            await fs.appendFileSync(fnDirFn, jsonStr);
-        } catch (err1) {
-            console.log(`❌ Error writing ${fnDirFn}:`, err1);
-            process.exit(0)
-        }
-
-        switch (fExt) {
-            case 'publicEndpoints':
-                let reachableCnt = Object.keys(jsonObj).length
-                console.log(`✅ Success: ${relayChain} ${reachableCnt} reachable parachain endpoints cached @\n    ${fnDirFn}`)
-                break;
-            case 'xcmRegistry':
-                let xcmAsseCnt = Object.keys(jsonObj).length
-                console.log(`✅ Success: ${relayChain} XCM Global Asset Registry (Found:${xcmAsseCnt}) cached @\n    ${fnDirFn}`)
-                break;
-            default:
-                console.log(`✅ Success: ${relayChain} ${fExt} cached @\n    ${fnDirFn}`)
-        }
-    }
-
-    async open_log(relayChain, fType = 'endpoint') {
-        const logDir = "./"
-        let fn = `${relayChain}_${fType}.json`
-        try {
-            // create fnDir directory
-            let fnDir = path.join(logDir, fType);
-            if (!fs.existsSync(fnDir)) {
-                await fs.mkdirSync(fnDir);
-            }
-            // set up fnDir fn  (deleting old file if exists)
-            try {
-                this.fnDirFn = path.join(fnDir, fn);
-                console.log("****open_log****", this.fnDirFn);
-                await fs.closeSync(fs.openSync(this.fnDirFn, 'w'));
-            } catch (err) {
-                console.log(err);
-            }
-        } catch (err) {
-            console.log(err, "open_log", fn);
-        }
-    }
-
-    async write_log(list = []) {
-        if (list.length > 0) {
-            list.push("");
-            try {
-                console.log("***** write_log ***** ", this.fnDirFn)
-                await fs.appendFileSync(this.fnDirFn, list.join("\n"));
-            } catch (err) {
-                console.log(err, "write_log", this.fnDirFn, list);
+    useCachedAsset(chainkey){
+        //let cachedXcmAssetMap = this.cachedXcmAssetMap[chainkey]
+        let cachedChainAssetMap = this.cachedChainAssetMap[chainkey]
+        if (cachedChainAssetMap){
+            console.log(`cachedChainAssetMap ${chainkey}`, cachedChainAssetMap)
+            let assetChainkeys = Object.keys(cachedChainAssetMap)
+            for (const assetChainkey of assetChainkeys){
+                let assetInfo = cachedChainAssetMap[assetChainkey]
+                this.setChainAsset(chainkey, assetChainkey, assetInfo)
             }
         }
     }
 
-    async write_json(jsonObj = {}) {
-        if (jsonObj != undefined) {
-            let jsonStr = JSON.stringify(jsonObj, null, 4)
-            try {
-                console.log("***** write_json ***** ", this.fnDirFn)
-                await fs.appendFileSync(this.fnDirFn, jsonStr);
-            } catch (err) {
-                console.log(err, "write_json", this.fnDirFn, jsonObj);
+    useCachedXcmAsset(chainkey){
+        let pieces = chainkey.split('-')
+        let relayChain = pieces[0]
+        let paraIDSource = pieces[1]
+        let cachedXcmAssetMap = this.cachedXcmAssetMap[chainkey]
+        if (cachedXcmAssetMap){
+            console.log(`cachedXcmAssetMap ${chainkey}`, cachedXcmAssetMap)
+            let xcmInteriorKeys = Object.keys(cachedXcmAssetMap)
+            for (const xcmInteriorKey of xcmInteriorKeys){
+                let xcmAssetInfo = cachedXcmAssetMap[xcmInteriorKey]
+                let assetID = xcmAssetInfo.xcCurrencyID[paraIDSource]
+                this.setXcmAsset(xcmInteriorKey, xcmAssetInfo, chainkey)
+                this.addXcmAssetLocalCurrencyID(xcmInteriorKey, paraIDSource, assetID, chainkey)
+                // compute xcContractAddress
+                if (xcmAssetInfo.xcContractAddress != undefined && xcmAssetInfo.xcContractAddress[paraIDSource] != undefined && assetID != undefined){
+                    this.addXcmAssetLocalxcContractAddress(chainkey, xcmInteriorKey, paraIDSource, assetID)
+                }
             }
         }
     }
@@ -267,14 +234,14 @@ module.exports = class XCMGlobalAssetRegistryManager {
             console.log(`Supported: ${relayChain} endpoints[${Object.keys(supportedList).length}]`, Object.keys(supportedList))
             console.log(`Unverified ${relayChain} endpoints[${Object.keys(unverifiedList).length}]`, Object.keys(unverifiedList))
             if (isUpdate) {
-                await this.writeJSONFn(relayChain, 'publicEndpoints', supportedList)
+                await xcmgarFileMngr.writeJSONFn(relayChain, 'publicEndpoints', supportedList)
             }
         }
     }
 
     async updateXcmRegistry() {
         let relayChain = this.relaychain
-        await this.writeJSONFn(relayChain, 'xcmRegistry', this.getXcmAssetMap())
+        let fnDirFn = await xcmgarFileMngr.writeJSONFn(relayChain, 'xcmRegistry', this.getXcmAssetMap())
     }
 
     async updateLocalMultilocation() {
@@ -306,12 +273,13 @@ module.exports = class XCMGlobalAssetRegistryManager {
                 localXcAssetList.push(xcAsset)
             }
             if (localXcAssetList.length > 0) {
-                await this.writeParaJSONFn(relayChain, paraIDSource, 'xcAssets', localXcAssetList)
+                let fnDirFn =  await xcmgarFileMngr.writeParaJSONFn(relayChain, paraIDSource, 'xcAssets', localXcAssetList)
             }
         }
     }
 
     async updateLocalAsset() {
+        let meta = {}
         let relayChain = this.relaychain
         let chainAssetMap = this.getChainAssetMap()
         for (const chainkey of Object.keys(chainAssetMap)) {
@@ -336,13 +304,16 @@ module.exports = class XCMGlobalAssetRegistryManager {
                 localAssetList.push(a)
             }
             if (localAssetList.length > 0) {
-                await this.writeParaJSONFn(relayChain, paraIDSource, 'assets', localAssetList)
+                let fnDirFn =  await xcmgarFileMngr.writeParaJSONFn(relayChain, paraIDSource, 'assets', localAssetList)
+                console.log(`updateLocalAsset`, fnDirFn)
+                meta[chainkey] = fnDirFn
             }
         }
     }
 
     async initPublicEndpointsMap(relaychain = 'polkadot') {
-        let publicEndpoints = this.readJSONFn(relaychain, 'publicEndpoints')
+        let publicEndpoints = xcmgarFileMngr.readJSONFn(relaychain, 'publicEndpoints')
+        this.allEndpointsMap = xcmgarFileMngr.readAllEndpoints()
         this.publicEndpointsMap = publicEndpoints
         this.relaychain = relaychain
         //console.log(`[${relaychain}] publicEndpointsMap`, this.publicEndpointsMap)
@@ -659,12 +630,26 @@ module.exports = class XCMGlobalAssetRegistryManager {
 
     }
 
-    addXcmAssetLocalxcContractAddress(xcmInteriorKey, localParaID, localCurrencyID) {
+    addXcmAssetLocalxcContractAddress(chainkey, xcmInteriorKey, localParaID, localCurrencyID) {
         let xcmAsset = this.xcmAssetMap[xcmInteriorKey]
+        let xcContractAddress = xcmgarTool.xcAssetIDToContractAddr(localCurrencyID)
         if (xcmAsset != undefined) {
-            let xcContractAddress = xcmgarTool.xcAssetIDToContractAddr(localCurrencyID)
             //console.log(`add xcContractAddress ${xcContractAddress}`)
             this.xcmAssetMap[xcmInteriorKey]['xcContractAddress'][localParaID] = xcContractAddress.toLowerCase()
+        }
+        if (this.chainXcmAssetMap[chainkey] == undefined) {
+            this.chainXcmAssetMap[chainkey] = {}
+            console.log(`currencyID creating this.chainXcmAssetMap[${chainkey}]!!!`, this.chainXcmAssetMap[chainkey])
+        }
+        try {
+            if (this.chainXcmAssetMap[chainkey][xcmInteriorKey] != undefined) {
+                this.chainXcmAssetMap[chainkey][xcmInteriorKey]['xcContractAddress'][localParaID] = xcContractAddress.toLowerCase()
+                console.log(`currencyID setting this.chainXcmAssetMap[${chainkey}][${xcmInteriorKey}]['xcContractAddress'][${localParaID}] !!!`, this.chainXcmAssetMap[chainkey][xcmInteriorKey]['xcContractAddress'][localParaID])
+            } else {
+                console.log(`ELSE! currencyID setting this.chainXcmAssetMap[${chainkey}][${xcmInteriorKey}]['xcContractAddress'][${localParaID}] !!!`, this.chainXcmAssetMap[chainkey][xcmInteriorKey]['xcContractAddress'][localParaID])
+            }
+        } catch (e) {
+            console.log(`[${chainkey}] addXcmAssetLocalCurrencyID xcmInteriorKey=${xcmInteriorKey}, localParaID=${localParaID}, localCurrencyID`, localCurrencyID, `xcContractAddress`, xcContractAddress, e)
         }
     }
 

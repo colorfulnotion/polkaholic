@@ -1193,6 +1193,7 @@ from chain where chainID = '${chainID}' limit 1`);
                 r.blockHash = blkhashes[0];
                 r.finalized = true;
             } else {
+		r.fork = true;
                 //use the correct finalized hash by checking and see if we can find the proper blockrow
                 console.log(`ERROR: multiple finalized blkhashes found ${blkhashes}`)
                 this.logger.error({

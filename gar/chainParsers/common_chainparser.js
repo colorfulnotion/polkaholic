@@ -1,4 +1,5 @@
 const xcmgarTool = require("../xcmgarTool");
+const xcmgarFileMngr = require("../xcmgarFileManager");
 const {
     decodeAddress,
 } = require("@polkadot/keyring");
@@ -11,12 +12,14 @@ module.exports = class ChainParser {
     api;
     manager;
     isCustomParser = false;
+    endpointMap = false;
     nativeAsset = false;
 
     constructor(api, manager, isCustomParser = true) {
         this.api = api
         this.manager = manager
         this.isCustomParser = isCustomParser
+        this.endpointMap = xcmgarFileMngr.readAllEndpoints()
     }
 
     setDebugLevel(debugLevel = xcmgarTool.debugNoLog) {
@@ -30,6 +33,16 @@ module.exports = class ChainParser {
 
     isObject(val) {
         return (typeof val === 'object');
+    }
+
+    getChainId(relayChain, paraID){
+        let id = null
+        let chainkey = `${relayChain}-${paraID}`
+        if (this.endpointMap && this.endpointMap[chainkey] != undefined){
+            let ep = this.endpointMap[chainkey]
+            if (ep.id != undefined) id = ep.id
+        }
+        return id
     }
 
     async detectPalletStorage(chainkey, pallet, storage) {
@@ -330,6 +343,7 @@ module.exports = class ChainParser {
                     //interior: interiorVStr, //interior
                     paraID: paraID,
                     relayChain: relayChain,
+                    nativeChainID: this.getChainId(relayChain, paraID),
                     symbol: nativeSymbol,
                     decimals: decimals,
                     interiorType: standardizedInteriorK,
@@ -463,6 +477,7 @@ module.exports = class ChainParser {
                     //interior: interiorVStr, //interior
                     paraID: paraID,
                     relayChain: relayChain,
+                    nativeChainID: this.getChainId(relayChain, paraID),
                     symbol: nativeSymbol,
                     decimals: decimals,
                     interiorType: standardizedInteriorK,
@@ -636,6 +651,7 @@ module.exports = class ChainParser {
                         //interior: interiorVStr, //interior
                         paraID: paraID,
                         relayChain: relayChain,
+                        nativeChainID: this.getChainId(relayChain, paraID),
                         symbol: nativeSymbol,
                         decimals: decimals,
                         interiorType: standardizedInteriorK,
@@ -761,6 +777,7 @@ module.exports = class ChainParser {
                     //interior: interiorVStr, //interior
                     paraID: paraID,
                     relayChain: relayChain,
+                    nativeChainID: this.getChainId(relayChain, paraID),
                     symbol: nativeSymbol,
                     decimals: decimals,
                     interiorType: standardizedInteriorK,

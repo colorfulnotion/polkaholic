@@ -1288,16 +1288,6 @@ const prodParasKusama = [{
         }
     },
     {
-        info: 'subsocialX',
-        homepage: 'https://subsocial.network/',
-        paraId: 2100,
-        text: 'SubsocialX',
-        providers: {
-            //'Dappforce 1': 'wss://para.f3joule.space',
-            //'Dappforce 2': 'wss://para.subsocial.network'
-        }
-    },
-    {
         info: 'zero',
         homepage: 'https://zero.io',
         paraId: 2236,

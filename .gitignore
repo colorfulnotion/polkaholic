@@ -24,3 +24,9 @@ yaml/hosts_ui*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+gar/assets
+gar/xcAssets
+gar/xcmRegistry
+gar/metadata
+gar/node_modules
+gar/publicEndpoints

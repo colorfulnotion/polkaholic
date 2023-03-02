@@ -2,6 +2,7 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const path = require("path");
+const fetch = require("node-fetch");
 const AssetManager = require("./assetManager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
@@ -21,67 +22,21 @@ const {
     StorageKey
 } = require('@polkadot/types');
 
+
+const xcmgarSourceURL = 'https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry/metadata/xcmgar.json'
+
 module.exports = class XCMGARLoadManager extends AssetManager {
 
     knownEvmChains = [paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDMoonbaseBeta, paraTool.chainIDMoonbaseAlpha, paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDShibuya]
 
-    readJSONFn(relayChain = 'polkadot', fExt = 'xcmRegistry') {
-        const logDir = "../gar"
-        let fnDir = path.join(logDir, fExt);
-        let fn = `${relayChain}_${fExt}.json`
-        let fnDirFn = false
-        let jsonObj = false
-        try {
-            fnDirFn = path.join(fnDir, fn)
-            const fnContent = fs.readFileSync(fnDirFn, 'utf8');
-            jsonObj = JSON.parse(fnContent)
-        } catch (err) {
-            console.log(err, "readJSONFn", fnDirFn);
-            return false
-        }
-        return jsonObj
-    }
+    async fetchXcmGarRegistry() {
+        // Storing response
+        const response = await fetch(xcmgarSourceURL);
 
-    //fs.readdirSync('../gar/assets/kusama')
-    readFilelist(relayChain = 'polkadot', fExt = 'assets') {
-        const logDir = "../gar"
-        let fnDir = path.join(logDir, fExt, relayChain);
-        let fn = ``
-        let fnDirFn = false
-        let files = false
-        try {
-            fnDirFn = path.join(fnDir, fn)
-            console.log(`fnDirFn`, fnDirFn)
-            files = fs.readdirSync(fnDirFn, 'utf8');
-        } catch (err) {
-            console.log(err, "readJSONFn", fnDirFn);
-            return false
-        }
-        return files
-    }
-
-    readParachainFiles(relayChain = 'polkadot', fn = 'polkadot_2000_assets.json', fExt = 'assets') {
-        const logDir = "../gar"
-        let fnDir = path.join(logDir, fExt, relayChain);
-        let pieces = fn.split('_')
-        let paraID = paraTool.dechexToInt(pieces[1])
-        let fnDirFn = false
-        let jsonObj = false
-        try {
-            fnDirFn = path.join(fnDir, fn)
-            const fnContent = fs.readFileSync(fnDirFn, 'utf8');
-            jsonObj = JSON.parse(fnContent)
-        } catch (err) {
-            console.log(err, "readParachainAssets", fnDirFn);
-            return false
-        }
-        let r = {
-            chainkey: `${relayChain}-${paraID}`,
-            chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-            paraID: paraID,
-            assets: jsonObj
-        }
-        return r
+        // Storing data in form of JSON
+        var data = await response.json();
+        console.log(`xcmgarSourceURL res`, data);
+        return data
     }
 
     categorizeAssetType(assetName, assetSymbol, chainID) {
@@ -464,13 +419,18 @@ module.exports = class XCMGARLoadManager extends AssetManager {
     +-----------------------+--------------+------+-----+---------+-------+
     */
 
-    async flushXcmAssetGar(xcRegistryNew) {
+    async flushXcmAssetGar(xcRegistryNew, filterList = false, isDry = true, targetTable = 'xcmassetgar') {
         // flush new xc Registry into
+        if (targetTable != 'xcmassetgar' && targetTable != 'xcmasset') {
+            console.log(`Invalid targetTable=${targetTable}`)
+            return
+        }
         let xcmtransferKeys = Object.keys(xcRegistryNew)
         console.log(`xcmtransferKeys[${xcmtransferKeys.length}]`, xcmtransferKeys)
         if (xcmtransferKeys.length > 0) {
             let xcmAssets = [];
             for (let i = 0; i < xcmtransferKeys.length; i++) {
+                let xcmtransferKey = xcmtransferKeys[i]
                 let r = xcRegistryNew[xcmtransferKeys[i]];
                 //["xcmInteriorKey", "symbol", "relayChain"]
                 // ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parents"]
@@ -479,23 +439,40 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                 ].join(",") + ")";
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} >>>`, t)
                 console.log(`xcmInteriorKey=${r.xcmInteriorKey} res`, r)
-                xcmAssets.push(t);
-
+                if (filterList) {
+                    if (filterList.includes(xcmtransferKey)) {
+                        xcmAssets.push(t);
+                    }
+                } else {
+                    xcmAssets.push(t);
+                }
             }
-            let sqlDebug = true
-            await this.upsertSQL({
-                "table": "xcmassetgar",
-                "keys": ["xcmInteriorKey"],
-                "vals": ["symbol", "relayChain", "xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
-                "data": xcmAssets,
-                "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
-                "replaceIfNull": ["symbol"]
-            }, sqlDebug);
+            if (xcmAssets.length > 0 && isDry) {
+                console.log('new xcm registry detected', xcmAssets)
+                process.exit(1, 'new xcm registry detected')
+            }
+            if (xcmAssets.length > 0) {
+                let sqlDebug = true
+                await this.upsertSQL({
+                    "table": targetTable,
+                    "keys": ["xcmInteriorKey"],
+                    "vals": ["symbol", "relayChain", "xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
+                    "data": xcmAssets,
+                    "replace": ["xcmchainID", "nativeAssetChain", "isUSD", "decimals", "parent", "xcmInteriorKeyV2", "parachainID", "confidence"],
+                    "replaceIfNull": ["symbol"]
+                }, sqlDebug);
+            } else {
+                console.log(`No new registry detected`)
+            }
         }
     }
 
-    async flushParachainAssets(assetMap, filterList = false) {
+    async flushParachainAssets(assetMap, filterList = false, isDry = true, targetTable = 'assetgar') {
         // flush new xc Registry into
+        if (targetTable != 'assetgar' && targetTable != 'asset') {
+            console.log(`Invalid targetTable=${targetTable}`)
+            return
+        }
         let assetMapKey = Object.keys(assetMap)
         console.log(`flushParachainAssets, filterList[${filterList.length}]`, filterList)
         if (assetMapKey.length > 0) {
@@ -520,17 +497,23 @@ module.exports = class XCMGARLoadManager extends AssetManager {
                     assets.push(a)
                 }
             }
-            console.log(`sql`, assets)
-            //return
-            let sqlDebug = true
-            await this.upsertSQL({
-                "table": "assetgar",
-                "keys": ["asset", "chainID"],
-                "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"],
-                "data": assets,
-                "replaceIfNull": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"]
-            }, sqlDebug);
-            await this.update_batchedSQL()
+            if (assets.length > 0 && isDry) {
+                console.log('new asset detected', assets)
+                process.exit(1, 'new asset detected')
+            }
+            if (assets.length > 0) {
+                let sqlDebug = true
+                await this.upsertSQL({
+                    "table": targetTable,
+                    "keys": ["asset", "chainID"],
+                    "vals": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"],
+                    "data": assets,
+                    "replaceIfNull": ["assetType", "xcmInteriorKey", "decimals", "symbol", "assetName", "currencyID", "xcContractAddress"]
+                }, sqlDebug);
+                await this.update_batchedSQL()
+            } else {
+                console.log(`No new asset detected`)
+            }
         }
     }
 }

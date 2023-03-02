@@ -640,7 +640,7 @@ module.exports = class XCMGlobalAssetRegistry {
         }
     }
 
-    addXcmAssetLocalxcContractAddress(xcmInteriorKey, localParaID, localCurrencyID) {
+    addXcmAssetLocalxcContractAddress(chainkey, xcmInteriorKey, localParaID, localCurrencyID) {
         let xcmAsset = this.xcmAssetMap[xcmInteriorKey]
         if (xcmAsset != undefined) {
             let xcContractAddress = xcmgarTool.xcAssetIDToContractAddr(localCurrencyID)
