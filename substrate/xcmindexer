@@ -113,6 +113,7 @@ async function main() {
                 await manager.generate_extrinsic_XCMInfo(extrinsicHash, transferIndex, xcmIndex);
                 process.exit(0);
             } else if (opt.chainID != undefined) {
+                let chainID = opt.chainID;
                 let lookbackDays = opt.lookbackDays;
                 await manager.bulk_generate_XCMInfo(chainID, lookbackDays, 1000);
                 process.exit(0);

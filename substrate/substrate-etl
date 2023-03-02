@@ -70,8 +70,19 @@ async function main() {
                             }
                         }
                     }
-                } else {
-                    await substrateetl.sleep(20000);
+		}
+		if ( tally % 10 == 0 ) {
+                    let x = await substrateetl.get_random_accountmetrics_ready(relayChain, paraID);
+                    let _logDT = x.logDT;
+                    let _paraID = x.paraID;
+                    let _relayChain = x.relayChain;
+                    tally++;
+                    if (_logDT && (_paraID >= 0) && _relayChain) {
+                        await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT, dry);
+                        await substrateetl.sleep(1000);
+                    } else {
+                        await substrateetl.sleep(5000);
+                    }
                 }
             }
         })
@@ -82,6 +93,8 @@ async function main() {
         .option('-r, --relayChain <relayChain>', 'Relay chain', null)
         .option('-p, --paraID <paraID>', 'Para ID', myParseInt)
         .option('-l, --logDT <logDT>', 'Date', null)
+        .option('--endDT <endDT>', 'Date', null)
+
         .option('-d, --dry', `dry run the cmd without updating`, false)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
@@ -90,7 +103,17 @@ async function main() {
             let logDT = opt.logDT;
             let dry = opt.dry;
             if (logDT && paraID && relayChain) {
-                await substrateetl.dump_accountmetrics(relayChain, paraID, logDT, dry);
+                let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+                if (endDT) {
+                    let logTS = paraTool.logDT_hr_to_ts(logDT, 0);
+                    let endTS = paraTool.logDT_hr_to_ts(endDT, 0);
+                    for (let ts = logTS; ts <= endTS; ts += 86400) {
+                        let [dt, hr] = paraTool.ts_to_logDT_hr(ts);
+                        await substrateetl.dump_accountmetrics(relayChain, paraID, dt, dry);
+                    }
+                } else {
+                    await substrateetl.dump_accountmetrics(relayChain, paraID, logDT, dry);
+                }
                 process.exit(0);
             }
             let tally = 0;
@@ -143,19 +166,38 @@ async function main() {
         .description(`Update Balances for some chain`)
         .option('-c, --chainID <chainID>', 'ChainID to update balances', myParseInt)
         .option('-l, --logDT <logDT>', 'Date to update', null)
+        .option('--endDT <endDT>', 'For multi-day ranges', null)
+        .option('--startTS <startTS>', 'To resume long-running update balances', null)
         .action(async (opt) => {
-            chainID = opt.chainID ? opt.chainID : null;
-            logDT = opt.logDT ? opt.logDT : null;
+            let chainID = opt.chainID ? opt.chainID : null;
+            let logDT = opt.logDT ? opt.logDT : null;
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
 
-            if (chainID >= 0 && logDT) {
-                var manager = new SubstrateETL();
-                let done = false;
-                let startTS = manager.getCurrentTS();
-                do {
-                    console.log("GO!")
-                    done = await manager.update_address_balances_logDT(chainID, logDT, startTS);
-                } while (!done)
-                process.exit(0);
+            if (chainID >= 0) {
+                if (endDT && logDT) {
+                    var manager = new SubstrateETL();
+                    let done = false;
+                    let logTS = paraTool.logDT_hr_to_ts(logDT, 0);
+                    let endTS = paraTool.logDT_hr_to_ts(endDT, 0);
+                    for (let ts = logTS; ts <= endTS; ts += 86400) {
+                        let startTS = manager.getCurrentTS();
+                        let [dt, hr] = paraTool.ts_to_logDT_hr(ts);
+                        await manager.update_address_balances_logDT(chainID, dt, startTS);
+                    }
+                    process.exit(0);
+                } else if (logDT) {
+                    var manager = new SubstrateETL();
+                    let done = false;
+                    let startTS = opt.startTS ? opt.startTS : manager.getCurrentTS();
+                    do {
+                        done = await manager.update_address_balances_logDT(chainID, logDT, startTS);
+                        //await manager.sleep(5000);
+                    } while (!done)
+                    if (!done) {
+                        console.log(`manually resume: ./substrate-etl -c ${chainID} -l ${logDT} --startTS ${startTS}`);
+                    }
+                    process.exit(0);
+                }
             } else {
                 while (1) {
                     var manager = new SubstrateETL();
@@ -216,7 +258,6 @@ async function main() {
         .action(async (relayChain, opt) => {
             var substrateetl = new SubstrateETL();
             let [weekagoDT, _] = paraTool.ts_to_logDT_hr(substrateetl.getCurrentTS() - 86400 * 7);
-            weekagoDT = "2022-08-01" // temporary
             let logDT = opt.logDT ? opt.logDT : weekagoDT;
             await substrateetl.dump_xcm_range(relayChain, logDT);
             await substrateetl.update_xcm_summary(relayChain, logDT);

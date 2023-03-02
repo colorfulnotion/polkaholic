@@ -5199,6 +5199,7 @@ module.exports = class Query extends AssetManager {
     mergeEventDataAndDataType(data, dataType, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let dd = []
+        if (!data || !data.length) return dd;
         for (var i = 0; i < data.length; i++) {
             let d = data[i]
             let x = {
