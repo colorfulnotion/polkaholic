@@ -228,7 +228,7 @@ module.exports = class SubstrateETL extends AssetManager {
                     let endBN = gap[1];
                     // attempted > 100 == don't try again, its been audited (missing timestamps, has decoding errors etc.)
                     let sql = `update block${f.chainID} set crawlBlock = 1, attempted = 0 where blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 100;`
-                    if (endBN - startBN < 10000) { // 50 blocks * 6-12bps = 5-10mins
+                    if (endBN - startBN < 5000) { // 50 blocks * 6-12bps = 5-10mins
                         console.log("EXECUTING: ", sql);
                         this.batchedSQL.push(sql);
                         await this.update_batchedSQL()
@@ -239,22 +239,18 @@ module.exports = class SubstrateETL extends AssetManager {
             }
 
             if (failures.errors && failures.errors.length > 0) {
-                console.log("FAILURES", f);
+		const tableChain = this.getTableChain(chainID);
                 for (const bn of failures.errors) {
                     let paraID = paraTool.getParaIDfromChainID(f.chainID);
                     let relayChain = paraTool.getRelayChainByChainID(f.chainID);
-                    // remove old blocks
+                    // redo in runs of 3
                     for (let n = bn - 1; n <= bn + 1; n++) {
-                        console.log(`cbt deleterow chain${f.chainID} ${paraTool.blockNumberToHex(n)}`)
-                        console.log(`update block${f.chainID} set attempted = 0, crawlBlock=1 where blockNumber = '${n}';`);
-                        console.log(`./polkaholic indexblock ${f.chainID} ${n}`);
-                    }
-                    // dump day into bigquery
-                    let sql = `select UNIX_TIMESTAMP(blockDT) as blockTS from block${f.chainID} where blockNumber = "${bn}"`;
-                    let q = await this.poolREADONLY.query(sql);
-                    if (q.length > 0) {
-                        let [logDT, _] = paraTool.ts_to_logDT_hr(q[0].blockTS)
-                        console.log(`./substrate-etl dump -rc ${relayChain} -p ${paraID} -l ${logDT}`);
+			let rowId = paraTool.blockNumberToHex(n);
+			tableChain.row(rowId).delete();
+			let sql = `update block${f.chainID} set crawlBlock=1, attempted = 0 where blockNumber = '${n}' and attempted < 100;`;
+			console.log("DELETED:", rowId, " recrawling", sql, `./polkaholic indexblock ${f.chainID} ${n}`);
+			this.batchedSQL.push(sql);
+                        await this.update_batchedSQL()
                     }
                     console.log("");
                 }
@@ -265,8 +261,8 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async audit_blocks(chainID = null, fix = true) {
         // 1. find problematic periods with a small number of records (
-        let w = chainID ? ` and chainID = ${chainID}` : ""
-        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where ( monthDT = last_day(Date(Now())) or monthDT = last_day(date_sub(Now(), interval 1 day)) ) and (auditDT is Null or auditDT < date_sub(Now(), interval 1 day ) or audited in ( 'Unknown', 'Failure' ) )  ${w}  order by auditDT`
+        let w = chainID != null ? ` and chainID = ${chainID}` : " and (auditDT is Null or auditDT < date_sub(Now(), interval 10 hour))  "
+        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where monthDT >= last_day(date_sub(Now(), interval 90 day)) and audited in ( 'Unknown', 'Failure' )   ${w}  order by auditDT`
         console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);

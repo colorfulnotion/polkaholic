@@ -356,7 +356,7 @@ module.exports = class Crawler extends Indexer {
             let traceType = crawlTrace ? "state_traceBlock" : false
             let success = await this.save_block_trace(chain.chainID, block, blockHash, events, trace, true, traceType, evmBlock, evmReceipts, evmTrace);
             if (success) {
-                return [t, block, events, trace, evmBlock, evmReceipts, blockHash];
+                return {t, block, events, trace, evmBlock, evmReceipts, blockHash};
             }
         } catch (err) {
             console.log(err);
@@ -367,27 +367,7 @@ module.exports = class Crawler extends Indexer {
                 "err": err
             })
         }
-        return [t, false, false, false, false, false, false];
-    }
-
-    // crawl_trace fetches a block
-    async crawl_trace(chain, t) {
-        let blockHash = t.blockHash;
-        let attemptNumber = t.attempted;
-
-        try {
-            let trace = await this.crawlTrace(chain, blockHash, 60000 * (attemptNumber + 1));
-            let success = await this.save_trace(chain.chainID, t, trace, "state_traceBlock");
-            return [t, trace];
-        } catch (err) {
-            this.logger.warn({
-                "op": "crawl_trace",
-                "chainID": chain.chainID,
-                "blockHash": blockHash,
-                "err": err
-            })
-        }
-        return [t, false];
+        return {t, block: false, events:false, trace:false, evmBlock:false, evmReceipts:false, blockHash:false};
     }
 
     // crawl_trace fetches a block
@@ -1201,6 +1181,16 @@ module.exports = class Crawler extends Indexer {
         await this.update_chain_assets(chain, daysago)
     }
 
+    async getChainLookbackBlocks(chainID, defaultLookbackBlocks = 14000) {
+	var sql = `select chain.chainID, chain.blocksCovered, min(startBN) startBN, blocksCovered - min(startBN) as lookbackBlocks from blocklogstats join chain on blocklogstats.chainID = chain.chainID where monthDT >= LAST_DAY(date_sub(Now(), interval 90 day)) and audited in ('Failure', 'Unknown') and chain.chainID = ${chainID} limit 1`;
+	var stats = await this.poolREADONLY.query(sql);
+	if ( stats.length > 0 ) {
+	    console.log(stats[0]);
+	    return parseInt(stats[0].lookbackBlocks, 10);
+	}
+	return defaultLookbackBlocks;
+    }
+
     async crawlTracesRandom(lookbackBackfill = 60) {
         var sql = `select chainID, traceTSLast, UNIX_TIMESTAMP( NOW() ) - traceTSLast as ts from chain where crawling = 1 and UNIX_TIMESTAMP( NOW() ) - traceTSLast < 864000 and chainID != 22007 and WSEndpointSelfHosted = 1 order by traceTSLast limit 1`;
         var chains = await this.poolREADONLY.query(sql);
@@ -1219,11 +1209,15 @@ module.exports = class Crawler extends Indexer {
     }
 
     // for any missing blocks/traces, this refetches the dataset
-    async crawlBackfill(chain, techniqueParams = ["mod", 0, 1], lookbackBlocks = 50000, wsBackfill = false) {
+    async crawlBackfill(chain, techniqueParams = ["mod", 0, 1], lookbackBlocks = null, wsBackfill = false) {
         let chainID = chain.chainID;
         let sql = false;
         let extraflds = (chain.isEVM > 0) ? " crawlBlockEVM, crawlReceiptsEVM, " : "";
         let extracond = (chain.isEVM > 0) ? " or crawlBlockEVM = 1 or crawlReceiptsEVM = 1 " : "";
+	if ( lookbackBlocks == null ) {
+	    lookbackBlocks = await this.getChainLookbackBlocks(chainID);
+	}
+	
         if (techniqueParams[0] == "mod") {
             let n = techniqueParams[1];
             let nmax = techniqueParams[2];
@@ -1255,18 +1249,21 @@ module.exports = class Crawler extends Indexer {
             })
             let res2 = await Promise.all(res);
             res2.forEach(async (t_block_trace) => {
-                let [t, block, events, trace, evmBlock, evmReceipts] = t_block_trace;
+                let {t, block, events, trace, evmBlock, evmReceipts} = t_block_trace;
                 if (t.attempted > 100) t.attempted = 100;
 
                 let flds = [];
                 if (block && events && (t.crawlBlock > 0)) {
                     t.crawlBlock = 0;
                     flds.push(`crawlBlock = '${t.crawlBlock}'`);
-                }
-                if (trace && (t.crawlTrace > 0)) {
-                    t.crawlTrace = 0;
-                    flds.push(`crawlTrace = '${t.crawlTrace}'`);
-                }
+                    if (trace && (t.crawlTrace > 0)) {
+			t.crawlTrace = 0;
+			flds.push(`crawlTrace = '${t.crawlTrace}'`);
+                    }
+                } else {
+                    flds.push(`attempted = ${t.attempted + 1}`);
+                    flds.push(`attemptedDT = Now()`);
+		}
                 if (chain.isEVM > 0) {
                     if ((t.crawlBlockEVM > 0) && evmBlock && evmBlock.hash) {
                         t.crawlBlockEVM = 0;
@@ -1277,12 +1274,9 @@ module.exports = class Crawler extends Indexer {
                         flds.push("crawlReceiptsEVM = 0");
                     }
                 }
-                if (flds.length == 0) {
-                    flds.push(`attempted = ${t.attempted + 1}`);
-                }
                 let sql = `update block${chainID} set ${flds.join(", ")} where blockNumber = '${t.blockNumber}'`;
                 this.batchedSQL.push(sql)
-                this.mark_indexlog_dirty(chainID, block.blockTS);
+                await this.mark_indexlog_dirty(chainID, block.blockTS);
                 await this.update_batchedSQL();
                 return
             });
@@ -1290,12 +1284,12 @@ module.exports = class Crawler extends Indexer {
         await this.update_batchedSQL();
     }
 
-    async getNumRecentCrawlTraces(chain, lookbackBlocks = 14000) {
-        var sql = `select count(*) as numRecentCrawlTraces from block${chain.chainID} b, chain c where crawlTrace > 0 and length(blockHash) > 0 and blockNumber >= c.blocksFinalized - ${lookbackBlocks} and c.chainID = ${chain.chainID} and attempted < 3 order by crawlTrace desc,attempted, blockNumber desc limit 1000`;
+    async getNumRecentCrawlBlocks(chain, lookbackBlocks = 14000) {
+        var sql = `select count(*) as numRecentCrawlBlocks from block${chain.chainID} b, chain c where crawlBlock = 1 and blockNumber >= c.blocksFinalized - ${lookbackBlocks} and c.chainID = ${chain.chainID} and attemptedDT < date_sub(Now(), INTERVAL POW(5, attempted) MINUTE) order by attempted limit 1000`;
         let result = await this.poolREADONLY.query(sql);
 
         if (result.length > 0) {
-            return result[0].numRecentCrawlTraces;
+            return result[0].numRecentCrawlBlocks;
         }
         return (-1);
     }
@@ -1333,12 +1327,12 @@ module.exports = class Crawler extends Indexer {
                     let [t, trace] = t_trace;
                     if (trace) {
                         let sql = `update block${chainID} set crawlTraceEVM = 0 where blockNumber = ${t.blockNumber}`
-                        this.mark_indexlog_dirty(chainID, t_trace.blockTS)
                         this.batchedSQL.push(sql)
                     } else {
                         let sql = `update block${chainID} set attempted = attempted + 1, attemptedDT = Now() where blockNumber = ${t.blockNumber}`
                         this.batchedSQL.push(sql)
                     }
+                    await this.mark_indexlog_dirty(chainID, t_trace.blockTS)
                     return
                 });
                 this.batchedSQL.push(`update chain set traceTSLast = UNIX_TIMESTAMP(Now()) where chainID = ${chainID}`)
@@ -1349,7 +1343,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     // for any missing traces, this refetches the dataset
-    async crawlTraces(chainID, techniqueParams = ["mod", 0, 1], lookbackBlocks = 500000) {
+    async crawlTraces(chainID, techniqueParams = ["mod", 0, 1], lookbackBlocks = null, skipTrace = true) {
         let chain = await this.setupChainAndAPI(chainID, true, true);
         await this.check_chain_endpoint_correctness(chain);
 
@@ -1360,13 +1354,15 @@ module.exports = class Crawler extends Indexer {
             let currentBlock = parseInt(syncState.currentBlock.toString(), 10);
             let startingBlock = parseInt(syncState.startingBlock.toString(), 10);
             //console.log("crawlTraces highestBlock", currentBlock, highestBlock, syncState, startingBlock);
-
+	    let lookbackBlocks = await this.getChainLookbackBlocks(chainID);
             let startBN = chain.blocksFinalized - lookbackBlocks;
-            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and attempted < ${maxTraceAttempts} and blockNumber > ${startBN} and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} limit 5000`
+	    let w = ( ( techniqueParams.length > 2 ) && ( techniqueParams[2] > 0 ) ) ? `and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]}` : ""
+	    let w2 = ( chainID == 0 || chainID == 2 ) ? " or crawlTrace = 1 " : ""; // only need traces from relay chains in practice
+            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where ( crawlBlock = 1 ${w2} ) and blockNumber > ${startBN} and ( attemptedDT is Null or attemptedDT < date_sub(Now(), INTERVAL POW(5, attempted) MINUTE) ) ${w} limit 5000`
             if (techniqueParams[0] == "range") {
                 let startBN = techniqueParams[1];
                 let endBN = techniqueParams[2];
-                sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where crawlTrace = 1 and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < ${maxTraceAttempts} order by rand() limit 1000`
+                sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, crawlBlock, blockHash, attempted from block${chainID} where ( crawlBlock = 1 ${w2} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} order by rand() limit 1000`
             }
             console.log(sql);
             let tasks = await this.poolREADONLY.query(sql);
@@ -1383,40 +1379,46 @@ module.exports = class Crawler extends Indexer {
                         blockTS: t1.blockTS, // could be null
                         attempted: t1.attempted // should be
                     };
-                    console.log(t2)
-                    if (t1.crawlBlock) {
-                        return this.crawl_block_trace(chain, t2)
-                    } else {
-                        return this.crawl_trace(chain, t2);
-                    }
+                    return this.crawl_block_trace(chain, t2)
                 });
                 let res2 = await Promise.all(res);
                 res2.forEach(async (t_trace) => {
-                    let [t, trace] = t_trace;
-                    if (trace && (trace.length > 0)) {
-                        let sql = `update block${chainID} set crawlTrace = 0 where blockNumber = ${t.blockNumber}`
-                        this.mark_indexlog_dirty(chainID, t.blockTS)
-                        this.batchedSQL.push(sql)
-                    } else {
-                        let sql = `update block${chainID} set attempted = attempted + 1, attemptedDT = Now() where blockNumber = ${t.blockNumber}`
-                        this.batchedSQL.push(sql)
-                    }
+                    let { t, block, events, trace, evmBlock, blockHash } = t_trace;
+		    let flds = [];
+		    if ( blockHash ) {
+			flds.push('crawlBlock = 0');
+			if ( trace ) {
+			    flds.push('crawlTrace = 0');
+			}
+		    } else {
+			flds.push('attempted = attempted + 1');
+			flds.push('attemptedDT = Now()');
+		    }
+                    let sql = `update block${chainID} set ${flds.join(",")} where blockNumber = ${t.blockNumber}`;
+		    console.log(sql)
+                    this.batchedSQL.push(sql)
+	            await this.mark_indexlog_dirty(chainID, block.blockTS)
                     return
                 });
                 this.batchedSQL.push(`update chain set traceTSLast = UNIX_TIMESTAMP(Now()) where chainID = ${chainID}`)
                 await this.update_batchedSQL();
             }
-            let numRecentCrawlTraces = await this.getNumRecentCrawlTraces(chain, lookbackBlocks);
-            console.log("crawlTraces numRecentCrawlTraces=", numRecentCrawlTraces)
-            if (numRecentCrawlTraces < 3) done = true;
+            let numRecentCrawlBlocks = await this.getNumRecentCrawlBlocks(chain, lookbackBlocks);
+            console.log("crawlTraces numRecentCrawlBlocks=", numRecentCrawlBlocks)
+            if (numRecentCrawlBlocks < 3) done = true;
         } while (!done);
 
     }
 
-    mark_indexlog_dirty(chainID, ts) {
-        if (!(ts > 0)) return (false);
+    async mark_indexlog_dirty(chainID, ts) {
+
+        if (!(ts > 0)) {
+	    return (false);
+	}
         let indexTS = Math.floor(ts / 3600) * 3600;
-        if (indexTS == this.lastmarkedTS) return (false);
+        if (indexTS == this.lastmarkedTS) {
+	    return (false);
+	}
         let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
         this.upsertSQL({
             "table": "indexlog",

@@ -37,20 +37,21 @@ async function main() {
             let [unsubscribeFinalizedHeads, unsubscribeStorage, unsubscribeRuntimeVersion] = await crawler.crawlBlocks(chainID);
             // do not process.exit
         });
-
+    
     program.command('crawltraces')
         .description(`Crawl Traces of chain`)
         .usage("2004")
         .argument('<chainID>', 'ChainID to crawl traces for', myParseInt)
         .option('-n <n>', 'Shard #', 0, myParseInt)
         .option('-m, --nmax <nmax>', 'Shard Max', 1, myParseInt)
-        .option('--lookbackBlocks <lookbackBlocks>', 'Lookback blocks', 14000, myParseInt)
+        .option('--lookbackBlocks <lookbackBlocks>', 'Lookback blocks', null, myParseInt)
         .action(async (chainID, opt) => {
-            let n = opt.n;
-            let m = opt.nmax;
-            let lookbackBlocks = opt.lookbackBlocks;
             var crawler = new Crawler();
             await crawler.assetManagerInit();
+            let n = opt.n;
+            let m = opt.nmax;
+	    let lookbackBlocks = opt.lookbackBlocks ? opt.lookbackBlocks : await crawler.getChainLookbackBlocks(chainID);
+	    console.log("HEY", lookbackBlocks);
             await crawler.crawlTraces(chainID, ["mod", n, m], lookbackBlocks);
             await crawler.release(5000);
             process.exit(0);
