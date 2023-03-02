@@ -78,7 +78,7 @@ async function main() {
                     let _relayChain = x.relayChain;
                     tally++;
                     if (_logDT && (_paraID >= 0) && _relayChain) {
-                        await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT, dry);
+                        await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT);
                         await substrateetl.sleep(1000);
                     } else {
                         await substrateetl.sleep(5000);
