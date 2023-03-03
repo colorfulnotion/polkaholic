@@ -109,7 +109,9 @@ async function main() {
                     let endTS = paraTool.logDT_hr_to_ts(endDT, 0);
                     for (let ts = logTS; ts <= endTS; ts += 86400) {
                         let [dt, hr] = paraTool.ts_to_logDT_hr(ts);
-                        await substrateetl.dump_accountmetrics(relayChain, paraID, dt, dry);
+			if ( await substrateetl.is_accountmetrics_ready(relayChain, paraID, dt) ) {
+                            await substrateetl.dump_accountmetrics(relayChain, paraID, dt, dry);
+			}
                     }
                 } else {
                     await substrateetl.dump_accountmetrics(relayChain, paraID, logDT, dry);
@@ -127,7 +129,7 @@ async function main() {
                     await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT, dry);
                     await substrateetl.sleep(1000);
                 } else {
-		    process.exit(0);
+                    process.exit(0);
                 }
             }
         });
@@ -154,7 +156,7 @@ async function main() {
                     await substrateetl.dump_networkmetrics(_network, _logDT, dry);
                     await substrateetl.sleep(1000);
                 } else {
-		    process.exit(0);
+                    process.exit(0);
                 }
             }
             process.exit(0);
@@ -171,7 +173,7 @@ async function main() {
             let logDT = opt.logDT ? opt.logDT : null;
             let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
 
-            if (chainID != null) {
+            if (chainID != null && logDT) {
                 if (endDT && logDT) {
                     var manager = new SubstrateETL();
                     let done = false;

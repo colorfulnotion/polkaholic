@@ -39,7 +39,7 @@ const {
 } = require('@google-cloud/bigquery');
 
 // first day when balances are available daily
-const balanceStartDT = "2023-01-01";
+const balanceStartDT = "2021-12-01";
 
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
@@ -182,7 +182,6 @@ module.exports = class SubstrateETL extends AssetManager {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
 
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and ( logDT <= date(date_sub(Now(), interval 1 day)) or logDT = date(Now()) ) ${w} order by rand() limit 1`;
         console.log("get_random_substrateetl", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
@@ -419,9 +418,16 @@ module.exports = class SubstrateETL extends AssetManager {
         // pick something your node started already
         let [chainID, indexTS, startTS] = await this.pick_chainbalancecrawler(specific_chainID);
         if (chainID == null) {
-            let w = (specific_chainID) ? ` and chainID = '${specific_chainID}' ` : "";
-            // pick a chain that has been marked Ready ( all blocks finalized ), and no other node is working on
-            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where updateAddressBalanceStatus = "Ready" and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 5+POW(2, lastUpdateAddressBalancesAttempts) MINUTE) or lastUpdateAddressBalancesStartDT is Null ) and chainID not in ( select chainID from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 1 hour) ) and logDT >= '2023-01-01' ${w} order by logDT desc, rand()`;
+            let w = (specific_chainID) ? ` and blocklog.chainID = '${specific_chainID}' ` : "";
+            // pick a chain-logDT combo that has been marked Ready ( all blocks finalized ), and no other node is working on
+            let sql = `select blocklog.chainID, UNIX_TIMESTAMP(blocklog.logDT) as indexTS
+ from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecrawler.logDT and blocklog.chainID = chainbalancecrawler.chainID
+ where updateAddressBalanceStatus = "Ready" and
+ ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 5+POW(4, lastUpdateAddressBalancesAttempts) MINUTE) or lastUpdateAddressBalancesStartDT is Null ) and
+ chainbalancecrawler.logDT is null and
+ blocklog.logDT >= '2022-01-01' ${w} and
+ lastUpdateAddressBalancesAttempts < 10 
+ order by lastUpdateAddressBalancesAttempts asc, rand()`;
             console.log("updateAddressBalances", sql);
             let chains = await this.pool.query(sql);
 
@@ -435,7 +441,7 @@ module.exports = class SubstrateETL extends AssetManager {
             startTS = this.getCurrentTS();
         }
         let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
-        let sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}'`;
+        let sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}' and lastUpdateAddressBalancesAttempts < 30`;
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
         await this.update_address_balances_logDT(chainID, logDT, startTS);
@@ -502,6 +508,7 @@ module.exports = class SubstrateETL extends AssetManager {
             await exec(cmd);
             // do a confirmatory query to compute numAddresses and mark that we're done by updating lastUpdateAddressBalancesEndDT
             let sql = `select count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} where date(ts) = '${logDT}'`;
+
             let rows = await this.execute_bqJob(sql);
             let row = rows.length > 0 ? rows[0] : null;
             let [min_numAddresses, max_numAddresses] = await this.getMinMaxNumAddresses(chainID, logDT);
@@ -546,6 +553,14 @@ module.exports = class SubstrateETL extends AssetManager {
         if (fs.existsSync(bqlogfn)) {
             fs.unlinkSync(bqlogfn);
         }
+	// place an empty file ala "touch"
+	try {
+	    const time = new Date();
+	    fs.utimesSync(bqlogfn, time, time);
+	} catch (e) {
+	    let fd = fs.openSync(bqlogfn, 'a');
+	    fs.closeSync(fd);
+	}
         let sql_upd = `update blocklog set lastUpdateAddressBalancesStartDT = Now() where chainID = ${chainID} and logDT = '${logDT}'`;
         console.log("updateAddressBalances START", sql_upd);
         this.batchedSQL.push(sql_upd);
@@ -901,10 +916,8 @@ module.exports = class SubstrateETL extends AssetManager {
                 let rawRows = bqRows.map((r) => {
                     return JSON.stringify(r);
                 });
-                if (rawRows.length > 0) {
-                    rawRows.push("");
-                    await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
-                }
+                rawRows.push("");
+                await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
                 bqRows = [];
             } else {
                 await this.upsertSQL({
@@ -1026,9 +1039,31 @@ module.exports = class SubstrateETL extends AssetManager {
 
         // update total issuances
         try {
-            if (api.query.balances && api.query.balances.totalIssuance) {
-                let totalIssuance = decimals ? await api.query.balances.totalIssuance() / 10 ** decimals : null;
-                if (totalIssuance) {
+            let totalIssuance = 0;
+            if (decimals) {
+                if (api.query.balances && api.query.balances.totalIssuance) {
+                    totalIssuance = await api.query.balances.totalIssuance() / 10 ** decimals;
+                } else if (api.query.tokens && api.query.tokens.totalIssuance) {
+                    // hard wired for now...
+                    let currencyID = null;
+                    if (chainID == 2032) {
+                        currencyID = {
+                            Token: "INTR"
+                        }
+                    } else if (chainID == 22092) {
+                        currencyID = {
+                            Token: "KINT"
+                        }
+                    } else if (chainID == 22110) {
+                        currencyID = 0
+                    }
+                    if (currencyID) {
+                        totalIssuance = await api.query.tokens.totalIssuance(currencyID) / 10 ** decimals;
+                    }
+                } else {
+                    console.log("totalIssuance NOT AVAIL");
+                }
+                if (totalIssuance > 0) {
                     let sql_totalIssuance = `update chain set totalIssuance = '${totalIssuance}' where chainID = '${chainID}'`
                     console.log(sql_totalIssuance);
                     this.batchedSQL.push(sql_totalIssuance);
@@ -1038,7 +1073,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 }
             }
         } catch (e) {
-            console.log(e);
+            console.log("totalIssuance ERR", e);
         }
 
         let numHolders = 0; // we can't tally like this.
@@ -1149,10 +1184,8 @@ module.exports = class SubstrateETL extends AssetManager {
                 let rawRows = bqRows.map((r) => {
                     return JSON.stringify(r);
                 });
-                if (rawRows.length > 0) {
-                    rawRows.push("");
-                    await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
-                }
+                rawRows.push("");
+                await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
             } else {
                 await this.insertBTRows(tblRealtime, rows, tblName);
             }
@@ -1169,11 +1202,11 @@ module.exports = class SubstrateETL extends AssetManager {
             if (gbRounded > 1) {
                 // when we come back, we'll pick this one
                 console.log(`EXITING with last key stored:`, last_key.toString());
-		// update lastUpdateAddressBalancesAttempts back to 0
+                // update lastUpdateAddressBalancesAttempts back to 0
                 let sql = `update blocklog set lastUpdateAddressBalancesAttempts = 1 where logDT = '${logDT}' and chainID = '${chainID}'`;
-		this.batchedSQL.push(sql1);
-		await this.update_batchedSQL();
-		process.exit(1);
+                this.batchedSQL.push(sql1);
+                await this.update_batchedSQL();
+                process.exit(1);
             }
             rows = [];
         }
@@ -1208,8 +1241,8 @@ module.exports = class SubstrateETL extends AssetManager {
         return gbRounded;
     }
 
-    async compute_teleportfees(relayChain, logDT = '2023-01-01') {
-        let sql = `insert into teleportfees ( symbol, chainIDDest, teleportFeeDecimals_avg, teleportFeeDecimals_std, teleportFeeDecimals_avg_imperfect, teleportFeeDecimals_std_imperfect) (select symbol, chainIDDest, avg(teleportFeeDecimals) teleportFeeDecimals_avg, if(std(teleportFeeDecimals)=0, avg(teleportFeeDecimals)*.2, std(teleportFeeDecimals)) as teleportFeeDecimals_std, avg(amountSentDecimals - amountReceivedDecimals), std(amountSentDecimals - amountReceivedDecimals) from xcmtransfer where amountSentDecimals > amountReceivedDecimals and teleportFeeDecimals is not null and teleportFeeDecimals > 0 and confidence = 1 and  isFeeItem and sourceTS > unix_timestamp("2022-01-01") group by symbol, chainIDDest) on duplicate key update teleportFeeDecimals_avg = values(teleportFeeDecimals_avg), teleportFeeDecimals_std = values(teleportFeeDecimals_std), teleportFeeDecimals_avg_imperfect = values(teleportFeeDecimals_avg_imperfect), teleportFeeDecimals_std_imperfect = values(teleportFeeDecimals_std_imperfect)`
+    async compute_teleportfees(relayChain, logDT = '2021-12-01') {
+        let sql = `insert into teleportfees ( symbol, chainIDDest, teleportFeeDecimals_avg, teleportFeeDecimals_std, teleportFeeDecimals_avg_imperfect, teleportFeeDecimals_std_imperfect) (select symbol, chainIDDest, avg(teleportFeeDecimals) teleportFeeDecimals_avg, if(std(teleportFeeDecimals)=0, avg(teleportFeeDecimals)*.2, std(teleportFeeDecimals)) as teleportFeeDecimals_std, avg(amountSentDecimals - amountReceivedDecimals), std(amountSentDecimals - amountReceivedDecimals) from xcmtransfer where amountSentDecimals > amountReceivedDecimals and teleportFeeDecimals is not null and teleportFeeDecimals > 0 and confidence = 1 and  isFeeItem and sourceTS > unix_timestamp("${logDT}") group by symbol, chainIDDest) on duplicate key update teleportFeeDecimals_avg = values(teleportFeeDecimals_avg), teleportFeeDecimals_std = values(teleportFeeDecimals_std), teleportFeeDecimals_avg_imperfect = values(teleportFeeDecimals_avg_imperfect), teleportFeeDecimals_std_imperfect = values(teleportFeeDecimals_std_imperfect)`
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
     }
@@ -1351,7 +1384,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 // add xcm_interior_key using para_id / symbol combination
                 let xcmInteriorKey = this.lookup_xcmRegistry_xcmInteriorKey(xcmRegistry, relayChain, para_id, a.symbol)
                 if (xcmInteriorKey) {
-                    o.xcm_interior_key = xcmInteriorKey
+                    o.xcm_interior_key = paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey)
                 }
                 out.push(o)
             }
@@ -1366,7 +1399,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 for (const xcmInteriorKey of Object.keys(registry.data)) {
                     let a = registry.data[xcmInteriorKey];
                     let o = {
-                        xcm_interior_key: xcmInteriorKey,
+                        xcm_interior_key: paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey),
                         para_id: a.paraID,
                         chain_name: a.nativeChainID,
                         symbol: a.symbol,
@@ -1388,7 +1421,7 @@ module.exports = class SubstrateETL extends AssetManager {
         return (out);
     }
 
-    async dump_substrateetl_xcmgar(startDT = "2023-02-18") {
+    async dump_substrateetl_xcmgar(startDT = "2023-02-28") {
         const relayChains = ["polkadot", "kusama"];
 
         // fetch xcmgar data 
@@ -1402,7 +1435,7 @@ module.exports = class SubstrateETL extends AssetManager {
             const resp = await axios.get(url);
             assets = resp.data.assets;
             xcmRegistry = resp.data.xcmRegistry;
-	    
+
             if (assets && xcmRegistry) {
                 // copy to  gs://cdn.polkaholic.io/substrate-etl/xcmgar.json
                 let fn = path.join(dir, `xcmgar.json`)
@@ -1668,7 +1701,7 @@ monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by relayChain 
                 if (symbol_xcmInteriorKeys[symbolRelayChain] == undefined) {
                     symbol_xcmInteriorKeys[symbolRelayChain] = [];
                 }
-                symbol_xcmInteriorKeys[symbolRelayChain].push(xc.xcmInteriorKey);
+                symbol_xcmInteriorKeys[symbolRelayChain].push(paraTool.convertXcmInteriorKeyV1toV2(xc.xcmInteriorKey));
             }
 
             let sql_assetschain = `select a.symbol, a.chainID, a.asset, a.numHolders, a.free, a.freeUSD, a.reserved, a.reservedUSD, a.miscFrozen, a.miscFrozenUSD, a.frozen, a.frozenUSD, a.priceUSD, chain.paraID, chain.id, chain.chainName from assetholderchain a, chain where a.chainID = chain.chainID and logDT = '${logDT}' and a.chainID in ( select chainID from chain where relayChain = '${r.relayChain}' ) order by a.freeUSD desc, a.numHolders desc`
@@ -1774,7 +1807,7 @@ round(numTransactionsEVM_avg) as numTransactionsEVM,
 round(numEVMTransfers_avg) as numEVMTransfers,
 round(numNewAccounts_avg) as numNewAccounts,
 round(numAddresses_max) as numAddresses, issues, chain.crawlingStatus
-from blocklogstats join chain on blocklogstats.chainID = chain.chainID where monthDT >= "${birthDT}" and monthDT <= last_day(date(date_sub(Now(), interval 10 day))) and chain.relayChain in ("polkadot", "kusama") order by relayChain desc, paraID asc, monthDT desc`;
+from blocklogstats join chain on blocklogstats.chainID = chain.chainID where monthDT >= "${birthDT}" and monthDT <= last_day(date(Now())) and chain.relayChain in ("polkadot", "kusama") order by relayChain desc, paraID asc, monthDT desc`;
         tallyRecs = await this.poolREADONLY.query(sql_tally);
         let prevChainID = null;
         let prevStartBN = null;
@@ -1820,8 +1853,8 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
             prevChainID = chainID;
             let numSignedExtrinsics = r.numSignedExtrinsics ? parseInt(r.numSignedExtrinsics, 10) : 0;
             let numActiveAccounts = r.numActiveAccounts ? parseInt(r.numActiveAccounts, 10) : 0;
-            let numPassiveAccounts = r.yr >= 2023 && r.numPassiveAccounts ? parseInt(r.numPassiveAccounts, 10) : null;
-            let numNewAccounts = r.yr >= 2023 && r.numNewAccounts ? parseInt(r.numNewAccounts, 10) : null;
+            let numPassiveAccounts = r.yr >= 2022 && r.numPassiveAccounts ? parseInt(r.numPassiveAccounts, 10) : null;
+            let numNewAccounts = r.yr >= 2022 && r.numNewAccounts ? parseInt(r.numNewAccounts, 10) : null;
             let numAddresses = r.numAddresses ? parseInt(r.numAddresses, 10) : 0;
             let issues = r.issues ? r.issues : "";
             let m = {
@@ -2215,6 +2248,17 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
     }
 
+    async is_accountmetrics_ready(relayChain, paraID, logDT) {
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
+	let sql = `select accountMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}' and accountMetricsStatus = 'Ready'`
+	let recs = await this.poolREADONLY.query(sql)
+	if ( recs.length == 1 ) {
+	    return(true);
+	}
+	return(false);
+
+    }
+    
     async dump_accountmetrics(relayChain, paraID, logDT) {
         console.log(`dump_accountmetrics logDT=${logDT}, ${relayChain}-${paraID}`)
         let bqjobs = []
@@ -2448,7 +2492,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             let sql_networklog = `insert ignore into networklog ( network, logDT, networkMetricsStatus ) (select "dotsama", logDT, "Ready" from blocklog where logDT >= "${balanceStartDT}" group by logDT having sum(if(accountMetricsStatus in ("Audited", "AuditRequired"), 1, 0)) = sum(if(accountMetricsStatus!="Ignore", 1, 0)) )`
             this.batchedSQL.push(sql_networklog);
             await this.update_batchedSQL();
-	    
+
         }
         bqjobs = []
 
@@ -2675,7 +2719,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let ts = this.getCurrentTS();
         let [currDT, _c] = paraTool.ts_to_logDT_hr(ts);
         if (startLogDT == null) {
-            startLogDT = (relayChain == "kusama") ? "2023-01-01" : "2023-01-01";
+            startLogDT = (relayChain == "kusama") ? "2021-12-18" : "2021-12-18";
         }
         console.log(`dump_substrateetl_range, paraID=${paraID}, relayChain=${relayChain}, isEVM=${isEVM}, startLogDT=${startLogDT}, currDT=${currDT}`)
         let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0)
@@ -2769,11 +2813,11 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
                 //console.log("processing:", bn, b.blockTS, logDT0, hr);
                 let hdr = b.header;
-		if ( r.fork || (!hdr || hdr.number == undefined) || (logDT != logDT0) ) {
+                if (r.fork || (!hdr || hdr.number == undefined) || (logDT != logDT0)) {
                     let rowId = paraTool.blockNumberToHex(bn);
-		    if ( r.fork ) console.log("FORK!!!! DELETE ", bn, rowId);
-                    if ( (!hdr || hdr.number == undefined) ) console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
-                    if ( logDT != logDT0 ) console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
+                    if (r.fork) console.log("FORK!!!! DELETE ", bn, rowId);
+                    if ((!hdr || hdr.number == undefined)) console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
+                    if (logDT != logDT0) console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
                     await tableChain.row(rowId).delete();
                     continue;
                 }
@@ -3184,7 +3228,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         return (false);
     }
 
-    async update_blocklog_bulk(chainID, startDT = "2023-01-01") {
+    async update_blocklog_bulk(chainID, startDT = "2021-12-01") {
         console.log("update_blocklog_bulk", chainID);
         let [today, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
         let project = this.project;

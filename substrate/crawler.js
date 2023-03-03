@@ -1200,13 +1200,15 @@ module.exports = class Crawler extends Indexer {
     async getChainLookbackBlocks(chainID, defaultLookbackBlocks = 14000) {
         var sql = `select chain.chainID, chain.blocksCovered, min(startBN) startBN, blocksCovered - min(startBN) as lookbackBlocks from blocklogstats join chain on blocklogstats.chainID = chain.chainID where monthDT >= LAST_DAY(date_sub(Now(), interval 90 day)) and audited in ('Failure', 'Unknown') and chain.chainID = ${chainID} limit 1`;
         var stats = await this.poolREADONLY.query(sql);
-        if (stats.length > 0) {
-            console.log(stats[0]);
+        if (stats.length > 0 && ( stats[0].lookbackBlocks > 0 ) ) {
             return parseInt(stats[0].lookbackBlocks, 10);
         }
-        return defaultLookbackBlocks;
+        if ( defaultLookbackBlocks > 0 ) {
+            return defaultLookbackBlocks;
+	}
+	return 14000;
     }
-
+    
     async crawlTracesRandom(lookbackBackfill = 60) {
         var sql = `select chainID, traceTSLast, UNIX_TIMESTAMP( NOW() ) - traceTSLast as ts from chain where crawling = 1 and UNIX_TIMESTAMP( NOW() ) - traceTSLast < 864000 and chainID != 22007 and WSEndpointSelfHosted = 1 order by traceTSLast limit 1`;
         var chains = await this.poolREADONLY.query(sql);

@@ -992,9 +992,9 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         return 0;
     }
 
-    async bulk_generate_XCMInfo(chainIDDest = null, lookbackDays = 16, limit = 1000) {
+    async bulk_generate_XCMInfo(chainIDDest = null, lookbackDays = 16, limit = 100) {
         let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2022-05-05") and  sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and ( matchAttemptDT is null or matchAttemptDT < date_sub(Now(), INTERVAL POW(3, matchAttempts) MINUTE) ) and symbol is not null  and chainID in ( select chainID from chain where crawling = 1 ) and chainIDDest in ( select chainID from chain where crawling = 1 )  ${w}  order by matchAttempts asc, sourceTS desc limit ${limit}`;
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2023-02-28") and  sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and ( matchAttemptDT is null or matchAttemptDT < date_sub(Now(), INTERVAL POW(3, matchAttempts) MINUTE) ) and symbol is not null ${w}  order by matchAttempts asc, sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
         let extrinsic = {};

@@ -5,9 +5,9 @@ multi-chain block explorer at https://polkaholic.io powered by APIs https://api.
 
 The Polkaholic index is fully available in BigQuery via [substrate-etl](https://github.com/colorfulnotion/substrate-etl)
 and covers 70 chains:
-* [Polkadot](https://github.com/colorfulnotion/substrate-etl/polkadot)
-* [Kusama](https://github.com/colorfulnotion/substrate-etl/kusama)
-* [Summary](https://github.com/colorfulnotion/substrate-etl/SUMMARY.md)
+* [Polkadot](https://github.com/colorfulnotion/substrate-etl/tree/main/polkadot)
+* [Kusama](https://github.com/colorfulnotion/substrate-etl/tree/main/kusama)
+* [Summary](https://github.com/colorfulnotion/substrate-etl/blob/main/SUMMARY.md)
 
 ## Running the Polkaholic.io Indexer + Block explorer
 
@@ -22,7 +22,7 @@ To use your local index, set `POLKAHOLIC_API_URL` in your environment
 # node api.js
 ```
 
-The `substrate-etl` is the recommended route for access to the Polkaholic Index
+The `substrate-etl` is the recommended route for large scale access to the Polkaholic Index.
 
 ## Set up Indexing
 

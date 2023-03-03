@@ -627,7 +627,7 @@ module.exports = class PolkaholicDB {
     async getChains(crawling = 1, orderBy = "valueTransfersUSD7d DESC") {
         let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, chain.chainName, blocksCovered, blocksFinalized, chain.symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS,
 unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents,
-valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numAccountsActive, numAccountsActive7d, numAccountsActive30d, chain.relayChain, totalIssuance, lastUpdateChainAssetsTS,
+valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numAccountsActive, numAccountsActive7d, numAccountsActive30d, chain.relayChain, chain.paraID, totalIssuance, lastUpdateChainAssetsTS,
 onfinalityID, onfinalityStatus, isEVM, chain.asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, xcmasset.priceUSD, xcmasset.priceUSDPercentChange, 0 as numHolders
 from chain left join xcmasset on chain.symbolXcmInteriorKey = xcmasset.xcmInteriorKey where crawling = ${crawling} order by ${orderBy}`);
         return (chains);
@@ -1193,7 +1193,7 @@ from chain where chainID = '${chainID}' limit 1`);
                 r.blockHash = blkhashes[0];
                 r.finalized = true;
             } else {
-		r.fork = true;
+                r.fork = true;
                 //use the correct finalized hash by checking and see if we can find the proper blockrow
                 console.log(`ERROR: multiple finalized blkhashes found ${blkhashes}`)
                 this.logger.error({
