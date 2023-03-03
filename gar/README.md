@@ -5,9 +5,12 @@ This XCM Global Asset Registry (XCMGAR) repo does all the data processing needed
 
 * Input: known [Polkadot + Kusama RPC endpoints](https://github.com/colorfulnotion/xcm-global-registry/tree/main/assets)
 
-* Output: one [[XCM Global Asset Registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/xcmRegistry)] containing all xcAsset across parachains and [[local (xc)Assets registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/assets/polkadot) + [local xcm registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/xcAssets/polkadot)] per each parachain.
+* Output:
+	* [xcmgar.json](https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry/metadata/xcmgar.json): a registry file containing all assets, xcAssets, xcmRegsitry across parachains.  (CDN: `https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry/metadata/xcmgar.json`)
+	*  [xcmgar_url.json](https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry/metadata/xcmgar_url.json): a metadata file containing links to every individual asset, xcAsset. xcmRegistry files. Each file can be served individually, depending on your use case  (CDN: `https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry/metadata/xcmgar_url.json`)
+	* [[local (xc)Assets registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/assets/polkadot) + [local xcm registry](https://github.com/colorfulnotion/xcm-global-registry/tree/main/xcAssets/polkadot)] per each parachain. Used as cached backups when endpoints are temporarily unreachable during the periodic on-chain crawl.
 
-As of mid-January 2023, XCMGAR covers 55+ chains with 30 xcAssets on Polkadot and 44 on Kusama. This is a work in progress and needs contributions from parachain teams to be successful. Data is updated daily via Github Actions.
+As of mid-January 2023, XCMGAR covers 55+ chains with 35 xcAssets on Polkadot and 47 on Kusama. This is a work in progress and needs contributions from parachain teams to be successful. Data is updated daily via Github Actions.
 
 Target use cases: multichain dapps, chain analytics in the Substrate ecosystem
 

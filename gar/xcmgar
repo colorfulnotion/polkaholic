@@ -2,8 +2,9 @@
 const { Command } = require('commander');
 const endpoints = require("./endpoints");
 const xcmgarTool = require("./xcmgarTool");
+const xcmgarFileMngr = require("./xcmgarFileManager");
 const fs = require('fs');
-var XCMGlobalAssetRegistryManager = require("./xcmgarManager");
+const XCMGlobalAssetRegistryManager = require("./xcmgarManager");
 
 class XCMGlobalAssetRegistryCLI {
     async registry(opt) {
@@ -101,6 +102,13 @@ class XCMGlobalAssetRegistryCLI {
         let validParachainList = await xcmgarm.fetchParaIDs(relayEndpoints)
         await xcmgarm.updatePublicEndpoints(relaychains, validParachainList, !isDryRun)
     }
+
+    async generateData(opt) {
+        let isURL = (opt.url)? true : false
+        let isMeta = (opt.metadata)? true : false
+        if (isURL) await xcmgarFileMngr.generateMeta()
+        if (isMeta) await xcmgarFileMngr.generateURL()
+    }
 }
 
 async function main() {
@@ -130,6 +138,15 @@ async function main() {
 	    let xcmgarcli = new XCMGlobalAssetRegistryCLI();
 	    await xcmgarcli.updateEndpoints(opt);
 	});
+
+    program.command('generate')
+    .description('generate metadata from cached results')
+    .option('-u, --url', `generate xcmgar.json containing all records from {xcmRegistry, assets, xcAssets}`, false)
+    .option('-m, --metadata', `generate xcmgarUrl.json containing all urls from {xcmRegistry, assets, xcAssets}`, false)
+    .action(async (opt) => {
+        let xcmgarcli = new XCMGlobalAssetRegistryCLI();
+        await xcmgarcli.generateData(opt);
+    });
     await program.parseAsync(process.argv);
 }
 
