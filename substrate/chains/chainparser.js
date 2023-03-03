@@ -3319,7 +3319,6 @@ module.exports = class ChainParser {
                             transferIndex++
                         }
                     }
-
                     for (const assetAndAmountSent of assetAndAmountSents) {
                         let targetedSymbol = assetAndAmountSent.xcmSymbol
                         let targetedXcmInteriorKey = assetAndAmountSent.xcmInteriorKey
@@ -3327,7 +3326,7 @@ module.exports = class ChainParser {
                         let transferIndex = assetAndAmountSent.transferIndex
                         let isFeeItem = assetAndAmountSent.isFeeItem
                         let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
-                        if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent) && chainIDDest) {
+                        if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent) && (chainIDDest || chainIDDest == paraTool.chainIDPolkadot)) {
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcmIndex
                             let r = {
@@ -3359,7 +3358,7 @@ module.exports = class ChainParser {
                             extrinsic.xcms.push(r)
                             //outgoingXcmList.push(r)
                         } else if (incomplete) {
-                            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer incomplete `, `module:${section_method}`, a);
+                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processXCMTransfer incomplete `, `module:${section_method}`, a);
                             // TODO: tally error
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcmIndex
@@ -3606,7 +3605,7 @@ module.exports = class ChainParser {
                         let amountSent = assetAndAmountSent.amountSent
                         let transferIndex = assetAndAmountSent.transferIndex
                         let isFeeItem = assetAndAmountSent.isFeeItem
-                        if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent) && chainIDDest) {
+                        if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent) && (chainIDDest || chainIDDest == paraTool.chainIDPolkadot)) {
                             let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
                             let xcmIndex = extrinsic.xcmIndex
