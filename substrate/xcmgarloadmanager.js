@@ -29,8 +29,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
 
     knownEvmChains = [paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDMoonbaseBeta, paraTool.chainIDMoonbaseAlpha, paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDShibuya]
 
-    // Defining async function
-    async fetchxcmgar() {
+    async fetchXcmGarRegistry() {
         // Storing response
         const response = await fetch(xcmgarSourceURL);
 
@@ -38,41 +37,6 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         var data = await response.json();
         console.log(`xcmgarSourceURL res`, data);
         return data
-    }
-
-    readJSONFn(relayChain = 'polkadot', fExt = 'xcmRegistry') {
-        const logDir = "../gar"
-        let fnDir = path.join(logDir, fExt);
-        let fn = `${relayChain}_${fExt}.json`
-        let fnDirFn = false
-        let jsonObj = false
-        try {
-            fnDirFn = path.join(fnDir, fn)
-            const fnContent = fs.readFileSync(fnDirFn, 'utf8');
-            jsonObj = JSON.parse(fnContent)
-        } catch (err) {
-            console.log(err, "readJSONFn", fnDirFn);
-            return false
-        }
-        return jsonObj
-    }
-
-    //fs.readdirSync('../gar/assets/kusama')
-    readFilelist(relayChain = 'polkadot', fExt = 'assets') {
-        const logDir = "../gar"
-        let fnDir = path.join(logDir, fExt, relayChain);
-        let fn = ``
-        let fnDirFn = false
-        let files = false
-        try {
-            fnDirFn = path.join(fnDir, fn)
-            console.log(`fnDirFn`, fnDirFn)
-            files = fs.readdirSync(fnDirFn, 'utf8');
-        } catch (err) {
-            console.log(err, "readJSONFn", fnDirFn);
-            return false
-        }
-        return files
     }
 
     categorizeAssetType(assetName, assetSymbol, chainID) {

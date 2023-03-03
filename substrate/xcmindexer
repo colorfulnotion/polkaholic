@@ -151,7 +151,21 @@ async function main() {
             let tagetTable = opt.target;
             let relayChain = opt.relayChain;
             var xcmgarlm = new XCMGARLoadManager();
-            let xcRegistryRaw = xcmgarlm.readJSONFn(relayChain, 'xcmRegistry')
+            let registryJSON = await xcmgarlm.fetchXcmGarRegistry()
+            //console.log(`registryJSON***`, registryJSON)
+            let xcRegistryRaw = false
+            if (registryJSON['xcmRegistry'] != undefined){
+                let xcmRegistries = registryJSON['xcmRegistry']
+                for (const xcmRegistry of xcmRegistries){
+                    if (xcmRegistry.relayChain == relayChain){
+                        xcRegistryRaw = xcmRegistry.data
+                    }
+                }
+            }
+            if (!xcRegistryRaw){
+                console.log(`Unable to find xcmRegistry for relayChain=${relayChain}`)
+                process.exit(0)
+            }
             let xcRegistryNew = xcmgarlm.transformXcGarRegistry(xcRegistryRaw)
             //console.log(`xcRegistryNew`, xcRegistryNew)
             let xcRegistryOld = await xcmgarlm.init_xcm_asset_old(relayChain)
@@ -178,8 +192,8 @@ async function main() {
             let targetedRelaychain = opt.relayChain;
             let targetedParaID = opt.paraID ? opt.paraID : "all";
             var xcmgarlm = new XCMGARLoadManager();
-            let registryJSON = await xcmgarlm.fetchxcmgar()
-            console.log(`registryJSON***`, registryJSON)
+            let registryJSON = await xcmgarlm.fetchXcmGarRegistry()
+            //console.log(`registryJSON***`, registryJSON)
             let globalAsetMap = {}
             let chainAssets = false
             try {
