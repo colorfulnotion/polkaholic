@@ -109,9 +109,9 @@ async function main() {
                     let endTS = paraTool.logDT_hr_to_ts(endDT, 0);
                     for (let ts = logTS; ts <= endTS; ts += 86400) {
                         let [dt, hr] = paraTool.ts_to_logDT_hr(ts);
-			if ( await substrateetl.is_accountmetrics_ready(relayChain, paraID, dt) ) {
+                        if (await substrateetl.is_accountmetrics_ready(relayChain, paraID, dt)) {
                             await substrateetl.dump_accountmetrics(relayChain, paraID, dt, dry);
-			}
+                        }
                     }
                 } else {
                     await substrateetl.dump_accountmetrics(relayChain, paraID, logDT, dry);
@@ -211,6 +211,16 @@ async function main() {
                     await manager.sleep(5000);
                 }
             }
+        });
+
+
+    program.command('cleanreaped')
+        .description(`For any reaped balances, deletes old records, if we crawled chain balances recently`)
+        .option('-l, --logDT <logDT>', `Deletes  form`, null)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            await substrateetl.cleanReaped();
+            process.exit(0);
         });
 
     program.command('blocklog')
