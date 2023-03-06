@@ -7909,6 +7909,9 @@ module.exports = class Indexer extends AssetManager {
         if (chainID == paraTool.chainIDStatemine || chainID == paraTool.chainIDStatemint || chainID == paraTool.chainIDShiden) {
             return 1577836800; // placeholder
         }
+        if (chainID == 2058) { // watr
+            return 1677087384 + 12 * blockNumber;
+        }
         return (false);
     }
 

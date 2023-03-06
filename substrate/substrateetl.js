@@ -39,7 +39,7 @@ const {
 } = require('@google-cloud/bigquery');
 
 // first day when balances are available daily
-const balanceStartDT = "2021-12-01";
+const balanceStartDT = "2022-01-01";
 
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
@@ -110,6 +110,74 @@ module.exports = class SubstrateETL extends AssetManager {
                     console.log(e);
                     // TODO optimization: do not create twice
                 }
+            }
+        }
+    }
+
+    async cleanReaped(execute = false) {
+        // get chains that have WSEndpointArchive = 1
+        let sql = `select chainID from chain where crawling = 1 and WSEndpointArchive = 1`
+        let recs = await this.poolREADONLY.query(sql);
+        let chainIDs = {};
+        for (const r of recs) {
+            chainIDs[r.chainID] = true;
+        }
+
+        for (let i = 0; i <= 4096; i++) {
+            let hs = "0x" + i.toString(16).padStart(3, '0');
+            let he = (i < 4096) ? "0x" + (i + 1).toString(16).padStart(2, '0') : "0xfffZ";
+            await this.clean_reaped(hs, he, chainIDs, execute);
+        }
+    }
+
+    async clean_reaped(start = "0x2c", end = "0x2d", chainIDs, execute = false) {
+        console.log("clean_balances", start, end)
+        let [t, tbl] = this.get_btTableRealtime()
+        // with 2 digit prefixes, there are 30K rows (7MM rows total)
+        let [rows] = await tbl.getRows({
+            start: start,
+            end: end
+        });
+        let family = "realtime";
+        let currentTS = this.getCurrentTS();
+        for (const row of rows) {
+            try {
+                let rowKey = row.id;
+                let rowData = row.data;
+                let data = rowData[family];
+                if (data) {
+                    for (const column of Object.keys(data)) {
+                        let cells = data[column];
+                        for (const cell of cells) {
+                            let ts = cell.timestamp / 1000000;
+                            let secondsago = currentTS - ts;
+                            let column_with_family = `${family}:${column}`
+                            let assetChain = paraTool.decodeAssetChain(column);
+                            let [asset, chainID] = paraTool.parseAssetChain(assetChain);
+                            if (chainIDs[chainID]) {
+                                if (secondsago > 86400 * 2) {
+                                    console.log("EXECUTE", rowKey, column, ts, secondsago, asset, chainID, column_with_family);
+                                } else {
+                                    console.log("RECENT", rowKey, column, ts, secondsago, asset, chainID, column_with_family);
+                                }
+                                /*tbl.mutate({
+                                    key: rowKey,
+                                    method: 'delete',
+                                    data: {
+                                        column: column_with_family
+                                    },
+                                }); */
+                            }
+                        }
+
+                    }
+                }
+            } catch (err) {
+                console.log(err);
+                /*this.logger.warn({
+                    "op": "deleteCells",
+                    err
+                })*/
             }
         }
     }
@@ -345,7 +413,7 @@ module.exports = class SubstrateETL extends AssetManager {
         }
         return [];
     }
-    async getFinalizedBlockInfo(chainID, api) {
+    async getFinalizedBlockInfo(chainID, api, logDT) {
         let done = false;
         let finalizedBlockHash = null;
         let blockTS = null;
@@ -376,6 +444,9 @@ module.exports = class SubstrateETL extends AssetManager {
                 }
                 done = true;
             }
+        }
+        if (logDT != null) {
+            blockTS = paraTool.logDT_hr_to_ts(logDT, 0) + 86400 - 1;
         }
         return [finalizedBlockHash, blockTS, bn]
     }
@@ -425,7 +496,7 @@ module.exports = class SubstrateETL extends AssetManager {
  where updateAddressBalanceStatus = "Ready" and
  ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 5+POW(4, lastUpdateAddressBalancesAttempts) MINUTE) or lastUpdateAddressBalancesStartDT is Null ) and
  chainbalancecrawler.logDT is null and
- blocklog.logDT >= '2022-01-01' ${w} and
+ blocklog.logDT >= '${balanceStartDT}' ${w} and
  lastUpdateAddressBalancesAttempts < 10 
  order by lastUpdateAddressBalancesAttempts asc, rand()`;
             console.log("updateAddressBalances", sql);
@@ -553,14 +624,14 @@ module.exports = class SubstrateETL extends AssetManager {
         if (fs.existsSync(bqlogfn)) {
             fs.unlinkSync(bqlogfn);
         }
-	// place an empty file ala "touch"
-	try {
-	    const time = new Date();
-	    fs.utimesSync(bqlogfn, time, time);
-	} catch (e) {
-	    let fd = fs.openSync(bqlogfn, 'a');
-	    fs.closeSync(fd);
-	}
+        // place an empty file ala "touch"
+        try {
+            const time = new Date();
+            fs.utimesSync(bqlogfn, time, time);
+        } catch (e) {
+            let fd = fs.openSync(bqlogfn, 'a');
+            fs.closeSync(fd);
+        }
         let sql_upd = `update blocklog set lastUpdateAddressBalancesStartDT = Now() where chainID = ${chainID} and logDT = '${logDT}'`;
         console.log("updateAddressBalances START", sql_upd);
         this.batchedSQL.push(sql_upd);
@@ -599,7 +670,7 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async updateNonNativeBalances(chainID, logDT = null, startTS = null, perPagelimit = 1000) {
         await this.assetManagerInit();
-        let chains = await this.pool.query(`select chainID, paraID, id, WSEndpoint, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
+        let chains = await this.pool.query(`select chainID, paraID, id, WSEndpoint, WSEndpointArchive, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
         if (chains.length == 0) {
             console.log("No chain found ${chainID}")
             return false;
@@ -630,7 +701,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let rows = [];
         let asset = this.getChainAsset(chainID);
         let [tblName, tblRealtime] = this.get_btTableRealtime()
-        let [finalizedBlockHash, blockTS, bn] = logDT ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api)
+        let [finalizedBlockHash, blockTS, bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
         if (finalizedBlockHash == null) {
             console.log("Could not determine blockHash", chainID, logDT);
             // log.fatal
@@ -646,6 +717,8 @@ module.exports = class SubstrateETL extends AssetManager {
         let priceUSDCache = {}; // this will map any assetChain asset to a priceUSD at blockTS, if possible
         let done = false;
         let page = 0;
+        let [todayDT, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
+        let [yesterdayDT, __] = paraTool.ts_to_logDT_hr(this.getCurrentTS() - 86400);
         while (!done) {
             let query = null
 
@@ -737,45 +810,47 @@ module.exports = class SubstrateETL extends AssetManager {
                         if (val.balance != undefined) {
                             balance = parseFloat(paraTool.toNumWithoutComma(val.balance), 10) / 10 ** decimals;
                         }
-                        if (numHolders[currencyID] != undefined) {
-                            numHolders[currencyID]++;
-                        } else {
-                            numHolders[currencyID] = 1;
-                        }
-                        if (logDT) {
-                            if (priceUSDCache[assetChain] == undefined) {
-                                let p = await this.computePriceUSD({
-                                    assetChain,
-                                    ts: blockTS
-                                })
-                                priceUSDCache[assetChain] = p && p.priceUSD ? p.priceUSD : 0;
+                        if (balance > 0) {
+                            if (numHolders[currencyID] != undefined) {
+                                numHolders[currencyID]++;
+                            } else {
+                                numHolders[currencyID] = 1;
                             }
-                            let priceUSD = priceUSDCache[assetChain];
-                            let free_usd = balance * priceUSD;
-                            bqRows.push({
-                                chain_name: chainName,
-                                id,
-                                para_id: paraID,
-                                ts: blockTS,
-                                address_pubkey: address,
-                                address_ss58: account_id,
-                                symbol,
-                                asset,
-                                free: balance,
-                                reserved: 0,
-                                misc_frozen: 0,
-                                frozen: 0,
-                                free_usd,
-                                reserved_usd: 0,
-                                misc_frozen_usd: 0,
-                                frozen_usd: 0,
-                                price_usd: priceUSD
-                            });
-                        } else {
-                            out.push(`('${currencyID}', '${address}', '${account_id}', ${mysql.escape(asset)}, '${symbol}', '${balance}', 0, 0, 0, '${finalizedBlockHash}', Now(), '${bn}', '${blockTS}', ${mysql.escape(JSON.stringify(val))})`);
-                            let rowKey = address.toLowerCase() // just in case
-                            rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, balance, 0, 0, 0, blockTS, bn));
-                            console.log(symbol, currencyID, `cbt read accountrealtime prefix=${rowKey}`, balance, val.balance, "decimals", decimals);
+                            if (logDT) {
+                                if (priceUSDCache[assetChain] == undefined) {
+                                    let p = await this.computePriceUSD({
+                                        assetChain,
+                                        ts: blockTS
+                                    })
+                                    priceUSDCache[assetChain] = p && p.priceUSD ? p.priceUSD : 0;
+                                }
+                                let priceUSD = priceUSDCache[assetChain];
+                                let free_usd = balance * priceUSD;
+                                bqRows.push({
+                                    chain_name: chainName,
+                                    id,
+                                    para_id: paraID,
+                                    ts: blockTS,
+                                    address_pubkey: address,
+                                    address_ss58: account_id,
+                                    symbol,
+                                    asset,
+                                    free: balance,
+                                    reserved: 0,
+                                    misc_frozen: 0,
+                                    frozen: 0,
+                                    free_usd,
+                                    reserved_usd: 0,
+                                    misc_frozen_usd: 0,
+                                    frozen_usd: 0,
+                                    price_usd: priceUSD
+                                });
+                                if ((logDT == yesterdayDT) || (logDT == todayDT)) {
+                                    let rowKey = address.toLowerCase() // just in case
+                                    rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, balance, 0, 0, 0, blockTS, bn));
+                                    console.log(symbol, currencyID, `cbt read accountrealtime prefix=${rowKey}`, balance, val.balance, "decimals", decimals);
+                                }
+                            }
                         }
 
                     } else {
@@ -887,9 +962,9 @@ module.exports = class SubstrateETL extends AssetManager {
                                 frozen_usd,
                                 price_usd: priceUSD
                             });
-                        } else {
-                            out.push(`('${asset}', '${address}', '${account_id}', ${mysql.escape(asset)}, '${symbol}', '${free}', '${reserved}', '${miscFrozen}', '${frozen}', '${finalizedBlockHash}', Now(), '${bn}', '${blockTS}', ${mysql.escape(JSON.stringify(state))})`);
-                            rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free, reserved, miscFrozen, frozen, blockTS, bn));
+                            if (logDT == yesterdayDT || logDT == todayDT) {
+                                rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free, reserved, miscFrozen, frozen, blockTS, bn));
+                            }
                         }
                         //console.log(`CHECK ${assetChain} -- cbt read accountrealtime prefix=${rowKey}`);
                     } else {
@@ -919,17 +994,10 @@ module.exports = class SubstrateETL extends AssetManager {
                 rawRows.push("");
                 await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
                 bqRows = [];
-            } else {
-                await this.upsertSQL({
-                    "table": TABLE,
-                    "keys": ["currencyID", "address"],
-                    "vals": vals,
-                    "data": out,
-                    "replace": vals,
-                    "lastUpdateBN": lastUpdateBN
-                });
-                console.log(`writing ${chainName}`, rows.length, "rows chainID=", chainID);
-                await this.insertBTRows(tblRealtime, rows, tblName);
+                if (rows.length > 0) {
+                    console.log(`writing ${chainName}`, rows.length, "rows chainID=", chainID);
+                    await this.insertBTRows(tblRealtime, rows, tblName);
+                }
             }
             rows = [];
             if (cnt == 0) {
@@ -939,42 +1007,29 @@ module.exports = class SubstrateETL extends AssetManager {
 
         if (logDT) {
             // close files
-
-        } else {
-            // for all the other accounts that did NOT appear, we can delete them if they were OLDER than bn, because they are reaped == but we still need to 0 out the balances
-            let sql_reap = `select address, asset, lastUpdateBN from ${TABLE} where lastUpdateBN < ${bn}`
-            let sql_delete = `delete from ${TABLE} where lastUpdateBN < ${bn}`
-            console.log(`REAPING: `, sql_reap, ` DELETE: `, sql_delete);
-
-            let reapedAccounts = await this.poolREADONLY.query(sql_reap)
-            for (let a = 0; a < reapedAccounts.length; a++) {
-                let address = reapedAccounts[a].address;
-                let asset = reapedAccounts[a].asset;
-                let assetChain = paraTool.makeAssetChain(asset, chainID);
-                if (this.assetInfo[assetChain] == undefined) {
-                    this.logger.fatal({
-                        "op": "updateAddressBalances - unknown asset",
-                        assetChain
-                    })
-                } else {
-                    let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
-                    rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
-                    console.log("REAPED ACCOUNT-ADDRESS", address, encodedAssetChain);
+            let [yesterdayDT, __] = paraTool.ts_to_logDT_hr(this.getCurrentTS() - 86400);
+            if (logDT == yesterdayDT && false) {
+                // TODO: for all the other accounts that did NOT appear, we can delete them if they were OLDER than bn, because they are reaped == but we still need to 0 out the balances
+                let reapedAccounts = await this.poolREADONLY.query(sql_reap)
+                for (let a = 0; a < reapedAccounts.length; a++) {
+                    let address = reapedAccounts[a].address;
+                    let asset = reapedAccounts[a].asset;
+                    let assetChain = paraTool.makeAssetChain(asset, chainID);
+                    if (this.assetInfo[assetChain] == undefined) {
+                        this.logger.fatal({
+                            "op": "updateAddressBalances - unknown asset",
+                            assetChain
+                        })
+                    } else {
+                        let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
+                        rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
+                        console.log("REAPED ACCOUNT-ADDRESS", address, encodedAssetChain);
+                    }
                 }
+                console.log("writing ", rows.length, " REAPED accounts to bt");
+                await this.insertBTRows(tblRealtime, rows, tblName);
+                rows = [];
             }
-            console.log("writing ", rows.length, " REAPED accounts to bt");
-            await this.insertBTRows(tblRealtime, rows, tblName);
-            rows = [];
-            // now that we have written them out to BT, we can delete them
-            this.batchedSQL.push(sql_delete);
-            await this.update_batchedSQL();
-            for (const asset of Object.keys(numHolders)) {
-                let cnt = numHolders[asset];
-                let sql = `update asset set numHolders = '${cnt}'  where asset = '${asset}' and chainID = '${chainID}'`
-                this.batchedSQL.push(sql);
-                console.log("writing", asset, chainID, "rows numHolders=", cnt, sql)
-            }
-
         }
         let sql_assetPallet = `update blocklog set assetNonNativeRegistered = '${Object.keys(numHolders).length}', assetNonNativeUnregistered = '${Object.keys(numFailures).length}' where chainID = '${chainID}' and logDT = '${logDT}'`
         this.batchedSQL.push(sql_assetPallet);
@@ -1003,7 +1058,7 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async updateNativeBalances(chainID, logDT = null, startTS = 0, perPagelimit = 1000) {
         await this.assetManagerInit();
-        let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, numHolders, totalIssuance, decimals from chain where chainID = '${chainID}'`);
+        let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, WSEndpointArchive, numHolders, totalIssuance, decimals from chain where chainID = '${chainID}'`);
         if (chains.length == 0) {
             console.log("No chain found ${chainID}")
             return false;
@@ -1093,7 +1148,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let [tblName, tblRealtime] = this.get_btTableRealtime()
         let priceUSDCache = {}; // this will map any assetChain asset to a priceUSD at blockTS, if possible
 
-        let [finalizedBlockHash, blockTS, bn] = logDT ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api)
+        let [finalizedBlockHash, blockTS, bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
         let p = await this.computePriceUSD({
             assetChain,
             ts: blockTS
@@ -1108,6 +1163,8 @@ module.exports = class SubstrateETL extends AssetManager {
         }
         let page = 0;
         let done = false;
+        let [todayDT, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
+        let [yesterdayDT, __] = paraTool.ts_to_logDT_hr(this.getCurrentTS() - 86400);
         while (!done) {
             let apiAt = await api.at(finalizedBlockHash)
             let query = null;
@@ -1153,31 +1210,33 @@ module.exports = class SubstrateETL extends AssetManager {
                     let free_usd = free_balance * priceUSD;
                     let reserved_usd = reserved_balance * priceUSD;
                     let miscFrozen_usd = miscFrozen_balance * priceUSD;
-                    let frozen_usd = feeFrozen_balance * priceUSD; // CHECK difference between feeFrozen and frozen
-                    bqRows.push({
-                        chain_name: chainName,
-                        id,
-                        para_id: paraID,
-                        address_pubkey: pubkey,
-                        address_ss58: account_id,
-                        asset,
-                        symbol,
-                        free: free_balance,
-                        reserved: reserved_balance,
-                        misc_frozen: miscFrozen_balance,
-                        frozen: feeFrozen_balance,
-                        free_usd,
-                        reserved_usd,
-                        misc_frozen_usd: miscFrozen_usd,
-                        frozen_usd,
-                        ts: blockTS,
-                        price_usd: priceUSD
-                    });
-                } else {
-                    console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
-                    rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn));
+                    let frozen_usd = feeFrozen_balance * priceUSD;
+                    if ((free_balance > 0) || (reserved_balance > 0) || (miscFrozen_balance > 0) || (feeFrozen_balance > 0)) {
+                        bqRows.push({
+                            chain_name: chainName,
+                            id,
+                            para_id: paraID,
+                            address_pubkey: pubkey,
+                            address_ss58: account_id,
+                            asset,
+                            symbol,
+                            free: free_balance,
+                            reserved: reserved_balance,
+                            misc_frozen: miscFrozen_balance,
+                            frozen: feeFrozen_balance,
+                            free_usd,
+                            reserved_usd,
+                            misc_frozen_usd: miscFrozen_usd,
+                            frozen_usd,
+                            ts: blockTS,
+                            price_usd: priceUSD
+                        });
+                        if ((logDT == yesterdayDT) || (logDT == todayDT)) {
+                            console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
+                            rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn));
+                        }
+                    }
                 }
-
             }
             if (logDT) {
                 // write rows
@@ -1186,8 +1245,11 @@ module.exports = class SubstrateETL extends AssetManager {
                 });
                 rawRows.push("");
                 await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
-            } else {
-                await this.insertBTRows(tblRealtime, rows, tblName);
+                if (rows.length > 0) {
+                    console.log("WRITING", rows.length, tblName)
+                    await this.insertBTRows(tblRealtime, rows, tblName);
+                    rows = [];
+                }
             }
             last_key = (query.length > 999) ? query[query.length - 1][0] : "";
 
@@ -1208,7 +1270,6 @@ module.exports = class SubstrateETL extends AssetManager {
                 await this.update_batchedSQL();
                 process.exit(1);
             }
-            rows = [];
         }
         console.log(`****** Native account: numHolders = ${numHolders}`);
         if (logDT) {} else {
@@ -1853,8 +1914,8 @@ from blocklogstats join chain on blocklogstats.chainID = chain.chainID where mon
             prevChainID = chainID;
             let numSignedExtrinsics = r.numSignedExtrinsics ? parseInt(r.numSignedExtrinsics, 10) : 0;
             let numActiveAccounts = r.numActiveAccounts ? parseInt(r.numActiveAccounts, 10) : 0;
-            let numPassiveAccounts = r.yr >= 2022 && r.numPassiveAccounts ? parseInt(r.numPassiveAccounts, 10) : null;
-            let numNewAccounts = r.yr >= 2022 && r.numNewAccounts ? parseInt(r.numNewAccounts, 10) : null;
+            let numPassiveAccounts = r.yr >= 2023 && r.numPassiveAccounts ? parseInt(r.numPassiveAccounts, 10) : null;
+            let numNewAccounts = r.yr >= 2023 && r.numNewAccounts ? parseInt(r.numNewAccounts, 10) : null;
             let numAddresses = r.numAddresses ? parseInt(r.numAddresses, 10) : 0;
             let issues = r.issues ? r.issues : "";
             let m = {
@@ -2250,15 +2311,15 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
     async is_accountmetrics_ready(relayChain, paraID, logDT) {
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
-	let sql = `select accountMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}' and accountMetricsStatus = 'Ready'`
-	let recs = await this.poolREADONLY.query(sql)
-	if ( recs.length == 1 ) {
-	    return(true);
-	}
-	return(false);
+        let sql = `select accountMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}' and accountMetricsStatus = 'Ready'`
+        let recs = await this.poolREADONLY.query(sql)
+        if (recs.length == 1) {
+            return (true);
+        }
+        return (false);
 
     }
-    
+
     async dump_accountmetrics(relayChain, paraID, logDT) {
         console.log(`dump_accountmetrics logDT=${logDT}, ${relayChain}-${paraID}`)
         let bqjobs = []
