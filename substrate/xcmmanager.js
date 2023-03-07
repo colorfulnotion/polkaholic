@@ -595,7 +595,9 @@ module.exports = class XCMManager extends Query {
     analyzeXCM_MultiAsset(analysis, c, chainID, chainIDDest, ctx) {
         if (c.id != undefined) {
             if (c.id.concrete != undefined) {
-                if (ctx == "buyExecution") {} else {
+                if (ctx == "buyExecution" && false) {
+                    //Not sure why skipping buyExecution here - bypass instead
+                } else {
                     let [assetChain, xcmInteriorKey] = this.get_concrete_assetChain(analysis, c.id.concrete, chainID, chainIDDest);
                     if (assetChain && (analysis.assetChains[assetChain] == undefined)) {
                         analysis.assetChains[assetChain] = 1;

@@ -6572,8 +6572,13 @@ module.exports = class Indexer extends AssetManager {
         let rows = [];
         for (const x of xcmList) {
             try {
+
                 let isFinalized = (x.finalized) ? 1 : 0
-                out.push(`('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayChain}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(x.msg))}, '${x.msgHex}', ${mysql.escape(x.path)}, '${x.version}', ${mysql.escape(x.beneficiaries)}, Now(), ${isFinalized})`)
+                let xcmInteriorKeys = (x.xcmInteriorKeys != undefined) ? `${mysql.escape(x.xcmInteriorKeys)}` : `NULL`
+                let xcmInteriorKeysUnregistered = (x.xcmInteriorKeysUnregistered != undefined) ? `${mysql.escape(x.xcmInteriorKeysUnregistered)}` : `NULL`
+
+                out.push(`('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayChain}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(x.msg))}, '${x.msgHex}', ${mysql.escape(x.path)}, '${x.version}', ${mysql.escape(x.beneficiaries)}, Now(), ${isFinalized}, ${xcmInteriorKeys}, ${xcmInteriorKeysUnregistered})`)
+
                 if (relayChain) {
                     let insertId = `${x.msgHash}-${x.includedAt}-${x.chainID}-${x.chainIDDest}`;
                     let xcm = {
@@ -6588,7 +6593,9 @@ module.exports = class Indexer extends AssetManager {
                             origination_ts: x.blockTS,
                             msg: JSON.stringify(x.msg),
                             msg_hex: x.msgHex,
-                            version: x.version
+                            version: x.version,
+                            //xcm_interior_keys: x.xcmInteriorKeys,
+                            //xcm_interior_keys_unregistered: x.xcmInteriorKeysUnregistered,
                         }
                     }
                     rows.push(xcm)
@@ -6598,7 +6605,7 @@ module.exports = class Indexer extends AssetManager {
             }
         }
         try {
-            if (false) { // rows.length > 0 
+            if (false) { // rows.length > 0
                 const {
                     BigQuery
                 } = require('@google-cloud/bigquery');
@@ -6615,8 +6622,8 @@ module.exports = class Indexer extends AssetManager {
         } catch (err) {
             console.log("process_rcxcm STREAMING INSERT", err, JSON.stringify(err));
         }
-        let vals = ["relayChain", "relayedBlockHash", "relayedAt", "includedAt", "msgType", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT", "finalized"]
-        let sqlDebug = false
+        let vals = ["relayChain", "relayedBlockHash", "relayedAt", "includedAt", "msgType", "blockTS", "msgStr", "msgHex", "path", "version", "beneficiaries", "indexDT", "finalized", "xcmInteriorKeys", "xcmInteriorKeysUnregistered"]
+        let sqlDebug = true
         await this.upsertSQL({
             "table": "xcm",
             "keys": ["msgHash", "chainID", "chainIDDest", "sentAt"],
@@ -6674,10 +6681,16 @@ module.exports = class Indexer extends AssetManager {
                                     var msgHash = xcm.msgHash
                                     var msg = xcm.msg
                                     var msgHex = xcm.hex
+                                    let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
+                                    let chainIDDest = this.chainID
+                                    let analysis = this.performAnalysisInstructions(msg, chainID, chainIDDest)
+                                    if (this.debugLevel >= paraTool.debugInfo) console.log(`**UMP [${msgHash}] analysis`, analysis)
+                                    let xcmInteriorKeys = analysis.xcmInteriorKeysAll;
+                                    let xcmInteriorKeysUnregistered = analysis.xcmInteriorKeysUnRegistered;
                                     let umpMsg = {
                                         msgType: "ump",
-                                        chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-                                        chainIDDest: this.chainID,
+                                        chainID: chainID,
+                                        chainIDDest: chainIDDest,
                                         paraID: paraID,
                                         paraIDDest: 0,
                                         sentAt: sourceSentAt,
@@ -6686,6 +6699,8 @@ module.exports = class Indexer extends AssetManager {
                                         msgHex: msgHex,
                                         msgHash: msgHash,
                                         msg: xcm.msg,
+                                        xcmInteriorKeys: (xcmInteriorKeys && xcmInteriorKeys.length > 0)? xcmInteriorKeys: null,
+                                        xcmInteriorKeysUnregistered: (xcmInteriorKeysUnregistered && xcmInteriorKeysUnregistered.length > 0)? xcmInteriorKeysUnregistered: null,
                                         blockTS: blockTS,
                                         relayChain: relayChain,
                                         isTip: isTip,
@@ -6712,10 +6727,16 @@ module.exports = class Indexer extends AssetManager {
                                     var msgHash = xcm.msgHash
                                     var msg = xcm.msg
                                     var msgHex = xcm.hex
+                                    let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
+                                    let chainIDDest = paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain)
+                                    let analysis = this.performAnalysisInstructions(msg, chainID, chainIDDest)
+                                    if (this.debugLevel >= paraTool.debugInfo) console.log(`**HRMP [${msgHash}] analysis`, analysis)
+                                    let xcmInteriorKeys = analysis.xcmInteriorKeysAll;
+                                    let xcmInteriorKeysUnregistered = analysis.xcmInteriorKeysUnRegistered;
                                     let hrmpMsg = {
                                         msgType: "hrmp",
-                                        chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-                                        chainIDDest: paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain),
+                                        chainID: chainID,
+                                        chainIDDest: chainIDDest,
                                         paraID: paraID,
                                         paraIDDest: paraIDDest,
                                         sentAt: sourceSentAt,
@@ -6724,6 +6745,8 @@ module.exports = class Indexer extends AssetManager {
                                         msgHex: msgHex,
                                         msgHash: msgHash,
                                         msg: xcm.msg,
+                                        xcmInteriorKeys: (xcmInteriorKeys && xcmInteriorKeys.length > 0)? xcmInteriorKeys: null,
+                                        xcmInteriorKeysUnregistered: (xcmInteriorKeysUnregistered && xcmInteriorKeysUnregistered.length > 0)? xcmInteriorKeysUnregistered: null,
                                         blockTS: blockTS,
                                         relayChain: relayChain,
                                         isTip: isTip,
@@ -6761,6 +6784,12 @@ module.exports = class Indexer extends AssetManager {
                                     var msgHash = xcm.msgHash
                                     var msg = xcm.msg
                                     var msgHex = xcm.hex
+                                    let chainID = this.chainID
+                                    let chainIDDest = paraTool.getChainIDFromParaIDAndRelayChain(paraIDDest, relayChain)
+                                    let analysis = this.performAnalysisInstructions(msg, chainID, chainIDDest)
+                                    if (this.debugLevel >= paraTool.debugInfo) console.log(`**DMP [${msgHash}] analysis`, analysis)
+                                    let xcmInteriorKeys = analysis.xcmInteriorKeysAll;
+                                    let xcmInteriorKeysUnregistered = analysis.xcmInteriorKeysUnRegistered;
                                     let dmpMsg = {
                                         msgType: "dmp",
                                         chainID: this.chainID,
@@ -6773,6 +6802,8 @@ module.exports = class Indexer extends AssetManager {
                                         msgHex: msgHex,
                                         msgHash: msgHash,
                                         msg: xcm.msg,
+                                        xcmInteriorKeys: (xcmInteriorKeys && xcmInteriorKeys.length > 0)? xcmInteriorKeys: null,
+                                        xcmInteriorKeysUnregistered: (xcmInteriorKeysUnregistered && xcmInteriorKeysUnregistered.length > 0)? xcmInteriorKeysUnregistered: null,
                                         blockTS: blockTS,
                                         relayChain: relayChain,
                                         isTip: isTip,
@@ -8537,6 +8568,5 @@ module.exports = class Indexer extends AssetManager {
             await this.update_spec_version(chain.chainID, specVersion);
         }
     }
-
 
 }
