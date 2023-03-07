@@ -160,7 +160,7 @@ async function main() {
         .description(`XCM GAR Loader`)
         .option('-r, --relayChain <relayChain>', 'Relay Chain to load', "polkadot")
         .option('-d, --dry', `dry run the cmd without updating`, false)
-        .option('-t, --target <target>', 'targeted asset table', "xcmasset")
+        .option('-t, --target <target>', 'targeted asset table', "xcmassetgar")
         .action(async (opt) => {
             console.log(`xcmgar loadregistry opt`, opt)
             let dry = opt.dry;

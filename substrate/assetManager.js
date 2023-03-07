@@ -1866,4 +1866,442 @@ module.exports = class AssetManager extends PolkaholicDB {
         return args
     }
 
+    // Msg parsing
+    get_concrete_assetChain(analysis, c, chainID, chainIDDest) {
+        let paraID = paraTool.getParaIDfromChainID(chainID)
+        let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let relayChainID = paraTool.getRelayChainID(relayChain)
+
+        if (c.parents !== undefined && c.interior !== undefined) {
+            let parents = c.parents;
+            let interior = c.interior;
+            let interiorType = Object.keys(interior)[0]
+
+            if (interiorType == 'here') {
+                /*
+                  parents: 0 -> referring to itself
+                  parents: 1 -> referring to parents (relaychain)
+                */
+                try {
+                    let targetAssetChain = (parents == 0) ? this.getNativeChainAsset(chainIDDest) : this.getNativeChainAsset(relayChainID)
+                    if (targetAssetChain == undefined) {
+                        //console.log(`get_concrete_assetChain missing!!! parents=${parents}, chainID=${chainID}, chainIDDest=${chainIDDest}, relayChain=${relayChain}, relayChainID=${relayChainID}, targetAssetChain=${targetAssetChain}`)
+                        return [false, false]
+                    }
+                    let [targetAsset, targetChainID] = paraTool.parseAssetChain(targetAssetChain)
+                    let targetSymbol = this.getAssetSymbol(targetAsset, targetChainID)
+                    let symbolRelayChain = paraTool.makeAssetChain(targetSymbol, relayChain);
+                    let xcmAssetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain)
+                    let xcmInteriorKey = (xcmAssetInfo == false || xcmAssetInfo == undefined || xcmAssetInfo.xcmInteriorKey == undefined) ? false : xcmAssetInfo.xcmInteriorKey
+                    //console.log(`[paranets=${parents}] ${chainID} ${chainIDDest} ${JSON.stringify(interior)} -> ${targetAssetChain}, symbolRelayChain=${symbolRelayChain}, xcmInteriorKey=${xcmInteriorKey}, xcmAssetInfo`, xcmAssetInfo)
+                    return [targetAssetChain, xcmInteriorKey]
+                } catch (err) {
+                    //console.log(`get_concrete_assetChain parents=${parents}, chainID=${chainID}, chainIDDest=${chainIDDest}, relayChain=${relayChain}, relayChainID=${relayChainID}, error`, err)
+                    return [false, false]
+                }
+
+            } else {
+                let interiorVal = interior[interiorType]
+                if (parents == 1 || (chainIDDest == relayChainID)) {
+                    // easy case: no expansion if it's from relaychain's perspective
+                } else {
+                    // expand the key
+                    let new_interiorVal = []
+                    let expandedParachainPiece = {
+                        parachain: paraIDDest
+                    }
+                    new_interiorVal.push(expandedParachainPiece)
+                    if (interiorType == 'x1') {
+                        new_interiorVal.push(interiorVal)
+
+                    } else if (Array.isArray(interiorVal)) {
+                        //x2/x3/x4/..
+                        for (const v of interiorVal) {
+                            new_interiorVal.push(v)
+                        }
+                        //new_interiorVal.concat(interiorVal)
+                    } else {
+                        //console.log(`expansion error. expecting array`, JSON.stringify(interior))
+                        return [false, false]
+                    }
+                    //console.log(`${chainID}, ${chainIDDest} [parents=${parents}] expandedkey ${JSON.stringify(interiorVal)} ->  ${JSON.stringify(new_interiorVal)}`)
+                    interiorVal = new_interiorVal
+                }
+                let interiorVStr = JSON.stringify(interiorVal)
+                let res = this.getXCMAsset(interiorVStr, relayChain)
+                let xcmInteriorKey = paraTool.makeXcmInteriorKey(interiorVStr, relayChain);
+                if (res) {
+                    //console.log(`get_concrete_assetChain FOUND ${chainID}, ${chainIDDest} [parents=${parents}] [${interiorType}] ${JSON.stringify(interior)} -> ${res}, ${xcmInteriorKey}`)
+                    return [res, xcmInteriorKey];
+                } else {
+                    //console.log(`get_concrete_assetChain error ${chainID}, ${chainIDDest} [parents=${parents}] [${interiorType}] ${JSON.stringify(interior)}`)
+                    //return xcmInteriorKey whenever possible
+                    return [false, xcmInteriorKey]
+                }
+            }
+        } else {
+            //console.log("get_concrete_assetChain FAILED2 - parents/interior not set", c);
+            return [null, false];
+        }
+    }
+
+    // All instructions with "MultiAsset" type should be decorated with assetChain / symbols / decimals + USD value at the time of message
+    analyzeXCM_MultiAsset(analysis, c, chainID, chainIDDest, ctx) {
+        //console.log(`analyzeXCM_MultiAsset, c`, c)
+        if (c.id != undefined) {
+            if (c.id.concrete != undefined) {
+                if (ctx == "buyExecution" && false) {
+                    //Not sure why skipping buyExecution here - bypass instead
+                } else {
+                    let [assetChain, xcmInteriorKey] = this.get_concrete_assetChain(analysis, c.id.concrete, chainID, chainIDDest);
+                    if (assetChain && (analysis.assetChains[assetChain] == undefined)) {
+                        analysis.assetChains[assetChain] = 1;
+                        analysis.xcmInteriorKeys[xcmInteriorKey] = 1;
+                        //console.log("PUSHING", assetChain, xcmInteriorKey,  c.id.concrete);
+                        return [assetChain, xcmInteriorKey];
+                    } else {
+                        //console.log("analyzeXCM_MultiAsset MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.id.concrete));
+                    }
+                }
+            } else {
+                //console.log("analyzeXCM_MultiAsset NOT CONCRETE PROBLEM", chainID, chainIDDest, JSON.stringify(c))
+            }
+        } else if (c.concreteFungible != undefined) {
+            let [assetChain, xcmInteriorKey] = this.get_concrete_assetChain(analysis, c.concreteFungible.id, chainID, chainIDDest);
+            if (assetChain && (analysis.assetChains[assetChain] == undefined)) {
+                analysis.assetChains[assetChain] = 1;
+                analysis.xcmInteriorKeys[xcmInteriorKey] = 1;
+                //console.log("PUSHING", assetChain, xcmInteriorKey, c.id.concrete);
+                return [assetChain, xcmInteriorKey];
+            } else {
+                //console.log("analyzeXCM_MultiAsset V0 MISS PROBLEM", ctx, chainID, chainIDDest, JSON.stringify(c.concreteFungible.id));
+            }
+        } else {
+            //console.log("analyzeXCM_MultiAsset NO ID PROBLEM", chainID, chainIDDest, JSON.stringify(c))
+        }
+        return [false, false];
+    }
+
+    //TODO: currently does not parse reserveAssetDeposited
+    analyzeXCM_MultiAssetFilter(analysis, c, fld, chainID, chainIDDest, ctx) {
+        //console.log(`** analyzeXCM_MultiAssetFilter, c[${fld}]`, c[fld], `c`, c)
+        if (c[fld] == undefined) return;
+        if (c[fld].wild) {} else if (c[fld].definite) {
+            //console.log("analyzeXCM_MultiAssetFilter", chainID, chainIDDest, JSON.stringify(c[fld].definite));
+        } else {
+            // analyzeXCM_MultiAssetFilter 22085 2 {"definite":[{"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10000000000}}]}
+            if (Array.isArray(c[fld])) {
+                for (let i = 0; i < c[fld].length; i++) {
+                    let [ac, xcmKey] = this.analyzeXCM_MultiAsset(analysis, c[fld][i], chainID, chainIDDest, "multiassetfilter")
+                    if (ac) {
+                        //console.log("analyzeXCM_MultiAssetFilter", ctx, chainID, chainIDDest, JSON.stringify(c[fld][i]), ac, xcmKey);
+                    }
+                }
+            }
+        }
+    }
+
+    // All instructions with "MultiLocation" (parachain, accountID32/ accountID20, here) should be decorated with chain.id, chain.chainName or the "identity" using lookup_account
+    analyzeXCM_MultiLocation(analysis, c, fld, chainID, chainIDDest, ctx) {
+        if (c[fld] == undefined) return;
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let destAddress = this.chainParser.processBeneficiary(false, c[fld], relayChain);
+        if (destAddress) {
+            analysis.xcmAddresses.push(destAddress)
+            //console.log(`${msg.msgHash} analyzeXCM_MultiLocation destFound:${destAddress}`)
+        }
+    }
+
+    analyzeXCM_Call(analysis, c, fld, chainID, chainIDDest, ctx) {
+        if (c[fld] == undefined) return;
+        if (c[fld].encoded != undefined) {
+            // analyzeXCM_Call 22000 2 0x1801010006010f23ada31bd3bb06
+            //console.log("analyzeXCM_Call", ctx, chainID, chainIDDest, c[fld].encoded)
+            // extrinsicCall = apiAt.registry.createType('Call', opaqueCall);
+            // ISSUE: How do we get the right api since the indexer needs the "receiving chain" api? -- can we do a mini-API call for this?
+        }
+    }
+
+    getInstructionSet() {
+        let instructionSet = {
+            'withdrawAsset': { // Remove the on-chain asset(s) (assets) and accrue them into Holding
+                MultiAssets: ['assets'],
+                MultiAssetFilter: ['assets'], //v0
+                Effects: ['effects'] //v0
+            },
+            'reserveAssetDeposited': { // Accrue into Holding derivative assets to represent the asset(s) (assets) on Origin.
+                MultiAssets: ['assets']
+            },
+            'receiveTeleportedAsset': {
+                MultiAssets: ['assets']
+            },
+            'queryResponse': {},
+            'transferAsset': {
+                MultiAssetFilter: ['assets'],
+                MultiLocation: ['beneficiary'],
+            },
+            'transferReserveAsset': {
+                MultiAsset: ['assets'],
+                MultiLocation: ['destination'],
+                XCM: ['xcm']
+            },
+            'transact': {
+                Call: ['call']
+            },
+            'hrmpNewChannelOpenRequest': {},
+            'hrmpChannelAccepted': {},
+            'hrmpChannelClosing': {},
+            'clearOrigin': {},
+            'descendOrigin': {},
+            'reportError': {},
+            'depositAsset': { // Subtract the asset(s) (assets) from Holding and deposit on-chain equivalent assets under the ownership of beneficiary.
+                MultiAssetFilter: ['assets'],
+                MultiLocation: ['beneficiary']
+            },
+            'depositReserveAsset': {
+                MultiAssetFilter: ['assets'],
+                MultiLocation: ['beneficiary'],
+                XCM: ['xcm']
+            },
+            'exchangeAsset': {
+                MultiAssetFilter: ['give'],
+                MultiAssets: ['receive']
+            },
+            'initiateReserveWithdraw': {
+                MultiAssetFilter: ['assets'],
+                XCM: ['xcm']
+            },
+            'initiateTeleport': {
+                MultiAssetFilter: ['assets'],
+                MultiLocation: ['destination'],
+                XCM: ['xcm']
+            },
+            'queryHolding': {
+                MultiLocation: ['destination'],
+                MultiAssetFilter: ['assets']
+            },
+            'buyExecution': { //Pay for the execution of the current message from Holding.
+                MultiAsset: ['fees']
+            },
+            'refundSurplus': {},
+            'setErrorHandler': {},
+            'setAppendix': {},
+            'clearError': {},
+            'claimAsset': {
+                MultiAsset: ['assets'],
+                MultiLocation: ['ticket']
+            },
+            'trap': {},
+            'subscribeVersion': {},
+            'unsubscribeVersion': {},
+            'burnAsset': {
+                MultiAsset: ['assets']
+            },
+            'expectAsset': {
+                MultiAsset: ['assets']
+            },
+            'expectOrigin': {
+                MultiLocation: ['origin']
+            },
+            'expectError': {},
+            //V1
+            'reserveAssetDeposited': {
+                MultiAssetFilter: ['assets'],
+                Effects: ['effects'],
+            },
+            //V0
+            'teleportAsset': {
+                MultiAsset: ['assets'],
+                Effects: ['effects'],
+            },
+            'reserveAssetDeposit': {
+                MultiAsset: ['assets'],
+                Effects: ['effects'],
+            }
+
+        }
+        return instructionSet
+    }
+
+    getXCMParentFingerprintsOfChild(o) {
+        let fps = [];
+        let xcmInstructions = [
+            ["isTransferReserveAsset", "asTransferReserveAsset"],
+            ["isDepositReserveAsset", "asDepositReserveAsset"],
+            ["isInitiateReserveWithdraw", "asInitiateReserveWithdraw"],
+            ["isInitiateTeleport", "asInitiateTeleport"],
+            ["isExchangeAsset", "asExchangeAsset"]
+        ];
+
+        for (let i = 0; i < o.asV2.length; i++) {
+            let instruction = o.asV2[i];
+            for (let j = 0; j < xcmInstructions.length; j++) {
+                let is = xcmInstructions[j][0];
+                let as = xcmInstructions[j][1];
+                if (instruction[is]) {
+                    let o2 = instruction[as];
+                    if (o2.xcm != undefined) {
+                        for (let k = 0; k < o2.xcm.length; k++) {
+                            let fp = o2.xcm[k].toHex();
+                            //console.log("CHILD", as, k, o2.xcm[k].toHex(), JSON.stringify(o2.xcm[k].toJSON()));
+                            fps.push(fp);
+                        }
+                    }
+                }
+            }
+        }
+
+        return fps;
+    }
+
+    getXCMChildFingerprints(o) {
+        let fps = [];
+        for (let i = 0; i < o.asV2.length; i++) {
+            let instruction = o.asV2[i];
+            let fp = instruction.toHex();
+            //console.log(instruction.toJSON(), instruction.toHex());
+            fps.push(fp);
+        }
+        return fps;
+    }
+
+    compute_fingerprints_inclusion(fp0, fp1) {
+        // cnt0 = # of elements of fp0 in fp1
+        let cnt0 = 0;
+        for (let i = 0; i < fp0.length; i++) {
+            if (fp1.includes(fp0[i])) {
+                cnt0++;
+            }
+        }
+        // cnt1 = # of elements of fp1 in fp0
+        let cnt1 = 0;
+        for (let i = 0; i < fp1.length; i++) {
+            if (fp0.includes(fp0[i])) {
+                cnt1++;
+            }
+        }
+        if (cnt0 == fp0.length) return (true);
+        if (cnt1 == fp1.length) return (true);
+        return (false);
+    }
+
+    //Driver function
+    performAnalysisInstructions(msg, chainID, chainIDDest) {
+        let analysis = {
+            xcmAddresses: [],
+            assetChains: {},
+            xcmInteriorKeys: {}, //consider removing this
+            xcmInteriorKeysAll: [],
+            xcmInteriorKeysRegistered: [],
+            xcmInteriorKeysUnregistered: [],
+        }
+        this.chainParserInit(chainID, this.debugLevel);
+        let version = Object.keys(msg)[0]
+        switch (version) {
+            case 'v2':
+                this.analyzeXCMInstructions(analysis, msg.v2, chainID, chainIDDest, "computeAssetChains")
+                break;
+            case 'v1':
+                this.analyzeXCMInstructionsV1(analysis, msg.v1, chainID, chainIDDest, "computeAssetChains")
+                break;
+            case 'v0':
+                this.analyzeXCMInstructionsV0(analysis, msg.v0, chainID, chainIDDest, "computeAssetChains")
+                break;
+            default:
+                //console.log("unknown version", version);
+        }
+        for (const xcmInteriorKey of Object.keys(analysis.xcmInteriorKeys)) {
+            let symbol = this.getXcmAssetInfoSymbol(xcmInteriorKey)
+            let xcmInteriorKeyV2 = paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey)
+            analysis.xcmInteriorKeysAll.push(xcmInteriorKeyV2)
+            if (symbol) {
+                analysis.xcmInteriorKeysRegistered.push(xcmInteriorKeyV2)
+            } else {
+                analysis.xcmInteriorKeysUnregistered.push(xcmInteriorKeyV2)
+            }
+        }
+        return analysis;
+    }
+
+    analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx = "") {
+        let instructionSet = this.getInstructionSet();
+
+        for (const i of Object.keys(instructionSet)) {
+            if (instruction[i] != undefined) {
+                let features = instructionSet[i];
+                if (features.MultiAssets != undefined) {
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`Instruction=${i} MultiAssets found!`)
+                    for (let j = 0; j < instruction[i].length; j++) {
+                        this.analyzeXCM_MultiAsset(analysis, instruction[i][j], chainID, chainIDDest, i);
+                    }
+                }
+                if (features.MultiAsset != undefined) {
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`Instruction=${i} MultiAssets found!`)
+                    for (const fld of features.MultiAsset) {
+                        if (instruction[i][fld] != undefined) {
+                            this.analyzeXCM_MultiAsset(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                        }
+                    }
+                }
+                if (features.MultiAssetFilter != undefined) {
+                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`Instruction=${i} MultiAssetFilter found!`)
+                    for (const fld of features.MultiAssetFilter) {
+                        this.analyzeXCM_MultiAssetFilter(analysis, instruction[i], fld, chainID, chainIDDest, i);
+                    }
+                }
+                if (features.MultiLocation != undefined) {
+                    for (const fld of features.MultiLocation) {
+                        this.analyzeXCM_MultiLocation(analysis, instruction[i], fld, chainID, chainIDDest, i);
+                    }
+                }
+
+                if (features.XCM != undefined) {
+                    for (const fld of features.XCM) {
+                        if (instruction[i][fld] != undefined) {
+                            //console.log("analyzing instruction containing XCM ", instruction);
+                            // recursive call
+                            let xcmChild = instruction[i][fld];
+                            // console.log( "  ... xcmChild:", xcmChild);
+                            this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                        }
+                    }
+                }
+
+                if (features.Effects != undefined) {
+                    for (const fld of features.Effects) {
+                        if (instruction[i][fld] != undefined) {
+                            //console.log("analyzing instruction containing effects ", instruction);
+                            // recursive call
+                            let xcmChild = instruction[i][fld];
+
+                            this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                        }
+                    }
+                }
+
+                if (features.Call != undefined) {
+                    for (const fld of features.Call) {
+                        this.analyzeXCM_Call(analysis, instruction[i], fld, chainID, chainIDDest, i);
+                    }
+                }
+            }
+        }
+    }
+
+    analyzeXCMInstructionsV1(analysis, xcmMsgV1, chainID, chainIDDest, ctx) {
+        this.analyzeXCMInstruction(analysis, xcmMsgV1, chainID, chainIDDest, ctx)
+    }
+
+    analyzeXCMInstructionsV0(analysis, xcmMsgV0, chainID, chainIDDest, ctx) {
+        this.analyzeXCMInstruction(analysis, xcmMsgV0, chainID, chainIDDest, ctx)
+    }
+
+    analyzeXCMInstructions(analysis, instructions, chainID, chainIDDest, ctx) {
+        for (const instruction of instructions) {
+            //console.log(`instruction`, instruction)
+            this.analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx)
+        }
+    }
+
 }
