@@ -2578,7 +2578,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let bqDataset = relayChain
         let logDTp = logDT.replaceAll("-", "")
         let xcmtransfers = [];
-
+        let NL = "\r\n";
         // 3. map into canonical form
         xcmtransferRecs.forEach((r) => {
 
@@ -2644,7 +2644,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 console.log(e)
             }
         });
-        let NL = "\r\n";
         xcmtransfers.forEach((e) => {
             fs.writeSync(f, JSON.stringify(e) + NL);
         });
@@ -2658,7 +2657,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
 
         // same as above, except for xcm dataset 
-        let sql_xcm = `select msgHash, chainID, chainIDDest, relayedAt, includedAt, msgType, blockTS, CONVERT(msgStr using utf8) as msg, CONVERT(msgHex using utf8) as msgHex, version from xcm where blockTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and blockTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' order by blockTS;`
+        let sql_xcm = `select msgHash, chainID, chainIDDest, relayedAt, includedAt, msgType, blockTS, CONVERT(msgStr using utf8) as msg, CONVERT(msgHex using utf8) as msgHex, version, xcmInteriorKeys, xcmInteriorKeysUnregistered from xcm where blockTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and blockTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' order by blockTS;`
         let xcmRecs = await this.poolREADONLY.query(sql_xcm)
         tbl = "xcm";
         fn = path.join(dir, `${tbl}-${relayChain}-${logDT}.json`)
@@ -2666,6 +2665,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let xcm = [];
         xcmRecs.forEach((x) => {
             try {
+                let xcmInteriorKeys = x.xcmInteriorKeys ? JSON.parse(x.xcmInteriorKeys) : null;
+                let xcmInteriorKeysUnregistered = x.xcmInteriorKeysUnregistered ? JSON.parse(x.xcmInteriorKeysUnregistered) : null;
                 let xcm = {
                     msg_hash: x.msgHash,
                     origination_para_id: paraTool.getParaIDfromChainID(x.chainID),
@@ -2676,7 +2677,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     origination_ts: x.blockTS,
                     msg: x.msg,
                     msg_hex: x.msgHex,
-                    version: x.version
+                    version: x.version,
+                    xcm_interior_keys: xcmInteriorKeys,
+                    xcm_interior_keys_unregistered: xcmInteriorKeysUnregistered
                 }
                 fs.writeSync(f, JSON.stringify(xcm) + NL);
             } catch (e) {

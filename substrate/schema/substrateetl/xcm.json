@@ -45,6 +45,11 @@
     },
     {
         "mode": "NULLABLE",
+        "name": "version",
+        "type": "STRING"
+    },
+    {
+        "mode": "NULLABLE",
         "name": "xcm_interior_keys",
         "type": "JSON"
     },
