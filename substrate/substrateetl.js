@@ -39,7 +39,7 @@ const {
 } = require('@google-cloud/bigquery');
 
 // first day when balances are available daily
-const balanceStartDT = "2022-01-01";
+const balanceStartDT = "2023-01-01";
 
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
@@ -114,8 +114,36 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
-    async cleanReaped(execute = false) {
-        // get chains that have WSEndpointArchive = 1
+    async cleanReapedExcess(chainID) {
+        if (chainID == 2004 || chainID == 22023) {
+            let paraID = paraTool.getParaIDfromChainID(chainID);
+            let relayChain = paraTool.getRelayChainByChainID(chainID);
+            let sql = `select UNIX_TIMESTAMP(logDT) as logTS from blocklog where chainID = ${chainID} and logDT in ("2022-02-11") order by logDT desc`
+            let recs = await this.poolREADONLY.query(sql);
+            for (const r of recs) {
+                let [logDT, hr] = paraTool.ts_to_logDT_hr(r.logTS);
+                let logYYYYMMDD = logDT.replaceAll('-', '')
+                let cmd = `bq query --destination_table '${relayChain}.balances${paraID}$${logYYYYMMDD}' --project_id=substrate-etl --time_partitioning_field ts --replace --use_legacy_sql=false 'select symbol,address_ss58,CONCAT(LEFT(address_pubkey, 2), RIGHT(address_pubkey, 40)) as address_pubkey,ts,id,chain_name,asset,para_id,free,free_usd,reserved,reserved_usd,misc_frozen,misc_frozen_usd,frozen,frozen_usd,price_usd from ${relayChain}.balances${paraID} where DATE(ts) = "${logDT}"'`
+                try {
+                    console.log(cmd);
+                    //await exec(cmd);
+                } catch (err) {
+                    console.log(err);
+                }
+            }
+        }
+    }
+
+    async cleanReaped(start = null, end = null) {
+        if (start == null) {
+            // pick a multiple of 256 between 0 and 4096
+            start = Math.floor(Math.random() * 16) * 256;
+        }
+        if (end == null) {
+            // pick 256 later, so we're working on 1/16 of the dataset
+            end = start + 256;
+        }
+        // get chains that have WSEndpointArchive = 1 only ... for now
         let sql = `select chainID from chain where crawling = 1 and WSEndpointArchive = 1`
         let recs = await this.poolREADONLY.query(sql);
         let chainIDs = {};
@@ -123,14 +151,22 @@ module.exports = class SubstrateETL extends AssetManager {
             chainIDs[r.chainID] = true;
         }
 
-        for (let i = 0; i <= 4096; i++) {
+        for (let i = start; i <= end; i++) {
             let hs = "0x" + i.toString(16).padStart(3, '0');
-            let he = (i < 4096) ? "0x" + (i + 1).toString(16).padStart(2, '0') : "0xfffZ";
-            await this.clean_reaped(hs, he, chainIDs, execute);
+            let he = (i < 4096) ? "0x" + (i + 1).toString(16).padStart(3, '0') : "0xfffZ";
+            if (hs == "0x6df") {
+                for (let j = 0; j <= 256; j++) {
+                    let hs2 = hs + i.toString(16).padStart(2, '0');
+                    let he2 = he + ((j < 256) ? (j + 1).toString(16).padStart(2, '0') : "ffF");
+                    await this.clean_reaped(hs2, he2, chainIDs);
+                }
+            } else {
+                await this.clean_reaped(hs, he, chainIDs);
+            }
         }
     }
 
-    async clean_reaped(start = "0x2c", end = "0x2d", chainIDs, execute = false) {
+    async clean_reaped(start = "0x2c", end = "0x2d", chainIDs) {
         console.log("clean_balances", start, end)
         let [t, tbl] = this.get_btTableRealtime()
         // with 2 digit prefixes, there are 30K rows (7MM rows total)
@@ -148,28 +184,29 @@ module.exports = class SubstrateETL extends AssetManager {
                 if (data) {
                     for (const column of Object.keys(data)) {
                         let cells = data[column];
-                        for (const cell of cells) {
-                            let ts = cell.timestamp / 1000000;
-                            let secondsago = currentTS - ts;
-                            let column_with_family = `${family}:${column}`
-                            let assetChain = paraTool.decodeAssetChain(column);
-                            let [asset, chainID] = paraTool.parseAssetChain(assetChain);
-                            if (chainIDs[chainID]) {
-                                if (secondsago > 86400 * 2) {
-                                    console.log("EXECUTE", rowKey, column, ts, secondsago, asset, chainID, column_with_family);
-                                } else {
-                                    console.log("RECENT", rowKey, column, ts, secondsago, asset, chainID, column_with_family);
-                                }
-                                /*tbl.mutate({
+                        let cell = cells[0];
+                        let ts = cell.timestamp / 1000000;
+                        let secondsago = currentTS - ts;
+                        let column_with_family = `${family}:${column}`
+                        let assetChain = paraTool.decodeAssetChain(column);
+                        let [asset, chainID] = paraTool.parseAssetChain(assetChain);
+                        if (chainIDs[chainID]) {
+                            if (asset.includes("0x")) {
+                                //console.log("SKIP CONTRACTS", rowKey, column, ts, secondsago, asset, chainID, column_with_family);
+                            } else if (secondsago > 86400 * 2) {
+                                console.log("deleting", rowKey, column, ts, secondsago, asset, chainID, column_with_family);
+                                tbl.mutate({
                                     key: rowKey,
                                     method: 'delete',
                                     data: {
                                         column: column_with_family
                                     },
-                                }); */
+                                });
+                            } else {
+                                //console.log("RECENT", rowKey, column, ts, secondsago, asset, chainID, column_with_family);
                             }
+                            // important: only consider FIRST cell -
                         }
-
                     }
                 }
             } catch (err) {
@@ -249,9 +286,9 @@ module.exports = class SubstrateETL extends AssetManager {
         } else {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
-
-        console.log("get_random_substrateetl", sql);
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and ( logDT <= date(date_sub(Now(), interval 1 day)) or logDT = date(Now()) ) ${w} order by rand() limit 1`;
         let recs = await this.poolREADONLY.query(sql);
+        console.log("get_random_substrateetl", sql);
         if (recs.length == 0) return ([null, null]);
         let {
             indexTS,
@@ -1115,6 +1152,11 @@ module.exports = class SubstrateETL extends AssetManager {
                     if (currencyID) {
                         totalIssuance = await api.query.tokens.totalIssuance(currencyID) / 10 ** decimals;
                     }
+                } else if (api.query.eqAggregates && api.query.eqAggregates.totalUserGroups) {
+                    let currencyID = (chainID == 2011) ? 25969 : 1734700659; // native asset id 
+                    let res = await api.query.eqAggregates.totalUserGroups("Balances", currencyID);
+                    totalIssuance = (res.collateral - res.debt) / 10 ** decimals;
+                    console.log(res, totalIssuance);
                 } else {
                     console.log("totalIssuance NOT AVAIL");
                 }
@@ -1197,7 +1239,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 let pub = user[0].slice(-32);
                 let pubkey = u8aToHex(pub);
                 let account_id = encodeAddress(pub, prefix);
-                let nonce = user[1].nonce.toString()
+                let nonce = parseInt(user[1].nonce.toString(), 10)
                 let balance = user[1].data
                 let free_balance = (balance.free) ? parseInt(balance.free.toString(), 10) / 10 ** decimals : 0;
                 let reserved_balance = (balance.reserved) ? parseInt(balance.reserved.toString(), 10) / 10 ** decimals : 0;
@@ -1205,6 +1247,9 @@ module.exports = class SubstrateETL extends AssetManager {
                 let feeFrozen_balance = (balance.feeFrozen) ? parseInt(balance.feeFrozen.toString(), 10) / 10 ** decimals : 0;
 
                 let stateHash = u8aToHex(user[1].createdAtHash)
+                if ((chainID == 2004 || chainID == 22023) && (pubkey.length >= 40)) {
+                    pubkey = "0x" + pubkey.substr(pubkey.length - 40, 40); // evmaddress is the last 20 bytes (40 chars) of the storagekey
+                }
                 let rowKey = pubkey.toLowerCase()
                 if (logDT) {
                     let free_usd = free_balance * priceUSD;
@@ -1229,7 +1274,8 @@ module.exports = class SubstrateETL extends AssetManager {
                             misc_frozen_usd: miscFrozen_usd,
                             frozen_usd,
                             ts: blockTS,
-                            price_usd: priceUSD
+                            price_usd: priceUSD,
+                            nonce: nonce
                         });
                         if ((logDT == yesterdayDT) || (logDT == todayDT)) {
                             console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
@@ -3296,6 +3342,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
         let sqla = {
+            "balances": `select date(ts) logDT, count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} where DATE(ts) >= "${startDT}" group by logDT order by logDT`,
             "extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics, sum(fee) fees from ${project}.${relayChain}.extrinsics${paraID} where DATE(block_time) >= "${startDT}" group by logDT having logDT < "${today}" order by logDT`,
             "events": `select date(block_time) logDT, count(*) as numEvents from substrate-etl.${relayChain}.events${paraID} where DATE(block_time) >= "${startDT}" group by logDT order by logDT`,
             "transfers": `select  date(block_time) logDT, count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers${paraID} where DATE(block_time) >= "${startDT}" group by logDT having logDT < "${today}" order by logDT`,

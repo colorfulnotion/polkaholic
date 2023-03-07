@@ -215,11 +215,11 @@ async function main() {
 
 
     program.command('cleanreaped')
-        .description(`For any reaped balances, deletes old records, if we crawled chain balances recently`)
-        .option('-l, --logDT <logDT>', `Deletes  form`, null)
+        .description(`For any reaped account balances, deletes old cells more than 48 hours old from a random or specified shard`)
+        .option('-s, --shard <shard>', `Shard [0..15]`, null)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
-            await substrateetl.cleanReaped();
+            await substrateetl.cleanReaped(opt.shard);
             process.exit(0);
         });
 

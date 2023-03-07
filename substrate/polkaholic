@@ -295,7 +295,7 @@ async function main() {
             var Manager = require("./manager");
             var manager = new Manager();
             await manager.mapChains((c) => {
-                console.log(`./substrate-etl accountmetrics -r ${c.relayChain} -p ${c.paraID} -l 2022-01-01 --endDT 2022-12-31`)
+                console.log(`bq update --project_id=substrate-etl ${c.relayChain}.balances${c.paraID} schema/substrateetl/balances.json`)
             });
             process.exit(0);
         })
