@@ -718,7 +718,9 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 destStatus,
                 errorDesc,
                 incomplete,
-                blockNumberDest
+                blockNumberDest,
+                xcmInteriorKey,
+                xcmInteriorKeysRegistered,
               from xcmtransfer
        where  extrinsicHash = '${extrinsicHash}' and transferIndex = '${transferIndex}' and xcmIndex = '${xcmIndex}' limit 1`
         let xcmRecs = await this.poolREADONLY.query(sqlA)
@@ -768,8 +770,26 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             return (false);
         }
         let decimals = inp.decimals;
+        let xcmInteriorKey = xcm.xcmInteriorKey
+        let xcmInteriorKeyV2 = null
+        let xcmInteriorKeyUnregistered = null
+        try {
+            if (xcmInteriorKey != undefined){
+                xcmInteriorKeyV2 = paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey)
+                if (this.isXcmInteriorKeyRegistered(xcmInteriorKey)){
+                    xcmInteriorKeyUnregistered = 0
+                }else{
+                    xcmInteriorKeyUnregistered = 1
+                }
+            }
+        } catch(e){
+            console.log(`${xcm.extrinsicHash} [${xcm.transferIndex}-${xcm.xcmIndex}] v1Key=${xcmInteriorKey}. Error:`, e)
+        }
+
         let xcmInfo = {
             symbol: xcm.symbol,
+            xcmInteriorKey: xcmInteriorKeyV2,
+            xcmInteriorKeyUnregistered: xcmInteriorKeyUnregistered,
             priceUSD: xcm.priceUSD,
             relayChain: {
                 relayChain: xcm.relayChain,
@@ -830,7 +850,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 await this.update_batchedSQL();
                 return xcmInfo;
             }
-            // WATERFALL match criteria: search db, substrateetl, then rpc endpoint 
+            // WATERFALL match criteria: search db, substrateetl, then rpc endpoint
             this.cachedMessages = null;
             this.cachedRows = null;
             let best = null;

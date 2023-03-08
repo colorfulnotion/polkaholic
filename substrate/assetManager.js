@@ -584,6 +584,15 @@ module.exports = class AssetManager extends PolkaholicDB {
         return false
     }
 
+    isXcmInteriorKeyRegistered(xcmInteriorKey){
+        let xcmAssetInfo = this.xcmAssetInfo[xcmInteriorKey]
+        if (xcmAssetInfo != undefined) {
+            return true
+        }else{
+            return false
+        }
+    }
+
     getXcmAssetInfoByInteriorkey(xcmInteriorKey) {
         let xcmAssetInfo = this.xcmAssetInfo[xcmInteriorKey]
         console.log(`getXcmAssetInfoByInteriorkey k=${xcmInteriorKey}`, xcmAssetInfo)
@@ -2212,10 +2221,9 @@ module.exports = class AssetManager extends PolkaholicDB {
                 //console.log("unknown version", version);
         }
         for (const xcmInteriorKey of Object.keys(analysis.xcmInteriorKeys)) {
-            let symbol = this.getXcmAssetInfoSymbol(xcmInteriorKey)
             let xcmInteriorKeyV2 = paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey)
             analysis.xcmInteriorKeysAll.push(xcmInteriorKeyV2)
-            if (symbol) {
+            if (this.isXcmInteriorKeyRegistered(xcmInteriorKey)) {
                 analysis.xcmInteriorKeysRegistered.push(xcmInteriorKeyV2)
             } else {
                 analysis.xcmInteriorKeysUnregistered.push(xcmInteriorKeyV2)

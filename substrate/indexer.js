@@ -1195,8 +1195,13 @@ module.exports = class Indexer extends AssetManager {
                     console.log(`invalid asset`, r.xcmSymbol, r.chainID, "xcmtransfer", r)
                 } else {
                     let innerCall = (r.innerCall) ? `'${r.innerCall}'` : `NULL`
+
                     let msgHash = (r.msgHash && r.msgHash != "0x") ? `'${r.msgHash}'` : `NULL`
                     let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `${mysql.escape(r.xcmInteriorKey)}` : `NULL`
+                    let xcmInteriorKeyUnregistered = `NULL` //TODO: modify this
+                    if (r.xcmInteriorKey != undefined){
+                        xcmInteriorKeyUnregistered = (this.isXcmInteriorKeyRegistered(xcmInteriorKey))? 0: 1
+                    }
                     let xcmSymbol = (r.xcmSymbol) ? `${mysql.escape(r.xcmSymbol)}` : `NULL`
                     let xcmType = (r.xcmType != undefined) ? `'${r.xcmType}'` : 'xcmtransfer'
                     let pendingXcmInfoStr = (r.xcmInfo != undefined) ? JSON.stringify(r.xcmInfo) : false
@@ -1235,7 +1240,8 @@ module.exports = class Indexer extends AssetManager {
                         xcmType,
                         pendingXcmInfoBlob,
                         `Now()`,
-                        originationTxFee
+                        originationTxFee,
+                        xcmInteriorKeyUnregistered
                     ].join(",") + ")";
                     // CHECK: do we need isXcmTipSafe = (isSigned || finalized) ? true : false concept here to ensure that xcmtransfer records are inserted only when "safe"
                     if (r.msgHash == "0x" && !r.finalized) {
@@ -1256,9 +1262,9 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSentDecimals", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo", "xcmInfolastUpdateDT", "txFee"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSentDecimals", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo", "xcmInfolastUpdateDT", "txFee", "xcmInteriorKeyUnregistered"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "txFee"],
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "txFee", "xcmInteriorKeyUnregistered"],
                 "replaceIfNull": ["xcmInfo", "msgHash", "xcmInfolastUpdateDT", "amountSentDecimals", "amountSent"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
             }, sqlDebug);
 
@@ -5430,15 +5436,12 @@ module.exports = class Indexer extends AssetManager {
         if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
         let xcmInteriorKey = null
+        let xcmInteriorKeyV2 = null
         let xcmInteriorKeyUnregistered = null
         if (x.xcmInteriorKey != undefined){
             xcmInteriorKey = x.xcmInteriorKey
-            let xcmSymbol = this.getXcmAssetInfoSymbol(xcmInteriorKey)
-            if (xcmSymbol){
-                xcmInteriorKeyUnregistered = 0
-            }else{
-                xcmInteriorKeyUnregistered = 1
-            }
+            xcmInteriorKeyV2 = paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey)
+            xcmInteriorKeyUnregistered = (this.isXcmInteriorKeyRegistered(xcmInteriorKey))? 0: 1
         }
 
         try {
@@ -5547,7 +5550,7 @@ module.exports = class Indexer extends AssetManager {
             let isExpectedFinalized = (timeDiff > 300) ? true : false
             let xcmInfo = {
                 symbol: x.symbol,
-                xcmInteriorKey: xcmInteriorKey,
+                xcmInteriorKey: xcmInteriorKeyV2,
                 xcmInteriorKeyUnregistered: xcmInteriorKeyUnregistered,
                 priceUSD: (x.priceUSD != undefined) ? x.priceUSD : null,
                 relayChain: null,
