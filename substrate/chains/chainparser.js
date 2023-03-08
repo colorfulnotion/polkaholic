@@ -2521,7 +2521,7 @@ module.exports = class ChainParser {
                 // dest for relaychain  {"v1":{"parents":1,"interior":{"x1":{"accountId32":{"network":{"any":null},"id":"0x42f433b9325d91779a6e226931d20e31ec3f6017111b842ef4f7a3c13364bf63"}}}}}
 
                 let [paraIDDest, chainIDDest, destAddress] = this.processDest(dest, relayChain)
-                //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} paraIDDest=${paraIDDest}, chainIDDest=${chainIDDest}, destAddress=${destAddress}`)
                 if (chainIDDest == -1 || paraIDDest == -1) {
                     //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] section_method=${section_method} parsing failed`)
                     return
@@ -2680,7 +2680,7 @@ module.exports = class ChainParser {
 
             } else {
                 // TODO: tally errors in logger
-                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processOutgoingXTokens Unknown`, `module:${section_method}`);
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] chainparser-processOutgoingXTokens Unknown`, `module:${section_method}`);
             }
         } catch (e) {
             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`processOutgoingXTokens error`, e)

@@ -5153,7 +5153,8 @@ module.exports = class Indexer extends AssetManager {
 
             let isSuccess = (rExtrinsic.err == undefined) ? true : false //skip feedtransfer/feedxcm/feedreward/feedcrowdloan processing if is failure case
 
-            if (isSuccess) {
+            //!! failure-pending are going through with isSuccess check
+            if (isSuccess || true) {
                 /* process feedtransfer:
                 feedtransfer keeps a list of incoming transfers
                 for outgoing transfer, we set isIncoming to 0 and addresss as senderAddress
@@ -5198,7 +5199,6 @@ module.exports = class Indexer extends AssetManager {
 
                 //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
                 this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
-
                 if (rExtrinsic.xcms == undefined) {
                     // process xcmtransfer extrinsic params
                     this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
@@ -5381,8 +5381,6 @@ module.exports = class Indexer extends AssetManager {
                         this.updateMultisigMap(multisigRec)
                     }
                 }
-
-
             }
 
             if (this.validAddress(fromAddress)) {
@@ -5431,6 +5429,18 @@ module.exports = class Indexer extends AssetManager {
         //build systhetic xcmInfo here when xcmInfo is not set yet
         if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
+        let xcmInteriorKey = null
+        let xcmInteriorKeyUnregistered = null
+        if (x.xcmInteriorKey != undefined){
+            xcmInteriorKey = x.xcmInteriorKey
+            let xcmSymbol = this.getXcmAssetInfoSymbol(xcmInteriorKey)
+            if (xcmSymbol){
+                xcmInteriorKeyUnregistered = 0
+            }else{
+                xcmInteriorKeyUnregistered = 1
+            }
+        }
+
         try {
             let sectionPieces = x.sectionMethod.split(':')
             let xSection = null,
@@ -5470,7 +5480,6 @@ module.exports = class Indexer extends AssetManager {
                     sourceTxFeeUSD = p.valUSD;
                 }
             }
-
 
             let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
             //console.log(`symbolRelayChain=${symbolRelayChain}`, assetInfo)
@@ -5538,6 +5547,8 @@ module.exports = class Indexer extends AssetManager {
             let isExpectedFinalized = (timeDiff > 300) ? true : false
             let xcmInfo = {
                 symbol: x.symbol,
+                xcmInteriorKey: xcmInteriorKey,
+                xcmInteriorKeyUnregistered: xcmInteriorKeyUnregistered,
                 priceUSD: (x.priceUSD != undefined) ? x.priceUSD : null,
                 relayChain: null,
                 origination: null,
@@ -5654,7 +5665,7 @@ module.exports = class Indexer extends AssetManager {
         } catch (e) {
             this.logger.error({
                 "op": "buildingPendingXcmInfo",
-                e
+                "err": e
             })
             return false
         }
