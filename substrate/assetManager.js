@@ -140,6 +140,16 @@ module.exports = class AssetManager extends PolkaholicDB {
         }
     }
 
+    async get_chainSymbols(){
+        let chainSQL = `select chainID, symbol from chain where symbol is not null`
+        var chains = await this.poolREADONLY.query(chainSQL);
+        let nativeSymbolMap = {}
+        for (const chain of chains){
+            nativeSymbolMap[chain.chainID] = chain.symbol
+        }
+        return nativeSymbolMap
+    }
+
     // reads all the decimals from the chain table and then the asset mysql table
     async init_chainInfos() {
         //TODO: adjust getSystemProperties to handle case where chain that does not have a "asset" specified (or use left join here) will get one
