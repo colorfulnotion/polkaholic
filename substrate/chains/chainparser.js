@@ -2717,6 +2717,9 @@ module.exports = class ChainParser {
                             incomplete = 1;
                             //if (this.debugLevel >= paraTool.debugTracing) console.log("extract_xcm_incomplete INCOMPLETE");
                             return (incomplete);
+                        }else if (d.error !== undefined){
+                            let info = d.error; // [{"error":{"weightLimitReached":"0xffffffffffffffff"}] see: 0x8d3b83fdefde0cfd1b3eae343644d9ebfb77ba724bc6b841383392b4fc6da07c
+                            incomplete = 1;
                         }
                     }
                 }
