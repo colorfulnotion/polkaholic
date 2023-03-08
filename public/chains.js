@@ -88,7 +88,8 @@ async function show_chains() {
                         if (row.dappURL) {
                             links.push(`<a href='${row.dappURL}' target='_new'>app</a>`);
                         }
-                        links.push(`<a href='/xcminfows/${row.id}' target='_new'>xcminfo</a>`);
+
+                        links.push(`<a href='https://github.com/colorfulnotion/substrate-etl/tree/main/${row.relayChain}/${row.paraID}-${row.id}' target='_new'>substrate-etl</a>`);
                         return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus) + `<div class="explorer">` + links.join(" | ") + `</div>`
                     }
                     return row.chainName;

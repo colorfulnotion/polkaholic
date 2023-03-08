@@ -39,7 +39,7 @@ const {
 } = require('@google-cloud/bigquery');
 
 // first day when balances are available daily
-const balanceStartDT = "2023-01-01";
+const balanceStartDT = "2021-12-17";
 
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
@@ -526,7 +526,81 @@ module.exports = class SubstrateETL extends AssetManager {
         // pick something your node started already
         let [chainID, indexTS, startTS] = await this.pick_chainbalancecrawler(specific_chainID);
         if (chainID == null) {
-            let w = (specific_chainID) ? ` and blocklog.chainID = '${specific_chainID}' ` : "";
+	    // for large chains with > 100K numAddresses, have each node work on themselves
+	    switch ( this.hostname ) {
+	    case "polkadot":
+		specific_chainID  = 0;
+		break;
+	    case "kusama":
+		specific_chainID  = 2;
+		break;
+	    case "acala":
+		specific_chainID  = 2000;
+		break;
+	    case "basilisk":
+		specific_chainID  = 2002;
+		break;
+	    case "bifrost-dot":
+		specific_chainID  = 2026;
+		break;
+	    case "moonbeam":
+		specific_chainID  = 2004;
+		break;
+	    case "astar":
+		specific_chainID  = 2006;
+		break;
+	    case "karura":
+		specific_chainID  = 22000;
+		break;
+	    case "bifrost-ksm":
+		specific_chainID  = 22001;
+		break;
+	    case "moonriver":
+		specific_chainID  = 22023;
+		break;
+	    case "shiden":
+		specific_chainID  = 22007;
+		break;
+	    case "statemine":
+		specific_chainID  = 21000;
+		break;
+	    case "statemint":
+		specific_chainID  = 1000;
+		break;
+	    case "hydradx":
+		switch ( Math.floor(Math.random() * 8) ) {
+		case 0:
+		    specific_chainID = 22096;
+		    break;
+		case 1:
+		    specific_chainID = 22084;
+		    break;
+		case 2:
+		    specific_chainID = 22090;
+		    break;
+		case 3:
+		    specific_chainID = 22088;
+		    break;
+		case 4:
+		    specific_chainID = 22092;
+		    break;
+		case 5:
+		    specific_chainID = 22095;
+		    break;
+		case 6:
+		    specific_chainID = 22096;
+		    break;
+		case 7:
+		    // pick something random
+		}
+	    }
+	    let orderby = "rand()";
+            let w = ""
+	    if (specific_chainID != null) {
+		orderby = "blocklog.logDT desc";
+		w = ` and blocklog.chainID = '${specific_chainID}' `;
+	    }
+	    
             // pick a chain-logDT combo that has been marked Ready ( all blocks finalized ), and no other node is working on
             let sql = `select blocklog.chainID, UNIX_TIMESTAMP(blocklog.logDT) as indexTS
  from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecrawler.logDT and blocklog.chainID = chainbalancecrawler.chainID
@@ -535,7 +609,7 @@ module.exports = class SubstrateETL extends AssetManager {
  chainbalancecrawler.logDT is null and
  blocklog.logDT >= '${balanceStartDT}' ${w} and
  lastUpdateAddressBalancesAttempts < 10 
- order by lastUpdateAddressBalancesAttempts asc, rand()`;
+ order by lastUpdateAddressBalancesAttempts asc, ${orderby}`;
             console.log("updateAddressBalances", sql);
             let chains = await this.pool.query(sql);
 
@@ -1845,7 +1919,7 @@ Round(max(numAddresses_avg)) as numAddresses,
 sum(if(issues is not null, 1, 0)) as numIssues,
 chain.crawlingStatus
 from blocklogstats join chain on blocklogstats.chainID = chain.chainID where monthDT >= "${birthDT}" and chain.relayChain in ("polkadot", "kusama") and
-monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID order by relayChain desc, paraID asc`;
+monthDT <= last_day(date(date_sub(Now(), interval 1 day))) group by chainID order by relayChain desc, paraID asc`;
         console.log(sql_tally);
         tallyRecs = await this.poolREADONLY.query(sql_tally);
         for (const r of tallyRecs) {
