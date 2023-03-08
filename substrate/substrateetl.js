@@ -534,7 +534,7 @@ module.exports = class SubstrateETL extends AssetManager {
  ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 5+POW(4, lastUpdateAddressBalancesAttempts) MINUTE) or lastUpdateAddressBalancesStartDT is Null ) and
  chainbalancecrawler.logDT is null and
  blocklog.logDT >= '${balanceStartDT}' ${w} and
- lastUpdateAddressBalancesAttempts < 10 
+ lastUpdateAddressBalancesAttempts < 10
  order by lastUpdateAddressBalancesAttempts asc, rand()`;
             console.log("updateAddressBalances", sql);
             let chains = await this.pool.query(sql);
@@ -1153,7 +1153,7 @@ module.exports = class SubstrateETL extends AssetManager {
                         totalIssuance = await api.query.tokens.totalIssuance(currencyID) / 10 ** decimals;
                     }
                 } else if (api.query.eqAggregates && api.query.eqAggregates.totalUserGroups) {
-                    let currencyID = (chainID == 2011) ? 25969 : 1734700659; // native asset id 
+                    let currencyID = (chainID == 2011) ? 25969 : 1734700659; // native asset id
                     let res = await api.query.eqAggregates.totalUserGroups("Balances", currencyID);
                     totalIssuance = (res.collateral - res.debt) / 10 ** decimals;
                     console.log(res, totalIssuance);
@@ -1532,7 +1532,7 @@ module.exports = class SubstrateETL extends AssetManager {
     async dump_substrateetl_xcmgar(startDT = "2023-02-28") {
         const relayChains = ["polkadot", "kusama"];
 
-        // fetch xcmgar data 
+        // fetch xcmgar data
         const axios = require("axios");
         let url = "https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry@main/metadata/xcmgar.json";
         let assets = null;
@@ -2638,6 +2638,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
                     xcmtransfers.push({
                         symbol: r.symbol, // xcmInfo.symbol
+                        //xcm_interior_key: (xcmInfo.xcmInteriorKey != undefined)? xcmInfo.xcmInteriorKey: null,
+                        //xcm_interior_keys_unregistered: (xcmInfo.xcm_interior_keys_unregistered != undefined)? xcmInfo.xcm_interior_keys_unregistered: null,
                         price_usd: r.priceUSD, // xcmInfo.priceUSD
                         origination_transfer_index: r.transferIndex, // should be o.transferIndex?
                         origination_xcm_index: r.xcmIndex, // should be o.xcmIndex?
@@ -2681,7 +2683,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         destination_ts: d.ts,
                         destination_execution_status: destination_execution_status,
                         xcm_info: xcmInfo,
-                        xcm_info_last_update_time: r.lastUpdateTS
+                        xcm_info_last_update_time: r.lastUpdateTS,
                     });
                 } else {
                     console.log("BAD xcmtransfer xcmInfo", r.extrinsicHash, xcmInfo)
@@ -2703,7 +2705,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             console.log("XCMTRANSFERS Load ERR", cmd, err);
         }
 
-        // same as above, except for xcm dataset 
+        // same as above, except for xcm dataset
         let sql_xcm = `select msgHash, chainID, chainIDDest, relayedAt, includedAt, msgType, blockTS, CONVERT(msgStr using utf8) as msg, CONVERT(msgHex using utf8) as msgHex, version, xcmInteriorKeys, xcmInteriorKeysUnregistered from xcm where blockTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and blockTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' order by blockTS;`
         let xcmRecs = await this.poolREADONLY.query(sql_xcm)
         tbl = "xcm";
