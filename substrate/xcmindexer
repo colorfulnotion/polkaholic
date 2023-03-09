@@ -152,9 +152,10 @@ async function main() {
 
     program.command('reindex')
         .description(`Rewrite BigTable column data with latest xcmInfo info`)
-        .option('-l <lookbackDays>', '# of days to lookback', 1, myParseInt)
+        .option('-l --lookbackdays <lookbackDays>', '# of days to lookback', 1, myParseInt)
         .action(async (opt) => {
             var manager = new XCMManager();
+            let lookbackDays = opt.lookbackdays;
             await manager.xcm_init()
             await manager.assetManagerInit();
             await manager.xcmReanalytics(lookbackDays)
