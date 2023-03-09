@@ -150,7 +150,8 @@ module.exports = class PolkaholicDB {
         }
 
         // 2. ready db config for READONLY mysql pool [default US replica but could be EU/AS replica] using env variable POLKAHOLIC_DB_REPLICA
-        let dbconfigReplicaFilename = (process.env.POLKAHOLIC_DB_REPLICA != undefined) ? process.env.POLKAHOLIC_DB_REPLICA : '/root/.mysql/.db00-us-indexer.cnf';
+        // let dbconfigReplicaFilename = (process.env.POLKAHOLIC_DB_REPLICA != undefined) ? process.env.POLKAHOLIC_DB_REPLICA : '/root/.mysql/.db00-us-indexer.cnf';
+        let dbconfigReplicaFilename = (process.env.POLKAHOLIC_DB != undefined) ? process.env.POLKAHOLIC_DB : '/root/.mysql/.db00.cnf';
         try {
             let dbconfigREADONLY = ini.parseSync(dbconfigReplicaFilename);
             this.poolREADONLY = mysql.createPool(this.convert_dbconfig(dbconfigREADONLY.client));
