@@ -1029,7 +1029,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
     async bulk_generate_XCMInfo(chainIDDest = null, lookbackDays = 16, limit = 100) {
         let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2023-02-28") and  sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and ( matchAttemptDT is null or matchAttemptDT < date_sub(Now(), INTERVAL POW(3, matchAttempts) MINUTE) ) and symbol is not null ${w}  order by matchAttempts asc, sourceTS desc limit ${limit}`;
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID, chainID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2023-02-28") and  sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and ( matchAttemptDT is null or matchAttemptDT < date_sub(Now(), INTERVAL POW(3, matchAttempts) MINUTE) ) and symbol is not null ${w}  order by matchAttempts asc, sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
         let extrinsic = {};
@@ -1062,6 +1062,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             let e = extrinsic[extrinsicHash];
             let extrinsicID = e.extrinsicID;
             let sourceTS = e.sourceTS;
+            let chainID = e.chainID
             let hashrec = {};
             let col = extrinsicID
             let xcmInfo = results[extrinsicHash];
@@ -1080,7 +1081,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             /*
             TODO: REVIEW
             for (const x in xcmInfo){
-                let hres = btTool.encode_xcminfo_finalized(extrinsicHash, extrinsicID, x, sourceTS)
+                let hres = btTool.encode_xcminfofinalized(extrinsicHash, chainID, extrinsicID, x, sourceTS)
                 if (hres){
                     hashesRowsToInsert.push(hres);
                 }

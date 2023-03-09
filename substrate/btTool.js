@@ -56,7 +56,7 @@ const {
 
 const assetChainSeparator = "~"
 
-function encode_column_bt_hashes_xcminfofinalized(extrinsicID, xcmIndex, transferIndex){
+function encode_column_bt_hashes_xcminfofinalized(chainID, extrinsicID, xcmIndex, transferIndex){
     /* Definition
     xcmIndex: The nth xcm msg sent by this the extrinsic. Usually there's only one msg per extrinsic unless its utility-batch
     transferIndex: Rhe nth asset transfer within the xcmMsg(xcmIndex). Majority of the transfers have only one asset unless they are the >2 assets case by Multicurrencies or MultiAssets
@@ -67,40 +67,47 @@ function encode_column_bt_hashes_xcminfofinalized(extrinsicID, xcmIndex, transfe
     C: 0x8d3b83fdefde0cfd1b3eae343644d9ebfb77ba724bc6b841383392b4fc6da07c xcmPallet:limitedReserveTransferAssets  -> sedning multiasset [xcmIndex=0, transferIndex={0,1}] (kusama 15124933)
     D: 0xb0c89f90284960ed8b29b0e29a76c2590bf6b2f02817ac8e32c91a9c3d354c9c xTokens:TransferMulticurrencies -> one xcm sedning 2 assets [xcmIndex=0, transferIndex={0,1}] (karura 1630356)
     */
-    let rowKey = `${extrinsicID}-${xcmIndex}-${transferIndex}`
+    //key chainID-bn-extrinsicIdx-xcmIndex:transferIndex
+    let rowKey = `${chainID}-${extrinsicID}-${xcmIndex}-${transferIndex}`
     return rowKey
 }
 
 function decode_column_bt_hashes_xcminfofinalized(rowKey){
-    //key blockNum-extrinsicIdx-xcmIndex:transferIndex
-    let extrinsicID, xcmIndex, transferIndex = false
+    //key chainID-bn-extrinsicIdx-xcmIndex:transferIndex
+    let chainID, extrinsicID, xcmIndex, transferIndex = false
     try {
         let pieces = rowKey.split('-')
-        if (pieces.length == 4){
-            extrinsicID = `${pieces[0]}-${pieces[1]}`
-            xcmIndex = pieces[2]
-            transferIndex = pieces[3]
+        if (pieces.length == 5){
+            chainID = pieces[0]
+            extrinsicID = `${pieces[1]}-${pieces[2]}`
+            xcmIndex = pieces[3]
+            transferIndex = pieces[4]
         }
     } catch (e){
         console.log(`invalid rowKey ${rowKey}`)
     }
-    return [extrinsicID, xcmIndex, transferIndex]
+    return [chainID, extrinsicID, xcmIndex, transferIndex]
 }
 
-function decode_xcminfo_finalized(XCMInfoData){
+function decode_xcminfofinalized(XCMInfoData){
     if (XCMInfoData) {
         let xcmInfos = []
         for (const rowKey of Object.keys(XCMInfoData)) {
-            let [extrinsicID, xcmIndex, transferIndex] = decode_column_bt_hashes_xcminfofinalized(rowKey)
-            const cell = XCMInfoData[rowKey][0]; // latest cell
-            let xcmInfo = JSON.parse(cell.value);
-            xcmInfos.push(xcmInfo)
+            let [chainID, extrinsicID, xcmIndex, transferIndex] = decode_column_bt_hashes_xcminfofinalized(rowKey)
+            if (chainID != false && extrinsicID != false && xcmIndex != false && transferIndex != false){
+                const cell = XCMInfoData[rowKey][0]; // latest cell
+                let xcmInfo = JSON.parse(cell.value);
+                xcmInfos.push(xcmInfo)
+            }else{
+                console.log(`invalid rowKey ${rowKey}`)
+            }
         }
         return xcmInfos;
     }
 }
 
-function encode_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS) {
+function encode_xcminfofinalized(extrinsicHash, chainID, extrinsicID, xcmInfo, sourceTS, columnfamily = 'xcminfofinalized') {
+    //let columnfamily = 'xcminfofinalized'
     if (!xcmInfo) return false;
     let hres = {
         key: extrinsicHash,
@@ -113,10 +120,11 @@ function encode_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS)
     }
     try {
         // write "hashes" xcminfofinalized with row key extrinsicHash and column extrinsicID
-        let columnfamily = 'xcminfofinalized'
         hres.data[columnfamily] = {}
-        let rowKey = encode_column_bt_hashes_xcminfofinalized(extrinsicID, xcmInfo.origination.xcmIndex, xcmInfo.origination.transferIndex)
-        //console.log(`!!! create_xcminfo_finalized rowKey`, rowKey)
+        let xcmIndex = xcmInfo.origination.xcmIndex
+        let transferIndex =  xcmInfo.origination.transferIndex
+        let rowKey = encode_column_bt_hashes_xcminfofinalized(chainID, extrinsicID, xcmIndex, transferIndex)
+        //console.log(`!!! encode_column_bt_hashes_xcminfofinalized rowKey`, rowKey)
         //console.log(`!!! decode_column_bt_hashes_xcminfofinalized rowKey`, decode_column_bt_hashes_xcminfofinalized(rowKey))
         hres['data'][columnfamily][rowKey] = {
             value: JSON.stringify(xcmInfo),
@@ -131,8 +139,8 @@ function encode_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS)
 }
 
 module.exports = {
-    encode_xcminfo_finalized: encode_xcminfo_finalized,
-    decode_xcminfo_finalized: decode_xcminfo_finalized,
+    encode_xcminfofinalized: encode_xcminfofinalized,
+    decode_xcminfofinalized: decode_xcminfofinalized,
     encode_column_bt_hashes_xcminfofinalized: encode_column_bt_hashes_xcminfofinalized,
     decode_column_bt_hashes_xcminfofinalized: decode_column_bt_hashes_xcminfofinalized,
 }

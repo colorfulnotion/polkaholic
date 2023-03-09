@@ -1732,7 +1732,8 @@ module.exports = class Indexer extends AssetManager {
 
     store_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS) {
         if (!xcmInfo) return;
-        let hres = encode_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS)
+        //TODO: temporarily write into feedxcminfo. should write into xcminfofinalized instead
+        let hres = btTool.encode_xcminfofinalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS, 'feedxcminfo')
         if (hres){
             this.hashesRowsToInsert.push(hres)
         }
@@ -2060,7 +2061,7 @@ module.exports = class Indexer extends AssetManager {
                                 let extrinsicHash = xcmtransfer.extrinsicHash
                                 let msgHash = xcmtransfer.msgHash
                                 await this.publish_xcminfo(xcmtransfer.xcmInfo);
-                                await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, xcmInfo, this.getCurrentTS());
+                                await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.chainID, xcmtransfer.extrinsicID, xcmInfo, this.getCurrentTS());
                             }
                         }
                     }
