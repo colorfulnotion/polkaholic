@@ -1,6 +1,7 @@
 <%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Chain`}); %>
 <%- include('chainheader', { chain: chain, title: `Recent Blocks` }); %>
 
+<%- include('substrateetlalert', { chain: chain }); %>
 <table id="tablerecentblocks" class="display" style='width: 100%'>
   <thead>
     <tr class="tableheader">

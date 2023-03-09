@@ -1,0 +1,10 @@
+<%
+let relayChain = chain.relayChain;
+let paraID = chain.paraID;
+let id = chain.id;
+let monthDT = "2023-03-31"
+let url = `https://github.com/colorfulnotion/substrate-etl/blob/main/${relayChain}/${paraID}-${id}/${monthDT}.md`
+%>
+<div class="alert" role="alert" data-mdb-color="warning">
+    <i class="fa-solid fa-star"></i> NEW! You can download the <i>entire</i> Polkaholic index from BigQuery in the <a href='https://github.com/colorfulnotion/substrate-etl/'>substrate-etl</a> project -- see <a href='<%= url %>'>here</a>
+</div>

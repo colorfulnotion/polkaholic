@@ -1,4 +1,5 @@
 <%
+
 function getHostChain() {
   let fullhost = req.get('host');
   if ( ! fullhost ) return(null);
@@ -83,7 +84,6 @@ function getHostChain() {
     <% } %>
 </head>
 <body>
-
 <%
 
 let chains = [
@@ -684,7 +684,6 @@ let chains = [
         "ss58Format": 42
     }
   ]
-
   let selchain = "all";
   let sel = null;
   let selid = null;
@@ -694,7 +693,16 @@ let chains = [
   if ( site ) {
     baseiconUrl = site.baseiconUrl;
   }
-  if (req.cookies && req.cookies.selchain) {
+  if (typeof chain == 'object' &&  chain !== undefined && chain.id ) {
+    selid = chain.id;
+    selChainName = chain.chainName;
+    selchain = selid;
+    for (const c of chains ) {
+      if ( c.id == selchain) {
+       sel = c;
+      }
+    }
+  } else  if (req.cookies && req.cookies.selchain) {
     selchain = req.cookies.selchain;
     for (const c of chains ) {
       if ( c.id == selchain) {
@@ -799,11 +807,11 @@ let chains = [
                <a class="dropdown-item" href="/chaininfo"><img src="<%= sel.iconUrl; %>" width="24" class="circularClass"/>&nbsp;<%= selChainName %><% if (sel.paraID) { %> (ParaID <%= sel.paraID; %>) <% } else { %> (Relay) <% } %> </a>
              </li>
              <li>
-               <a class="dropdown-item" href="/blocks">Recent Blocks</a>
+               <a class="dropdown-item" href="/blocks/<%= selid %>">Recent Blocks</a>
              </li>
 	     <% if ( sel.isEVM ) { %>
              <li>
-               <a class="dropdown-item" href="/pools">Liquidity Pools</a>
+               <a class="dropdown-item" href="/pools/<%= selid %>">Liquidity Pools</a>
              </li>
 	     <% } %>
 	     <% if ( sel.isWASM ) { %>
@@ -815,7 +823,7 @@ let chains = [
              </li>
 	     <% } %>
              <li>
-               <a class="dropdown-item" href="/specversions">Spec Versions</a>
+               <a class="dropdown-item" href="/specversions/<%= selid %>">Spec Versions</a>
              </li>
 	     <% if ( sel.isEVM ) { %>
 
@@ -831,10 +839,10 @@ let chains = [
 	     <% } %>
 	     <% } %>
              <li>
-               <a class="dropdown-item" href="/chainlog">Daily Log</a>
+               <a class="dropdown-item" href="/chainlog/<%= selid %>">Daily Log</a>
              </li>
              <li>
-               <a class="dropdown-item" href="/chaininfo">Chain Info</a>
+               <a class="dropdown-item" href="/chaininfo/<%= selid %>">Chain Info</a>
              </li>
            </ul>
         </li>

@@ -94,27 +94,26 @@ async function main() {
         .option('-p, --paraID <paraID>', 'Para ID', myParseInt)
         .option('-l, --logDT <logDT>', 'Date', null)
         .option('--endDT <endDT>', 'Date', null)
-
-        .option('-d, --dry', `dry run the cmd without updating`, false)
+        .option('-f, --force', `Force even if not ready`, false)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
             let relayChain = opt.relayChain;
             let paraID = opt.paraID;
             let logDT = opt.logDT;
-            let dry = opt.dry;
-            if (logDT && paraID && relayChain) {
+            let force = opt.force;
+            if (logDT && paraID != null && relayChain) {
                 let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
                 if (endDT) {
                     let logTS = paraTool.logDT_hr_to_ts(logDT, 0);
                     let endTS = paraTool.logDT_hr_to_ts(endDT, 0);
                     for (let ts = logTS; ts <= endTS; ts += 86400) {
                         let [dt, hr] = paraTool.ts_to_logDT_hr(ts);
-                        if (await substrateetl.is_accountmetrics_ready(relayChain, paraID, dt)) {
-                            await substrateetl.dump_accountmetrics(relayChain, paraID, dt, dry);
+                        if (force || ( await substrateetl.is_accountmetrics_ready(relayChain, paraID, dt) ) ) {
+                            await substrateetl.dump_accountmetrics(relayChain, paraID, dt);
                         }
                     }
                 } else {
-                    await substrateetl.dump_accountmetrics(relayChain, paraID, logDT, dry);
+                    await substrateetl.dump_accountmetrics(relayChain, paraID, logDT);
                 }
                 process.exit(0);
             }
@@ -126,7 +125,7 @@ async function main() {
                 let _relayChain = x.relayChain;
                 tally++;
                 if (_logDT && (_paraID >= 0) && _relayChain) {
-                    await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT, dry);
+                    await substrateetl.dump_accountmetrics(_relayChain, _paraID, _logDT);
                     await substrateetl.sleep(1000);
                 } else {
                     process.exit(0);
@@ -139,21 +138,33 @@ async function main() {
         .usage("-l 2023-02-01 -n dotsama")
         .option('-n, --network <network>', `Network (e.g. dotsama, ethereum, polygon)`, 'dotsama')
         .option('-l, --logDT <logDT>', `LogDT in YYYY-MM-DD form`, null)
-        .option('-d, --dry', `dry run the cmd without updating`, false)
+        .option('-f, --force', `Force even if not ready`, false)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
             let network = opt.network;
             let logDT = opt.logDT;
-            let dry = opt.dry;
+            let force = opt.force;
             if (logDT && network) {
-                await substrateetl.dump_networkmetrics(network, logDT, dry);
+                let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+                if (endDT) {
+                    let logTS = paraTool.logDT_hr_to_ts(logDT, 0);
+                    let endTS = paraTool.logDT_hr_to_ts(endDT, 0);
+                    for (let ts = logTS; ts <= endTS; ts += 86400) {
+                        let [dt, hr] = paraTool.ts_to_logDT_hr(ts);
+                        if (force || ( await substrateetl.is_networkmetrics_ready(network, dt) ) ) {
+			    await substrateetl.dump_networkmetrics(network, logDT);
+                        }
+                    }
+                } else {
+                    await substrateetl.dump_networkmetrics(network, logDT);
+                }
             }
             while (true) {
                 let x = await substrateetl.get_random_networkmetrics_ready();
                 let _network = x.network;
                 let _logDT = x.logDT;
                 if (_logDT && _network) {
-                    await substrateetl.dump_networkmetrics(_network, _logDT, dry);
+                    await substrateetl.dump_networkmetrics(_network, _logDT);
                     await substrateetl.sleep(1000);
                 } else {
                     process.exit(0);
@@ -169,7 +180,7 @@ async function main() {
         .option('--endDT <endDT>', 'For multi-day ranges', null)
         .option('--startTS <startTS>', 'To resume long-running update balances', null)
         .action(async (opt) => {
-            let chainID = opt.chainID ? opt.chainID : null;
+            let chainID = opt.chainID != null ? opt.chainID : null;
             let logDT = opt.logDT ? opt.logDT : null;
             let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
 
