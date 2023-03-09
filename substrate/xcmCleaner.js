@@ -1007,7 +1007,17 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                         });
                         console.log("xcmInfo", JSON.stringify(xcmInfo, null, 4));
                     }
-                    return xcmInfo;
+
+		    let hashesRowsToInsert = [];
+		    let hres = btTool.encode_xcminfofinalized(xcm.extrinsicHash, xcm.chainID, xcm.extrinsicID, xcmInfo, xcm.sourceTS)
+		    if (hres){
+			hashesRowsToInsert.push(hres);
+		    }
+		    if (hashesRowsToInsert.length > 0) {
+			await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+		    }
+
+		    return xcmInfo;
                 }
             }
         } catch (e) {
@@ -1041,56 +1051,9 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         for (const e of extrinsics) {
             try {
                 let xcmInfo = await this.generate_extrinsic_XCMInfo(e.extrinsicHash, e.transferIndex, e.xcmIndex);
-                if (results[e.extrinsicHash] == undefined) {
-                    results[e.extrinsicHash] = [xcmInfo];
-                    extrinsic[e.extrinsicHash] = e;
-                    extrinsicconfidence[e.extrinsicHash] = this.get_confidence(xcmInfo);
-                } else {
-                    let confidence = this.get_confidence(xcmInfo)
-                    if (confidence > extrinsicconfidence[e.extrinsicHash]) {
-                        extrinsicconfidence[e.extrinsicHash] = confidence;
-                    }
-                }
             } catch (err) {
                 console.log(err);
             }
-        }
-
-        let hashesRowsToInsert = [];
-        for (const extrinsicHash of Object.keys(extrinsicconfidence)) {
-            let confidence = extrinsicconfidence[extrinsicHash]; // store confidence in xcmtransfer
-            let e = extrinsic[extrinsicHash];
-            let extrinsicID = e.extrinsicID;
-            let sourceTS = e.sourceTS;
-            let chainID = e.chainID
-            let hashrec = {};
-            let col = extrinsicID
-            let xcmInfo = results[extrinsicHash];
-            /*
-            hashrec[col] = {
-                value: (xcmInfo.length == 1) ? JSON.stringify(xcmInfo[0]) : JSON.stringify(xcmInfo),
-                timestamp: sourceTS * 1000000
-            };
-            let extrinsicHashRec = {
-                key: extrinsicHash,
-                data: {},
-            };
-            extrinsicHashRec.data["xcminfofinalized"] = hashrec;
-            hashesRowsToInsert.push(extrinsicHashRec);
-            */
-            /*
-            TODO: REVIEW
-            for (const x in xcmInfo){
-                let hres = btTool.encode_xcminfofinalized(extrinsicHash, chainID, extrinsicID, x, sourceTS)
-                if (hres){
-                    hashesRowsToInsert.push(hres);
-                }
-            }
-            */
-        }
-
-        if (hashesRowsToInsert.length > 0) {
-            await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
         }
         return (true);
     }
