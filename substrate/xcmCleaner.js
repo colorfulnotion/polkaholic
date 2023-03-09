@@ -35,6 +35,7 @@ const Ably = require('ably');
 const Query = require('./query');
 const mysql = require("mysql2");
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 /*
 Setup xcmcleaner to do all writes to the new column family currently done by  xcmmatch work except failure
 Compute teleport fee and teleport usd fee in xcmcleaner correctly
@@ -826,6 +827,8 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 ts: xcm.sourceTS,
                 isMsgSent: isMsgSent,
                 finalized: true,
+                xcmIndex: xcmIndex,
+                transferIndex: transferIndex,
             },
             destination: {
                 chainName: xcm.chainDestName,
@@ -1062,6 +1065,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             let hashrec = {};
             let col = extrinsicID
             let xcmInfo = results[extrinsicHash];
+            /*
             hashrec[col] = {
                 value: (xcmInfo.length == 1) ? JSON.stringify(xcmInfo[0]) : JSON.stringify(xcmInfo),
                 timestamp: sourceTS * 1000000
@@ -1072,6 +1076,16 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             };
             extrinsicHashRec.data["xcminfofinalized"] = hashrec;
             hashesRowsToInsert.push(extrinsicHashRec);
+            */
+            /*
+            TODO: REVIEW
+            for (const x in xcmInfo){
+                let hres = btTool.encode_xcminfo_finalized(extrinsicHash, extrinsicID, x, sourceTS)
+                if (hres){
+                    hashesRowsToInsert.push(hres);
+                }
+            }
+            */
         }
 
         if (hashesRowsToInsert.length > 0) {

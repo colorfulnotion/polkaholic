@@ -4,6 +4,7 @@ const {
     Command
 } = require('commander');
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 const XCMManager = require("./xcmmanager");
 const XCMGARLoadManager = require("./xcmgarloadmanager");
 

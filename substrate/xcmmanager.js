@@ -32,6 +32,7 @@ const Query = require('./query');
 const AssetManager = require("./assetManager");
 const mysql = require("mysql2");
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 
 module.exports = class XCMManager extends Query {
     constructor() {
@@ -740,10 +741,12 @@ order by msgHash`
     }
 
     async xcm_reanalytics() {
-        let sql = `select chainID, chainIDDest, symbol, relayChain, extrinsicHash, extrinsicID, xcmIndex, isFeeItem, transferIndex, destStatus, sourceTS, xcmInteriorKey, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where x\
-cmInfo is not null and sourceTS >= UNIX_TIMESTAMP("2021-01-01") and destStatus = 1 and (teleportFee = 0 or amountReceived = 0) and xcmInfoAudited < 2 order by extrinsicHash, xcmIndex, transferIndex limit 5000`
+        let sql = `select chainID, chainIDDest, symbol, relayChain, extrinsicHash, extrinsicID, xcmIndex, isFeeItem, transferIndex, destStatus, sourceTS, xcmInteriorKey, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null and sourceTS >= UNIX_TIMESTAMP("2021-01-01") and destStatus = 1 and
+        (teleportFee = 0 or amountReceived = 0) and xcmInfoAudited < 2 order by extrinsicHash, xcmIndex, transferIndex limit 4100`
+        //check the (teleportFee = 0 or amountReceived = 0) condition..
         try {
             console.log(sql);
+            let hashesRowsToInsert = []
             let xcmmatches = await this.pool.query(sql);
             for (let i = 0; i < xcmmatches.length; i++) {
                 let r = xcmmatches[i];
@@ -792,10 +795,22 @@ cmInfo is not null and sourceTS >= UNIX_TIMESTAMP("2021-01-01") and destStatus =
                     };
                     let sql0 = `update xcmtransfer set xcmInfoAudited = 2, xcmInfo = ${mysql.escape(JSON.stringify(updatedXcmInfo))} where extrinsicHash = '${r.extrinsicHash}' and xcmIndex = '${r.xcmIndex}' and transferIndex = '${r.transferIndex} and xcmInteriorKeyUnregistered = ${xcmInteriorKeyUnregistered}`
                     console.log(`sql0`, updatedXcmInfo)
-                    // TODO: write hashes xcminfofinalized
                     // this.batchedSQL.push(sql0);
+                    // write hashes xcminfofinalized
+                    let hres = btTool.encode_xcminfo_finalized(r.extrinsicHash, r.extrinsicID, updatedXcmInfo, r.sourceTS)
+                    if (hres) hashesRowsToInsert.push(hres);
+                    if (hashesRowsToInsert.length >= 500) {
+                        console.log(`flush hashesRowsToInsert ${hashesRowsToInsert.length}`)
+                        //await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+                        hashesRowsToInsert = []
+                    }
 
                 }
+            }
+            if (hashesRowsToInsert.length >= 0) {
+                console.log(`flush hashesRowsToInsert ${hashesRowsToInsert.length} last batch`)
+                //await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+                hashesRowsToInsert = []
             }
         } catch (err) {
             console.log("xcmtransfer_reanalytics", err)

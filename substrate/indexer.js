@@ -4,6 +4,7 @@ const path = require("path");
 const AssetManager = require("./assetManager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 const mysql = require("mysql2");
 const {
     WebSocket
@@ -1730,6 +1731,14 @@ module.exports = class Indexer extends AssetManager {
     }
 
     store_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS) {
+        if (!xcmInfo) return;
+        let hres = encode_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS)
+        if (hres){
+            this.hashesRowsToInsert.push(hres)
+        }
+    }
+
+    store_xcminfo_finalized_old(extrinsicHash, extrinsicID, xcmInfo, sourceTS) {
         if (!xcmInfo) return;
         try {
             // write "hashes" xcminfofinalized with row key extrinsicHash and column extrinsicID
@@ -5438,6 +5447,8 @@ module.exports = class Indexer extends AssetManager {
         let xcmInteriorKey = null
         let xcmInteriorKeyV2 = null
         let xcmInteriorKeyUnregistered = null
+        let xcmIndex = x.xcmIndex
+        let transferIndex = x.transferIndex
         if (x.xcmInteriorKey != undefined){
             xcmInteriorKey = x.xcmInteriorKey
             xcmInteriorKeyV2 = paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey)
@@ -5593,7 +5604,9 @@ module.exports = class Indexer extends AssetManager {
                 decimals: x.decimals,
                 isMsgSent: isMsgSent,
                 finalized: originationFinalized,
-                isFeeItem: x.isFeeItem
+                isFeeItem: x.isFeeItem,
+                xcmIndex: xcmIndex,
+                transferIndex: transferIndex,
             }
             if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
             if (failureType != undefined) {

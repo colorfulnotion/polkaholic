@@ -16,6 +16,7 @@
 
 const AssetManager = require("./assetManager");
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 const ethTool = require("./ethTool");
 const mysql = require("mysql2");
 const uiTool = require('./uiTool')
@@ -6615,10 +6616,17 @@ module.exports = class Query extends AssetManager {
                 XCMInfoData = rowData["xcminfofinalized"]
             }
             if (XCMInfoData) {
-                for (const extrinsicID of Object.keys(XCMInfoData)) {
-                    const cell = XCMInfoData[extrinsicID][0];
+                /*
+                for (const rowKey of Object.keys(XCMInfoData)) {
+                    const cell = XCMInfoData[rowKey][0];
                     let xcmInfo = JSON.parse(cell.value);
                     return xcmInfo;
+                }
+                */
+                let xcmInfos = btTool.decode_column_bt_hashes_xcminfofinalized(XCMInfoData)
+                if (Array.isArray(xcmInfos) && xcmInfos.length > 0){
+                    //TODO: return infos
+                    return xcmInfos[0]
                 }
             } else {
                 throw new paraTool.InvalidError(`${hash} not found`)
