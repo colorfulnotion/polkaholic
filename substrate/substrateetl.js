@@ -39,7 +39,7 @@ const {
 } = require('@google-cloud/bigquery');
 
 // first day when balances are available daily
-const balanceStartDT = "2023-01-01";
+const balanceStartDT = "2021-12-17";
 
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
@@ -510,15 +510,33 @@ module.exports = class SubstrateETL extends AssetManager {
         return (JSON.stringify(a));
     }
 
+    async is_update_balance_ready(chainID, logDT) {
+	let sql_check = `select lastUpdateAddressBalancesAttempts from blocklog where chainID = '${chainID}' and logDT = '${logDT}' and updateAddressBalanceStatus = 'Ready'`;
+        let checks = await this.pool.query(sql_check);
+	if ( checks.length == 1 ) {
+            return true;
+	}
+	return false;
+    }
+
     async pick_chainbalancecrawler(specific_chainID = null) {
         let w = (specific_chainID) ? ` and chainID = '${specific_chainID}' ` : "";
-        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS, startTS, logDT from chainbalancecrawler as c where hostname = '${this.hostname}' and chainID not in ( select chainID from chainbalancecrawler where lastDT > date_sub(Now(), interval 5 minute) and hostname != '${this.hostname}' ) and lastDT > date_sub(Now(), interval 1 hour) ${w} order by lastDT DESC limit 1`;
+        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS, startTS, logDT from chainbalancecrawler as c where hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 5 MINUTE) ${w} order by lastDT DESC limit 1`;
         console.log("pick_chainbalancecrawler", sql);
         let chains = await this.pool.query(sql);
         if (chains.length == 0) {
             return [null, null, null];
         }
-        return [chains[0].chainID, chains[0].indexTS, chains[0].startTS];
+	// check that its actually in the ready state
+	let chainID = chains[0].chainID;
+	let logTS = chains[0].indexTS;
+	let startTS = chains[0].startTS;
+	let [logDT, _] = paraTool.ts_to_logDT_hr(logTS);
+	if ( await this.is_update_balance_ready(chainID, logDT) ) {
+            return [chainID, chains[0].indexTS, startTS];
+	}
+	console.log("pick_chainbalancecrawler ... not ready anymore", chainID, logDT)
+        return [null, null, null];
     }
 
     // pick a random chain to load yesterday for all chains
@@ -526,28 +544,75 @@ module.exports = class SubstrateETL extends AssetManager {
         // pick something your node started already
         let [chainID, indexTS, startTS] = await this.pick_chainbalancecrawler(specific_chainID);
         if (chainID == null) {
-            let w = (specific_chainID) ? ` and blocklog.chainID = '${specific_chainID}' ` : "";
+	    // for large chains with > 100K numAddresses, have each node work on themselves
+	    switch ( this.hostname ) {
+	    case "polkadot":
+		specific_chainID  = 0;
+		break;
+	    case "kusama":
+		specific_chainID  = 2;
+		break;
+	    case "acala":
+		specific_chainID  = 2000;
+		break;
+	    case "bifrost-dot":
+		specific_chainID  = 2026;
+		break;
+	    case "moonbeam":
+		specific_chainID  = 2004;
+		break;
+	    case "astar":
+		specific_chainID  = 2006;
+		break;
+	    case "karura":
+		specific_chainID  = 22000;
+		break;
+	    case "bifrost-ksm":
+		specific_chainID  = 22001;
+		break;
+	    case "moonriver":
+		specific_chainID  = 22023;
+		break;
+	    case "shiden":
+		specific_chainID  = 22007;
+		break;
+	    case "statemine":
+		specific_chainID  = 21000;
+		break;
+	    }
+	    let orderby = "blocklog.logDT desc, rand()";
+            let w = ""
+	    if (specific_chainID != null) {
+		w = ` and blocklog.chainID = '${specific_chainID}' `;
+	    }
             // pick a chain-logDT combo that has been marked Ready ( all blocks finalized ), and no other node is working on
-            let sql = `select blocklog.chainID, UNIX_TIMESTAMP(blocklog.logDT) as indexTS
- from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecrawler.logDT and blocklog.chainID = chainbalancecrawler.chainID
- where updateAddressBalanceStatus = "Ready" and
- ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 5+POW(4, lastUpdateAddressBalancesAttempts) MINUTE) or lastUpdateAddressBalancesStartDT is Null ) and
- chainbalancecrawler.logDT is null and
- blocklog.logDT >= '${balanceStartDT}' ${w} and
- lastUpdateAddressBalancesAttempts < 10
- order by lastUpdateAddressBalancesAttempts asc, rand()`;
-            console.log("updateAddressBalances", sql);
-            let chains = await this.pool.query(sql);
-
-            if (chains.length == 0) {
-                console.log(`No chain found`)
-                // TODO: since we loaded every chain from yesterday that we could, pick a chain where we load real time balances instead of loading yesterday
+	    let othersRecs = await this.pool.query(`select chainID, UNIX_TIMESTAMP(logDT) as logTS from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 3 minute)`);
+	    let others = {};
+	    for (const o of othersRecs) {
+		others[`${o.chainID}-${o.logTS}`] = true;
+	    }
+	    // now out of candidate jobs choose the first one that hasn't been picked
+	    let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where updateAddressBalanceStatus = "Ready" and
+ ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 3+POW(3, lastUpdateAddressBalancesAttempts) MINUTE )
+ or lastUpdateAddressBalancesStartDT is Null  ) and blocklog.logDT >= '${balanceStartDT}' ${w} order by ${orderby}`;
+            let jobs = await this.pool.query(sql);
+            if (jobs.length == 0) {
+                console.log(`No updatebalances jobs available`)
                 return false;
             }
-            chainID = chains[0].chainID;
-            indexTS = chains[0].indexTS;
-            startTS = this.getCurrentTS();
-        }
+	    for ( const c of jobs ) {
+		if ( others[`${c.chainID}-${c.indexTS}`] ) {
+		    console.log("skipping job cand:", c);
+		    break;
+		} else {
+		    console.log("choosing job cand:", c);
+		    chainID = c.chainID;
+		    indexTS = c.indexTS;
+		    startTS = this.getCurrentTS();
+		    break;
+		}
+            }
+	}
         let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
         let sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}' and lastUpdateAddressBalancesAttempts < 30`;
         this.batchedSQL.push(sql);
@@ -599,7 +664,7 @@ module.exports = class SubstrateETL extends AssetManager {
 
 
     async clean_chainbalancecrawler(logDT, chainID) {
-        let sql = `delete from chainbalancecrawler where  (logDT = '${logDT}' and chainID = '${chainID}' and hostname = '${this.hostname}') or lastDT < date_sub(Now(), interval 1 hour)`;
+        let sql = `delete from chainbalancecrawler where logDT = '${logDT}' and chainID = '${chainID}'`;
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
     }
@@ -1197,12 +1262,18 @@ module.exports = class SubstrateETL extends AssetManager {
         })
         let priceUSD = p && p.priceUSD ? p.priceUSD : 0;
         let last_key = await this.getLastKey(chainID, logDT);
-        if (last_key == "") {
-            await this.clean_bqlogfn(chainID, logDT, startTS);
+
+        if (last_key == "" || (bqlogfn && ! fs.existsSync(bqlogfn)) ) {
+	    last_key = "";
+	    await this.clean_bqlogfn(chainID, logDT, startTS);
             console.log("STARTING CLEAN");
         } else {
-            console.log("RESUMING with last_key", last_key)
+	    console.log("RESUMING with last_key", last_key)
         }
+	let sql_reset = `update blocklog set lastUpdateAddressBalancesAttempts = 0 where logDT = '${logDT}' and chainID = '${chainID}'`
+	this.batchedSQL.push(sql_reset);
+	await this.update_batchedSQL();
+
         let page = 0;
         let done = false;
         let [todayDT, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
@@ -1279,7 +1350,7 @@ module.exports = class SubstrateETL extends AssetManager {
                             nonce: nonce
                         });
                         if ((logDT == yesterdayDT) || (logDT == todayDT)) {
-                            console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
+                            //console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
                             rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, free_balance, reserved_balance, miscFrozen_balance, feeFrozen_balance, blockTS, bn));
                         }
                     }
@@ -1845,7 +1916,7 @@ Round(max(numAddresses_avg)) as numAddresses,
 sum(if(issues is not null, 1, 0)) as numIssues,
 chain.crawlingStatus
 from blocklogstats join chain on blocklogstats.chainID = chain.chainID where monthDT >= "${birthDT}" and chain.relayChain in ("polkadot", "kusama") and
-monthDT <= last_day(date(date_sub(Now(), interval 10 day))) group by chainID order by relayChain desc, paraID asc`;
+monthDT <= last_day(date(date_sub(Now(), interval 1 day))) group by chainID order by relayChain desc, paraID asc`;
         console.log(sql_tally);
         tallyRecs = await this.poolREADONLY.query(sql_tally);
         for (const r of tallyRecs) {

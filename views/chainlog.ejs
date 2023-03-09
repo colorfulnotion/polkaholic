@@ -1,9 +1,6 @@
 <%- include('header', {chainInfo: chainInfo, title: `${chain.chainName} Chain`}); %>
 <%- include('chainheader', { chain: chain, title: `Daily Log` }); %>
-
-<div class="alert" role="alert" data-mdb-color="warning">
-    <i class="fas fa-exclamation-triangle"></i>This is a new feature under active development; data is being indexed.
-</div>
+<%- include('substrateetlalert', { chain: chain }); %>
 <table id="tablechainlog" class="display" style='width: 100%'>
     <thead>
         <tr>
