@@ -693,6 +693,17 @@ module.exports = class XCMCleaner extends Query {
         return (currentTS >= cutoffTS);
     }
 
+    async generate_extrinsic_XCMInfo_targetSQL(targetSQL) {
+        let res = await this.poolREADONLY.query(targetSQL)
+        for (const r of res){
+            let transferIndex = (r.transferIndex != undefined)? r.transferIndex: 0
+            let xcmIndex = (r.transferIndex != undefined)? r.xcmIndex: 0
+            let extrinsicHash = (r.extrinsicHash != undefined)? r.extrinsicHash: null
+            if (extrinsicHash != undefined){
+                await this.generate_extrinsic_XCMInfo(extrinsicHash, transferIndex, xcmIndex)
+            }
+        }
+    }
     /*
     for any extrinsicHash / extrinsicID in xcmtransfer, pull out the assetChain/xcmInteriorKey, sourceTS, beneficiary and construct the "origination" structure
 read a short window of  N minutes from block${chainIDDest} and open up an API connection for ${chainIDDest}.  Query beneficiary for all N minutes for { accounts, tokens } for the asset
@@ -720,9 +731,10 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 incomplete,
                 blockNumberDest,
                 xcmInteriorKey,
-                xcmInteriorKeysRegistered,
+                xcmInteriorKeyUnregistered
               from xcmtransfer
        where  extrinsicHash = '${extrinsicHash}' and transferIndex = '${transferIndex}' and xcmIndex = '${xcmIndex}' limit 1`
+        //console.log(paraTool.removeNewLine(sqlA))
         let xcmRecs = await this.poolREADONLY.query(sqlA)
         let xcm = null
         if (xcmRecs.length == 1) {

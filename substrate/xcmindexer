@@ -99,6 +99,7 @@ async function main() {
         .option('-c, --chainID <chainID>', 'ChainID', null)
         .option('-h, --extrinsicHash <extrinsicHash>', 'ExtrinsicHash', null)
         .option('-hh, --extrinsicHashes <extrinsicHashes>', 'ExtrinsicHashes, comma saperated', null)
+        .option('-s, --sql <targetSQL>', 'Target SQL', null)
         .option('-t, --transferIndex <transferIndex>', 'Transfer Index', 0, myParseInt)
         .option('-x, --xcmIndex <xcmIndex>', 'XCM Message Index', 0, myParseInt)
         .option('-l, --lookbackDays <lookbackDays>', 'Lookback days', 7, myParseInt)
@@ -129,6 +130,10 @@ async function main() {
                     console.log(`--extrinsicHashes opt err`, e)
                     process.exit(1);
                 }
+            } else if (opt.sql) {
+                await manager.assetManagerInit();
+                await manager.generate_extrinsic_XCMInfo_targetSQL(opt.sql)
+                process.exit(0);
             } else if (opt.chainID != undefined) {
                 let chainID = opt.chainID;
                 let lookbackDays = opt.lookbackDays;
