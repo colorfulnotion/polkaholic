@@ -1297,15 +1297,20 @@ function parseXcmInteriorKeyV2(xcmInteriorKey = '[{"network":"polkadot"},{"parac
 function makeXcmInteriorKeyV2(interiorStr, network = {
     network: 'kusama'
 }) {
-    let interior = JSON.parse(interiorStr)
-    let globalInterior = [network]
-    if (Array.isArray(interior)) {
-        globalInterior = globalInterior.concat(interior);
-    } else {
-        globalInterior.push(interior)
+    try {
+        let interior = JSON.parse(interiorStr)
+        let globalInterior = [network]
+        if (Array.isArray(interior)) {
+            globalInterior = globalInterior.concat(interior);
+        } else {
+            globalInterior.push(interior)
+        }
+        //return (relayChain + assetChainSeparator + interior);
+        return JSON.stringify(globalInterior)
+    } catch (err) {
+        console.log("makeXcmInteriorKeyV2 ERR", interiorStr);
+        return null;
     }
-    //return (relayChain + assetChainSeparator + interior);
-    return JSON.stringify(globalInterior)
 }
 
 function makeXcmInteriorKeyV1(interior, relayChain = 'kusama') {

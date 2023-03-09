@@ -38,8 +38,8 @@ const {
     BigQuery
 } = require('@google-cloud/bigquery');
 
-// first day when balances are available daily
-const balanceStartDT = "2021-12-17";
+// first day when balances are available daily in modern ways from Kusama
+const balanceStartDT = "2020-03-09";
 
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
@@ -511,14 +511,14 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async is_update_balance_ready(chainID, logDT) {
-	let sql_check = `select lastUpdateAddressBalancesAttempts from blocklog where chainID = '${chainID}' and logDT = '${logDT}' and updateAddressBalanceStatus = 'Ready'`;
+        let sql_check = `select lastUpdateAddressBalancesAttempts from blocklog where chainID = '${chainID}' and logDT = '${logDT}' and updateAddressBalanceStatus = 'Ready'`;
         let checks = await this.pool.query(sql_check);
-	if ( checks.length == 1 ) {
+        if (checks.length == 1) {
             return true;
-	}
-	return false;
+        }
+        return false;
     }
-    
+
     async pick_chainbalancecrawler(specific_chainID = null) {
         let w = (specific_chainID) ? ` and chainID = '${specific_chainID}' ` : "";
         let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS, startTS, logDT from chainbalancecrawler as c where hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 5 MINUTE) ${w} order by lastDT DESC limit 1`;
@@ -527,15 +527,15 @@ module.exports = class SubstrateETL extends AssetManager {
         if (chains.length == 0) {
             return [null, null, null];
         }
-	// check that its actually in the ready state
-	let chainID = chains[0].chainID;
-	let logTS = chains[0].indexTS;
-	let startTS = chains[0].startTS;
-	let [logDT, _] = paraTool.ts_to_logDT_hr(logTS);
-	if ( await this.is_update_balance_ready(chainID, logDT) ) {
+        // check that its actually in the ready state
+        let chainID = chains[0].chainID;
+        let logTS = chains[0].indexTS;
+        let startTS = chains[0].startTS;
+        let [logDT, _] = paraTool.ts_to_logDT_hr(logTS);
+        if (await this.is_update_balance_ready(chainID, logDT)) {
             return [chainID, chains[0].indexTS, startTS];
-	}
-	console.log("pick_chainbalancecrawler ... not ready anymore", chainID, logDT)
+        }
+        console.log("pick_chainbalancecrawler ... not ready anymore", chainID, logDT)
         return [null, null, null];
     }
 
@@ -544,75 +544,41 @@ module.exports = class SubstrateETL extends AssetManager {
         // pick something your node started already
         let [chainID, indexTS, startTS] = await this.pick_chainbalancecrawler(specific_chainID);
         if (chainID == null) {
-	    // for large chains with > 100K numAddresses, have each node work on themselves
-	    switch ( this.hostname ) {
-	    case "polkadot":
-		specific_chainID  = 0;
-		break;
-	    case "kusama":
-		specific_chainID  = 2;
-		break;
-	    case "acala":
-		specific_chainID  = 2000;
-		break;
-	    case "bifrost-dot":
-		specific_chainID  = 2026;
-		break;
-	    case "moonbeam":
-		specific_chainID  = 2004;
-		break;
-	    case "astar":
-		specific_chainID  = 2006;
-		break;
-	    case "karura":
-		specific_chainID  = 22000;
-		break;
-	    case "bifrost-ksm":
-		specific_chainID  = 22001;
-		break;
-	    case "moonriver":
-		specific_chainID  = 22023;
-		break;
-	    case "shiden":
-		specific_chainID  = 22007;
-		break;
-	    case "statemine":
-		specific_chainID  = 21000;
-		break;
-	    }
-	    let orderby = "blocklog.logDT desc, rand()";
-            let w = ""
-	    if (specific_chainID != null) {
-		w = ` and blocklog.chainID = '${specific_chainID}' `;
-	    }
+            let orderby = "blocklog.logDT desc, rand()";
+            let w = (specific_chainID != null) ? ` and blocklog.chainID = '${specific_chainID}' ` : "";
             // pick a chain-logDT combo that has been marked Ready ( all blocks finalized ), and no other node is working on
-	    let othersRecs = await this.pool.query(`select chainID, UNIX_TIMESTAMP(logDT) as logTS from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 3 minute)`);
-	    let others = {};
-	    for (const o of othersRecs) {
-		others[`${o.chainID}-${o.logTS}`] = true;
-	    }
-	    // now out of candidate jobs choose the first one that hasn't been picked
-	    let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where updateAddressBalanceStatus = "Ready" and
- ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 3+POW(3, lastUpdateAddressBalancesAttempts) MINUTE ) 
+            let othersRecs = await this.pool.query(`select chainID, UNIX_TIMESTAMP(logDT) as logTS from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 3 minute)`);
+            let others = {};
+            for (const o of othersRecs) {
+                others[`${o.chainID}-${o.logTS}`] = true;
+            }
+            // now out of candidate jobs choose the first one that hasn't been picked
+            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where updateAddressBalanceStatus = "Ready" and
+ ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 3+POW(3, lastUpdateAddressBalancesAttempts) MINUTE )
  or lastUpdateAddressBalancesStartDT is Null  ) and blocklog.logDT >= '${balanceStartDT}' ${w} order by ${orderby}`;
             let jobs = await this.pool.query(sql);
+            console.log(sql);
             if (jobs.length == 0) {
                 console.log(`No updatebalances jobs available`)
                 return false;
             }
-	    for ( const c of jobs ) {
-		if ( others[`${c.chainID}-${c.indexTS}`] ) {
-		    console.log("skipping job cand:", c);
-		    break;
-		} else {
-		    console.log("choosing job cand:", c);
-		    chainID = c.chainID;
-		    indexTS = c.indexTS;
-		    startTS = this.getCurrentTS();
-		    break;
-		}
+
+            for (const c of jobs) {
+                if (others[`${c.chainID}-${c.indexTS}`]) {
+                    console.log("skipping job cand:", c);
+                } else {
+                    console.log("choosing job cand:", c);
+                    chainID = c.chainID;
+                    indexTS = c.indexTS;
+                    startTS = this.getCurrentTS();
+                    break;
+                }
             }
-	}
+        }
+        if (chainID == null) {
+            return (false);
+        }
+        console.log("SELECTED", chainID);
         let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
         let sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}' and lastUpdateAddressBalancesAttempts < 30`;
         this.batchedSQL.push(sql);
@@ -1174,6 +1140,16 @@ module.exports = class SubstrateETL extends AssetManager {
         let id = chain.id;
 
         let wsEndpoint = chain.WSEndpoint;
+	let alts = {
+	    0: ['wss://1rpc.io/dot','wss://rpc.dotters.network/polkadot','wss://polkadot-rpc.dwellir.com','wss://polkadot-rpc-tn.dwellir.com','wss://rpc.ibp.network/polkadot','wss://rpc.polkadot.io','wss://polkadot.public.curie.radiumblock.co/ws'],
+	    2: ['wss://1rpc.io/ksm', 'wss://rpc.dotters.network/kusama', 'wss://kusama-rpc.dwellir.com', 'wss://kusama-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/kusama', 'wss://kusama.api.onfinality.io/public-ws', 'wss://kusama-rpc.polkadot.io', 'wss://kusama.public.curie.radiumblock.co/ws'],
+	    22023: ['wss://moonriver.public.blastapi.io','wss://wss.api.moonriver.moonbeam.network','wss://moonriver.api.onfinality.io/public-ws','wss://moonriver.unitedbloc.com:2001'],
+	    2004: ['wss://1rpc.io/glmr','wss://moonbeam.public.blastapi.io','wss://wss.api.moonbeam.network','wss://moonbeam.api.onfinality.io/public-ws','wss://moonbeam.unitedbloc.com:3001']
+	}
+	if ( alts[chainID] !== undefined && ( alts[chainID].length > 0 ) ) {
+	    let a = alts[chainID];
+	    wsEndpoint = a[Math.floor(Math.random()*a.length)];
+	}
         let prev_numHolders = chain.numHolders;
         let decimals = this.getChainDecimal(chainID)
         const provider = new WsProvider(wsEndpoint);
@@ -1218,7 +1194,7 @@ module.exports = class SubstrateETL extends AssetManager {
                         totalIssuance = await api.query.tokens.totalIssuance(currencyID) / 10 ** decimals;
                     }
                 } else if (api.query.eqAggregates && api.query.eqAggregates.totalUserGroups) {
-                    let currencyID = (chainID == 2011) ? 25969 : 1734700659; // native asset id 
+                    let currencyID = (chainID == 2011) ? 25969 : 1734700659; // native asset id
                     let res = await api.query.eqAggregates.totalUserGroups("Balances", currencyID);
                     totalIssuance = (res.collateral - res.debt) / 10 ** decimals;
                     console.log(res, totalIssuance);
@@ -1263,17 +1239,17 @@ module.exports = class SubstrateETL extends AssetManager {
         let priceUSD = p && p.priceUSD ? p.priceUSD : 0;
         let last_key = await this.getLastKey(chainID, logDT);
 
-        if (last_key == "" || (bqlogfn && ! fs.existsSync(bqlogfn)) ) {
-	    last_key = "";
-	    await this.clean_bqlogfn(chainID, logDT, startTS);
+        if (last_key == "" || (bqlogfn && !fs.existsSync(bqlogfn))) {
+            last_key = "";
+            await this.clean_bqlogfn(chainID, logDT, startTS);
             console.log("STARTING CLEAN");
         } else {
-	    console.log("RESUMING with last_key", last_key)
+            console.log("RESUMING with last_key", last_key)
         }
-	let sql_reset = `update blocklog set lastUpdateAddressBalancesAttempts = 0 where logDT = '${logDT}' and chainID = '${chainID}'`
-	this.batchedSQL.push(sql_reset);
-	await this.update_batchedSQL();
-	
+        let sql_reset = `update blocklog set lastUpdateAddressBalancesAttempts = 0 where logDT = '${logDT}' and chainID = '${chainID}'`
+        this.batchedSQL.push(sql_reset);
+        await this.update_batchedSQL();
+
         let page = 0;
         let done = false;
         let [todayDT, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
@@ -1320,7 +1296,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 let stateHash = u8aToHex(user[1].createdAtHash)
                 if ((chainID == 2004 || chainID == 22023) && (pubkey.length >= 40)) {
                     pubkey = "0x" + pubkey.substr(pubkey.length - 40, 40); // evmaddress is the last 20 bytes (40 chars) of the storagekey
-		    account_id = null;
+                    account_id = "";
                 }
                 let rowKey = pubkey.toLowerCase()
                 if (logDT) {
@@ -1603,7 +1579,7 @@ module.exports = class SubstrateETL extends AssetManager {
     async dump_substrateetl_xcmgar(startDT = "2023-02-28") {
         const relayChains = ["polkadot", "kusama"];
 
-        // fetch xcmgar data 
+        // fetch xcmgar data
         const axios = require("axios");
         let url = "https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry@main/metadata/xcmgar.json";
         let assets = null;
@@ -2459,7 +2435,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
         console.log(`${paraIDs.length} active ${relayChain} chains [${paraIDs}]`)
 
-        let accountTbls = ["new", "old", "reaped", "assetreaped", "active", "passive"]
+        let accountTbls = ["new", "old", "reaped", "active", "passive"]
 
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
         for (const tbl of accountTbls) {
@@ -2709,6 +2685,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
                     xcmtransfers.push({
                         symbol: r.symbol, // xcmInfo.symbol
+                        //xcm_interior_key: (xcmInfo.xcmInteriorKey != undefined)? xcmInfo.xcmInteriorKey: null,
+                        //xcm_interior_keys_unregistered: (xcmInfo.xcm_interior_keys_unregistered != undefined)? xcmInfo.xcm_interior_keys_unregistered: null,
                         price_usd: r.priceUSD, // xcmInfo.priceUSD
                         origination_transfer_index: r.transferIndex, // should be o.transferIndex?
                         origination_xcm_index: r.xcmIndex, // should be o.xcmIndex?
@@ -2752,7 +2730,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         destination_ts: d.ts,
                         destination_execution_status: destination_execution_status,
                         xcm_info: xcmInfo,
-                        xcm_info_last_update_time: r.lastUpdateTS
+                        xcm_info_last_update_time: r.lastUpdateTS,
                     });
                 } else {
                     console.log("BAD xcmtransfer xcmInfo", r.extrinsicHash, xcmInfo)
@@ -2774,7 +2752,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             console.log("XCMTRANSFERS Load ERR", cmd, err);
         }
 
-        // same as above, except for xcm dataset 
+        // same as above, except for xcm dataset
         let sql_xcm = `select msgHash, chainID, chainIDDest, relayedAt, includedAt, msgType, blockTS, CONVERT(msgStr using utf8) as msg, CONVERT(msgHex using utf8) as msgHex, version, xcmInteriorKeys, xcmInteriorKeysUnregistered from xcm where blockTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and blockTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' order by blockTS;`
         let xcmRecs = await this.poolREADONLY.query(sql_xcm)
         tbl = "xcm";

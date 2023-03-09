@@ -32,6 +32,7 @@ const Query = require('./query');
 const AssetManager = require("./assetManager");
 const mysql = require("mysql2");
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 
 module.exports = class XCMManager extends Query {
     constructor() {
@@ -739,9 +740,92 @@ order by msgHash`
         }
     }
 
+    async xcm_reanalytics() {
+        // sourceTS >= UNIX_TIMESTAMP("2021-01-01") and destStatus = 1 and
+        let sql = `select chainID, chainIDDest, symbol, relayChain, extrinsicHash, extrinsicID, xcmIndex, isFeeItem, transferIndex, destStatus, sourceTS, xcmInteriorKey, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null and 
+         xcmInfoAudited < 2 order by extrinsicHash, xcmIndex, transferIndex limit 5000`
+        //check the (teleportFee = 0 or amountReceived = 0) condition..
+        try {
+            console.log(sql);
+            let batchN = 0
+            let hashesRowsToInsert = []
+            let xcmmatches = await this.pool.query(sql);
+            for (let i = 0; i < xcmmatches.length; i++) {
+                let r = xcmmatches[i];
+                let x = JSON.parse(r.xcmInfo);
+                let teleportFee = 0;
+                let teleportFeeUSD = 0;
+                /*
+                "symbol": "DOT",
+                "xcmInteriorKey": "[{\"network\":\"polkadot\"},\"here\"]",
+                "xcmInteriorKeyUnregistered": 0,
+                "priceUSD": x,
+                "relayChain": {
+                    "relayChain": "polkadot",
+                    "relayAt": _
+                },
+                "origination": {...},
+                "destination": {...},
+                "version": "V4"
+                */
+                if (x.origination && x.destination) {
+                    let xcmInteriorKey = null
+                    let xcmInteriorKeyV2 = null
+                    let xcmInteriorKeyUnregistered = `NULL`
+                    if (r.xcmInteriorKey != undefined) {
+                        xcmInteriorKey = r.xcmInteriorKey
+                        xcmInteriorKeyV2 = paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey)
+                        xcmInteriorKeyUnregistered = (this.isXcmInteriorKeyRegistered(xcmInteriorKey)) ? 0 : 1
+                    }
+                    let updatedXcmInfo = {
+                        symbol: (x.symbol != undefined) ? x.symbol : null,
+                        xcmInteriorKey: xcmInteriorKeyV2,
+                        xcmInteriorKeyUnregistered: xcmInteriorKeyUnregistered,
+                        priceUSD: (x.priceUSD != undefined) ? x.priceUSD : null,
+                        relayChain: x.relayChain,
+                        origination: x.origination,
+                        destination: x.destination,
+                        version: x.version
+                    }
+                    updatedXcmInfo.origination.xcmIndex = r.xcmIndex
+                    updatedXcmInfo.origination.transferIndex = r.transferIndex
+                    console.log(`updatedXcmInfo`, updatedXcmInfo)
+                    let inp = {
+                        symbol: r.symbol,
+                        relayChain: r.relayChain,
+                        ts: r.sourceTS
+                    };
+                    let sql0 = `update xcmtransfer set xcmInfoAudited = 2, xcmInfo = ${mysql.escape(JSON.stringify(updatedXcmInfo))}, xcmInteriorKeyUnregistered = ${xcmInteriorKeyUnregistered} where extrinsicHash = '${r.extrinsicHash}' and xcmIndex = '${r.xcmIndex}' and transferIndex = '${r.transferIndex}'`
+                    console.log(`sql0`, sql0)
+                    this.batchedSQL.push(sql0);
+                    // write hashes xcminfofinalized
+                    let hres = btTool.encode_xcminfofinalized(r.extrinsicHash, r.chainID, r.extrinsicID, updatedXcmInfo, r.sourceTS)
+                    if (hres) hashesRowsToInsert.push(hres);
+                    if (hashesRowsToInsert.length >= 500) {
+                        await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+                        console.log(`Batch#${batchN} flush hashesRowsToInsert ${hashesRowsToInsert.length}`)
+                        hashesRowsToInsert = []
+                        batchN++
+                    }
+
+                }
+            }
+            if (hashesRowsToInsert.length > 0) {
+                await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+                console.log(`Last Batch#${batchN} flush hashesRowsToInsert ${hashesRowsToInsert.length} DONE`)
+                hashesRowsToInsert = []
+            }
+        } catch (err) {
+            console.log("xcmtransfer_reanalytics", err)
+        }
+        await this.update_batchedSQL();
+        return 0
+    }
+
+
     // when we need to do some reanalytics on demand, xcmReanalytics writes hashes table with "xcminfofinalized" column records with "v4" column
     //  either an array or object based on the number of xcmInfo objects -- to cover xcmIndex > 0 and transferIndex > 0 situations
-    async xcm_reanalytics() {
+    async xcm_reanalytics_old() {
         let sql = `select chainID, chainIDDest, symbol, relayChain, extrinsicHash, extrinsicID, xcmIndex, isFeeItem, transferIndex, destStatus, sourceTS, convert(xcmInfo using utf8) as xcmInfo from xcmtransfer where xcmInfo is not null and sourceTS >= UNIX_TIMESTAMP("2023-01-01") and destStatus = 1 and (teleportFee = 0 or amountReceived = 0) and xcmInfoAudited < 2 order by extrinsicHash, xcmIndex, transferIndex limit 5000`
         try {
             console.log(sql);

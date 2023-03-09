@@ -39,6 +39,57 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         return data
     }
 
+    async getLatestXcmGarRegistry(relayChain) {
+        await this.init_chainInfos()
+        let registryJSON = await this.fetchXcmGarRegistry()
+        //console.log(`registryJSON***`, registryJSON)
+        let xcRegistryRaw = false
+        if (registryJSON['xcmRegistry'] != undefined) {
+            let xcmRegistries = registryJSON['xcmRegistry']
+            for (const xcmRegistry of xcmRegistries) {
+                if (xcmRegistry.relayChain == relayChain) {
+                    xcRegistryRaw = xcmRegistry.data
+                }
+            }
+        }
+        if (!xcRegistryRaw) {
+            console.log(`Unable to find xcmRegistry for relayChain=${relayChain}`)
+            process.exit(0)
+        }
+        let xcRegistryNew = this.transformXcGarRegistry(xcRegistryRaw)
+        return xcRegistryNew
+    }
+
+    async getLatestLocalAssets(targetedRelaychain, targetedParaID) {
+        let rawGlobalAsetMap = {}
+        await this.init_chainInfos()
+        let registryJSON = await this.fetchXcmGarRegistry()
+        let chainAssets = false
+        try {
+            chainAssets = registryJSON['assets'][targetedRelaychain]
+        } catch (err) {
+            console.log(`registry.json load error`, err)
+            process.exit(0)
+        }
+        for (const chainAsset of chainAssets) {
+            let relayChain = chainAsset.relayChain
+            let paraID = chainAsset.paraID
+            let r = {
+                chainkey: `${relayChain}-${paraID}`,
+                chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
+                paraID: paraID,
+                assets: chainAsset.data
+            }
+            if (targetedParaID == 'all' || targetedParaID == `${r.paraID}`) {
+                let assetMap = this.transformParachainAssets(r)
+                for (const assetChain of Object.keys(assetMap)) {
+                    rawGlobalAsetMap[assetChain] = assetMap[assetChain]
+                }
+            }
+        }
+        return rawGlobalAsetMap
+    }
+
     categorizeAssetType(assetName, assetSymbol, chainID) {
         let assetType = paraTool.assetTypeToken
         if (chainID = paraTool.chainIDParallel || chainID == paraTool.chainIDParallel) {
@@ -60,6 +111,27 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         convertedVSBond2 = [d, paraID, leaseStart, leaseEnd]
         console.log(`assetName=${assetName}, convertedVSBond2`, convertedVSBond2)
         return convertedVSBond2
+    }
+
+    validateLocalAssetSymbol(globalAsetMap, xcRegistryNew) {
+        for (const assetChain of Object.keys(globalAsetMap)) {
+            let localAsset = globalAsetMap[assetChain]
+            let localAssetSymbol = localAsset.symbol
+            let xcmInteriorKeyV1 = localAsset.xcmInteriorKeyV1
+            // check symbol consistency
+            if (xcmInteriorKeyV1 != undefined) {
+                let xcmRegistry = xcRegistryNew[xcmInteriorKeyV1]
+                if (xcmRegistry != undefined) {
+                    let xcmRegistrySymbol = xcmRegistry.symbol
+                    if (localAssetSymbol != xcmRegistrySymbol) {
+                        console.log(`UPDATE localAsset symbol ${assetChain}: ${localAssetSymbol} -> ${xcmRegistrySymbol}`)
+                        globalAsetMap[assetChain].xcmSymbol = xcmRegistrySymbol
+                        globalAsetMap[assetChain].symbol = localAssetSymbol
+                    }
+                }
+            }
+        }
+        return globalAsetMap
     }
 
     transformParachainAssets(r) {
@@ -227,6 +299,65 @@ module.exports = class XCMGARLoadManager extends AssetManager {
             polkaholicXcGar[xcmInteriorKeyV1] = transformedXcmAsset
             console.log(`xcmInteriorKeyV1=${xcmInteriorKeyV1}`, transformedXcmAsset)
             //polkaholicXcGar[xcmInteriorKeyV1] = xcmAsset
+        }
+        let cleanPolkaholicXcGar = this.checkSymbolCollision(polkaholicXcGar)
+        return cleanPolkaholicXcGar
+    }
+
+    computeFallbackSymbol(xcmAsset) {
+        let symbol = xcmAsset.symbol
+        let paraID = xcmAsset.parachainID
+        let chainID = xcmAsset.xcmchainID
+        let xcmInteriorKeyV1 = xcmAsset.xcmInteriorKey
+        if (paraID == 0 || paraID == 1000) {
+            //no padding for relaychain / statemine(t)
+            return symbol
+        }
+        let nativeSymbol = this.getChainSymbol(chainID)
+        //let nativeSymbol = this.nativeSymbolMap[chainID]
+        // no padding for native
+        if (symbol == nativeSymbol) {
+            return symbol
+        } else {
+            symbol = `${symbol}.${nativeSymbol}`
+        }
+        // known exceptions
+        if (xcmInteriorKeyV1 == '[{"parachain":2085},{"generalKey":"0x734b534d"}]~kusama') {
+            symbol = 'SKSM.OLD'
+        }
+        if (xcmInteriorKeyV1 == '[{"network":"kusama"},{"parachain":2090},{"generalKey":"0x00000000"}]') {
+            symbol = 'BSX.OLD'
+        }
+        return symbol
+    }
+
+    checkSymbolCollision(polkaholicXcGar) {
+        //TODO: check symbol collision here
+        let symbolChainMap = {}
+        let fallbackSymbolMap = {}
+        let collisions = []
+        for (const xcmAsset of Object.values(polkaholicXcGar)) {
+            let uppercaseSymbol = xcmAsset.symbol.toUpperCase()
+            let xcmInteriorKeyV1 = xcmAsset.xcmInteriorKey
+            let symbolChain = paraTool.makeAssetChain(uppercaseSymbol, xcmAsset.relayChain)
+            fallbackSymbolMap[xcmInteriorKeyV1] = this.computeFallbackSymbol(xcmAsset)
+            if (symbolChainMap[symbolChain] == undefined) {
+                symbolChainMap[symbolChain] = {}
+                symbolChainMap[symbolChain].xcmInteriorKeys = []
+            } else {
+                collisions.push(symbolChain)
+            }
+            symbolChainMap[symbolChain].xcmInteriorKeys.push(xcmInteriorKeyV1)
+        }
+        console.log(`fallbackSymbolMap`, fallbackSymbolMap)
+        console.log(`collision!!`, collisions)
+        for (const symbolChain of collisions) {
+            for (const xcmInteriorKeyV1 of symbolChainMap[symbolChain].xcmInteriorKeys) {
+                let originalSymbol = polkaholicXcGar[xcmInteriorKeyV1].symbol
+                let fallbackSymbol = fallbackSymbolMap[xcmInteriorKeyV1]
+                console.log(`update collision. xcmInteriorKeyV1=${xcmInteriorKeyV1}, ${originalSymbol}->${fallbackSymbol}`)
+                polkaholicXcGar[xcmInteriorKeyV1].symbol = fallbackSymbol
+            }
         }
         return polkaholicXcGar
     }

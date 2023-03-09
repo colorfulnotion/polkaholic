@@ -35,6 +35,7 @@ const Ably = require('ably');
 const Query = require('./query');
 const mysql = require("mysql2");
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 /*
 Setup xcmcleaner to do all writes to the new column family currently done by  xcmmatch work except failure
 Compute teleport fee and teleport usd fee in xcmcleaner correctly
@@ -693,6 +694,17 @@ module.exports = class XCMCleaner extends Query {
         return (currentTS >= cutoffTS);
     }
 
+    async generate_extrinsic_XCMInfo_targetSQL(targetSQL) {
+        let res = await this.poolREADONLY.query(targetSQL)
+        for (const r of res) {
+            let transferIndex = (r.transferIndex != undefined) ? r.transferIndex : 0
+            let xcmIndex = (r.transferIndex != undefined) ? r.xcmIndex : 0
+            let extrinsicHash = (r.extrinsicHash != undefined) ? r.extrinsicHash : null
+            if (extrinsicHash != undefined) {
+                await this.generate_extrinsic_XCMInfo(extrinsicHash, transferIndex, xcmIndex)
+            }
+        }
+    }
     /*
     for any extrinsicHash / extrinsicID in xcmtransfer, pull out the assetChain/xcmInteriorKey, sourceTS, beneficiary and construct the "origination" structure
 read a short window of  N minutes from block${chainIDDest} and open up an API connection for ${chainIDDest}.  Query beneficiary for all N minutes for { accounts, tokens } for the asset
@@ -718,9 +730,12 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 destStatus,
                 errorDesc,
                 incomplete,
-                blockNumberDest
+                blockNumberDest,
+                xcmInteriorKey,
+                xcmInteriorKeyUnregistered
               from xcmtransfer
        where  extrinsicHash = '${extrinsicHash}' and transferIndex = '${transferIndex}' and xcmIndex = '${xcmIndex}' limit 1`
+        //console.log(paraTool.removeNewLine(sqlA))
         let xcmRecs = await this.poolREADONLY.query(sqlA)
         let xcm = null
         if (xcmRecs.length == 1) {
@@ -768,8 +783,26 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
             return (false);
         }
         let decimals = inp.decimals;
+        let xcmInteriorKey = xcm.xcmInteriorKey
+        let xcmInteriorKeyV2 = null
+        let xcmInteriorKeyUnregistered = null
+        try {
+            if (xcmInteriorKey != undefined) {
+                xcmInteriorKeyV2 = paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey)
+                if (this.isXcmInteriorKeyRegistered(xcmInteriorKey)) {
+                    xcmInteriorKeyUnregistered = 0
+                } else {
+                    xcmInteriorKeyUnregistered = 1
+                }
+            }
+        } catch (e) {
+            console.log(`${xcm.extrinsicHash} [${xcm.transferIndex}-${xcm.xcmIndex}] v1Key=${xcmInteriorKey}. Error:`, e)
+        }
+
         let xcmInfo = {
             symbol: xcm.symbol,
+            xcmInteriorKey: xcmInteriorKeyV2,
+            xcmInteriorKeyUnregistered: xcmInteriorKeyUnregistered,
             priceUSD: xcm.priceUSD,
             relayChain: {
                 relayChain: xcm.relayChain,
@@ -794,6 +827,8 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 ts: xcm.sourceTS,
                 isMsgSent: isMsgSent,
                 finalized: true,
+                xcmIndex: xcmIndex,
+                transferIndex: transferIndex,
             },
             destination: {
                 chainName: xcm.chainDestName,
@@ -830,7 +865,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                 await this.update_batchedSQL();
                 return xcmInfo;
             }
-            // WATERFALL match criteria: search db, substrateetl, then rpc endpoint 
+            // WATERFALL match criteria: search db, substrateetl, then rpc endpoint
             this.cachedMessages = null;
             this.cachedRows = null;
             let best = null;
@@ -972,6 +1007,16 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
                         });
                         console.log("xcmInfo", JSON.stringify(xcmInfo, null, 4));
                     }
+
+                    let hashesRowsToInsert = [];
+                    let hres = btTool.encode_xcminfofinalized(xcm.extrinsicHash, xcm.chainID, xcm.extrinsicID, xcmInfo, xcm.sourceTS)
+                    if (hres) {
+                        hashesRowsToInsert.push(hres);
+                    }
+                    if (hashesRowsToInsert.length > 0) {
+                        await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
+                    }
+
                     return xcmInfo;
                 }
             }
@@ -994,7 +1039,7 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
 
     async bulk_generate_XCMInfo(chainIDDest = null, lookbackDays = 16, limit = 100) {
         let w = chainIDDest ? `and chainIDDest = ${chainIDDest} ` : "";
-        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2023-02-28") and  sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and ( matchAttemptDT is null or matchAttemptDT < date_sub(Now(), INTERVAL POW(3, matchAttempts) MINUTE) ) and symbol is not null ${w}  order by matchAttempts asc, sourceTS desc limit ${limit}`;
+        let sql = `select extrinsicHash, xcmIndex, transferIndex, sourceTS, extrinsicID, chainID from xcmtransfer where chainIDDest >=0 and chainIDDest < 40000 and destStatus = -1 and sourceTS > UNIX_TIMESTAMP("2023-02-28") and  sourceTS < UNIX_TIMESTAMP(Date_sub(Now(), interval 2 MINUTE)) and ( matchAttemptDT is null or matchAttemptDT < date_sub(Now(), INTERVAL POW(3, matchAttempts) MINUTE) ) and symbol is not null ${w}  order by matchAttempts asc, sourceTS desc limit ${limit}`;
         console.log(sql);
         let extrinsics = await this.pool.query(sql);
         let extrinsic = {};
@@ -1006,44 +1051,9 @@ if a jump in balance is found in those N minutes, mark the blockNumber in ${chai
         for (const e of extrinsics) {
             try {
                 let xcmInfo = await this.generate_extrinsic_XCMInfo(e.extrinsicHash, e.transferIndex, e.xcmIndex);
-                if (results[e.extrinsicHash] == undefined) {
-                    results[e.extrinsicHash] = [xcmInfo];
-                    extrinsic[e.extrinsicHash] = e;
-                    extrinsicconfidence[e.extrinsicHash] = this.get_confidence(xcmInfo);
-                } else {
-                    let confidence = this.get_confidence(xcmInfo)
-                    if (confidence > extrinsicconfidence[e.extrinsicHash]) {
-                        extrinsicconfidence[e.extrinsicHash] = confidence;
-                    }
-                }
             } catch (err) {
                 console.log(err);
             }
-        }
-
-        let hashesRowsToInsert = [];
-        for (const extrinsicHash of Object.keys(extrinsicconfidence)) {
-            let confidence = extrinsicconfidence[extrinsicHash]; // store confidence in xcmtransfer
-            let e = extrinsic[extrinsicHash];
-            let extrinsicID = e.extrinsicID;
-            let sourceTS = e.sourceTS;
-            let hashrec = {};
-            let col = extrinsicID
-            let xcmInfo = results[extrinsicHash];
-            hashrec[col] = {
-                value: (xcmInfo.length == 1) ? JSON.stringify(xcmInfo[0]) : JSON.stringify(xcmInfo),
-                timestamp: sourceTS * 1000000
-            };
-            let extrinsicHashRec = {
-                key: extrinsicHash,
-                data: {},
-            };
-            extrinsicHashRec.data["xcminfofinalized"] = hashrec;
-            hashesRowsToInsert.push(extrinsicHashRec);
-        }
-
-        if (hashesRowsToInsert.length > 0) {
-            await this.insertBTRows(this.btHashes, hashesRowsToInsert, "hashes");
         }
         return (true);
     }

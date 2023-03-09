@@ -16,6 +16,7 @@
 
 const AssetManager = require("./assetManager");
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 const ethTool = require("./ethTool");
 const mysql = require("mysql2");
 const uiTool = require('./uiTool')
@@ -5704,6 +5705,7 @@ module.exports = class Query extends AssetManager {
             throw new paraTool.NotFoundError(`XCM Message not found: ${msgHash}/${number}`)
         }
         let x = xcmrecs[0];
+
         x.paraID = paraTool.getParaIDfromChainID(x.chainID)
         x.paraIDDest = paraTool.getParaIDfromChainID(x.chainIDDest)
         x.msgHex = `${x.msgHex}`
@@ -5711,8 +5713,12 @@ module.exports = class Query extends AssetManager {
         let blockTS = (x.blockTS != undefined) ? x.blockTS : 0
         let dAssetChains = []
         if (x.assetChains) {
-            dAssetChains = await this.decorateXCMAssetReferences(x.assetChains, blockTS, decorate, decorateExtra)
-            x.assetChains = dAssetChains
+            try {
+                dAssetChains = await this.decorateXCMAssetReferences(x.assetChains, blockTS, decorate, decorateExtra)
+                x.assetChains = dAssetChains
+            } catch (err) {
+                console.log(err);
+            }
         }
 
         let xcmMsg = (x.msg != undefined) ? JSON.parse(x.msg) : null
@@ -5774,7 +5780,7 @@ module.exports = class Query extends AssetManager {
     }
 
     decorateFungible(fun, xcmAssetInfo) {
-        if (fun != undefined && fun.fungible != undefined) {
+        if (fun != undefined && fun.fungible != undefined && xcmAssetInfo && xcmAssetInfo.decimals) {
             let assetFun = fun
             let fungible = assetFun.fungible
             let decimals = xcmAssetInfo.decimals
@@ -6098,31 +6104,34 @@ module.exports = class Query extends AssetManager {
 
         dXcmMsg.version = version
 
+        try {
+            let xcmPath = []
 
-        let xcmPath = []
-
-        //"withdrawAsset", "clearOrigin","buyExecution", "depositAsset"
-        if (version == 'v1') {
-            let instructionK = Object.keys(xcmMsgV)[0]
-            let instructionV = xcmMsgV[instructionK]
-            //console.log(`instructionK=${instructionK}, instructionV`, instructionV)
-            dXcmMsg[version] = {}
-            await this.decorateXCMInstructionV1(chainID, chainIDDest, dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
-        } else if (version == 'v2') {
-            dXcmMsg[version] = []
-            for (let i = 0; i < xcmMsgV.length; i++) {
-                let instructionK = Object.keys(xcmMsgV[i])[0]
-                xcmPath.push(instructionK)
-            }
-            //console.log(`decorateXCMMsg Path`, xcmPath)
-            for (let i = 0; i < xcmPath.length; i++) {
-                let instructionK = xcmPath[i]
-                let instructionV = xcmMsgV[i][instructionK]
+            //"withdrawAsset", "clearOrigin","buyExecution", "depositAsset"
+            if (version == 'v1') {
+                let instructionK = Object.keys(xcmMsgV)[0]
+                let instructionV = xcmMsgV[instructionK]
                 //console.log(`instructionK=${instructionK}, instructionV`, instructionV)
-                await this.decorateXCMInstruction(chainID, chainIDDest, dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
+                dXcmMsg[version] = {}
+                await this.decorateXCMInstructionV1(chainID, chainIDDest, dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
+            } else if (version == 'v2') {
+                dXcmMsg[version] = []
+                for (let i = 0; i < xcmMsgV.length; i++) {
+                    let instructionK = Object.keys(xcmMsgV[i])[0]
+                    xcmPath.push(instructionK)
+                }
+                //console.log(`decorateXCMMsg Path`, xcmPath)
+                for (let i = 0; i < xcmPath.length; i++) {
+                    let instructionK = xcmPath[i]
+                    let instructionV = xcmMsgV[i][instructionK]
+                    //console.log(`instructionK=${instructionK}, instructionV`, instructionV)
+                    await this.decorateXCMInstruction(chainID, chainIDDest, dXcmMsg, instructionK, instructionV, blockTS, dAssetChains, decorate, decorateExtra)
+                }
+            } else if (version == 'v0') {
+                //skip for now
             }
-        } else if (version == 'v0') {
-            //skip for now
+        } catch (err) {
+            console.log(err);
         }
         return dXcmMsg
     }
@@ -6615,10 +6624,17 @@ module.exports = class Query extends AssetManager {
                 XCMInfoData = rowData["xcminfofinalized"]
             }
             if (XCMInfoData) {
-                for (const extrinsicID of Object.keys(XCMInfoData)) {
-                    const cell = XCMInfoData[extrinsicID][0];
+                /*
+                for (const rowKey of Object.keys(XCMInfoData)) {
+                    const cell = XCMInfoData[rowKey][0];
                     let xcmInfo = JSON.parse(cell.value);
                     return xcmInfo;
+                }
+                */
+                let xcmInfos = btTool.decode_column_bt_hashes_xcminfofinalized(XCMInfoData)
+                if (Array.isArray(xcmInfos) && xcmInfos.length > 0) {
+                    //TODO: return infos
+                    return xcmInfos[0]
                 }
             } else {
                 throw new paraTool.InvalidError(`${hash} not found`)

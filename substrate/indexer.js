@@ -4,6 +4,7 @@ const path = require("path");
 const AssetManager = require("./assetManager");
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 const mysql = require("mysql2");
 const {
     WebSocket
@@ -1195,8 +1196,13 @@ module.exports = class Indexer extends AssetManager {
                     console.log(`invalid asset`, r.xcmSymbol, r.chainID, "xcmtransfer", r)
                 } else {
                     let innerCall = (r.innerCall) ? `'${r.innerCall}'` : `NULL`
+
                     let msgHash = (r.msgHash && r.msgHash != "0x") ? `'${r.msgHash}'` : `NULL`
                     let xcmInteriorKey = (r.xcmInteriorKey != undefined) ? `${mysql.escape(r.xcmInteriorKey)}` : `NULL`
+                    let xcmInteriorKeyUnregistered = `NULL` //TODO: modify this
+                    if (r.xcmInteriorKey != undefined) {
+                        xcmInteriorKeyUnregistered = (this.isXcmInteriorKeyRegistered(xcmInteriorKey)) ? 0 : 1
+                    }
                     let xcmSymbol = (r.xcmSymbol) ? `${mysql.escape(r.xcmSymbol)}` : `NULL`
                     let xcmType = (r.xcmType != undefined) ? `'${r.xcmType}'` : 'xcmtransfer'
                     let pendingXcmInfoStr = (r.xcmInfo != undefined) ? JSON.stringify(r.xcmInfo) : false
@@ -1207,7 +1213,7 @@ module.exports = class Indexer extends AssetManager {
                         let evmTxHash = r.xcmInfo.origination.transactionHash
                         let extRes = this.extrinsicEvmMap[evmTxHash]
                         console.log(`extRes`, extRes)
-                        if (extRes.txFee != undefined) originationTxFee = extRes.txFee
+                        if (extRes && extRes.txFee != undefined) originationTxFee = extRes.txFee
                     }
                     //["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"]
                     //["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSent", "amountSentDecimals", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey"]
@@ -1235,7 +1241,8 @@ module.exports = class Indexer extends AssetManager {
                         xcmType,
                         pendingXcmInfoBlob,
                         `Now()`,
-                        originationTxFee
+                        originationTxFee,
+                        xcmInteriorKeyUnregistered
                     ].join(",") + ")";
                     // CHECK: do we need isXcmTipSafe = (isSigned || finalized) ? true : false concept here to ensure that xcmtransfer records are inserted only when "safe"
                     if (r.msgHash == "0x" && !r.finalized) {
@@ -1256,9 +1263,9 @@ module.exports = class Indexer extends AssetManager {
             await this.upsertSQL({
                 "table": "xcmtransfer",
                 "keys": ["extrinsicHash", "extrinsicID", "transferIndex", "xcmIndex"],
-                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSentDecimals", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo", "xcmInfolastUpdateDT", "txFee"],
+                "vals": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "amountSentDecimals", "amountSent", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "msgHash", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "xcmInfo", "xcmInfolastUpdateDT", "txFee", "xcmInteriorKeyUnregistered"],
                 "data": xcmtransfers,
-                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "txFee"],
+                "replace": ["chainID", "chainIDDest", "blockNumber", "fromAddress", "symbol", "sourceTS", "relayChain", "paraID", "paraIDDest", "destAddress", "sectionMethod", "incomplete", "isFeeItem", "sentAt", "xcmInteriorKey", "innerCall", "xcmType", "txFee", "xcmInteriorKeyUnregistered"],
                 "replaceIfNull": ["xcmInfo", "msgHash", "xcmInfolastUpdateDT", "amountSentDecimals", "amountSent"] // TODO: "replaceIfMatchedZero": ["xcmInfo"] AND if finalized
             }, sqlDebug);
 
@@ -1725,6 +1732,14 @@ module.exports = class Indexer extends AssetManager {
 
     store_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS) {
         if (!xcmInfo) return;
+        let hres = btTool.encode_xcminfofinalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS)
+        if (hres) {
+            this.hashesRowsToInsert.push(hres)
+        }
+    }
+
+    store_xcminfo_finalized_old(extrinsicHash, extrinsicID, xcmInfo, sourceTS) {
+        if (!xcmInfo) return;
         try {
             // write "hashes" xcminfofinalized with row key extrinsicHash and column extrinsicID
             let hres = {
@@ -2045,7 +2060,7 @@ module.exports = class Indexer extends AssetManager {
                                 let extrinsicHash = xcmtransfer.extrinsicHash
                                 let msgHash = xcmtransfer.msgHash
                                 await this.publish_xcminfo(xcmtransfer.xcmInfo);
-                                await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.extrinsicID, xcmInfo, this.getCurrentTS());
+                                await this.store_xcminfo_finalized(xcmtransfer.extrinsicHash, xcmtransfer.chainID, xcmtransfer.extrinsicID, xcmInfo, this.getCurrentTS());
                             }
                         }
                     }
@@ -5153,7 +5168,8 @@ module.exports = class Indexer extends AssetManager {
 
             let isSuccess = (rExtrinsic.err == undefined) ? true : false //skip feedtransfer/feedxcm/feedreward/feedcrowdloan processing if is failure case
 
-            if (isSuccess) {
+            //!! failure-pending are going through with isSuccess check
+            if (isSuccess || true) {
                 /* process feedtransfer:
                 feedtransfer keeps a list of incoming transfers
                 for outgoing transfer, we set isIncoming to 0 and addresss as senderAddress
@@ -5198,7 +5214,6 @@ module.exports = class Indexer extends AssetManager {
 
                 //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
                 this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
-
                 if (rExtrinsic.xcms == undefined) {
                     // process xcmtransfer extrinsic params
                     this.chainParser.processOutgoingXCM(this, rExtrinsic, feed, fromAddress, false, false, false); // we will temporarily keep xcms at rExtrinsic.xcms and remove it afterwards
@@ -5381,8 +5396,6 @@ module.exports = class Indexer extends AssetManager {
                         this.updateMultisigMap(multisigRec)
                     }
                 }
-
-
             }
 
             if (this.validAddress(fromAddress)) {
@@ -5431,6 +5444,17 @@ module.exports = class Indexer extends AssetManager {
         //build systhetic xcmInfo here when xcmInfo is not set yet
         if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo xcmtransfer`, x)
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`buildPendingXcmInfo extrinsic`, extrinsic)
+        let xcmInteriorKey = null
+        let xcmInteriorKeyV2 = null
+        let xcmInteriorKeyUnregistered = null
+        let xcmIndex = x.xcmIndex
+        let transferIndex = x.transferIndex
+        if (x.xcmInteriorKey != undefined) {
+            xcmInteriorKey = x.xcmInteriorKey
+            xcmInteriorKeyV2 = paraTool.convertXcmInteriorKeyV1toV2(xcmInteriorKey)
+            xcmInteriorKeyUnregistered = (this.isXcmInteriorKeyRegistered(xcmInteriorKey)) ? 0 : 1
+        }
+
         try {
             let sectionPieces = x.sectionMethod.split(':')
             let xSection = null,
@@ -5470,7 +5494,6 @@ module.exports = class Indexer extends AssetManager {
                     sourceTxFeeUSD = p.valUSD;
                 }
             }
-
 
             let assetInfo = this.getXcmAssetInfoBySymbolKey(symbolRelayChain);
             //console.log(`symbolRelayChain=${symbolRelayChain}`, assetInfo)
@@ -5538,6 +5561,8 @@ module.exports = class Indexer extends AssetManager {
             let isExpectedFinalized = (timeDiff > 300) ? true : false
             let xcmInfo = {
                 symbol: x.symbol,
+                xcmInteriorKey: xcmInteriorKeyV2,
+                xcmInteriorKeyUnregistered: xcmInteriorKeyUnregistered,
                 priceUSD: (x.priceUSD != undefined) ? x.priceUSD : null,
                 relayChain: null,
                 origination: null,
@@ -5579,7 +5604,9 @@ module.exports = class Indexer extends AssetManager {
                 decimals: x.decimals,
                 isMsgSent: isMsgSent,
                 finalized: originationFinalized,
-                isFeeItem: x.isFeeItem
+                isFeeItem: x.isFeeItem,
+                xcmIndex: xcmIndex,
+                transferIndex: transferIndex,
             }
             if (evmTransactionHash == undefined) delete xcmInfo.origination.transactionHash;
             if (failureType != undefined) {
@@ -5654,7 +5681,7 @@ module.exports = class Indexer extends AssetManager {
         } catch (e) {
             this.logger.error({
                 "op": "buildingPendingXcmInfo",
-                e
+                "err": e
             })
             return false
         }

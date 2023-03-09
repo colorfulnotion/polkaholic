@@ -4,6 +4,7 @@ const {
     Command
 } = require('commander');
 const paraTool = require("./paraTool");
+const btTool = require("./btTool");
 const XCMManager = require("./xcmmanager");
 const XCMGARLoadManager = require("./xcmgarloadmanager");
 
@@ -99,6 +100,7 @@ async function main() {
         .option('-c, --chainID <chainID>', 'ChainID', null)
         .option('-h, --extrinsicHash <extrinsicHash>', 'ExtrinsicHash', null)
         .option('-hh, --extrinsicHashes <extrinsicHashes>', 'ExtrinsicHashes, comma saperated', null)
+        .option('-s, --sql <targetSQL>', 'Target SQL', null)
         .option('-t, --transferIndex <transferIndex>', 'Transfer Index', 0, myParseInt)
         .option('-x, --xcmIndex <xcmIndex>', 'XCM Message Index', 0, myParseInt)
         .option('-l, --lookbackDays <lookbackDays>', 'Lookback days', 7, myParseInt)
@@ -129,6 +131,10 @@ async function main() {
                     console.log(`--extrinsicHashes opt err`, e)
                     process.exit(1);
                 }
+            } else if (opt.sql) {
+                await manager.assetManagerInit();
+                await manager.generate_extrinsic_XCMInfo_targetSQL(opt.sql)
+                process.exit(0);
             } else if (opt.chainID != undefined) {
                 let chainID = opt.chainID;
                 let lookbackDays = opt.lookbackDays;
@@ -147,9 +153,10 @@ async function main() {
 
     program.command('reindex')
         .description(`Rewrite BigTable column data with latest xcmInfo info`)
-        .option('-l <lookbackDays>', '# of days to lookback', 1, myParseInt)
+        .option('-l --lookbackdays <lookbackDays>', '# of days to lookback', 1, myParseInt)
         .action(async (opt) => {
             var manager = new XCMManager();
+            let lookbackDays = opt.lookbackdays;
             await manager.xcm_init()
             await manager.assetManagerInit();
             await manager.xcmReanalytics(lookbackDays)
@@ -167,22 +174,7 @@ async function main() {
             let tagetTable = opt.target;
             let relayChain = opt.relayChain;
             var xcmgarlm = new XCMGARLoadManager();
-            let registryJSON = await xcmgarlm.fetchXcmGarRegistry()
-            //console.log(`registryJSON***`, registryJSON)
-            let xcRegistryRaw = false
-            if (registryJSON['xcmRegistry'] != undefined) {
-                let xcmRegistries = registryJSON['xcmRegistry']
-                for (const xcmRegistry of xcmRegistries) {
-                    if (xcmRegistry.relayChain == relayChain) {
-                        xcRegistryRaw = xcmRegistry.data
-                    }
-                }
-            }
-            if (!xcRegistryRaw) {
-                console.log(`Unable to find xcmRegistry for relayChain=${relayChain}`)
-                process.exit(0)
-            }
-            let xcRegistryNew = xcmgarlm.transformXcGarRegistry(xcRegistryRaw)
+            let xcRegistryNew = await xcmgarlm.getLatestXcmGarRegistry(relayChain)
             //console.log(`xcRegistryNew`, xcRegistryNew)
             let xcRegistryOld = await xcmgarlm.init_xcm_asset_old(relayChain)
             //console.log(`xcRegistryOld`, xcRegistryOld)
@@ -208,32 +200,9 @@ async function main() {
             let targetedRelaychain = opt.relayChain;
             let targetedParaID = opt.paraID ? opt.paraID : "all";
             var xcmgarlm = new XCMGARLoadManager();
-            let registryJSON = await xcmgarlm.fetchXcmGarRegistry()
-            //console.log(`registryJSON***`, registryJSON)
-            let globalAsetMap = {}
-            let chainAssets = false
-            try {
-                chainAssets = registryJSON['assets'][targetedRelaychain]
-            } catch (err) {
-                console.log(`registry.json load error`, err)
-                process.exit(0)
-            }
-            for (const chainAsset of chainAssets) {
-                let relayChain = chainAsset.relayChain
-                let paraID = chainAsset.paraID
-                let r = {
-                    chainkey: `${relayChain}-${paraID}`,
-                    chainID: paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain),
-                    paraID: paraID,
-                    assets: chainAsset.data
-                }
-                if (targetedParaID == 'all' || targetedParaID == `${r.paraID}`) {
-                    let assetMap = xcmgarlm.transformParachainAssets(r)
-                    for (const assetChain of Object.keys(assetMap)) {
-                        globalAsetMap[assetChain] = assetMap[assetChain]
-                    }
-                }
-            }
+            let xcRegistryNew = await xcmgarlm.getLatestXcmGarRegistry(targetedRelaychain)
+            let rawGlobalAsetMap = await xcmgarlm.getLatestLocalAssets(targetedRelaychain, targetedParaID)
+            let globalAsetMap = xcmgarlm.validateLocalAssetSymbol(rawGlobalAsetMap, xcRegistryNew)
 
             console.log(`[${targetedRelaychain}-${targetedParaID}]`, globalAsetMap)
 

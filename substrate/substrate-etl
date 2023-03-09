@@ -108,7 +108,7 @@ async function main() {
                     let endTS = paraTool.logDT_hr_to_ts(endDT, 0);
                     for (let ts = logTS; ts <= endTS; ts += 86400) {
                         let [dt, hr] = paraTool.ts_to_logDT_hr(ts);
-                        if (force || ( await substrateetl.is_accountmetrics_ready(relayChain, paraID, dt) ) ) {
+                        if (force || (await substrateetl.is_accountmetrics_ready(relayChain, paraID, dt))) {
                             await substrateetl.dump_accountmetrics(relayChain, paraID, dt);
                         }
                     }
@@ -151,8 +151,8 @@ async function main() {
                     let endTS = paraTool.logDT_hr_to_ts(endDT, 0);
                     for (let ts = logTS; ts <= endTS; ts += 86400) {
                         let [dt, hr] = paraTool.ts_to_logDT_hr(ts);
-                        if (force || ( await substrateetl.is_networkmetrics_ready(network, dt) ) ) {
-			    await substrateetl.dump_networkmetrics(network, logDT);
+                        if (force || (await substrateetl.is_networkmetrics_ready(network, dt))) {
+                            await substrateetl.dump_networkmetrics(network, logDT);
                         }
                     }
                 } else {
@@ -210,8 +210,8 @@ async function main() {
                     process.exit(0);
                 }
             } else {
+                var manager = new SubstrateETL();
                 while (1) {
-                    var manager = new SubstrateETL();
                     let res = await manager.updateAddressBalances(chainID);
                     if (res == false) {
                         const gbRounded = manager.gb_heap_used();
