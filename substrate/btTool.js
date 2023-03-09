@@ -106,8 +106,7 @@ function decode_xcminfofinalized(XCMInfoData){
     }
 }
 
-function encode_xcminfofinalized(extrinsicHash, chainID, extrinsicID, xcmInfo, sourceTS, columnfamily = 'xcminfofinalized') {
-    //let columnfamily = 'xcminfofinalized'
+function encode_xcminfofinalized(extrinsicHash, chainID, extrinsicID, xcmInfo, sourceTS) {
     if (!xcmInfo) return false;
     let hres = {
         key: extrinsicHash,
@@ -119,6 +118,7 @@ function encode_xcminfofinalized(extrinsicHash, chainID, extrinsicID, xcmInfo, s
         return false
     }
     try {
+	let columnfamily = 'xcminfofinalized'
         // write "hashes" xcminfofinalized with row key extrinsicHash and column extrinsicID
         hres.data[columnfamily] = {}
         let xcmIndex = xcmInfo.origination.xcmIndex

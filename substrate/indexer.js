@@ -1732,8 +1732,7 @@ module.exports = class Indexer extends AssetManager {
 
     store_xcminfo_finalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS) {
         if (!xcmInfo) return;
-        //TODO: temporarily write into feedxcminfo. should write into xcminfofinalized instead
-        let hres = btTool.encode_xcminfofinalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS, 'feedxcminfo')
+        let hres = btTool.encode_xcminfofinalized(extrinsicHash, extrinsicID, xcmInfo, sourceTS)
         if (hres){
             this.hashesRowsToInsert.push(hres)
         }
