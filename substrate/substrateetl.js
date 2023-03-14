@@ -44,6 +44,7 @@ const balanceStartDT = "2020-03-09";
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
     publish = 0;
+    isProd = false
 
     constructor() {
         super("manager")
@@ -61,6 +62,8 @@ module.exports = class SubstrateETL extends AssetManager {
             case "specversions":
                 return (null);
                 break;
+            case "xcmtransfers":
+                return "origination_ts"
         }
         return "block_time";
     }
@@ -68,23 +71,30 @@ module.exports = class SubstrateETL extends AssetManager {
     // sets up system tables (independent of paraID) and paraID specific tables
     async setup_tables(chainID = null, execute = false) {
         let projectID = `${this.project}`
-        // setup "system" tables across all paraIDs
-        if (chainID == null) {
-            let systemtbls = ["xcmtransfers", "chains"];
-            for (const tbl of systemtbls) {
-                let p = (this.partitioned_table(tbl)) ? "--time_partitioning_field block_time --time_partitioning_type DAY" : "";
-                let cmd = `bq mk  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}`
-                try {
-                    console.log(cmd);
-                    //await exec(cmd);
-                } catch (e) {
-                    // TODO optimization: do not create twice
+        //setup "system" tables across all paraIDs
+        if (chainID == undefined) {
+            console.log(`setup "system" tables across all paraIDs`)
+            let systemtbls = ["xcmtransfers", "chains"]
+            let relayChains = ["polkadot", "kusama"]
+            for (const relayChain of relayChains){
+                let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+                for (const tbl of systemtbls) {
+                    let fld = (this.partitioned_table(tbl))
+                    let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
+                    let cmd = `bq mk  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${bqDataset}.${tbl}`
+                    try {
+                        console.log(cmd);
+                        //await exec(cmd);
+                    } catch (e) {
+                        // TODO optimization: do not create twice
+                    }
                 }
             }
+            process.exit(0)
         }
         // setup paraID specific tables, including paraID=0 for the relay chain
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers"]
-        let p = (chainID) ? ` and chainID = ${chainID} ` : ""
+        let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
         let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
 
         let recs = await this.poolREADONLY.query(sql);
@@ -92,11 +102,12 @@ module.exports = class SubstrateETL extends AssetManager {
             let chainID = parseInt(rec.chainID, 10);
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
+            let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
             //console.log(" --- ", chainID, paraID, relayChain);
             for (const tbl of tbls) {
                 let fld = this.partitioned_table(tbl);
                 let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
-                let cmd = `bq mk  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
+                let cmd = `bq mk  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${bqDataset}.${tbl}${paraID}`
                 if ((tbl == "evmtxs" || tbl == "evmtransfers") && rec.isEVM == 0) {
                     cmd = null;
                 }
@@ -2675,7 +2686,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let dir = "/tmp";
         let fn = path.join(dir, `${tbl}-${relayChain}-${logDT}.json`)
         let f = fs.openSync(fn, 'w', 0o666);
-        let bqDataset = relayChain
+        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
         let logDTp = logDT.replaceAll("-", "")
         let xcmtransfers = [];
         let NL = "\r\n";
@@ -2942,8 +2953,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             console.log("openSync", fn[tbl]);
             f[tbl] = fs.openSync(fn[tbl], 'w', 0o666);
         }
-        //let bqDataset = relayChain
-        let bqDataset = `${relayChain}_dev` //MK: TEST ONLY
+        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
 
         // 3. setup specversions
         const tableChain = this.getTableChain(chainID);
@@ -3217,84 +3227,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     //console.log(`bqExtrinsic`, bqExtrinsic)
                     extrinsics.push(bqExtrinsic);
                 }
-                /*
-                let extrinsics = b.extrinsics.map(async (ext) =>{
-                    ext.events.forEach(async (e) => {
-                        let dEvent = await this.decorateEvent(e, chainID, block.block_time, true, ["data", "address", "usd"], false)
-                        //console.log(`${e.eventID} decoded`, dEvent)
-                        if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
-                            if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
-                                if (dEvent.data[0].weight.refTime != undefined) {
-                                    ext.weight = dEvent.data[0].weight.refTime;
-                                } else if (!isNaN(dEvent.data[0].weight)) {
-                                    ext.weight = dEvent.data[0].weight;
-                                }
-                            }
-                        }
-                        events.push({
-                            event_id: e.eventID,
-                            extrinsic_hash: ext.extrinsicHash,
-                            extrinsic_id: ext.extrinsicID,
-                            block_number: block.number,
-                            block_time: block.block_time,
-                            block_hash: block.hash,
-                            section: e.section,
-                            method: e.method,
-                            data: e.data,
-                            data_decoded: (dEvent && dEvent.decodedData != undefined)? dEvent.decodedData: null,
-                        });
-                        block.event_count++;
-                    });
-                    if (ext.transfers) {
-                        ext.transfers.forEach((t) => {
-                            transfers.push({
-                                block_hash: block.hash,
-                                block_number: block.number,
-                                block_time: block.block_time,
-                                extrinsic_hash: ext.extrinsicHash,
-                                extrinsic_id: ext.extrinsicID,
-                                event_id: t.eventID,
-                                section: t.section,
-                                method: t.method,
-                                from_ss58: t.from,
-                                to_ss58: t.to,
-                                from_pub_key: t.fromAddress,
-                                to_pub_key: t.toAddress,
-                                amount: t.amount,
-                                raw_amount: t.rawAmount,
-                                asset: t.asset,
-                                price_usd: t.priceUSD,
-                                amount_usd: t.amountUSD,
-                                symbol: t.symbol,
-                                decimals: t.decimals
-                            });
-                        });
-                        block.transfer_count++;
-                    }
-                    let feeUSD = await this.computeExtrinsicFeeUSD(ext)
-                    let extrinsic = {
-                        hash: ext.extrinsicHash,
-                        extrinsic_id: ext.extrinsicID,
-                        block_time: block.block_time,
-                        block_number: block.number,
-                        block_hash: block.hash,
-                        lifetime: ext.lifetime,
-                        section: ext.section,
-                        method: ext.method,
-                        params: ext.params,
-                        fee: ext.fee,
-                        fee_usd: feeUSD,
-                        //amounts: null
-                        //amount_usd: null,
-                        weight: (ext.weight != undefined)? ext.weight: null, // TODO: ext.weight,
-                        signed: ext.signer ? true : false,
-                        signer_ss58: ext.signer ? ext.signer : null,
-                        signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
-                    }
-                    //console.log(`extrinsic`, extrinsic)
-                    return extrinsic
-                });
-                */
                 let log_count = 0;
                 let logs = hdr.digest.logs.map((l) => {
                     let logID = `${block.number}-${log_count}`
@@ -3446,7 +3378,10 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
     async update_blocklog(chainID, logDT) {
         let project = this.project;
         let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //TODO:MK write to relay_dev for dev
+        if (!this.isProd) return //TODO:MK skip query for dev
         let paraID = paraTool.getParaIDfromChainID(chainID)
+        //xcmtransfers0, xcmtransfers1 are using substrate-etl.relayChain even for dev case
         let sqla = {
             "extrinsics": `select count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics, sum(fee) as fees from ${project}.${relayChain}.extrinsics${paraID} where date(block_time) = '${logDT}'`,
             "events": `select count(*) as numEvents from substrate-etl.${relayChain}.events${paraID} where date(block_time) = '${logDT}'`,

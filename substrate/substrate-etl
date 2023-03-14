@@ -311,11 +311,14 @@ async function main() {
         })
 
     program.command('setuptables')
-        .description("Setup BigQuery tables for new relaychain/paraID")
+        .description("Setup BigQuery tables for new relaychain/paraID.")
         .usage("2002")
-        .argument('<chainID>', 'Chain ID', myParseInt)
-        .action(async (chainID, opt) => {
+        .option('-c, --chainID <chainID>', 'ChainID', null)
+        //.argument('<chainID>', 'Chain ID', myParseInt)
+        .action(async (opt) => {
             var substrateetl = new SubstrateETL();
+            let chainID = opt.chainID
+            if (chainID != undefined) chainID = myParseInt(chainID)
             await substrateetl.setup_tables(chainID);
             process.exit(0);
         })
