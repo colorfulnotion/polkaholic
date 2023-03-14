@@ -35,6 +35,7 @@ async function main() {
         .option('-l, --logDT <logDT>', 'Date', null)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
+            await substrateetl.assetManagerInit() // required for decoratedEvents
             let logDT = opt.logDT;
             let paraID = opt.paraID;
             let relayChain = opt.relayChain;

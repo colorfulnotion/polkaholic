@@ -1563,6 +1563,216 @@ module.exports = class AssetManager extends PolkaholicDB {
         }
     }
 
+    getDecorateOption(decorateExtra) {
+        if (Array.isArray(decorateExtra)) {
+            let decorateData = decorateExtra.includes("data")
+            let decorateAddr = decorateExtra.includes("address")
+            let decorateUSD = decorateExtra.includes("usd")
+            let decorateRelated = decorateExtra.includes("related")
+            // TODO: deep events/logs let decorateDeep = decorateExtra.includes("deep")
+            return [decorateData, decorateAddr, decorateUSD, decorateRelated]
+        } else if (decorateExtra == true) {
+            // remove this once ready
+            return [true, true, true, true]
+        } else if (decorateExtra == false) {
+            return [true, true, true, false]
+        } else {
+            //return nothing if user purposefully pass in non-matched filter
+            return [false, false, false, false]
+        }
+    }
+
+    mergeEventDataAndDataType(data, dataType, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        let dd = []
+        if (!data || !data.length) return dd;
+        for (var i = 0; i < data.length; i++) {
+            let d = data[i]
+            let x = {
+                data: d,
+            }
+            let dt = dataType[i]
+            if (dt) {
+                x.typeDef = dt.typeDef
+                x.name = dt.name
+                if (x.typeDef == "AccountId32") {
+                    x.address = paraTool.getPubKey(d)
+                }
+            }
+            dd.push(x)
+        }
+        return dd
+    }
+
+    async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"], includeCurrentUSD = true) {
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        if (!decorate || !decorateData) return event
+
+        let dEvent = event
+        let decodedData = this.mergeEventDataAndDataType(event.data, event.dataType, decorate, decorateExtra)
+
+        let [pallet, method] = paraTool.parseSectionMethod(event)
+        let pallet_method = `${pallet}:${method}`
+
+        switch (pallet_method) {
+
+            case "treasury:Awarded": //balance, accountID
+            case "treasury:Burnt": //bal
+            case "treasury:Deposit": //bal
+            case "treasury:Proposed": //ProposalIndex
+            case "treasury:Rejected": //ProposalIndex, bal
+            case "treasury:Rollover": //bal
+            case "treasury:Spending": //bal
+
+            case "balances:BalanceSet": //
+            case "balances:Deposit":
+            case "balances:DustLost":
+            case "balances:Endowed":
+            case "balances:ReserveRepatriated":
+            case "balances:Reserved":
+            case "balances:Slashed":
+            case "balances:Transfer":
+            case "balances:Unreserved":
+            case "balances:Withdraw":
+
+                let exceptionList = ["balances:BalanceSet", "balances:ReserveRepatriated", "treasury:Awarded", "treasury:Proposed", "treasury:Rejected"]
+                let idxs = []
+                //some balance events have different inputs (i.e. BalanceSet, ReserveRepatriated, Awarded, Proposed, Rejected)
+                if (exceptionList.includes(pallet_method)) {
+                    if (pallet_method == "balances:BalanceSet") {
+                        idxs.push(event.data.length - 1)
+                        idxs.push(event.data.length - 2)
+                    }
+                    if (pallet_method == "balances:ReserveRepatriated") {
+                        //status is the last input
+                        idxs.push(event.data.length - 2)
+                    }
+                    if (pallet_method == "treasury:Awarded") {
+                        idxs.push(event.data.length - 2)
+                    }
+                    if (pallet_method == "treasury:Proposed") {
+                        //TODO: how to process ProposalIndex?
+                    }
+                    if (pallet_method == "treasury:Rejected") {
+                        //TODO: how to process ProposalIndex?
+                        idxs.push(event.data.length - 1)
+                    }
+
+                } else {
+                    // bal is ususally the last input
+                    idxs.push(event.data.length - 1)
+                }
+
+                var chainSymbol = this.getChainSymbol(chainID)
+                var chainDecimals = this.getChainDecimal(chainID)
+                var targetAsset = `{"Token":"${chainSymbol}"}`
+                //console.log("targetAsset", targetAsset)
+                for (const idx of idxs) {
+                    var bal = paraTool.dechexToInt(event.data[idx])
+                    if (paraTool.isFloat(bal)) {
+                        // already float
+                    } else if (paraTool.isInt(bal)) {
+                        bal = bal / 10 ** chainDecimals // always get here
+                    }
+                    if (decorateUSD) {
+                        let p = await this.computePriceUSD({
+                            val: bal,
+                            asset: targetAsset,
+                            chainID,
+                            ts
+                        })
+                        decodedData[idx].symbol = chainSymbol
+                        decodedData[idx].dataRaw = bal
+                        if (p) {
+                            decodedData[idx].dataUSD = p.valUSD
+                            decodedData[idx].priceUSD = p.priceUSD
+                            if (includeCurrentUSD) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
+                        }
+                    } else {
+                        decodedData[idx].symbol = chainSymbol
+                        decodedData[idx].dataRaw = bal
+                    }
+                }
+                break;
+
+            case "crowdloan:Contributed": //accountID, paraID, balance
+            {
+                let paraInfo = this.getParaInfo(event.data[1], chainID)
+                decodedData[1].projectName = paraInfo.name
+                decodedData[1].relayChain = paraInfo.relayChain
+                var chainSymbol = this.getChainSymbol(chainID)
+                var chainDecimals = this.getChainDecimal(chainID)
+                var targetAsset = `{"Token":"${chainSymbol}"}`
+                var bal = paraTool.dechexToInt(event.data[2])
+
+                if (paraTool.isFloat(bal)) {
+                    // already float
+                } else if (paraTool.isInt(bal)) {
+                    bal = bal / 10 ** chainDecimals // always get here
+                }
+                if (decorateUSD) {
+                    var p = await this.computePriceUSD({
+                        val: bal,
+                        asset: targetAsset,
+                        chainID,
+                        ts
+                    })
+                    decodedData[2].symbol = chainSymbol
+                    decodedData[2].dataRaw = bal
+                    if (p) {
+                        decodedData[2].dataUSD = p.valUSD
+                        decodedData[2].priceUSD = p.priceUSD
+                        if (includeCurrentUSD) decodedData[2].priceUSDCurrent = p.priceUSDCurrent
+                    }
+                } else {
+                    decodedData[2].symbol = chainSymbol
+                    decodedData[2].dataRaw = bal
+                }
+
+            }
+            break;
+
+            case "crowdloan:Contributed": //accountID, paraID, balance
+            {
+                let paraInfo = this.getParaInfo(event.data[1], chainID)
+                decodedData[1].projectName = paraInfo.name
+                decodedData[1].relayChain = paraInfo.relayChain
+                var chainSymbol = this.getChainSymbol(chainID)
+                var chainDecimals = this.getChainDecimal(chainID)
+                var targetAsset = `{"Token":"${chainSymbol}"}`
+                var bal = paraTool.dechexToInt(event.data[2])
+
+                if (paraTool.isFloat(bal)) {
+                    // already float
+                } else if (paraTool.isInt(bal)) {
+                    bal = bal / 10 ** chainDecimals // always get here
+                }
+
+                if (decorateUSD) {
+                    let p = await this.computePriceUSD({
+                        val: bal,
+                        asset: targetAsset,
+                        chainID,
+                        ts
+                    })
+                    decodedData[2].symbol = chainSymbol
+                    decodedData[2].dataRaw = bal
+                    if (p) {
+                        decodedData[2].dataUSD = p.valUSD
+                        decodedData[2].priceUSD = p.priceUSD
+                        if (includeCurrentUSD) decodedData[2].priceUSDCurrent = p.priceUSDCurrent
+                    }
+                } else {
+                    decodedData[idx].symbol = chainSymbol
+                    decodedData[idx].dataRaw = bal
+                }
+            }
+            break;
+        }
+        if (decorateData) dEvent.decodedData = decodedData
+        return dEvent
+    }
+
     async decorate_assetState(assetInfo, state, flds, ts) {
         let targetAsset = assetInfo.asset;
         let totalUSDVal = 0;

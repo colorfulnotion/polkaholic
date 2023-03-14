@@ -3124,8 +3124,10 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 }
 
                 let events = [];
-                let extrinsics = b.extrinsics.map((ext) => {
-                    ext.events.forEach((e) => {
+                let extrinsics = b.extrinsics.map(async (ext) =>{
+                    ext.events.forEach(async (e) => {
+                        let dEvent = await this.decorateEvent(e, chainID, block.block_time, true, ["data", "address", "usd"], false)
+                        console.log(`${e.eventID} decoded`, dEvent)
                         events.push({
                             event_id: e.eventID,
                             extrinsic_hash: ext.extrinsicHash,
@@ -3135,7 +3137,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             block_hash: block.hash,
                             section: e.section,
                             method: e.method,
-                            data: e.data
+                            data: e.data,
+                            //decoded_data: null,
                         });
                         block.event_count++;
                     });
@@ -3165,7 +3168,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         });
                         block.transfer_count++;
                     }
-                    return {
+                    let extrinsic = {
                         hash: ext.extrinsicHash,
                         extrinsic_id: ext.extrinsicID,
                         block_time: block.block_time,
@@ -3181,6 +3184,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         signer_ss58: ext.signer ? ext.signer : null,
                         signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
                     }
+                    return extrinsic
                 });
                 let log_count = 0;
                 let logs = hdr.digest.logs.map((l) => {
