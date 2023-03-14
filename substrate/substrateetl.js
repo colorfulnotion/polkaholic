@@ -67,12 +67,13 @@ module.exports = class SubstrateETL extends AssetManager {
 
     // sets up system tables (independent of paraID) and paraID specific tables
     async setup_tables(chainID = null, execute = false) {
+        let projectID = `${this.project}`
         // setup "system" tables across all paraIDs
         if (chainID == null) {
             let systemtbls = ["xcmtransfers", "chains"];
             for (const tbl of systemtbls) {
                 let p = (this.partitioned_table(tbl)) ? "--time_partitioning_field block_time --time_partitioning_type DAY" : "";
-                let cmd = `bq mk  --project_id=substrate-etl  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}`
+                let cmd = `bq mk  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}`
                 try {
                     console.log(cmd);
                     //await exec(cmd);
@@ -95,7 +96,7 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const tbl of tbls) {
                 let fld = this.partitioned_table(tbl);
                 let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
-                let cmd = `bq mk  --project_id=substrate-etl  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
+                let cmd = `bq mk  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${relayChain}.${tbl}${paraID}`
                 if ((tbl == "evmtxs" || tbl == "evmtransfers") && rec.isEVM == 0) {
                     cmd = null;
                 }
@@ -115,6 +116,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async cleanReapedExcess(chainID) {
+        let projectID = `${this.project}`
         if (chainID == 2004 || chainID == 22023) {
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
@@ -123,7 +125,7 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const r of recs) {
                 let [logDT, hr] = paraTool.ts_to_logDT_hr(r.logTS);
                 let logYYYYMMDD = logDT.replaceAll('-', '')
-                let cmd = `bq query --destination_table '${relayChain}.balances${paraID}$${logYYYYMMDD}' --project_id=substrate-etl --time_partitioning_field ts --replace --use_legacy_sql=false 'select symbol,address_ss58,CONCAT(LEFT(address_pubkey, 2), RIGHT(address_pubkey, 40)) as address_pubkey,ts,id,chain_name,asset,para_id,free,free_usd,reserved,reserved_usd,misc_frozen,misc_frozen_usd,frozen,frozen_usd,price_usd from ${relayChain}.balances${paraID} where DATE(ts) = "${logDT}"'`
+                let cmd = `bq query --destination_table '${relayChain}.balances${paraID}$${logYYYYMMDD}' --project_id=${projectID} --time_partitioning_field ts --replace --use_legacy_sql=false 'select symbol,address_ss58,CONCAT(LEFT(address_pubkey, 2), RIGHT(address_pubkey, 40)) as address_pubkey,ts,id,chain_name,asset,para_id,free,free_usd,reserved,reserved_usd,misc_frozen,misc_frozen_usd,frozen,frozen_usd,price_usd from ${relayChain}.balances${paraID} where DATE(ts) = "${logDT}"'`
                 try {
                     console.log(cmd);
                     //await exec(cmd);
@@ -636,11 +638,12 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async load_bqlogfn(chainID, logDT, startTS) {
+        let projectID = `${this.project}`
         let logDTp = logDT.replaceAll("-", "")
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
         let fn = this.get_bqlogfn(chainID, logDT, startTS)
-        let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${relayChain}.balances${paraID}$${logDTp}' ${fn} schema/substrateetl/balances.json`
+        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${relayChain}.balances${paraID}$${logDTp}' ${fn} schema/substrateetl/balances.json`
 
         console.log(cmd);
         try {
@@ -1578,6 +1581,7 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async dump_substrateetl_xcmgar(startDT = "2023-02-28") {
         const relayChains = ["polkadot", "kusama"];
+        let projectID = `${this.project}`
 
         // fetch xcmgar data
         const axios = require("axios");
@@ -1610,7 +1614,8 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const tbl of system_tables) {
                 let fn = path.join(dir, `${relayChain}-${tbl}.json`)
                 let f = fs.openSync(fn, 'w', 0o666);
-                let fulltbl = `${this.project}:${relayChain}.${tbl}`;
+                let fulltbl = `${projectID}:${relayChain}.${tbl}`;
+                let projectID = `${projectID}`
                 if (tbl == "chains") {
                     let sql = `select id, chainName as chain_name, paraID para_id, ss58Format as ss58_prefix, symbol, isEVM as is_evm, isWASM as is_wasm from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' order by para_id`;
                     let recs = await this.poolREADONLY.query(sql)
@@ -1630,7 +1635,7 @@ module.exports = class SubstrateETL extends AssetManager {
                         fs.writeSync(f, JSON.stringify(c) + "\r\n");
                     }
                 }
-                let cmd = `bq load  --project_id=${this.project} --max_bad_records=1 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${fulltbl}' ${fn} schema/substrateetl/${tbl}.json`;
+                let cmd = `bq load  --project_id=${projectID} --max_bad_records=1 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${fulltbl}' ${fn} schema/substrateetl/${tbl}.json`;
                 console.log(cmd);
                 await exec(cmd);
             }
@@ -2258,11 +2263,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async dump_networkmetrics(network, logDT) {
+        let projectID = `${this.project}`
         if (network != "dotsama") {
             // not covering other networks yet
             return (false);
         }
-
         console.log(`dump_networkmetrics logDT=${logDT}`)
         let datasetID = 'dotsama'
         let bqjobs = []
@@ -2287,7 +2292,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
  group by address_pubkey`
 
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         tbl: tblName,
                         destinationTbl: destinationTbl,
@@ -2313,7 +2318,7 @@ prevDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_networ
 prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot left outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
 select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDayAll where address_pubkey not in (select address_pubkey from prevDayAll) order by polkadot_network_cnt desc;`
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         tbl: tblName,
                         destinationTbl: destinationTbl,
@@ -2340,7 +2345,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot left outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
                     select address_pubkey, polkadot_network_cnt, kusama_network_cnt, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts from prevDayAll where address_pubkey not in (select address_pubkey from currDayAll) group by address_pubkey, polkadot_network_cnt, kusama_network_cnt order by polkadot_network_cnt desc`
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         tbl: tblName,
                         destinationTbl: destinationTbl,
@@ -2361,7 +2366,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                                       currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot left outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey)
                                       select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDayAll order by polkadot_network_cnt desc;`
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         tbl: tblName,
                         destinationTbl: destinationTbl,
@@ -2416,6 +2421,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
     async dump_accountmetrics(relayChain, paraID, logDT) {
         console.log(`dump_accountmetrics logDT=${logDT}, ${relayChain}-${paraID}`)
+        let projectID = `${this.project}`
         let bqjobs = []
 
         // load new accounts
@@ -2456,7 +2462,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             currDay AS (SELECT address_ss58, address_pubkey, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58, address_pubkey)
                             SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, ts FROM currDay where address_pubkey not in (select address_pubkey from prevDay) order by address_pubkey`
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         chainID: chainID,
                         paraID: paraID,
@@ -2476,7 +2482,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             currDay AS (SELECT address_ss58, address_pubkey, min(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58, address_pubkey)
                             SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, ts FROM prevDay where address_pubkey in (select address_pubkey from currDay) order by address_pubkey`
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     //bqjobs.push({chainID: chainID, paraID: paraID, tbl: tblName, destinationTbl: destinationTbl, cmd: cmd})
                     break;
 
@@ -2490,7 +2496,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                      currDay AS (SELECT address_ss58, address_pubkey, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58, address_pubkey)
                 SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, ts FROM prevDay where address_pubkey not in (select address_pubkey from currDay) order by address_pubkey`
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         chainID: chainID,
                         paraID: paraID,
@@ -2510,7 +2516,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                                 currDay AS (SELECT address_ss58, address_pubkey, asset, concat(address_ss58, asset) address_asset, max(ts) as ts FROM \`substrate-etl.${relayChain}.balances${paraID}\` WHERE DATE(ts) = "${currDT}" group by address_ss58, address_pubkey, asset)
                                 SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, asset, ts FROM prevDay where address_asset not in (select address_asset from currDay) order by address_asset`
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         chainID: chainID,
                         paraID: paraID,
@@ -2542,7 +2548,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                          where address_ss58 is not null
                          group by address_ss58, address_pubkey, para_id, relay_chain order by address_pubkey`
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         chainID: chainID,
                         paraID: paraID,
@@ -2553,7 +2559,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     if (isEVM) {
                         let destinationTblEVM = `${datasetID}.accountsevmactive${paraID}$${logYYYYMMDD}`
                         targetSQL = `SELECT from_address, MAX(block_timestamp) as ts, count(*) transaction_count FROM \`substrate-etl.${relayChain}.evmtxs${paraID}\` where date(block_timestamp) = "${currDT}" group by from_address order by from_address`;
-                        cmd = `bq query --destination_table '${destinationTblEVM}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                        cmd = `bq query --destination_table '${destinationTblEVM}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                         bqjobs.push({
                             chainID: chainID,
                             paraID: paraID,
@@ -2583,7 +2589,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         SELECT "${paraID}" as para_id, "${relayChain}" as relay_chain, address_ss58, address_pubkey, Max(block_time) as ts from TransferAccount where address_ss58 not in (select address_ss58 from AcctiveAccount) and address_ss58 is not null group by address_ss58, address_pubkey, para_id, relay_chain order by address_pubkey;
                         `
                     partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         chainID: chainID,
                         paraID: paraID,
@@ -2604,7 +2610,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         WHERE DATE(block_timestamp) = "${currDT}" GROUP BY address union ALL (SELECT distinct from_address as address, Max(block_timestamp) as block_time from \`substrate-etl.${relayChain}.evmtransfers${paraID}\` where date(block_timestamp) = "${currDT}"  GROUP BY address))
 
                         SELECT "${paraID}" as para_id, "polkadot" as relay_chain, address, Max(block_time) as ts from TransferAccount where address not in (select address from AcctiveAccount) and address is not null group by address, para_id, relay_chain order by address;`;
-                        cmd = `bq query --destination_table '${destinationTblEVM}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                        cmd = `bq query --destination_table '${destinationTblEVM}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                         bqjobs.push({
                             chainID: chainID,
                             paraID: paraID,
@@ -2744,7 +2750,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             fs.writeSync(f, JSON.stringify(e) + NL);
         });
         // 4. load into bq
-        let cmd = `bq load --project_id=${this.project} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+        let projectID = `${this.project}`
+        let cmd = `bq load --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
         try {
             console.log(cmd);
             await exec(cmd);
@@ -2782,7 +2789,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 console.log(e)
             }
         });
-        cmd = `bq load --project_id=${this.project} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+        cmd = `bq load --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
         try {
             console.log(cmd);
             await exec(cmd);
@@ -2901,6 +2908,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
     }
 
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+        let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let chain = await this.getChain(chainID);
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back
@@ -3281,9 +3289,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             for (const tbl of tbls) {
                 fs.closeSync(f[tbl]);
                 let logDTp = logDT.replaceAll("-", "")
-                let cmd = `bq load  --project_id=${this.project} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
+                let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 if (tbl == "specversions") {
-                    cmd = `bq load  --project_id=${this.project} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
+                    cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 }
                 try {
                     console.log(cmd);
@@ -3321,7 +3329,7 @@ outgoingTransfers as (SELECT token_address, from_address as account_address, con
 transfersCombined as (Select * from incomingTransfer union all select * from outgoingTransfers order by account_address)
 select token_address, account_address, sum(value) as value, sum(valuein) as receivedValue, sum(valueout) as sentValue, sum(valueCnt) as transferCnt , min(ts) as ts from transfersCombined group by token_address, account_address order by token_address`
                 partitionedFld = 'ts'
-                let bqCmd = `bq query --destination_table '${destinationTbl}' --project_id=substrate-etl --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                let bqCmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                 console.log(`${tblName}***\n\n${bqCmd}`)
                 await exec(bqCmd);
             } catch (e) {
@@ -3498,11 +3506,12 @@ let topNgroups = ["balanceUSD", "numChains", "numAssets", "numTransfersIn", "avg
     }
 
     async getAlltables(filter = 'accounts') {
+        let projectID = `${this.project}`
         let relayChains = ['kusama', 'polkadot']
         let bqCmds = []
         let fullTableIDs = []
         for (const rc of relayChains) {
-            let bqCmd = `bq ls --max_results 1000 --project_id="substrate-etl" --dataset_id="${rc}" --format=json`
+            let bqCmd = `bq ls --max_results 1000 --project_id=${projectID} --dataset_id="${rc}" --format=json`
             let res = await exec(bqCmd)
             try {
                 if (res.stdout && res.stderr == '') {
