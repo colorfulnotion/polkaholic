@@ -3137,7 +3137,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let extrinsics = b.extrinsics.map(async (ext) =>{
                     ext.events.forEach(async (e) => {
                         let dEvent = await this.decorateEvent(e, chainID, block.block_time, true, ["data", "address", "usd"], false)
-                        console.log(`${e.eventID} decoded`, dEvent)
+                        //console.log(`${e.eventID} decoded`, dEvent)
                         if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
                             if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
                                 if (dEvent.data[0].weight.refTime != undefined) {
@@ -3239,6 +3239,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         if (typeof e.section == "string" && typeof e.method == "string") {
                             fs.writeSync(f["extrinsics"], JSON.stringify(e) + NL);
                         } else {
+                            console.log(`++e`, e)
                             console.log(`update chain${chainID} set crawlBlock = 1, attempted=0  where blockNumber = ${e.block_number};`);
                         }
                     });

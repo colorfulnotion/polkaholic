@@ -1631,7 +1631,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         return feeUSD
     }
 
-    async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"], includeCurrentUSD = true) {
+    async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"], isSubtrateETL = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         if (!decorate || !decorateData) return event
 
@@ -1695,12 +1695,11 @@ module.exports = class AssetManager extends PolkaholicDB {
                 var targetAsset = `{"Token":"${chainSymbol}"}`
                 //console.log("targetAsset", targetAsset)
                 for (const idx of idxs) {
-                    var bal = paraTool.dechexToInt(event.data[idx])
-                    if (paraTool.isFloat(bal)) {
-                        // already float
-                    } else if (paraTool.isInt(bal)) {
-                        bal = bal / 10 ** chainDecimals // always get here
-                    }
+                    let dataVal = event.data[idx]
+                    let bal = paraTool.toBn(dataVal)
+                    decodedData[idx].data = bal.toString() // convert dec, '0x...' to 'intStr'
+                    //var bal = paraTool.dechexToInt(dataVal) //
+                    bal = bal / 10 ** chainDecimals // always get here
                     if (decorateUSD) {
                         let p = await this.computePriceUSD({
                             val: bal,
@@ -1713,7 +1712,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                         if (p) {
                             decodedData[idx].dataUSD = p.valUSD
                             decodedData[idx].priceUSD = p.priceUSD
-                            if (includeCurrentUSD) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
+                            if (isSubtrateETL) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
                         }
                     } else {
                         decodedData[idx].symbol = chainSymbol
@@ -1730,13 +1729,12 @@ module.exports = class AssetManager extends PolkaholicDB {
                 var chainSymbol = this.getChainSymbol(chainID)
                 var chainDecimals = this.getChainDecimal(chainID)
                 var targetAsset = `{"Token":"${chainSymbol}"}`
-                var bal = paraTool.dechexToInt(event.data[2])
 
-                if (paraTool.isFloat(bal)) {
-                    // already float
-                } else if (paraTool.isInt(bal)) {
-                    bal = bal / 10 ** chainDecimals // always get here
-                }
+                let dataVal = event.data[2]
+                var bal = paraTool.toBn(dataVal)
+                //var bal = paraTool.dechexToInt(event.data[2])
+                decodedData[2].data = bal.toString() // convert dec, '0x...' to 'intStr'
+                bal = bal / 10 ** chainDecimals // always get here
                 if (decorateUSD) {
                     var p = await this.computePriceUSD({
                         val: bal,
@@ -1749,7 +1747,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     if (p) {
                         decodedData[2].dataUSD = p.valUSD
                         decodedData[2].priceUSD = p.priceUSD
-                        if (includeCurrentUSD) decodedData[2].priceUSDCurrent = p.priceUSDCurrent
+                        if (isSubtrateETL) decodedData[2].priceUSDCurrent = p.priceUSDCurrent
                     }
                 } else {
                     decodedData[2].symbol = chainSymbol

@@ -105,6 +105,15 @@ function q(inp) {
     return ("'" + inp + "'");
 }
 
+function toIntegerStr(n){
+    var b = bnToBn(n)
+    return b.toString()
+}
+
+function toBn(n){
+    return bnToBn(n)
+}
+
 function dechexToInt(number) {
     if (number && typeof number == "string" && (number.length > 2) && number.substring(0, 2) == "0x") {
         return parseInt(number);
@@ -1572,6 +1581,8 @@ module.exports = {
     dechexToInt: function(number) {
         return dechexToInt(number);
     },
+    toIntegerStr: toIntegerStr,
+    toBn: toBn,
     dechexAssetID: function(number) {
         return dechexAssetID(number);
     },
