@@ -2912,6 +2912,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let chain = await this.getChain(chainID);
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back
+        console.log(`dump_substrateetl paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, logDT=${logDT} (projectID=${projectID}), tbls=${tbls}`)
         if (chain.isEVM) {
             tbls.push("evmtxs");
             tbls.push("evmtransfers");
@@ -2941,7 +2942,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             console.log("openSync", fn[tbl]);
             f[tbl] = fs.openSync(fn[tbl], 'w', 0o666);
         }
-        let bqDataset = relayChain
+        //let bqDataset = relayChain
+        let bqDataset = `${relayChain}_dev` //MK: TEST ONLY
 
         // 3. setup specversions
         const tableChain = this.getTableChain(chainID);
@@ -3135,7 +3137,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let extrinsics = b.extrinsics.map(async (ext) =>{
                     ext.events.forEach(async (e) => {
                         let dEvent = await this.decorateEvent(e, chainID, block.block_time, true, ["data", "address", "usd"], false)
-                        //console.log(`${e.eventID} decoded`, dEvent)
+                        console.log(`${e.eventID} decoded`, dEvent)
                         if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
                             if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
                                 if (dEvent.data[0].weight.refTime != undefined) {
@@ -3198,6 +3200,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         params: ext.params,
                         fee: ext.fee,
                         fee_usd: feeUSD,
+                        //amounts: null
+                        //amount_usd: null,
                         weight: (ext.weight != undefined)? ext.weight: null, // TODO: ext.weight,
                         signed: ext.signer ? true : false,
                         signer_ss58: ext.signer ? ext.signer : null,

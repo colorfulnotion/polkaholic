@@ -1755,44 +1755,6 @@ module.exports = class AssetManager extends PolkaholicDB {
                     decodedData[2].symbol = chainSymbol
                     decodedData[2].dataRaw = bal
                 }
-
-            }
-            break;
-
-            case "crowdloan:Contributed": //accountID, paraID, balance
-            {
-                let paraInfo = this.getParaInfo(event.data[1], chainID)
-                decodedData[1].projectName = paraInfo.name
-                decodedData[1].relayChain = paraInfo.relayChain
-                var chainSymbol = this.getChainSymbol(chainID)
-                var chainDecimals = this.getChainDecimal(chainID)
-                var targetAsset = `{"Token":"${chainSymbol}"}`
-                var bal = paraTool.dechexToInt(event.data[2])
-
-                if (paraTool.isFloat(bal)) {
-                    // already float
-                } else if (paraTool.isInt(bal)) {
-                    bal = bal / 10 ** chainDecimals // always get here
-                }
-
-                if (decorateUSD) {
-                    let p = await this.computePriceUSD({
-                        val: bal,
-                        asset: targetAsset,
-                        chainID,
-                        ts
-                    })
-                    decodedData[2].symbol = chainSymbol
-                    decodedData[2].dataRaw = bal
-                    if (p) {
-                        decodedData[2].dataUSD = p.valUSD
-                        decodedData[2].priceUSD = p.priceUSD
-                        if (includeCurrentUSD) decodedData[2].priceUSDCurrent = p.priceUSDCurrent
-                    }
-                } else {
-                    decodedData[idx].symbol = chainSymbol
-                    decodedData[idx].dataRaw = bal
-                }
             }
             break;
         }

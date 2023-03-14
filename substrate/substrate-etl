@@ -39,7 +39,7 @@ async function main() {
             let logDT = opt.logDT;
             let paraID = opt.paraID;
             let relayChain = opt.relayChain;
-            if (logDT && paraID && relayChain) {
+            if (logDT && relayChain && paraID != undefined) {
                 await substrateetl.dump_substrateetl(logDT, paraID, relayChain);
                 process.exit(0);
             }
