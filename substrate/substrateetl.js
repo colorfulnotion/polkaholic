@@ -3128,6 +3128,15 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     ext.events.forEach(async (e) => {
                         let dEvent = await this.decorateEvent(e, chainID, block.block_time, true, ["data", "address", "usd"], false)
                         //console.log(`${e.eventID} decoded`, dEvent)
+                        if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
+                            if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
+                                if (dEvent.data[0].weight.refTime != undefined) {
+                                    ext.weight = dEvent.data[0].weight.refTime;
+                                } else if (!isNaN(dEvent.data[0].weight)) {
+                                    ext.weight = dEvent.data[0].weight;
+                                }
+                            }
+                        }
                         events.push({
                             event_id: e.eventID,
                             extrinsic_hash: ext.extrinsicHash,
@@ -3181,12 +3190,12 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         params: ext.params,
                         fee: ext.fee,
                         fee_usd: feeUSD,
-                        weight: null, // TODO: ext.weight,
+                        weight: (ext.weight != undefined)? ext.weight: null, // TODO: ext.weight,
                         signed: ext.signer ? true : false,
                         signer_ss58: ext.signer ? ext.signer : null,
                         signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
                     }
-                    console.log(`extrinsic`, extrinsic)
+                    //console.log(`extrinsic`, extrinsic)
                     return extrinsic
                 });
                 let log_count = 0;
