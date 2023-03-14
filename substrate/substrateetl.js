@@ -3134,6 +3134,90 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 }
 
                 let events = [];
+
+                let extrinsics = [];
+                for (const ext of b.extrinsics){
+                    for (const ev of ext.events){
+                        let dEvent = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
+                        //console.log(`${e.eventID} decoded`, dEvent)
+                        if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
+                            if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
+                                if (dEvent.data[0].weight.refTime != undefined) {
+                                    ext.weight = dEvent.data[0].weight.refTime;
+                                } else if (!isNaN(dEvent.data[0].weight)) {
+                                    ext.weight = dEvent.data[0].weight;
+                                }
+                            }
+                        }
+                        let bqEvent = {
+                            event_id: ev.eventID,
+                            extrinsic_hash: ext.extrinsicHash,
+                            extrinsic_id: ext.extrinsicID,
+                            block_number: block.number,
+                            block_time: block.block_time,
+                            block_hash: block.hash,
+                            section: ev.section,
+                            method: ev.method,
+                            data: ev.data,
+                            data_decoded: (dEvent && dEvent.decodedData != undefined)? dEvent.decodedData: null,
+                        }
+                        events.push(bqEvent);
+                        block.event_count++;
+                    }
+                    if (ext.transfers) {
+                        for (const t of ext.transfers){
+                            let bqTransfer = {
+                                block_hash: block.hash,
+                                block_number: block.number,
+                                block_time: block.block_time,
+                                extrinsic_hash: ext.extrinsicHash,
+                                extrinsic_id: ext.extrinsicID,
+                                event_id: t.eventID,
+                                section: t.section,
+                                method: t.method,
+                                from_ss58: t.from,
+                                to_ss58: t.to,
+                                from_pub_key: t.fromAddress,
+                                to_pub_key: t.toAddress,
+                                amount: t.amount,
+                                raw_amount: t.rawAmount,
+                                asset: t.asset,
+                                price_usd: t.priceUSD,
+                                amount_usd: t.amountUSD,
+                                symbol: t.symbol,
+                                decimals: t.decimals
+                            }
+                            transfers.push(bqTransfer);
+                        }
+                        ext.transfers.forEach((t) => {
+                            transfers.push();
+                            block.transfer_count++; //MK: review transfer definition. should it be transfer count or num extrinsic that has transfer?
+                        });
+                    }
+                    let feeUSD = await this.computeExtrinsicFeeUSD(ext)
+                    let bqExtrinsic = {
+                        hash: ext.extrinsicHash,
+                        extrinsic_id: ext.extrinsicID,
+                        block_time: block.block_time,
+                        block_number: block.number,
+                        block_hash: block.hash,
+                        lifetime: ext.lifetime,
+                        section: ext.section,
+                        method: ext.method,
+                        params: ext.params,
+                        fee: ext.fee,
+                        fee_usd: feeUSD,
+                        //amounts: null
+                        //amount_usd: null,
+                        weight: (ext.weight != undefined)? ext.weight: null, // TODO: ext.weight,
+                        signed: ext.signer ? true : false,
+                        signer_ss58: ext.signer ? ext.signer : null,
+                        signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
+                    }
+                    //console.log(`bqExtrinsic`, bqExtrinsic)
+                    extrinsics.push(bqExtrinsic);
+                }
+                /*
                 let extrinsics = b.extrinsics.map(async (ext) =>{
                     ext.events.forEach(async (e) => {
                         let dEvent = await this.decorateEvent(e, chainID, block.block_time, true, ["data", "address", "usd"], false)
@@ -3210,6 +3294,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     //console.log(`extrinsic`, extrinsic)
                     return extrinsic
                 });
+                */
                 let log_count = 0;
                 let logs = hdr.digest.logs.map((l) => {
                     let logID = `${block.number}-${log_count}`
