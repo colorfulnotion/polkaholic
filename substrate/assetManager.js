@@ -1604,6 +1604,33 @@ module.exports = class AssetManager extends PolkaholicDB {
         return dd
     }
 
+    async computeExtrinsicFeeUSD(ext){
+        let feeUSD = null
+        try {
+            let fee = ext.fee // adjusted with decimals
+            let ts = ext.ts
+            if (fee == 0){
+                return 0
+            }
+            let chainID = ext.chainID
+            let chainSymbol = this.getChainSymbol(chainID)
+            let chainDecimals = this.getChainDecimal(chainID)
+            let targetAsset = `{"Token":"${chainSymbol}"}`
+            let p = await this.computePriceUSD({
+                val: fee,
+                asset: targetAsset,
+                chainID: chainID,
+                ts: ts
+            })
+            if (p){
+                feeUSD = p.priceUSD * fee
+            }
+        } catch (e){
+            return null
+        }
+        return feeUSD
+    }
+
     async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"], includeCurrentUSD = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         if (!decorate || !decorateData) return event

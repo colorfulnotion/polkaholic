@@ -3127,7 +3127,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let extrinsics = b.extrinsics.map(async (ext) =>{
                     ext.events.forEach(async (e) => {
                         let dEvent = await this.decorateEvent(e, chainID, block.block_time, true, ["data", "address", "usd"], false)
-                        console.log(`${e.eventID} decoded`, dEvent)
+                        //console.log(`${e.eventID} decoded`, dEvent)
                         events.push({
                             event_id: e.eventID,
                             extrinsic_hash: ext.extrinsicHash,
@@ -3138,7 +3138,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             section: e.section,
                             method: e.method,
                             data: e.data,
-                            //decoded_data: null,
+                            data_decoded: (dEvent && dEvent.decodedData != undefined)? dEvent.decodedData: null,
                         });
                         block.event_count++;
                     });
@@ -3168,6 +3168,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         });
                         block.transfer_count++;
                     }
+                    let feeUSD = await this.computeExtrinsicFeeUSD(ext)
                     let extrinsic = {
                         hash: ext.extrinsicHash,
                         extrinsic_id: ext.extrinsicID,
@@ -3179,11 +3180,13 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         method: ext.method,
                         params: ext.params,
                         fee: ext.fee,
+                        fee_usd: feeUSD,
                         weight: null, // TODO: ext.weight,
                         signed: ext.signer ? true : false,
                         signer_ss58: ext.signer ? ext.signer : null,
                         signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
                     }
+                    console.log(`extrinsic`, extrinsic)
                     return extrinsic
                 });
                 let log_count = 0;
