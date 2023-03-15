@@ -2391,6 +2391,138 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
     }
 
+    getLogDTRange(startLogDT = null, endLogDT = null, isAscending = true){
+        let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0)
+        let [startDT, _] = paraTool.ts_to_logDT_hr(startLogTS);
+        if (startLogDT == null) {
+            //startLogDT = (relayChain == "kusama") ? "2021-07-01" : "2022-05-04";
+            startLogDT = "2023-02-01"
+        }
+        let ts = this.getCurrentTS();
+        if (endLogDT != undefined) {
+            let endTS = paraTool.logDT_hr_to_ts(endLogDT, 0) + 86400
+            if (ts > endTS) ts = endTS
+        }
+        let logDTRange = []
+        while (true) {
+            ts = ts - 86400;
+            let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
+            logDTRange.push(logDT)
+            if (logDT == startDT) {
+                 break;
+            }
+        }
+        if (isAscending){
+            return logDTRange.reverse();
+        }else{
+            return logDTRange
+        }
+    }
+
+    async is_dump_ready(logDT, dumpType = 'accountmetrics', opt = {}) {
+        let chainID = false
+        let status = 'NotReady'
+        if (opt.paraID != undefined && opt.relayChain != undefined){
+            chainID = paraTool.getChainIDFromParaIDAndRelayChain(opt.paraID , opt.relayChain)
+            opt.chainID = chainID
+        }
+        let sql = null
+        let recs = []
+        //accountMetricsStatus, updateAddressBalanceStatus, crowdloanMetricsStatus, sourceMetricsStatus, poolsMetricsStatus, identityMetricsStatus, loaded
+        switch (dumpType){
+            case "dotsama_crowdloan":
+                sql = `select crowdloanMetricsStatus from blocklog where chainID in (0, 2) and logDT = '${logDT}';`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 2) {
+                    let cnt = 0
+                    for (const rec of recs){
+                        status = rec.crowdloanMetricsStatus
+                        if (rec.crowdloanMetricsStatus == "AuditRequired"){
+                            cnt++
+                        }
+                    }
+                    if (cnt == 2) return (true);
+                }
+                break;
+            case "substrate-etl":
+                // how to check if dump substrate-etl is ready?
+                sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded >= 0 and logDT = '${logDT}' and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and chain.chainID = ${chainID} order by rand() limit 1`;
+                recs = await this.poolREADONLY.query(sql);
+                console.log("get_substrate-etl ready", sql);
+                if (recs.length == 1) {
+                    if (recs[0].loaded){
+                        status = 'Loaded'
+                    }else{
+                        return (true);
+                    }
+                }
+                break;
+            case "balances":
+                sql = `select updateAddressBalanceStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 1) {
+                    status = recs[0].updateAddressBalanceStatus
+                    if (status == 'Ready') return (true);
+                }
+                break;
+            case "networkmetrics":
+                // how to check if dump substrate-etl is ready?
+                let _network = opt.network
+                if (_network){
+                    sql = `select UNIX_TIMESTAMP(logDT) indexTS, logDT, networklog.network, network.isEVM, networkMetricsStatus from networklog, network where network.network = networklog.network and logDT = '${logDT}' and network.network = '${_network}' limit 1`
+                    recs = await this.poolREADONLY.query(sql);
+                    console.log("networkmetrics ready", sql);
+                    if (recs.length == 1) {
+                        status = recs[0].networkMetricsStatus
+                        if (status == 'Ready') return (true);
+                    }
+                }
+                break;
+            case "accountmetrics":
+                sql = `select accountMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 1) {
+                    status = recs[0].accountMetricsStatus
+                    if (status == 'Ready') return (true);
+                }
+                break;
+            case "crowdloan":
+                sql = `select crowdloanMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 1) {
+                    status = recs[0].crowdloanMetricsStatus
+                    if (status == 'Ready') return (true);
+                }
+                break;
+            case "sources":
+                sql = `select sourceMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 1) {
+                    status = recs[0].sourceMetricsStatus
+                    if (status == 'Ready') return (true);
+                }
+                break;
+            case "pools":
+                sql = `select poolsMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 1) {
+                    status = recs[0].poolsMetricsStatus
+                    if (status == 'Ready') return (true);
+                }
+                break;
+            case "idendity":
+                sql = `select identityMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 1) {
+                    status = recs[0].identityMetricsStatus
+                    if (status == 'Ready') return (true);
+                }
+                break;
+        }
+        console.log(`dumpType=${dumpType} [OPT=${JSON.stringify(opt)}, DT=${logDT}] Status=${status}`)
+        return (false);
+    }
+
     async is_accountmetrics_ready(relayChain, paraID, logDT) {
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
         let sql = `select accountMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}' and accountMetricsStatus = 'Ready'`
@@ -2400,6 +2532,82 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
         return (false);
 
+    }
+
+    async dump_dotsama_crowdloan(logDT) {
+        let paraID = 0
+        let projectID = `${this.project}`
+        let bqDataset = (this.isProd)? `dotsama`: `dotsama_dev`
+        let bqDataset_txra = (this.isProd)? ``: `_dev` //MK write to relay_dev for dev
+        let bqjobs = []
+        console.log(`dump_dotsama_crowdloan logDT=${logDT}, projectID=${projectID}, bqDataset=${bqDataset}, bqDataset_txra=${bqDataset_txra}`)
+
+        // load new accounts
+        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
+        let logYYYYMMDD = logDT.replaceAll('-', '')
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
+        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
+
+        let accountTbls = ["accountscrowdloan"]
+
+        for (const tbl of accountTbls) {
+            let datasetID = bqDataset
+            let tblName = `${tbl}`
+            let destinationTbl = `${datasetID}.${tblName}$${logYYYYMMDD}`
+            let targetSQL, partitionedFld, cmd;
+            switch (tbl) {
+                case "accountscrowdloan":
+                    /* Crowdloan
+                    With CrowdloanP as (SELECT contributor_pubkey, sum(contribution) contribution_p, sum(contribution_usd) contribution_value_usd_p,  ARRAY_TO_STRING(ARRAY_AGG(distinct(concat("polkadot-",paraID)) order by concat("polkadot-",paraID) asc),',') crowdloans_chains_p, ARRAY_TO_STRING(ARRAY_AGG((concat("0-",extrinsic_id)) order by concat("0-",extrinsic_id) asc ),',') crowdloans_extrinsic_id_p, count(distinct(paraID)) crowdloans_num_chains_p, count(*) crowdloans_num_contributions_p, max(ts) as last_contibution_ts_p FROM `substrate-etl.polkadot_dev.crowdloan` WHERE DATE(ts) = "2021-11-11" group by contributor_pubkey),
+                    CrowdloanK as (SELECT contributor_pubkey, sum(contribution) contribution_k, sum(contribution_usd) contribution_value_usd_k,  ARRAY_TO_STRING(ARRAY_AGG(distinct(concat("kusama-",paraID)) order by concat("kusama-",paraID) asc ),',') crowdloans_chains_k, ARRAY_TO_STRING(ARRAY_AGG((concat("2-",extrinsic_id)) order by concat("2-",extrinsic_id) asc ),',') crowdloans_extrinsic_id_k, count(distinct(paraID)) crowdloans_num_chains_k, count(*) crowdloans_num_contributions_k, max(ts) as last_contibution_ts_k FROM `substrate-etl.kusama_dev.crowdloan` WHERE DATE(ts) = "2011-11-11" group by contributor_pubkey),
+                    Crowdloan as (
+                    select contributor_pubkey, sum(contribution_k) contribution_KSM, sum(contribution_p) contribution_DOT, sum(ifNull(contribution_value_usd_p,0)+ ifNull(contribution_value_usd_k,0)) contribution_value_usd, sum(ifNull(crowdloans_num_chains_p,0)+ ifNull(crowdloans_num_chains_k,0)) crowdloans_num_chains, sum(ifNull(crowdloans_num_contributions_p,0)+ ifNull(crowdloans_num_contributions_k,0)) crowdloans_num_contributions,
+                    max(concat(if(crowdloans_chains_p is null,'', crowdloans_chains_p),if(crowdloans_chains_k is not null,concat(',',crowdloans_chains_k),''))) crowdloans_chains,
+                    max(concat(if(crowdloans_extrinsic_id_p is null,'', crowdloans_extrinsic_id_p),if(crowdloans_extrinsic_id_k is not null,concat(',',crowdloans_extrinsic_id_k),''))) crowdloans_extrinsic_id,
+                    max(IFNULL(last_contibution_ts_k, last_contibution_ts_p)) ts, max(IFNULL(last_contibution_ts_p, last_contibution_ts_k)) ts2
+                    from CrowdloanP FULL OUTER JOIN CrowdloanK USING (contributor_pubkey) group by contributor_pubkey order by crowdloans_num_chains desc)
+                    select contributor_pubkey as address_pubkey, contribution_KSM as crowdloan_contribution_KSM, contribution_DOT as crowdloan_contribution_DOT, contribution_value_usd as crowdloan_value_usd, crowdloans_num_chains, crowdloans_num_contributions, split(crowdloans_chains) crowdloans_chains, split(crowdloans_extrinsic_id) crowdloans_extrinsic_id, if(ts > ts2, ts, ts2) as ts from Crowdloan order by address_pubkey
+                    */
+                    targetSQL = `With CrowdloanP as (SELECT contributor_pubkey, sum(contribution) contribution_p, sum(contribution_usd) contribution_value_usd_p,  ARRAY_TO_STRING(ARRAY_AGG(distinct(concat("polkadot-",paraID)) order by concat("polkadot-",paraID) asc),",") crowdloans_chains_p, ARRAY_TO_STRING(ARRAY_AGG((concat("0-",extrinsic_id)) order by concat("0-",extrinsic_id) asc ),",") crowdloans_extrinsic_id_p, count(distinct(paraID)) crowdloans_num_chains_p, count(*) crowdloans_num_contributions_p, max(ts) as last_contibution_ts_p FROM \`${projectID}.polkadot${bqDataset_txra}.crowdloan\` WHERE DATE(ts) = "${currDT}" group by contributor_pubkey),
+                    CrowdloanK as (SELECT contributor_pubkey, sum(contribution) contribution_k, sum(contribution_usd) contribution_value_usd_k,  ARRAY_TO_STRING(ARRAY_AGG(distinct(concat("kusama-",paraID)) order by concat("kusama-",paraID) asc ),",") crowdloans_chains_k, ARRAY_TO_STRING(ARRAY_AGG((concat("2-",extrinsic_id)) order by concat("2-",extrinsic_id) asc ),",") crowdloans_extrinsic_id_k, count(distinct(paraID)) crowdloans_num_chains_k, count(*) crowdloans_num_contributions_k, max(ts) as last_contibution_ts_k FROM \`substrate-etl.kusama${bqDataset_txra}.crowdloan\` WHERE DATE(ts) = "${currDT}" group by contributor_pubkey),
+                    Crowdloan as (
+                    select contributor_pubkey, sum(contribution_k) contribution_KSM, sum(contribution_p) contribution_DOT, sum(ifNull(contribution_value_usd_p,0)+ ifNull(contribution_value_usd_k,0)) contribution_value_usd, sum(ifNull(crowdloans_num_chains_p,0)+ ifNull(crowdloans_num_chains_k,0)) crowdloans_num_chains, sum(ifNull(crowdloans_num_contributions_p,0)+ ifNull(crowdloans_num_contributions_k,0)) crowdloans_num_contributions,
+                    max(concat(if(crowdloans_chains_p is null,"", crowdloans_chains_p),if(crowdloans_chains_k is not null,concat(",",crowdloans_chains_k),""))) crowdloans_chains,
+                    max(concat(if(crowdloans_extrinsic_id_p is null,"", crowdloans_extrinsic_id_p),if(crowdloans_extrinsic_id_k is not null,concat(",",crowdloans_extrinsic_id_k),""))) crowdloans_extrinsic_id,
+                    max(IFNULL(last_contibution_ts_k, last_contibution_ts_p)) ts, max(IFNULL(last_contibution_ts_p, last_contibution_ts_k)) ts2
+                    from CrowdloanP FULL OUTER JOIN CrowdloanK USING (contributor_pubkey) group by contributor_pubkey order by crowdloans_num_chains desc)
+                    select contributor_pubkey as address_pubkey, contribution_KSM as crowdloan_contribution_KSM, contribution_DOT as crowdloan_contribution_DOT, contribution_value_usd as crowdloan_value_usd, crowdloans_num_chains, crowdloans_num_contributions, split(crowdloans_chains) crowdloans_chains, split(crowdloans_extrinsic_id) crowdloans_extrinsic_id, if(ts > ts2, ts, ts2) as ts from Crowdloan order by address_pubkey`
+                    partitionedFld = 'ts'
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    bqjobs.push({
+                        tbl: tblName,
+                        destinationTbl: destinationTbl,
+                        cmd: cmd
+                    })
+                    break;
+                default:
+            }
+        }
+        let errloadCnt = 0
+        let isDry = false;
+        for (const bqjob of bqjobs) {
+            try {
+                if (isDry) {
+                    console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                } else {
+                    console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                    //await exec(bqjob.cmd);
+                }
+            } catch (e) {
+                errloadCnt++
+                this.logger.error({
+                    "op": "dump_dotsama_crowdloan",
+                    e
+                })
+            }
+        }
+        //await this.update_batchedSQL();
+        return true
     }
 
     async dump_crowdloan(relayChain, logDT) {
