@@ -2235,16 +2235,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-
-    async update_networklog(network, logDT) {
+    async update_networklog(network, logDT, jobStartTS = 0) {
         let project = this.project;
         let sqla = {
-            // TODO: union across polkadot + kusama
-            //"extrinsics": `select count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics from ${project}.${relayChain}.extrinsics* where date(block_time) = '${logDT}'`,
-            //"events": `select count(*) as numEvents from substrate-etl.${relayChain}.events* where date(block_time) = '${logDT}'`,
-            //"transfers": `select count(*) as numTransfers, count(distinct from_pub_key) numAccountsTransfersOut, count(distinct to_pub_key) numAccountsTransfersIn, sum(if(amount_usd is null, 0, amount_usd)) valueTransfersUSD from substrate-etl.${relayChain}.transfers* where date(block_time) = '${logDT}'`,
-            //"xcmtransfers0": `select count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${relayChain}.xcmtransfers where destination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`,
-            //"xcmtransfers1": `select count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${relayChain}.xcmtransfers where origination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`,
             "accountsall": `select count(*) as numAddresses from substrate-etl.dotsama.accountsall where date(ts) = '${logDT}'`,
             "accountsnew": `select count(distinct address_pubkey) as numNewAccounts from substrate-etl.dotsama.accountsnew where date(ts) = '${logDT}'`,
             "accountsreaped": `select count(distinct address_pubkey) as numReapedAccounts from substrate-etl.dotsama.accountsreaped where date(ts) = '${logDT}'`,
@@ -2265,8 +2258,10 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 }
             }
         }
+	let elapsedSeconds = this.getCurrentTS() - jobStartTS;
         vals.push(` loadDT=Now()`);
         vals.push(` networkMetricsStatus = "AuditRequired" `);
+        vals.push(` networkMetricsElapsedSeconds = "${elapsedSeconds}" `);
         let sql = `update networklog set ` + vals.join(",") + `  where network = '${network}' and logDT = '${logDT}'`
         console.log(sql)
         this.batchedSQL.push(sql);
@@ -2274,6 +2269,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async dump_networkmetrics(network, logDT) {
+	let jobTS = this.getCurrentTS();
         let projectID = `${this.project}`
         if (network != "dotsama") {
             // not covering other networks yet
@@ -2301,7 +2297,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
  WHERE DATE(ts) = "${currDT}" group by address_pubkey))
  select address_pubkey, TIMESTAMP_SECONDS(${logTS}) as ts, sum(polkadot_active_cnt) polkadot_active_cnt, sum(kusama_active_cnt) kusama_active_cnt from pk
  group by address_pubkey`
-
                     partitionedFld = 'ts'
                     cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
@@ -2311,22 +2306,12 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     })
                     break;
                 case "new":
-                    /* New Dotsama User (by account)
-                    WITH
-                    currDayPolkadot AS (SELECT address_pubkey, count(distinct(para_id)) polkadot_network_cnt, min(ts) as ts FROM `substrate-etl.polkadot.balances*` WHERE DATE(ts) = "2023-02-15" group by address_pubkey),
-                    currDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM `substrate-etl.kusama.balances*` WHERE DATE(ts) = "2023-02-15" group by address_pubkey),
-                    currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot left outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey),
-                    prevDayPolkadot AS (SELECT address_pubkey,  count(distinct(para_id)) polkadot_network_cnt, min(ts) as ts FROM `substrate-etl.polkadot.balances*` WHERE DATE(ts) = "2023-02-14" group by address_pubkey),
-                    prevDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM `substrate-etl.kusama.balances*` WHERE DATE(ts) = "2023-02-14" group by address_pubkey),
-                    prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot left outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
-                    select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDayAll where address_pubkey not in (select address_pubkey from prevDayAll) order by polkadot_network_cnt desc;
-                    */
                     targetSQL = `WITH currDayPolkadot AS (SELECT address_pubkey, count(distinct(para_id)) polkadot_network_cnt, min(ts) as ts FROM \`substrate-etl.polkadot.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
 currDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM \`substrate-etl.kusama.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
-currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot left outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey),
+currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot full outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey),
 prevDayPolkadot AS (SELECT address_pubkey,  count(distinct(para_id)) polkadot_network_cnt, min(ts) as ts FROM \`substrate-etl.polkadot.balances*\` WHERE DATE(ts) = "${prevDT}" group by address_pubkey),
 prevDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM \`substrate-etl.kusama.balances*\` WHERE DATE(ts) = "${prevDT}" group by address_pubkey),
-prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot left outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
+prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot full outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
 select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDayAll where address_pubkey not in (select address_pubkey from prevDayAll) order by polkadot_network_cnt desc;`
                     partitionedFld = 'ts'
                     cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
@@ -2338,22 +2323,12 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     break;
 
                 case "reaped":
-                    /*
-                    WITH
-                    currDayPolkadot AS (SELECT address_pubkey, count(distinct(para_id)) polkadot_network_cnt, max(ts) as ts FROM `substrate-etl.polkadot.balances*` WHERE DATE(ts) = "2023-02-15" group by address_pubkey),
-                    currDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM `substrate-etl.kusama.balances*` WHERE DATE(ts) = "2023-02-15" group by address_pubkey),
-                    currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot left outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey),
-                    prevDayPolkadot AS (SELECT address_pubkey,  count(distinct(para_id)) polkadot_network_cnt, min(ts) as ts FROM `substrate-etl.polkadot.balances*` WHERE DATE(ts) = "2023-02-14" group by address_pubkey),
-                    prevDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM `substrate-etl.kusama.balances*` WHERE DATE(ts) = "2023-02-14" group by address_pubkey),
-                    prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot left outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
-                    select address_pubkey, polkadot_network_cnt, kusama_network_cnt, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts from prevDayAll where address_pubkey not in (select address_pubkey from currDayAll) group by address_pubkey, polkadot_network_cnt, kusama_network_cnt order by polkadot_network_cnt desc;
-                    */
                     targetSQL = `WITH currDayPolkadot AS (SELECT address_pubkey, count(distinct(para_id)) polkadot_network_cnt, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts  FROM \`substrate-etl.polkadot.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
                     currDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, max(ts) as ts FROM \`substrate-etl.kusama.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
-                    currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot left outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey),
+                    currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot full outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey),
                     prevDayPolkadot AS (SELECT address_pubkey,  count(distinct(para_id)) polkadot_network_cnt, max(ts) as ts FROM \`substrate-etl.polkadot.balances*\` WHERE DATE(ts) = "${prevDT}" group by address_pubkey),
                     prevDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, max(ts) as ts FROM \`substrate-etl.kusama.balances*\` WHERE DATE(ts) = "${prevDT}" group by address_pubkey),
-                    prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot left outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
+                    prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot full outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
                     select address_pubkey, polkadot_network_cnt, kusama_network_cnt, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts from prevDayAll where address_pubkey not in (select address_pubkey from currDayAll) group by address_pubkey, polkadot_network_cnt, kusama_network_cnt order by polkadot_network_cnt desc`
                     partitionedFld = 'ts'
                     cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
@@ -2365,18 +2340,15 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     break;
 
                 case "all":
-                    /* All Dotsama User (by account)
-                    WITH
-                    currDayPolkadot AS (SELECT address_pubkey, count(distinct(para_id)) polkadot_network_cnt, min(ts) as ts FROM `substrate-etl.polkadot.balances*` WHERE DATE(ts) = "2023-02-15" group by address_pubkey),
-                    currDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM `substrate-etl.kusama.balances*` WHERE DATE(ts) = "2023-02-15" group by address_pubkey),
-                    currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot left outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey)
-                    select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDayAll order by polkadot_network_cnt desc;
-                    */
-                    targetSQL = `WITH currDayPolkadot AS (SELECT address_pubkey, count(distinct(para_id)) polkadot_network_cnt, min(ts) as ts FROM \`substrate-etl.polkadot.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
-                                      currDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM \`substrate-etl.kusama.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
-                                      currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot left outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey)
-                                      select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDayAll order by polkadot_network_cnt desc;`
-                    partitionedFld = 'ts'
+                    targetSQL = `SELECT
+  IFNULL(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) AS address_pubkey,
+  IFNULL(currDayKusama.ts,currDayPolkadot.ts) AS ts,
+  IFNULL(polkadot_network_cnt, 0) AS polkadot_network_cnt,
+  IFNULL(kusama_network_cnt, 0) AS kusama_network_cnt
+ FROM (  SELECT address_pubkey, COUNT(DISTINCT(para_id)) polkadot_network_cnt, MIN(ts) AS ts  FROM \`substrate-etl.polkadot.balances*\` WHERE DATE(ts) = "${currDT}" GROUP BY address_pubkey) AS currDayPolkadot
+ FULL OUTER JOIN (  SELECT    address_pubkey,    COUNT(DISTINCT(para_id)) kusama_network_cnt,    MIN(ts) AS ts  FROM    \`substrate-etl.kusama.balances*\`  WHERE    DATE(ts) = "${currDT}"  GROUP BY    address_pubkey) AS currDayKusama
+ ON currDayPolkadot.address_pubkey = currDayKusama.address_pubkey`;
+		partitionedFld = 'ts'
                     cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         tbl: tblName,
@@ -2415,7 +2387,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
 
         if (errloadCnt == 0 && !isDry) {
-            await this.update_networklog(network, logDT);
+            await this.update_networklog(network, logDT, jobTS);
         }
     }
 
@@ -2532,6 +2504,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let bqjobs = []
 
         // load new accounts
+	let jobTS = this.getCurrentTS();
         let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
         let logYYYYMMDD = logDT.replaceAll('-', '')
         let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
@@ -2753,7 +2726,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         if (errloadCnt == 0 && !isDry) {
             await this.update_blocklog(chainID, logDT);
             //update loadAccountMetricsDT, loadedAccountMetrics, accountMetricsStatus to "AuditRequired"
-            let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=Now(), accountMetricsStatus = "AuditRequired" where chainID = '${chainID}' and logDT = '${logDT}'`
+	    let elapsedSeconds = this.getCurrentTS() - jobTS;
+            let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=Now(), accountMetricsStatus = "AuditRequired", accountMetricsElapsedSeconds = '${elapsedSeconds}' where chainID = '${chainID}' and logDT = '${logDT}'`
             this.batchedSQL.push(sql_upd);
 
             // add new network logs -- TODO: remove AuditRequired
