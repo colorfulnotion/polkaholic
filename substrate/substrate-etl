@@ -134,6 +134,52 @@ async function main() {
             }
         });
 
+        program.command('crowdloan')
+            .description('Dump crowdloan for given relay chain')
+            .usage("-r polkadot --logDT 2023-02-02")
+            .option('-r, --relayChain <relayChain>', 'Relay chain', null)
+            .option('-l, --logDT <logDT>', 'Date', null)
+            .option('--endDT <endDT>', 'Date', null)
+            .option('-f, --force', `Force even if not ready`, false)
+            .action(async (opt) => {
+                let substrateetl = new SubstrateETL();
+                let relayChain = opt.relayChain;
+                let logDT = opt.logDT;
+                let force = opt.force;
+                if (logDT && relayChain) {
+                    let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+                    if (endDT) {
+                        let logTS = paraTool.logDT_hr_to_ts(logDT, 0);
+                        let endTS = paraTool.logDT_hr_to_ts(endDT, 0);
+                        for (let ts = logTS; ts <= endTS; ts += 86400) {
+                            let [dt, hr] = paraTool.ts_to_logDT_hr(ts);
+                            if (force || (await substrateetl.is_accountmetrics_ready(relayChain, dt))) {
+                                await substrateetl.dump_crowdloan(relayChain, dt);
+                            }
+                        }
+                    } else {
+                        await substrateetl.dump_crowdloan(relayChain, logDT);
+                    }
+                    process.exit(0);
+                }
+                let tally = 0;
+                process.exit(0);
+                //TODO
+                while (true) {
+                    let x = await substrateetl.get_random_accountmetrics_ready(relayChain);
+                    let _logDT = x.logDT;
+                    let _paraID = x.paraID;
+                    let _relayChain = x.relayChain;
+                    tally++;
+                    if (_logDT && (_paraID >= 0) && _relayChain) {
+                        await substrateetl.dump_accountmetrics(_relayChain, _logDT);
+                        await substrateetl.sleep(1000);
+                    } else {
+                        process.exit(0);
+                    }
+                }
+            });
+
     program.command('networkmetrics')
         .description(`Generate Network metrics (dotsama)`)
         .usage("-l 2023-02-01 -n dotsama")

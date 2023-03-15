@@ -2430,6 +2430,102 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
     }
 
+    async dump_crowdloan(relayChain, logDT) {
+        let paraID = 0
+        let projectID = `${this.project}`
+        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+        let bqjobs = []
+        console.log(`dump_crowdloan logDT=${logDT}, ${relayChain}-${paraID}, projectID=${projectID}, bqDataset=${bqDataset}`)
+
+        // load new accounts
+        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
+        let logYYYYMMDD = logDT.replaceAll('-', '')
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
+        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
+
+        let paraIDs = []
+        let w = (paraID == 'all') ? "" : ` and paraID = '${paraID}'`;
+        let sql = `select id, chainName, paraID, symbol, ss58Format, isEVM from chain where crawling = 1 and relayChain = '${relayChain}' order by paraID`
+        let chainsRecs = await this.poolREADONLY.query(sql)
+        let isEVMparaID = {};
+        for (const chainsRec of chainsRecs) {
+            paraIDs.push(chainsRec.paraID)
+            isEVMparaID[chainsRec.paraID] = chainsRec.isEVM;
+        }
+        console.log(`${paraIDs.length} active ${relayChain} chains [${paraIDs}]`)
+
+        let accountTbls = ["crowdloan"]
+
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain)
+        for (const tbl of accountTbls) {
+            let datasetID = bqDataset
+            let tblName = `${tbl}`
+            let destinationTbl = `${datasetID}.${tblName}$${logYYYYMMDD}`
+            let isEVM = isEVMparaID[paraID];
+
+            let targetSQL, partitionedFld, cmd;
+            switch (tbl) {
+                case "crowdloan":
+                    /* Crowdloan
+                    WITH Crowdloan AS (SELECT extrinsic_id, event_id, concat(section,"(", method, ")") event_section_method,
+                    Float64(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(2)], "$.dataRaw")) contribution,
+                    Float64(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(2)], "$.dataUSD")) contribution_usd,
+                    String(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(2)], "$.symbol")) contribution_symbol,
+                    INT64(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(1)], "$.data")) paraID,
+                    String(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(1)], "$.projectName")) projectName,
+                    String(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(0)], "$.address")) contributor_pubkey,
+                    String(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(0)], "$.data")) contributor
+                    FROM `substrate-etl.kusama_dev.events0` WHERE DATE(block_time) = "2021-11-27" and section = "crowdloan" and method = "Contributed"),
+                    Extrinsics as (SELECT `hash` as extrinsichash, extrinsic_id, block_time, concat(section, ":",method) extrinsic_section_method FROM `substrate-etl.kusama_dev.extrinsics0` WHERE DATE(block_time) = "2021-11-27")
+                    select Crowdloan.extrinsic_id, extrinsichash, extrinsic_section_method, event_section_method, contributor_pubkey, contributor, paraID, projectName, contribution, contribution_usd, contribution_symbol, block_time as ts
+                    from Crowdloan left join extrinsics on Crowdloan.extrinsic_id = Extrinsics.extrinsic_id order by contributor_pubkey
+                    */
+                    targetSQL = ` WITH Crowdloan AS (SELECT extrinsic_id, event_id, concat(section,"(", method, ")") event_section_method,
+                    Float64(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(2)], "$.dataRaw")) contribution,
+                    Float64(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(2)], "$.dataUSD")) contribution_usd,
+                    String(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(2)], "$.symbol")) contribution_symbol,
+                    INT64(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(1)], "$.data")) paraID,
+                    String(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(1)], "$.projectName")) projectName,
+                    String(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(0)], "$.address")) contributor_pubkey,
+                    String(json_extract(JSON_EXTRACT_ARRAY(data_decoded)[offset(0)], "$.data")) contributor FROM \`${projectID}.${bqDataset}.events${paraID}\` WHERE DATE(block_time) = "${currDT}" and section = "crowdloan" and method = "Contributed"),
+                    Extrinsics as (SELECT \`hash\` as extrinsichash, extrinsic_id, block_time, concat(section, ":",method) extrinsic_section_method FROM \`${projectID}.${bqDataset}.extrinsics${paraID}\` WHERE DATE(block_time) = "${currDT}")
+                    select Crowdloan.extrinsic_id, extrinsichash, extrinsic_section_method, event_section_method, contributor_pubkey, contributor, paraID, projectName, contribution, contribution_usd, contribution_symbol, block_time as ts from Crowdloan left join extrinsics on Crowdloan.extrinsic_id = Extrinsics.extrinsic_id order by contributor_pubkey`
+                    partitionedFld = 'ts'
+                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+                    bqjobs.push({
+                        chainID: chainID,
+                        paraID: paraID,
+                        tbl: tblName,
+                        destinationTbl: destinationTbl,
+                        cmd: cmd
+                    })
+                    break;
+                default:
+
+            }
+        }
+        let errloadCnt = 0
+        let isDry = false;
+        for (const bqjob of bqjobs) {
+            try {
+                if (isDry) {
+                    console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                } else {
+                    console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                    await exec(bqjob.cmd);
+                }
+            } catch (e) {
+                errloadCnt++
+                this.logger.error({
+                    "op": "dump_crowdloan",
+                    e
+                })
+            }
+        }
+        //await this.update_batchedSQL();
+        return true
+    }
+
     async dump_accountmetrics(relayChain, paraID, logDT) {
         console.log(`dump_accountmetrics logDT=${logDT}, ${relayChain}-${paraID}`)
         let projectID = `${this.project}`
@@ -2667,7 +2763,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
         }
         bqjobs = []
-
         await this.update_batchedSQL();
         return true
     }
