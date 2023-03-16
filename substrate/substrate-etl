@@ -173,34 +173,58 @@ async function main() {
                 let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
                 let force = opt.force;
                 let paraID = 0
-                let dumpType = 'dotsama_crowdloan'
+                let dumpType_step1 = 'relaychain_crowdloan'
+                let dumpType_step2 = 'dotsama_crowdloan'
                 let relayChains = ['polkadot', 'kusama']
+                /*
+                Step 1: compute relaychain_crowdloan -> this generate the relaychain.crowdloan tbl in substrate etl
+                Step 2: compute dotsama_crowdloan -> this generate the dotsama.accountscrowdloan tbl in substrate etl
+                */
                 if (logDT) {
                     if (endDT) {
                         let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
                         console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
                         for (const dt of logDTRange){
                             for (const relayChain of relayChains){
-                                if (force || (await substrateetl.is_dump_ready(dt, dumpType, {relayChain}))) {
+                                if (force || (await substrateetl.is_dump_ready(dt, dumpType_step1, {relayChain}))) {
                                     await substrateetl.dump_relaychain_crowdloan(relayChain, dt);
                                 }
                             }
-                            if (force || (await substrateetl.is_dump_ready(dt, dumpType, {}))) {
+                            if (force || (await substrateetl.is_dump_ready(dt, dumpType_step2, {}))) {
                                 await substrateetl.dump_dotsama_crowdloan(dt);
                             }
                         }
                     } else {
                         for (const relayChain of relayChains){
-                            if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {relayChain}))) {
+                            if (force || (await substrateetl.is_dump_ready(logDT, dumpType_step1, {relayChain}))) {
                                 await substrateetl.dump_relaychain_crowdloan(relayChain, logDT);
                             }
                         }
-                        if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {}))) {
+                        if (force || (await substrateetl.is_dump_ready(logDT, dumpType_step2, {}))) {
                             await substrateetl.dump_dotsama_crowdloan(logDT);
                         }
                     }
                     process.exit(0);
                 }
+
+                while (true) {
+                    let x = await substrateetl.get_random_crowdloan_ready();
+                    let _logDT = x.logDT;
+                    if (_logDT) {
+                        for (const relayChain of relayChains){
+                            if (force || (await substrateetl.is_dump_ready(logDT, dumpType_step1, {relayChain}))) {
+                                await substrateetl.dump_relaychain_crowdloan(relayChain, _logDT);
+                            }
+                        }
+                        if (force || (await substrateetl.is_dump_ready(_logDT, dumpType_step2, {}))) {
+                            await substrateetl.dump_dotsama_crowdloan(_logDT);
+                        }
+                    } else {
+                        process.exit(0);
+                    }
+                }
+                process.exit(0);
+
             });
 
     program.command('networkmetrics')

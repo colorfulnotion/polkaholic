@@ -232,6 +232,22 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
+    async get_random_crowdloan_ready(_network, lookbackDays = 3000) {
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, crowdloanMetricsStatus from blocklog where crowdloanMetricsStatus not in ('AuditRequired', 'Audited') and chainID in (${paraTool.chainIDKusama},${paraTool.chainIDPolkadot}) and logDT >= "2021-06-08" order by rand() limit 1`;
+        let recs = await this.poolREADONLY.query(sql);
+        let rec = {
+            logDT: null
+        }
+        if (recs.length == 0) return rec
+        let {
+            indexTS,
+            crowdloanMetricsStatus
+        } = recs[0];
+        let [logDT, _] = paraTool.ts_to_logDT_hr(indexTS);
+        rec.logDT = logDT
+        return rec
+    }
+
     async get_random_networkmetrics_ready(_network, lookbackDays = 3000) {
         let w = "";
         if (_network) {
@@ -2458,7 +2474,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 if (_network){
                     sql = `select UNIX_TIMESTAMP(logDT) indexTS, logDT, networklog.network, network.isEVM, networkMetricsStatus from networklog, network where network.network = networklog.network and logDT = '${logDT}' and network.network = '${_network}' limit 1`
                     recs = await this.poolREADONLY.query(sql);
-                    console.log("networkmetrics ready", sql);
+                    console.log("networkmetrics ready sql", sql);
                     if (recs.length == 1) {
                         status = recs[0].networkMetricsStatus
                         if (status == 'Ready') return (true);
@@ -2473,17 +2489,23 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     if (status == 'Ready') return (true);
                 }
                 break;
-            case "crowdloan":
-                sql = `select crowdloanMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
-                recs = await this.poolREADONLY.query(sql)
-                if (recs.length == 1) {
-                    status = recs[0].crowdloanMetricsStatus
-                    if (status == 'Ready') return (true);
+            case "relaychain_crowdloan":
+                if (opt.relayChain){
+                    if (opt.relayChain == 'polkadot') chainID = 0;
+                    if (opt.relayChain == 'kusama') chainID = 2;
+                    sql = `select crowdloanMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                    recs = await this.poolREADONLY.query(sql)
+                    //console.log("relaychain_crowdloan ready sql", sql);
+                    if (recs.length == 1) {
+                        status = recs[0].crowdloanMetricsStatus
+                        if (status == 'Ready') return (true);
+                    }
+                    break;
                 }
-                break;
             case "dotsama_crowdloan":
                 sql = `select crowdloanMetricsStatus from blocklog where chainID in (0, 2) and logDT = '${logDT}';`
                 recs = await this.poolREADONLY.query(sql)
+                //console.log("dotsama_crowdloan ready sql", sql);
                 if (recs.length == 2) {
                     let cnt = 0
                     for (const rec of recs){
