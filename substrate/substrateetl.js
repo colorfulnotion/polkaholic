@@ -2430,20 +2430,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let recs = []
         //accountMetricsStatus, updateAddressBalanceStatus, crowdloanMetricsStatus, sourceMetricsStatus, poolsMetricsStatus, identityMetricsStatus, loaded
         switch (dumpType){
-            case "dotsama_crowdloan":
-                sql = `select crowdloanMetricsStatus from blocklog where chainID in (0, 2) and logDT = '${logDT}';`
-                recs = await this.poolREADONLY.query(sql)
-                if (recs.length == 2) {
-                    let cnt = 0
-                    for (const rec of recs){
-                        status = rec.crowdloanMetricsStatus
-                        if (rec.crowdloanMetricsStatus == "AuditRequired"){
-                            cnt++
-                        }
-                    }
-                    if (cnt == 2) return (true);
-                }
-                break;
+
             case "substrate-etl":
                 // how to check if dump substrate-etl is ready?
                 sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded >= 0 and logDT = '${logDT}' and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and chain.chainID = ${chainID} order by rand() limit 1`;
@@ -2492,6 +2479,21 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 if (recs.length == 1) {
                     status = recs[0].crowdloanMetricsStatus
                     if (status == 'Ready') return (true);
+                }
+                break;
+            case "dotsama_crowdloan":
+                sql = `select crowdloanMetricsStatus from blocklog where chainID in (0, 2) and logDT = '${logDT}';`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 2) {
+                    let cnt = 0
+                    for (const rec of recs){
+                        status = rec.crowdloanMetricsStatus
+                        if (rec.crowdloanMetricsStatus == "FirstStepDone"){
+                            cnt++
+                        }
+                    }
+                    //need both relaychain have "FirstStepDone" to initiate the aggregate step
+                    if (cnt == 2) return (true);
                 }
                 break;
             case "sources":
@@ -2606,11 +2608,15 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 })
             }
         }
-        //await this.update_batchedSQL();
+        if (errloadCnt == 0){
+            let sql = `update blocklog set crowdloanMetricsStatus = 'AuditRequired' where chainID in (${paraTool.chainIDPolkadot}, ${paraTool.chainIDKusama}) and logDT = '${logDT}'`
+            this.batchedSQL.push(sql);
+        }
+        await this.update_batchedSQL();
         return true
     }
 
-    async dump_crowdloan(relayChain, logDT) {
+    async dump_relaychain_crowdloan(relayChain, logDT) {
         let paraID = 0
         let projectID = `${this.project}`
         let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
@@ -2702,7 +2708,11 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 })
             }
         }
-        //await this.update_batchedSQL();
+        if (errloadCnt == 0){
+            let sql = `update blocklog set crowdloanMetricsStatus = 'FirstStepDone' where chainID = '${chainID}' and logDT = '${logDT}'`
+            this.batchedSQL.push(sql);
+        }
+        await this.update_batchedSQL();
         return true
     }
 
@@ -3612,8 +3622,14 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
         // mark crowdloanMetricsStatus as redy or ignore, depending on the result
         if (numSubstrateETLLoadErrors == 0){
+            //first polkadot crowdloan: 2021-11-05
+            //first kusama crowdloan: 2021-06-08
+            let w = ''
+            if (paraID == 0){
+                w = `and logDT >= '2021-06-08'`
+            }
             let crowdloanMetricsStatus = (paraID == 0)? 'Ready': 'Ignore'
-            let sql = `update blocklog set crowdloanMetricsStatus = '${crowdloanMetricsStatus}' where chainID = '${chainID}' and logDT = '${logDT}'`
+            let sql = `update blocklog set crowdloanMetricsStatus = '${crowdloanMetricsStatus}' where chainID = '${chainID}' and logDT = '${logDT}' ${w}`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
         }

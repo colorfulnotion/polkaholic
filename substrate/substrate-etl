@@ -161,9 +161,9 @@ async function main() {
             }
         });
 
-        program.command('dotsamacrowdloan')
+        program.command('crowdloan')
             .description('Dump account crowdloan using crowdloan table')
-            .usage("-r polkadot --logDT 2023-02-02")
+            .usage("-r polkadot --logDT 2021-10-29")
             .option('-l, --logDT <logDT>', 'Date', null)
             .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
             .option('-f, --force', `Force even if not ready`, false)
@@ -174,73 +174,32 @@ async function main() {
                 let force = opt.force;
                 let paraID = 0
                 let dumpType = 'dotsama_crowdloan'
+                let relayChains = ['polkadot', 'kusama']
                 if (logDT) {
                     if (endDT) {
                         let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
                         console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
                         for (const dt of logDTRange){
-                            let f = {
-
+                            for (const relayChain of relayChains){
+                                if (force || (await substrateetl.is_dump_ready(dt, dumpType, {relayChain}))) {
+                                    await substrateetl.dump_relaychain_crowdloan(relayChain, dt);
+                                }
                             }
                             if (force || (await substrateetl.is_dump_ready(dt, dumpType, {}))) {
                                 await substrateetl.dump_dotsama_crowdloan(dt);
                             }
                         }
                     } else {
+                        for (const relayChain of relayChains){
+                            if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {relayChain}))) {
+                                await substrateetl.dump_relaychain_crowdloan(relayChain, logDT);
+                            }
+                        }
                         if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {}))) {
                             await substrateetl.dump_dotsama_crowdloan(logDT);
                         }
                     }
                     process.exit(0);
-                }
-            });
-
-        program.command('crowdloan')
-            .description('Dump crowdloan for given relay chain')
-            .usage("-r polkadot --logDT 2023-02-02")
-            .option('-r, --relayChain <relayChain>', 'Relay chain', null)
-            .option('-l, --logDT <logDT>', 'Date', null)
-            .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
-            .option('-f, --force', `Force even if not ready`, false)
-            .action(async (opt) => {
-                let substrateetl = new SubstrateETL();
-                let relayChain = opt.relayChain;
-                let logDT = opt.logDT;
-                let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
-                let force = opt.force;
-                let paraID = 0
-                let dumpType = 'crowdloan'
-                if (logDT && relayChain) {
-                    if (endDT) {
-                        let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
-                        console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
-                        for (const dt of logDTRange){
-                            if (force || (await substrateetl.is_dump_ready(dt, dumpType, {relayChain}))) {
-                                await substrateetl.dump_crowdloan(relayChain, dt);
-                            }
-                        }
-                    } else {
-                        if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {relayChain}))) {
-                            await substrateetl.dump_crowdloan(relayChain, logDT);
-                        }
-                    }
-                    process.exit(0);
-                }
-                let tally = 0;
-                process.exit(0);
-                //TODO
-                while (true) {
-                    let x = await substrateetl.get_random_accountmetrics_ready(relayChain);
-                    let _logDT = x.logDT;
-                    let _paraID = x.paraID;
-                    let _relayChain = x.relayChain;
-                    tally++;
-                    if (_logDT && (_paraID >= 0) && _relayChain) {
-                        await substrateetl.dump_accountmetrics(_relayChain, _logDT);
-                        await substrateetl.sleep(1000);
-                    } else {
-                        process.exit(0);
-                    }
                 }
             });
 
