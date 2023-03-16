@@ -44,7 +44,7 @@ const balanceStartDT = "2020-03-09";
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
     publish = 0;
-    isProd = false
+    isProd = true
 
     constructor() {
         super("manager")
@@ -59,7 +59,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
         return [logTS, logYYYYMMDD, currDT, prevDT]
     }
-    
+
     // all bigquery tables are date-partitioned except 2 for now: chains and specversions
     partitioned_table(tbl) {
         switch (tbl) {
@@ -2295,7 +2295,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async dump_networkmetrics(network, logDT) {
-	let jobTS = this.getCurrentTS();
+	    let jobTS = this.getCurrentTS();
         let projectID = `${this.project}`
         if (network != "dotsama") {
             // not covering other networks yet
