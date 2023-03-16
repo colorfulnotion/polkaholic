@@ -50,6 +50,16 @@ module.exports = class SubstrateETL extends AssetManager {
         super("manager")
     }
 
+    getTimeFormat(logDT){
+        //2020-12-01 -> [TS, '20221201', '2022-12-01', '2022-11-30']
+        //20201201 -> [TS, '20221201', '2022-12-01', '2022-11-30']
+        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
+        let logYYYYMMDD = logDT.replaceAll('-', '')
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
+        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
+        return [logTS, logYYYYMMDD, currDT, prevDT]
+    }
+    
     // all bigquery tables are date-partitioned except 2 for now: chains and specversions
     partitioned_table(tbl) {
         switch (tbl) {
@@ -2294,10 +2304,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         console.log(`dump_networkmetrics logDT=${logDT}`)
         let datasetID = 'dotsama'
         let bqjobs = []
-        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
-        let logYYYYMMDD = logDT.replaceAll('-', '')
-        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
-        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         let accountTbls = ["new", "reaped", "active", "all"]
         for (const tbl of accountTbls) {
             let tblName = `accounts${tbl}`
@@ -2567,11 +2574,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         console.log(`dump_dotsama_crowdloan logDT=${logDT}, projectID=${projectID}, bqDataset=${bqDataset}, bqDataset_txra=${bqDataset_txra}`)
 
         // load new accounts
-        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
-        let logYYYYMMDD = logDT.replaceAll('-', '')
-        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
-        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
-
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         let accountTbls = ["accountscrowdloan"]
 
         for (const tbl of accountTbls) {
@@ -2646,11 +2649,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         console.log(`dump_crowdloan logDT=${logDT}, ${relayChain}-${paraID}, projectID=${projectID}, bqDataset=${bqDataset}`)
 
         // load new accounts
-        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
-        let logYYYYMMDD = logDT.replaceAll('-', '')
-        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
-        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
-
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         let paraIDs = []
         let w = (paraID == 'all') ? "" : ` and paraID = '${paraID}'`;
         let sql = `select id, chainName, paraID, symbol, ss58Format, isEVM from chain where crawling = 1 and relayChain = '${relayChain}' order by paraID`
@@ -2744,12 +2743,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let bqjobs = []
 
         // load new accounts
-	let jobTS = this.getCurrentTS();
-        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
-        let logYYYYMMDD = logDT.replaceAll('-', '')
-        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
-        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
-
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
+	    let jobTS = this.getCurrentTS();
         let paraIDs = []
         let w = (paraID == 'all') ? "" : ` and paraID = '${paraID}'`;
         let sql = `select id, chainName, paraID, symbol, ss58Format, isEVM from chain where crawling = 1 and relayChain = '${relayChain}' order by paraID`
@@ -3202,31 +3197,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         await this.update_batchedSQL()
     }
 
-    async dump_substrateetl_range(paraID = 2000, relayChain = "polkadot", isEVM = 0, startLogDT = null) {
-        let ts = this.getCurrentTS();
-        let [currDT, _c] = paraTool.ts_to_logDT_hr(ts);
-        if (startLogDT == null) {
-            startLogDT = (relayChain == "kusama") ? "2021-12-18" : "2021-12-18";
-        }
-        console.log(`dump_substrateetl_range, paraID=${paraID}, relayChain=${relayChain}, isEVM=${isEVM}, startLogDT=${startLogDT}, currDT=${currDT}`)
-        let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0)
-        let [startDT, _s] = paraTool.ts_to_logDT_hr(startLogTS);
-        try {
-            while (true) {
-                ts = ts - 86400;
-                let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
-                console.log(`dump_substrateetl logDT=${logDT}, paraID=${paraID}, relayChain=${relayChain}, isEVM=${isEVM}`)
-                await this.dump_substrateetl(logDT, paraID, relayChain, isEVM)
-                if (startDT == logDT) {
-                    return (true);
-                }
-            }
-        } catch (err) {
-            console.log(err);
-            return (false);
-        }
-    }
-
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
@@ -3238,9 +3208,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             tbls.push("evmtransfers");
         }
         // 1. get bnStart, bnEnd for logDT
-        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
-        let logYYYYMMDD = logDT.replaceAll('-', '')
-        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
 
         let minLogDT = `${logDT} 00:00:00`;
