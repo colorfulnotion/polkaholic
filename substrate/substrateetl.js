@@ -79,11 +79,12 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     // sets up system tables (independent of paraID) and paraID specific tables
-    async setup_tables(chainID = null, execute = false) {
+    async setup_tables(chainID = null, isUpdate = false, execute = false) {
         let projectID = `${this.project}`
         //setup "system" tables across all paraIDs
+        let opType = (isUpdate)? 'update': 'mk'
         if (chainID == undefined) {
-            console.log(`setup "system" tables across all paraIDs`)
+            console.log(`***** setup "system" tables across all paraIDs ******`)
             let systemtbls = ["xcmtransfers", "chains"]
             let relayChains = ["polkadot", "kusama"]
             for (const relayChain of relayChains){
@@ -91,7 +92,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 for (const tbl of systemtbls) {
                     let fld = (this.partitioned_table(tbl))
                     let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
-                    let cmd = `bq mk  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${bqDataset}.${tbl}`
+                    let cmd = `bq ${opType}  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${bqDataset}.${tbl}`
                     try {
                         console.log(cmd);
                         //await exec(cmd);
@@ -100,14 +101,15 @@ module.exports = class SubstrateETL extends AssetManager {
                     }
                 }
             }
-            process.exit(0)
+            console.log(`************`)
+            //process.exit(0)
         }
         // setup paraID specific tables, including paraID=0 for the relay chain
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers"]
         let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
         let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
-
         let recs = await this.poolREADONLY.query(sql);
+        console.log(`***** setup "chain" tables:${tbls} (chainID=${chainID}) ******`)
         for (const rec of recs) {
             let chainID = parseInt(rec.chainID, 10);
             let paraID = paraTool.getParaIDfromChainID(chainID);
@@ -117,7 +119,7 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const tbl of tbls) {
                 let fld = this.partitioned_table(tbl);
                 let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
-                let cmd = `bq mk  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${bqDataset}.${tbl}${paraID}`
+                let cmd = `bq ${opType}  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${bqDataset}.${tbl}${paraID}`
                 if ((tbl == "evmtxs" || tbl == "evmtransfers") && rec.isEVM == 0) {
                     cmd = null;
                 }
@@ -134,6 +136,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 }
             }
         }
+        process.exit(0)
     }
 
     async cleanReapedExcess(chainID) {
