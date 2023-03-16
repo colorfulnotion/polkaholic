@@ -3609,6 +3609,14 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         } catch (e) {
             console.log(e);
         }
+
+        // mark crowdloanMetricsStatus as redy or ignore, depending on the result
+        if (numSubstrateETLLoadErrors == 0){
+            let crowdloanMetricsStatus = (paraID == 0)? 'Ready': 'Ignore'
+            let sql = `update blocklog set crowdloanMetricsStatus = '${crowdloanMetricsStatus}' where chainID = '${chainID}' and logDT = '${logDT}'`
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL();
+        }
         // load evmholders changes
         if (numSubstrateETLLoadErrors == 0 && chain.isEVM) {
             try {

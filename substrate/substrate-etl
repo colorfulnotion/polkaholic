@@ -262,12 +262,12 @@ async function main() {
                     let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
                     console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
                     for (const dt of logDTRange){
-                        if (force || (await substrateetl.is_networkmetrics_ready(network, dt, {network}))) {
+                        if (force || (await substrateetl.is_dump_ready(network, dt, {network}))) {
                             await substrateetl.dump_networkmetrics(network, dt);
                         }
                     }
                 } else {
-                    if (force || (await substrateetl.is_networkmetrics_ready(network, logDT, {network}))) {
+                    if (force || (await substrateetl.is_dump_ready(network, logDT, {network}))) {
                         await substrateetl.dump_networkmetrics(relayChain, logDT);
                     }
                 }
