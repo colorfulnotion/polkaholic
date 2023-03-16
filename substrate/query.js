@@ -4895,6 +4895,7 @@ module.exports = class Query extends AssetManager {
         return false
     }
 
+    /*
     async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         if (!decorate || !decorateData) return event
@@ -5063,6 +5064,7 @@ module.exports = class Query extends AssetManager {
         if (decorateData) dEvent.decodedData = decodedData
         return dEvent
     }
+    */
 
     async decorateQueryFeedTransfer(feedtransfer, chainID, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         /*
@@ -5197,6 +5199,7 @@ module.exports = class Query extends AssetManager {
         return dFeedtransfer
     }
 
+    /*
     mergeEventDataAndDataType(data, dataType, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let dd = []
@@ -5221,6 +5224,7 @@ module.exports = class Query extends AssetManager {
         }
         return dd
     }
+    */
 
     // input: 1642608001
     // output: 1642608000
@@ -5551,25 +5555,6 @@ module.exports = class Query extends AssetManager {
             return true
         }
         return false
-    }
-
-    getDecorateOption(decorateExtra) {
-        if (Array.isArray(decorateExtra)) {
-            let decorateData = decorateExtra.includes("data")
-            let decorateAddr = decorateExtra.includes("address")
-            let decorateUSD = decorateExtra.includes("usd")
-            let decorateRelated = decorateExtra.includes("related")
-            // TODO: deep events/logs let decorateDeep = decorateExtra.includes("deep")
-            return [decorateData, decorateAddr, decorateUSD, decorateRelated]
-        } else if (decorateExtra == true) {
-            // remove this once ready
-            return [true, true, true, true]
-        } else if (decorateExtra == false) {
-            return [true, true, true, false]
-        } else {
-            //return nothing if user purposefully pass in non-matched filter
-            return [false, false, false, false]
-        }
     }
 
     getRewardLevelHOLIC(action) {
