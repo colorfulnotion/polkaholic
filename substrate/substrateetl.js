@@ -52,7 +52,7 @@ const balanceStartDT = "2020-03-09";
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
     publish = 0;
-    isProd = true
+    isProd = false
 
     constructor() {
         super("manager")
@@ -166,6 +166,34 @@ module.exports = class SubstrateETL extends AssetManager {
                 }
             }
         }
+    }
+
+    async publishExchangeAddress(){
+        let relayChain = 'polkadot'
+        let tbl = `exchanges`
+        let projectID = `${this.project}`
+        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+        let sql = `select nickname, exchange_name, address from account where is_exchange = 1`
+        let recs = await this.poolREADONLY.query(sql);
+        let knownAccounts = [];
+        for (const r of recs) {
+            let a = {
+                address_pubkey: r.address,
+                address_nickname: r.nickname,
+                address_label: r.exchange_name,
+            }
+            knownAccounts.push(a)
+        }
+        let dir = "/tmp";
+        let fn = path.join(dir, `${tbl}.json`)
+        let f = fs.openSync(fn, 'w', 0o666);
+        let NL = "\r\n";
+        knownAccounts.forEach((e) => {
+            fs.writeSync(f, JSON.stringify(e) + NL);
+        });
+        fs.closeSync(f);
+        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/${tbl}.json`;
+        console.log(cmd)
     }
 
     async cleanReaped(start = null, end = null) {

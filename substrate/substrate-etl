@@ -287,6 +287,18 @@ async function main() {
 
         });
 
+    program.command('exchange')
+        .description('Dump exchange users')
+        .usage("TBD")
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .option('-f, --force', `Force even if not ready`, false)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            await substrateetl.publishExchangeAddress()
+            process.exit(0);
+        });
+
     program.command('networkmetrics')
         .description(`Generate Network metrics (dotsama)`)
         .usage("-l 2023-02-01 -n dotsama")
