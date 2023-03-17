@@ -35,6 +35,14 @@ const util = require('util');
 const exec = util.promisify(require("child_process").exec);
 const path = require('path');
 const {
+    StorageKey
+} = require('@polkadot/types');
+const {
+    hexToU8a,
+    compactStripLength,
+    hexToBn
+} = require("@polkadot/util");
+const {
     BigQuery
 } = require('@google-cloud/bigquery');
 
@@ -50,7 +58,7 @@ module.exports = class SubstrateETL extends AssetManager {
         super("manager")
     }
 
-    getTimeFormat(logDT){
+    getTimeFormat(logDT) {
         //2020-12-01 -> [TS, '20221201', '2022-12-01', '2022-11-30']
         //20201201 -> [TS, '20221201', '2022-12-01', '2022-11-30']
         let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
@@ -82,13 +90,13 @@ module.exports = class SubstrateETL extends AssetManager {
     async setup_tables(chainID = null, isUpdate = false, execute = false) {
         let projectID = `${this.project}`
         //setup "system" tables across all paraIDs
-        let opType = (isUpdate)? 'update': 'mk'
+        let opType = (isUpdate) ? 'update' : 'mk'
         if (chainID == undefined) {
             console.log(`***** setup "system" tables across all paraIDs ******`)
             let systemtbls = ["xcmtransfers", "chains"]
             let relayChains = ["polkadot", "kusama"]
-            for (const relayChain of relayChains){
-                let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+            for (const relayChain of relayChains) {
+                let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
                 for (const tbl of systemtbls) {
                     let fld = (this.partitioned_table(tbl))
                     let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
@@ -114,7 +122,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let chainID = parseInt(rec.chainID, 10);
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
-            let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+            let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
             //console.log(" --- ", chainID, paraID, relayChain);
             for (const tbl of tbls) {
                 let fld = this.partitioned_table(tbl);
@@ -1183,16 +1191,16 @@ module.exports = class SubstrateETL extends AssetManager {
         let id = chain.id;
 
         let wsEndpoint = chain.WSEndpoint;
-	let alts = {
-	    0: ['wss://1rpc.io/dot','wss://rpc.dotters.network/polkadot','wss://polkadot-rpc.dwellir.com','wss://polkadot-rpc-tn.dwellir.com','wss://rpc.ibp.network/polkadot','wss://rpc.polkadot.io','wss://polkadot.public.curie.radiumblock.co/ws'],
-	    2: ['wss://1rpc.io/ksm', 'wss://rpc.dotters.network/kusama', 'wss://kusama-rpc.dwellir.com', 'wss://kusama-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/kusama', 'wss://kusama.api.onfinality.io/public-ws', 'wss://kusama-rpc.polkadot.io', 'wss://kusama.public.curie.radiumblock.co/ws'],
-	    22023: ['wss://moonriver.public.blastapi.io','wss://wss.api.moonriver.moonbeam.network','wss://moonriver.api.onfinality.io/public-ws','wss://moonriver.unitedbloc.com:2001'],
-	    2004: ['wss://1rpc.io/glmr','wss://moonbeam.public.blastapi.io','wss://wss.api.moonbeam.network','wss://moonbeam.api.onfinality.io/public-ws','wss://moonbeam.unitedbloc.com:3001']
-	}
-	if ( alts[chainID] !== undefined && ( alts[chainID].length > 0 ) ) {
-	    let a = alts[chainID];
-	    wsEndpoint = a[Math.floor(Math.random()*a.length)];
-	}
+        let alts = {
+            0: ['wss://1rpc.io/dot', 'wss://rpc.dotters.network/polkadot', 'wss://polkadot-rpc.dwellir.com', 'wss://polkadot-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/polkadot', 'wss://rpc.polkadot.io', 'wss://polkadot.public.curie.radiumblock.co/ws'],
+            2: ['wss://1rpc.io/ksm', 'wss://rpc.dotters.network/kusama', 'wss://kusama-rpc.dwellir.com', 'wss://kusama-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/kusama', 'wss://kusama.api.onfinality.io/public-ws', 'wss://kusama-rpc.polkadot.io', 'wss://kusama.public.curie.radiumblock.co/ws'],
+            22023: ['wss://moonriver.public.blastapi.io', 'wss://wss.api.moonriver.moonbeam.network', 'wss://moonriver.api.onfinality.io/public-ws', 'wss://moonriver.unitedbloc.com:2001'],
+            2004: ['wss://1rpc.io/glmr', 'wss://moonbeam.public.blastapi.io', 'wss://wss.api.moonbeam.network', 'wss://moonbeam.api.onfinality.io/public-ws', 'wss://moonbeam.unitedbloc.com:3001']
+        }
+        if (alts[chainID] !== undefined && (alts[chainID].length > 0)) {
+            let a = alts[chainID];
+            wsEndpoint = a[Math.floor(Math.random() * a.length)];
+        }
         let prev_numHolders = chain.numHolders;
         let decimals = this.getChainDecimal(chainID)
         const provider = new WsProvider(wsEndpoint);
@@ -2287,7 +2295,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 }
             }
         }
-	let elapsedSeconds = this.getCurrentTS() - jobStartTS;
+        let elapsedSeconds = this.getCurrentTS() - jobStartTS;
         vals.push(` loadDT=Now()`);
         vals.push(` networkMetricsStatus = "AuditRequired" `);
         vals.push(` networkMetricsElapsedSeconds = "${elapsedSeconds}" `);
@@ -2298,7 +2306,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async dump_networkmetrics(network, logDT) {
-	    let jobTS = this.getCurrentTS();
+        let jobTS = this.getCurrentTS();
         let projectID = `${this.project}`
         if (network != "dotsama") {
             // not covering other networks yet
@@ -2374,7 +2382,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
  FROM (  SELECT address_pubkey, COUNT(DISTINCT(para_id)) polkadot_network_cnt, MIN(ts) AS ts  FROM \`substrate-etl.polkadot.balances*\` WHERE DATE(ts) = "${currDT}" GROUP BY address_pubkey) AS currDayPolkadot
  FULL OUTER JOIN (  SELECT    address_pubkey,    COUNT(DISTINCT(para_id)) kusama_network_cnt,    MIN(ts) AS ts  FROM    \`substrate-etl.kusama.balances*\`  WHERE    DATE(ts) = "${currDT}"  GROUP BY    address_pubkey) AS currDayKusama
  ON currDayPolkadot.address_pubkey = currDayKusama.address_pubkey`;
-		partitionedFld = 'ts'
+                    partitionedFld = 'ts'
                     cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                     bqjobs.push({
                         tbl: tblName,
@@ -2417,7 +2425,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
     }
 
-    getLogDTRange(startLogDT = null, endLogDT = null, isAscending = true){
+    getLogDTRange(startLogDT = null, endLogDT = null, isAscending = true) {
         let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0)
         let [startDT, _] = paraTool.ts_to_logDT_hr(startLogTS);
         if (startLogDT == null) {
@@ -2435,12 +2443,12 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
             logDTRange.push(logDT)
             if (logDT == startDT) {
-                 break;
+                break;
             }
         }
-        if (isAscending){
+        if (isAscending) {
             return logDTRange.reverse();
-        }else{
+        } else {
             return logDTRange
         }
     }
@@ -2448,14 +2456,14 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
     async is_dump_ready(logDT, dumpType = 'accountmetrics', opt = {}) {
         let chainID = false
         let status = 'NotReady'
-        if (opt.paraID != undefined && opt.relayChain != undefined){
-            chainID = paraTool.getChainIDFromParaIDAndRelayChain(opt.paraID , opt.relayChain)
+        if (opt.paraID != undefined && opt.relayChain != undefined) {
+            chainID = paraTool.getChainIDFromParaIDAndRelayChain(opt.paraID, opt.relayChain)
             opt.chainID = chainID
         }
         let sql = null
         let recs = []
         //accountMetricsStatus, updateAddressBalanceStatus, crowdloanMetricsStatus, sourceMetricsStatus, poolsMetricsStatus, identityMetricsStatus, loaded
-        switch (dumpType){
+        switch (dumpType) {
 
             case "substrate-etl":
                 // how to check if dump substrate-etl is ready?
@@ -2463,9 +2471,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 recs = await this.poolREADONLY.query(sql);
                 console.log("get_substrate-etl ready", sql);
                 if (recs.length == 1) {
-                    if (recs[0].loaded){
+                    if (recs[0].loaded) {
                         status = 'Loaded'
-                    }else{
+                    } else {
                         return (true);
                     }
                 }
@@ -2481,7 +2489,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             case "networkmetrics":
                 // how to check if dump substrate-etl is ready?
                 let _network = opt.network
-                if (_network){
+                if (_network) {
                     sql = `select UNIX_TIMESTAMP(logDT) indexTS, logDT, networklog.network, network.isEVM, networkMetricsStatus from networklog, network where network.network = networklog.network and logDT = '${logDT}' and network.network = '${_network}' limit 1`
                     recs = await this.poolREADONLY.query(sql);
                     console.log("networkmetrics ready sql", sql);
@@ -2500,7 +2508,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 }
                 break;
             case "relaychain_crowdloan":
-                if (opt.relayChain){
+                if (opt.relayChain) {
                     if (opt.relayChain == 'polkadot') chainID = 0;
                     if (opt.relayChain == 'kusama') chainID = 2;
                     sql = `select crowdloanMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
@@ -2518,9 +2526,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 //console.log("dotsama_crowdloan ready sql", sql);
                 if (recs.length == 2) {
                     let cnt = 0
-                    for (const rec of recs){
+                    for (const rec of recs) {
                         status = rec.crowdloanMetricsStatus
-                        if (rec.crowdloanMetricsStatus == "FirstStepDone"){
+                        if (rec.crowdloanMetricsStatus == "FirstStepDone") {
                             cnt++
                         }
                     }
@@ -2544,7 +2552,23 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     if (status == 'Ready') return (true);
                 }
                 break;
-            case "idendity":
+            case "storage":
+                sql = `select storageMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 1) {
+                    status = recs[0].storageMetricsStatus
+                    if (status == 'Ready') return (true);
+                }
+                break;
+            case "trace":
+                sql = `select traceMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                recs = await this.poolREADONLY.query(sql)
+                if (recs.length == 1) {
+                    status = recs[0].traceMetricsStatus
+                    if (status == 'Ready') return (true);
+                }
+                break;
+            case "identity":
                 sql = `select identityMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
                 recs = await this.poolREADONLY.query(sql)
                 if (recs.length == 1) {
@@ -2571,8 +2595,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
     async dump_dotsama_crowdloan(logDT) {
         let paraID = 0
         let projectID = `${this.project}`
-        let bqDataset = (this.isProd)? `dotsama`: `dotsama_dev`
-        let bqDataset_txra = (this.isProd)? ``: `_dev` //MK write to relay_dev for dev
+        let bqDataset = (this.isProd) ? `dotsama` : `dotsama_dev`
+        let bqDataset_txra = (this.isProd) ? `` : `_dev` //MK write to relay_dev for dev
         let bqjobs = []
         console.log(`dump_dotsama_crowdloan logDT=${logDT}, projectID=${projectID}, bqDataset=${bqDataset}, bqDataset_txra=${bqDataset_txra}`)
 
@@ -2636,7 +2660,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 })
             }
         }
-        if (errloadCnt == 0){
+        if (errloadCnt == 0) {
             let sql = `update blocklog set crowdloanMetricsStatus = 'AuditRequired' where chainID in (${paraTool.chainIDPolkadot}, ${paraTool.chainIDKusama}) and logDT = '${logDT}'`
             this.batchedSQL.push(sql);
         }
@@ -2647,7 +2671,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
     async dump_relaychain_crowdloan(relayChain, logDT) {
         let paraID = 0
         let projectID = `${this.project}`
-        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+        let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
         let bqjobs = []
         console.log(`dump_crowdloan logDT=${logDT}, ${relayChain}-${paraID}, projectID=${projectID}, bqDataset=${bqDataset}`)
 
@@ -2732,7 +2756,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 })
             }
         }
-        if (errloadCnt == 0){
+        if (errloadCnt == 0) {
             let sql = `update blocklog set crowdloanMetricsStatus = 'FirstStepDone' where chainID = '${chainID}' and logDT = '${logDT}'`
             this.batchedSQL.push(sql);
         }
@@ -2747,7 +2771,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
         // load new accounts
         let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
-	    let jobTS = this.getCurrentTS();
+        let jobTS = this.getCurrentTS();
         let paraIDs = []
         let w = (paraID == 'all') ? "" : ` and paraID = '${paraID}'`;
         let sql = `select id, chainName, paraID, symbol, ss58Format, isEVM from chain where crawling = 1 and relayChain = '${relayChain}' order by paraID`
@@ -2964,7 +2988,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         if (errloadCnt == 0 && !isDry) {
             await this.update_blocklog(chainID, logDT);
             //update loadAccountMetricsDT, loadedAccountMetrics, accountMetricsStatus to "AuditRequired"
-	    let elapsedSeconds = this.getCurrentTS() - jobTS;
+            let elapsedSeconds = this.getCurrentTS() - jobTS;
             let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=Now(), accountMetricsStatus = "AuditRequired", accountMetricsElapsedSeconds = '${elapsedSeconds}' where chainID = '${chainID}' and logDT = '${logDT}'`
             this.batchedSQL.push(sql_upd);
 
@@ -2993,7 +3017,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let dir = "/tmp";
         let fn = path.join(dir, `${tbl}-${relayChain}-${logDT}.json`)
         let f = fs.openSync(fn, 'w', 0o666);
-        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+        let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
         let logDTp = logDT.replaceAll("-", "")
         let xcmtransfers = [];
         let NL = "\r\n";
@@ -3233,7 +3257,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             console.log("openSync", fn[tbl]);
             f[tbl] = fs.openSync(fn[tbl], 'w', 0o666);
         }
-        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+        let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
 
         // 3. setup specversions
         const tableChain = this.getTableChain(chainID);
@@ -3426,8 +3450,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let events = [];
 
                 let extrinsics = [];
-                for (const ext of b.extrinsics){
-                    for (const ev of ext.events){
+                for (const ext of b.extrinsics) {
+                    for (const ev of ext.events) {
                         let dEvent = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
                         //console.log(`${e.eventID} decoded`, dEvent)
                         if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
@@ -3449,13 +3473,13 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             section: ev.section,
                             method: ev.method,
                             data: ev.data,
-                            data_decoded: (dEvent && dEvent.decodedData != undefined)? dEvent.decodedData: null,
+                            data_decoded: (dEvent && dEvent.decodedData != undefined) ? dEvent.decodedData : null,
                         }
                         events.push(bqEvent);
                         block.event_count++;
                     }
                     if (ext.transfers) {
-                        for (const t of ext.transfers){
+                        for (const t of ext.transfers) {
                             let bqTransfer = {
                                 block_hash: block.hash,
                                 block_number: block.number,
@@ -3499,7 +3523,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         fee_usd: feeUSD,
                         //amounts: null
                         //amount_usd: null,
-                        weight: (ext.weight != undefined)? ext.weight: null, // TODO: ext.weight,
+                        weight: (ext.weight != undefined) ? ext.weight : null, // TODO: ext.weight,
                         signed: ext.signer ? true : false,
                         signer_ss58: ext.signer ? ext.signer : null,
                         signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
@@ -3614,14 +3638,14 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         }
 
         // mark crowdloanMetricsStatus as redy or ignore, depending on the result
-        if (numSubstrateETLLoadErrors == 0){
+        if (numSubstrateETLLoadErrors == 0) {
             //first polkadot crowdloan: 2021-11-05
             //first kusama crowdloan: 2021-06-08
             let w = ''
-            if (paraID == 0){
+            if (paraID == 0) {
                 w = `and logDT >= '2021-06-08'`
             }
-            let crowdloanMetricsStatus = (paraID == 0)? 'Ready': 'Ignore'
+            let crowdloanMetricsStatus = (paraID == 0) ? 'Ready' : 'Ignore'
             let sql = `update blocklog set crowdloanMetricsStatus = '${crowdloanMetricsStatus}' where chainID = '${chainID}' and logDT = '${logDT}' ${w}`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
@@ -3660,6 +3684,278 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         }
     }
 
+    parse_trace(e, traceType, traceIdx, bn, api) {
+        let o = {}
+        o.trace_id = `${bn}-${traceIdx}`
+        let decodeFailed = false
+        let key = e.k.slice()
+        var query = api.query;
+        if (key.substr(0, 2) == "0x") key = key.substr(2)
+        let val = "0x"; // this is essential to cover "0" balance situations where e.v is null ... we cannot return otherwise we never zero out balances
+        if (e.v) {
+            val = e.v.slice()
+            if (val.substr(0, 2) == "0x") val = val.substr(2)
+        }
+        let k = key.slice();
+        if (k.length > 64) k = k.substr(0, 64);
+        let sk = this.storageKeys[k];
+        if (!sk) {
+            o.section = 'unknown'
+            o.storage = 'unknown'
+            o.k = e.k
+            o.v = e.v
+            return o;
+        }
+
+        // add the palletName + storageName to the object, if found
+        o.section = sk.palletName;
+        o.storage = sk.storageName;
+        if (!o.section || !o.storage) {
+            console.log(`k=${k} not found (${key},${val})`)
+            decodeFailed = true
+            o.section = 'unknown'
+            o.storage = 'unknown'
+            o.k = e.k
+            o.v = e.v
+            return o;
+        }
+
+        let parsev = false;
+        let p = paraTool.firstCharLowerCase(o.section);
+        let s = paraTool.firstCharLowerCase(o.storage);
+        let kk = ''
+        let vv = ''
+        let pk = ''
+        let pv = ''
+        let debugCode = 0
+        let palletSection = `${o.p}:${o.s}`
+
+        try {
+            if (!query[p]) decodeFailed = true;
+            if (!query[p][s]) decodeFailed = true;
+            if (!query[p][s].meta) decodeFailed = true;
+        } catch (e) {
+
+            decodeFailed = true
+        }
+
+        if (decodeFailed) {
+            o.section = p
+            o.storage = s
+            o.k = e.k
+            o.v = e.v
+            return o;
+        }
+        let queryMeta = query[p][s].meta;
+
+        // parse key
+        try {
+            kk = key;
+            var skey = new StorageKey(api.registry, '0x' + key);
+            skey.setMeta(api.query[p][s].meta);
+            var parsek = skey.toHuman();
+            var decoratedKey = JSON.stringify(parsek)
+            pk = decoratedKey
+        } catch (err) {
+            pk = "err"
+        }
+
+        // parse value
+        try {
+            let valueType = (queryMeta.type.isMap) ? queryMeta.type.asMap.value.toJSON() : queryMeta.type.asPlain.toJSON();
+            let valueTypeDef = api.registry.metadata.lookup.getTypeDef(valueType).type;
+            let v = (val.length >= 2) ? val.substr(2).slice() : ""; // assume 01 "Some" prefix exists
+            if (valueTypeDef == "u128" || valueTypeDef == "u64" || valueTypeDef == "u32" || valueTypeDef == "u64" || valueTypeDef == "Balance") {
+                parsev = hexToBn(v, {
+                    isLe: true
+                }).toString();
+            } else {
+                switch (traceType) {
+                    case "state_traceBlock":
+                        if (api.createType != undefined) {
+                            parsev = api.createType(valueTypeDef, hexToU8a("0x" + v)).toString();
+                        } else if (api.registry != undefined && this.apiAt.registry.createType != undefined) {
+                            parsev = api.registry.createType(valueTypeDef, hexToU8a("0x" + v)).toString();
+                        }
+                        break;
+                    case "subscribeStorage":
+                    default: // skip over compact encoding bytes in Vec<u8>, see https://github.com/polkadot-js/api/issues/4445
+                        let b0 = parseInt(val.substr(0, 2), 16);
+                        switch (b0 & 3) {
+                            case 0: // single-byte mode: upper six bits are the LE encoding of the value
+                                let el0 = (b0 >> 2) & 63;
+                                if (el0 == (val.substr(2).length) / 2) {
+                                    if (api.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, hexToU8a("0x" + val.substr(2))).toString(); // 1 byte
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, hexToU8a("0x" + val.substr(2))).toString(); // 1 byte
+                                    }
+                                } else {
+                                    // MYSTERY: why should this work?
+                                    // console.log("0 BYTE FAIL - el0", el0, "!=", (val.substr(2).length) / 2);
+                                    if (api.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, hexToU8a("0x" + val.substr(2))).toString();
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, hexToU8a("0x" + val.substr(2))).toString();
+                                    }
+                                }
+                                break;
+                            case 1: // two-byte mode: upper six bits and the following byte is the LE encoding of the value
+                                var b1 = parseInt(val.substr(2, 2), 16);
+                                var el1 = ((b0 >> 2) & 63) + (b1 << 6);
+                                if (el1 == (val.substr(2).length - 2) / 2) {
+                                    if (api.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, hexToU8a("0x" + val.substr(4))).toString(); // 2 bytes
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, hexToU8a("0x" + val.substr(4))).toString(); // 2 bytes
+                                    }
+                                } else {
+                                    // MYSTERY: why should this work?
+                                    // console.log("2 BYTE FAIL el1=", el1, "!=", (val.substr(2).length - 2) / 2, "b0", b0, "b1", b1, "len", (val.substr(2).length - 2) / 2, "val", val);
+                                    if (this.apiAt.createType != undefined) {
+                                        parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString();
+                                    } else if (api.registry != undefined && api.registry.createType != undefined) {
+                                        parsev = api.registry.createType(valueTypeDef, "0x" + hexToU8a(val.substr(2))).toString();
+                                    }
+                                }
+                                break;
+                            case 2: // four-byte mode: upper six bits and the following three bytes are the LE encoding of the value
+                                /*var b1 = parseInt(val.substr(2, 2), 16);
+                                  var b2 = parseInt(val.substr(4, 2), 16);
+                                  var b3 = parseInt(val.substr(6, 2), 16);
+                                  var el2 = (b0 >> 2) & 63 + (b1 << 6) + (b2 << 14) + (b3 << 22);
+                                  if (el2 == (val.substr(2).length - 6) / 2) {
+                                  parsev = api.createType(valueTypeDef, "0x" + val.substr(8)).toString(); // 4 bytes
+                                  } else {
+                                  parsev = api.createType(valueTypeDef, "0x" + val.substr(2)).toString(); // assume 01 "Some" is the first byte
+                                  } */
+                                break;
+                            case 3: // Big-integer mode: The upper six bits are the number of bytes following, plus four.
+                                //let numBytes = ( b0 >> 2 ) & 63 + 4;
+                                //parsev = api.createType(valueTypeDef, "0x" + val.substr(2 + numBytes*2)).toString(); // check?
+                                break;
+                        }
+                }
+            }
+            vv = val;
+            if (parsev) {
+                pv = parsev;
+            }
+        } catch (err) {
+            console.log(`[${o.traceID}] SOURCE: pv`, traceType, k, val, err);
+        }
+        let paddedK = (kk.substr(0, 2) == '0x') ? kk : '0x' + kk
+        let paddedV = (vv.substr(0, 2) == '0x') ? vv : '0x' + vv
+        if (JSON.stringify(paddedK) == pk) pk = ''
+        if (kk != '') o.k = paddedK
+        if (vv != '') o.v = paddedV
+        if (pk != '') o.pk_extra = pk
+        if (pv != '') o.pv = pv
+
+        return o;
+    }
+
+    async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+        let projectID = `${this.project}`
+
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let chain = await this.getChain(chainID);
+        console.log(`dump_trace paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, logDT=${logDT} (projectID=${projectID})`)
+        // 1. get bnStart, bnEnd for logDT
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
+        logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
+
+        let minLogDT = `${logDT} 00:00:00`;
+        let maxLogDT = `${logDT} 23:59:59`;
+        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}'`
+        console.log(sql1);
+        let bnRanges = await this.poolREADONLY.query(sql1)
+        let {
+            bnStart,
+            bnEnd
+        } = bnRanges[0];
+
+        // 2. setup directories for tbls on date
+        let dir = "/tmp";
+        let tbl = "traces";
+        let fn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
+        let f = fs.openSync(fn, 'w', 0o666);
+        let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
+
+        // 3. setup specversions
+        const tableChain = this.getTableChain(chainID);
+        let specversions = [];
+        var specVersionRecs = await this.poolREADONLY.query(`select specVersion, blockNumber, blockHash, UNIX_TIMESTAMP(firstSeenDT) blockTS, CONVERT(metadata using utf8) as spec from specVersions where chainID = '${chainID}' and blockNumber > 0 order by blockNumber`);
+        this.specVersions[chainID.toString()] = [];
+        for (const specVersion of specVersionRecs) {
+            this.specVersions[chainID].push(specVersion);
+            specversions.push({
+                spec_version: specVersion.specVersion,
+                block_number: specVersion.blockNumber,
+                block_hash: specVersion.blockHash,
+                block_time: specVersion.blockTS,
+                spec: specVersion.spec
+            });
+            this.specVersion = specVersion.specVersion;
+        }
+
+        await this.setupAPI(chain)
+        let api = this.api;
+        let [finalizedBlockHash, blockTS, _bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
+        await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
+        // 4. do table scan 50 blocks at a time
+        let NL = "\r\n";
+        let jmp = 50;
+        let numTraces = 0;
+
+
+        for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
+            let bn1 = bn0 + jmp - 1;
+            if (bn1 > bnEnd) bn1 = bnEnd;
+            let start = paraTool.blockNumberToHex(bn0);
+            let end = paraTool.blockNumberToHex(bn1);
+            console.log("FETCHING", bn0, bn1, start, end);
+            let [rows] = await tableChain.getRows({
+                start: start,
+                end: end
+            });
+            for (const row of rows) {
+                let r = this.build_block_from_row(row);
+                let b = r.feed;
+                let bn = parseInt(row.id.substr(2), 16);
+                let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
+                let hdr = b.header;
+                let traces = r.trace;
+                if (traces.length > 0) {
+                    numTraces += traces.length;
+                    traces.forEach((t, traceIdx) => {
+                        let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
+                        o.block_number = bn;
+                        o.block_time = b.blockTS;
+                        o.block_hash = b.hash
+                        fs.writeSync(f, JSON.stringify(o) + NL);
+                    });
+                }
+            }
+        }
+
+        try {
+            fs.closeSync(f);
+            let logDTp = logDT.replaceAll("-", "")
+            let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field block_time --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+            console.log(cmd);
+            await exec(cmd);
+            let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
+            let loaded = (logDT == todayDT) ? 0 : 1;
+            let sql = `insert into blocklog (logDT, chainID, numTraces, traceMetricsStatus, traceMetricsDT) values ('${logDT}', '${chainID}', '${numTraces}', 'AuditRequired', Now() ) on duplicate key update numTraces = values(numTraces), traceMetricsStatus = values(traceMetricsStatus), traceMetricsDT = values(traceMetricsDT)`
+            console.log(sql);
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL();
+        } catch (err) {
+            console.log("dump_trace", err);
+        }
+    }
+
     async isEVMChain(chainID) {
         let sql = `select isEVM from chain where chainID = ${chainID}`;
         let recs = await this.poolREADONLY.query(sql);
@@ -3672,7 +3968,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
     async update_blocklog(chainID, logDT) {
         let project = this.project;
         let relayChain = paraTool.getRelayChainByChainID(chainID)
-        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //TODO:MK write to relay_dev for dev
+        let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //TODO:MK write to relay_dev for dev
         if (!this.isProd) return //TODO:MK skip query for dev
         let paraID = paraTool.getParaIDfromChainID(chainID)
         //xcmtransfers0, xcmtransfers1 are using substrate-etl.relayChain even for dev case
@@ -3816,12 +4112,58 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         let sql0 = `update chain set lastUpdateChainAssetsTS = UNIX_TIMESTAMP(Now()) where chainID = ${chainID}`;
         this.batchedSQL.push(sql0);
         await this.update_batchedSQL(10.0);
+    }
 
-        /*
-let topNgroups = ["balanceUSD", "numChains", "numAssets", "numTransfersIn", "avgTransferInUSD", "sumTransferInUSD", "numTransfersOut", "avgTransferOutUSD", "sumTransferOutUSD", "numExtrinsics", "numExtrinsicsDefi", "numCrowdloans", "numSubAccounts", "numRewards", "rewardsUSD"]
-        for (const topN of topNgroups) {
+    async trace_tally(startDT = '2023-03-10') {
+        let sql = `SELECT
+  section, storage, SUM(cnt) AS numKeys7d, COUNT(DISTINCT _TABLE_SUFFIX) numChains, MAX(_TABLE_SUFFIX) chainID
+ FROM (
+  SELECT _TABLE_SUFFIX,    section,    storage,    k,    COUNT(*) AS cnt,    min(string(pk_extra)) as pk1,    max(string(pk_extra)) as pk2,    min(string(pv)) as pv1,    max(string(pv)) as pv2
+  FROM   \`substrate-etl.polkadot.traces*\`
+  WHERE
+    DATE(block_time) >= "${startDT}"
+  GROUP BY section, storage, k, _TABLE_SUFFIX
+  HAVING
+    section NOT IN ("ParasDisputes",      "AuthorInherent",      "AutomationTime",      "ParaInherent",      "ParaSessionInfo",      "ImOnline",
+      "Initializer", "aura", "XcAssetConfig",      "auraExt",      "Ethereum",      "ParaScheduler",      "ElectionProviderMultiPhase",
+      "PolkadotXcm", "polkadotXcm",      "EVM",      "System",      "RandomnessCollectiveFlip",      "ParachainStaking",      "CollatorStaking",
+      "TransactionPayment", "historical", "VoterList", "Staking", "Scheduler",      "XcmPallet",      "Grandpa",      "Timestamp",     
+      "Paras", "Dmp", "Hrmp", "Ump", "Randomness",      "ParaInclusion",      "ParasShared",      "Babe",      "unknown",      "Security",      "ParachainSystem",      "CollatorSelection",
+      "Vesting", "XcmpQueue",      "Session",      "SessionManager",      "DmpQueue",      "Aura",      "AuraExt", "relayerXcm",      "Authorship", "Evm")
+      and storage not in ("Locks", "LowestUnbaked", "LastAccumulationSecs", "HasDispatched", "PreviousRelayBlockNumber"))
+ GROUP BY section, storage`
+        let rows = await this.execute_bqJob(sql);
+        let keys = ["palletName", "storageName"];
+        let vals = ["numKeys7d", "numChains", "chainID", "lastCountUpdateDT"]
+        let data = [];
+        for (const r of rows) {
+            data.push(`('${r.section}', '${r.storage}', '${r.numKeys7d}', '${r.numChains}', '${r.chainID}', Now() )`);
         }
-*/
+        console.log("trace_tally", data.length);
+        await this.upsertSQL({
+            "table": "chainPalletStorage",
+            keys,
+            vals,
+            data,
+            replace: vals
+        });
+    }
+
+    async mark_pallet_storage(pallet, storage, group, groupsection) {
+        //let sql = `update chainPalletStorage set substrateetl = 1, substrateetlGroup = '${group}', substrateetlGroupSection = '${groupSection}' where palletName = '${pallet}' and storageName = '${storage}'`
+        //this.batchedSQL.push(sql);
+        //this.update_batchSQL();
+    }
+
+    async dump_storage(chainID, logDT) {
+        let sql = `select storageKey, palletName, storageName, substrateetlGroup, substrateetlGroupSection from chainPalletStorage where substrateetl = 1`
+        let recs = this.poolREADONLY(sql);
+        let storageKeys = {};
+        for (const r of recs) {
+            storageKeys[r.storageKey] = r;
+        }
+        console.log(storageKeys);
+        // now
     }
 
     async getAlltables(filter = 'accounts') {

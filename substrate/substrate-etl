@@ -48,25 +48,24 @@ async function main() {
                 if (endDT) {
                     let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
                     console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
-                    for (const dt of logDTRange){
-                        if (force || (await substrateetl.is_dump_ready(dt, dumpType, {relayChain, paraID}))) {
+                    for (const dt of logDTRange) {
+                        if (force || (await substrateetl.is_dump_ready(dt, dumpType, {
+                                relayChain,
+                                paraID
+                            }))) {
                             await substrateetl.dump_substrateetl(dt, paraID, relayChain);
                         }
                     }
                 } else {
-                    if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {relayChain, paraID}))) {
+                    if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {
+                            relayChain,
+                            paraID
+                        }))) {
                         await substrateetl.dump_substrateetl(logDT, paraID, relayChain);
                     }
                 }
                 process.exit(0);
             }
-
-            /*
-            if (logDT && relayChain && paraID != undefined) {
-                await substrateetl.dump_substrateetl(logDT, paraID, relayChain);
-                process.exit(0);
-            }
-            */
 
             let tally = 0;
             while (true) {
@@ -109,7 +108,56 @@ async function main() {
                     } else {
                         await substrateetl.sleep(5000);
                     }
+                } else {
+                    await substrateetl.sleep(5000);
                 }
+            }
+        })
+
+    program.command('tracetally')
+        .description("Stream trace data out to Bigquery")
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            await substrateetl.trace_tally();
+            process.exit(0);
+        });
+
+    program.command('trace')
+        .description("Stream trace data out to Bigquery")
+        .option('-r, --relayChain <relayChain>', 'Relay chain', "polkadot")
+        .option('-p, --paraID <paraID>', 'Para ID', null, myParseInt)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .option('-f, --force', `Force even if not ready`, false)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            let logDT = opt.logDT ? opt.logDT : "2023-03-10";
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : "2023-03-16";
+            let paraID = opt.paraID ? opt.paraID : 0;
+            let relayChain = opt.relayChain ? opt.relayChain : "polkadot";
+            let force = opt.force;
+            let dumpType = 'trace'
+            if (logDT && relayChain && paraID != undefined) {
+                if (endDT) {
+                    let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
+                    console.log(`Days=${logDTRange.length} ${relayChain}:${paraID} [${logDT}, ${endDT}] ->`, logDTRange)
+                    for (const dt of logDTRange) {
+                        if (force || (await substrateetl.is_dump_ready(dt, dumpType, {
+                                relayChain,
+                                paraID
+                            }))) {
+                            await substrateetl.dump_trace(dt, paraID, relayChain);
+                        }
+                    }
+                } else {
+                    if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {
+                            relayChain,
+                            paraID
+                        }))) {
+                        await substrateetl.dump_substrateetl(logDT, paraID, relayChain);
+                    }
+                }
+                process.exit(0);
             }
         })
 
@@ -133,13 +181,19 @@ async function main() {
                 if (endDT) {
                     let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
                     console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
-                    for (const dt of logDTRange){
-                        if (force || (await substrateetl.is_dump_ready(dt, dumpType, {relayChain, paraID}))) {
+                    for (const dt of logDTRange) {
+                        if (force || (await substrateetl.is_dump_ready(dt, dumpType, {
+                                relayChain,
+                                paraID
+                            }))) {
                             await substrateetl.dump_accountmetrics(relayChain, paraID, dt);
                         }
                     }
                 } else {
-                    if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {relayChain, paraID}))) {
+                    if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {
+                            relayChain,
+                            paraID
+                        }))) {
                         await substrateetl.dump_accountmetrics(relayChain, paraID, logDT);
                     }
                 }
@@ -161,71 +215,77 @@ async function main() {
             }
         });
 
-        program.command('crowdloan')
-            .description('Dump account crowdloan using crowdloan table')
-            .usage("-r polkadot --logDT 2021-10-29")
-            .option('-l, --logDT <logDT>', 'Date', null)
-            .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
-            .option('-f, --force', `Force even if not ready`, false)
-            .action(async (opt) => {
-                let substrateetl = new SubstrateETL();
-                let logDT = opt.logDT;
-                let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
-                let force = opt.force;
-                let paraID = 0
-                let dumpType_step1 = 'relaychain_crowdloan'
-                let dumpType_step2 = 'dotsama_crowdloan'
-                let relayChains = ['polkadot', 'kusama']
-                /*
-                Step 1: compute relaychain_crowdloan -> this generate the relaychain.crowdloan tbl in substrate etl
-                Step 2: compute dotsama_crowdloan -> this generate the dotsama.accountscrowdloan tbl in substrate etl
-                */
-                if (logDT) {
-                    if (endDT) {
-                        let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
-                        console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
-                        for (const dt of logDTRange){
-                            for (const relayChain of relayChains){
-                                if (force || (await substrateetl.is_dump_ready(dt, dumpType_step1, {relayChain}))) {
-                                    await substrateetl.dump_relaychain_crowdloan(relayChain, dt);
-                                }
-                            }
-                            if (force || (await substrateetl.is_dump_ready(dt, dumpType_step2, {}))) {
-                                await substrateetl.dump_dotsama_crowdloan(dt);
+    program.command('crowdloan')
+        .description('Dump account crowdloan using crowdloan table')
+        .usage("-r polkadot --logDT 2021-10-29")
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .option('-f, --force', `Force even if not ready`, false)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            let logDT = opt.logDT;
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            let force = opt.force;
+            let paraID = 0
+            let dumpType_step1 = 'relaychain_crowdloan'
+            let dumpType_step2 = 'dotsama_crowdloan'
+            let relayChains = ['polkadot', 'kusama']
+            /*
+            Step 1: compute relaychain_crowdloan -> this generate the relaychain.crowdloan tbl in substrate etl
+            Step 2: compute dotsama_crowdloan -> this generate the dotsama.accountscrowdloan tbl in substrate etl
+            */
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
+                    console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
+                    for (const dt of logDTRange) {
+                        for (const relayChain of relayChains) {
+                            if (force || (await substrateetl.is_dump_ready(dt, dumpType_step1, {
+                                    relayChain
+                                }))) {
+                                await substrateetl.dump_relaychain_crowdloan(relayChain, dt);
                             }
                         }
-                    } else {
-                        for (const relayChain of relayChains){
-                            if (force || (await substrateetl.is_dump_ready(logDT, dumpType_step1, {relayChain}))) {
-                                await substrateetl.dump_relaychain_crowdloan(relayChain, logDT);
-                            }
-                        }
-                        if (force || (await substrateetl.is_dump_ready(logDT, dumpType_step2, {}))) {
-                            await substrateetl.dump_dotsama_crowdloan(logDT);
+                        if (force || (await substrateetl.is_dump_ready(dt, dumpType_step2, {}))) {
+                            await substrateetl.dump_dotsama_crowdloan(dt);
                         }
                     }
-                    process.exit(0);
-                }
-
-                while (true) {
-                    let x = await substrateetl.get_random_crowdloan_ready();
-                    let _logDT = x.logDT;
-                    if (_logDT) {
-                        for (const relayChain of relayChains){
-                            if (force || (await substrateetl.is_dump_ready(logDT, dumpType_step1, {relayChain}))) {
-                                await substrateetl.dump_relaychain_crowdloan(relayChain, _logDT);
-                            }
+                } else {
+                    for (const relayChain of relayChains) {
+                        if (force || (await substrateetl.is_dump_ready(logDT, dumpType_step1, {
+                                relayChain
+                            }))) {
+                            await substrateetl.dump_relaychain_crowdloan(relayChain, logDT);
                         }
-                        if (force || (await substrateetl.is_dump_ready(_logDT, dumpType_step2, {}))) {
-                            await substrateetl.dump_dotsama_crowdloan(_logDT);
-                        }
-                    } else {
-                        process.exit(0);
+                    }
+                    if (force || (await substrateetl.is_dump_ready(logDT, dumpType_step2, {}))) {
+                        await substrateetl.dump_dotsama_crowdloan(logDT);
                     }
                 }
                 process.exit(0);
+            }
 
-            });
+            while (true) {
+                let x = await substrateetl.get_random_crowdloan_ready();
+                let _logDT = x.logDT;
+                if (_logDT) {
+                    for (const relayChain of relayChains) {
+                        if (force || (await substrateetl.is_dump_ready(logDT, dumpType_step1, {
+                                relayChain
+                            }))) {
+                            await substrateetl.dump_relaychain_crowdloan(relayChain, _logDT);
+                        }
+                    }
+                    if (force || (await substrateetl.is_dump_ready(_logDT, dumpType_step2, {}))) {
+                        await substrateetl.dump_dotsama_crowdloan(_logDT);
+                    }
+                } else {
+                    process.exit(0);
+                }
+            }
+            process.exit(0);
+
+        });
 
     program.command('networkmetrics')
         .description(`Generate Network metrics (dotsama)`)
@@ -244,13 +304,17 @@ async function main() {
                 if (endDT) {
                     let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
                     console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
-                    for (const dt of logDTRange){
-                        if (force || (await substrateetl.is_dump_ready(network, dt, {network}))) {
+                    for (const dt of logDTRange) {
+                        if (force || (await substrateetl.is_dump_ready(network, dt, {
+                                network
+                            }))) {
                             await substrateetl.dump_networkmetrics(network, dt);
                         }
                     }
                 } else {
-                    if (force || (await substrateetl.is_dump_ready(network, logDT, {network}))) {
+                    if (force || (await substrateetl.is_dump_ready(network, logDT, {
+                            network
+                        }))) {
                         await substrateetl.dump_networkmetrics(relayChain, logDT);
                     }
                 }
@@ -270,6 +334,62 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('palletstorage')
+        .description(`Mark pallet storage combination across chains`)
+        .option('-p, --pallet <pallet>', `Pallet`, null)
+        .option('-s, --storage <storage>', `Storage`, false)
+        .option('--group <group>', `Storage`, null)
+        .option('--groupsection <groupsection>', `Storage`, null)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            let pallet = opt.pallet;
+            let storage = opt.storage;
+            let group = opt.group;
+            let groupsection = opt.groupsection;
+            await substrateetl.mark_pallet_storage(pallet, storage, group, groupsection);
+            process.exit(0);
+        });
+
+    program.command('storage')
+        .description(`Generate Storage data for a chain from trace (load subset of trace into long-term storage, key-value extraction)`)
+        .usage("-l 2023-02-01 -c 2000")
+        .option('-r, --relayChain <relayChain>', 'Relay chain', null)
+        .option('-p, --paraID <paraID>', 'Para ID', myParseInt)
+        .option('-l, --logDT <logDT>', `LogDT in YYYY-MM-DD form`, null)
+        .option('-f, --force', `Force even if not ready`, true)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            let paraID = opt.paraID;
+            let relayChain = opt.relayChain;
+
+            let logDT = opt.logDT ? opt.logDT : "2023-03-10";
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : "2023-03-16";
+            let force = opt.force;
+            let dumpType = 'storage'
+            if (logDT && relayChain && paraID != undefined) {
+                if (endDT) {
+                    let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
+                    console.log(`Days=${logDTRange.length} ${relayChain} ${paraID} [${logDT}, ${endDT}] ->`, logDTRange)
+                    for (const dt of logDTRange) {
+                        if (force || (await substrateetl.is_dump_ready(dt, dumpType, {
+                                relayChain,
+                                paraID
+                            }))) {
+                            await substrateetl.dump_storage(relayChain, paraID, dt);
+                        }
+                    }
+                } else {
+                    if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {
+                            relayChain,
+                            paraID
+                        }))) {
+                        await substrateetl.dump_storage(relayChain, paraID, logDT);
+                    }
+                }
+                process.exit(0);
+            }
+        });
+
     program.command('updatebalances')
         .description(`Update Balances for some chain`)
         .option('-c, --chainID <chainID>', 'ChainID to update balances', null, myParseInt)
@@ -285,9 +405,9 @@ async function main() {
                 if (endDT && logDT) {
                     var manager = new SubstrateETL();
                     let done = false;
-                    let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
+                    let logDTRange = manager.getLogDTRange(logDT, endDT)
                     console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
-                    for (const dt of logDTRange){
+                    for (const dt of logDTRange) {
                         let startTS = manager.getCurrentTS();
                         await manager.update_address_balances_logDT(chainID, dt, startTS);
                         //TODO: review the startTS?
@@ -415,8 +535,8 @@ async function main() {
         .action(async (opt) => {
             var substrateetl = new SubstrateETL();
             let chainID = opt.chainID
-            let isUpdate = (opt.update)? true: false
-            let isAll = (opt.all)? true: false
+            let isUpdate = (opt.update) ? true : false
+            let isAll = (opt.all) ? true : false
             if (chainID != undefined) chainID = myParseInt(chainID)
             await substrateetl.setup_tables(chainID, isUpdate);
             process.exit(0);
