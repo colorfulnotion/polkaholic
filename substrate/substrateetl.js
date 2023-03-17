@@ -45,6 +45,7 @@ const {
 const {
     BigQuery
 } = require('@google-cloud/bigquery');
+const fetch = require("node-fetch");
 
 // first day when balances are available daily in modern ways from Kusama
 const balanceStartDT = "2020-03-09";
@@ -168,15 +169,181 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
+    async fetchCsvAndConvertToJson(url) {
+      const response = await fetch(url);
+      const csvContent = await response.text();
+      return this.csvToJson(csvContent);
+    }
+
+    csvToJson(csv) {
+      const lines = csv.split("\n");
+      const headers = lines[0].split(",");
+      const result = lines.slice(1).map(line => {
+        const values = line.split(",");
+        return headers.reduce((obj, header, index) => {
+          obj[header] = values[index];
+          return obj;
+        }, {});
+      });
+      return result;
+    }
+
+    async ingestWalletAttribution(){
+        //FROM Fearless-Util
+        let url ='https://gist.githubusercontent.com/mkchungs/2f99c4403b64e5d4c17d46abdd9869a3/raw/9550f0ab7294f44c8c6c981c2fbc4a3d84f17b06/Polkadot_Hot_Wallet_Attributions.csv'
+        let recs = await this.fetchCsvAndConvertToJson(url)
+        let exchanges = []
+        for (const r of recs){
+            if (r.tag_type_verbose == 'Exchange'){
+                r.address_pubkey = paraTool.getPubKey(r.addresses)
+                let t = "(" + [`'${r.address_pubkey}'`, `'${r.tag_name_verbose} Exchange'`, `'${r.tag_name_verbose}'`, `'1'`
+                ].join(",") + ")";
+                exchanges.push(t)
+            }
+        }
+        console.log(exchanges)
+        let sqlDebug = true
+        await this.upsertSQL({
+            "table": "account",
+            "keys": ["address"],
+            "vals": ["nickname", "exchange_name", "is_exchange"],
+            "data": exchanges,
+            "replaceIfNull": ["nickname", "exchange_name", "is_exchange"]
+        }, sqlDebug);
+        return
+    }
+
+    decode_asciiType(asciiName = 'modlpy/trsrycb:6664'){
+        //para:2031
+        //modlpy/nopls:13312
+        //modlpy/cfund:2094
+        //trsry, nopl, cfund
+        let groups = ['trsry', 'nopl', 'cfund', "sibl"]
+        if (!asciiName.includes(':')) asciiName+=':'
+        let r = {
+            nickname: asciiName,
+            isModlePy : false,
+            type: null,
+            prefix: '',
+            idx: null,
+        }
+        let pieces = asciiName.split(':')
+        if (pieces.length == 2){
+            let firstPiece = pieces[0]
+            let idx = pieces[1]
+            if (idx != ''){
+                r.idx = idx
+            }
+            if (firstPiece.includes('/')){
+                let p = firstPiece.split('/')
+                if (p.length == 2){
+                    r.isModlePy = true
+                    let p1 = p[1]
+                    for (const c of groups){
+                        if (p1.includes(c)) {
+                            r.type = c
+                            let prefix = p1.split(c)
+                            r.prefix = prefix[1]
+                        }
+                    }
+                }
+            }else{
+                r.type = firstPiece
+            }
+        }
+        return r
+    }
+    async ingestSystemAddress(){
+        //FROM Fearless-Util
+        let url ='https://gist.githubusercontent.com/mkchungs/2f99c4403b64e5d4c17d46abdd9869a3/raw/5ea73227ca9e303a02f00791e9a9297637fa3dec/system_accounts.csv'
+        let recs = await this.fetchCsvAndConvertToJson(url)
+        let systemAddresses = []
+        let unknownAscii = []
+        for (const r of recs){
+            let asciiName = paraTool.pubKeyHex2ASCII(r.user_pubkey);
+            if (asciiName){
+                r.nickname = asciiName
+            }else{
+                unknownAscii.push(r)
+            }
+            console.log(this.decode_asciiType(r.nickname))
+
+        }
+        console.log(unknownAscii)
+    }
+
+    async dump_exchange_users(){
+        let paraID = 0
+        let relayChain = 'polkadot'
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let projectID = `${this.project}`
+        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+
+        let datasetID = `${relayChain}`
+        let tblName = `exchange_users${paraID}`
+        let destinationTbl = `${datasetID}.${tblName}`
+        //let destinationTbl = `${datasetID}.${tblName}$${logYYYYMMDD}`
+
+        let bqjobs = []
+        /*
+        with exchangeoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(block_time) as ts FROM `substrate-etl.polkadot.transfers0` where date(block_time)= '2023-03-01' group by from_pub_key, to_pub_key)
+        select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount, ts from substrate-etl.polkadot.exchanges inner join transfer on exchanges.address_pubkey = transfer.from_pub_key),
+        firstAttribution as (select user_pubkey, min(concat(ts, "_",exchagne_label)) attribution from exchangeoutgoing group by user_pubkey)
+        select user_pubkey, array_agg(distinct(exchagne_label)) as exchange_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt, min(split(attribution, "_")[offset(0)]) as first_exchange_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_exchange from exchangeoutgoing
+        inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc
+        */
+        let targetSQL = `with exchangeoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(block_time) as ts FROM \`${projectID}.${relayChain}.transfers${paraID}\` group by from_pub_key, to_pub_key)
+        select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount, ts from ${projectID}.${relayChain}.exchanges inner join transfer on exchanges.address_pubkey = transfer.from_pub_key),
+        firstAttribution as (select user_pubkey, min(concat(ts, "_",exchagne_label)) attribution from exchangeoutgoing group by user_pubkey)
+        select user_pubkey, array_agg(distinct(exchagne_label)) as exchange_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt, min(split(attribution, "_")[offset(0)]) as first_exchange_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_exchange from exchangeoutgoing
+        inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc`
+        /*
+        let targetSQL = `with exchangeoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt FROM \`${projectID}.${relayChain}.transfers${paraID}\` where date(block_time)= "2023-03-01" group by from_pub_key, to_pub_key)
+                select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount from substrate-etl.polkadot_dev.exchanges inner join transfer on exchanges.address_pubkey = transfer.from_pub_key)
+                select user_pubkey, array_agg(distinct(exchagne_label)) as exchange_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt from exchangeoutgoing group by user_pubkey order by transfer_cnt desc`
+        */
+        let cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+        bqjobs.push({
+            chainID: chainID,
+            paraID: paraID,
+            tbl: tblName,
+            destinationTbl: destinationTbl,
+            cmd: cmd
+        })
+
+        let errloadCnt = 0
+        let isDry = false;
+        for (const bqjob of bqjobs) {
+            try {
+                if (isDry) {
+                    console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                } else {
+                    console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                    //await exec(bqjob.cmd);
+                }
+            } catch (e) {
+                errloadCnt++
+                this.logger.error({
+                    "op": "dump_exchange_users",
+                    e
+                })
+            }
+        }
+
+    }
+
     async publishExchangeAddress(){
+        await this.ingestSystemAddress()
+        //await this.ingestWalletAttribution()
         let relayChain = 'polkadot'
         let tbl = `exchanges`
         let projectID = `${this.project}`
         let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
         let sql = `select nickname, exchange_name, address from account where is_exchange = 1`
-        let recs = await this.poolREADONLY.query(sql);
+        let sqlRecs = await this.poolREADONLY.query(sql);
         let knownAccounts = [];
-        for (const r of recs) {
+        let knownPubkeys = {}
+        for (const r of sqlRecs) {
             let a = {
                 address_pubkey: r.address,
                 address_nickname: r.nickname,
@@ -194,6 +361,8 @@ module.exports = class SubstrateETL extends AssetManager {
         fs.closeSync(f);
         let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/${tbl}.json`;
         console.log(cmd)
+
+        await this.dump_exchange_users()
     }
 
     async cleanReaped(start = null, end = null) {
@@ -4155,7 +4324,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
     section NOT IN ("ParasDisputes",      "AuthorInherent",      "AutomationTime",      "ParaInherent",      "ParaSessionInfo",      "ImOnline",
       "Initializer", "aura", "XcAssetConfig",      "auraExt",      "Ethereum",      "ParaScheduler",      "ElectionProviderMultiPhase",
       "PolkadotXcm", "polkadotXcm",      "EVM",      "System",      "RandomnessCollectiveFlip",      "ParachainStaking",      "CollatorStaking",
-      "TransactionPayment", "historical", "VoterList", "Staking", "Scheduler",      "XcmPallet",      "Grandpa",      "Timestamp",     
+      "TransactionPayment", "historical", "VoterList", "Staking", "Scheduler",      "XcmPallet",      "Grandpa",      "Timestamp",
       "Paras", "Dmp", "Hrmp", "Ump", "Randomness",      "ParaInclusion",      "ParasShared",      "Babe",      "unknown",      "Security",      "ParachainSystem",      "CollatorSelection",
       "Vesting", "XcmpQueue",      "Session",      "SessionManager",      "DmpQueue",      "Aura",      "AuraExt", "relayerXcm",      "Authorship", "Evm")
       and storage not in ("Locks", "LowestUnbaked", "LastAccumulationSecs", "HasDispatched", "PreviousRelayBlockNumber"))
