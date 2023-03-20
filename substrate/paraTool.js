@@ -105,12 +105,12 @@ function q(inp) {
     return ("'" + inp + "'");
 }
 
-function toIntegerStr(n){
+function toIntegerStr(n) {
     var b = bnToBn(n)
     return b.toString()
 }
 
-function toBn(n){
+function toBn(n) {
     return bnToBn(n)
 }
 
@@ -715,6 +715,8 @@ function getChainIDFromParaIDAndRelayChain(paraID, relayChain = 'polkadot') {
     let relayChainID = getRelayChainID(relayChain)
     let paraIDExtra = getParaIDExtra(relayChain)
     if (paraID == 0) return relayChainID
+    paraID = parseInt(paraID, 10);
+
     return paraIDExtra + paraID
 }
 

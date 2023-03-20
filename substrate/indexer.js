@@ -68,7 +68,6 @@ module.exports = class Indexer extends AssetManager {
     chainID = false;
     chainName = false;
     relayChain = "";
-    metadata = {};
     authorErrorSpecVersion = 0; //query.session.currentIndex is not available for certain v. cache the errorV and do not ask author until specV changed again
     specVersion = -1;
     xcmeventsMap = {};
@@ -555,97 +554,7 @@ module.exports = class Indexer extends AssetManager {
         //  where each cell will be specific time and it is in reverse chronilogical order
         return (true);
     }
-    // getSpecVersionMetadata returns a cached metadata object OR fetches from SQL table OR does a RPC call
-    // and updates this.storageKeys using the "pallets"
-    async getSpecVersionMetadata(chain, specVersion, blockHash = false, bn = 0) {
-        let chainID = chain.chainID;
-        let updateChainPalletStorage = (this.getCurrentTS() - chain.lastUpdateStorageKeysTS > 86400 * 3);
-        if (this.metadata[specVersion]) return (this.metadata[specVersion]);
-        let sql = `select metadata, specVersion from specVersions where chainID = '${chainID}' and specVersion = ${specVersion} limit 1`;
-        var metadataRecs = await this.poolREADONLY.query(sql)
-        let metadata = false;
-        if (metadataRecs.length == 0 || !(metadataRecs[0].metadata.length > 0)) {
-            let chainID = chain.chainID;
-            let metadataRaw = blockHash ? await this.api.rpc.state.getMetadata(blockHash) : await this.api.rpc.state.getMetadata();
-            metadata = metadataRaw.asV14.toJSON();
-            let metadataString = JSON.stringify(metadata);
-            console.log("getSpecVersionMetadata: fetch metadata from rpc", "chainID", chainID, "specVersion", specVersion, "len(metadataString)", metadataString.length);
-            if (await this.update_spec_version(chainID, specVersion)) {}
-            await this.upsertSQL({
-                "table": "specVersions",
-                "keys": ["chainID", "specVersion"],
-                "vals": ["metadata"],
-                "data": [`('${chainID}', '${specVersion}', ${mysql.escape(metadataString)} )`],
-                "replace": ["metadata"]
-            });
-            this.metadata[specVersion] = metadata;
-        } else {
-            console.log("getSpecVersionMetadata: fetch metadata from db", sql);
-            metadata = JSON.parse(metadataRecs[0].metadata);
-            this.metadata[specVersion] = metadata;
-        }
 
-        var pallets = metadata.pallets;
-        /*  Example: {
-          name: 'Balances',
-          storage: { prefix: 'Balances', items: [Array] },
-          calls: { type: '210' },
-          events: { type: '41' },
-          constants: [ [Object], [Object], [Object] ],
-          errors: { type: '343' },
-          index: '10'
-        }, */
-        this.storageKeys = {};
-        let sks = [];
-        for (const pallet of pallets) {
-            var palletName = pallet.name; // Tokens
-            var calls = pallet.calls;
-            var events = pallet.events;
-            var constants = pallet.constants;
-            var errors = pallet.errors;
-            var storage = pallet.storage;
-            var prefix = pallet.prefix;
-            if (storage && storage.items) {
-                for (const item of storage.items) {
-                    /* Example: {
-                      name: 'TotalIssuance',
-                      modifier: 'Default',
-                      type: { map: { hashers: [Array], key: '44', value: '6' } },
-                      fallback: '0x00000000000000000000000000000000',
-                      docs: [ ' The total issuance of a token type.' ]
-                      }		*/
-                    let type0 = JSON.stringify(item.type);
-                    let modifier = item.modifier;
-                    let fallback = item.fallback;
-                    let storageName = item.name;
-                    let docs = item.docs.join(" ").trim();
-                    let storageKey = paraTool.twox_128(palletName) + paraTool.twox_128(storageName);
-                    this.storageKeys[storageKey] = {
-                        palletName,
-                        storageName
-                    };
-                    if (updateChainPalletStorage) {
-                        sks.push(`('${palletName}', '${storageName}', '${chainID}', '${storageKey}', ${mysql.escape(modifier)}, ${mysql.escape(type0)}, ${mysql.escape(fallback)}, ${mysql.escape(docs)}, Now())`)
-                    }
-                }
-            }
-        }
-        if (sks.length > 0) {
-            // add potentially new chainPalletStorage records and record that we have done so
-            await this.upsertSQL({
-                "table": `chainPalletStorage`,
-                "keys": ["palletName", "storageName"],
-                "vals": ["chainID", "storageKey", "modifier", "type", "fallback", "docs", "lastUpdateDT"],
-                "data": sks,
-                "replace": ["chainID", "storageKey", "modifier", "type", "fallback", "docs", "lastUpdateDT"]
-            });
-            let sql = `update chain set lastUpdateStorageKeysTS = UNIX_TIMESTAMP(Now()) where chainID = '${chainID}'`
-            this.batchedSQL.push(sql);
-            await this.update_batchedSQL()
-        }
-        return (this.metadata[specVersion]);
-
-    }
 
     resetTimeUsage() {
         let newTimeStat = {
@@ -832,10 +741,11 @@ module.exports = class Indexer extends AssetManager {
             let xcmMetaRecs = [];
             for (let i = 0; i < xcmMetaMapKeys.length; i++) {
                 let r = this.xcmMetaMap[xcmMetaMapKeys[i]];
-                //["blockNumber"] + ["blockTS", "blockHash", "stateRoot", "xcmMeta"]
-                let xcmMeta = mysql.escape(JSON.stringify(r.xcmMeta))
-                let t = "(" + [`'${r.blockNumber}'`, `'${r.blockTS}'`, `'${r.blockHash}'`, `'${r.stateRoot}'`, mysql.escape(JSON.stringify(r.xcmMeta))].join(",") + ")";
-                xcmMetaRecs.push(t)
+		if ( r.blockNumber ) {
+                    let xcmMeta = mysql.escape(JSON.stringify(r.xcmMeta))
+                    let t = "(" + [`'${r.blockNumber}'`, `'${r.blockTS}'`, `'${r.blockHash}'`, `'${r.stateRoot}'`, mysql.escape(JSON.stringify(r.xcmMeta))].join(",") + ")";
+                    xcmMetaRecs.push(t)
+		}
             }
             let sqlDebug = false
             this.xcmMetaMap = {};

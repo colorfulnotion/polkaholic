@@ -1173,7 +1173,7 @@ module.exports = class Crawler extends Indexer {
     async indexChainRandom(lookbackBackfillDays = 60, audit = true, backfill = true, write_bq_log = true, update_chain_assets = true) {
         // pick a chainID that the node is also crawling
         let hostname = this.hostname;
-        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 and ( lastAttemptStartDT is null or lastAttemptStartDT < date_sub(Now(), interval POW(5, attempted) MINUTE) )  and chainID in ( select chainID from chainhostnameendpoint where hostname = '${hostname}' ) group by chainID having count(*) < 200 order by rand() desc`;
+        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 and ( lastAttemptStartDT is null or lastAttemptStartDT < date_sub(Now(), interval POW(5, attempted) MINUTE) )  and chainID in ( select chainID from chainhostnameendpoint where hostname = '${hostname}' ) group by chainID having count(*) < 500 order by rand() desc`;
         console.log(sql);
         var chains = await this.poolREADONLY.query(sql);
 
