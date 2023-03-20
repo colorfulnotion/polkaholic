@@ -281,6 +281,48 @@ function getAuthor(digest, validators) {
     return [author, authorPubkey]
 }
 
+decode_systemAccountType(asciiName = 'modlpy/trsrycb:6664'){
+    //para:2031
+    //sibl:2000
+    //modlpy/nopls:13312
+    //modlpy/cfund:2094
+    //trsry, nopl, cfund
+    let groups = ["trsry", "nopl", "cfund", "sibl", "para", "trsy"]
+    if (!asciiName.includes(':')) asciiName+=':'
+    let r = {
+        nickname: asciiName,
+        isModlePy : false,
+        systemAccountType: null,
+        prefix: '',
+        idx: null,
+    }
+    let pieces = asciiName.split(':')
+    if (pieces.length == 2){
+        let firstPiece = pieces[0]
+        let idx = pieces[1]
+        if (idx != ''){
+            r.idx = idx
+        }
+        if (firstPiece.includes('/')){
+            let p = firstPiece.split('/')
+            if (p.length >= 2){
+                r.isModlePy = true
+                let p1 = p[1]
+                for (const c of groups){
+                    if (p1.includes(c)) {
+                        r.systemAccountType = c
+                        let prefix = p1.split(c)
+                        r.prefix = prefix[1]
+                    }
+                }
+            }
+        }else{
+            r.systemAccountType = firstPiece
+        }
+    }
+    return r
+}
+
 function pubKey_hex2ascii(str) {
     if (typeof str != "string") return (null);
     let inp = (str.substring(0, 2) == "0x") ? str.substring(2) : str.substring(0);
@@ -1931,6 +1973,7 @@ module.exports = {
     parseBool: function(input) {
         return parseBool(input);
     },
+    decode_systemAccountType: decode_systemAccountType,
     pubKeyHex2ASCII: function(str) {
         return pubKey_hex2ascii(str)
     },

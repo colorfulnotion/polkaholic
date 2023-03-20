@@ -192,67 +192,35 @@ module.exports = class SubstrateETL extends AssetManager {
         //FROM Fearless-Util
         let url ='https://gist.githubusercontent.com/mkchungs/2f99c4403b64e5d4c17d46abdd9869a3/raw/9550f0ab7294f44c8c6c981c2fbc4a3d84f17b06/Polkadot_Hot_Wallet_Attributions.csv'
         let recs = await this.fetchCsvAndConvertToJson(url)
-        let exchanges = []
+        let accounts = []
+        let idx = 0
         for (const r of recs){
-            if (r.tag_type_verbose == 'Exchange'){
-                r.address_pubkey = paraTool.getPubKey(r.addresses)
-                let t = "(" + [`'${r.address_pubkey}'`, `'${r.tag_name_verbose} Exchange'`, `'${r.tag_name_verbose}'`, `'1'`
+            let isExchange = (r.tag_type_verbose == 'Exchange')? 1 : 0
+            let accountName = r.tag_name_verbose
+            let verified = 1
+            r.accountType = r.tag_type_verbose
+            let pubkey = paraTool.getPubKey(r.addresses)
+            if (pubkey){
+                r.address_pubkey = pubkey
+                let t = "(" + [`'${r.address_pubkey}'`, `'${r.tag_name_verbose} ${r.accountType}'`, `'${r.accountType}'`, `'${accountName}'`, `'${isExchange}'`, `'${verified}'`, `NOW()`
                 ].join(",") + ")";
-                exchanges.push(t)
+                accounts.push(t)
+                idx++
+                console.log(`[${idx}] ${t}`)
             }
         }
-        console.log(exchanges)
+        console.log(accounts)
         let sqlDebug = true
         await this.upsertSQL({
             "table": "account",
             "keys": ["address"],
-            "vals": ["nickname", "exchange_name", "is_exchange"],
-            "data": exchanges,
-            "replaceIfNull": ["nickname", "exchange_name", "is_exchange"]
+            "vals": ["nickname", "accountType", "accountName", "is_exchange", "verified", "verifyDT"],
+            "data": accounts,
+            "replaceIfNull": ["nickname", "accountType", "accountName", "is_exchange", "verifyDT"],
+            "replace": ["verified"]
         }, sqlDebug);
-        return
     }
 
-    decode_asciiType(asciiName = 'modlpy/trsrycb:6664'){
-        //para:2031
-        //modlpy/nopls:13312
-        //modlpy/cfund:2094
-        //trsry, nopl, cfund
-        let groups = ['trsry', 'nopl', 'cfund', "sibl"]
-        if (!asciiName.includes(':')) asciiName+=':'
-        let r = {
-            nickname: asciiName,
-            isModlePy : false,
-            type: null,
-            prefix: '',
-            idx: null,
-        }
-        let pieces = asciiName.split(':')
-        if (pieces.length == 2){
-            let firstPiece = pieces[0]
-            let idx = pieces[1]
-            if (idx != ''){
-                r.idx = idx
-            }
-            if (firstPiece.includes('/')){
-                let p = firstPiece.split('/')
-                if (p.length == 2){
-                    r.isModlePy = true
-                    let p1 = p[1]
-                    for (const c of groups){
-                        if (p1.includes(c)) {
-                            r.type = c
-                            let prefix = p1.split(c)
-                            r.prefix = prefix[1]
-                        }
-                    }
-                }
-            }else{
-                r.type = firstPiece
-            }
-        }
-        return r
-    }
     async ingestSystemAddress(){
         //FROM Fearless-Util
         let url ='https://gist.githubusercontent.com/mkchungs/2f99c4403b64e5d4c17d46abdd9869a3/raw/5ea73227ca9e303a02f00791e9a9297637fa3dec/system_accounts.csv'
@@ -262,13 +230,36 @@ module.exports = class SubstrateETL extends AssetManager {
         for (const r of recs){
             let asciiName = paraTool.pubKeyHex2ASCII(r.user_pubkey);
             if (asciiName){
-                r.nickname = asciiName
+                let systemAccountInfo = paraTool.decode_systemAccountType(asciiName)
+                systemAccountInfo.user_pubkey = r.user_pubkey
+                systemAddresses.push(systemAccountInfo)
             }else{
                 unknownAscii.push(r)
             }
-            console.log(this.decode_asciiType(r.nickname))
-
         }
+        let accounts = []
+        let idx = 0
+        for (const r of systemAddresses){
+            r.accountType = "System"
+            r.address_pubkey = paraTool.getPubKey(r.user_pubkey)
+            let accountName = `${r.systemAccountType}${r.prefix}:${r.idx}`
+            let verified = 1
+            let t = "(" + [`'${r.address_pubkey}'`, `'${r.nickname}'`, `'${r.accountType}'`, `'${r.systemAccountType}'`, `'${accountName}'`, `'${verified}'`, `NOW()`
+            ].join(",") + ")";
+            accounts.push(t)
+            idx++
+            console.log(`[${idx}] ${t}`)
+        }
+        console.log(accounts)
+        let sqlDebug = true
+        await this.upsertSQL({
+            "table": "account",
+            "keys": ["address"],
+            "vals": ["nickname", "accountType", "systemAccountType", "accountName", "verified", "verifyDT"],
+            "data": accounts,
+            "replaceIfNull": ["nickname", "accountType", "systemAccountType", "verified", "verifyDT"],
+            "replace": ["accountName"]
+        }, sqlDebug);
         console.log(unknownAscii)
     }
 
@@ -339,7 +330,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let tbl = `exchanges`
         let projectID = `${this.project}`
         let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
-        let sql = `select nickname, exchange_name, address from account where is_exchange = 1`
+        let sql = `select nickname, accountName, address from account where is_exchange = 1`
         let sqlRecs = await this.poolREADONLY.query(sql);
         let knownAccounts = [];
         let knownPubkeys = {}
@@ -347,7 +338,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let a = {
                 address_pubkey: r.address,
                 address_nickname: r.nickname,
-                address_label: r.exchange_name,
+                address_label: r.accountName,
             }
             knownAccounts.push(a)
         }
