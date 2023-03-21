@@ -72,29 +72,32 @@ function encode_column_bt_hashes_xcminfofinalized(chainID, extrinsicID, xcmIndex
     return rowKey
 }
 
-function decode_column_bt_hashes_xcminfofinalized(rowKey) {
+function decode_column_bt_hashes_xcminfofinalized(rowKey = '2004-3126881-4-0-0') {
     //key chainID-bn-extrinsicIdx-xcmIndex:transferIndex
-    let chainID, extrinsicID, xcmIndex, transferIndex = false
+    let chainID = false, extrinsicID = false, xcmIndex = false, transferIndex = false, isValid = false
     try {
         let pieces = rowKey.split('-')
         if (pieces.length == 5) {
-            chainID = pieces[0]
+            chainID = parseInt(pieces[0])
             extrinsicID = `${pieces[1]}-${pieces[2]}`
-            xcmIndex = pieces[3]
-            transferIndex = pieces[4]
+            xcmIndex = parseInt(pieces[3])
+            transferIndex = parseInt(pieces[4])
         }
     } catch (e) {
-        console.log(`invalid rowKey ${rowKey}`)
+        console.log(`invalid rowKey ${rowKey} e`, e)
     }
-    return [chainID, extrinsicID, xcmIndex, transferIndex]
+    if (chainID != undefined && extrinsicID != undefined && xcmIndex != undefined && transferIndex != undefined){
+        isValid = true
+    }
+    return [chainID, extrinsicID, xcmIndex, transferIndex, isValid]
 }
 
 function decode_xcminfofinalized(XCMInfoData) {
     if (XCMInfoData) {
         let xcmInfos = []
         for (const rowKey of Object.keys(XCMInfoData)) {
-            let [chainID, extrinsicID, xcmIndex, transferIndex] = decode_column_bt_hashes_xcminfofinalized(rowKey)
-            if (chainID != false && extrinsicID != false && xcmIndex != false && transferIndex != false) {
+            let [chainID, extrinsicID, xcmIndex, transferIndex, isValid] = decode_column_bt_hashes_xcminfofinalized(rowKey)
+            if (isValid) {
                 const cell = XCMInfoData[rowKey][0]; // latest cell
                 let xcmInfo = JSON.parse(cell.value);
                 xcmInfos.push(xcmInfo)

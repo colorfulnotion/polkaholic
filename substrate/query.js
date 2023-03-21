@@ -1746,13 +1746,10 @@ module.exports = class Query extends AssetManager {
 
                     if (c.substrate != undefined && isRecursive) {
                         if (XCMInfoData) {
-                            let extrinsicIDs = Object.keys(XCMInfoData)
-
-                            for (const extrinsicID of extrinsicIDs) {
-                                let cells = XCMInfoData[extrinsicID];
-                                let cell = cells[0]
-                                let xcmInfo = JSON.parse(cell.value);
-                                c.xcmInfo = xcmInfo;
+                            //MK: TODO - present as array
+                            let xcmInfo = this.pickXcmInfo(XCMInfoData)
+                            if (xcmInfo){
+                                c.xcmInfo = xcmInfo
                             }
                         } else if (this.is_evm_xcmtransfer_input(c.input)) {
                             //  fetch xcmInfo from substrate extrinsicHash
@@ -1795,15 +1792,12 @@ module.exports = class Query extends AssetManager {
 
                     let traceID = null
                     if (XCMInfoData) {
-                        let extrinsicIDs = Object.keys(XCMInfoData)
-                        let fee = 0;
-                        for (const extrinsicID of extrinsicIDs) {
-                            let cells = XCMInfoData[extrinsicID];
-                            let cell = cells[0]
-                            let xcmInfo = JSON.parse(cell.value);
-                            c.xcmInfo = xcmInfo;
+                        //MK: TODO - present as array
+                        let xcmInfo = this.pickXcmInfo(XCMInfoData)
+                        if (xcmInfo){
+                            c.xcmInfo = xcmInfo
+                            d.xcmInfo = c.xcmInfo
                         }
-                        d.xcmInfo = c.xcmInfo
                         return d;
                     } else if (isExtrinsicXcm) {
                         //let [traceID] = await this.getTraceXCMInfo(txHash)
@@ -6589,8 +6583,31 @@ module.exports = class Query extends AssetManager {
         return [];
     }
 
+    pickXcmInfo(XCMInfoData){
+        let mainXcmInfo = false
+        let xcmInfos = btTool.decode_xcminfofinalized(XCMInfoData)
+        if (Array.isArray(xcmInfos) && xcmInfos.length > 0) {
+            //MK - TODO: return infos as array
+            mainXcmInfo = xcmInfos[0]
+            if (xcmInfos.length >= 2){
+                let prevConf = 0
+                for (const xcmInfo of xcmInfos){
+                    if (xcmInfo != undefined && xcmInfo.destination != undefined && xcmInfo.destination.confidence != undefined){
+                        let currConf = xcmInfo.destination.confidence
+                        console.log(`prevConf=${prevConf}, currConf=${currConf}`)
+                        if (currConf > prevConf){
+                            mainXcmInfo = xcmInfo
+                            prevConf = currConf
+                        }
+                    }
+                }
+            }
+        }
+        return mainXcmInfo
+    }
 
     async getXCMInfo(hash) {
+        console.log(`!!! getXCMInfo hash=${hash} called`)
         const filter = {
             column: {
                 cellLimit: 1
@@ -6609,18 +6626,8 @@ module.exports = class Query extends AssetManager {
                 XCMInfoData = rowData["xcminfofinalized"]
             }
             if (XCMInfoData) {
-                /*
-                for (const rowKey of Object.keys(XCMInfoData)) {
-                    const cell = XCMInfoData[rowKey][0];
-                    let xcmInfo = JSON.parse(cell.value);
-                    return xcmInfo;
-                }
-                */
-                let xcmInfos = btTool.decode_column_bt_hashes_xcminfofinalized(XCMInfoData)
-                if (Array.isArray(xcmInfos) && xcmInfos.length > 0) {
-                    //TODO: return infos
-                    return xcmInfos[0]
-                }
+                let xcmInfo = this.pickXcmInfo(XCMInfoData)
+                return xcmInfo
             } else {
                 throw new paraTool.InvalidError(`${hash} not found`)
             }
