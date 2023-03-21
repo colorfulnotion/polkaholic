@@ -741,11 +741,11 @@ module.exports = class Indexer extends AssetManager {
             let xcmMetaRecs = [];
             for (let i = 0; i < xcmMetaMapKeys.length; i++) {
                 let r = this.xcmMetaMap[xcmMetaMapKeys[i]];
-		if ( r.blockNumber ) {
+                if (r.blockNumber) {
                     let xcmMeta = mysql.escape(JSON.stringify(r.xcmMeta))
                     let t = "(" + [`'${r.blockNumber}'`, `'${r.blockTS}'`, `'${r.blockHash}'`, `'${r.stateRoot}'`, mysql.escape(JSON.stringify(r.xcmMeta))].join(",") + ")";
                     xcmMetaRecs.push(t)
-		}
+                }
             }
             let sqlDebug = false
             this.xcmMetaMap = {};
@@ -6595,7 +6595,7 @@ module.exports = class Indexer extends AssetManager {
         return backedMap
     }
 
-    async indexRelayChainTrace(traces, bn, chainID, blockTS, relayChain = 'polkadot', isTip = false, finalized = false) {
+    async indexRelayChainTrace(traces, bn, chainID, blockTS, relayChain = 'polkadot', isTip = false, finalized = false, chainParserStat = false) {
         let xcmList = [];
         let backedMap = this.ParaInclusionPendingAvailabilityFilter(traces)
         let mp = {}
@@ -6772,17 +6772,21 @@ module.exports = class Indexer extends AssetManager {
             // TODO: keep minimal essential data
             // blockTS|msgType|relayChain|blockNumber|relayParentStateRoot|relayBlockHash|chainID|chainIDDest|sentAt|relayedAt|includedAt|msgHash
             // (integer) blockTS|blockNumber|chainID|chainIDDest|sentAt|relayedAt|includedAt
-            let s = `${x.blockTS}|${x.msgType}|${this.relayChain}|${this.chainParser.parserBlockNumber}|${this.chainParser.relayParentStateRoot}|${this.chainParser.parserBlockHash}|${x.chainID}|${x.chainIDDest}|${x.sentAt}|${x.relayedAt}|${x.includedAt}|${x.msgHash}`
-            if (this.debugLevel >= paraTool.debugInfo) console.log(`xcmMeta: ${s}`)
-            xcmMeta.push(s)
+            //console.log(`xcmMeta!!`, x)
+            // '1679350644|hrmp|kusama|false|false|false|22092|22000|17126302|17126303|17126304|0x81009ec171d725cb0265ca9e49b2db16888fa2b76b475fd14bdd0f4520d74894'
+            if (chainParserStat){
+                let s = `${x.blockTS}|${x.msgType}|${this.relayChain}|${chainParserStat.parserBlockNumber}|${chainParserStat.relayParentStateRoot}|${chainParserStat.parserBlockHash}|${x.chainID}|${x.chainIDDest}|${x.sentAt}|${x.relayedAt}|${x.includedAt}|${x.msgHash}`
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`xcmMeta: ${s}`)
+                xcmMeta.push(s)
+            }
         }
         //this.xcmMeta = xcmMeta
         if (xcmMeta.length > 0) {
             this.xcmMetaMap[bn] = {
-                blockNumber: this.chainParser.parserBlockNumber,
-                blockTS: this.chainParser.parserTS,
-                blockHash: this.chainParser.parserBlockHash,
-                stateRoot: this.chainParser.relayParentStateRoot,
+                blockNumber: chainParserStat.parserBlockNumber,
+                blockTS: chainParserStat.parserTS,
+                blockHash: chainParserStat.parserBlockHash,
+                stateRoot: chainParserStat.relayParentStateRoot,
                 xcmMeta: xcmMeta,
             }
         }
@@ -6846,8 +6850,10 @@ module.exports = class Indexer extends AssetManager {
             }
         }
         // setParserContext
+        //console.log(`**** blockHash=${blockHash}, blockNumber=${blockNumber}, stateRoot=${stateRoot}`)
         this.chainParser.setParserContext(block.blockTS, blockNumber, blockHash, chainID);
         if (this.isRelayChain) this.chainParser.setRelayParentStateRoot(stateRoot)
+        //console.log(`**** chainParserStat`, this.chainParser.getChainParserStat())
         let api = this.apiAt; //processBlockEvents is sync func, so we must initialize apiAt before pass in?
         block.finalized = finalized;
 
@@ -6918,10 +6924,9 @@ module.exports = class Indexer extends AssetManager {
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             if (autoTraces) {
                 //console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
-                await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain, isTip, finalized);
+                await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain, isTip, finalized, this.chainParser.getChainParserStat());
             }
         }
-
         let xcmMeta = []
         if (this.isRelayChain) {
             let xcmMetaInfo = this.xcmMetaMap[blockNumber]
