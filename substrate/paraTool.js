@@ -281,7 +281,7 @@ function getAuthor(digest, validators) {
     return [author, authorPubkey]
 }
 
-decode_systemAccountType(asciiName = 'modlpy/trsrycb:6664'){
+function decode_systemAccountType(asciiName = 'modlpy/trsrycb:6664'){
     //para:2031
     //sibl:2000
     //modlpy/nopls:13312

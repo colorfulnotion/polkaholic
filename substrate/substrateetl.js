@@ -327,10 +327,12 @@ module.exports = class SubstrateETL extends AssetManager {
         await this.ingestSystemAddress()
         //await this.ingestWalletAttribution()
         let relayChain = 'polkadot'
-        let tbl = `exchanges`
+        //let tbl = `exchanges`
+        let tbl = `knownpubs`
         let projectID = `${this.project}`
         let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
-        let sql = `select nickname, accountName, address from account where is_exchange = 1`
+        //let sql = `select nickname, accountName, address from account where is_exchange = 1`
+        let sql = `select nickname, accountName, address, accountType from account where accountType not in ('Unknown', 'User');`
         let sqlRecs = await this.poolREADONLY.query(sql);
         let knownAccounts = [];
         let knownPubkeys = {}
@@ -339,6 +341,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 address_pubkey: r.address,
                 address_nickname: r.nickname,
                 address_label: r.accountName,
+                account_type: r.accountType
             }
             knownAccounts.push(a)
         }
