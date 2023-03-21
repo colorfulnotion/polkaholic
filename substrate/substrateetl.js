@@ -263,7 +263,7 @@ module.exports = class SubstrateETL extends AssetManager {
         console.log(unknownAscii)
     }
 
-    async dump_exchange_users(){
+    async dump_users_tags(){
         let paraID = 0
         let relayChain = 'polkadot'
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
@@ -271,24 +271,39 @@ module.exports = class SubstrateETL extends AssetManager {
         let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
 
         let datasetID = `${relayChain}`
-        let tblName = `exchange_users${paraID}`
+        let tblName = `full_users${paraID}`
         let destinationTbl = `${datasetID}.${tblName}`
         //let destinationTbl = `${datasetID}.${tblName}$${logYYYYMMDD}`
 
         let bqjobs = []
+        let tagsourceTbl = 'knownpubs'
         /*
         with exchangeoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(block_time) as ts FROM `substrate-etl.polkadot.transfers0` where date(block_time)= '2023-03-01' group by from_pub_key, to_pub_key)
         select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount, ts from substrate-etl.polkadot.exchanges inner join transfer on exchanges.address_pubkey = transfer.from_pub_key),
         firstAttribution as (select user_pubkey, min(concat(ts, "_",exchagne_label)) attribution from exchangeoutgoing group by user_pubkey)
         select user_pubkey, array_agg(distinct(exchagne_label)) as exchange_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt, min(split(attribution, "_")[offset(0)]) as first_exchange_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_exchange from exchangeoutgoing
         inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc
+
+        with transferoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(extrinsic_id) as extrinsic_id, min(block_time) as ts FROM `substrate-etl.polkadot.transfers0` where date(block_time)= "2023-03-01" group by from_pub_key, to_pub_key)
+        select to_pub_key as user_pubkey, ifNull(address_label, "other") as known_label, from_pub_key, extrinsic_id, transfer_cnt, amount, ts from transfer left join substrate-etl.polkadot_dev.knownpubs on knownpubs.address_pubkey = transfer.from_pub_key where knownpubs.account_type not in ('Scams', 'sanction')),
+        firstAttribution as (select user_pubkey, min(concat(ts, "_", extrinsic_id, "_", from_pub_key, "_",known_label)) attribution from transferoutgoing group by user_pubkey)
+        select user_pubkey, array_agg(distinct(known_label)) as known_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt, min(split(attribution, "_")[offset(0)]) as first_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_transfer_extrinsic_id, min(split(attribution, "_")[offset(2)]) as first_transfer_sender_pub_key,  min(split(attribution, "_")[offset(3)]) as first_transfer from transferoutgoing inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc
+
         */
+        let targetSQL = `with transferoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(extrinsic_id) as extrinsic_id, min(block_time) as ts FROM \`${projectID}.${relayChain}.transfers${paraID}\` group by from_pub_key, to_pub_key)
+        select to_pub_key as user_pubkey, ifNull(address_label, "other") as known_label, from_pub_key, extrinsic_id, transfer_cnt, amount, ts from transfer left join ${projectID}.${relayChain}.${tagsourceTbl} on knownpubs.address_pubkey = transfer.from_pub_key where ${tagsourceTbl}.account_type not in ("Scams")),
+        firstAttribution as (select user_pubkey, min(concat(ts, "_", extrinsic_id, "_", from_pub_key, "_",known_label)) attribution from transferoutgoing group by user_pubkey)
+        select user_pubkey, array_agg(distinct(known_label)) as known_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt,
+        min(split(attribution, "_")[offset(0)]) as first_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_transfer_extrinsic_id,
+        min(split(attribution, "_")[offset(2)]) as first_transfer_sender_pub_key,  min(split(attribution, "_")[offset(3)]) as first_transfer
+        from transferoutgoing inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc`
+
+        /*
         let targetSQL = `with exchangeoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(block_time) as ts FROM \`${projectID}.${relayChain}.transfers${paraID}\` group by from_pub_key, to_pub_key)
-        select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount, ts from ${projectID}.${relayChain}.exchanges inner join transfer on exchanges.address_pubkey = transfer.from_pub_key),
+        select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount, ts from ${projectID}.${relayChain}.${tagsourceTbl} inner join transfer on ${tagsourceTbl}.address_pubkey = transfer.from_pub_key),
         firstAttribution as (select user_pubkey, min(concat(ts, "_",exchagne_label)) attribution from exchangeoutgoing group by user_pubkey)
         select user_pubkey, array_agg(distinct(exchagne_label)) as exchange_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt, min(split(attribution, "_")[offset(0)]) as first_exchange_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_exchange from exchangeoutgoing
         inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc`
-        /*
         let targetSQL = `with exchangeoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt FROM \`${projectID}.${relayChain}.transfers${paraID}\` where date(block_time)= "2023-03-01" group by from_pub_key, to_pub_key)
                 select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount from substrate-etl.polkadot_dev.exchanges inner join transfer on exchanges.address_pubkey = transfer.from_pub_key)
                 select user_pubkey, array_agg(distinct(exchagne_label)) as exchange_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt from exchangeoutgoing group by user_pubkey order by transfer_cnt desc`
@@ -315,7 +330,7 @@ module.exports = class SubstrateETL extends AssetManager {
             } catch (e) {
                 errloadCnt++
                 this.logger.error({
-                    "op": "dump_exchange_users",
+                    "op": "dump_users_tags",
                     e
                 })
             }
@@ -324,7 +339,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async publishExchangeAddress(){
-        await this.ingestSystemAddress()
+        //await this.ingestSystemAddress()
         //await this.ingestWalletAttribution()
         let relayChain = 'polkadot'
         //let tbl = `exchanges`
@@ -356,7 +371,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/${tbl}.json`;
         console.log(cmd)
 
-        await this.dump_exchange_users()
+        await this.dump_users_tags()
     }
 
     async cleanReaped(start = null, end = null) {
