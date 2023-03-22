@@ -327,7 +327,7 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null, lookbackDays = 365) {
+    async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null, lookbackDays = 30) {
 
         let w = "";
         if (paraID >= 0 && relayChain) {
@@ -336,7 +336,7 @@ module.exports = class SubstrateETL extends AssetManager {
         } else {
             w = " and chain.chainID in ( select chainID from chain where crawling = 1 )"
         }
-        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and ( logDT <= date(date_sub(Now(), interval 1 day)) or logDT = date(Now()) ) ${w} order by rand() limit 1`;
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded = 0 and logDT >= date_sub(Now(), interval ${lookbackDays} day) and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and ( logDT <= date(date_sub(Now(), interval 1 day)) ) ${w} order by rand() limit 1`;
         let recs = await this.poolREADONLY.query(sql);
         console.log("get_random_substrateetl", sql);
         if (recs.length == 0) return ([null, null]);

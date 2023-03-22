@@ -1850,7 +1850,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             }
             break;
         }
-        if (decorateData) dEvent.decodedData = decodedData
+        if (decorateData && dEvent) dEvent.decodedData = decodedData
         return dEvent
     }
 

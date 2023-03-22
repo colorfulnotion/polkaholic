@@ -51,6 +51,16 @@ module.exports = class ChainParser {
         this.relayParentStateRoot = stateRoot
     }
 
+    getChainParserStat(){
+        let r = {
+            parserTS: this.parserTS,
+            parserBlockNumber: this.parserBlockNumber,
+            parserBlockHash: this.parserBlockHash,
+            relayParentStateRoot: this.relayParentStateRoot,
+        }
+        return r
+    }
+
     tokens_to_string(tokens) {
         let outArr = []
         for (const i of tokens) {

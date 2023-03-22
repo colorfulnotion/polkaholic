@@ -112,7 +112,7 @@ async function main() {
             let lookbackBlocks = opt.lookbackBlocks;
             var chain = await crawler.getChain(chainID);
             await crawler.crawlBackfill(chain, ["mod", n, nmax], lookbackBlocks, true);
-            await crawler.release();
+            
             process.exit(0);
         });
 

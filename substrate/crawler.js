@@ -1429,7 +1429,7 @@ module.exports = class Crawler extends Indexer {
                     let sql = `update block${chainID} set ${flds.join(",")} where blockNumber = ${t.blockNumber}`;
                     console.log(sql)
                     this.batchedSQL.push(sql)
-                    await this.mark_indexlog_dirty(chainID, block.blockTS)
+                    //await this.mark_indexlog_dirty(chainID, block.blockTS)
                     return
                 });
                 this.batchedSQL.push(`update chain set traceTSLast = UNIX_TIMESTAMP(Now()) where chainID = ${chainID}`)

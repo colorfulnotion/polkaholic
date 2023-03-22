@@ -315,7 +315,7 @@ async function main() {
                     if (force || (await substrateetl.is_dump_ready(network, logDT, {
                             network
                         }))) {
-                        await substrateetl.dump_networkmetrics(relayChain, logDT);
+                        await substrateetl.dump_networkmetrics(network, logDT);
                     }
                 }
                 process.exit(0);

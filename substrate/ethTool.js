@@ -838,14 +838,14 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
         s: txn.s,
         v: txn.v
     }
-    console.log(`txn=${txn.hash} (${txn.raw}) rsv, r=${txn.r}, s=${txn.s}, v=${txn.v}`)
     try {
         if (txn.r && txn.s) {
+            console.log(`txn=${txn.hash} (${txn.raw}) rsv, r=${txn.r.length}, s=${txn.s.length}, v=${txn.v.length}, signature`, output.signature)
             if (txn.r.length == 66 && txn.s.length == 66) {
                 return output // let's not validate irrelevant tx
             } else {
                 let derivedTx = decodeRLPTx(txn.raw)
-                if (derivedTx.errorDesc != undefined || txn.hash != derivedTx.txHash) console.log(`!!!! Mismatch txHash: ${txn.hash}, derived=${derivedTxhash}, raw=${txn.raw}`)
+                if (derivedTx.errorDesc != undefined || txn.hash != derivedTx.txHash) console.log(`!!!! Mismatch txHash: ${txn.hash}, derived=${derivedTx.txHash}, raw=${txn.raw}`)
                 if (derivedTx.tx != undefined && derivedTx.tx.r.length != 66 && derivedTx.tx.s.length != 66) {
                     output.isConnectedCall = 1
                 }
