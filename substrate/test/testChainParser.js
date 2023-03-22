@@ -209,7 +209,7 @@ async function main() {
                         [targetedSymbol, targetedRelayChain] = indexer.chainParser.processFeeLocation(indexer, instruction)
                         break;
                     case 'getNativeSymbol':
-                        targetedSymbol = indexer.chainParser.getNativeSymbol() // no instruction
+                        targetedSymbol = indexer.chainParser.getNativeSymbol(chainID) // no instruction
                         break;
                     case 'processXcmGenericCurrencyID':
                         targetedSymbol = indexer.chainParser.processXcmGenericCurrencyID(instruction)

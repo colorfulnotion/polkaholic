@@ -679,7 +679,8 @@ module.exports = class ParallelParser extends ChainParser {
 
         if (assetID == '0' || assetID == '1') {
             // manually write native token price
-            let nativeAssetString = indexer.getNativeAsset();
+            let chainID = indexer.chainID
+            let nativeAssetString = indexer.getNativeAsset(chainID);
             indexer.updateAssetPrice(nativeAssetString, price, paraTool.assetTypeToken, paraTool.assetSourceOracle)
         }
         if (assetID == '100' || assetID == '101') {

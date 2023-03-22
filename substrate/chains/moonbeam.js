@@ -1011,6 +1011,7 @@ module.exports = class MoonbeamParser extends ChainParser {
         let targetedAsset = false;
         let rawTargetedAsset = false;
         let targetSymbol = false;
+        let chainID = indexer.chainID
         if (feelocation.v1 != undefined) {
             let feelocation_v1 = feelocation.v1
             let feelocation_v1_interior = feelocation_v1.interior
@@ -1018,15 +1019,13 @@ module.exports = class MoonbeamParser extends ChainParser {
             if (feelocation_v1_interior != undefined && feelocation_v1_parents.here !== undefined) {
                 if (feelocation_v1_parents != undefined && feelocation_v1_parents == 0) {
                     //normal case?
-                    targetSymbol = indexer.getNativeSymbol()
-                    //targetedAsset = indexer.getNativeSymbol()
-                    //rawTargetedAsset = indexer.getNativeSymbol()
+                    targetSymbol = indexer.getNativeSymbol(chainID)
+                    //targetedAsset = indexer.getNativeSymbol(chainID)
+                    //rawTargetedAsset = indexer.getNativeSymbol(chainID)
                     console.log(`processFeeMultiLocation targetedAsset parents:0, here`, targetedSymbol)
                 } else if (feelocation_v1_parents != undefined && feelocation_v1_parents == 1) {
                     //ump
-                    targetSymbol = indexer.getRelayChainSymbol()
-                    //targetedAsset = indexer.getRelayChainAsset()
-                    //rawTargetedAsset = indexer.getRelayChainAsset()
+                    targetSymbol = indexer.getRelayChainSymbol(chainID)
                     console.log(`processFeeMultiLocation targetedAsset parents:1, here`, targetedSymbol)
                 } else {}
                 //} else if (v1_id_concrete_interior != undefined && v1_id_concrete_interior.x2 !== undefined && Array.isArray(v1_id_concrete_interior.x2)) {
@@ -1040,7 +1039,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                 } else {
                     // expand the key
                     let new_feelocation_v1_interiorVal = []
-                    let paraChainID = indexer.chainID - paraIDExtra
+                    let paraChainID = chainID - paraIDExtra
                     let expandedParachainPiece = {
                         parachain: paraChainID
                     }
@@ -1052,7 +1051,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                         //x2/x3...
                         for (const v of feelocation_v1_interiorVal) {
                             new_feelocation_v1_interiorVal.push(v)
-                            console.log(`${indexer.chainID}, [parents=${feelocation_v1_interiorVal}] expandedkey ${JSON.stringify(feelocation_v1_interiorVal)} ->  ${JSON.stringify(new_feelocation_v1_interiorVal)}`)
+                            console.log(`${chainID}, [parents=${feelocation_v1_interiorVal}] expandedkey ${JSON.stringify(feelocation_v1_interiorVal)} ->  ${JSON.stringify(new_feelocation_v1_interiorVal)}`)
                         }
                         //new_v1_id_concrete_interiorVal.concat(v1_id_concrete_interiorVal)
                     } else {

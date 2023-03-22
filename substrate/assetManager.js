@@ -1010,6 +1010,36 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
 
+    getNativeAsset(chainID) {
+        let symbol = this.getChainSymbol(chainID);
+        if (symbol) {
+            return JSON.stringify({
+                Token: symbol
+            })
+        } else {
+            return (false);
+        }
+    }
+
+    getNativeSymbol(chainID) {
+        let symbol = this.getChainSymbol(chainID);
+        if (symbol) {
+            return symbol
+        } else {
+            return (false);
+        }
+    }
+
+    getRelayChainSymbol(chainID) {
+        let relayChainID = paraTool.getRelayChainID(chainID)
+        let symbol = this.getChainSymbol(relayChainID);
+        if (symbol) {
+            return symbol
+        } else {
+            return (false);
+        }
+    }
+
 
     //todo: should this function be async. If so, how to handle it in txparams.ejs?
     getAssetDecimal(asset, chainID, ctx = "false") {
@@ -1756,6 +1786,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             case "balances:Unreserved":
             case "balances:Withdraw":
 
+                //a list where balance is not at last index
                 let exceptionList = ["balances:BalanceSet", "balances:ReserveRepatriated", "treasury:Awarded", "treasury:Proposed", "treasury:Rejected"]
                 let idxs = []
                 //some balance events have different inputs (i.e. BalanceSet, ReserveRepatriated, Awarded, Proposed, Rejected)
@@ -1848,6 +1879,93 @@ module.exports = class AssetManager extends PolkaholicDB {
                     decodedData[2].dataRaw = bal
                 }
             }
+            break;
+
+            case "assets:Transferred": //AssetId, from, to, bal
+            case "assets:Burned": //
+            case "assets:Issued":
+
+                //a list where balance is not at last index
+                let aExceptionList = []
+                let aIdxs = []
+                //some balance events have different inputs (i.e. BalanceSet, ReserveRepatriated, Awarded, Proposed, Rejected)
+                if (aExceptionList.includes(pallet_method)) {
+                    //TODO
+                } else {
+                    // bal is ususally the last input
+                    aIdxs.push(event.data.length - 1)
+                }
+
+                let assetID = event.data[0]
+                let assetTarget = false;
+                let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID)
+                if (assetIDSymbol && assetIDDecimals !== false) {
+                    symbol = assetIDSymbol
+                    decimals = assetIDDecimals
+                    assetTarget = `{"Token":"${symbol}"}`
+                }
+
+                for (const idx of aIdxs) {
+                    let dataVal = event.data[idx]
+                    let bal = paraTool.toBn(dataVal)
+                    decodedData[idx].data = bal.toString() // convert dec, '0x...' to 'intStr'
+                    //var bal = paraTool.dechexToInt(dataVal) //
+                    if (assetIDSymbol && assetIDDecimals !== false) {
+                        bal = bal / 10 ** assetIDDecimals
+                        decodedData[idx].symbol = assetIDSymbol
+                        decodedData[idx].dataRaw = bal
+                        decodedData[idx].knownAsset = 1
+                    }else{
+                        decodedData[idx].knownAsset = 0
+                    }
+                    if (decorateUSD) {
+                        let p = await this.computePriceUSD({
+                            val: bal,
+                            asset: assetTarget,
+                            chainID,
+                            ts
+                        })
+                        if (p) {
+                            decodedData[idx].dataUSD = p.valUSD
+                            decodedData[idx].priceUSD = p.priceUSD
+                            if (isSubtrateETL) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
+                        }
+                    }
+                }
+                break;
+
+
+
+/*
+            case "assets:ApprovalCancelled":
+            case "assets:ApprovedTransfer":
+
+            //case "assets:Created":
+            case "assets:ForceCreated":
+
+            //case "assets:MetadataSet":
+            //case "assets:TeamChanged":
+*/
+            case "currencies:Deposited":
+            case "currencies:Transferred":
+            case "currencies:Withdrawn":
+
+            case "tokens:Transfer":
+            case "tokens:Withdrawn":
+            case "tokens:Deposited":
+            case "tokens:Endowed":
+
+            case "tokens:BalanceSet":
+
+            case "tokens:DustLost":
+
+            //case "tokens:LockRemoved":
+            //case "tokens:LockSet":
+            //case "tokens:Reserved":
+            //case "tokens:Slashed":
+
+            //case "tokens:Unreserved":
+
             break;
         }
         if (decorateData && dEvent) dEvent.decodedData = decodedData

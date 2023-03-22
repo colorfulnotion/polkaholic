@@ -16,6 +16,8 @@
 
 const AssetManager = require("./assetManager");
 const PolkaholicDB = require("./polkaholicDB");
+const Crawler = require("./crawler");
+
 const {
     ApiPromise,
     WsProvider
@@ -53,7 +55,8 @@ const balanceStartDT = "2020-03-09";
 module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
     publish = 0;
-    isProd = false
+    isProd = true
+    chainID = null;
 
     constructor() {
         super("manager")
@@ -3430,6 +3433,11 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         await this.update_batchedSQL()
     }
 
+    async setUpSubstrateEtlChainparser(chainID, debugLevel){
+        await this.chainParserInit(chainID, debugLevel);
+        this.chainID = chainID
+    }
+
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
@@ -3440,6 +3448,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             tbls.push("evmtxs");
             tbls.push("evmtransfers");
         }
+        // 0. include chainParser + chainID
+        await this.setUpSubstrateEtlChainparser(chainID, debugLevel)
+
         // 1. get bnStart, bnEnd for logDT
         let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
