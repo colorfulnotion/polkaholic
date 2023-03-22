@@ -3433,7 +3433,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         await this.update_batchedSQL()
     }
 
-    async setUpSubstrateEtlChainparser(chainID, debugLevel){
+    async setUpSubstrateEtlChainparser(chainID, debugLevel = paraTool.debugInfo){
         await this.chainParserInit(chainID, debugLevel);
         this.chainID = chainID
     }
@@ -3449,7 +3449,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             tbls.push("evmtransfers");
         }
         // 0. include chainParser + chainID
-        await this.setUpSubstrateEtlChainparser(chainID, debugLevel)
+        await this.setUpSubstrateEtlChainparser(chainID)
 
         // 1. get bnStart, bnEnd for logDT
         let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)

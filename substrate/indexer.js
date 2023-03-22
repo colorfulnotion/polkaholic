@@ -7303,7 +7303,6 @@ module.exports = class Indexer extends AssetManager {
                     ]
                     */
                     let rAsset = data[0]
-
                     if (rAsset.dexShare != undefined) rAsset = rAsset.dexShare
                     if (rAsset.dEXShare != undefined) rAsset = rAsset.dEXShare
 
