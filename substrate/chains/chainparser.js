@@ -5137,9 +5137,10 @@ module.exports = class ChainParser {
 
 
     getAssetRegistrySymbolAndDecimals(indexer, currency_id) {
+        console.log(`getAssetRegistrySymbolAndDecimals !!! currency_id`, currency_id)
         let convertedAssetString = false
         let assetString = this.token_to_string(currency_id)
-        //console.log(`getAssetRegistrySymbolAndDecimals assetString=${assetString}`, `currency_id`, currency_id)
+        console.log(`getAssetRegistrySymbolAndDecimals assetString=${assetString}`, `currency_id`, currency_id)
         let newAssetString = assetString
         let parsedAsset = JSON.parse(assetString)
         let decimals = false
@@ -5210,13 +5211,14 @@ module.exports = class ChainParser {
     // universal parser
     getGenericSymbolAndDecimal(indexer, currency_id) {
         let chainID = indexer.chainID
+        console.log(`im here chainID=${chainID}, currency_id`, currency_id)
         try {
-            if (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala || chainID == paraTool.chainIDBifrostKSM || chainID == paraTool.chainIDBifrostDOT) {
+            if ([paraTool.chainIDKarura, paraTool.chainIDAcala, paraTool.chainIDBifrostKSM, paraTool.chainIDBifrostDOT].includes(chainID)) {
                 //assetregistry
                 return this.getAssetRegistrySymbolAndDecimals(indexer, currency_id)
-            } else if (chainID == paraTool.chainIDInterlay || chainID == paraTool.chainIDKintsugi) {
+            } else if ([paraTool.chainIDInterlay, paraTool.chainIDKintsugi].includes(chainID)) {
                 return this.getAssetRegistrySymbolAndDecimals(indexer, currency_id)
-            } else if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbaseAlpha || chainID == paraTool.chainIDMoonbaseBeta) {
+            } else if ([paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDMoonbaseAlpha, paraTool.chainIDMoonbaseBeta].includes(chainID)) {
                 //assets (default case)
                 let [symbols, decimals, assetString] = this.getDecHexCurrencyIDSymbolAndDecimals(indexer, currency_id)
                 if (symbols) {
@@ -5230,7 +5232,7 @@ module.exports = class ChainParser {
                 return [symbols, decimals, assetString]
             }
         } catch (e) {
-            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getGenericSymbolAndDecimal error`, e.toString())
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getGenericSymbolAndDecimal error`, e.toString())
             return [false, false, false]
         }
     }

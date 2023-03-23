@@ -1709,6 +1709,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     mergeEventDataAndDataType(data, dataType, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let dd = []
+        let addrList = []
         if (!data || !data.length) return dd;
         for (var i = 0; i < data.length; i++) {
             let d = data[i]
@@ -1721,11 +1722,12 @@ module.exports = class AssetManager extends PolkaholicDB {
                 x.name = dt.name
                 if (x.typeDef == "AccountId32" || x.typeDef == "AccountId20") {
                     x.address = paraTool.getPubKey(d)
+                    addrList.push(x.address)
                 }
             }
             dd.push(x)
         }
-        return dd
+        return [dd, addrList]
     }
 
     async computeExtrinsicFeeUSD(ext) {
@@ -1755,26 +1757,63 @@ module.exports = class AssetManager extends PolkaholicDB {
         return feeUSD
     }
 
+    generateTransferSummary(pallet_method, addressList, decodedData) {
+        var incrementList = [
+            "balances:Deposit", "balances:Endowed",
+            "assets:Issued",
+            "currencies:Deposited", "tokens:Deposited", "tokens:Endowed"
+        ]
+        var decrementList = [
+            "balances:DustLost", "balances:Withdraw", "balances:Slashed",
+            "assets:Burned",
+            "currencies:Withdrawn", "tokens:Deposited", "tokens:DustLost"
+        ]
+
+        //write from, to for transfer events
+        let transferSummary = {
+            from_pubkey: null,
+            to_pubkey: null,
+            type: "nontransfer"
+        }
+        let eventLen = decodedData.length
+        if (addressList.length == 2) {
+            transferSummary.from_pubkey = addressList[0]
+            transferSummary.to_pubkey = addressList[1]
+            transferSummary.type = "transfer"
+            decodedData.push(transferSummary)
+        } else if (addressList.length == 1) {
+            if (incrementList.includes(pallet_method)) {
+                transferSummary.to_pubkey = addressList[0]
+                transferSummary.type = "incoming"
+                decodedData.push(transferSummary)
+            } else if (decrementList.includes(pallet_method)) {
+                transferSummary.from_pubkey = addressList[0]
+                transferSummary.type = "outgoing"
+                decodedData.push(transferSummary)
+            }
+        }
+        return decodedData
+    }
+
     async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"], isSubtrateETL = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         if (!decorate || !decorateData) return event
 
         let dEvent = event
-        let decodedData = this.mergeEventDataAndDataType(event.data, event.dataType, decorate, decorateExtra)
+        let [decodedData, addressList] = this.mergeEventDataAndDataType(event.data, event.dataType, decorate, decorateExtra)
 
         let [pallet, method] = paraTool.parseSectionMethod(event)
         let pallet_method = `${pallet}:${method}`
 
-
         switch (pallet_method) {
 
             /*
+            balances, tokens, assets, curriencies
+            Principal:
+            symbol, decimals should be queriable at data[0]
+            balance should be queriable at data[length(originDataLen-1)]
+            transferSummer should be queriable at appendex extra
 
-            For balances, tokens, assets, curriencies:
-            symbol, decimals should be queriable at data[0] - no exception
-            balance should be queriable at data[length(data-1)]
-
-            TODO: need generic {from, to} all cases
             */
             case "treasury:Awarded": //balance, accountID
             case "treasury:Burnt": //bal
@@ -1836,7 +1875,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     decodedData[commonBalanceDataIdx].decimals = chainDecimals
                     decodedData[commonBalanceDataIdx].assetChain = paraTool.makeAssetChain(targetAsset, chainID)
                     decodedData[commonBalanceDataIdx].knownAsset = 1
-                }else{
+                } else {
                     decodedData[commonBalanceDataIdx].knownAsset = 0
                 }
 
@@ -1866,6 +1905,8 @@ module.exports = class AssetManager extends PolkaholicDB {
                         decodedData[idx].dataRaw = bal
                     }
                 }
+                decodedData = this.generateTransferSummary(pallet_method, addressList, decodedData)
+                console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
                 break;
 
             case "crowdloan:Contributed": //accountID, paraID, balance
@@ -1910,7 +1951,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             case "assets:ApprovalCancelled": //assetID, source, delegate (NO Balance)
             case "assets:ApprovedTransfer": //assetID, source, delegate, balance
             case "assets:Created": //assetID, creator, owner
-            //case "assets:ForceCreated":??
+                //case "assets:ForceCreated":??
             case "assets:MetadataSet": //assetID, name, symbol, decimals, isFrozen
             case "assets:TeamChanged": //assetID, issuer, admin, freezer
 
@@ -1933,7 +1974,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     let assetIDBN = paraTool.toBn(assetID)
                     assetIDBNStr = assetIDBN.toString()
                     assetIDChain = paraTool.makeAssetChain(`{"Token":"${assetIDBNStr}"}`, chainID)
-                }catch(e){
+                } catch (e) {
                     console.log(`decodedEvent: ${pallet_method} e`, e)
                 }
 
@@ -1950,7 +1991,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     decodedData[assetIDDataIdx].dataRaw = assetIDBNStr
                     decodedData[assetIDDataIdx].assetChain = assetIDChain
                     decodedData[assetIDDataIdx].knownAsset = 1
-                }else{
+                } else {
                     decodedData[assetIDDataIdx].knownAsset = 0
                 }
 
@@ -1965,7 +2006,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                         decodedData[idx].decimals = assetIDDecimals
                         decodedData[idx].dataRaw = bal
                         decodedData[idx].knownAsset = 1
-                    }else{
+                    } else {
                         decodedData[idx].knownAsset = 0
                     }
                     if (decorateUSD && assetTarget) {
@@ -1982,104 +2023,110 @@ module.exports = class AssetManager extends PolkaholicDB {
                         }
                     }
                 }
-                console.log(`decodedEvent: ${pallet_method}, decodedData`, decodedData)
+                decodedData = this.generateTransferSummary(pallet_method, addressList, decodedData)
+                console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
                 break;
 
 
 
-            case "currencies:Deposited":   //currencyID, who, balance
+            case "currencies:Deposited": //currencyID, who, balance
             case "currencies:Transferred": //currencyID, from, to, balance
-            case "currencies:Withdrawn":   //currencyID, who, balance
+            case "currencies:Withdrawn": //currencyID, who, balance
 
-            case "tokens:Transfer":     //currencyID, from, to, balance
-            case "tokens:Withdrawn":    //currencyID, who, balance
-            case "tokens:Deposited":    //currencyID, who, balance
-            case "tokens:Endowed":      //currencyID, who, balance
-            case "tokens:DustLost":     //currencyID, who, balance
+            case "tokens:Transfer": //currencyID, from, to, balance
+            case "tokens:Withdrawn": //currencyID, who, balance
+            case "tokens:Deposited": //currencyID, who, balance
+            case "tokens:Endowed": //currencyID, who, balance
+            case "tokens:DustLost": //currencyID, who, balance
 
 
-            //case "tokens:BalanceSet":
-            //case "tokens:LockRemoved":
-            //case "tokens:LockSet":
-            //case "tokens:Reserved":
-            //case "tokens:Slashed":
-            //case "tokens:Unreserved":
+                //case "tokens:BalanceSet":
+                //case "tokens:LockRemoved":
+                //case "tokens:LockSet":
+                //case "tokens:Reserved":
+                //case "tokens:Slashed":
+                //case "tokens:Unreserved":
 
-            //a list where balance is not at last index
-            let tExceptionList = []
-            let tIdxs = []
-            //some balance events have different inputs (i.e. BalanceSet, ReserveRepatriated, Awarded, Proposed, Rejected)
-            if (tExceptionList.includes(pallet_method)) {
-                //These events has no balances
-            } else {
-                // bal is ususally the last input
-                tIdxs.push(event.data.length - 1)
-            }
-
-            let tokenIDDataIdx = 0
-            let rAsset = event.data[tokenIDDataIdx]
-            if (rAsset.dexShare != undefined) rAsset = rAsset.dexShare
-            if (rAsset.dEXShare != undefined) rAsset = rAsset.dEXShare
-
-            let tokenTarget = false;
-            let tokenIDChain = null, rawAssetSymbol = null, rawAssetDecimals = null, rawAssetString = null;
-            try {
-                [rawAssetSymbol, rawAssetDecimals, rawAssetString] = this.chainParser.getGenericSymbolAndDecimal(this, rAsset)
-                tokenIDChain = paraTool.makeAssetChain(`${JSON.stringify(rAsset)}`, chainID)
-            } catch (merr) {
-                console.log("this.chainParser.getGenericSymbolAndDecimal", rAsset, merr)
-            }
-            //console.log(`rawAssetSymbol=${rawAssetSymbol}, rawAssetDecimals=${rawAssetDecimals}, rawAssetString=${rawAssetString}, fdata`, fdata, )
-            if (rAsset.token != undefined || rAsset.Token != undefined) { // move to chainParser ... this is Acala specific
-                let symbol = rawAssetSymbol
-                tokenTarget = `{"Token":"${symbol}"}`
-                tokenIDChain = paraTool.makeAssetChain(tokenTarget, chainID)
-            } else if (rawAssetSymbol && rawAssetDecimals !== false) {
-                tokenTarget = rawAssetString
-            } else {
-                // NOT COVERED (dexShare)
-                console.log(`dexShare not covered`, pallet_method, data)
-            }
-            //NOTE: we will dual represent asset info in both bal and assetID fields
-            if (rawAssetSymbol && rawAssetDecimals !== false) {
-                decodedData[tokenIDDataIdx].symbol = rawAssetSymbol
-                decodedData[tokenIDDataIdx].decimals = rawAssetDecimals
-                decodedData[tokenIDDataIdx].assetChain = tokenIDChain
-                decodedData[tokenIDDataIdx].knownAsset = 1
-            }else{
-                decodedData[tokenIDDataIdx].knownAsset = 0
-            }
-
-            for (const idx of tIdxs) {
-                let dataVal = event.data[idx]
-                let bal = paraTool.toBn(dataVal)
-                decodedData[idx].data = bal.toString() // convert dec, '0x...' to 'intStr'
-                //var bal = paraTool.dechexToInt(dataVal) //
-                if (rawAssetSymbol && rawAssetDecimals !== false) {
-                    bal = bal / 10 ** rawAssetDecimals
-                    decodedData[idx].symbol = rawAssetSymbol
-                    decodedData[idx].decimals = rawAssetDecimals
-                    decodedData[idx].dataRaw = bal
-                    decodedData[idx].knownAsset = 1
-                }else{
-                    decodedData[idx].knownAsset = 0
+                //a list where balance is not at last index
+                let tExceptionList = []
+                let tIdxs = []
+                //some balance events have different inputs (i.e. BalanceSet, ReserveRepatriated, Awarded, Proposed, Rejected)
+                if (tExceptionList.includes(pallet_method)) {
+                    //These events has no balances
+                } else {
+                    // bal is ususally the last input
+                    tIdxs.push(event.data.length - 1)
                 }
-                if (decorateUSD && tokenTarget) {
-                    let p = await this.computePriceUSD({
-                        val: bal,
-                        asset: tokenTarget,
-                        chainID,
-                        ts
-                    })
-                    if (p) {
-                        decodedData[idx].dataUSD = p.valUSD
-                        decodedData[idx].priceUSD = p.priceUSD
-                        if (isSubtrateETL) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
+
+                let tokenIDDataIdx = 0
+                let rAsset = event.data[tokenIDDataIdx]
+                if (rAsset.dexShare != undefined) rAsset = rAsset.dexShare
+                if (rAsset.dEXShare != undefined) rAsset = rAsset.dEXShare
+
+                let tokenTarget = false;
+                let tokenIDChain = null,
+                    rawAssetSymbol = null,
+                    rawAssetDecimals = null,
+                    rawAssetString = null;
+                try {
+                    console.log(`this`, this)
+                    [rawAssetSymbol, rawAssetDecimals, rawAssetString] = this.chainParser.getGenericSymbolAndDecimal(this, rAsset)
+                    console.log(`rawAssetSymbol=${rawAssetSymbol}, rawAssetDecimals=${rawAssetDecimals}, rawAssetString=${rawAssetString}, rAsset`, rAsset)
+                    tokenIDChain = paraTool.makeAssetChain(`${JSON.stringify(rAsset)}`, chainID)
+                } catch (merr) {
+                    console.log("this.chainParser.getGenericSymbolAndDecimal", rAsset, merr)
+                }
+                if (rAsset.token != undefined || rAsset.Token != undefined) {
+                    let symbol = rawAssetSymbol
+                    tokenTarget = `{"Token":"${symbol}"}`
+                    tokenIDChain = paraTool.makeAssetChain(tokenTarget, chainID)
+                } else if (rawAssetSymbol && rawAssetDecimals !== false) {
+                    tokenTarget = rawAssetString
+                } else {
+                    // NOT COVERED (dexShare)
+                    console.log(`dexShare not covered`, pallet_method, rAsset)
+                }
+                //NOTE: we will dual represent asset info in both bal and assetID fields
+                if (rawAssetSymbol && rawAssetDecimals !== false) {
+                    decodedData[tokenIDDataIdx].symbol = rawAssetSymbol
+                    decodedData[tokenIDDataIdx].decimals = rawAssetDecimals
+                    decodedData[tokenIDDataIdx].assetChain = tokenIDChain
+                    decodedData[tokenIDDataIdx].knownAsset = 1
+                } else {
+                    decodedData[tokenIDDataIdx].knownAsset = 0
+                }
+
+                for (const idx of tIdxs) {
+                    let dataVal = event.data[idx]
+                    let bal = paraTool.toBn(dataVal)
+                    decodedData[idx].data = bal.toString() // convert dec, '0x...' to 'intStr'
+                    //var bal = paraTool.dechexToInt(dataVal) //
+                    if (rawAssetSymbol && rawAssetDecimals !== false) {
+                        bal = bal / 10 ** rawAssetDecimals
+                        decodedData[idx].symbol = rawAssetSymbol
+                        decodedData[idx].decimals = rawAssetDecimals
+                        decodedData[idx].dataRaw = bal
+                        decodedData[idx].knownAsset = 1
+                    } else {
+                        decodedData[idx].knownAsset = 0
+                    }
+                    if (decorateUSD && tokenTarget) {
+                        let p = await this.computePriceUSD({
+                            val: bal,
+                            asset: tokenTarget,
+                            chainID,
+                            ts
+                        })
+                        if (p) {
+                            decodedData[idx].dataUSD = p.valUSD
+                            decodedData[idx].priceUSD = p.priceUSD
+                            if (isSubtrateETL) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
+                        }
                     }
                 }
-            }
-            console.log(`decodedEvent: ${pallet_method}, decodedData`, decodedData)
-            break;
+                decodedData = this.generateTransferSummary(pallet_method, addressList, decodedData)
+                console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
+                break;
         }
         if (decorateData && dEvent) dEvent.decodedData = decodedData
         return dEvent

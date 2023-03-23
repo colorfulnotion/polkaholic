@@ -562,6 +562,7 @@ module.exports = class AcalaParser extends ChainParser {
     }
 
     // Because we need to canonizalie token + foreignAsset and further 0 => strings "0", this helper function is needed
+    /*
     token_to_string(i) {
         if (Array.isArray(i)) {
             return this.tokens_to_string(i);
@@ -586,6 +587,7 @@ module.exports = class AcalaParser extends ChainParser {
         let out = JSON.stringify(o);
         return (out);
     }
+    */
     /* note token0/token1 ordering is not guranteed: (KAR/LKSM) -> (KUSD/LKSM)* -> (KUSD/KSM)
       process_dex_swap [
         'pJjgdtbGih7qfQkrUTKitPDuxtv3Fm9tUBJKcgENxmwkTHt',
