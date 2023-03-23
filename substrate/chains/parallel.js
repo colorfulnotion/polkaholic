@@ -82,9 +82,10 @@ module.exports = class ParallelParser extends ChainParser {
         */
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel processOutgoingXTokens start`)
         let a = args
+        let chainID = indexer.chainID
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id, chainID)
         }
         //let generalOutgoingXcmList = super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress)
         super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
@@ -119,9 +120,10 @@ module.exports = class ParallelParser extends ChainParser {
         */
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel processOutgoingXcmPallet start`)
         let a = args
+        let chainID = indexer.chainID
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id, chainID)
         }
         //let generalOutgoingXcmList = super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress)
         super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
@@ -824,11 +826,12 @@ module.exports = class ParallelParser extends ChainParser {
         let parsedAsset = {
             Token: assetID
         }
+        let chainID = indexer.chainID
         let assetString = JSON.stringify(parsedAsset);
-        let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
+        let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset, chainID)
         let suppliedAssetString = this.elevatedAssetKey(paraTool.assetTypeCDPSupply, assetString);
         let suppliedAsset = JSON.parse(suppliedAssetString)
-        let suppliedAssetInfo = this.getSynchronizedAssetInfo(indexer, suppliedAsset)
+        let suppliedAssetInfo = this.getSynchronizedAssetInfo(indexer, suppliedAsset, chainID)
         let cdpAssetString = this.elevatedAssetKey(paraTool.assetTypeCDP, assetString);
         indexer.updateAssetLoanExchangeRate(cdpAssetString, exchangeRate, "supply");
         //todo: check assetInfo. if not found, add key
@@ -854,11 +857,12 @@ module.exports = class ParallelParser extends ChainParser {
         let parsedAsset = {
             Token: assetID
         }
+        let chainID = indexer.chainID
         let assetString = JSON.stringify(parsedAsset);
-        let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
+        let assetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset, chainID)
         let borrowedAssetString = this.elevatedAssetKey(paraTool.assetTypeCDPBorrow, assetString);
         let borrowedAsset = JSON.parse(borrowedAssetString)
-        let borrowedAssetInfo = this.getSynchronizedAssetInfo(indexer, borrowedAsset)
+        let borrowedAssetInfo = this.getSynchronizedAssetInfo(indexer, borrowedAsset, chainID)
         let cdpAssetString = this.elevatedAssetKey(paraTool.assetTypeCDP, assetString);
         indexer.updateAssetLoanExchangeRate(cdpAssetString, exchangeRate, "borrow");
         //todo: check assetInfo. if not found, add key
@@ -887,7 +891,8 @@ module.exports = class ParallelParser extends ChainParser {
         let parsedAsset = {
             Token: assetID
         }
-        let cachedAssetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
+        let chainID = indexer.chainID
+        let cachedAssetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset, chainID)
         if (cachedAssetInfo != undefined && cachedAssetInfo.decimals != undefined) {
             return cachedAssetInfo.decimals
         } else {
@@ -899,7 +904,8 @@ module.exports = class ParallelParser extends ChainParser {
         let parsedAsset = {
             Token: assetID
         }
-        let cachedAssetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset)
+        let chainID = indexer.chainID
+        let cachedAssetInfo = this.getSynchronizedAssetInfo(indexer, parsedAsset, chainID)
         if (cachedAssetInfo != undefined) {
             return {
                 Token: cachedAssetInfo.symbol
@@ -929,8 +935,6 @@ module.exports = class ParallelParser extends ChainParser {
         return JSON.stringify(liquidStakingAsset)
     }
 
-
-    //processDecHexCurrencyID(indexer, currency_id)
     async decorate_query_params(query, pallet_method, args, chainID, ts) {
         for (const k of Object.keys(args)) {
             if (k == "asset_id") {

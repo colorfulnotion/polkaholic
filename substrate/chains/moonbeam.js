@@ -321,9 +321,10 @@ module.exports = class MoonbeamParser extends ChainParser {
         // need additional processing for currency_id part
         //if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXTokens start`)
         let a = args
+        let chainID = indexer.chainID
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id, chainID)
         }
         //let generalOutgoingXcmList = super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
         super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args)
@@ -354,9 +355,10 @@ module.exports = class MoonbeamParser extends ChainParser {
         // TODO: have not seen case like this yet
         //if (this.debugLevel >= paraTool.debugVerbose) console.log(`moonbeam processOutgoingXcmPallet start`)
         let a = args
+        let chainID = indexer.chainID
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id, chainID)
         }
 
         //let generalOutgoingXcmList = super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)
@@ -764,7 +766,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                     let [extractedSymbol, _] = this.processFeeStruct(indexer, a.fee, relayChain)
                     targetedSymbol = extractedSymbol
                 }
-                //let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
+                //let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id, chainID) //inferred approach
                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.fee)
 
                 // get msgHash, innerCall from event
@@ -819,7 +821,7 @@ module.exports = class MoonbeamParser extends ChainParser {
                     let [extractedSymbol, _] = this.processFeeStruct(indexer, a.fee, relayChain)
                     targetedSymbol = extractedSymbol
                 }
-                //let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id) //inferred approach
+                //let targetedSymbol = this.processXcmGenericCurrencyID(indexer, a.currency_id, chainID) //inferred approach
                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "moonbeam xcmTransactor:transactThroughSigned", a.fee)
 
                 // inner_call processing
@@ -965,6 +967,7 @@ module.exports = class MoonbeamParser extends ChainParser {
     */
     processFeeStruct(indexer, feeStruct, relayChain) {
         //TODO: feeAmount is not accurate and potentially null
+        let chainID = indexer.chainID
         let feeCurrency = feeStruct.currency
         let feeType = Object.keys(feeCurrency)[0]
         let feeTypeStruct = feeCurrency[feeType]
@@ -973,11 +976,11 @@ module.exports = class MoonbeamParser extends ChainParser {
             case "asCurrencyId":
                 //let subType = Object.keys(feeTypeStruct)[0] //selfReserve/foreignAsset/LocalAssetReserve
                 //let currencyID = feeTypeStruct[subType]
-                let targetedSymbol0 = this.processXcmGenericCurrencyID(indexer, feeTypeStruct) //inferred approach
+                let targetedSymbol0 = this.processXcmGenericCurrencyID(indexer, feeTypeStruct, chainID) //inferred approach
                 console.log(`processFeeStruct ${feeType} ${targetedSymbol0}`, JSON.stringify(feeTypeStruct, null, 4))
                 return [targetedSymbol0, relayChain]
             case "asMultiLocation":
-                let [targetSymbol1, _] = this.processFeeMultiLocation(indexer, feeTypeStruct, relayChain)
+                let [targetSymbol1, _] = this.processFeeMultiLocation(indexer, feeTypeStruct, relayChain, chainID)
                 console.log(`processFeeStruct ${feeType} ${targetSymbol1}`, JSON.stringify(feeTypeStruct, null, 4))
                 return [targetSymbol1, relayChain]
             default:
@@ -987,7 +990,7 @@ module.exports = class MoonbeamParser extends ChainParser {
         return [false, relayChain]
     }
 
-    processFeeMultiLocation(indexer, feelocation, relayChain) {
+    processFeeMultiLocation(indexer, feelocation, relayChain, chainID) {
         /*
         {
             "asMultiLocation": {
@@ -1011,7 +1014,6 @@ module.exports = class MoonbeamParser extends ChainParser {
         let targetedAsset = false;
         let rawTargetedAsset = false;
         let targetSymbol = false;
-        let chainID = indexer.chainID
         if (feelocation.v1 != undefined) {
             let feelocation_v1 = feelocation.v1
             let feelocation_v1_interior = feelocation_v1.interior

@@ -7316,7 +7316,7 @@ module.exports = class Indexer extends AssetManager {
                     let rawAssetDecimals = null
                     let rawAssetString = null
                     try {
-                        [rawAssetSymbol, rawAssetDecimals, rawAssetString] = this.chainParser.getGenericSymbolAndDecimal(this, rAsset)
+                        [rawAssetSymbol, rawAssetDecimals, rawAssetString] = this.chainParser.getGenericSymbolAndDecimal(this, rAsset, chainID)
                     } catch (merr) {
                         console.log("this.chainParser.getGenericSymbolAndDecimal", rAsset, merr)
                     }
@@ -7375,7 +7375,7 @@ module.exports = class Indexer extends AssetManager {
                     */
                     let assetID = data[0]
                     //console.log(`assets:Transferred - rawAsset = ${assetID}`)
-                    let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID)
+                    let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID, chainID)
                     if (assetIDSymbol && assetIDDecimals !== false) {
                         symbol = assetIDSymbol
                         decimals = assetIDDecimals
@@ -7968,62 +7968,6 @@ module.exports = class Indexer extends AssetManager {
             return (false);
         }
     }
-
-    /*
-    Moved to assetManager
-
-    getNativeAsset() {
-        let symbol = this.getChainSymbol(this.chainID);
-        if (symbol) {
-            return JSON.stringify({
-                Token: symbol
-            })
-        } else {
-            return (false);
-        }
-    }
-
-    getNativeSymbol() {
-        let symbol = this.getChainSymbol(this.chainID);
-        if (symbol) {
-            return symbol
-        } else {
-            return (false);
-        }
-    }
-
-    getRelayChainSymbol() {
-        let relayChain = this.relayChain
-        let relayChainID = paraTool.getRelayChainID(relayChain)
-        let symbol = this.getChainSymbol(relayChainID);
-        if (symbol) {
-            return symbol
-        } else {
-            return (false);
-        }
-    }
-
-    getRelayChainAsset() {
-        let relayChain = this.relayChain
-        let relayChainID = paraTool.getRelayChainID(relayChain)
-        let symbol = this.getChainSymbol(relayChainID);
-        if (symbol) {
-            return JSON.stringify({
-                Token: symbol
-            })
-        } else {
-            return (false);
-        }
-    }
-
-    getNativeAssetChain() {
-        let chainID = indexer.chainID
-        let nativeAsset = this.getNativeAsset(chainID);
-        if (!nativeAsset) return (false);
-        let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
-        return (nativeAssetChain);
-    }
-    */
 
     async update_indexlog_hourly(chain, daysago = 2) {
         try {

@@ -1768,6 +1768,19 @@ module.exports = class AssetManager extends PolkaholicDB {
             "assets:Burned",
             "currencies:Withdrawn", "tokens:Deposited", "tokens:DustLost"
         ]
+        var transferList = [
+            "balances:Transfer",
+            "assets:Transferred",
+            "currencies:Transferred", "tokens:Transfer"
+        ]
+
+        var revokeList = [
+            "assets:ApprovalCancelled"
+        ]
+
+        var approvalList = [
+            "assets:ApprovedTransfer"
+        ]
 
         //write from, to for transfer events
         let transferSummary = {
@@ -1776,21 +1789,30 @@ module.exports = class AssetManager extends PolkaholicDB {
             type: "nontransfer"
         }
         let eventLen = decodedData.length
-        if (addressList.length == 2) {
-            transferSummary.from_pubkey = addressList[0]
-            transferSummary.to_pubkey = addressList[1]
-            transferSummary.type = "transfer"
-            decodedData.push(transferSummary)
-        } else if (addressList.length == 1) {
-            if (incrementList.includes(pallet_method)) {
-                transferSummary.to_pubkey = addressList[0]
-                transferSummary.type = "incoming"
-                decodedData.push(transferSummary)
-            } else if (decrementList.includes(pallet_method)) {
+        switch (addressList.length) {
+            case 2:
                 transferSummary.from_pubkey = addressList[0]
-                transferSummary.type = "outgoing"
-                decodedData.push(transferSummary)
-            }
+                transferSummary.to_pubkey = addressList[1]
+                if (transferList.includes(pallet_method)){
+                    transferSummary.type = "transfer"
+                }else if (approvalList.includes(pallet_method)){
+                    transferSummary.type = "approval"
+                }else if(revokeList.includes(pallet_method)){
+                    transferSummary.type = "revoke"
+                }
+                break;
+            case 1:
+                if (incrementList.includes(pallet_method)) {
+                    transferSummary.to_pubkey = addressList[0]
+                    transferSummary.type = "incoming"
+                } else if (decrementList.includes(pallet_method)) {
+                    transferSummary.from_pubkey = addressList[0]
+                    transferSummary.type = "outgoing"
+                }
+            default:
+        }
+        if (addressList.length > 0){
+            decodedData.push(transferSummary)
         }
         return decodedData
     }
@@ -1884,7 +1906,6 @@ module.exports = class AssetManager extends PolkaholicDB {
                     let dataVal = event.data[idx]
                     let bal = paraTool.toBn(dataVal)
                     decodedData[idx].data = bal.toString() // convert dec, '0x...' to 'intStr'
-                    //var bal = paraTool.dechexToInt(dataVal) //
                     bal = bal / 10 ** chainDecimals // always get here
                     if (decorateUSD) {
                         let p = await this.computePriceUSD({
@@ -1906,7 +1927,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     }
                 }
                 decodedData = this.generateTransferSummary(pallet_method, addressList, decodedData)
-                console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
+                //console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
                 break;
 
             case "crowdloan:Contributed": //accountID, paraID, balance
@@ -1979,7 +2000,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
 
                 let assetTarget = false;
-                let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID)
+                let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID, chainID)
                 if (assetIDSymbol && assetIDDecimals !== false) {
                     assetTarget = `{"Token":"${assetIDSymbol}"}`
                 }
@@ -2024,7 +2045,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     }
                 }
                 decodedData = this.generateTransferSummary(pallet_method, addressList, decodedData)
-                console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
+                //console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
                 break;
 
 
@@ -2039,14 +2060,14 @@ module.exports = class AssetManager extends PolkaholicDB {
             case "tokens:Endowed": //currencyID, who, balance
             case "tokens:DustLost": //currencyID, who, balance
 
-
-                //case "tokens:BalanceSet":
-                //case "tokens:LockRemoved":
-                //case "tokens:LockSet":
-                //case "tokens:Reserved":
-                //case "tokens:Slashed":
-                //case "tokens:Unreserved":
-
+/*
+            case "tokens:BalanceSet":
+            case "tokens:LockRemoved":
+            case "tokens:LockSet": //LockIdentifier, currencyID, AccountId, balance
+            case "tokens:Reserved":
+            case "tokens:Slashed":
+            case "tokens:Unreserved":
+*/
                 //a list where balance is not at last index
                 let tExceptionList = []
                 let tIdxs = []
@@ -2069,9 +2090,8 @@ module.exports = class AssetManager extends PolkaholicDB {
                     rawAssetDecimals = null,
                     rawAssetString = null;
                 try {
-                    console.log(`this`, this)
-                    [rawAssetSymbol, rawAssetDecimals, rawAssetString] = this.chainParser.getGenericSymbolAndDecimal(this, rAsset)
-                    console.log(`rawAssetSymbol=${rawAssetSymbol}, rawAssetDecimals=${rawAssetDecimals}, rawAssetString=${rawAssetString}, rAsset`, rAsset)
+                    [rawAssetSymbol, rawAssetDecimals, rawAssetString] = this.chainParser.getGenericSymbolAndDecimal(this, rAsset, chainID)
+                    //console.log(`rawAssetSymbol=${rawAssetSymbol}, rawAssetDecimals=${rawAssetDecimals}, rawAssetString=${rawAssetString}, rAsset`, rAsset)
                     tokenIDChain = paraTool.makeAssetChain(`${JSON.stringify(rAsset)}`, chainID)
                 } catch (merr) {
                     console.log("this.chainParser.getGenericSymbolAndDecimal", rAsset, merr)
@@ -2084,7 +2104,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     tokenTarget = rawAssetString
                 } else {
                     // NOT COVERED (dexShare)
-                    console.log(`dexShare not covered`, pallet_method, rAsset)
+                    console.log(`not covered`, pallet_method, rAsset)
                 }
                 //NOTE: we will dual represent asset info in both bal and assetID fields
                 if (rawAssetSymbol && rawAssetDecimals !== false) {
@@ -2125,7 +2145,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     }
                 }
                 decodedData = this.generateTransferSummary(pallet_method, addressList, decodedData)
-                console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
+                //console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
                 break;
         }
         if (decorateData && dEvent) dEvent.decodedData = decodedData
