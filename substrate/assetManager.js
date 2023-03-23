@@ -1031,7 +1031,8 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     getRelayChainSymbol(chainID) {
-        let relayChainID = paraTool.getRelayChainID(chainID)
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let relayChainID = paraTool.getRelayChainID(relayChain)
         let symbol = this.getChainSymbol(relayChainID);
         if (symbol) {
             return symbol
