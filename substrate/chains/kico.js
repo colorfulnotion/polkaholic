@@ -71,7 +71,8 @@ module.exports = class KicoParser extends ChainParser {
         }
         if (false) {
             // manually write native token price
-            let nativeAssetString = indexer.getNativeAsset();
+            let chainID = indexer.chainID
+            let nativeAssetString = indexer.getNativeAsset(chainID);
             indexer.updateAssetPrice(nativeAssetString, price, paraTool.assetTypeToken, paraTool.assetSourceOracle)
         }
         let assetString = JSON.stringify(parsedAsset);

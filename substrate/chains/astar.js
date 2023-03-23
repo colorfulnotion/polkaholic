@@ -435,10 +435,11 @@ module.exports = class AstarParser extends ChainParser {
     processOutgoingXTokens(indexer, extrinsic, feed, fromAddress, section_method, args) {
         // need additional processing for currency_id part
         //if (this.debugLevel >= paraTool.debugVerbose) console.log(`astar processOutgoingXTokens start`)
+        let chainID = this.chainID
         let a = args
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id, chainID)
         }
         /* 0xb64a6325b5374ed3efca6628337aab00aff1febff06d6977bc6f192690126996
         currency_id": {
@@ -447,7 +448,7 @@ module.exports = class AstarParser extends ChainParser {
         */
         if (!xcmAssetSymbol) {
             if (a.currency_id != undefined && a.currency_id.selfReserve !== undefined) {
-                xcmAssetSymbol = indexer.getNativeSymbol();
+                xcmAssetSymbol = indexer.getNativeSymbol(chainID);
             }
         }
         //let generalOutgoingXcmList = super.processOutgoingXTokens(indexer, extrinsic, feed, fromAddress)
@@ -479,6 +480,7 @@ module.exports = class AstarParser extends ChainParser {
 
     processOutgoingEthereumAssetWithdraw(indexer, extrinsic, feed, fromAddress, section_method, a) {
         // need additional processing for currency_id part
+        let chainID = indexer.chainID
         if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
         } else {
@@ -545,7 +547,7 @@ module.exports = class AstarParser extends ChainParser {
             let evmMethod = `${a.signature.split('(')[0]}:${a.methodID}`
 
             if (a.msgValue > 0) {
-                let nativeSymbol = indexer.getNativeSymbol()
+                let nativeSymbol = indexer.getNativeSymbol(chainID)
                 //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] Adding native ${nativeSymbol} transfer!`)
                 params.asset_id.push(`${native}-${nativeSymbol}`)
                 params.asset_amount.push(a.msgValue)
@@ -553,7 +555,7 @@ module.exports = class AstarParser extends ChainParser {
             for (let i = 0; i < params.asset_id.length; i++) {
                 let rawAssetID = `${params.asset_id[i]}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
                 if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
-                let targetedSymbol = (rawAssetID.includes("native")) ? indexer.getNativeSymbol() : this.processXcmGenericCurrencyID(indexer, rawAssetID)
+                let targetedSymbol = (rawAssetID.includes("native")) ? indexer.getNativeSymbol(chainID) : this.processXcmGenericCurrencyID(indexer, rawAssetID, chainID)
                 if (rawAssetID == 0 && chainID == paraTool.chainIDAstar) {
                     targetedSymbol = "ASTR"
                 }
@@ -621,6 +623,7 @@ module.exports = class AstarParser extends ChainParser {
 
     processOutgoingEthereumRemoteExecution(indexer, extrinsic, feed, fromAddress, section_method, a) {
         // need additional processing for currency_id part
+        let chainID = indexer.chainID
         if (extrinsic.xcmIndex == undefined) {
             extrinsic.xcmIndex = 0
         } else {
@@ -713,7 +716,7 @@ module.exports = class AstarParser extends ChainParser {
                     //process fee
                     let rawAssetID = `${params.payment_asset_id}` //(xcAsset address = "0xFFFFFFFF" + DecimalToHexWith32Digits(AssetId)
                     if (rawAssetID.substr(0, 2) == '0x') rawAssetID = '0x' + rawAssetID.substr(10)
-                    let targetedSymbol = this.processXcmGenericCurrencyID(indexer, rawAssetID) //inferred approach
+                    let targetedSymbol = this.processXcmGenericCurrencyID(indexer, rawAssetID, chainID) //inferred approach
                     let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, relayChain, chainID, chainIDDest, "processXcmGenericCurrencyID", "astar processOutgoingEthereumRemoteExecution", rawAssetID)
                     let assetAmount = paraTool.dechexToInt(params.payment_amount)
 
@@ -765,7 +768,7 @@ module.exports = class AstarParser extends ChainParser {
         let a = args
         let xcmAssetSymbol = false
         if (a.currency_id != undefined) {
-            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id)
+            xcmAssetSymbol = this.processXcmDecHexCurrencyID(indexer, a.currency_id, chainID)
         }
         //let generalOutgoingXcmList = super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress)
         super.processOutgoingXcmPallet(indexer, extrinsic, feed, fromAddress, section_method, args)

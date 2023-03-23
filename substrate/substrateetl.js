@@ -16,6 +16,8 @@
 
 const AssetManager = require("./assetManager");
 const PolkaholicDB = require("./polkaholicDB");
+const Crawler = require("./crawler");
+
 const {
     ApiPromise,
     WsProvider
@@ -45,6 +47,7 @@ const {
 const {
     BigQuery
 } = require('@google-cloud/bigquery');
+const fetch = require("node-fetch");
 
 // first day when balances are available daily in modern ways from Kusama
 const balanceStartDT = "2020-03-09";
@@ -53,6 +56,7 @@ module.exports = class SubstrateETL extends AssetManager {
     project = "substrate-etl";
     publish = 0;
     isProd = true
+    chainID = null;
 
     constructor() {
         super("manager")
@@ -166,6 +170,211 @@ module.exports = class SubstrateETL extends AssetManager {
                 }
             }
         }
+    }
+
+    async fetchCsvAndConvertToJson(url) {
+      const response = await fetch(url);
+      const csvContent = await response.text();
+      return this.csvToJson(csvContent);
+    }
+
+    csvToJson(csv) {
+      const lines = csv.split("\n");
+      const headers = lines[0].split(",");
+      const result = lines.slice(1).map(line => {
+        const values = line.split(",");
+        return headers.reduce((obj, header, index) => {
+          obj[header] = values[index];
+          return obj;
+        }, {});
+      });
+      return result;
+    }
+
+    async ingestWalletAttribution(){
+        //FROM Fearless-Util
+        let url ='https://gist.githubusercontent.com/mkchungs/2f99c4403b64e5d4c17d46abdd9869a3/raw/9550f0ab7294f44c8c6c981c2fbc4a3d84f17b06/Polkadot_Hot_Wallet_Attributions.csv'
+        let recs = await this.fetchCsvAndConvertToJson(url)
+        let accounts = []
+        let idx = 0
+        for (const r of recs){
+            let isExchange = (r.tag_type_verbose == 'Exchange')? 1 : 0
+            let accountName = r.tag_name_verbose
+            let verified = 1
+            r.accountType = r.tag_type_verbose
+            let pubkey = paraTool.getPubKey(r.addresses)
+            if (pubkey){
+                r.address_pubkey = pubkey
+                let t = "(" + [`'${r.address_pubkey}'`, `'${r.tag_name_verbose} ${r.accountType}'`, `'${r.accountType}'`, `'${accountName}'`, `'${isExchange}'`, `'${verified}'`, `NOW()`
+                ].join(",") + ")";
+                accounts.push(t)
+                idx++
+                console.log(`[${idx}] ${t}`)
+            }
+        }
+        console.log(accounts)
+        let sqlDebug = true
+        await this.upsertSQL({
+            "table": "account",
+            "keys": ["address"],
+            "vals": ["nickname", "accountType", "accountName", "is_exchange", "verified", "verifyDT"],
+            "data": accounts,
+            "replaceIfNull": ["nickname", "accountType", "accountName", "is_exchange", "verifyDT"],
+            "replace": ["verified"]
+        }, sqlDebug);
+    }
+
+    async ingestSystemAddress(){
+        //FROM Fearless-Util
+        let url ='https://gist.githubusercontent.com/mkchungs/2f99c4403b64e5d4c17d46abdd9869a3/raw/5ea73227ca9e303a02f00791e9a9297637fa3dec/system_accounts.csv'
+        let recs = await this.fetchCsvAndConvertToJson(url)
+        let systemAddresses = []
+        let unknownAscii = []
+        for (const r of recs){
+            let asciiName = paraTool.pubKeyHex2ASCII(r.user_pubkey);
+            if (asciiName){
+                let systemAccountInfo = paraTool.decode_systemAccountType(asciiName)
+                systemAccountInfo.user_pubkey = r.user_pubkey
+                systemAddresses.push(systemAccountInfo)
+            }else{
+                unknownAscii.push(r)
+            }
+        }
+        let accounts = []
+        let idx = 0
+        for (const r of systemAddresses){
+            r.accountType = "System"
+            r.address_pubkey = paraTool.getPubKey(r.user_pubkey)
+            let accountName = `${r.systemAccountType}${r.prefix}:${r.idx}`
+            let verified = 1
+            let t = "(" + [`'${r.address_pubkey}'`, `'${r.nickname}'`, `'${r.accountType}'`, `'${r.systemAccountType}'`, `'${accountName}'`, `'${verified}'`, `NOW()`
+            ].join(",") + ")";
+            accounts.push(t)
+            idx++
+            console.log(`[${idx}] ${t}`)
+        }
+        console.log(accounts)
+        let sqlDebug = true
+        await this.upsertSQL({
+            "table": "account",
+            "keys": ["address"],
+            "vals": ["nickname", "accountType", "systemAccountType", "accountName", "verified", "verifyDT"],
+            "data": accounts,
+            "replaceIfNull": ["nickname", "accountType", "systemAccountType", "verified", "verifyDT"],
+            "replace": ["accountName"]
+        }, sqlDebug);
+        console.log(unknownAscii)
+    }
+
+    async dump_users_tags(){
+        let paraID = 0
+        let relayChain = 'polkadot'
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let projectID = `${this.project}`
+        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+
+        let datasetID = `${relayChain}`
+        let tblName = `full_users${paraID}`
+        let destinationTbl = `${datasetID}.${tblName}`
+        //let destinationTbl = `${datasetID}.${tblName}$${logYYYYMMDD}`
+
+        let bqjobs = []
+        let tagsourceTbl = 'knownpubs'
+        /*
+        with exchangeoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(block_time) as ts FROM `substrate-etl.polkadot.transfers0` where date(block_time)= '2023-03-01' group by from_pub_key, to_pub_key)
+        select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount, ts from substrate-etl.polkadot.exchanges inner join transfer on exchanges.address_pubkey = transfer.from_pub_key),
+        firstAttribution as (select user_pubkey, min(concat(ts, "_",exchagne_label)) attribution from exchangeoutgoing group by user_pubkey)
+        select user_pubkey, array_agg(distinct(exchagne_label)) as exchange_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt, min(split(attribution, "_")[offset(0)]) as first_exchange_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_exchange from exchangeoutgoing
+        inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc
+
+        with transferoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(extrinsic_id) as extrinsic_id, min(block_time) as ts FROM `substrate-etl.polkadot.transfers0` where date(block_time)= "2023-03-01" group by from_pub_key, to_pub_key)
+        select to_pub_key as user_pubkey, ifNull(address_label, "other") as known_label, from_pub_key, extrinsic_id, transfer_cnt, amount, ts from transfer left join substrate-etl.polkadot_dev.knownpubs on knownpubs.address_pubkey = transfer.from_pub_key where knownpubs.account_type not in ('Scams', 'sanction')),
+        firstAttribution as (select user_pubkey, min(concat(ts, "_", extrinsic_id, "_", from_pub_key, "_",known_label)) attribution from transferoutgoing group by user_pubkey)
+        select user_pubkey, array_agg(distinct(known_label)) as known_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt, min(split(attribution, "_")[offset(0)]) as first_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_transfer_extrinsic_id, min(split(attribution, "_")[offset(2)]) as first_transfer_sender_pub_key,  min(split(attribution, "_")[offset(3)]) as first_transfer from transferoutgoing inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc
+
+        */
+        let targetSQL = `with transferoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(extrinsic_id) as extrinsic_id, min(block_time) as ts FROM \`${projectID}.${relayChain}.transfers${paraID}\` group by from_pub_key, to_pub_key)
+        select to_pub_key as user_pubkey, ifNull(address_label, "other") as known_label, from_pub_key, extrinsic_id, transfer_cnt, amount, ts from transfer left join ${projectID}.${relayChain}.${tagsourceTbl} on knownpubs.address_pubkey = transfer.from_pub_key where ${tagsourceTbl}.account_type not in ("Scams")),
+        firstAttribution as (select user_pubkey, min(concat(ts, "_", extrinsic_id, "_", from_pub_key, "_",known_label)) attribution from transferoutgoing group by user_pubkey)
+        select user_pubkey, array_agg(distinct(known_label)) as known_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt,
+        min(split(attribution, "_")[offset(0)]) as first_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_transfer_extrinsic_id,
+        min(split(attribution, "_")[offset(2)]) as first_transfer_sender_pub_key,  min(split(attribution, "_")[offset(3)]) as first_transfer
+        from transferoutgoing inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc`
+
+        /*
+        let targetSQL = `with exchangeoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(block_time) as ts FROM \`${projectID}.${relayChain}.transfers${paraID}\` group by from_pub_key, to_pub_key)
+        select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount, ts from ${projectID}.${relayChain}.${tagsourceTbl} inner join transfer on ${tagsourceTbl}.address_pubkey = transfer.from_pub_key),
+        firstAttribution as (select user_pubkey, min(concat(ts, "_",exchagne_label)) attribution from exchangeoutgoing group by user_pubkey)
+        select user_pubkey, array_agg(distinct(exchagne_label)) as exchange_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt, min(split(attribution, "_")[offset(0)]) as first_exchange_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_exchange from exchangeoutgoing
+        inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc`
+        let targetSQL = `with exchangeoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt FROM \`${projectID}.${relayChain}.transfers${paraID}\` where date(block_time)= "2023-03-01" group by from_pub_key, to_pub_key)
+                select to_pub_key as user_pubkey, address_label as exchagne_label, transfer_cnt, amount from substrate-etl.polkadot_dev.exchanges inner join transfer on exchanges.address_pubkey = transfer.from_pub_key)
+                select user_pubkey, array_agg(distinct(exchagne_label)) as exchange_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt from exchangeoutgoing group by user_pubkey order by transfer_cnt desc`
+        */
+        let cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+        bqjobs.push({
+            chainID: chainID,
+            paraID: paraID,
+            tbl: tblName,
+            destinationTbl: destinationTbl,
+            cmd: cmd
+        })
+
+        let errloadCnt = 0
+        let isDry = false;
+        for (const bqjob of bqjobs) {
+            try {
+                if (isDry) {
+                    console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                } else {
+                    console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
+                    //await exec(bqjob.cmd);
+                }
+            } catch (e) {
+                errloadCnt++
+                this.logger.error({
+                    "op": "dump_users_tags",
+                    e
+                })
+            }
+        }
+
+    }
+
+    async publishExchangeAddress(){
+        //await this.ingestSystemAddress()
+        //await this.ingestWalletAttribution()
+        let relayChain = 'polkadot'
+        //let tbl = `exchanges`
+        let tbl = `knownpubs`
+        let projectID = `${this.project}`
+        let bqDataset = (this.isProd)? `${relayChain}`: `${relayChain}_dev` //MK write to relay_dev for dev
+        //let sql = `select nickname, accountName, address from account where is_exchange = 1`
+        let sql = `select nickname, accountName, address, accountType from account where accountType not in ('Unknown', 'User');`
+        let sqlRecs = await this.poolREADONLY.query(sql);
+        let knownAccounts = [];
+        let knownPubkeys = {}
+        for (const r of sqlRecs) {
+            let a = {
+                address_pubkey: r.address,
+                address_nickname: r.nickname,
+                address_label: r.accountName,
+                account_type: r.accountType
+            }
+            knownAccounts.push(a)
+        }
+        let dir = "/tmp";
+        let fn = path.join(dir, `${tbl}.json`)
+        let f = fs.openSync(fn, 'w', 0o666);
+        let NL = "\r\n";
+        knownAccounts.forEach((e) => {
+            fs.writeSync(f, JSON.stringify(e) + NL);
+        });
+        fs.closeSync(f);
+        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/${tbl}.json`;
+        console.log(cmd)
+
+        await this.dump_users_tags()
     }
 
     async cleanReaped(start = null, end = null) {
@@ -3224,6 +3433,11 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         await this.update_batchedSQL()
     }
 
+    async setUpSubstrateEtlChainparser(chainID, debugLevel = paraTool.debugInfo){
+        await this.chainParserInit(chainID, debugLevel);
+        this.chainID = chainID
+    }
+
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
@@ -3234,6 +3448,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             tbls.push("evmtxs");
             tbls.push("evmtransfers");
         }
+        // 0. include chainParser + chainID
+        await this.setUpSubstrateEtlChainparser(chainID)
+
         // 1. get bnStart, bnEnd for logDT
         let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
@@ -4127,7 +4344,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
     section NOT IN ("ParasDisputes",      "AuthorInherent",      "AutomationTime",      "ParaInherent",      "ParaSessionInfo",      "ImOnline",
       "Initializer", "aura", "XcAssetConfig",      "auraExt",      "Ethereum",      "ParaScheduler",      "ElectionProviderMultiPhase",
       "PolkadotXcm", "polkadotXcm",      "EVM",      "System",      "RandomnessCollectiveFlip",      "ParachainStaking",      "CollatorStaking",
-      "TransactionPayment", "historical", "VoterList", "Staking", "Scheduler",      "XcmPallet",      "Grandpa",      "Timestamp",     
+      "TransactionPayment", "historical", "VoterList", "Staking", "Scheduler",      "XcmPallet",      "Grandpa",      "Timestamp",
       "Paras", "Dmp", "Hrmp", "Ump", "Randomness",      "ParaInclusion",      "ParasShared",      "Babe",      "unknown",      "Security",      "ParachainSystem",      "CollatorSelection",
       "Vesting", "XcmpQueue",      "Session",      "SessionManager",      "DmpQueue",      "Aura",      "AuraExt", "relayerXcm",      "Authorship", "Evm")
       and storage not in ("Locks", "LowestUnbaked", "LastAccumulationSecs", "HasDispatched", "PreviousRelayBlockNumber"))

@@ -4251,6 +4251,7 @@ module.exports = class Indexer extends AssetManager {
             to: null,
             transactionHash: null,
         }
+        let chainID = this.chainID
         let withdrawFee = 0 // if set, transaction is paid in native currency
         let totalDepositFee = 0 // if set, should equal to withdrawTxFee, including the 20% deposit to treasury
         let depositFeeList = [];
@@ -4277,13 +4278,13 @@ module.exports = class Indexer extends AssetManager {
             if (dataType != undefined && Array.isArray(dataType)) {
                 if (pallet_method == 'tokens:Withdrawn') {
                     //this is normal case for txfees
-                    if (data != undefined && Array.isArray(data) && (this.chainID == paraTool.chainIDKintsugi || this.chainID == paraTool.chainIDInterlay)) {
+                    if (data != undefined && Array.isArray(data) && (chainID == paraTool.chainIDKintsugi || chainID == paraTool.chainIDInterlay)) {
                         try {
                             //this assumes that transaction is paid by nativeAsset
                             let isNativeToken = true
                             let feeToken = data[0]
                             if (feeToken.token != undefined) {
-                                if (feeToken.token != this.getNativeSymbol()) {
+                                if (feeToken.token != this.getNativeSymbol(chainID)) {
                                     isNativeToken = false
                                     console.log(`[${extrinsicID}] ${extrinsicHash} nonNative feeToken ${feeToken.token}`)
                                 }
@@ -5770,7 +5771,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async process_evmtx_native_transfer(tx, chainID, ts, blockNumber, finalized = false) {
-        let nativeAsset = this.getNativeAsset()
+        let nativeAsset = this.getNativeAsset(chainID)
         let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, chainID);
         // mark assetholder as worthy of update
         // Note: could get internal transfer with evmtraces https://docs.moonbeam.network/builders/build/eth-api/debug-trace/ https://docs.moonbeam.network/builders/build/eth-api/debug-trace/
@@ -7270,7 +7271,7 @@ module.exports = class Indexer extends AssetManager {
                         from: data[0],
                         to: data[1],
                         rawAmount: paraTool.dechexToInt(data[2]),
-                        rawAsset: this.getNativeAsset()
+                        rawAsset: this.getNativeAsset(chainID)
                     }
                     symbol = this.getChainSymbol(chainID)
                     asset = `{"Token":"${symbol}"}`
@@ -7302,7 +7303,6 @@ module.exports = class Indexer extends AssetManager {
                     ]
                     */
                     let rAsset = data[0]
-
                     if (rAsset.dexShare != undefined) rAsset = rAsset.dexShare
                     if (rAsset.dEXShare != undefined) rAsset = rAsset.dEXShare
 
@@ -7316,7 +7316,7 @@ module.exports = class Indexer extends AssetManager {
                     let rawAssetDecimals = null
                     let rawAssetString = null
                     try {
-                        [rawAssetSymbol, rawAssetDecimals, rawAssetString] = this.chainParser.getGenericSymbolAndDecimal(this, rAsset)
+                        [rawAssetSymbol, rawAssetDecimals, rawAssetString] = this.chainParser.getGenericSymbolAndDecimal(this, rAsset, chainID)
                     } catch (merr) {
                         console.log("this.chainParser.getGenericSymbolAndDecimal", rAsset, merr)
                     }
@@ -7375,7 +7375,7 @@ module.exports = class Indexer extends AssetManager {
                     */
                     let assetID = data[0]
                     //console.log(`assets:Transferred - rawAsset = ${assetID}`)
-                    let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID)
+                    let [assetIDSymbol, assetIDDecimals, assetIDString] = this.chainParser.getGenericSymbolAndDecimal(this, assetID, chainID)
                     if (assetIDSymbol && assetIDDecimals !== false) {
                         symbol = assetIDSymbol
                         decimals = assetIDDecimals
@@ -7969,79 +7969,6 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    getNativeAsset() {
-        let symbol = this.getChainSymbol(this.chainID);
-        if (symbol) {
-            return JSON.stringify({
-                Token: symbol
-            })
-        } else {
-            return (false);
-        }
-    }
-
-    getNativeSymbol() {
-        let symbol = this.getChainSymbol(this.chainID);
-        if (symbol) {
-            return symbol
-        } else {
-            return (false);
-        }
-    }
-
-    getRelayChainSymbol() {
-        let relayChain = this.relayChain
-        let relayChainID = paraTool.getRelayChainID(relayChain)
-        let symbol = this.getChainSymbol(relayChainID);
-        if (symbol) {
-            return symbol
-        } else {
-            return (false);
-        }
-    }
-
-    getNativeAssetChain() {
-        let nativeAsset = this.getNativeAsset();
-        if (!nativeAsset) return (false);
-        let nativeAssetChain = paraTool.makeAssetChain(nativeAsset, this.chainID);
-        return (nativeAssetChain);
-    }
-
-    getRelayChainAsset() {
-        let relayChain = this.relayChain
-        let relayChainID = paraTool.getRelayChainID(relayChain)
-        let symbol = this.getChainSymbol(relayChainID);
-        if (symbol) {
-            return JSON.stringify({
-                Token: symbol
-            })
-        } else {
-            return (false);
-        }
-    }
-
-    async genesisAsset(chain) {
-        let nativeAssetChain = this.getNativeAsset();
-        if (!nativeAssetChain) return (false);
-        let totalIssuance = 0;
-        try {
-            totalIssuance = await this.apiAt.query.balances.totalIssuance();
-            let d = this.getChainDecimal(this.chainID);
-            totalIssuance = Math.floor(totalIssuance / (10 ** d));
-        } catch (err) {
-            this.logger.warn({
-                "op": "genesisAsset",
-                "chainID": chain.chainID,
-                err
-            })
-        }
-        let result = {};
-        result[nativeAssetChain] = {
-            issuance: totalIssuance
-        };
-        return result;
-    }
-
     async update_indexlog_hourly(chain, daysago = 2) {
         try {
             let chainID = chain.chainID;
@@ -8143,7 +8070,7 @@ module.exports = class Indexer extends AssetManager {
         if (currPeriod.eventsperblock > 50 || currPeriod.extrinsicsperblock > 30) {
             console.log(`WARNING: high usage block [jmp=${jmp}]`, currPeriod);
         }
-        let nativeAsset = this.getNativeAsset()
+        let nativeAsset = this.getNativeAsset(chainID)
         const tableChain = this.instance.table("chain" + chainID);
         let batchN = 0
         let totalBlkCnt = 1 + currPeriod.endBN - currPeriod.startBN

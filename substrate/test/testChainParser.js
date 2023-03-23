@@ -209,13 +209,13 @@ async function main() {
                         [targetedSymbol, targetedRelayChain] = indexer.chainParser.processFeeLocation(indexer, instruction)
                         break;
                     case 'getNativeSymbol':
-                        targetedSymbol = indexer.chainParser.getNativeSymbol() // no instruction
+                        targetedSymbol = indexer.chainParser.getNativeSymbol(chainID) // no instruction
                         break;
                     case 'processXcmGenericCurrencyID':
-                        targetedSymbol = indexer.chainParser.processXcmGenericCurrencyID(instruction)
+                        targetedSymbol = indexer.chainParser.processXcmGenericCurrencyID(indexer, instruction, chainID)
                         break;
                     case 'processXcmDecHexCurrencyID':
-                        targetedSymbol = indexer.chainParser.processXcmDecHexCurrencyID(instruction)
+                        targetedSymbol = indexer.chainParser.processXcmDecHexCurrencyID(indexer, instruction, chainID)
                         break;
                     default:
                         console.log(`unhandled ${parserFunc}`)
