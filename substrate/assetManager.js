@@ -1719,7 +1719,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             if (dt) {
                 x.typeDef = dt.typeDef
                 x.name = dt.name
-                if (x.typeDef == "AccountId32") {
+                if (x.typeDef == "AccountId32" || x.typeDef == "AccountId20") {
                     x.address = paraTool.getPubKey(d)
                 }
             }
@@ -1774,6 +1774,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             symbol, decimals should be queriable at data[0] - no exception
             balance should be queriable at data[length(data-1)]
 
+            TODO: need generic {from, to} all cases
             */
             case "treasury:Awarded": //balance, accountID
             case "treasury:Burnt": //bal
