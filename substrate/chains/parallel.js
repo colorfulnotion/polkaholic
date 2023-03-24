@@ -7,6 +7,7 @@ module.exports = class ParallelParser extends ChainParser {
 
     constructor() {
         super()
+        this.chainParserName = 'Parallel'
     }
 
     tokenID_to_string(t) {
@@ -434,7 +435,7 @@ module.exports = class ParallelParser extends ChainParser {
 
     parseStorageKey(indexer, p, s, key, decoratedKey) {
         let pallet_section = `${p}:${s}`
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel parseStorageKey ps=${pallet_section}`)
+        if (this.debugLevel >= paraTool.debugVerbose) console.log(`parseStorageKey ps=${pallet_section}`)
         if (pallet_section == "assets:account") {
             // decoratedKey: ["100","hJHfe3mtq3Rx4gcUGtSjXwL4Wmq3Krtt3uumUhXG1rTq9WwZg"]
             return this.getAssetsAccountKey(indexer, decoratedKey);
@@ -491,7 +492,9 @@ module.exports = class ParallelParser extends ChainParser {
 
     parseStorageVal(indexer, p, s, val, decoratedVal, o = false) {
         let pallet_section = `${p}:${s}`
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel parseStorageVal ps=${pallet_section}`)
+        if (this.debugLevel >= paraTool.debugVerbose) {
+            console.log(`!!!parallel parseStorageVal ps=${pallet_section}`)
+        }
         if (pallet_section == "oracle:values") {
             //skip oracle:rawvalues
             return this.getOracleValuesVal(indexer, decoratedVal);

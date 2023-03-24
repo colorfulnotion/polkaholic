@@ -213,7 +213,7 @@ module.exports = class Indexer extends AssetManager {
     log_indexing_error(err, op, obj = {}, showOnConsole = true) {
         this.numIndexingErrors++;
         if (showOnConsole) {
-            console.log("ERROR", "op", op, obj, this.context, err);
+            console.log("** numIndexingErrors ERROR", "op", op, obj, this.context, err);
         }
         obj.chainID = this.chainID;
         obj.context = this.context;
@@ -6510,12 +6510,11 @@ module.exports = class Indexer extends AssetManager {
         let rows = [];
         for (const x of xcmList) {
             try {
-
                 let isFinalized = (x.finalized) ? 1 : 0
-                let xcmInteriorKeys = (x.xcmInteriorKeys != undefined) ? `${mysql.escape(x.xcmInteriorKeys)}` : `NULL`
-                let xcmInteriorKeysUnregistered = (x.xcmInteriorKeysUnregistered != undefined) ? `${mysql.escape(x.xcmInteriorKeysUnregistered)}` : `NULL`
-
-                out.push(`('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayChain}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(x.msg))}, '${x.msgHex}', ${mysql.escape(x.path)}, '${x.version}', ${mysql.escape(x.beneficiaries)}, Now(), ${isFinalized}, ${xcmInteriorKeys}, ${xcmInteriorKeysUnregistered})`)
+                let xcmInteriorKeys = (x.xcmInteriorKeys != undefined) ? `${mysql.escape(JSON.stringify(x.xcmInteriorKeys))}` : `NULL`
+                let xcmInteriorKeysUnregistered = (x.xcmInteriorKeysUnregistered != undefined) ? `${mysql.escape(JSON.stringify(x.xcmInteriorKeysUnregistered))}` : `NULL`
+                let s = `('${x.msgHash}', '${x.chainID}', '${x.chainIDDest}', '${x.sentAt}', '${x.relayChain}', '${x.relayedBlockHash}', '${x.relayedAt}', '${x.includedAt}', '${x.msgType}', '${x.blockTS}', ${mysql.escape(JSON.stringify(x.msg))}, '${x.msgHex}', ${mysql.escape(x.path)}, '${x.version}', ${mysql.escape(x.beneficiaries)}, Now(), ${isFinalized}, ${xcmInteriorKeys}, ${xcmInteriorKeysUnregistered})`
+                out.push(s)
 
                 if (relayChain) {
                     let insertId = `${x.msgHash}-${x.includedAt}-${x.chainID}-${x.chainIDDest}`;
@@ -6643,6 +6642,7 @@ module.exports = class Indexer extends AssetManager {
                                         relayChain: relayChain,
                                         isTip: isTip,
                                         finalized: finalized,
+                                        relayedBlockHash: chainParserStat.parserBlockHash,
                                         ctx: t.s,
                                     }
                                     this.patch_xcm(umpMsg)
@@ -6689,6 +6689,7 @@ module.exports = class Indexer extends AssetManager {
                                         relayChain: relayChain,
                                         isTip: isTip,
                                         finalized: finalized,
+                                        relayedBlockHash: chainParserStat.parserBlockHash,
                                         ctx: t.s,
                                     }
                                     this.patch_xcm(hrmpMsg)
@@ -6746,6 +6747,7 @@ module.exports = class Indexer extends AssetManager {
                                         relayChain: relayChain,
                                         isTip: isTip,
                                         finalized: finalized,
+                                        relayedBlockHash: chainParserStat.parserBlockHash,
                                         ctx: t.s,
                                     }
                                     this.patch_xcm(dmpMsg)
@@ -7724,6 +7726,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async setup_chainParser(chain, debugLevel = paraTool.debugNoLog, isTip = false) {
+        console.log(`*** chain.chainID=${chain.chainID}, this.chainID=${this.chainID}`)
         await this.chainParserInit(chain.chainID, debugLevel);
         if (chain.isEVM == 1) {
             await this.getChainERCAssets(this.chainID);

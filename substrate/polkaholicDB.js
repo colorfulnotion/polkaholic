@@ -517,6 +517,7 @@ module.exports = class PolkaholicDB {
                         err
                     });
                     this.numIndexingErrors++;
+                    console.log("polkaholicDB numIndexingErrors ERROR", err);
                     let tsm = new Date().getTime();
                     let fn = "/var/log/" + tsm + "-" + i + ".sql";
                     await fs.writeFileSync(fn, sql);
@@ -541,6 +542,7 @@ module.exports = class PolkaholicDB {
                             err
                         });
                         this.numIndexingErrors++;
+                        console.log("*polkaholicDB numIndexingErrors ERROR", err);
                         let tsm = new Date().getTime()
                         let fn = "/var/log/" + tsm + "-" + i + ".sql";
                         await fs.writeFileSync(fn, sql);

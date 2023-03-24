@@ -5,6 +5,7 @@ const ChainParser = require("./chainparser");
 module.exports = class BifrostParser extends ChainParser {
     constructor() {
         super()
+        this.chainParserName = 'Bifrost'
     }
 
     //WIP assetRegistry.currencyMetadatas

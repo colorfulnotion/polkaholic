@@ -839,8 +839,8 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
         v: txn.v
     }
     try {
-        if (txn.r && txn.s) {
-            console.log(`txn=${txn.hash} (${txn.raw}) rsv, r=${txn.r.length}, s=${txn.s.length}, v=${txn.v.length}, signature`, output.signature)
+        if (txn.r != undefined && txn.s != undefined) {
+            //console.log(`txn=${txn.hash} (${txn.raw}) rsv, r=${txn.r.length}, s=${txn.s.length}, v=${txn.v.length}, signature`, output.signature)
             if (txn.r.length == 66 && txn.s.length == 66) {
                 return output // let's not validate irrelevant tx
             } else {
