@@ -9,6 +9,7 @@ const {
 
 module.exports = class ChainParser {
     debugLevel = paraTool.debugNoLog;
+    chainParserName = "generic"
     parserTS = false;
     parserBlockNumber = false;
     parserBlockHash = false;
@@ -57,6 +58,7 @@ module.exports = class ChainParser {
             parserBlockNumber: this.parserBlockNumber,
             parserBlockHash: this.parserBlockHash,
             relayParentStateRoot: this.relayParentStateRoot,
+            chainParserName: this.chainParserName
         }
         return r
     }

@@ -5,6 +5,7 @@ const ChainParser = require("./chainparser");
 module.exports = class AcalaParser extends ChainParser {
     constructor() {
         super()
+        this.chainParserName = 'Acala'
     }
 
     getTokensAccountsKey(indexer, decoratedKey) {

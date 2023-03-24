@@ -115,27 +115,29 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     async chainParserInit(chainID, debugLevel = 0) {
-        if (this.chainParser && (this.chainParserChainID == chainID)) return;
-        if (chainID == paraTool.chainIDKarura || chainID == paraTool.chainIDAcala) {
+        if (debugLevel >= paraTool.debugVerbose) console.log(`chainParserInit chainID=${chainID}, this.chainParserChainID=${this.chainParserChainID}`)
+        if (this.chainParser && (this.chainParserChainID == chainID)) {
+            return;
+        }
+        if ([paraTool.chainIDKarura, paraTool.chainIDAcala].includes(chainID)) {
             this.chainParser = new AcalaParser();
-        } else if (chainID == paraTool.chainIDBifrostDOT || chainID == paraTool.chainIDBifrostKSM) {
+        } else if ([paraTool.chainIDBifrostDOT, paraTool.chainIDBifrostKSM].includes(chainID)) {
             this.chainParser = new BifrostParser();
-        } else if (chainID == paraTool.chainIDAstar || chainID == paraTool.chainIDShiden || chainID == paraTool.chainIDShibuya) {
+        } else if ([paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDShibuya].includes(chainID)) {
             this.chainParser = new AstarParser();
         } else if (chainID == paraTool.chainIDParallel || chainID == paraTool.chainIDHeiko) {
             this.chainParser = new ParallelParser();
             //await this.chainParser.addCustomAsset(this); // This line add psuedo asset HKO/PARA used by dex volume / LP pair / etc ..
-        } else if (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver || chainID == paraTool.chainIDMoonbaseAlpha || this.chainID == paraTool.chainIDMoonbaseBeta) {
+        } else if ([paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDMoonbaseAlpha, paraTool.chainIDMoonbaseBeta].includes(chainID)) {
             this.chainParser = new MoonbeamParser();
-        } else if (chainID == paraTool.chainIDInterlay || chainID == paraTool.chainIDKintsugi) {
+        } else if ([paraTool.chainIDInterlay, paraTool.chainIDKintsugi].includes(chainID)) {
             this.chainParser = new InterlayParser();
-        } else if (chainID == paraTool.chainIDKico) {
-            this.chainParser = new KicoParser();
         } else {
             this.chainParser = new ChainParser();
         }
         if (this.chainParser) {
             this.chainParserChainID = chainID;
+            if (debugLevel >= paraTool.debugVerbose) console.log(`this.chainParserChainID chainID=${chainID}, chainParserName=${this.chainParser.chainParserName}`)
         }
         if (debugLevel > 0) {
             this.chainParser.setDebugLevel(debugLevel)
@@ -607,7 +609,7 @@ module.exports = class AssetManager extends PolkaholicDB {
 
     getXcmAssetInfoByInteriorkey(xcmInteriorKey) {
         let xcmAssetInfo = this.xcmAssetInfo[xcmInteriorKey]
-        console.log(`getXcmAssetInfoByInteriorkey k=${xcmInteriorKey}`, xcmAssetInfo)
+        //console.log(`getXcmAssetInfoByInteriorkey k=${xcmInteriorKey}`, xcmAssetInfo)
         if (xcmAssetInfo != undefined) {
             return xcmAssetInfo
         }
@@ -2805,7 +2807,9 @@ module.exports = class AssetManager extends PolkaholicDB {
             xcmInteriorKeysRegistered: [],
             xcmInteriorKeysUnregistered: [],
         }
-        this.chainParserInit(chainID, this.debugLevel);
+        if (!this.chainParser){
+            this.chainParserInit(chainID, this.debugLevel);
+        }
         let version = Object.keys(msg)[0]
         switch (version) {
             case 'v2':
@@ -2839,13 +2843,13 @@ module.exports = class AssetManager extends PolkaholicDB {
             if (instruction[i] != undefined) {
                 let features = instructionSet[i];
                 if (features.MultiAssets != undefined) {
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`Instruction=${i} MultiAssets found!`)
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`Instruction=${i} MultiAssets found!`)
                     for (let j = 0; j < instruction[i].length; j++) {
                         this.analyzeXCM_MultiAsset(analysis, instruction[i][j], chainID, chainIDDest, i);
                     }
                 }
                 if (features.MultiAsset != undefined) {
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`Instruction=${i} MultiAssets found!`)
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`Instruction=${i} MultiAssets found!`)
                     for (const fld of features.MultiAsset) {
                         if (instruction[i][fld] != undefined) {
                             this.analyzeXCM_MultiAsset(analysis, instruction[i][fld], chainID, chainIDDest, i);
@@ -2853,7 +2857,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     }
                 }
                 if (features.MultiAssetFilter != undefined) {
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`Instruction=${i} MultiAssetFilter found!`)
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`Instruction=${i} MultiAssetFilter found!`)
                     for (const fld of features.MultiAssetFilter) {
                         this.analyzeXCM_MultiAssetFilter(analysis, instruction[i], fld, chainID, chainIDDest, i);
                     }

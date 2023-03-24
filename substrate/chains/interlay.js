@@ -5,6 +5,7 @@ const ChainParser = require("./chainparser");
 module.exports = class InterlayParser extends ChainParser {
     constructor() {
         super()
+        this.chainParserName = 'Interlay'
     }
 
     getTokensAccounts(decoratedKey) {

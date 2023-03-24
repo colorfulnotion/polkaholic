@@ -6,6 +6,11 @@ const ChainParser = require("./chainparser");
 
 module.exports = class AstarParser extends ChainParser {
 
+    constructor() {
+        super()
+        this.chainParserName = 'Astar'
+    }
+
     xcmTransferMethodList = ["0xecf766ff", "0x019054d0", "0x106d59fe", "0x400c0e8d"];
     xcmTransactorMethodList = ["0xf90eb212"];
 

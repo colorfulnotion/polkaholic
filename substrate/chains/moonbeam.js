@@ -5,6 +5,11 @@ const ChainParser = require("./chainparser");
 
 module.exports = class MoonbeamParser extends ChainParser {
 
+    constructor() {
+        super()
+        this.chainParserName = 'Moonbeam'
+    }
+
     xcmTransactorMethodList = ["0xfe430475", "0x185de2ae", "0xd7ab340c", "0xb648f3fe"];
 
     processIncomingXCM(indexer, extrinsic, extrinsicID, events, isTip = false, finalized = false) {
