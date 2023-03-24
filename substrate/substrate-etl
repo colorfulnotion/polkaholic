@@ -453,6 +453,18 @@ async function main() {
             }
         });
 
+    program.command('contracts')
+        .description(`Update Contracts for (2006-astar, 2094-pendulum, 22007-shiden, 22124-amplitude, 40000-rococo`)
+        .option('-c, --chainID <chainID>', 'ChainID to update contracts', null, myParseInt)
+        .action(async (opt) => {
+            let chainID = opt.chainID != null ? opt.chainID : 22007;
+            if (chainID != null) {
+                var manager = new SubstrateETL();
+                await manager.updateContracts(chainID)
+                process.exit(0);
+            }
+        });
+
 
     program.command('cleanreaped')
         .description(`For any reaped account balances, deletes old cells more than 48 hours old from a random or specified shard`)

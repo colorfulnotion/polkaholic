@@ -1,0 +1,98 @@
+[
+  {
+    "mode": "REQUIRED",
+    "name": "chain_name",
+    "type": "STRING",
+    "description": "Chain name (human readable)"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "id",
+    "type": "STRING",
+    "description": "Chain id (all lowercase)"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "para_id",
+    "type": "INTEGER",
+    "description": "Para ID of chain"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "address_pubkey",
+    "type": "STRING",
+    "description": "Address of caller"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "address_ss58",
+    "type": "STRING",
+    "description": "Address of caller (SS58)"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "extrinsic_id",
+    "type": "STRING",
+    "description": "Extrinsic ID of the contract call"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "extrinsic_hash",
+    "type": "STRING",
+    "description": "Extrinsic Hash of the contract call"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_timestamp",
+    "type": "TIMESTAMP",
+    "description": "Block timestamp of the contract call"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_number",
+    "type": "STRING",
+    "description": "Block nubmer of the contract call"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_hash",
+    "type": "STRING",
+    "description": "Block hash of the contract call"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "code_hash",
+    "type": "STRING",
+    "description": "Code Hash of the contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "gas_limit",
+    "type": "STRING",
+    "description": "Gas limit"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storage_deposit_limit",
+    "type": "STRING",
+    "description": "Storage Deposit Limit"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "value",
+    "type": "STRING",
+    "description": "Value in contract call"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "caller",
+    "type": "STRING",
+    "description": "Caller"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "decoded_call",
+    "type": "JSON",
+    "description": "Decoded Message call data"
+  }
+]

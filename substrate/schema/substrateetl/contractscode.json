@@ -1,0 +1,92 @@
+[
+  {
+    "mode": "REQUIRED",
+    "name": "chain_name",
+    "type": "STRING",
+    "description": "Chain Name"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "id",
+    "type": "STRING",
+    "description": "Chain ID"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "para_id",
+    "type": "INTEGER",
+    "description": "Para ID of Chain"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "code_hash",
+    "type": "STRING",
+    "description": "Code Hash of Byte Code"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "extrinsic_id",
+    "type": "STRING",
+    "description": "Extrinsic ID of the extrinsic that Stored the Contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "extrinsic_hash",
+    "type": "STRING",
+    "description": "Extrinsic Hash of the extrinsic that Stored the Conttract"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "storer_pubkey",
+    "type": "STRING",
+    "description": "Storer of contract (pub key)"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "storer_ss58",
+    "type": "STRING",
+    "description": "Storer of contract (SS58)"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "bytecode",
+    "type": "STRING",
+    "description": "Byte Code of contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_number",
+    "type": "INTEGER",
+    "description": "Block number of when the contract is stored"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_timestamp",
+    "type": "TIMESTAMP",
+    "description": "Timestamp of block"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "metadata",
+    "type": "STRING",
+    "description": "Metadata of contract code, if provided"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "status",
+    "type": "STRING",
+    "description": "Verification status of contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "language",
+    "type": "STRING",
+    "description": "Language of contract source code, if provided"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "compiler",
+    "type": "STRING",
+    "description": "Compiler used for contract source code, if provided"
+  }
+]

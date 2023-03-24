@@ -281,34 +281,34 @@ function getAuthor(digest, validators) {
     return [author, authorPubkey]
 }
 
-function decode_systemAccountType(asciiName = 'modlpy/trsrycb:6664'){
+function decode_systemAccountType(asciiName = 'modlpy/trsrycb:6664') {
     //para:2031
     //sibl:2000
     //modlpy/nopls:13312
     //modlpy/cfund:2094
     //trsry, nopl, cfund
     let groups = ["trsry", "nopl", "cfund", "sibl", "para", "trsy"]
-    if (!asciiName.includes(':')) asciiName+=':'
+    if (!asciiName.includes(':')) asciiName += ':'
     let r = {
         nickname: asciiName,
-        isModlePy : false,
+        isModlePy: false,
         systemAccountType: null,
         prefix: '',
         idx: null,
     }
     let pieces = asciiName.split(':')
-    if (pieces.length == 2){
+    if (pieces.length == 2) {
         let firstPiece = pieces[0]
         let idx = pieces[1]
-        if (idx != ''){
+        if (idx != '') {
             r.idx = idx
         }
-        if (firstPiece.includes('/')){
+        if (firstPiece.includes('/')) {
             let p = firstPiece.split('/')
-            if (p.length >= 2){
+            if (p.length >= 2) {
                 r.isModlePy = true
                 let p1 = p[1]
-                for (const c of groups){
+                for (const c of groups) {
                     if (p1.includes(c)) {
                         r.systemAccountType = c
                         let prefix = p1.split(c)
@@ -316,7 +316,7 @@ function decode_systemAccountType(asciiName = 'modlpy/trsrycb:6664'){
                     }
                 }
             }
-        }else{
+        } else {
             r.systemAccountType = firstPiece
         }
     }

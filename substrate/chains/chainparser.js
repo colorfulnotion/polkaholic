@@ -51,7 +51,7 @@ module.exports = class ChainParser {
         this.relayParentStateRoot = stateRoot
     }
 
-    getChainParserStat(){
+    getChainParserStat() {
         let r = {
             parserTS: this.parserTS,
             parserBlockNumber: this.parserBlockNumber,
@@ -4271,7 +4271,7 @@ module.exports = class ChainParser {
         let paraIDExtra = paraTool.getParaIDExtra(relayChain)
 
         var a;
-        if ([paraTool.chainIDAcala,paraTool.chainIDKarura].includes(chainID)) {
+        if ([paraTool.chainIDAcala, paraTool.chainIDKarura].includes(chainID)) {
             a = await indexer.api.query.assetRegistry.foreignAssetLocations.entries()
         } else if ([paraTool.chainIDBifrostKSM, paraTool.chainIDBifrostDOT].includes(chainID)) {
             a = await indexer.api.query.assetRegistry.currencyIdToLocations.entries()

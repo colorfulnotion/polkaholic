@@ -1,0 +1,152 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "contract_name",
+    "type": "STRING",
+    "description": "Contract Name (obtained from metadata.json)"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "chain_name",
+    "type": "STRING",
+    "description": "Chain Name (human readable display name)"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "id",
+    "type": "STRING",
+    "description": "Chain id (all lowercase)"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "para_id",
+    "type": "INTEGER",
+    "description": "Parachain ID"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "address_pubkey",
+    "type": "STRING",
+    "description": "Contract Address Public Key"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "address_ss58",
+    "type": "STRING",
+    "description": "Contract Address SS58 Address"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "deployer_pubkey",
+    "type": "STRING",
+    "description": "Deployer Public Key"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "deployer_ss58",
+    "type": "STRING",
+    "description": "Deployer SS58 Address"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "extrinsic_id",
+    "type": "STRING",
+    "description": "Extrinsic ID of the extrinsic that Instantiated Contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "extrinsic_hash",
+    "type": "STRING",
+    "description": "Extrinsic Hash of the extrinsic that Instantiated Contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_number_stored",
+    "type": "STRING",
+    "description": "Block Number of when the code hash of the contract was stored"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_number_instantiated",
+    "type": "STRING",
+    "description": "Block Number of when the contract was instantiated"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "code_hash",
+    "type": "STRING",
+    "description": "Code hash of the contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "constructor",
+    "type": "STRING",
+    "description": "Constructor of the contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "salt",
+    "type": "STRING",
+    "description": "Salt Value"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_timestamp",
+    "type": "TIMESTAMP",
+    "description": "Block time (unix time) of the block that includes this event"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storage_bytes",
+    "type": "STRING",
+    "description": "Storage Bytes of contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storage_items",
+    "type": "STRING",
+    "description": "Storage Items of contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storage_byte_deposit",
+    "type": "STRING",
+    "description": "Storage byte deposit"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storage_item_deposit",
+    "type": "STRING",
+    "description": "Storage Item deposit"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storage_base_deposit",
+    "type": "STRING",
+    "description": "Storage base Deposit"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "metadata",
+    "type": "STRING",
+    "description": "Contract metadata.json (if available)"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "status",
+    "type": "STRING",
+    "description": "Contract verification status"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "language",
+    "type": "STRING",
+    "description": "Language of contract source code"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "compiler",
+    "type": "STRING",
+    "description": "Compiler of contract source code"
+  }
+]

@@ -1748,7 +1748,7 @@ module.exports = class Query extends AssetManager {
                         if (XCMInfoData) {
                             //MK: TODO - present as array
                             let xcmInfo = this.pickXcmInfo(XCMInfoData)
-                            if (xcmInfo){
+                            if (xcmInfo) {
                                 c.xcmInfo = xcmInfo
                             }
                         } else if (this.is_evm_xcmtransfer_input(c.input)) {
@@ -1794,7 +1794,7 @@ module.exports = class Query extends AssetManager {
                     if (XCMInfoData) {
                         //MK: TODO - present as array
                         let xcmInfo = this.pickXcmInfo(XCMInfoData)
-                        if (xcmInfo){
+                        if (xcmInfo) {
                             c.xcmInfo = xcmInfo
                             d.xcmInfo = c.xcmInfo
                         }
@@ -6385,19 +6385,19 @@ module.exports = class Query extends AssetManager {
         return [];
     }
 
-    pickXcmInfo(XCMInfoData){
+    pickXcmInfo(XCMInfoData) {
         let mainXcmInfo = false
         let xcmInfos = btTool.decode_xcminfofinalized(XCMInfoData)
         if (Array.isArray(xcmInfos) && xcmInfos.length > 0) {
             //MK - TODO: return infos as array
             mainXcmInfo = xcmInfos[0]
-            if (xcmInfos.length >= 2){
+            if (xcmInfos.length >= 2) {
                 let prevConf = 0
-                for (const xcmInfo of xcmInfos){
-                    if (xcmInfo != undefined && xcmInfo.destination != undefined && xcmInfo.destination.confidence != undefined){
+                for (const xcmInfo of xcmInfos) {
+                    if (xcmInfo != undefined && xcmInfo.destination != undefined && xcmInfo.destination.confidence != undefined) {
                         let currConf = xcmInfo.destination.confidence
                         console.log(`prevConf=${prevConf}, currConf=${currConf}`)
-                        if (currConf > prevConf){
+                        if (currConf > prevConf) {
                             mainXcmInfo = xcmInfo
                             prevConf = currConf
                         }

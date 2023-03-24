@@ -74,7 +74,11 @@ function encode_column_bt_hashes_xcminfofinalized(chainID, extrinsicID, xcmIndex
 
 function decode_column_bt_hashes_xcminfofinalized(rowKey = '2004-3126881-4-0-0') {
     //key chainID-bn-extrinsicIdx-xcmIndex:transferIndex
-    let chainID = false, extrinsicID = false, xcmIndex = false, transferIndex = false, isValid = false
+    let chainID = false,
+        extrinsicID = false,
+        xcmIndex = false,
+        transferIndex = false,
+        isValid = false
     try {
         let pieces = rowKey.split('-')
         if (pieces.length == 5) {
@@ -86,7 +90,7 @@ function decode_column_bt_hashes_xcminfofinalized(rowKey = '2004-3126881-4-0-0')
     } catch (e) {
         console.log(`invalid rowKey ${rowKey} e`, e)
     }
-    if (chainID != undefined && extrinsicID != undefined && xcmIndex != undefined && transferIndex != undefined){
+    if (chainID != undefined && extrinsicID != undefined && xcmIndex != undefined && transferIndex != undefined) {
         isValid = true
     }
     return [chainID, extrinsicID, xcmIndex, transferIndex, isValid]

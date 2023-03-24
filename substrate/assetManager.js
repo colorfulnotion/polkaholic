@@ -1031,7 +1031,8 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     getRelayChainSymbol(chainID) {
-        let relayChainID = paraTool.getRelayChainID(chainID)
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let relayChainID = paraTool.getRelayChainID(relayChain)
         let symbol = this.getChainSymbol(relayChainID);
         if (symbol) {
             return symbol
@@ -1793,11 +1794,11 @@ module.exports = class AssetManager extends PolkaholicDB {
             case 2:
                 transferSummary.from_pubkey = addressList[0]
                 transferSummary.to_pubkey = addressList[1]
-                if (transferList.includes(pallet_method)){
+                if (transferList.includes(pallet_method)) {
                     transferSummary.type = "transfer"
-                }else if (approvalList.includes(pallet_method)){
+                } else if (approvalList.includes(pallet_method)) {
                     transferSummary.type = "approval"
-                }else if(revokeList.includes(pallet_method)){
+                } else if (revokeList.includes(pallet_method)) {
                     transferSummary.type = "revoke"
                 }
                 break;
@@ -1811,7 +1812,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
             default:
         }
-        if (addressList.length > 0){
+        if (addressList.length > 0) {
             decodedData.push(transferSummary)
         }
         return decodedData
@@ -2060,14 +2061,14 @@ module.exports = class AssetManager extends PolkaholicDB {
             case "tokens:Endowed": //currencyID, who, balance
             case "tokens:DustLost": //currencyID, who, balance
 
-/*
-            case "tokens:BalanceSet":
-            case "tokens:LockRemoved":
-            case "tokens:LockSet": //LockIdentifier, currencyID, AccountId, balance
-            case "tokens:Reserved":
-            case "tokens:Slashed":
-            case "tokens:Unreserved":
-*/
+                /*
+                            case "tokens:BalanceSet":
+                            case "tokens:LockRemoved":
+                            case "tokens:LockSet": //LockIdentifier, currencyID, AccountId, balance
+                            case "tokens:Reserved":
+                            case "tokens:Slashed":
+                            case "tokens:Unreserved":
+                */
                 //a list where balance is not at last index
                 let tExceptionList = []
                 let tIdxs = []

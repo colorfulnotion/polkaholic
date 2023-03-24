@@ -6775,7 +6775,7 @@ module.exports = class Indexer extends AssetManager {
             // (integer) blockTS|blockNumber|chainID|chainIDDest|sentAt|relayedAt|includedAt
             //console.log(`xcmMeta!!`, x)
             // '1679350644|hrmp|kusama|false|false|false|22092|22000|17126302|17126303|17126304|0x81009ec171d725cb0265ca9e49b2db16888fa2b76b475fd14bdd0f4520d74894'
-            if (chainParserStat){
+            if (chainParserStat) {
                 let s = `${x.blockTS}|${x.msgType}|${this.relayChain}|${chainParserStat.parserBlockNumber}|${chainParserStat.relayParentStateRoot}|${chainParserStat.parserBlockHash}|${x.chainID}|${x.chainIDDest}|${x.sentAt}|${x.relayedAt}|${x.includedAt}|${x.msgHash}`
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`xcmMeta: ${s}`)
                 xcmMeta.push(s)
