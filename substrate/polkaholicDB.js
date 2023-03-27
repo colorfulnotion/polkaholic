@@ -58,6 +58,7 @@ module.exports = class PolkaholicDB {
     reloadChainInfo = false; // if set to true after system properties brings in a new asset, we get one chance to do so.
     lastBatchTS = 0;
     connection = false;
+    APIWSEndpoint = null;
 
     GC_PROJECT = "";
     GC_BIGTABLE_INSTANCE = "";
@@ -889,6 +890,7 @@ from chain where chainID = '${chainID}' limit 1`);
             decorateStorage
         } = require('@polkadot/types');
         let endpoint = await this.get_chain_hostname_endpoint(chain, useWSBackfill);
+	this.APIWSEndpoint = endpoint;
         const provider = new WsProvider(endpoint);
         //let crawls2 = this
         provider.on('disconnected', () => {

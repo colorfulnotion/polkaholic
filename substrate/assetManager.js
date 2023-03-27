@@ -2807,7 +2807,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             xcmInteriorKeysRegistered: [],
             xcmInteriorKeysUnregistered: [],
         }
-        if (!this.chainParser){
+        if (!this.chainParser) {
             this.chainParserInit(chainID, this.debugLevel);
         }
         let version = Object.keys(msg)[0]
