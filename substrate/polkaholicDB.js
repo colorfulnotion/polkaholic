@@ -890,7 +890,7 @@ from chain where chainID = '${chainID}' limit 1`);
             decorateStorage
         } = require('@polkadot/types');
         let endpoint = await this.get_chain_hostname_endpoint(chain, useWSBackfill);
-	this.APIWSEndpoint = endpoint;
+        this.APIWSEndpoint = endpoint;
         const provider = new WsProvider(endpoint);
         //let crawls2 = this
         provider.on('disconnected', () => {
@@ -1197,9 +1197,9 @@ from chain where chainID = '${chainID}' limit 1`);
                 r.blockHash = blkhashes[0];
                 r.finalized = true;
             } else {
-                r.fork = true;
+                r.fork = r.blockNumber;
                 //use the correct finalized hash by checking and see if we can find the proper blockrow
-                console.log(`ERROR: multiple finalized blkhashes found ${blkhashes}`)
+                console.log(`ERROR: multiple finalized blkhashes found ${blkhashes} @ blockNumber:`, r.blockNumber, `cbt read chain prefix=${row.id}`)
                 this.logger.error({
                     "op": "build_block_from_row",
                     "err": `multiple finalized blkhashes found ${blkhashes}`
@@ -1379,12 +1379,14 @@ from chain where chainID = '${chainID}' limit 1`);
         }
         let data = {}
         data[`${family}`] = colData
-        let row = {
-            key: key.toLowerCase(),
-            data
+        if (key) {
+            let row = {
+                key: key.toLowerCase(),
+                data
+            }
+            //console.log("PUSH", row);
+            rows.push(row);
         }
-        //console.log("PUSH", row);
-        rows.push(row);
     }
 
     getCurrentTS() {

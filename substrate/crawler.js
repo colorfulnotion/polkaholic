@@ -169,12 +169,6 @@ module.exports = class Crawler extends Indexer {
     }
 
     async crawlTrace(chain, blockHash, timeoutMS = 20000) {
-        if (!chain.RPCBackfill) {
-            return (false);
-        }
-        if (chain.RPCBackfill.length == 0) {
-            return (false);
-        }
         try {
             let headers = {
                 "Content-Type": "application/json"
@@ -185,10 +179,13 @@ module.exports = class Crawler extends Indexer {
                 "method": "state_traceBlock",
                 "params": [blockHash, "state", "", "Put"]
             }
-	    if ( chain.onfinalityStatus == "Active" && chain.onfinalityID && chain.onfinalityID.length > 32 && this.APIWSEndpoint.includes("onfinality") ) {
-		chain.RPCBackfill = `https://${chain.id}.api.onfinality.io/rpc?apikey=${chain.onfinalityID}`
-		console.log("BACKFILL", chain.RPCBackfill);
-	    }
+            if (chain.onfinalityStatus == "Active" && chain.onfinalityID && chain.onfinalityID.length > 32 && this.APIWSEndpoint.includes("onfinality")) {
+                chain.RPCBackfill = `https://${chain.id}.api.onfinality.io/rpc?apikey=${chain.onfinalityID}`
+                console.log("BACKFILL", chain.RPCBackfill);
+            }
+            if (!chain.RPCBackfill || chain.RPCBackfill.length == 0) {
+		return (false);
+            }
             let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' "${chain.RPCBackfill}"`
             const {
                 stdout,
@@ -313,6 +310,7 @@ module.exports = class Crawler extends Indexer {
             let header = await this.api.rpc.chain.getBlockHash(bn);
             let blockHash = header.toHex();
 
+            console.log("crawl_block_trace", bn, header.toHex());
             // 1. get the block, ALWAYS
             let [signedBlock, events] = await this.crawlBlock(this.api, blockHash);
 
@@ -1175,13 +1173,36 @@ module.exports = class Crawler extends Indexer {
     }
 
     async maintainIndexer() {
-	let sql = `select chainID from chainhostnameendpoint where updateDT < date_sub(Now(), interval 5 minute) and hostname = '${this.hostname}' order by updateDT Desc limit 1`;
+        let sql = `select chainID from chainhostnameendpoint where updateDT < date_sub(Now(), interval 5 minute) and hostname = '${this.hostname}' order by updateDT Desc limit 100`;
         var chains = await this.poolREADONLY.query(sql);
-	if ( chains.length == 1 ) {
-	    let chainID = chains[0].chainID;
-	    let cmd = `systemctl restart crawler${chainID}.service`
-	    await exec(cmd);
-	}
+        for (const chain of chains) {
+            let chainID = chain.chainID;
+            let cmd = `systemctl restart crawler${chainID}.service`
+            await exec(cmd);
+        }
+        sql = `select chainID, CONVERT(auditFailures using utf8) auditFailures from blocklogstats where audited = 'Failure' and monthDT = LAST_DAY(Now()) limit 100`;
+        console.log(sql);
+        var failures = await this.poolREADONLY.query(sql);
+        for (const failure of failures) {
+            try {
+                let auditFailures = JSON.parse(failure.auditFailures);
+                let chainID = parseInt(failure.chainID, 10);
+                let total = 0;
+                for (const g of auditFailures.gaps) {
+                    let blocks = g[1] - g[0];
+                    total += blocks;
+                }
+                console.log(chainID, "TOTAL:", total, auditFailures.gaps);
+                if (total < 10000) {
+                    let chain = await this.getChain(chainID);
+                    await this.crawlBackfill(chain);
+                    // indexer => substrateetl => reaudit
+                }
+            } catch (err) {
+                console.log(err);
+            }
+        }
+        //process.exit(0);
     }
 
     async indexChainRandom(lookbackBackfillDays = 60, audit = true, backfill = true, write_bq_log = true, update_chain_assets = true) {
@@ -1255,12 +1276,12 @@ module.exports = class Crawler extends Indexer {
             let nmax = techniqueParams[2];
             let w = (nmax > 1) ? `and blockNumber % ${nmax} = ${n}` : "";
             let w2 = ` and blockNumber > ${chain.blocksCovered} - ${lookbackBlocks}`
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksCovered} and ( attemptedDT is null or attemptedDT < Date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksFinalized} and ( attemptedDT is null or attemptedDT < Date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 50000`
             console.log("lookback", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
             let endBN = techniqueParams[2];
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and ( attemptedDT is null  or attemptedDT < date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 10000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and ( attemptedDT is null  or attemptedDT < date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 50000`
             console.log("lookback", sql);
         }
         let tasks = await this.poolREADONLY.query(sql);
@@ -1826,15 +1847,16 @@ module.exports = class Crawler extends Indexer {
                     }
                 }
             }
-	    // if we didn't get a trace, or if we are using onfinality endpoint
-	    if ( chain.onfinalityStatus == "Active" && chain.onfinalityID && ( chain.onfinalityID.length > 0 ) &&
-		 ( ( trace == false || trace.length == 0 || this.APIWSEndpoint.includes("onfinality") ) ) ) {
-		let trace2 = await this.crawlTrace(chain, finalizedHash);
-		if ( trace2.length > 0 ) {
-		    trace = trace2;
-		}
-	    }
+            // if we didn't get a trace, or if we are using onfinality endpoint
 	    
+            if (chain.onfinalityStatus == "Active" && chain.onfinalityID && (chain.onfinalityID.length > 0) &&
+                ((trace == false || trace.length == 0 || this.APIWSEndpoint.includes("onfinality")))) {
+                let trace2 = await this.crawlTrace(chain, finalizedHash);
+                if (trace2.length > 0) {
+                    trace = trace2;
+                }
+            }
+
             if (cols.length > 0) {
                 await row.deleteCells(cols);
             }
@@ -2064,14 +2086,14 @@ module.exports = class Crawler extends Indexer {
             });
         }
     }
-    
+
     isWSEndpointSelfHosted() {
-	if ( this.APIWSEndpoint && ( ( this.APIWSEndpoint.includes("polkaholic") || this.APIWSEndpoint.includes("dotswap") ) ) ) {
-	    return(true)
-	}
-	return(false);
+        if (this.APIWSEndpoint && ((this.APIWSEndpoint.includes("polkaholic") || this.APIWSEndpoint.includes("dotswap")))) {
+            return (true)
+        }
+        return (false);
     }
-    
+
     async crawlBlocks(chainID) {
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
             this.readyToCrawlParachains = true;
@@ -2156,92 +2178,92 @@ module.exports = class Crawler extends Indexer {
         // subscribeStorage returns changes from ALL blockHashes, including the ones that eventually got dropped
         let unsubscribeStorage = null
         this.blocksCovered = chain.blocksCovered;
-	
+
         try {
-            if ( this.isWSEndpointSelfHosted() ) {
-		unsubscribeStorage = await this.api.rpc.state.subscribeStorage(async (results) => {
+            if (this.isWSEndpointSelfHosted()) {
+                unsubscribeStorage = await this.api.rpc.state.subscribeStorage(async (results) => {
                     try {
-			this.lastEventReceivedTS = this.getCurrentTS(); // if not received in 5mins, reset
-			// build block similar to sidecar
-			let blockHash = results.block.toHex();
-			let [signedBlock, events] = await this.crawlBlock(this.api, results.block.toHex());
-			let blockTS = signedBlock.blockTS;
-			
-			// to avoid 'hash' error, we create the a new block copy without decoration and add hash in
-			let block = JSON.parse(JSON.stringify(signedBlock));
-			block.number = paraTool.dechexToInt(block.header.number);
-			block.hash = blockHash;
-			block.blockTS = blockTS;
-			let blockNumber = block.number;
-			let subscribeStorageMsg = {
+                        this.lastEventReceivedTS = this.getCurrentTS(); // if not received in 5mins, reset
+                        // build block similar to sidecar
+                        let blockHash = results.block.toHex();
+                        let [signedBlock, events] = await this.crawlBlock(this.api, results.block.toHex());
+                        let blockTS = signedBlock.blockTS;
+
+                        // to avoid 'hash' error, we create the a new block copy without decoration and add hash in
+                        let block = JSON.parse(JSON.stringify(signedBlock));
+                        block.number = paraTool.dechexToInt(block.header.number);
+                        block.hash = blockHash;
+                        block.blockTS = blockTS;
+                        let blockNumber = block.number;
+                        let subscribeStorageMsg = {
                             "bn": blockNumber,
                             "chainID": chainID
-			}
-			
-			// get trace from block
-			let trace = [];
-			let traceType = "subscribeStorage";
-			let traceBlock = await this.api.rpc.state.traceBlock(blockHash, "state", "", "Put");
-			let traceBlockJSON = traceBlock.toJSON();
-			if (traceBlockJSON) {
+                        }
+
+                        // get trace from block
+                        let trace = [];
+                        let traceType = "subscribeStorage";
+                        let traceBlock = await this.api.rpc.state.traceBlock(blockHash, "state", "", "Put");
+                        let traceBlockJSON = traceBlock.toJSON();
+                        if (traceBlockJSON) {
                             if (traceBlockJSON.blockTrace && traceBlockJSON.blockTrace.events) {
-				let events = []
-				let changes = traceBlockJSON.blockTrace.events.forEach((e) => {
+                                let events = []
+                                let changes = traceBlockJSON.blockTrace.events.forEach((e) => {
                                     let x = this.canonicalize_trace_stringValues(e.data.stringValues);
                                     if (x) {
-					events.push(x);
+                                        events.push(x);
                                     }
-				})
-				if (events.length > 0) {
+                                })
+                                if (events.length > 0) {
                                     traceType = "state_traceBlock"
                                     trace = events;
-				}
+                                }
                             }
-			} else {
+                        } else {
                             if (this.debugLevel > paraTool.debugVerbose) console.log(`BN#${block.number} ${blockHash} no traceBlock!`)
-			}
-			
-			if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
-			let evmBlock = false
-			let evmReceipts = false
-			let evmTrace = false
-			
-			// write { blockraw:blockHash => block, trace:blockHash => trace, events:blockHash => events } to bigtable
-			let success = await this.save_block_trace(chainID, block, blockHash, events, trace, false, traceType);
-			if (success) {
+                        }
+
+                        if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
+                        let evmBlock = false
+                        let evmReceipts = false
+                        let evmTrace = false
+
+                        // write { blockraw:blockHash => block, trace:blockHash => trace, events:blockHash => events } to bigtable
+                        let success = await this.save_block_trace(chainID, block, blockHash, events, trace, false, traceType);
+                        if (success) {
                             // write to mysql
                             let blockTS = block.blockTS;
                             if (blockTS > 0) {
-				this.apiAt = this.api //set here for opaqueCall  // TODO: what if metadata changes?
-				let signedExtrinsicBlock = block
-				signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
-				// IMPORTANT NOTE: we only need to do this for evm chains... (review)
-				let isFinalized = false
-				let isTip = true
-				let isTracesPresent = success // true here
-				
-				let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
-				await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized); // use result from rawtrace to decorate
-				
-				//processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
-				let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces, isFinalized, false, isTip, isTracesPresent);
-				
-				await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
-				if (blockNumber > this.blocksCovered) {
+                                this.apiAt = this.api //set here for opaqueCall  // TODO: what if metadata changes?
+                                let signedExtrinsicBlock = block
+                                signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
+                                // IMPORTANT NOTE: we only need to do this for evm chains... (review)
+                                let isFinalized = false
+                                let isTip = true
+                                let isTracesPresent = success // true here
+
+                                let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
+                                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized); // use result from rawtrace to decorate
+
+                                //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
+                                let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces, isFinalized, false, isTip, isTracesPresent);
+
+                                await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
+                                if (blockNumber > this.blocksCovered) {
                                     // only update blocksCovered in the DB if its HIGHER than what we have seen before
                                     var sql = `update chain set blocksCovered = '${blockNumber}', lastCrawlDT = Now() where chainID = '${chainID}' and blocksCovered < ${blockNumber}`
                                     this.batchedSQL.push(sql);
                                     this.blocksCovered = blockNumber;
-				}
-				let numExtrinsics = blockStats && blockStats.numExtrinsics ? blockStats.numExtrinsics : 0
-				let numSignedExtrinsics = blockStats && blockStats.numSignedExtrinsics ? blockStats.numSignedExtrinsics : 0
-				let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
-				let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
-				let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
-				let fees = blockStats && blockStats.fees ? blockStats.fees : 0
-				let vals = ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "fees", "lastTraceDT"]
-				let evals = "";
-				if (chain.isEVM) {
+                                }
+                                let numExtrinsics = blockStats && blockStats.numExtrinsics ? blockStats.numExtrinsics : 0
+                                let numSignedExtrinsics = blockStats && blockStats.numSignedExtrinsics ? blockStats.numSignedExtrinsics : 0
+                                let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
+                                let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
+                                let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
+                                let fees = blockStats && blockStats.fees ? blockStats.fees : 0
+                                let vals = ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "fees", "lastTraceDT"]
+                                let evals = "";
+                                if (chain.isEVM) {
                                     let blockHashEVM = blockStats.blockHashEVM ? blockStats.blockHashEVM : "";
                                     let parentHashEVM = blockStats.parentHashEVM ? blockStats.parentHashEVM : "";
                                     let numTransactionsEVM = blockStats.numTransactionsEVM ? blockStats.numTransactionsEVM : 0;
@@ -2251,161 +2273,161 @@ module.exports = class Crawler extends Indexer {
                                     let gasLimit = blockStats.gasLimit ? blockStats.gasLimit : 0;
                                     vals.push("blockHashEVM", "parentHashEVM", "numTransactionsEVM", "numTransactionsInternalEVM", "numReceiptsEVM", "gasUsed", "gasLimit");
                                     evals = `, '${blockHashEVM}', '${parentHashEVM}', '${numTransactionsEVM}', '${numTransactionsInternalEVM}', '${numReceiptsEVM}', '${gasUsed}', '${gasLimit}'`;
-				}
-				
-				let out = `('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
-				await this.upsertSQL({
+                                }
+
+                                let out = `('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
+                                await this.upsertSQL({
                                     "table": `block${chainID}`,
                                     "keys": ["blockNumber"],
                                     "vals": vals,
                                     "data": [out],
                                     "replace": vals
-				});
-				//store unfinalized blockHashes in a single table shared across chains
-				let outunf = `('${chainID}', '${blockNumber}', '${blockHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
-				let vals2 = [...vals]; // same as other insert, but with
-				vals2.unshift("blockHash");
-				await this.upsertSQL({
+                                });
+                                //store unfinalized blockHashes in a single table shared across chains
+                                let outunf = `('${chainID}', '${blockNumber}', '${blockHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
+                                let vals2 = [...vals]; // same as other insert, but with
+                                vals2.unshift("blockHash");
+                                await this.upsertSQL({
                                     "table": "blockunfinalized",
                                     "keys": ["chainID", "blockNumber"],
                                     "vals": vals2,
                                     "data": [outunf],
                                     "replace": vals
-				})
-				
-				//console.log(`****** subscribeStorage ${chain.chainName} bn=${blockNumber} ${blockHash}: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(parseInt(blockNumber, 10)));
-				await this.update_batchedSQL();
+                                })
+
+                                //console.log(`****** subscribeStorage ${chain.chainName} bn=${blockNumber} ${blockHash}: cbt read chain${chainID} prefix=` + paraTool.blockNumberToHex(parseInt(blockNumber, 10)));
+                                await this.update_batchedSQL();
                             } else {
-				if (this.debugLevel > paraTool.debugErrorOnly) console.log(`BN#${block.number} ${blockHash} blockTS missing!!!`)
+                                if (this.debugLevel > paraTool.debugErrorOnly) console.log(`BN#${block.number} ${blockHash} blockTS missing!!!`)
                             }
-			} else {
+                        } else {
                             this.logger.warn({
-				"op": "subscribeStorage",
-				chainID,
-				blockNumber
+                                "op": "subscribeStorage",
+                                chainID,
+                                blockNumber
                             })
-			}
+                        }
                     } catch (err) {
-			if (err.toString().includes("disconnected")) {
+                        if (err.toString().includes("disconnected")) {
                             console.log(err);
-			} else {
+                        } else {
                             console.log(err);
                             this.logger.error({
-				"op": "subscribeStorage",
-				chainID,
-				err
+                                "op": "subscribeStorage",
+                                chainID,
+                                err
                             })
-			}
+                        }
                     }
-		});
-	    } else {
-		// subscribeNewHeads -- most of this code is similar to the above...
-		const unsubscribeStorage = await this.api.rpc.chain.subscribeNewHeads( async (header) => {
-		    try {
-			this.lastEventReceivedTS = this.getCurrentTS(); // if not received in 5mins, reset
-			// build block similar to sidecar
-			let blockHash = header.hash.toString();
-			let [signedBlock, events] = await this.crawlBlock(this.api, blockHash);
-			let blockTS = signedBlock.blockTS;
-			let traceType = "subscribeStorage";
+                });
+            } else {
+                // subscribeNewHeads -- most of this code is similar to the above...
+                const unsubscribeStorage = await this.api.rpc.chain.subscribeNewHeads(async (header) => {
+                    try {
+                        this.lastEventReceivedTS = this.getCurrentTS(); // if not received in 5mins, reset
+                        // build block similar to sidecar
+                        let blockHash = header.hash.toString();
+                        let [signedBlock, events] = await this.crawlBlock(this.api, blockHash);
+                        let blockTS = signedBlock.blockTS;
+                        let traceType = "subscribeStorage";
 
-			// to avoid 'hash' error, we create the a new block copy without decoration and add hash in
-			let block = JSON.parse(JSON.stringify(signedBlock));
-			block.number = paraTool.dechexToInt(block.header.number);
-			block.hash = blockHash;
-			block.blockTS = blockTS;
-			let blockNumber = block.number;
-			let subscribeStorageMsg = {
+                        // to avoid 'hash' error, we create the a new block copy without decoration and add hash in
+                        let block = JSON.parse(JSON.stringify(signedBlock));
+                        block.number = paraTool.dechexToInt(block.header.number);
+                        block.hash = blockHash;
+                        block.blockTS = blockTS;
+                        let blockNumber = block.number;
+                        let subscribeStorageMsg = {
                             "bn": blockNumber,
                             "chainID": chainID
-			}
-			if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
-			let trace = [];
-			// write { blockraw:blockHash => block, trace:blockHash => trace, events:blockHash => events } to bigtable
-			let success = await this.save_block_trace(chainID, block, blockHash, events, trace, false, traceType);
-			if (success) {
+                        }
+                        if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
+                        let trace = [];
+                        // write { blockraw:blockHash => block, trace:blockHash => trace, events:blockHash => events } to bigtable
+                        let success = await this.save_block_trace(chainID, block, blockHash, events, trace, false, traceType);
+                        if (success) {
                             // write to mysql
                             let blockTS = block.blockTS;
                             if (blockTS > 0) {
-				this.apiAt = this.api //set here for opaqueCall  // TODO: what if metadata changes?
-				let signedExtrinsicBlock = block
-				signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
-				let isFinalized = false
-				let isTip = true
-				let isTracesPresent = false
-				
-				let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
-				await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized); // use result from rawtrace to decorate
-				
-				//processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
-				let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, false, false, false, [], isFinalized, false, isTip, isTracesPresent);
-				
-				await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
-				if (blockNumber > this.blocksCovered) {
+                                this.apiAt = this.api //set here for opaqueCall  // TODO: what if metadata changes?
+                                let signedExtrinsicBlock = block
+                                signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
+                                let isFinalized = false
+                                let isTip = true
+                                let isTracesPresent = false
+
+                                let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
+                                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized); // use result from rawtrace to decorate
+
+                                //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
+                                let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, false, false, false, [], isFinalized, false, isTip, isTracesPresent);
+
+                                await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
+                                if (blockNumber > this.blocksCovered) {
                                     // only update blocksCovered in the DB if its HIGHER than what we have seen before
                                     var sql = `update chain set blocksCovered = '${blockNumber}', lastCrawlDT = Now() where chainID = '${chainID}' and blocksCovered < ${blockNumber}`
                                     this.batchedSQL.push(sql);
                                     this.blocksCovered = blockNumber;
-				}
-				let numExtrinsics = blockStats && blockStats.numExtrinsics ? blockStats.numExtrinsics : 0
-				let numSignedExtrinsics = blockStats && blockStats.numSignedExtrinsics ? blockStats.numSignedExtrinsics : 0
-				let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
-				let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
-				let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
-				let fees = blockStats && blockStats.fees ? blockStats.fees : 0
-				let vals = ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "fees", "lastTraceDT"]
-				let evals = "";
-				let out = `('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
-				await this.upsertSQL({
+                                }
+                                let numExtrinsics = blockStats && blockStats.numExtrinsics ? blockStats.numExtrinsics : 0
+                                let numSignedExtrinsics = blockStats && blockStats.numSignedExtrinsics ? blockStats.numSignedExtrinsics : 0
+                                let numTransfers = blockStats && blockStats.numTransfers ? blockStats.numTransfers : 0
+                                let numEvents = blockStats && blockStats.numEvents ? blockStats.numEvents : 0
+                                let valueTransfersUSD = blockStats && blockStats.valueTransfersUSD ? blockStats.valueTransfersUSD : 0
+                                let fees = blockStats && blockStats.fees ? blockStats.fees : 0
+                                let vals = ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "fees", "lastTraceDT"]
+                                let evals = "";
+                                let out = `('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
+                                await this.upsertSQL({
                                     "table": `block${chainID}`,
                                     "keys": ["blockNumber"],
                                     "vals": vals,
                                     "data": [out],
                                     "replace": vals
-				});
-				//store unfinalized blockHashes in a single table shared across chains
-				let outunf = `('${chainID}', '${blockNumber}', '${blockHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
-				let vals2 = [...vals]; // same as other insert, but with
-				console.log("***** subscribeNewHeads", blockHash, blockNumber);
-				vals2.unshift("blockHash");
-				await this.upsertSQL({
+                                });
+                                //store unfinalized blockHashes in a single table shared across chains
+                                let outunf = `('${chainID}', '${blockNumber}', '${blockHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
+                                let vals2 = [...vals]; // same as other insert, but with
+                                console.log("***** subscribeNewHeads", blockHash, blockNumber);
+                                vals2.unshift("blockHash");
+                                await this.upsertSQL({
                                     "table": "blockunfinalized",
                                     "keys": ["chainID", "blockNumber"],
                                     "vals": vals2,
                                     "data": [outunf],
                                     "replace": vals
-				})
-				
-				await this.update_batchedSQL();
+                                })
+
+                                await this.update_batchedSQL();
                             } else {
-				if (this.debugLevel > paraTool.debugErrorOnly) console.log(`BN#${block.number} ${blockHash} blockTS missing!!!`)
+                                if (this.debugLevel > paraTool.debugErrorOnly) console.log(`BN#${block.number} ${blockHash} blockTS missing!!!`)
                             }
-			} else {
+                        } else {
                             this.logger.warn({
-				"op": "subscribeNewHeads",
-				chainID,
-				blockNumber
+                                "op": "subscribeNewHeads",
+                                chainID,
+                                blockNumber
                             })
-			}
+                        }
 
                     } catch (err) {
-			if (err.toString().includes("disconnected")) {
+                        if (err.toString().includes("disconnected")) {
                             console.log(err);
-			} else {
+                        } else {
                             console.log(err);
                             this.logger.error({
-				"op": "subscribeStorage",
-				chainID,
-				err
+                                "op": "subscribeStorage",
+                                chainID,
+                                err
                             })
-			}
+                        }
                     }
-		});
-	    }
-        } catch (errus) { 
-	    console.log(errus);
-	    unsubscribeStorage = false
-	}
+                });
+            }
+        } catch (errus) {
+            console.log(errus);
+            unsubscribeStorage = false
+        }
 
         return [unsubscribeFinalizedHeads, unsubscribeStorage, unsubscribeRuntimeVersion];
     }
