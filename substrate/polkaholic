@@ -292,6 +292,19 @@ async function main() {
             process.exit(0);
         })
 
+    program.command('deleteblocks')
+        .description(`Delete blocks`)
+        .argument('<chainID>', 'ChainID', myParseInt)
+        .argument('<start>', 'ChainID', myParseInt)
+        .argument('<end>', 'ChainID', myParseInt)
+        .action(async (chainID, start, end) => {
+            var Manager = require("./manager");
+            var manager = new Manager();
+            // ./polkaholic deleteblocks 22087 1981793 1982984
+            await manager.deleteBlocks(chainID, start, end)
+            process.exit(0);
+        })
+
     await program.parseAsync(process.argv);
 }
 

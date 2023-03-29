@@ -79,6 +79,16 @@ module.exports = class Manager extends AssetManager {
         return inp.toLowerCase().replaceAll("_", "").trim()
     }
 
+    async deleteBlocks(chainID, start, end) {
+        const tableChain = this.getTableChain(chainID);
+        console.log(chainID, start, end);
+        for (let bn = start; bn <= end; bn++) {
+            let id = paraTool.blockNumberToHex(bn);
+            await tableChain.row(id).delete();
+            console.log("deleteBlocks", id);
+        }
+    }
+
     lookup_specversion_type(lookup, id) {
         try {
             for (let i = 0; i < lookup.length; i++) {

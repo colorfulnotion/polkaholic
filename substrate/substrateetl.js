@@ -583,7 +583,6 @@ module.exports = class SubstrateETL extends AssetManager {
         let wstr = (w.length > 0) ? ` and ${w.join(" and ")}` : "";
         // 1. find problematic periods with a small number of records (
         let sql = `select CONVERT(auditFailures using utf8) as failures, chainID, monthDT from blocklogstats where audited in ( 'Failure' ) ${wstr} order by chainID, monthDT`
-        console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
         for (const f of recs) {
@@ -627,8 +626,8 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async audit_blocks(chainID = null, fix = true) {
         // 1. find problematic periods with a small number of records (
-        let w = chainID != null ? ` and chainID = ${chainID}` : " and (auditDT is Null or auditDT < date_sub(Now(), interval 10 hour))  "
-        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where monthDT >= last_day(date_sub(Now(), interval 90 day)) and audited in ( 'Unknown', 'Failure' )   ${w}  order by auditDT`
+        let w = chainID != null ? ` and chainID = ${chainID}` : " and (auditDT is Null or auditDT < date_sub(Now(), interval 6 hour)) "
+        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where (( monthDT >= last_day(date_sub(Now(), interval 90 day)) and audited in ( 'Unknown', 'Failure' ) ) or monthDT = LAST_DAY(Now()) ) ${w} order by auditDT`
         console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
@@ -686,7 +685,7 @@ module.exports = class SubstrateETL extends AssetManager {
             await this.update_batchedSQL();
             cnt++;
 
-            if (fix) {
+            if (fix && audited == "Failure") {
                 await this.audit_fix(chainID, monthDT);
             }
         }
@@ -1486,7 +1485,7 @@ module.exports = class SubstrateETL extends AssetManager {
     | deployer      | varchar(67) | YES  | MUL | NULL    |       | contractevents{paraID} left join extrinsic_id with extrinsics{paraID}
     +---------------+-------------+------+-----+---------+-------+
     	    */
-    async updateContracts(chainID, perPagelimit = 1000, startDT = "2021-01-01", loadSourceTables = fale) {
+    async updateContracts(chainID, perPagelimit = 1000, startDT = "2021-01-01", loadSourceTables = false) {
         await this.assetManagerInit();
         let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, WSEndpointArchive, numHolders, totalIssuance, decimals from chain where chainID = '${chainID}'`);
         if (chains.length == 0) {
