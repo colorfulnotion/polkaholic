@@ -956,21 +956,122 @@ function decodeRLPTx(raw = '') {
     return r
 }
 
-function extract_method_Inputs(s) {
-  const startIndex = s.indexOf('(') + 1;
-  const endIndex = s.lastIndexOf(')');
-  const inputs = s.slice(startIndex, endIndex);
-  return inputs;
+function parseMethodInputs(paramsString, nested) {
+  const splitInputs = [];
+  let currentParam = '';
+  let nestedLevel = 0;
+  for (let i = 0; i < paramsString.length; i++) {
+    const char = paramsString[i];
+    if (char === '(') {
+      nestedLevel++;
+    } else if (char === ')') {
+      nestedLevel--;
+    }
+    if (char === ',' && nestedLevel === 0) {
+      splitInputs.push(currentParam.trim());
+      currentParam = '';
+    } else {
+      currentParam += char;
+    }
+    if (i === paramsString.length - 1) {
+      splitInputs.push(currentParam.trim());
+    }
+  }
+  const paramsArray = splitInputs.map(param => {
+    const separatorIndex = param.lastIndexOf(' ');
+    const type = param.slice(0, separatorIndex).trim();
+    const name = param.slice(separatorIndex + 1).trim();
+    if (nested && type.includes('(')) {
+      const nestedStartIndex = type.indexOf('(');
+      const nestedEndIndex = type.lastIndexOf(')');
+      const nestedParamsString = type.slice(nestedStartIndex + 1, nestedEndIndex);
+      const nestedType = type.slice(0, nestedStartIndex);
+      return {
+        nestedType: true,
+        name: name,
+        //type: nestedType,
+        type: parseMethodInputs(nestedParamsString, nested)
+      };
+    } else {
+      return {
+        name: name,
+        type: type,
+      };
+    }
+  });
+  return paramsArray;
 }
 
-function build_txn_input_stub(methodSignature='callBridgeCall(address token, uint256 amount, string destinationChain, string bridgedTokenSymbol, (uint8 callType, address target, uint256 value, bytes callData, bytes payload)[], (uint8 callType, address target, uint256 value, bytes callData, bytes payload)[], address refundRecipient, bool enableForecall)'){
-    let s = extract_method_Inputs(methodSignature)
-    //let inp=methodSignature.substr(methodSignature.length)
-    console.log(`s=${s}`)
+function build_txn_input_stub(methodSignature='callBridgeCall(address token, uint256 amount, string destinationChain, string bridgedTokenSymbol, (uint8 callType, address target, uint256 value, bytes callData, bytes payload)[] sourceCalls, (uint8 callType, address target, uint256 value, bytes callData, bytes payload)[] destinationCalls, address refundRecipient, bool enableForecall)', nested = false) {
+  const startIndex = methodSignature.indexOf('(') + 1;
+  const endIndex = methodSignature.lastIndexOf(')');
+  const inputs = methodSignature.slice(startIndex, endIndex);
+  return parseMethodInputs(inputs, nested);
+}
+
+function convertBigNumberStruct(val){
+    let value = val
+    if (val._hex != undefined){
+        if (val._isBigNumber != undefined){
+            let bigIntStr = paraTool.toIntegerStr(val._hex)
+            value = bigIntStr
+        }else{
+            value = val._hex
+        }
+    }else if (val.type != undefined && val.type == 'BigNumber'){
+        if (val.hex != undefined){
+            let bigIntStr = paraTool.toIntegerStr(val.hex)
+            value = bigIntStr
+        }
+    }else{
+        //console.log(`convertBigNumberStruct val`, val)
+    }
+    return value
+}
+
+function convertBigNumber(val){
+    let value = val
+    if (Array.isArray(val)){
+        //console.log(`convertBigNumber valLen=${value.length}`)
+        for (let i = 0; i < value.length; i++){
+            if (Array.isArray(value[i])){
+                //console.log(`convertBigNumber val[${i}]Len=${value[i].length}`)
+                val[i] = convertBigNumber(value[i])
+            }else{
+                //console.log(`convertBigNumberStruct *** value[${i}]`, value[i])
+                let value_i = convertBigNumberStruct(val[i])
+                //console.log(`convertBigNumberStruct *** value_i[${i}]`, value_i)
+                value[i] = value_i
+                //console.log(`convertBigNumberStruct *** value[${i}] updated`, value[i])
+            }
+        }
+    }else{
+        return convertBigNumberStruct(val)
+    }
+    //console.log(`convertBigNumber ** val`, val)
+    return value
 }
 
 function decode_txn_input_etherjs(txn, methodABIStr, methodSignature){
-
+    let txInput = txn.input
+    let methodID = txn.input.slice(0, 10)
+    console.log(`decode_txn_input_etherjs methodABIStr`, methodABIStr)
+    var iface = new ethers.utils.Interface(methodABIStr)
+    var txn_input_stub = build_txn_input_stub(methodSignature)
+    var res = iface.decodeFunctionData(methodID, txInput)
+    let combinedTxnInputs = []
+    for (const t of txn_input_stub){
+        let fld = t.name
+        let val = res[fld]
+        val = JSON.parse(JSON.stringify(val))
+        if (val != undefined){
+            //console.log(`val!!`, val)
+            t.value = convertBigNumber(JSON.parse(JSON.stringify(val)))
+        }
+        combinedTxnInputs.push(t)
+    }
+    console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
+    return [combinedTxnInputs, true]
 }
 
 
@@ -995,6 +1096,14 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder) {
             console.log(`decodeErr null methodSignature=${methodSignature}`)
             console.log(`decodeErr input=${txn.input}`)
             abiDecoder.discardNonDecodedLogs()
+            let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs(txn, methodABIStr, methodSignature)
+            if (isSuccess){
+                decodedData = {}
+                decodedData.params = decodedDataEtherJS
+                decodedData.decodeStatus = 'success'
+                console.log(`** decodedData`, decodedData)
+                return decodedData
+            }
         }
         let decodeNull = {
             decodeStatus: 'null'
