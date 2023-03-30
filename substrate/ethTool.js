@@ -25,6 +25,8 @@ const {
 
 const abiDecoder = require('abi-decoder');
 const exec = util.promisify(require("child_process").exec);
+const { ethers } = require("ethers");
+
 
 function shexdec(inp) {
     return parseInt(inp.replace("0x", ""), 16);
@@ -954,6 +956,23 @@ function decodeRLPTx(raw = '') {
     return r
 }
 
+function extract_method_Inputs(s) {
+  const startIndex = s.indexOf('(') + 1;
+  const endIndex = s.lastIndexOf(')');
+  const inputs = s.slice(startIndex, endIndex);
+  return inputs;
+}
+
+function build_txn_input_stub(methodSignature='callBridgeCall(address token, uint256 amount, string destinationChain, string bridgedTokenSymbol, (uint8 callType, address target, uint256 value, bytes callData, bytes payload)[], (uint8 callType, address target, uint256 value, bytes callData, bytes payload)[], address refundRecipient, bool enableForecall)'){
+    let s = extract_method_Inputs(methodSignature)
+    //let inp=methodSignature.substr(methodSignature.length)
+    console.log(`s=${s}`)
+}
+
+function decode_txn_input_etherjs(txn, methodABIStr, methodSignature){
+
+}
+
 
 //'0x38ed1739'
 //decodeMethod
@@ -1007,11 +1026,16 @@ function getMethodSignature(e) {
         let typeName;
         if (Array.isArray(inp.components)) {
             let t = []
+            let tupleType = inp.type
             for (const c of inp.components) {
                 let cTypeName = `${c.type} ${c.name}`.trim()
                 t.push(cTypeName)
             }
-            typeName = `(${t.join(', ')})`
+            let componentsType = `(${t.join(', ')})`
+            if (tupleType == 'tuple[]'){
+                componentsType+=`[]`
+            }
+            typeName = `${componentsType} ${inp.name}`
         } else {
             typeName = `${inp.type} ${inp.name}`.trim()
         }
@@ -1038,11 +1062,15 @@ function getMethodFingureprint(e) {
         let typeName;
         if (Array.isArray(inp.components)) {
             let t = []
+            let tupleType = inp.type
             for (const c of inp.components) {
                 let cTypeName = `${c.type}`.trim()
                 t.push(cTypeName)
             }
             typeName = `(${t.join(',')})`
+            if (tupleType == 'tuple[]'){
+                typeName+=`[]`
+            }
         } else {
             typeName = `${inp.type}`.trim()
         }
@@ -1071,11 +1099,15 @@ function getMethodSignatureRaw(e) {
     let inputs = []
     for (const inp of e.inputs) {
         if (Array.isArray(inp.components)) {
+            let tupleType = inp.type
             let t = []
             for (const c of inp.components) {
                 t.push(c.type)
             }
             let rawTuple = `(${t.join(',')})`
+            if (tupleType == 'tuple[]'){
+                rawTuple+=`[]`
+            }
             inputs.push(rawTuple)
         } else {
             inputs.push(inp.type)
