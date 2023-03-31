@@ -737,7 +737,8 @@ function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
             //console.log(`${methodID} -> ${methodSignature}`)
             let methodABIStr = foundApi.abi
             let cachedDecoder = foundApi.decoder
-            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder)
+            let cachedEtherjsDecoder = foundApi.etherjsDecoder
+            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder)
             if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
                 decodedTxnInput.decodeStatus = decodedInput.name
                 decodedTxnInput.methodID = methodID
@@ -799,7 +800,8 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
             //console.log(`${methodID} -> ${methodSignature}`)
             let methodABIStr = foundApi.abi
             let cachedDecoder = foundApi.decoder
-            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder)
+            let cachedEtherjsDecoder = foundApi.etherjsDecoder
+            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder)
             if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
                 decodedTxnInput.decodeStatus = decodedInput.name
                 decodedTxnInput.methodID = methodID
@@ -1052,32 +1054,37 @@ function convertBigNumber(val){
     return value
 }
 
-function decode_txn_input_etherjs(txn, methodABIStr, methodSignature){
-    let txInput = txn.input
-    let methodID = txn.input.slice(0, 10)
-    console.log(`decode_txn_input_etherjs methodABIStr`, methodABIStr)
-    var iface = new ethers.utils.Interface(methodABIStr)
-    var txn_input_stub = build_txn_input_stub(methodSignature)
-    var res = iface.decodeFunctionData(methodID, txInput)
-    let combinedTxnInputs = []
-    for (const t of txn_input_stub){
-        let fld = t.name
-        let val = res[fld]
-        val = JSON.parse(JSON.stringify(val))
-        if (val != undefined){
-            //console.log(`val!!`, val)
-            t.value = convertBigNumber(JSON.parse(JSON.stringify(val)))
+function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDecoder){
+    try {
+        let txInput = txn.input
+        let methodID = txn.input.slice(0, 10)
+        //console.log(`decode_txn_input_etherjs methodABIStr`, methodABIStr)
+        //var iface = new ethers.utils.Interface(methodABIStr)
+        var txn_input_stub = build_txn_input_stub(methodSignature)
+        var res = etherjsDecoder.decodeFunctionData(methodID, txInput)
+        let combinedTxnInputs = []
+        for (const t of txn_input_stub){
+            let fld = t.name
+            let val = res[fld]
+            val = JSON.parse(JSON.stringify(val))
+            if (val != undefined){
+                //console.log(`val!!`, val)
+                t.value = convertBigNumber(JSON.parse(JSON.stringify(val)))
+            }
+            combinedTxnInputs.push(t)
         }
-        combinedTxnInputs.push(t)
+        console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
+        return [combinedTxnInputs, true]
+    } catch (e){
+        console.log(`decode_txn_input_etherjs err`, e)
+        return [false, false]
     }
-    console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
-    return [combinedTxnInputs, true]
 }
 
 
 //'0x38ed1739'
 //decodeMethod
-function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder) {
+function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherjsDecoder) {
     //const abiDecoder = require('abi-decoder');
     //abiDecoder.addABI(methodABIStr)
     //abiDecoder.addABI(JSON.parse(methodABIStr));
@@ -1092,16 +1099,15 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder) {
             return decodedData
         } else {
             //decode null
-            console.log(`decodeErr null txHash=${txn.hash} methodID=${methodID} `)
-            console.log(`decodeErr null methodSignature=${methodSignature}`)
-            console.log(`decodeErr input=${txn.input}`)
+            //console.log(`decodeErr input=${txn.input}`)
+            console.log(`abi-decoder failed. Use etherJS txHash=${txn.hash} methodID=${methodID}\n methodSignature=${methodSignature}`)
             abiDecoder.discardNonDecodedLogs()
-            let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs(txn, methodABIStr, methodSignature)
+            let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDecoder)
             if (isSuccess){
                 decodedData = {}
                 decodedData.params = decodedDataEtherJS
                 decodedData.decodeStatus = 'success'
-                console.log(`** decodedData`, decodedData)
+                //console.log(`** decodedData`, decodedData)
                 return decodedData
             }
         }
@@ -1716,6 +1722,8 @@ function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
             const abiDecoder = require('abi-decoder');
             abiDecoder.addABI(matchedABI.abi)
             matchedABI.decoder = abiDecoder
+            const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
+            matchedABI.etherjsDecoder = etherjsDecoder
             contractABIs[fingerprintID] = matchedABI
             contractABISignatures[signatureID] = fingerprintID
             //console.log(`cache decoder -> ${fingerprintID}`)
@@ -1725,6 +1733,8 @@ function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
             const abiDecoder = require('abi-decoder');
             abiDecoder.addABI(matchedABI.abi)
             matchedABI.decoder = abiDecoder
+            const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
+            matchedABI.etherjsDecoder = etherjsDecoder
             contractABISignatures[signatureID] = fingerprintID
             //console.log(`re-cache decoder -> ${fingerprintID}`)
             //console.log(`re-cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
