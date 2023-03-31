@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-var ABIManager = require("./abiManager");
+var ABIManager = require("../abiManager");
 
 async function main() {
     let crawler = new ABIManager();

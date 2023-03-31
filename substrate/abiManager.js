@@ -151,12 +151,31 @@ module.exports = class ABIManager extends PolkaholicDB {
             let data = sigs[fingerprintID];
             let numContracts = numContractsTally[fingerprintID];
             //fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength
-            let row = `('${data.fingerprintID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${numContracts}', '${data.topicLength}')`
+            let row = `('${data.fingerprintID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${numContracts}', '${data.topicLength}', '1')`
             abiRows.push(row);
         }
         console.log(abiRows.length + " records");
         await this.dump_contract_abis(abiRows)
         await this.update_batchedSQL(true);
+    }
+
+    async reload_abi(){
+        let sql = `select abiType, name, signatureID, abi from contractabi where abi like '%component%';`
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`getBlockRangebyTS`, sql)
+        var res = await this.poolREADONLY.query(sql);
+        if (res.length > 0) {
+            for (let i = 0; i < res.length; i++){
+                let r = res[i]
+                let abiType = r.abiType
+                let name = r.name
+                let signatureID = r.signatureID
+                let abiABIStr = r.abi.toString('utf8')
+                console.log(`[#${i}] [${abiType}] [${signatureID}] ${name}`, abiABIStr)
+                await this.load_abi(abiABIStr)
+            }
+        } else {
+            return false
+        }
     }
 
     async load_abi(contractABIStr) {
@@ -177,7 +196,7 @@ module.exports = class ABIManager extends PolkaholicDB {
             let data = sigs[fingerprintID];
             let numContracts = numContractsTally[fingerprintID];
             //fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength
-            let row = `('${data.fingerprintID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${numContracts}', '${data.topicLength}')`
+            let row = `('${data.fingerprintID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${numContracts}', '${data.topicLength}', '1')`
             abiRows.push(row);
             console.log(`[${data.name}] ${row}`)
         }
@@ -191,7 +210,8 @@ module.exports = class ABIManager extends PolkaholicDB {
         for (i = 0; i < abiRows.length; i += 2000) {
             let j = i + 10000;
             if (j > abiRows.length) j = abiRows.length;
-            let sql = "insert into contractabi (fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength) values " + abiRows.slice(i, j).join(",") + " on duplicate key update name = values(name), signature = values(signature), signatureRaw = values(signatureRaw),signatureID = values(signatureID), abi = values(abi), abiType = values(abiType), numContracts = values(numContracts), topicLength = values(topicLength)";
+            let sql = "insert into contractabi (fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength, audited) values " + abiRows.slice(i, j).join(",") + " on duplicate key update name = values(name), signature = values(signature), signatureRaw = values(signatureRaw),signatureID = values(signatureID), abi = values(abi), abiType = values(abiType), numContracts = values(numContracts), topicLength = values(topicLength), audited = values(audited)";
+            console.log(`sql`, sql)
             this.batchedSQL.push(sql)
         }
         console.log(`dump_contract_abi len=${abiRows.length}`);

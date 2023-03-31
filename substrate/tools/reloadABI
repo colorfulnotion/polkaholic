@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+
+var ABIManager = require("../abiManager");
+
+async function main() {
+    let abiManager = new ABIManager();
+    await abiManager.reload_abi();
+}
+
+main()
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });
