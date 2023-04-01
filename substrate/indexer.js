@@ -6503,7 +6503,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async bq_streaming_insert_finalized_block(b) {
-	if ( this.BQ_SUBSTRATEETL_KEY == null ) return;
+        if (this.BQ_SUBSTRATEETL_KEY == null) return;
         const {
             BigQuery
         } = require('@google-cloud/bigquery');
@@ -6598,8 +6598,8 @@ module.exports = class Indexer extends AssetManager {
                     cnt++;
                 }
             }
-            if ( ext.signer ) {
-		let feeUSD = await this.computeExtrinsicFeeUSD(ext)
+            if (ext.signer) {
+                let feeUSD = await this.computeExtrinsicFeeUSD(ext)
                 let bqExtrinsic = {
                     relay_chain: relayChain,
                     para_id: paraID,
@@ -7787,17 +7787,87 @@ module.exports = class Indexer extends AssetManager {
             o.traceID = a.traceID
             dedupEvents[a.k] = o;
         }
-
+        let relayChain = paraTool.getRelayChainByChainID(chainID);
+        let paraID = paraTool.getParaIDfromChainID(chainID);
+        let balanceupdates = [];
+        let assetupdates = [];
+        let idx = 0;
         for (const dedupK of Object.keys(dedupEvents)) {
             let a = dedupEvents[dedupK];
             let [a2, _] = this.parse_trace_from_auto(a, traceType, blockNumber, blockHash, api);
-
             if (!a2) continue;
             let p = a2.p;
             let s = a2.s;
 
             let pallet_section = `${p}:${s}`
-
+            if (finalized && (p == "Tokens" || p == "System" || p == "Balances" || p == "Assets") && (s == "Account" || s == "Accounts" || s == "TotalIssuance")) {
+                if (a2.asset) {
+                    let p = await this.computePriceUSD({
+                        val: a2.free,
+                        asset: a2.asset,
+                        chainID: this.chainID,
+                        ts: null
+                    })
+                    if (p) {
+                        let assetInfo = p.assetInfo;
+                        let c = {
+                            relay_chain: relayChain,
+                            para_id: paraID,
+                            id: assetInfo.id,
+                            chain_name: assetInfo.chainName,
+                            block_number: blockNumber,
+                            ts: blockTS,
+                            asset: a2.asset,
+                            xcm_interior_key: assetInfo.xcmInteriorKey,
+                            decimals: assetInfo.decimals,
+                            symbol: assetInfo.symbol,
+                            asset_name: assetInfo.assetName,
+                            asset_type: assetInfo.assetType,
+                            price_usd: assetInfo.priceUSD
+                        }
+                        let flds = []
+                        if (s == "TotalIssuance" && a2.totalIssuance) {
+                            flds.push(["totalIssuance", "total_issuance"])
+                        } else {
+                            if (a2.free) {
+                                flds.push(["free", "free"])
+                            }
+                            if (a2.reserved) {
+                                flds.push(["reserved", "reserved"])
+                            }
+                            if (a2.frozen) {
+                                flds.push(["frozen", "frozen"])
+                            }
+			    if (a2.miscFrozen) {
+                                flds.push(["miscFrozen", "misc_frozen"])
+                            }
+			    if (a2.feeFrozen) {
+                                flds.push(["feeFrozen", "fee_frozen"])
+                            }
+                        }
+                        for (const fmap of flds) {
+                            let f = fmap[0] // e.g. totalIssuance
+                            let f2 = fmap[1] // e.g. total_issuance
+                            c[f2] = a2[f] / 10 ** c.decimals;
+                            c[`${f2}_raw`] = a2[f].toString();
+                            c[`${f2}_usd`] = c[f2] * c.price_usd;
+                        }
+                        if (a2.accountID) {
+                            c.address_ss58 = a2.accountID;
+                            c.address_pubkey = paraTool.getPubKey(a2.accountID);
+                            balanceupdates.push({
+                                insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+                                json: c
+                            });
+                        } else if (a2.totalIssuance) {
+                            assetupdates.push({
+                                insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+                                json: c
+                            });
+                        }
+                    }
+                }
+            }
             //temp local list blacklist for easier debugging
             if (pallet_section == '...') {
                 continue
@@ -7825,6 +7895,42 @@ module.exports = class Indexer extends AssetManager {
                     this.unhandledTraceMap[pallet_section] = 0;
                 }
                 this.unhandledTraceMap[pallet_section]++
+            }
+            idx++;
+        }
+
+        if (this.BQ_SUBSTRATEETL_KEY && ((balanceupdates.length > 0) || (assetupdates.length > 0))) {
+            const {
+                BigQuery
+            } = require('@google-cloud/bigquery');
+            const bigquery = new BigQuery({
+                projectId: 'substrate-etl',
+                keyFilename: this.BQ_SUBSTRATEETL_KEY
+            })
+            let tables = ["balanceupdates", "assetupdates"];
+            for (const t of tables) {
+                let rows = null;
+                switch (t) {
+                    case "balanceupdates":
+                        rows = balanceupdates;
+                        break;
+                    case "assetupdates":
+                        rows = assetupdates;
+                        break;
+                }
+                if (rows && rows.length > 0) {
+                    try {
+                        await bigquery
+                            .dataset("dotsama_dev") // TODO
+                            .table(t)
+                            .insert(rows, {
+                                raw: true
+                            });
+                        console.log("WRITE", relayChain, t, rows.length)
+                    } catch (err) {
+                        console.log(t, JSON.stringify(err));
+                    }
+                }
             }
         }
     }
