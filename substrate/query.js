@@ -4782,6 +4782,9 @@ module.exports = class Query extends AssetManager {
             decoratedExt.section = section
             decoratedExt.method = method
             decoratedExt.params = ext.params
+            if (ext.paramsDef) {
+                decoratedExt.paramsDef = ext.paramsDef
+            }
 
             if (ext.events != undefined) {
                 decoratedExt.events = []
