@@ -184,7 +184,7 @@ module.exports = class Crawler extends Indexer {
                 console.log("BACKFILL", chain.RPCBackfill);
             }
             if (!chain.RPCBackfill || chain.RPCBackfill.length == 0) {
-		return (false);
+                return (false);
             }
             let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' "${chain.RPCBackfill}"`
             const {
@@ -1848,7 +1848,7 @@ module.exports = class Crawler extends Indexer {
                 }
             }
             // if we didn't get a trace, or if we are using onfinality endpoint
-	    
+
             if (chain.onfinalityStatus == "Active" && chain.onfinalityID && (chain.onfinalityID.length > 0) &&
                 ((trace == false || trace.length == 0 || this.APIWSEndpoint.includes("onfinality")))) {
                 let trace2 = await this.crawlTrace(chain, finalizedHash);
