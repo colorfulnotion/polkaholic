@@ -71,6 +71,9 @@ module.exports = class PolkaholicDB {
 
     EXTERNAL_WS_PROVIDER_URL = null;
     EXTERNAL_WS_PROVIDER_KEY = null;
+
+    BQ_SUBSTRATEETL_KEY = null;
+    
     WSProviderQueue = {};
 
     constructor(serviceName = "polkaholic") {
@@ -111,13 +114,18 @@ module.exports = class PolkaholicDB {
                 this.GC_BIGTABLE_INSTANCE = dbconfig.gc.bigtableInstance;
                 this.GC_BIGTABLE_CLUSTER = dbconfig.gc.bigtableCluster;
                 this.GC_STORAGE_BUCKET = dbconfig.gc.storageBucket;
-
             }
             if (dbconfig.ws != undefined) {
                 this.EXTERNAL_WS_PROVIDER_KEY = dbconfig.ws.key;
                 this.EXTERNAL_WS_PROVIDER_URL = dbconfig.ws.url;
             }
 
+            if (dbconfig.bq != undefined) {
+		if ( dbconfig.bq.substrateetlKey ) {
+                    this.BQ_SUBSTRATEETL_KEY = dbconfig.bq.substrateetlKey;
+		}
+            }
+	    
             this.pool = mysql.createPool(this.convert_dbconfig(dbconfig.client));
             // Ping WRITABLE database to check for common exception errors.
             this.pool.getConnection((err, connection) => {

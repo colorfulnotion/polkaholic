@@ -159,12 +159,12 @@ module.exports = class ABIManager extends PolkaholicDB {
         await this.update_batchedSQL(true);
     }
 
-    async reload_abi(){
+    async reload_abi() {
         let sql = `select abiType, name, signatureID, abi from contractabi where abi like '%component%';`
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`getBlockRangebyTS`, sql)
         var res = await this.poolREADONLY.query(sql);
         if (res.length > 0) {
-            for (let i = 0; i < res.length; i++){
+            for (let i = 0; i < res.length; i++) {
                 let r = res[i]
                 let abiType = r.abiType
                 let name = r.name

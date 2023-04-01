@@ -6502,6 +6502,161 @@ module.exports = class Indexer extends AssetManager {
         return;
     }
 
+    async bq_streaming_insert_finalized_block(b) {
+	if ( this.BQ_SUBSTRATEETL_KEY == null ) return;
+        const {
+            BigQuery
+        } = require('@google-cloud/bigquery');
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        })
+        let chainID = this.chainID
+        let relayChain = paraTool.getRelayChainByChainID(chainID);
+        let paraID = paraTool.getParaIDfromChainID(chainID);
+
+
+        let extrinsics = [];
+        let events = [];
+        let transfers = [];
+
+        // map block into the above arrays
+        let block = {
+            hash: b.hash,
+            parent_hash: b.parentHash,
+            number: b.number,
+            state_root: b.stateRoot,
+            extrinsics_root: b.extrinsicsRoot,
+            block_time: b.blockTS,
+            author_ss58: b.author,
+            author_pub_key: paraTool.getPubKey(b.author),
+            relay_block_number: b.relayBN,
+            relay_state_root: b.relayStateRoot,
+            extrinsic_count: b.extrinsics.length,
+        };
+        for (const ext of b.extrinsics) {
+            for (const ev of ext.events) {
+                let dEvent = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
+                if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
+                    if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
+                        if (dEvent.data[0].weight.refTime != undefined) {
+                            ext.weight = dEvent.data[0].weight.refTime;
+                        } else if (!isNaN(dEvent.data[0].weight)) {
+                            ext.weight = dEvent.data[0].weight;
+                        }
+                    }
+                }
+                let bqEvent = {
+                    relay_chain: relayChain,
+                    para_id: paraID,
+                    event_id: ev.eventID,
+                    extrinsic_hash: ext.extrinsicHash,
+                    extrinsic_id: ext.extrinsicID,
+                    block_number: block.number,
+                    block_time: block.block_time,
+                    block_hash: block.hash,
+                    section: ev.section,
+                    method: ev.method,
+                    data: JSON.stringify(ev.data),
+                    data_decoded: (dEvent && dEvent.decodedData != undefined) ? JSON.stringify(dEvent.decodedData) : null,
+                }
+                events.push({
+                    insertId: `${relayChain}-${paraID}-${ev.eventID}`,
+                    json: bqEvent
+                })
+            }
+            if (ext.transfers) {
+                let cnt = 0;
+                for (const t of ext.transfers) {
+                    let bqTransfer = {
+                        relay_chain: relayChain,
+                        para_id: paraID,
+                        block_hash: block.hash,
+                        block_number: block.number,
+                        block_time: block.block_time,
+                        extrinsic_hash: ext.extrinsicHash,
+                        extrinsic_id: ext.extrinsicID,
+                        event_id: t.eventID,
+                        section: t.section,
+                        method: t.method,
+                        from_ss58: t.from,
+                        to_ss58: t.to,
+                        from_pub_key: t.fromAddress,
+                        to_pub_key: t.toAddress,
+                        amount: t.amount,
+                        raw_amount: t.rawAmount,
+                        asset: t.asset,
+                        price_usd: t.priceUSD,
+                        amount_usd: t.amountUSD,
+                        symbol: t.symbol,
+                        decimals: t.decimals
+                    }
+                    transfers.push({
+                        insertId: `${relayChain}-${paraID}-${t.eventID}-${cnt}`,
+                        json: bqTransfer
+                    });
+                    cnt++;
+                }
+            }
+            if ( ext.signer ) {
+		let feeUSD = await this.computeExtrinsicFeeUSD(ext)
+                let bqExtrinsic = {
+                    relay_chain: relayChain,
+                    para_id: paraID,
+                    hash: ext.extrinsicHash,
+                    extrinsic_id: ext.extrinsicID,
+                    block_time: block.block_time,
+                    block_number: block.number,
+                    block_hash: block.hash,
+                    lifetime: JSON.stringify(ext.lifetime),
+                    section: ext.section,
+                    method: ext.method,
+                    params: JSON.stringify(ext.params),
+                    fee: ext.fee,
+                    fee_usd: feeUSD,
+                    //amounts: null
+                    //amount_usd: null,
+                    weight: (ext.weight != undefined) ? ext.weight : null, // TODO: ext.weight,
+                    signed: ext.signer ? true : false,
+                    signer_ss58: ext.signer ? ext.signer : null,
+                    signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
+                }
+                extrinsics.push({
+                    insertId: `${relayChain}-${paraID}-{ext.extrinsicID}`,
+                    json: bqExtrinsic
+                })
+            }
+        }
+        let tables = ["extrinsics", "events", "transfers"];
+        for (const t of tables) {
+            let rows = null;
+            switch (t) {
+                case "extrinsics":
+                    rows = extrinsics;
+                    break;
+                case "events":
+                    rows = events;
+                    break;
+                case "transfers":
+                    rows = transfers;
+                    break;
+            }
+            if (rows && rows.length > 0) {
+                try {
+                    await bigquery
+                        .dataset("dotsama_dev") // TODO
+                        .table(t)
+                        .insert(rows, {
+                            raw: true
+                        });
+                    console.log("WRITE", relayChain, t, rows.length)
+                } catch (err) {
+                    console.log(t, JSON.stringify(err));
+                }
+            }
+        }
+    }
+
     async process_rcxcm(xcmList) {
         let relayChain = null;
         if (this.chainID == 0) relayChain = "polkadot";
@@ -6531,8 +6686,8 @@ module.exports = class Indexer extends AssetManager {
                             msg: JSON.stringify(x.msg),
                             msg_hex: x.msgHex,
                             version: x.version,
-                            xcm_interior_keys: x.xcmInteriorKeys,
-                            xcm_interior_keys_unregistered: x.xcmInteriorKeysUnregistered,
+                            //xcm_interior_keys: x.xcmInteriorKeys,
+                            //xcm_interior_keys_unregistered: x.xcmInteriorKeysUnregistered,
                         }
                     }
                     rows.push(xcm)
@@ -6542,20 +6697,18 @@ module.exports = class Indexer extends AssetManager {
             }
         }
         try {
-            if (false) { // rows.length > 0
-                const {
-                    BigQuery
-                } = require('@google-cloud/bigquery');
-                const bigquery = new BigQuery({
-                    projectId: 'substrate-etl'
-                })
-                await bigquery
-                    .dataset(relayChain)
-                    .table("xcm")
-                    .insert(rows, {
-                        raw: true
-                    });
-            }
+            const {
+                BigQuery
+            } = require('@google-cloud/bigquery');
+            const bigquery = new BigQuery({
+                projectId: 'substrate-etl'
+            })
+            await bigquery
+                .dataset(relayChain)
+                .table("xcm")
+                .insert(rows, {
+                    raw: true
+                });
         } catch (err) {
             console.log("process_rcxcm STREAMING INSERT", err, JSON.stringify(err));
         }
@@ -6925,6 +7078,7 @@ module.exports = class Indexer extends AssetManager {
         let forceTry = true //MK: need to review this
         if ((isTip || forceTry) && this.isRelayChain) {
             let relayChain = paraTool.getRelayChainByChainID(chainID);
+
             if (autoTraces) {
                 //console.log("this.indexRelayChainTrace SUCC", blockNumber, chainID, relayChain, autoTraces.length);
                 await this.indexRelayChainTrace(autoTraces, blockNumber, chainID, blockTS, relayChain, isTip, finalized, this.chainParser.getChainParserStat());
@@ -7191,8 +7345,9 @@ module.exports = class Indexer extends AssetManager {
         if (recentXcmMsgs.length > 0) {
             this.add_recent_activity(recentXcmMsgs)
         }
-        //let xcmMeta = this.xcmMeta;
-        //this.xcmMeta = []
+        if (isTip && finalized) {
+            await this.bq_streaming_insert_finalized_block(block);
+        }
         if (xcmMeta.length > 0) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`returning [${blockNumber}] [${blockHash}] xcmMeta!`, xcmMeta)
         }
