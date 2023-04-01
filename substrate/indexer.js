@@ -19,6 +19,9 @@ const {
 } = require('@polkadot/types');
 const fs = require('fs');
 
+const extrinsic_args_conversion_list = ['Compact<u128>', 'u128', 'i128']
+const event_conversion_list = ['Compact<u128>', 'u128']
+
 module.exports = class Indexer extends AssetManager {
     debugLevel = paraTool.debugNoLog;
     writeData = true; // true = production level write, false = debug SKIPs
@@ -3492,7 +3495,6 @@ module.exports = class Indexer extends AssetManager {
         // parse key
         try {
             kk = key;
-
             let parsek = (e.pkExtra != undefined) ? e.pkExtra : JSON.stringify(e.k)
             var decoratedKey = parsek
             //console.log(`parseStorageKey  key=${key}, decoratedKey=${decoratedKey}`)
@@ -3968,9 +3970,14 @@ module.exports = class Indexer extends AssetManager {
         dEvent.data = dData
 
         for (var i = 0; i < fields.length; i++) {
+            var dData_i = dEvent.data[i]
             var fld = fields[i]
             var valueType = fld.type.toJSON();
             var typeDef = api.registry.metadata.lookup.getTypeDef(valueType).type
+            if (event_conversion_list.includes(typeDef)){
+                dData_i = paraTool.toIntegerStr(dData_i)
+                dEvent.data[i] = dData_i
+            }
             //var parsedEvent = this.api.createType(typeDef, data[i]);
             var name = fld.name.toString();
             var typeName = fld.typeName.toString();
@@ -3986,11 +3993,12 @@ module.exports = class Indexer extends AssetManager {
     decode_s_internal_raw(call_s, apiAt) {
         //fetch method, section when human is not set
         let callIndex = call_s.callIndex
-        let [method, section] = this.getMethodSection(callIndex, apiAt)
+        let [method, section, argsDef] = this.getMethodSection(callIndex, apiAt)
         let f = {
             callIndex: callIndex,
             section: section,
             method: method,
+            argsDef: argsDef,
             args: call_s.args
         }
         return f
@@ -3998,27 +4006,47 @@ module.exports = class Indexer extends AssetManager {
 
     getMethodSection(callIndex, apiAt) {
         try {
+            //console.log(`getMethodSection callIndex=${callIndex}`)
             var {
                 method,
-                section
+                section,
+                toJSON
             } = apiAt.registry.findMetaCall(paraTool.hexAsU8(callIndex))
-            return [method, section]
+            var methodJSON = toJSON()
+            var argsDef = methodJSON.args
+            return [method, section, argsDef]
         } catch (e) {
             console.log(`getMethodSection unable to decode ${callIndex}`)
         }
-        return [null, null]
+        return [null, null, null]
     }
 
     recursive_batch_all(call_s, apiAt, extrinsicHash, extrinsicID, lvl = '', remarks = {}, opaqueCalls = {}) {
         if (call_s && call_s.args.calls != undefined) {
             for (let i = 0; i < call_s.args.calls.length; i++) {
                 let callIndex = call_s.args.calls[i].callIndex
-                let [method, section] = this.getMethodSection(callIndex, apiAt)
+                let [method, section, argsDef] = this.getMethodSection(callIndex, apiAt)
                 let ff = {
                     callIndex: callIndex,
                     section: section,
                     method: method,
-                    args: call_s.args.calls[i].args
+                    args: call_s.args.calls[i].args,
+                    argsDef: argsDef
+                }
+                try {
+                    for (let k = 0; k < argsDef.length; k++){
+                        let argsDef_k = argsDef[k]
+                        let argsDef_k_type = argsDef_k.type
+                        let argsDef_k_name = argsDef_k.name
+                        //console.log(`recursive_batch_all argsDef_k`, argsDef_k)
+                        //console.log(`recursive_batch_all argsDef_k_type`, argsDef_k_type)
+                        if (extrinsic_args_conversion_list.includes(argsDef_k_type)){
+                            let arg_val = call_s.args.calls[i].args[argsDef_k_name]
+                            call_s.args.calls[i].args[argsDef_k_name] = paraTool.toIntegerStr(arg_val)
+                        }
+                    }
+                } catch (recursiveArgsDefErr){
+                    console.log(`recursive_batch_all recursiveArgsDefErr`, recursiveArgsDefErr)
                 }
                 let pallet_method = `${ff.section}:${ff.method}`
                 if (pallet_method == 'system:remarkWithEvent' || pallet_method == 'system:remark') {
@@ -4122,7 +4150,7 @@ module.exports = class Indexer extends AssetManager {
         let extrinsicHash = extrinsic.hash.toHex()
         let extrinsicID = (index == 'pending') ? `${extrinsicHash}-pending` : blockNumber + "-" + index
         let callIndex = exos.method.callIndex
-        let [method, section] = this.getMethodSection(callIndex, apiAt)
+        let [method, section, argsDef] = this.getMethodSection(callIndex, apiAt)
         let remarks = {} // add all remarks here
         let opaqueCalls = {}
         let pv = `${section}:${method}`
@@ -4192,6 +4220,22 @@ module.exports = class Indexer extends AssetManager {
         for (const opaqueCall of Object.keys(opaqueCalls)) {
             encodedCalls.push(opaqueCall)
         }
+        try {
+            for (let i = 0; i < argsDef.length; i++){
+                let argsDef_i = argsDef[i]
+                let argsDef_i_type = argsDef_i.type
+                let argsDef_i_name = argsDef_i.name
+                //console.log(`argsDef_i`, argsDef_i)
+                //console.log(`argsDef_i_type`, argsDef_i_type)
+                if (extrinsic_args_conversion_list.includes(argsDef_i_type)){
+                    let arg_val = exos.method.args[argsDef_i_name]
+                    exos.method.args[argsDef_i_name] = paraTool.toIntegerStr(arg_val)
+                }
+            }
+        } catch (argsDefErr){
+            console.log(`decode_s_extrinsic argsDefErr`, argsDefErr)
+        }
+
         let out = {
             method: {
                 //todo: figure out method section
@@ -4200,6 +4244,7 @@ module.exports = class Indexer extends AssetManager {
                 method: method,
             },
             args: exos.method.args,
+            argsDef: argsDef,
             remarks: remarkStrs,
             encodedCalls: encodedCalls,
             signature: sig,
@@ -4726,8 +4771,9 @@ module.exports = class Indexer extends AssetManager {
             section: extrinsic.method.pallet,
             method: extrinsic.method.method, //replacing the original method object format
             params: extrinsic.args,
+            paramsDef: extrinsic.argsDef,
         }
-
+        //console.log(`pending rExtrinsic`, rExtrinsic)
         try {
 
             // feed is used for {feed, feedTransfer, feedRewards}
@@ -5038,8 +5084,10 @@ module.exports = class Indexer extends AssetManager {
             section: exSection,
             method: exMethod,
             params: extrinsic.args,
+            paramsDef: extrinsic.argsDef,
             events: extrinsic.events,
         }
+        //console.log(`pending rExtrinsic`, rExtrinsic)
         if (evmTxStatus) {
             rExtrinsic.evm = evmTxStatus;
         } else {
