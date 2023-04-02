@@ -539,7 +539,7 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null, lookbackDays = 30) {
+    async get_random_substrateetl(logDT = null, paraID = -1, relayChain = null, lookbackDays = 470) {
 
         let w = "";
         if (paraID >= 0 && relayChain) {
