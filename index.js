@@ -360,6 +360,12 @@ app.get('/apikeys', async (req, res) => {
     }
 })
 
+app.get('/charts', async (req, res) => {
+    res.render('charts', {
+	dashboard: "aae16473-8e10-48cd-b5ba-cc027bbac2ad"
+    });
+})
+
 app.get('/apikeys/create', async (req, res) => {
     const loggedInEmail = getLoginEmail(req);
     if (loggedInEmail) {
