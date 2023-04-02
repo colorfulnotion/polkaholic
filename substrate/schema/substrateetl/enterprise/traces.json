@@ -1,0 +1,207 @@
+[
+      {
+        "mode": "REQUIRED",
+        "name": "relay_chain",
+        "type": "STRING"
+      },
+      {
+        "mode": "REQUIRED",
+        "name": "para_id",
+        "type": "STRING"
+      },
+      {
+        "mode": "REQUIRED",
+        "name": "id",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "chain_name",
+        "type": "STRING"
+      },
+      {
+        "mode": "REQUIRED",
+        "name": "trace_id",
+        "type": "STRING"
+      },
+      {
+        "mode": "REQUIRED",
+        "name": "ts",
+        "type": "TIMESTAMP"
+      },
+      {
+        "mode": "REQUIRED",
+        "name": "block_number",
+        "type": "INTEGER"
+      },
+      {
+        "mode": "REQUIRED",
+        "name": "block_hash",
+        "type": "STRING"
+      },
+      {
+        "mode": "REQUIRED",
+        "name": "k",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "v",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "section",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "storage",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "pk_extra",
+        "type": "JSON"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "pv",
+        "type": "JSON"
+      },
+    {
+    "mode": "NULLABLE",
+    "name": "symbol",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "decimals",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "asset",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "asset_name",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "asset_type",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "xcm_interior_key",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "address_ss58",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "address_pubkey",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "free",
+    "type": "FLOAT"
+  },
+    {
+    "mode": "NULLABLE",
+    "name": "free_usd",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "free_raw",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "reserved",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "reserved_raw",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "reserved_usd",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "frozen",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "frozen_raw",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "frozen_usd",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "misc_frozen",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "misc_frozen_raw",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "misc_frozen_usd",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "fee_frozen",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "fee_frozen_raw",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "fee_frozen_usd",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "total_issuance",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "total_issuance_usd",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "total_issuance_raw",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "price_usd",
+    "type": "FLOAT"
+  }
+]

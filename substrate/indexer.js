@@ -6644,7 +6644,7 @@ module.exports = class Indexer extends AssetManager {
             if (rows && rows.length > 0) {
                 try {
                     await bigquery
-                        .dataset("polkadot_enterprise") 
+                        .dataset("polkadot_enterprise")
                         .table(t)
                         .insert(rows, {
                             raw: true
@@ -7789,6 +7789,9 @@ module.exports = class Indexer extends AssetManager {
         }
         let relayChain = paraTool.getRelayChainByChainID(chainID);
         let paraID = paraTool.getParaIDfromChainID(chainID);
+        let id = this.getIDByChainID(chainID);
+        let chainName = this.getChainName(chainID);
+        let traces = [];
         let balanceupdates = [];
         let assetupdates = [];
         let idx = 0;
@@ -7798,19 +7801,19 @@ module.exports = class Indexer extends AssetManager {
             if (!a2) continue;
             let p = a2.p;
             let s = a2.s;
-
             let pallet_section = `${p}:${s}`
-            if (finalized && (p == "Tokens" || p == "System" || p == "Balances" || p == "Assets") && (s == "Account" || s == "Accounts" || s == "TotalIssuance")) {
+            if (finalized) {
+                let c = null
                 if (a2.asset) {
-                    let p = await this.computePriceUSD({
+                    let prinfo = await this.computePriceUSD({
                         val: a2.free,
                         asset: a2.asset,
                         chainID: this.chainID,
                         ts: null
                     })
-                    if (p) {
-                        let assetInfo = p.assetInfo;
-                        let c = {
+                    if (prinfo) {
+                        let assetInfo = prinfo.assetInfo;
+                        c = {
                             relay_chain: relayChain,
                             para_id: paraID,
                             id: assetInfo.id,
@@ -7826,47 +7829,92 @@ module.exports = class Indexer extends AssetManager {
                             price_usd: assetInfo.priceUSD
                         }
                         let flds = []
-                        if (s == "TotalIssuance" && a2.totalIssuance) {
-                            flds.push(["totalIssuance", "total_issuance"])
-                        } else {
-                            if (a2.free) {
-                                flds.push(["free", "free"])
+                        try {
+                            if (s == "TotalIssuance" && a2.totalIssuance) {
+                                flds.push(["totalIssuance", "total_issuance"])
+                            } else {
+                                if (a2.free) {
+                                    flds.push(["free", "free"])
+                                }
+                                if (a2.reserved) {
+                                    flds.push(["reserved", "reserved"])
+                                }
+                                if (a2.frozen) {
+                                    flds.push(["frozen", "frozen"])
+                                }
+                                if (a2.miscFrozen) {
+                                    flds.push(["miscFrozen", "misc_frozen"])
+                                }
+                                if (a2.feeFrozen) {
+                                    flds.push(["feeFrozen", "fee_frozen"])
+                                }
                             }
-                            if (a2.reserved) {
-                                flds.push(["reserved", "reserved"])
+                            for (const fmap of flds) {
+                                let f = fmap[0] // e.g. totalIssuance
+                                let f2 = fmap[1] // e.g. total_issuance
+                                c[f2] = a2[f] / 10 ** c.decimals;
+                                c[`${f2}_raw`] = a2[f].toString();
+                                c[`${f2}_usd`] = c[f2] * c.price_usd;
                             }
-                            if (a2.frozen) {
-                                flds.push(["frozen", "frozen"])
+                            if ((p == "Tokens" || p == "System" || p == "Balances" || p == "Assets") && (s == "Account" || s == "Accounts" || s == "TotalIssuance")) {
+                                if (a2.accountID) {
+                                    c.address_ss58 = a2.accountID;
+                                    c.address_pubkey = paraTool.getPubKey(a2.accountID);
+                                    balanceupdates.push({
+                                        insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+                                        json: c
+                                    });
+                                    console.log("BALANCEUPDATE", c);
+                                } else if (a2.totalIssuance) {
+                                    assetupdates.push({
+                                        insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+                                        json: c
+                                    });
+                                    console.log("CASSETUPDATE", c);
+                                }
                             }
-			    if (a2.miscFrozen) {
-                                flds.push(["miscFrozen", "misc_frozen"])
-                            }
-			    if (a2.feeFrozen) {
-                                flds.push(["feeFrozen", "fee_frozen"])
-                            }
+                        } catch (err) {
+                            console.log(' BROKE', err);
                         }
-                        for (const fmap of flds) {
-                            let f = fmap[0] // e.g. totalIssuance
-                            let f2 = fmap[1] // e.g. total_issuance
-                            c[f2] = a2[f] / 10 ** c.decimals;
-                            c[`${f2}_raw`] = a2[f].toString();
-                            c[`${f2}_usd`] = c[f2] * c.price_usd;
-                        }
-                        if (a2.accountID) {
-                            c.address_ss58 = a2.accountID;
-                            c.address_pubkey = paraTool.getPubKey(a2.accountID);
-                            balanceupdates.push({
-                                insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
-                                json: c
-                            });
-                        } else if (a2.totalIssuance) {
-                            assetupdates.push({
-                                insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
-                                json: c
-                            });
+                    } else {
+                        console.log("YYY", a2)
+                    }
+                }
+
+                let t = {
+                    relay_chain: relayChain,
+                    para_id: paraID,
+                    id: id,
+                    chain_name: chainName,
+                    block_number: blockNumber,
+                    block_hash: blockHash,
+                    ts: blockTS,
+                    trace_id: `${blockNumber}-${idx}`,
+                    k: a2.k,
+                    v: a2.v,
+                    section: a2.p,
+                    storage: a2.s
+                };
+                if (a2.pk_extra) t.pk_extra = a2.pk_extra;
+                if (a2.pv) t.pv = a2.pv;
+                if (a2.accountID) {
+                    t.address_ss58 = a2.accountID;
+                    t.address_pubkey = paraTool.getPubKey(a2.accountID);
+                }
+                if (a2.asset) {
+                    t.asset = a2.asset;
+                }
+                if (c) {
+                    for (const f of Object.keys(c)) {
+                        if (t[f] == undefined) {
+                            t[f] = c[f];
                         }
                     }
                 }
+                traces.push({
+                    insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+                    json: t
+                });
             }
             //temp local list blacklist for easier debugging
             if (pallet_section == '...') {
@@ -7899,7 +7947,7 @@ module.exports = class Indexer extends AssetManager {
             idx++;
         }
 
-        if (this.BQ_SUBSTRATEETL_KEY && ((balanceupdates.length > 0) || (assetupdates.length > 0))) {
+        if (this.BQ_SUBSTRATEETL_KEY && ((balanceupdates.length > 0) || (assetupdates.length > 0) || (traces.length > 0))) {
             const {
                 BigQuery
             } = require('@google-cloud/bigquery');
@@ -7907,7 +7955,7 @@ module.exports = class Indexer extends AssetManager {
                 projectId: 'substrate-etl',
                 keyFilename: this.BQ_SUBSTRATEETL_KEY
             })
-            let tables = ["balanceupdates", "assetupdates"];
+            let tables = ["balanceupdates", "assetupdates", "traces"];
             for (const t of tables) {
                 let rows = null;
                 switch (t) {
@@ -7917,11 +7965,14 @@ module.exports = class Indexer extends AssetManager {
                     case "assetupdates":
                         rows = assetupdates;
                         break;
+                    case "traces":
+                        rows = traces;
+                        break;
                 }
                 if (rows && rows.length > 0) {
                     try {
                         await bigquery
-                            .dataset("polkadot_enterprise") 
+                            .dataset("polkadot_enterprise")
                             .table(t)
                             .insert(rows, {
                                 raw: true
