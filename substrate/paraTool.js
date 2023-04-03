@@ -215,11 +215,13 @@ function toBaseUnit(value, decimals) {
 }
 
 function dechexAssetID(number) {
+    //let numType = typeof (number)
+    //console.log(`${number} Type:${numType}`)
     if ((number.length > 2) && number.substring(0, 2) == "0x") {
         let n = hexToBn(number)
         return n.toString()
-    } else {
-        return `${parseInt(number)}`;
+    }else{
+        return `${number}`;
     }
 }
 
