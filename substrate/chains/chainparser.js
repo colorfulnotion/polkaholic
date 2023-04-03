@@ -816,9 +816,7 @@ module.exports = class ChainParser {
         if (v.data != undefined) {
             let data = v.data
             for (const f of Object.keys(data)) {
-                //MK: check precision!
                 extraField[f] = paraTool.dechexToIntStr(data[f])
-                //extraField[f] = paraTool.dechexToInt(data[f])
             }
             delete v.data
         }
@@ -845,7 +843,10 @@ module.exports = class ChainParser {
         let data = v.data
         let res = {}
         let extraField = []
+        //console.log(`getAssetAccountVal`, decoratedVal)
+        //console.log(`getAssetAccountVal data`, data)
         /*
+        MK: Why is this disabled?
         for (const f of Object.keys(data)) {
             extraField[f] = paraTool.dechexToInt(data[f])
         }
@@ -4186,20 +4187,20 @@ module.exports = class ChainParser {
     async processAccountAsset(indexer, p, s, e2, rAssetkey, fromAddress) {
         let chainID = indexer.chainID
         let pallet_section = `${p}:${s}`
-        console.log(`generic processAccountAsset ${pallet_section}`)
+        //console.log(`generic processAccountAsset ${pallet_section}`)
         if (pallet_section == "System:Account") {
             let aa = {};
             let flds = ["free", "reserved", "miscFrozen", "feeFrozen", "frozen"];
 
             let chainDecimal = indexer.getChainDecimal(chainID)
             // for ALL the evaluatable attributes in e2, copy them in
-            console.log(`${rAssetkey} ++++ before`, e2)
+            //console.log(`${rAssetkey} ++++ before`, e2)
             flds.forEach((fld) => {
                 aa[fld] = e2[fld] / 10 ** chainDecimal;
                 aa[`${fld}raw`] = e2[fld]
             });
             if (this.debugVerbose >= paraTool.debugVerbose) console.log(`${rAssetkey} **`, e2, aa)
-            console.log(`${rAssetkey} ++++ after`, e2, aa)
+            //console.log(`${rAssetkey} ++++ after`, e2, aa)
             let assetChain = paraTool.makeAssetChain(rAssetkey, chainID);
             indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-tokens", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
         } else if (pallet_section == "Assets:Account") {
