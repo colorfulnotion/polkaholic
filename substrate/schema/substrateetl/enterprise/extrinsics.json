@@ -9,6 +9,11 @@
         "name": "para_id",
         "type": "INTEGER"
       },
+      {
+        "mode": "NULLABLE",
+        "name": "id",
+        "type": "STRING"
+      },
   {
     "mode": "REQUIRED",
     "name": "hash",

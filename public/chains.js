@@ -85,10 +85,7 @@ async function show_chains() {
                 render: function(data, type, row, meta) {
                     if (type == 'display') {
                         let links = [];
-                        if (row.dappURL) {
-                            links.push(`<a href='${row.dappURL}' target='_new'>app</a>`);
-                        }
-
+                        links.push(`<a href='https://analytics.polkaholic.io/superset/dashboard/d98a6ba9-30c5-49bb-a132-e2c193be3c64/?relay_chain=${row.relayChain}&amp;para_id=${row.paraID}&id=${row.id}&standalone=3' target='_new'>charts</a>`);
                         links.push(`<a href='https://github.com/colorfulnotion/substrate-etl/tree/main/${row.relayChain}/${row.paraID}-${row.id}' target='_new'>substrate-etl</a>`);
                         return presentChain(row.id, row.chainName, row.iconUrl, row.crawlingStatus) + `<div class="explorer">` + links.join(" | ") + `</div>`
                     }

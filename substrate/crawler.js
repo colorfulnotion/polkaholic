@@ -2009,7 +2009,7 @@ module.exports = class Crawler extends Indexer {
     async check_chain_endpoint_correctness(chain) {
         try {
             let bn = chain.blocksFinalized - 100;
-            let sql = `select blockNumber, blockHash, parentHash from block${chain.chainID} where blockNumber >= ${bn} and blockHash is not null limit 20`
+            let sql = `select blockNumber, blockHash, parentHash from block${chain.chainID} where blockNumber >= ${bn} and length(blockHash) > 40 and length(parentHash) > 40 limit 20`
             let blocks = await this.poolREADONLY.query(sql);
             if (blocks.length > 0) {
                 let bHash = blocks[0].blockHash;
@@ -2017,6 +2017,7 @@ module.exports = class Crawler extends Indexer {
                 let parentHash = header.parentHash.toString();
                 let success = (blocks[0].parentHash == parentHash);
                 if (success == false) {
+		    console.log(blocks[0]);
                     console.log(`FATAL: FAILED to match chain @ blockNumber: ${blocks[0].blockNumber} expected ${blocks[0].parentHash} got ${parentHash}`);
                     process.exit(1);
                 } else {

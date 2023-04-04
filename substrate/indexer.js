@@ -6562,8 +6562,7 @@ module.exports = class Indexer extends AssetManager {
         let chainID = this.chainID
         let relayChain = paraTool.getRelayChainByChainID(chainID);
         let paraID = paraTool.getParaIDfromChainID(chainID);
-
-
+        let id = this.getIDByChainID(chainID);
         let extrinsics = [];
         let events = [];
         let transfers = [];
@@ -6597,7 +6596,8 @@ module.exports = class Indexer extends AssetManager {
                 let bqEvent = {
                     relay_chain: relayChain,
                     para_id: paraID,
-                    event_id: ev.eventID,
+                    id: id,
+		    event_id: ev.eventID,
                     extrinsic_hash: ext.extrinsicHash,
                     extrinsic_id: ext.extrinsicID,
                     block_number: block.number,
@@ -6619,6 +6619,7 @@ module.exports = class Indexer extends AssetManager {
                     let bqTransfer = {
                         relay_chain: relayChain,
                         para_id: paraID,
+			id: id,
                         block_hash: block.hash,
                         block_number: block.number,
                         block_time: block.block_time,
@@ -6651,6 +6652,7 @@ module.exports = class Indexer extends AssetManager {
                 let bqExtrinsic = {
                     relay_chain: relayChain,
                     para_id: paraID,
+		    id: id,
                     hash: ext.extrinsicHash,
                     extrinsic_id: ext.extrinsicID,
                     block_time: block.block_time,
