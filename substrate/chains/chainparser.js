@@ -816,7 +816,7 @@ module.exports = class ChainParser {
         if (v.data != undefined) {
             let data = v.data
             for (const f of Object.keys(data)) {
-                extraField[f] = paraTool.dechexToInt(data[f])
+                extraField[f] = paraTool.dechexToIntStr(data[f])
             }
             delete v.data
         }
@@ -843,7 +843,10 @@ module.exports = class ChainParser {
         let data = v.data
         let res = {}
         let extraField = []
+        //console.log(`getAssetAccountVal`, decoratedVal)
+        //console.log(`getAssetAccountVal data`, data)
         /*
+        MK: Why is this disabled?
         for (const f of Object.keys(data)) {
             extraField[f] = paraTool.dechexToInt(data[f])
         }
@@ -4019,10 +4022,14 @@ module.exports = class ChainParser {
     getBalancesTotalIssuanceVal(indexer, decoratedVal) {
         let chainID = indexer.chainID
         let v = JSON.parse(decoratedVal)
+        let decodeStatus = true
         //let v = ledec(val)
         let res = {}
         let extraField = []
-        extraField['totalIssuance'] = v
+        if (decodeStatus){
+            v = decoratedVal
+        }
+        extraField['totalIssuance'] = paraTool.dechexToIntStr(v)
         let asset = indexer.getNativeAsset(chainID)
         extraField['asset'] = asset
         res["pv"] = v //keep the high precision val in pv for now
@@ -4187,10 +4194,13 @@ module.exports = class ChainParser {
 
             let chainDecimal = indexer.getChainDecimal(chainID)
             // for ALL the evaluatable attributes in e2, copy them in
+            //console.log(`${rAssetkey} ++++ before`, e2)
             flds.forEach((fld) => {
                 aa[fld] = e2[fld] / 10 ** chainDecimal;
+                aa[`${fld}raw`] = e2[fld]
             });
-            //if (this.debugVerbose >= paraTool.debugVerbose) console.log(`${rAssetkey}`, e2, aa)
+            if (this.debugVerbose >= paraTool.debugVerbose) console.log(`${rAssetkey} **`, e2, aa)
+            //console.log(`${rAssetkey} ++++ after`, e2, aa)
             let assetChain = paraTool.makeAssetChain(rAssetkey, chainID);
             indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-tokens", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
         } else if (pallet_section == "Assets:Account") {

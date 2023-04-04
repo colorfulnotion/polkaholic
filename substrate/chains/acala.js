@@ -124,8 +124,9 @@ module.exports = class AcalaParser extends ChainParser {
     getLiquidityPoolVal(val, decoratedVal) {
         //'["0x00000000000000000cb7cb4050a9bcc4","0x000000000000000000373a436a7443dd"]'
         let v = JSON.parse(decoratedVal)
-        let token0 = paraTool.dechexToInt(v[0])
-        let token1 = paraTool.dechexToInt(v[1])
+        //express liquidityPool as bigIntStr
+        let token0 = paraTool.dechexToIntStr(v[0])
+        let token1 = paraTool.dechexToIntStr(v[1])
         let res = {}
         let extraField = []
         extraField['lp0'] = token0
@@ -149,7 +150,7 @@ module.exports = class AcalaParser extends ChainParser {
             if (!shouldSkip) { //0x00?
                 let v = JSON.parse(decoratedVal)
                 for (let f in v) {
-                    extraField[f] = paraTool.dechexToInt(v[f])
+                    extraField[f] = paraTool.dechexToIntStr(v[f])
                 }
             }
         } catch (e) {
@@ -163,9 +164,13 @@ module.exports = class AcalaParser extends ChainParser {
     getTotalIssuanceVal(val, decoratedVal) {
         let v = JSON.parse(decoratedVal)
         //let v = ledec(val)
+        let decodeStatus = true
         let res = {}
         let extraField = []
-        extraField['totalIssuance'] = paraTool.dechexToInt(v)
+        if (decodeStatus){
+            v = decoratedVal
+        }
+        extraField['totalIssuance'] = paraTool.dechexToIntStr(v)
         res["pv"] = v //keep the high precision val in pv for now
         res["extra"] = extraField
         return res
@@ -174,9 +179,13 @@ module.exports = class AcalaParser extends ChainParser {
     getDebitExchangeRateVal(val, decoratedVal) {
         let v = JSON.parse(decoratedVal)
         //let v = ledec(val)
+        let decodeStatus = true
         let res = {}
         let extraField = []
-        extraField['debitExchangeRate'] = paraTool.dechexToInt(v)
+        if (decodeStatus){
+            v = decoratedVal
+        }
+        extraField['debitExchangeRate'] = paraTool.dechexToIntStr(v)
         res["pv"] = v
         res["extra"] = extraField
         return res
@@ -251,7 +260,7 @@ module.exports = class AcalaParser extends ChainParser {
         let res = {}
         let extraField = []
         extraField['timestamp'] = Math.floor(v.timestamp / 1000)
-        extraField['rawPrice'] = paraTool.dechexToInt(v.value)
+        extraField['rawPrice'] = paraTool.dechexToIntStr(v.value) //MK: Review
         res["pv"] = ''
         res["extra"] = extraField
         return res
@@ -278,7 +287,7 @@ module.exports = class AcalaParser extends ChainParser {
         for (const rewardAsset of Object.keys(pv)) {
             //{ '{"token":"KAR"}': 41329820, '{"token":"BNC"}': 330640658 }
             //potentially emtpy
-            let claimableAmount = paraTool.dechexToInt(pv[rewardAsset]) / 10 ** indexer.getChainDecimal(indexer.chainID)
+            let claimableAmount = paraTool.dechexToIntStr(pv[rewardAsset]) / 10 ** indexer.getChainDecimal(indexer.chainID)
             if (claimableAmount >= 0) {
                 rewardsFound = true
                 claimable.push({
@@ -441,7 +450,7 @@ module.exports = class AcalaParser extends ChainParser {
             let claimedTokens = pv[1]
             for (const claimedAsset of Object.keys(claimedTokens)) {
                 //{ '{"token":"KAR"}': 28055998804, '{"token":"BNC"}': 224449256098 }
-                let claimedAmount = paraTool.dechexToInt(claimedTokens[claimedAsset]) / 10 ** indexer.getChainDecimal(indexer.chainID)
+                let claimedAmount = paraTool.dechexToIntStr(claimedTokens[claimedAsset]) / 10 ** indexer.getChainDecimal(indexer.chainID)
                 if (claimedAmount > 0) {
                     claimed.push({
                         asset: claimedAsset,
@@ -687,7 +696,7 @@ module.exports = class AcalaParser extends ChainParser {
         if (e.length < 6) return;
         let tok0 = e[1].token;
         let tok1 = e[3].token;
-        let issuance = paraTool.dechexToInt(e[5]);
+        let issuance = paraTool.dechexToIntStr(e[5]);
         let pair = [{
             "Token": tok0
         }, {
@@ -936,7 +945,7 @@ module.exports = class AcalaParser extends ChainParser {
         let issuance = 0
         try {
             let v = await indexer.api.query.tokens.totalIssuance.at(blockHash, JSON.parse(key));
-            issuance = paraTool.dechexToInt(v.toJSON()) / 10 ** decimals
+            issuance = paraTool.dechexToIntStr(v.toJSON()) / 10 ** decimals
             if (this.debugLevel >= paraTool.debugVerbose) console.log(`getOnChainAssetIssuance [blk=${blockHash}] [key=${key}] issuance=${issuance}`)
         } catch (e) {
             if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`getOnChainAssetIssuance [blk=${blockHash}] [key=${key}]`, e)

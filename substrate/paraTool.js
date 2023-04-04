@@ -121,6 +121,14 @@ function dechexToInt(number) {
     return parseInt(number)
 }
 
+function dechexToIntStr(number) {
+    if (number && typeof number == "string" && (number.length > 2) && number.substring(0, 2) == "0x") {
+        let n = hexToBn(number)
+        return n.toString()
+    }
+    return `${number}`
+}
+
 function isInt(n) {
     return Number(n) === n && n % 1 === 0;
 }
@@ -215,11 +223,13 @@ function toBaseUnit(value, decimals) {
 }
 
 function dechexAssetID(number) {
+    //let numType = typeof (number)
+    //console.log(`${number} Type:${numType}`)
     if ((number.length > 2) && number.substring(0, 2) == "0x") {
         let n = hexToBn(number)
         return n.toString()
-    } else {
-        return `${parseInt(number)}`;
+    }else{
+        return `${number}`;
     }
 }
 
@@ -1624,6 +1634,9 @@ module.exports = {
     },
     dechexToInt: function(number) {
         return dechexToInt(number);
+    },
+    dechexToIntStr: function(number) {
+        return dechexToIntStr(number);
     },
     toIntegerStr: toIntegerStr,
     toBn: toBn,
