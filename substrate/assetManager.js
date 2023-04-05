@@ -1852,10 +1852,10 @@ module.exports = class AssetManager extends PolkaholicDB {
             // extra transferType, from, to
             if (transferSummary.type != undefined && transferTypeList.includes(transferSummary.type)){
                 t.transferType = transferSummary.type
-                t.from_ss58 = transferSummary.from_ss58,
-                t.to_ss58 = transferSummary.to_ss58,
-                t.from_pub_key = transferSummary.from_pubkey,
-                t.to_pub_key = transferSummary.to_pubkey
+                t.from_ss58 = (transferSummary.from_ss58 != undefined)? transferSummary.from_ss58: '0x0',
+                t.to_ss58 = (transferSummary.to_ss58 != undefined)? transferSummary.to_ss58: '0x0',
+                t.from_pub_key = (transferSummary.from_pubkey != undefined)? transferSummary.from_pubkey: '0x0',
+                t.to_pub_key = (transferSummary.to_pubkey != undefined)? transferSummary.to_pubkey: '0x0'
             }
 
             // extract decimals, symbol, asset
