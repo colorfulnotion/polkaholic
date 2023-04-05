@@ -6584,6 +6584,7 @@ module.exports = class Indexer extends AssetManager {
             extrinsic_count: b.extrinsics.length,
         };
         for (const ext of b.extrinsics) {
+            let coveredTransfer = {}
             for (const ev of ext.events) {
                 let [dEvent, isTransferType] = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
                 if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
@@ -6615,7 +6616,6 @@ module.exports = class Indexer extends AssetManager {
                     json: bqEvent
                 })
 
-                //TODO: need dedup here
                 if (isTransferType){
                     let tInfo = this.extractTransferInfo(dEvent.decodedData)
                     let bqFullTransfer = {
@@ -6646,11 +6646,18 @@ module.exports = class Indexer extends AssetManager {
                         decimals: tInfo.decimals,
                         signed: ext.signer ? true : false,
                     }
-                    console.log(`bqFullTransfer`, bqFullTransfer)
-                    fulltransfers.push({
-                        insertId: `${relayChain}-${paraID}-${ev.eventID}`,
-                        json: bqFullTransfer
-                    });
+                    //Need dedup here
+                    let k = `${relayChain}-${paraID}-${ext.extrinsicHash}-${tInfo.from_pub_key}-${tInfo.to_pub_key}-${tInfo.raw_amount}` // it's nearly impossible to have collision even dropping the asset
+                    if (coveredTransfer[k] == undefined) { // PROBLEM: no preference between redundant events
+                        coveredTransfer[k] = 1;
+                        //console.log(`bqFullTransfer`, bqFullTransfer)
+                        fulltransfers.push({
+                            insertId: `${relayChain}-${paraID}-${ev.eventID}`,
+                            json: bqFullTransfer
+                        });
+                    }else{
+                        //console.log(`duplicates transfer`, bqFullTransfer)
+                    }
                 }
             }
             if (ext.transfers) {

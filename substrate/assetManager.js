@@ -1878,7 +1878,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 }
             }
         }
-        console.log(`extractTransferInfo`, t)
+        //console.log(`extractTransferInfo`, t)
         return t
     }
 
