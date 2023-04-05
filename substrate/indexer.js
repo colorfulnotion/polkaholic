@@ -6625,13 +6625,14 @@ module.exports = class Indexer extends AssetManager {
                         block_hash: block.hash,
                         block_number: block.number,
                         block_time: block.block_time,
+                        extrinsic_signed: ext.signer ? true : false,
                         extrinsic_hash: ext.extrinsicHash,
                         extrinsic_id: ext.extrinsicID,
                         extrtinsic_section: ext.section,
                         extrtinsic_method: ext.method,
                         event_id: ev.eventID,
-                        section: ev.section,
-                        method: ev.method,
+                        event_section: ev.section,
+                        event_method: ev.method,
                         transferType: tInfo.transferType,
                         from_ss58: tInfo.from_ss58,
                         from_pub_key: tInfo.from_pub_key,
@@ -6644,7 +6645,6 @@ module.exports = class Indexer extends AssetManager {
                         amount_usd: tInfo.amount_usd,
                         symbol: tInfo.symbol,
                         decimals: tInfo.decimals,
-                        signed: ext.signer ? true : false,
                     }
                     //Need dedup here
                     let k = `${relayChain}-${paraID}-${ext.extrinsicHash}-${tInfo.from_pub_key}-${tInfo.to_pub_key}-${tInfo.raw_amount}` // it's nearly impossible to have collision even dropping the asset
@@ -6652,7 +6652,7 @@ module.exports = class Indexer extends AssetManager {
                         coveredTransfer[k] = 1;
                         //console.log(`bqFullTransfer`, bqFullTransfer)
                         fulltransfers.push({
-                            insertId: `${relayChain}-${paraID}-${ev.eventID}`,
+                            insertId: `${k}`,
                             json: bqFullTransfer
                         });
                     }else{
