@@ -6563,9 +6563,11 @@ module.exports = class Indexer extends AssetManager {
         let relayChain = paraTool.getRelayChainByChainID(chainID);
         let paraID = paraTool.getParaIDfromChainID(chainID);
         let id = this.getIDByChainID(chainID);
+
         let extrinsics = [];
         let events = [];
         let transfers = [];
+        let fulltransfers = [];
 
         // map block into the above arrays
         let block = {
@@ -6583,7 +6585,7 @@ module.exports = class Indexer extends AssetManager {
         };
         for (const ext of b.extrinsics) {
             for (const ev of ext.events) {
-                let dEvent = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
+                let [dEvent, isTransferType] = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
                 if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
                     if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
                         if (dEvent.data[0].weight.refTime != undefined) {
@@ -6612,6 +6614,44 @@ module.exports = class Indexer extends AssetManager {
                     insertId: `${relayChain}-${paraID}-${ev.eventID}`,
                     json: bqEvent
                 })
+
+                //TODO: need dedup here
+                if (isTransferType){
+                    let tInfo = this.extractTransferInfo(dEvent.decodedData)
+                    let bqFullTransfer = {
+                        relay_chain: relayChain,
+                        para_id: paraID,
+                        id: id,
+                        block_hash: block.hash,
+                        block_number: block.number,
+                        block_time: block.block_time,
+                        extrinsic_hash: ext.extrinsicHash,
+                        extrinsic_id: ext.extrinsicID,
+                        extrtinsic_section: ext.section,
+                        extrtinsic_method: ext.method,
+                        event_id: ev.eventID,
+                        section: ev.section,
+                        method: ev.method,
+                        transferType: tInfo.transferType,
+                        from_ss58: tInfo.from_ss58,
+                        from_pub_key: tInfo.from_pub_key,
+                        to_ss58: tInfo.to_ss58,
+                        to_pub_key: tInfo.to_pub_key,
+                        amount: tInfo.amount,
+                        raw_amount: tInfo.raw_amount,
+                        asset: tInfo.asset,
+                        price_usd: tInfo.price_usd,
+                        amount_usd: tInfo.amount_usd,
+                        symbol: tInfo.symbol,
+                        decimals: tInfo.decimals,
+                        signed: ext.signer ? true : false,
+                    }
+                    console.log(`bqFullTransfer`, bqFullTransfer)
+                    fulltransfers.push({
+                        insertId: `${relayChain}-${paraID}-${ev.eventID}`,
+                        json: bqFullTransfer
+                    });
+                }
             }
             if (ext.transfers) {
                 let cnt = 0;
@@ -6619,7 +6659,7 @@ module.exports = class Indexer extends AssetManager {
                     let bqTransfer = {
                         relay_chain: relayChain,
                         para_id: paraID,
-			id: id,
+                        id: id,
                         block_hash: block.hash,
                         block_number: block.number,
                         block_time: block.block_time,
@@ -6652,7 +6692,7 @@ module.exports = class Indexer extends AssetManager {
                 let bqExtrinsic = {
                     relay_chain: relayChain,
                     para_id: paraID,
-		    id: id,
+                    id: id,
                     hash: ext.extrinsicHash,
                     extrinsic_id: ext.extrinsicID,
                     block_time: block.block_time,
@@ -6677,7 +6717,8 @@ module.exports = class Indexer extends AssetManager {
                 })
             }
         }
-        let tables = ["extrinsics", "events", "transfers"];
+        //let tables = ["extrinsics", "events", "transfers", "fulltransfers"];
+        let tables = ["fulltransfers"];
         for (const t of tables) {
             let rows = null;
             switch (t) {
@@ -6690,7 +6731,12 @@ module.exports = class Indexer extends AssetManager {
                 case "transfers":
                     rows = transfers;
                     break;
+                case "fulltransfers":
+                    rows = fulltransfers;
+                    console.log(`fulltransfers`, fulltransfers)
+                    break;
             }
+            /*
             if (rows && rows.length > 0) {
                 try {
                     await bigquery
@@ -6704,6 +6750,7 @@ module.exports = class Indexer extends AssetManager {
                     console.log(t, JSON.stringify(err));
                 }
             }
+            */
         }
     }
 
@@ -7398,6 +7445,9 @@ module.exports = class Indexer extends AssetManager {
         if (isTip && finalized) {
             await this.bq_streaming_insert_finalized_block(block);
         }
+        if (finalized) {
+            await this.bq_streaming_insert_finalized_block(block);
+        }
         if (xcmMeta.length > 0) {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`returning [${blockNumber}] [${blockHash}] xcmMeta!`, xcmMeta)
         }
@@ -8005,7 +8055,7 @@ module.exports = class Indexer extends AssetManager {
                 projectId: 'substrate-etl',
                 keyFilename: this.BQ_SUBSTRATEETL_KEY
             })
-            let tables = ["balanceupdates", "assetupdates", "traces"];
+            let tables = ["balanceupdates", "assetupdates", "traces", "tokentransfer"];
             for (const t of tables) {
                 let rows = null;
                 switch (t) {
@@ -8017,6 +8067,9 @@ module.exports = class Indexer extends AssetManager {
                         break;
                     case "traces":
                         rows = traces;
+                        break;
+                    case "transfer":
+                        //rows = tokentransfer;
                         break;
                 }
                 if (rows && rows.length > 0) {

@@ -1432,7 +1432,7 @@ module.exports = class SubstrateETL extends AssetManager {
 
     /*
     contracts pallets do not have that much activity yet, so reindexing an entire chain to find contracts events is just wasteful.
-     0. Do pagedEntries { codeStorage + contractInfo } 
+     0. Do pagedEntries { codeStorage + contractInfo }
      1. Build contractsevents{paraID} from startDT with a single bq load operation that generates an empirically small table
          SELECT * FROM `substrate-etl.kusama.events2007` WHERE DATE(block_time) >= "${startDT}" and section = "contracts";
      2. Filter contractsevents{paraID} 3 times based:
@@ -1459,12 +1459,12 @@ module.exports = class SubstrateETL extends AssetManager {
     | codeStoredBN  | int(11)                                 | YES  |     | NULL    |       | contractevents{paraID}
     | codeStoredTS  | int(11)                                 | YES  |     | NULL    |       | contractevents{paraID}
     | metadata      | mediumblob                              | YES  |     | NULL    |       | verifier metadata
-    | status        | enum('Unknown','Unverified','Verified') | YES  |     | Unknown |       | used to check 
+    | status        | enum('Unknown','Unverified','Verified') | YES  |     | Unknown |       | used to check
     | code          | mediumblob                              | YES  |     | NULL    |       | TBD
     | language      | varchar(128)                            | YES  |     | NULL    |       | verifier metadata source
     | compiler      | varchar(128)                            | YES  |     | NULL    |       | fill in with ink verifier + add lastCodeCheckDT -- and check hourly
     | lastStatusCheckDT datetime                              | YES  |     | NULL    |       | polling var
-    | contractName  | varchar(255)                            | YES  |     | NULL    |       | verifier metadata 
+    | contractName  | varchar(255)                            | YES  |     | NULL    |       | verifier metadata
     | version       | varchar(32)                             | YES  |     | NULL    |       | verifier metadata
     | authors       | blob                                    | YES  |     | NULL    |       | verifier metadata
     +---------------+-----------------------------------------+------+-----+---------+-------+
@@ -1475,13 +1475,13 @@ module.exports = class SubstrateETL extends AssetManager {
     +---------------+-------------+------+-----+---------+-------+
     | address       | varchar(67) | NO   | PRI | NULL    |       | contractInfoOf
     | chainID       | int(11)     | NO   | PRI | NULL    |       | contractInfoOf
-    | extrinsicHash | varchar(67) | YES  |     | NULL    |       | contractevents{paraID} 
-    | extrinsicID   | varchar(32) | YES  |     | NULL    |       | contractevents{paraID} 
-    | instantiateBN | int(11)     | YES  |     | NULL    |       | contractevents{paraID} 
+    | extrinsicHash | varchar(67) | YES  |     | NULL    |       | contractevents{paraID}
+    | extrinsicID   | varchar(32) | YES  |     | NULL    |       | contractevents{paraID}
+    | instantiateBN | int(11)     | YES  |     | NULL    |       | contractevents{paraID}
     | codeHash      | varchar(67) | YES  | MUL | NULL    |       | contractInfoOf
     | constructor   | blob        | YES  |     | NULL    |       | indexer only/verifier?
     | salt          | blob        | YES  |     | NULL    |       | indexer only/verifier?
-    | blockTS       | int(11)     | YES  | MUL | NULL    |       | contractevents{paraID} 
+    | blockTS       | int(11)     | YES  | MUL | NULL    |       | contractevents{paraID}
     | deployer      | varchar(67) | YES  | MUL | NULL    |       | contractevents{paraID} left join extrinsic_id with extrinsics{paraID}
     +---------------+-------------+------+-----+---------+-------+
     	    */
@@ -1707,7 +1707,7 @@ Example of contractInfoOf:
             switch (tbl) {
                 case "contractscode":
                     // (a) CodeStored ==> wasmCode.{extrinsicHash, extrinsicID, storer (*), codeStoredBN, codeStoredTS }
-                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) codeStoredTS, block_number, block_hash, data from substrate-etl.${relayChain}.contractsevents${paraID} 
+                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) codeStoredTS, block_number, block_hash, data from substrate-etl.${relayChain}.contractsevents${paraID}
   where section = 'contracts' and method = 'CodeStored')
   select events.*, signer_pub_key from events left join substrate-etl.${relayChain}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
                     let rows = await this.execute_bqJob(sql);
@@ -1728,7 +1728,7 @@ Example of contractInfoOf:
                 // (b) Instantiated ==> contracts.{extrinsicHash, extrinsicID, instantiateBN, blockTS, deployer (*) }
                 {
                     // ContractEmitted
-                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, data from substrate-etl.${relayChain}.contractsevents${paraID} 
+                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, data from substrate-etl.${relayChain}.contractsevents${paraID}
   where section = 'contracts' and method = 'Instantiated')
   select events.*, signer_pub_key from events left join substrate-etl.${relayChain}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
                     let rows = await this.execute_bqJob(sql);
@@ -4208,7 +4208,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let extrinsics = [];
                 for (const ext of b.extrinsics) {
                     for (const ev of ext.events) {
-                        let dEvent = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
+                        let [dEvent, isTransferType] = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
                         //console.log(`${e.eventID} decoded`, dEvent)
                         if (dEvent.section == "system" && (dEvent.method == "ExtrinsicSuccess" || dEvent.method == "ExtrinsicFailure")) {
                             if (dEvent.data != undefined && dEvent.data[0].weight != undefined) {
