@@ -3974,7 +3974,7 @@ module.exports = class Indexer extends AssetManager {
             var fld = fields[i]
             var valueType = fld.type.toJSON();
             var typeDef = api.registry.metadata.lookup.getTypeDef(valueType).type
-            if (event_conversion_list.includes(typeDef)){
+            if (event_conversion_list.includes(typeDef)) {
                 dData_i = paraTool.toIntegerStr(dData_i)
                 dEvent.data[i] = dData_i
             }
@@ -4034,18 +4034,18 @@ module.exports = class Indexer extends AssetManager {
                     argsDef: argsDef
                 }
                 try {
-                    for (let k = 0; k < argsDef.length; k++){
+                    for (let k = 0; k < argsDef.length; k++) {
                         let argsDef_k = argsDef[k]
                         let argsDef_k_type = argsDef_k.type
                         let argsDef_k_name = argsDef_k.name
                         //console.log(`recursive_batch_all argsDef_k`, argsDef_k)
                         //console.log(`recursive_batch_all argsDef_k_type`, argsDef_k_type)
-                        if (extrinsic_args_conversion_list.includes(argsDef_k_type)){
+                        if (extrinsic_args_conversion_list.includes(argsDef_k_type)) {
                             let arg_val = call_s.args.calls[i].args[argsDef_k_name]
                             call_s.args.calls[i].args[argsDef_k_name] = paraTool.toIntegerStr(arg_val)
                         }
                     }
-                } catch (recursiveArgsDefErr){
+                } catch (recursiveArgsDefErr) {
                     console.log(`recursive_batch_all recursiveArgsDefErr`, recursiveArgsDefErr)
                 }
                 let pallet_method = `${ff.section}:${ff.method}`
@@ -4221,18 +4221,18 @@ module.exports = class Indexer extends AssetManager {
             encodedCalls.push(opaqueCall)
         }
         try {
-            for (let i = 0; i < argsDef.length; i++){
+            for (let i = 0; i < argsDef.length; i++) {
                 let argsDef_i = argsDef[i]
                 let argsDef_i_type = argsDef_i.type
                 let argsDef_i_name = argsDef_i.name
                 //console.log(`argsDef_i`, argsDef_i)
                 //console.log(`argsDef_i_type`, argsDef_i_type)
-                if (extrinsic_args_conversion_list.includes(argsDef_i_type)){
+                if (extrinsic_args_conversion_list.includes(argsDef_i_type)) {
                     let arg_val = exos.method.args[argsDef_i_name]
                     exos.method.args[argsDef_i_name] = paraTool.toIntegerStr(arg_val)
                 }
             }
-        } catch (argsDefErr){
+        } catch (argsDefErr) {
             console.log(`decode_s_extrinsic argsDefErr`, argsDefErr)
         }
 
@@ -6600,7 +6600,7 @@ module.exports = class Indexer extends AssetManager {
                     relay_chain: relayChain,
                     para_id: paraID,
                     id: id,
-		    event_id: ev.eventID,
+                    event_id: ev.eventID,
                     extrinsic_hash: ext.extrinsicHash,
                     extrinsic_id: ext.extrinsicID,
                     block_number: block.number,
@@ -6616,7 +6616,7 @@ module.exports = class Indexer extends AssetManager {
                     json: bqEvent
                 })
 
-                if (isTransferType){
+                if (isTransferType) {
                     let tInfo = this.extractTransferInfo(dEvent.decodedData)
                     let bqFullTransfer = {
                         relay_chain: relayChain,
@@ -6628,12 +6628,12 @@ module.exports = class Indexer extends AssetManager {
                         extrinsic_signed: ext.signer ? true : false,
                         extrinsic_hash: ext.extrinsicHash,
                         extrinsic_id: ext.extrinsicID,
-                        extrtinsic_section: ext.section,
-                        extrtinsic_method: ext.method,
+                        extrinsic_section: ext.section,
+                        extrinsic_method: ext.method,
                         event_id: ev.eventID,
                         event_section: ev.section,
                         event_method: ev.method,
-                        transferType: tInfo.transferType,
+                        transfer_type: tInfo.transferType,
                         from_ss58: tInfo.from_ss58,
                         from_pub_key: tInfo.from_pub_key,
                         to_ss58: tInfo.to_ss58,
@@ -6655,7 +6655,7 @@ module.exports = class Indexer extends AssetManager {
                             insertId: `${k}`,
                             json: bqFullTransfer
                         });
-                    }else{
+                    } else {
                         //console.log(`duplicates transfer`, bqFullTransfer)
                     }
                 }

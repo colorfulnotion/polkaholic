@@ -1845,32 +1845,32 @@ module.exports = class AssetManager extends PolkaholicDB {
             decimals: null,
             transferType: "nontransfer"
         }
-        if (Array.isArray(dData) && dData.length >= 2){
+        if (Array.isArray(dData) && dData.length >= 2) {
             let assetSummary = dData.shift() // always the first element
             let transferSummary = dData.pop() // always the last element
             let transferTypeList = ['transfer', 'approval', 'revoke', 'incoming', 'outgoing']
             // extra transferType, from, to
-            if (transferSummary.type != undefined && transferTypeList.includes(transferSummary.type)){
+            if (transferSummary.type != undefined && transferTypeList.includes(transferSummary.type)) {
                 t.transferType = transferSummary.type
-                t.from_ss58 = (transferSummary.from_ss58 != undefined)? transferSummary.from_ss58: '0x0',
-                t.to_ss58 = (transferSummary.to_ss58 != undefined)? transferSummary.to_ss58: '0x0',
-                t.from_pub_key = (transferSummary.from_pubkey != undefined)? transferSummary.from_pubkey: '0x0',
-                t.to_pub_key = (transferSummary.to_pubkey != undefined)? transferSummary.to_pubkey: '0x0'
+                t.from_ss58 = (transferSummary.from_ss58 != undefined) ? transferSummary.from_ss58 : '0x0',
+                    t.to_ss58 = (transferSummary.to_ss58 != undefined) ? transferSummary.to_ss58 : '0x0',
+                    t.from_pub_key = (transferSummary.from_pubkey != undefined) ? transferSummary.from_pubkey : '0x0',
+                    t.to_pub_key = (transferSummary.to_pubkey != undefined) ? transferSummary.to_pubkey : '0x0'
             }
 
             // extract decimals, symbol, asset
             if (assetSummary.decimals != undefined) t.decimals = assetSummary.decimals
             if (assetSummary.symbol != undefined) t.symbol = assetSummary.symbol
-            if (assetSummary.assetChain != undefined){
+            if (assetSummary.assetChain != undefined) {
                 let [assetUnparsed, _] = paraTool.parseAssetChain(assetSummary.assetChain)
-                if (assetUnparsed){
+                if (assetUnparsed) {
                     t.asset = assetUnparsed
                 }
             }
             // extract amount, raw_amount, price_usd, amount_usd for remaining dData, ideally one element only
-            for (const dData_i of dData){
+            for (const dData_i of dData) {
                 // TODO: check eq case later
-                if (dData_i.data != undefined && dData_i.typeDef != undefined && dData_i.typeDef == 'u128'){
+                if (dData_i.data != undefined && dData_i.typeDef != undefined && dData_i.typeDef == 'u128') {
                     if (dData_i.data != undefined && typeof dData_i.data === 'string') t.raw_amount = dData_i.data
                     if (dData_i.dataRaw != undefined) t.amount = dData_i.dataRaw
                     if (dData_i.dataUSD != undefined) t.amount_usd = dData_i.dataUSD

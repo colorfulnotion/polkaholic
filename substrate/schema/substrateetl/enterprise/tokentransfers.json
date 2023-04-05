@@ -52,13 +52,13 @@
     },
     {
         "mode": "REQUIRED",
-        "name": "extrtinsic_section",
+        "name": "extrinsic_section",
         "type": "STRING",
         "description": "Section/Pallet of the extrinsic which includes the event"
     },
     {
         "mode": "REQUIRED",
-        "name": "extrtinsic_method",
+        "name": "extrinsic_method",
         "type": "STRING",
         "description": "method of the extrinsic which includes the event"
     },
@@ -82,7 +82,7 @@
     },
     {
         "mode": "REQUIRED",
-        "name": "transferType",
+        "name": "transfer_type",
         "type": "STRING",
         "description": "The event transferType"
     },
@@ -117,7 +117,7 @@
         "description": "Decimalized version of the asset"
     },
     {
-        "mode": "REQUIRED",
+        "mode": "NULLABLE",
         "name": "raw_amount",
         "type": "NUMERIC",
         "description": "Raw (non-decimalized) version of the amount of the asset being transferred"

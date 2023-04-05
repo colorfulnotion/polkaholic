@@ -167,7 +167,7 @@ module.exports = class AcalaParser extends ChainParser {
         let decodeStatus = true
         let res = {}
         let extraField = []
-        if (decodeStatus){
+        if (decodeStatus) {
             v = decoratedVal
         }
         extraField['totalIssuance'] = paraTool.dechexToIntStr(v)
@@ -182,7 +182,7 @@ module.exports = class AcalaParser extends ChainParser {
         let decodeStatus = true
         let res = {}
         let extraField = []
-        if (decodeStatus){
+        if (decodeStatus) {
             v = decoratedVal
         }
         extraField['debitExchangeRate'] = paraTool.dechexToIntStr(v)

@@ -2017,7 +2017,6 @@ module.exports = class Crawler extends Indexer {
                 let parentHash = header.parentHash.toString();
                 let success = (blocks[0].parentHash == parentHash);
                 if (success == false) {
-		    console.log(blocks[0]);
                     console.log(`FATAL: FAILED to match chain @ blockNumber: ${blocks[0].blockNumber} expected ${blocks[0].parentHash} got ${parentHash}`);
                     process.exit(1);
                 } else {

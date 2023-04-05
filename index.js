@@ -362,7 +362,7 @@ app.get('/apikeys', async (req, res) => {
 
 app.get('/charts', async (req, res) => {
     res.render('charts', {
-	dashboard: "aae16473-8e10-48cd-b5ba-cc027bbac2ad"
+        dashboard: "aae16473-8e10-48cd-b5ba-cc027bbac2ad"
     });
 })
 
