@@ -6567,7 +6567,7 @@ module.exports = class Indexer extends AssetManager {
         let extrinsics = [];
         let events = [];
         let transfers = [];
-        let fulltransfers = [];
+        let tokentransfers = [];
 
         // map block into the above arrays
         let block = {
@@ -6651,7 +6651,7 @@ module.exports = class Indexer extends AssetManager {
                     if (coveredTransfer[k] == undefined) { // PROBLEM: no preference between redundant events
                         coveredTransfer[k] = 1;
                         //console.log(`bqFullTransfer`, bqFullTransfer)
-                        fulltransfers.push({
+                        tokentransfers.push({
                             insertId: `${k}`,
                             json: bqFullTransfer
                         });
@@ -6725,7 +6725,7 @@ module.exports = class Indexer extends AssetManager {
             }
         }
         //let tables = ["extrinsics", "events", "transfers", "fulltransfers"];
-        let tables = ["fulltransfers"];
+        let tables = ["tokentransfers"];
         for (const t of tables) {
             let rows = null;
             switch (t) {
@@ -6738,16 +6738,16 @@ module.exports = class Indexer extends AssetManager {
                 case "transfers":
                     rows = transfers;
                     break;
-                case "fulltransfers":
-                    rows = fulltransfers;
-                    console.log(`fulltransfers`, fulltransfers)
+                case "tokentransfers":
+                    rows = tokentransfers;
+                    //console.log(`tokentransfers`, tokentransfers)
                     break;
             }
-            /*
             if (rows && rows.length > 0) {
+                let dataset = "polkadot_enterprise"
                 try {
                     await bigquery
-                        .dataset("polkadot_enterprise")
+                        .dataset(dataset)
                         .table(t)
                         .insert(rows, {
                             raw: true
@@ -6757,7 +6757,6 @@ module.exports = class Indexer extends AssetManager {
                     console.log(t, JSON.stringify(err));
                 }
             }
-            */
         }
     }
 
@@ -7450,9 +7449,6 @@ module.exports = class Indexer extends AssetManager {
             this.add_recent_activity(recentXcmMsgs)
         }
         if (isTip && finalized) {
-            await this.bq_streaming_insert_finalized_block(block);
-        }
-        if (finalized) {
             await this.bq_streaming_insert_finalized_block(block);
         }
         if (xcmMeta.length > 0) {

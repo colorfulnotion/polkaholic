@@ -35,8 +35,8 @@
     {
         "mode": "REQUIRED",
         "name": "extrinsic_signed",
-        "type": "STRING",
-        "description": "Whether the extrinsic is signed"
+        "type": "BOOLEAN",
+        "description": "Whether extrinsic which includes the even has been signed (true) or not (false)"
     },
     {
         "mode": "REQUIRED",
@@ -52,8 +52,8 @@
     },
     {
         "mode": "REQUIRED",
-        "name": "section",
-        "type": "extrtinsic_section",
+        "name": "extrtinsic_section",
+        "type": "STRING",
         "description": "Section/Pallet of the extrinsic which includes the event"
     },
     {
