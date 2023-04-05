@@ -228,7 +228,7 @@ function dechexAssetID(number) {
     if ((number.length > 2) && number.substring(0, 2) == "0x") {
         let n = hexToBn(number)
         return n.toString()
-    }else{
+    } else {
         return `${number}`;
     }
 }

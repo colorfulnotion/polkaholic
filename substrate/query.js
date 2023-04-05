@@ -1779,7 +1779,7 @@ module.exports = class Query extends AssetManager {
                     let dEvents = []
                     if (d.events) {
                         for (const evt of d.events) {
-                            let dEvent = await this.decorateEvent(evt, d.chainID, d.ts, decorate, decorateExtra)
+                            let [dEvent, isTransferType] = await this.decorateEvent(evt, d.chainID, d.ts, decorate, decorateExtra)
                             dEvents.push(dEvent)
                         }
                         d.events = dEvents

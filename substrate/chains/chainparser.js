@@ -4026,7 +4026,7 @@ module.exports = class ChainParser {
         //let v = ledec(val)
         let res = {}
         let extraField = []
-        if (decodeStatus){
+        if (decodeStatus) {
             v = decoratedVal
         }
         extraField['totalIssuance'] = paraTool.dechexToIntStr(v)

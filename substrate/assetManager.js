@@ -1725,7 +1725,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                 x.name = dt.name
                 if (x.typeDef == "AccountId32" || x.typeDef == "AccountId20") {
                     x.address = paraTool.getPubKey(d)
-                    addrList.push(x.address)
+                    addrList.push(d)
                 }
             }
             dd.push(x)
@@ -1761,6 +1761,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     generateTransferSummary(pallet_method, addressList, decodedData) {
+        let isTransferType = false
         var incrementList = [
             "balances:Deposit", "balances:Endowed",
             "assets:Issued",
@@ -1787,15 +1788,19 @@ module.exports = class AssetManager extends PolkaholicDB {
 
         //write from, to for transfer events
         let transferSummary = {
+            from_ss58: null,
             from_pubkey: null,
+            to_ss58: null,
             to_pubkey: null,
             type: "nontransfer"
         }
         let eventLen = decodedData.length
         switch (addressList.length) {
             case 2:
-                transferSummary.from_pubkey = addressList[0]
-                transferSummary.to_pubkey = addressList[1]
+                transferSummary.from_ss58 = addressList[0]
+                transferSummary.from_pubkey = paraTool.getPubKey(addressList[0])
+                transferSummary.to_ss58 = addressList[1]
+                transferSummary.to_pubkey = paraTool.getPubKey(addressList[1])
                 if (transferList.includes(pallet_method)) {
                     transferSummary.type = "transfer"
                 } else if (approvalList.includes(pallet_method)) {
@@ -1806,21 +1811,78 @@ module.exports = class AssetManager extends PolkaholicDB {
                 break;
             case 1:
                 if (incrementList.includes(pallet_method)) {
-                    transferSummary.to_pubkey = addressList[0]
+                    transferSummary.to_ss58 = addressList[0]
+                    transferSummary.to_pubkey = paraTool.getPubKey(addressList[0])
                     transferSummary.type = "incoming"
                 } else if (decrementList.includes(pallet_method)) {
-                    transferSummary.from_pubkey = addressList[0]
+                    transferSummary.from_ss58 = addressList[0]
+                    transferSummary.from_pubkey = paraTool.getPubKey(addressList[0])
                     transferSummary.type = "outgoing"
                 }
             default:
         }
         if (addressList.length > 0) {
             decodedData.push(transferSummary)
+            isTransferType = true
         }
-        return decodedData
+        return [decodedData, isTransferType]
     }
 
-    async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"], isSubtrateETL = true) {
+    extractTransferInfo(decodedData) {
+        //console.log(`extractTransferInfo`, decodedData)
+        let dData = decodedData
+        let t = {
+            from_ss58: null,
+            from_pub_key: null,
+            to_ss58: null,
+            to_pub_key: null,
+            amount: null,
+            raw_amount: null,
+            asset: null,
+            price_usd: null,
+            amount_usd: null,
+            symbol: null,
+            decimals: null,
+            transferType: "nontransfer"
+        }
+        if (Array.isArray(dData) && dData.length >= 2) {
+            let assetSummary = dData.shift() // always the first element
+            let transferSummary = dData.pop() // always the last element
+            let transferTypeList = ['transfer', 'approval', 'revoke', 'incoming', 'outgoing']
+            // extra transferType, from, to
+            if (transferSummary.type != undefined && transferTypeList.includes(transferSummary.type)) {
+                t.transferType = transferSummary.type
+                t.from_ss58 = (transferSummary.from_ss58 != undefined) ? transferSummary.from_ss58 : '0x0',
+                    t.to_ss58 = (transferSummary.to_ss58 != undefined) ? transferSummary.to_ss58 : '0x0',
+                    t.from_pub_key = (transferSummary.from_pubkey != undefined) ? transferSummary.from_pubkey : '0x0',
+                    t.to_pub_key = (transferSummary.to_pubkey != undefined) ? transferSummary.to_pubkey : '0x0'
+            }
+
+            // extract decimals, symbol, asset
+            if (assetSummary.decimals != undefined) t.decimals = assetSummary.decimals
+            if (assetSummary.symbol != undefined) t.symbol = assetSummary.symbol
+            if (assetSummary.assetChain != undefined) {
+                let [assetUnparsed, _] = paraTool.parseAssetChain(assetSummary.assetChain)
+                if (assetUnparsed) {
+                    t.asset = assetUnparsed
+                }
+            }
+            // extract amount, raw_amount, price_usd, amount_usd for remaining dData, ideally one element only
+            for (const dData_i of dData) {
+                // TODO: check eq case later
+                if (dData_i.data != undefined && dData_i.typeDef != undefined && dData_i.typeDef == 'u128') {
+                    if (dData_i.data != undefined && typeof dData_i.data === 'string') t.raw_amount = dData_i.data
+                    if (dData_i.dataRaw != undefined) t.amount = dData_i.dataRaw
+                    if (dData_i.dataUSD != undefined) t.amount_usd = dData_i.dataUSD
+                    if (dData_i.priceUSD != undefined) t.price_usd = dData_i.priceUSD
+                }
+            }
+        }
+        //console.log(`extractTransferInfo`, t)
+        return t
+    }
+
+    async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"], isUI = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         if (!decorate || !decorateData) return event
 
@@ -1829,6 +1891,7 @@ module.exports = class AssetManager extends PolkaholicDB {
 
         let [pallet, method] = paraTool.parseSectionMethod(event)
         let pallet_method = `${pallet}:${method}`
+        let isTransferType = false
 
         switch (pallet_method) {
 
@@ -1922,14 +1985,14 @@ module.exports = class AssetManager extends PolkaholicDB {
                         if (p) {
                             decodedData[idx].dataUSD = p.valUSD
                             decodedData[idx].priceUSD = p.priceUSD
-                            if (isSubtrateETL) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
+                            if (isUI) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
                         }
                     } else {
                         decodedData[idx].symbol = chainSymbol
                         decodedData[idx].dataRaw = bal
                     }
                 }
-                decodedData = this.generateTransferSummary(pallet_method, addressList, decodedData)
+                [decodedData, isTransferType] = this.generateTransferSummary(pallet_method, addressList, decodedData)
                 //console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
                 break;
 
@@ -1959,7 +2022,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     if (p) {
                         decodedData[2].dataUSD = p.valUSD
                         decodedData[2].priceUSD = p.priceUSD
-                        if (isSubtrateETL) decodedData[2].priceUSDCurrent = p.priceUSDCurrent
+                        if (isUI) decodedData[2].priceUSDCurrent = p.priceUSDCurrent
                     }
                 } else {
                     decodedData[2].symbol = chainSymbol
@@ -2043,11 +2106,11 @@ module.exports = class AssetManager extends PolkaholicDB {
                         if (p) {
                             decodedData[idx].dataUSD = p.valUSD
                             decodedData[idx].priceUSD = p.priceUSD
-                            if (isSubtrateETL) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
+                            if (isUI) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
                         }
                     }
                 }
-                decodedData = this.generateTransferSummary(pallet_method, addressList, decodedData)
+                [decodedData, isTransferType] = this.generateTransferSummary(pallet_method, addressList, decodedData)
                 //console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
                 break;
 
@@ -2143,16 +2206,16 @@ module.exports = class AssetManager extends PolkaholicDB {
                         if (p) {
                             decodedData[idx].dataUSD = p.valUSD
                             decodedData[idx].priceUSD = p.priceUSD
-                            if (isSubtrateETL) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
+                            if (isUI) decodedData[idx].priceUSDCurrent = p.priceUSDCurrent
                         }
                     }
                 }
-                decodedData = this.generateTransferSummary(pallet_method, addressList, decodedData)
+                [decodedData, isTransferType] = this.generateTransferSummary(pallet_method, addressList, decodedData)
                 //console.log(`decodedEvent: ${pallet_method}, extra`, decodedData)
                 break;
         }
         if (decorateData && dEvent) dEvent.decodedData = decodedData
-        return dEvent
+        return [dEvent, isTransferType]
     }
 
     async decorate_assetState(assetInfo, state, flds, ts) {
