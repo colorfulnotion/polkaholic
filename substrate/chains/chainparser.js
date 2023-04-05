@@ -845,8 +845,8 @@ module.exports = class ChainParser {
         let extraField = []
         //console.log(`getAssetAccountVal`, decoratedVal)
         //console.log(`getAssetAccountVal data`, data)
+        // TODO: REENABLE this using NEW paraTool.dechexToIntStr abstraction
         /*
-        MK: Why is this disabled?
         for (const f of Object.keys(data)) {
             extraField[f] = paraTool.dechexToInt(data[f])
         }
@@ -3976,6 +3976,7 @@ module.exports = class ChainParser {
             return this.getAccountVal(indexer, decoratedVal)
         } else if (pallet_section == "assets:account") {
             return this.getAssetAccountVal(indexer, decoratedVal)
+            // TODO: } else if (pallet_section == "tokens:accounts") {
         } else if (pallet_section == "balances:totalIssuance") {
             return this.getBalancesTotalIssuanceVal(indexer, decoratedVal)
         } else if (pallet_section == "identity:identityOf" && chainID == paraTool.chainIDPolkadot) {
@@ -4004,6 +4005,8 @@ module.exports = class ChainParser {
             return this.getSystemAccountKey(indexer, decoratedKey);
         } else if (pallet_section == "assets:account") {
             return this.getAssetsAccountKey(indexer, decoratedKey);
+            // TODO: } else if (pallet_section == "tokens:accounts") {
+
         } else if (pallet_section == "identity:identityOf" && chainID == paraTool.chainIDPolkadot) {
             return this.getIdentityKey(indexer, decoratedKey);
         } else if (pallet_section == "dmp:downwardMessageQueues") {
@@ -4093,6 +4096,7 @@ module.exports = class ChainParser {
                     let v = JSON.parse(e2.pv);
                     let aa = {};
                     aa["free"] = v.balance / 10 ** decimals;
+                    // TODO: add raw, use decHexToInt function 
                     let assetType = paraTool.assetTypeToken;
                     let assetChain = paraTool.makeAssetChain(rAssetkey, chainID)
                     //if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAssetsAccount  ${fromAddress}`, aa);
@@ -4189,21 +4193,34 @@ module.exports = class ChainParser {
         let pallet_section = `${p}:${s}`
         //console.log(`generic processAccountAsset ${pallet_section}`)
         if (pallet_section == "System:Account") {
-            let aa = {};
-            let flds = ["free", "reserved", "miscFrozen", "feeFrozen", "frozen"];
-
             let chainDecimal = indexer.getChainDecimal(chainID)
-            // for ALL the evaluatable attributes in e2, copy them in
-            //console.log(`${rAssetkey} ++++ before`, e2)
+            let aa = {
+                symbol: indexer.getChainSymbol(chainID),
+                decimal: chainDecimal
+            }
+            let flds = ["free", "miscFrozen", "feeFrozen", "reserved", "frozen"];
             flds.forEach((fld) => {
-                aa[fld] = e2[fld] / 10 ** chainDecimal;
-                aa[`${fld}raw`] = e2[fld]
+                if (e2[fld] != undefined) {
+                    let fld2 = fld;
+                    if (fld == "miscFrozen") {
+                        fld2 = "misc_frozen";
+                    }
+                    if (fld == "feeFrozen") {
+                        fld2 = "frozen";
+                    }
+                    let raw = paraTool.dechexToIntStr(e2[fld].toString())
+                    aa[`${fld2}_raw`] = raw;
+                    aa[fld2] = raw / 10 ** chainDecimal;
+                    // TODO: move _usd valuation here
+                }
             });
             if (this.debugVerbose >= paraTool.debugVerbose) console.log(`${rAssetkey} **`, e2, aa)
             //console.log(`${rAssetkey} ++++ after`, e2, aa)
             let assetChain = paraTool.makeAssetChain(rAssetkey, chainID);
             indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-tokens", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
-        } else if (pallet_section == "Assets:Account") {
+        } else if (pallet_section == "Tokens:Accounts") {
+            // TODO: check how acala and others handle this
+        } else if (pallet_section == "Assets:Account") { // TODO: check covers
             await this.processAssetsAccount(indexer, p, s, e2, rAssetkey, fromAddress);
         } else if (pallet_section == "Identity:IdentityOf" && chainID == paraTool.chainIDPolkadot) {
             await this.processAccountIdentity(indexer, p, s, e2, rAssetkey, fromAddress);

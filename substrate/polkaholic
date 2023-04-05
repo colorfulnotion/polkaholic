@@ -285,8 +285,8 @@ async function main() {
             var Manager = require("./manager");
             var manager = new Manager();
             await manager.mapChains((c) => {
-                console.log(`./substrate-etl trace -r ${c.relayChain} -p ${c.paraID}`);
-                //console.log(`bq update --project_id=substrate-etl  --time_partitioning_expiration 864000 ${c.relayChain}.traces${c.paraID}`)
+                //console.log(`./substrate-etl trace -r ${c.relayChain} -p ${c.paraID}`);
+                console.log(`bq update --project_id=substrate-etl  ${c.relayChain}.balances${c.paraID} schema/substrateetl/balances.json`)
                 //console.log(`bq rm -f substrate-etl:${c.relayChain}.traces${c.paraID}`)
             });
             process.exit(0);
