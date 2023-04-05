@@ -1,0 +1,15 @@
+{
+    "sourceFormat": "BIGTABLE",
+    "sourceUris": [
+        "https://googleapis.com/bigtable/projects/us-west1-wlk/instances/paraholic/tables/accountrealtime"
+    ],
+    "bigtableOptions": {
+        "columnFamilies" : [
+            {
+                "familyId": "realtime",
+                "type": "INTEGER",
+                "encoding": "BINARY"
+            }
+        ]
+    }
+}
