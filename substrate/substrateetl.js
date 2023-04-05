@@ -972,53 +972,48 @@ module.exports = class SubstrateETL extends AssetManager {
         return `/tmp/${tbl}${chainID}-${logDT}-${startTS}.json`
     }
 
-    // TODO: decimals
     generate_btRealtimeRow(rowKey, encodedAssetChain, symbol, decimals,
-			   free, reserved, misc_frozen, frozen,
-			   free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
-			   free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
-			   blockTS, bn) {
+        free, reserved, misc_frozen, frozen,
+        free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
+        free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
+        blockTS, bn) {
         let newState = {
             ts: blockTS,
             bn: bn,
-	    symbol,
-	    decimals,
+            symbol,
+            decimals,
             source: this.hostname,
             genTS: this.currentTS()
         };
-	let upd = false;
-	if ( free ) {
+        if (free) {
             newState.free = free;
-	    newState.free_raw = free_raw;
-	    if ( free_usd > 0 ) {
-		newState.free_usd = free_usd;
-	    }
-	    upd = true;
-	}
-	if ( reserved ) {
+            newState.free_raw = free_raw;
+            if (free_usd > 0) {
+                newState.free_usd = free_usd;
+            }
+        }
+        if (reserved) {
             newState.reserved = reserved;
             newState.reserved_raw = reserved_raw;
-	    if ( reserved_usd > 0 ) {
-		newState.reserved_usd = reserved_usd;
-	    }
-	    upd = true;
-	}
-        if ( misc_frozen ) {
-	    newState.misc_frozen = misc_frozen;
-	    newState.misc_frozen_raw = misc_frozen_raw;
-            if ( misc_frozen_usd > 0 ) {
-		newState.misc_frozen_usd = misc_frozen_usd;
-	    }
-	    upd = true;
-	}
-	if ( frozen ) {
+            if (reserved_usd > 0) {
+                newState.reserved_usd = reserved_usd;
+            }
+        }
+        if (misc_frozen) {
+            newState.misc_frozen = misc_frozen;
+            newState.misc_frozen_raw = misc_frozen_raw;
+            if (misc_frozen_usd > 0) {
+                newState.misc_frozen_usd = misc_frozen_usd;
+            }
+            upd = true;
+        }
+        if (frozen) {
             newState.frozen = frozen;
             newState.frozen_raw = frozen_raw;
-	    if ( frozen_usd > 0 ) {
-		newState.frozen_usd = frozen_usd;
-	    }
-	    upd = true;
-	}
+            if (frozen_usd > 0) {
+                newState.frozen_usd = frozen_usd;
+            }
+        }
         let rec = {};
         rec[encodedAssetChain] = {
             value: JSON.stringify(newState),
@@ -1132,7 +1127,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 cnt++
                 if (pallet == "assets") {
                     let key = user[0].toHuman();
-                    let val = user[1].toHuman(); 
+                    let val = user[1].toHuman();
 
                     /*
                       Responses like: [currencyID, account_id]
@@ -1157,7 +1152,6 @@ module.exports = class SubstrateETL extends AssetManager {
                         if (numFailures[asset] == undefined) {
                             console.log("UNKNOWN ASSET", chainID, assetChain);
                             this.logger.error({
-
                                 "op": "updateNonNativeBalances - unknown asset",
                                 assetChain
                             })
@@ -1170,11 +1164,11 @@ module.exports = class SubstrateETL extends AssetManager {
 
                     let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
 
-		    let free_raw = "";
+                    let free_raw = "";
                     let balance = 0;
                     if (decimals !== false && symbol) {
                         if (val.balance != undefined) {
-			    free_raw = paraTool.toNumWithoutComma(val.balance); // no need to call dexhexIntToString here!
+                            free_raw = paraTool.toNumWithoutComma(val.balance); // no need to call dexhexIntToString here!
                             balance = free_raw / 10 ** decimals;
                         }
                         if (balance > 0) {
@@ -1204,16 +1198,16 @@ module.exports = class SubstrateETL extends AssetManager {
                                     asset,
                                     free: balance,
                                     free_usd,
-				    free_raw,
+                                    free_raw,
                                     price_usd: priceUSD
                                 });
                                 if ((logDT == yesterdayDT) || (logDT == todayDT)) {
                                     let rowKey = address.toLowerCase() // just in case
                                     rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, symbol, decimals,
-									  balance, 0, 0, 0,
-									  free_usd, 0, 0, 0,
-									  free_raw, "", "", "",
-									  blockTS, bn));
+                                        balance, 0, 0, 0,
+                                        free_usd, 0, 0, 0,
+                                        free_raw, "", "", "",
+                                        blockTS, bn));
                                     console.log(symbol, currencyID, `cbt read accountrealtime prefix=${rowKey}`, balance, val.balance, "decimals", decimals);
                                 }
                             }
@@ -1275,26 +1269,26 @@ module.exports = class SubstrateETL extends AssetManager {
                     let reserved = 0;
                     let misc_frozen = 0;
                     let frozen = 0;
-		    let free_raw = "";
-		    let reserved_raw = "";
-		    let misc_frozen_raw = "";
-		    let frozen_raw = "";
-		   
+                    let free_raw = "";
+                    let reserved_raw = "";
+                    let misc_frozen_raw = "";
+                    let frozen_raw = "";
+
                     if (decimals !== false && symbol) {
                         if (state.free != undefined) {
-			    free_raw = paraTool.dechexToIntStr(state.free.toString());
+                            free_raw = paraTool.dechexToIntStr(state.free.toString());
                             free = free_raw / 10 ** decimals;
                         }
                         if (state.reserved != undefined) {
-			    reserved_raw = paraTool.dechexToIntStr(state.reserved.toString());
+                            reserved_raw = paraTool.dechexToIntStr(state.reserved.toString());
                             reserved = reserved_raw / 10 ** decimals;
                         }
                         if (state.miscFrozen != undefined) {
-			    misc_frozen_raw = paraTool.dechexToIntStr(state.miscFrozen.toString())
+                            misc_frozen_raw = paraTool.dechexToIntStr(state.miscFrozen.toString())
                             misc_frozen = misc_frozen_raw / 10 ** decimals;
                         }
                         if (state.frozen != undefined) {
-			    frozen_raw = paraTool.dechexToIntStr(state.frozen.toString());
+                            frozen_raw = paraTool.dechexToIntStr(state.frozen.toString());
                             frozen = frozen_raw / 10 ** decimals;
                         }
 
@@ -1335,18 +1329,18 @@ module.exports = class SubstrateETL extends AssetManager {
                                 reserved_usd,
                                 misc_frozen_usd,
                                 frozen_usd,
-				free_raw,
-				reserved_raw,
-				misc_frozen_raw,
-				frozen_raw,
+                                free_raw,
+                                reserved_raw,
+                                misc_frozen_raw,
+                                frozen_raw,
                                 price_usd: priceUSD
                             });
                             if (logDT == yesterdayDT || logDT == todayDT) {
                                 rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, symbol, decimals,
-								      free, reserved, misc_frozen, frozen,
-								      free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
-								      free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
-								      blockTS, bn));
+                                    free, reserved, misc_frozen, frozen,
+                                    free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
+                                    free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
+                                    blockTS, bn));
                             }
                         }
                         //console.log(`CHECK ${assetChain} -- cbt read accountrealtime prefix=${rowKey}`);
@@ -1406,9 +1400,10 @@ module.exports = class SubstrateETL extends AssetManager {
                     } else {
                         let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
                         rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, "", 1,
-							      0, 0, 0, 0,
-							      0, 0, 0, 0,
-							      0blockTS, bn));
+                            0, 0, 0, 0,
+                            0, 0, 0, 0,
+                            "", "", "", "",
+                            blockTS, bn));
                         console.log("REAPED ACCOUNT-ADDRESS", address, encodedAssetChain);
                     }
                 }
@@ -2143,14 +2138,14 @@ Example of contractInfoOf:
                 let account_id = encodeAddress(pub, prefix);
                 let nonce = parseInt(user[1].nonce.toString(), 10)
                 let balance = user[1].data // check equil/genshiro case
-		let free_raw = balance.free ? paraTool.dechexToIntStr(balance.free.toString()) : "";
-		let reserved_raw = balance.reserved ? paraTool.dechexToIntStr(balance.reserved.toString()) : "";
-		let misc_frozen_raw = balance.miscFrozen ? paraTool.dechexToIntStr(balance.miscFrozen.toString()) : "";
-		let frozen_raw = balance.feeFrozen ? paraTool.dechexToIntStr(balance.feeFrozen.toString()) : "";
-		
+                let free_raw = balance.free ? paraTool.dechexToIntStr(balance.free.toString()) : "";
+                let reserved_raw = balance.reserved ? paraTool.dechexToIntStr(balance.reserved.toString()) : "";
+                let misc_frozen_raw = balance.miscFrozen ? paraTool.dechexToIntStr(balance.miscFrozen.toString()) : "";
+                let frozen_raw = balance.feeFrozen ? paraTool.dechexToIntStr(balance.feeFrozen.toString()) : "";
+
                 let free = (free_raw.length > 0) ? free_raw / 10 ** decimals : 0;
                 let reserved = (reserved_raw.length > 0) ? reserved_raw / 10 ** decimals : 0;
-                let misc_frozen = (miscFrozen_raw.length > 0) ? miscFrozen_raw / 10 ** decimals : 0;
+                let misc_frozen = (misc_frozen_raw.length > 0) ? misc_frozen_raw / 10 ** decimals : 0;
                 let frozen = (frozen_raw.length > 0) ? frozen_raw / 10 ** decimals : 0;
 
                 let stateHash = u8aToHex(user[1].createdAtHash)
@@ -2160,10 +2155,10 @@ Example of contractInfoOf:
                 }
                 let rowKey = pubkey.toLowerCase()
                 if (logDT) {
-                    let free_usd = ( priceUSD > 0 ) ? free * priceUSD : 0;
-                    let reserved_usd = ( priceUSD > 0 ) ? reserved * priceUSD : 0;
-                    let misc_frozen_usd = ( priceUSD > 0 ) ? misc_frozen * priceUSD : 0;
-                    let frozen_usd = ( priceUSD > 0 ) ? fee_frozen * priceUSD : 0;
+                    let free_usd = (priceUSD > 0) ? free * priceUSD : 0;
+                    let reserved_usd = (priceUSD > 0) ? reserved * priceUSD : 0;
+                    let misc_frozen_usd = (priceUSD > 0) ? misc_frozen * priceUSD : 0;
+                    let frozen_usd = (priceUSD > 0) ? frozen * priceUSD : 0;
                     if ((free > 0) || (reserved > 0) || (misc_frozen > 0) || (frozen > 0)) {
                         bqRows.push({
                             chain_name: chainName,
@@ -2177,10 +2172,10 @@ Example of contractInfoOf:
                             reserved,
                             misc_frozen,
                             frozen,
-			    free_raw,
-			    reserved_raw,
-			    misc_frozen_raw,
-			    frozen_raw,
+                            free_raw,
+                            reserved_raw,
+                            misc_frozen_raw,
+                            frozen_raw,
                             free_usd,
                             reserved_usd,
                             misc_frozen_usd,
@@ -2192,10 +2187,10 @@ Example of contractInfoOf:
                         if ((logDT == yesterdayDT) || (logDT == todayDT)) {
                             //console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
                             rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, symbol, decimals,
-								  free, reserved, misc_frozen, frozen,
-								  free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
-								  free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
-								  blockTS, bn));
+                                free, reserved, misc_frozen, frozen,
+                                free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
+                                free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
+                                blockTS, bn));
                         }
                     }
                 }
