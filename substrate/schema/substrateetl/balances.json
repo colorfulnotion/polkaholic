@@ -50,6 +50,11 @@
     "type": "FLOAT"
   },
   {
+    "mode": "NULLABLE",
+    "name": "free_raw",
+    "type": "STRING"
+  },
+  {
     "mode": "REQUIRED",
     "name": "reserved",
     "type": "FLOAT"
@@ -58,6 +63,11 @@
     "mode": "NULLABLE",
     "name": "reserved_usd",
     "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "reserved_raw",
+    "type": "STRING"
   },
   {
     "mode": "REQUIRED",
@@ -70,6 +80,11 @@
     "type": "FLOAT"
   },
   {
+    "mode": "NULLABLE",
+    "name": "misc_frozen_raw",
+    "type": "STRING"
+  },
+  {
     "mode": "REQUIRED",
     "name": "frozen",
     "type": "FLOAT"
@@ -78,6 +93,11 @@
     "mode": "NULLABLE",
     "name": "frozen_usd",
     "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "frozen_raw",
+    "type": "STRING"
   },
   {
     "mode": "NULLABLE",

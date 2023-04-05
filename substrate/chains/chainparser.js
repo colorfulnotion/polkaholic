@@ -845,8 +845,8 @@ module.exports = class ChainParser {
         let extraField = []
         //console.log(`getAssetAccountVal`, decoratedVal)
         //console.log(`getAssetAccountVal data`, data)
+	// TODO: REENABLE this using NEW paraTool.dechexToIntStr abstraction
         /*
-        MK: Why is this disabled?
         for (const f of Object.keys(data)) {
             extraField[f] = paraTool.dechexToInt(data[f])
         }
@@ -3976,6 +3976,7 @@ module.exports = class ChainParser {
             return this.getAccountVal(indexer, decoratedVal)
         } else if (pallet_section == "assets:account") {
             return this.getAssetAccountVal(indexer, decoratedVal)
+	    // TODO: add tokens: H
         } else if (pallet_section == "balances:totalIssuance") {
             return this.getBalancesTotalIssuanceVal(indexer, decoratedVal)
         } else if (pallet_section == "identity:identityOf" && chainID == paraTool.chainIDPolkadot) {
@@ -4092,7 +4093,8 @@ module.exports = class ChainParser {
                 if (e2.pv !== undefined) {
                     let v = JSON.parse(e2.pv);
                     let aa = {};
-                    aa["free"] = v.balance / 10 ** decimals;
+                    an["free"] = v.balance / 10 ** decimals;
+		    // TODO: add raw, use decHexToInt function 
                     let assetType = paraTool.assetTypeToken;
                     let assetChain = paraTool.makeAssetChain(rAssetkey, chainID)
                     //if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAssetsAccount  ${fromAddress}`, aa);
@@ -4190,20 +4192,23 @@ module.exports = class ChainParser {
         //console.log(`generic processAccountAsset ${pallet_section}`)
         if (pallet_section == "System:Account") {
             let aa = {};
-            let flds = ["free", "reserved", "miscFrozen", "feeFrozen", "frozen"];
+            let flds = ["free", "reserved", "miscFrozen",
+			"feeFrozen", // REWRITE to frozen
+			"frozen"];
 
             let chainDecimal = indexer.getChainDecimal(chainID)
             // for ALL the evaluatable attributes in e2, copy them in
             //console.log(`${rAssetkey} ++++ before`, e2)
             flds.forEach((fld) => {
                 aa[fld] = e2[fld] / 10 ** chainDecimal;
-                aa[`${fld}raw`] = e2[fld]
+                aa[`${fld}raw`] = e2[fld] // TODO: add _
             });
             if (this.debugVerbose >= paraTool.debugVerbose) console.log(`${rAssetkey} **`, e2, aa)
             //console.log(`${rAssetkey} ++++ after`, e2, aa)
             let assetChain = paraTool.makeAssetChain(rAssetkey, chainID);
             indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-tokens", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
-        } else if (pallet_section == "Assets:Account") {
+	    // TODO: Tokens HERE
+        } else if (pallet_section == "Assets:Account") { // TODO: 
             await this.processAssetsAccount(indexer, p, s, e2, rAssetkey, fromAddress);
         } else if (pallet_section == "Identity:IdentityOf" && chainID == paraTool.chainIDPolkadot) {
             await this.processAccountIdentity(indexer, p, s, e2, rAssetkey, fromAddress);
