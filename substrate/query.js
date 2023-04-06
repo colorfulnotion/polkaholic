@@ -4806,7 +4806,7 @@ module.exports = class Query extends AssetManager {
             //console.log(`decoratedExt after decorateEventModule [decorate=${decorate}, decorateUSD=${decorateUSD}]`, decoratedExt)
             if (ext.params != undefined && decorate) {
                 await this.decorateParams(section, method, ext.params, chainID, ext.ts, 0, decorate, decorateData)
-                decoratedExt.calls = await this.paramToCalls(section, method, ext.params, chainID, ext.ts, '0', decorate, decorateData)
+                //decoratedExt.calls = await this.paramToCalls(section, method, ext.params, chainID, ext.ts, '0', decorate, decorateData)
 
                 // WASM decoration of contract metadata is done at the "extrinsic" level rather than "params" level
                 // for now, we ignore utility batch / proxy etc and put metadata up at the top level
