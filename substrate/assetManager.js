@@ -1885,59 +1885,76 @@ module.exports = class AssetManager extends PolkaholicDB {
         return t
     }
 
-    async paramToCalls(section, method, args, chainID, ts, depth = '0', decorate = true, decorateExtra = ["data", "address", "usd"]) {
+    async paramToCalls(extrinsicID, section, method, callIndex, args, argsDef, chainID, ts, depth = '0', decorate = true, decorateExtra = ["data", "address", "usd"]) {
         let flatCalls = []
-        await this.paramToCallsInternal(section, method, args, chainID, ts, depth, flatCalls, decorate, decorateExtra)
+        await this.paramToCallsInternal(extrinsicID, section, method, callIndex, args, argsDef, chainID, ts, depth, flatCalls, decorate, decorateExtra)
         return flatCalls
     }
 
-    async paramToCallsInternal(section, method, args, chainID, ts, depth = '0', flatCalls = [], decorate = true, decorateExtra = ["data", "address", "usd"]) {
+    async paramToCallsInternal(extrinsicID, section, method, callIndex, args, argsDef, chainID, ts, depth = '0', flatCalls = [], decorate = true, decorateExtra = ["data", "address", "usd"]) {
         //this.chainParserInit(chainID, this.debugLevel);
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let sectionMethod = `${section}:${method}`
+        let args_def = (argsDef != undefined)? argsDef: null
+        let call_index = (callIndex != undefined)? callIndex: null
         //let callsArr = []
         try {
             if (args.calls != undefined) { // this is an array
                 //console.log(`${depth}:${sectionMethod} descend into calls len[${args.calls.length}]`)
                 let f = {
-                    call_id: depth,
+                    id: `${depth}`,
+                    index: call_index,
                     section: section,
                     method: method,
-                    args: args
+                    args: args,
+                    argsDef: args_def,
+                    leaf: false,
+                    root: (depth == '0')? true: false
                 }
                 flatCalls.push(f)
                 let i = 0;
                 for (const c of args.calls) {
+                    //let c = args.calls[i]
                     let call_section = c.section;
                     let call_method = c.method;
+                    let call_lookup_index = c.callIndex;
                     let nextDepth = `${depth}-${i}`
                     //console.log(depth, "call ", i , call_section, call_method, c);
                     //console.log(`calls[${i}] nextDepth=${nextDepth} call_section=${call_section}, call_method=${call_method}`, c)
                     i++;
-                    await this.paramToCallsInternal(call_section, call_method, c.args, chainID, ts, nextDepth, flatCalls, decorate, decorateExtra)
+                    await this.paramToCallsInternal(extrinsicID, call_section, call_method, call_lookup_index, c.args, c.argsDef, chainID, ts, nextDepth, flatCalls, decorate, decorateExtra)
                 }
             } else if (args.call != undefined) { // this is an object
                 let call = args.call
                 let call_section = call.section;
                 let call_method = call.method;
+                let call_lookup_index = call.callIndex;
                 //console.log(`${depth}:${sectionMethod} descend into call`, call)
                 let f = {
-                    call_id: depth,
+                    id: `${depth}`,
+                    index: call_index,
                     section: section,
                     method: method,
-                    args: args
+                    args: args,
+                    argsDef: args_def,
+                    leaf: false,
+                    root: (depth == '0')? true: false
                 }
                 flatCalls.push(f)
                 let nextDepth = `${depth}-0`
                 //console.log(`call nextDepth=${nextDepth} call_section=${call_section}, call_method=${call_method}`, call)
-                await this.paramToCallsInternal(call_section, call_method, call.args, chainID, ts, nextDepth, flatCalls, decorate, decorateExtra)
+                await this.paramToCallsInternal(extrinsicID, call_section, call_method, call_lookup_index, call.args, call.argsDef, chainID, ts, nextDepth, flatCalls, decorate, decorateExtra)
             } else {
                 //collect leaf node here
                 let f = {
-                    call_id: depth,
+                    id: `${depth}`,
+                    index: call_index,
                     section: section,
                     method: method,
-                    args: args
+                    args: args,
+                    argsDef: args_def,
+                    leaf: true,
+                    root: (depth == '0')? true: false
                 }
                 flatCalls.push(f)
                 let pallet_method = `${section}:${method}`
