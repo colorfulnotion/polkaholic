@@ -10,32 +10,32 @@
     "type": "STRING"
   },
   {
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "name": "address_pubkey",
     "type": "STRING"
   },
   {
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "name": "ts",
     "type": "TIMESTAMP"
   },
   {
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "name": "id",
     "type": "STRING"
   },
   {
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "name": "chain_name",
     "type": "STRING"
   },
   {
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "name": "asset",
     "type": "STRING"
   },
   {
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "name": "para_id",
     "type": "INTEGER"
   },

@@ -5502,7 +5502,7 @@ module.exports = class Query extends AssetManager {
         if (xcmMsg != undefined) {
             let xcmMsg0 = JSON.parse(JSON.stringify(xcmMsg)) // deep copy here
             let analysis = this.performAnalysisInstructions(xcmMsg0, x.chainID, x.chainIDDest)
-            if (analysis!= undefined && analysis.assetChains) {
+            if (analysis != undefined && analysis.assetChains) {
                 let assetChainsKey = Object.keys(analysis.assetChains)
                 //console.log(`performAnalysisInstructions analysis.assetChains`, assetChainsKey)
                 try {
@@ -6034,7 +6034,7 @@ module.exports = class Query extends AssetManager {
                     }
                     break;
 
-                    default:
+                default:
                     break;
             }
         } catch (err) {

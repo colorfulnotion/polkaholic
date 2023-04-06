@@ -1,7 +1,13 @@
 [
   {
+    "mode": "NULLABLE",
+    "name": "contract_name",
+    "type": "STRING",
+    "description": "Contract Name (obtained from metadata.json)"
+  },
+  {
     "mode": "REQUIRED",
-    "name": "chain_name",
+    "name": "relay_chain",
     "type": "STRING",
     "description": "Chain name (human readable)"
   },
@@ -19,15 +25,15 @@
   },
   {
     "mode": "REQUIRED",
-    "name": "address_pubkey",
+    "name": "address_pub_key",
     "type": "STRING",
-    "description": "Address of caller"
+    "description": "Address of Contract"
   },
   {
     "mode": "REQUIRED",
     "name": "address_ss58",
     "type": "STRING",
-    "description": "Address of caller (SS58)"
+    "description": "Address of Contract (SS58)"
   },
   {
     "mode": "NULLABLE",
@@ -51,7 +57,7 @@
     "mode": "NULLABLE",
     "name": "block_number",
     "type": "STRING",
-    "description": "Block nubmer of the contract call"
+    "description": "Block number of the contract call"
   },
   {
     "mode": "NULLABLE",
@@ -85,14 +91,63 @@
   },
   {
     "mode": "NULLABLE",
-    "name": "caller",
+    "name": "caller_ss58",
     "type": "STRING",
     "description": "Caller"
   },
   {
     "mode": "NULLABLE",
+    "name": "caller_pub_key",
+    "type": "STRING",
+    "description": "Caller"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "deployer_pub_key",
+    "type": "STRING",
+    "description": "Deployer Public Key"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "deployer_ss58",
+    "type": "STRING",
+    "description": "Deployer SS58 Address"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storer_pub_key",
+    "type": "STRING",
+    "description": "Storer Public Key"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storer_ss58",
+    "type": "STRING",
+    "description": "Storer SS58 Address"
+  },
+    
+  {
+    "mode": "NULLABLE",
     "name": "decoded_call",
     "type": "JSON",
     "description": "Decoded Message call data"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "status",
+    "type": "STRING",
+    "description": "Verification status of contract"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "language",
+    "type": "STRING",
+    "description": "Language of contract source code, if provided"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "compiler",
+    "type": "STRING",
+    "description": "Compiler used for contract source code, if provided"
   }
 ]

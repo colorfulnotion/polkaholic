@@ -972,7 +972,8 @@ module.exports = class SubstrateETL extends AssetManager {
         return `/tmp/${tbl}${chainID}-${logDT}-${startTS}.json`
     }
 
-    generate_btRealtimeRow(rowKey, encodedAssetChain, symbol, decimals,
+    generate_btRealtimeRow(rowKey, encodedAssetChain,
+        id, relay_chain, para_id, symbol, decimals,
         free, reserved, misc_frozen, frozen,
         free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
         free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
@@ -980,6 +981,9 @@ module.exports = class SubstrateETL extends AssetManager {
         let newState = {
             ts: blockTS,
             bn: bn,
+            id,
+            relay_chain,
+            para_id,
             symbol,
             decimals,
             source: this.hostname,
@@ -1013,6 +1017,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 newState.frozen_usd = frozen_usd;
             }
         }
+        console.log(newState);
         let rec = {};
         rec[encodedAssetChain] = {
             value: JSON.stringify(newState),
@@ -1029,7 +1034,7 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async updateNonNativeBalances(chainID, logDT = null, startTS = null, perPagelimit = 1000) {
         await this.assetManagerInit();
-        let chains = await this.pool.query(`select chainID, paraID, id, WSEndpoint, WSEndpointArchive, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
+        let chains = await this.pool.query(`select relayChain, chainID, paraID, id, WSEndpoint, WSEndpointArchive, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
         if (chains.length == 0) {
             console.log("No chain found ${chainID}")
             return false;
@@ -1039,6 +1044,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let chainName = chain.chainName;
         let paraID = chain.paraID;
         let id = chain.id;
+        let relayChain = chain.relayChain;
         const provider = new WsProvider(wsEndpoint);
         const api = await ApiPromise.create({
             provider
@@ -1200,9 +1206,11 @@ module.exports = class SubstrateETL extends AssetManager {
                                     free_raw,
                                     price_usd: priceUSD
                                 });
+
                                 if ((logDT == yesterdayDT) || (logDT == todayDT)) {
                                     let rowKey = address.toLowerCase() // just in case
-                                    rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, symbol, decimals,
+                                    rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain,
+                                        id, relayChain, paraID, symbol, decimals,
                                         balance, 0, 0, 0,
                                         free_usd, 0, 0, 0,
                                         free_raw, "", "", "",
@@ -1335,7 +1343,8 @@ module.exports = class SubstrateETL extends AssetManager {
                                 price_usd: priceUSD
                             });
                             if (logDT == yesterdayDT || logDT == todayDT) {
-                                rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, symbol, decimals,
+                                rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain,
+                                    id, relayChain, paraID, symbol, decimals,
                                     free, reserved, misc_frozen, frozen,
                                     free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
                                     free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
@@ -1381,36 +1390,6 @@ module.exports = class SubstrateETL extends AssetManager {
             }
         }
 
-        if (logDT) {
-            // close files
-            let [yesterdayDT, __] = paraTool.ts_to_logDT_hr(this.getCurrentTS() - 86400);
-            if (logDT == yesterdayDT && false) {
-                // TODO: for all the other accounts that did NOT appear, we can delete them if they were OLDER than bn, because they are reaped == but we still need to 0 out the balances
-                let reapedAccounts = await this.poolREADONLY.query(sql_reap)
-                for (let a = 0; a < reapedAccounts.length; a++) {
-                    let address = reapedAccounts[a].address;
-                    let asset = reapedAccounts[a].asset;
-                    let assetChain = paraTool.makeAssetChain(asset, chainID);
-                    if (this.assetInfo[assetChain] == undefined) {
-                        this.logger.fatal({
-                            "op": "updateAddressBalances - unknown asset",
-                            assetChain
-                        })
-                    } else {
-                        let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
-                        rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, "", 1,
-                            0, 0, 0, 0,
-                            0, 0, 0, 0,
-                            "", "", "", "",
-                            blockTS, bn));
-                        console.log("REAPED ACCOUNT-ADDRESS", address, encodedAssetChain);
-                    }
-                }
-                console.log("writing ", rows.length, " REAPED accounts to bt");
-                await this.insertBTRows(tblRealtime, rows, tblName);
-                rows = [];
-            }
-        }
         let sql_assetPallet = `update blocklog set assetNonNativeRegistered = '${Object.keys(numHolders).length}', assetNonNativeUnregistered = '${Object.keys(numFailures).length}' where chainID = '${chainID}' and logDT = '${logDT}'`
         this.batchedSQL.push(sql_assetPallet);
         await this.update_batchedSQL();
@@ -1535,7 +1514,7 @@ module.exports = class SubstrateETL extends AssetManager {
     | deployer      | varchar(67) | YES  | MUL | NULL    |       | contractevents{paraID} left join extrinsic_id with extrinsics{paraID}
     +---------------+-------------+------+-----+---------+-------+
     	    */
-    async updateContracts(chainID, perPagelimit = 1000, startDT = "2021-01-01", loadSourceTables = false) {
+    async updateContracts(chainID, loadSourceTables = true, perPagelimit = 1000, startDT = "2023-03-01") {
         await this.assetManagerInit();
         let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, WSEndpointArchive, numHolders, totalIssuance, decimals from chain where chainID = '${chainID}'`);
         if (chains.length == 0) {
@@ -1697,14 +1676,14 @@ Example of contractInfoOf:
         if (loadSourceTables) {
             try {
                 let targetSQL = `SELECT * FROM \`substrate-etl.${relayChain}.extrinsics${paraID}\` WHERE DATE(block_time) >= "${startDT}" and section = "contracts"`;
-                let destinationTbl = `${relayChain}.contractsextrinsics${paraID}`
+                let destinationTbl = `contracts.contractsextrinsics${id}`
                 let partitionedFld = 'block_time'
                 let cmd = `bq query --destination_table '${destinationTbl}' --project_id=${this.project} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                 console.log(cmd);
                 await exec(cmd);
 
                 targetSQL = `SELECT * FROM \`substrate-etl.${relayChain}.events${paraID}\` WHERE DATE(block_time) >= "${startDT}" and section = "contracts"`;
-                destinationTbl = `${relayChain}.contractsevents${paraID}`
+                destinationTbl = `contracts.contractsevents${id}`
                 cmd = `bq query --destination_table '${destinationTbl}' --project_id=${this.project} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
                 console.log(cmd);
                 await exec(cmd);
@@ -1712,7 +1691,7 @@ Example of contractInfoOf:
                 console.log(err);
             }
         }
-        // 3. For any codeHash without any recent verification (based on wasmCode.status), execute
+        // 3. For any codeHash without any recent verification (based on wasmCode.status), check if sirato has any verification info
         try {
             let sql = `select codeHash from wasmCode where chainID = '${chainID}' and ( lastStatusCheckDT is null or lastStatusCheckDT < date_sub(Now(), interval 1 hour) ) and status in ('Unknown', 'Unverified')`;
             let codeRecs = await this.poolREADONLY.query(sql);
@@ -1757,7 +1736,7 @@ Example of contractInfoOf:
             switch (tbl) {
                 case "contractscode":
                     // (a) CodeStored ==> wasmCode.{extrinsicHash, extrinsicID, storer (*), codeStoredBN, codeStoredTS }
-                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) codeStoredTS, block_number, block_hash, data from substrate-etl.${relayChain}.contractsevents${paraID}
+                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) codeStoredTS, block_number, block_hash, data from substrate-etl.contracts.contractsevents${id}
   where section = 'contracts' and method = 'CodeStored')
   select events.*, signer_pub_key from events left join substrate-etl.${relayChain}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
                     let rows = await this.execute_bqJob(sql);
@@ -1777,8 +1756,8 @@ Example of contractInfoOf:
                 case "contracts":
                 // (b) Instantiated ==> contracts.{extrinsicHash, extrinsicID, instantiateBN, blockTS, deployer (*) }
                 {
-                    // ContractEmitted
-                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, data from substrate-etl.${relayChain}.contractsevents${paraID}
+                    // TODO: ContractEmitted
+                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, data from substrate-etl.contracts.contractsevents${id}
   where section = 'contracts' and method = 'Instantiated')
   select events.*, signer_pub_key from events left join substrate-etl.${relayChain}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
                     let rows = await this.execute_bqJob(sql);
@@ -1794,7 +1773,6 @@ Example of contractInfoOf:
                             let address = paraTool.getPubKey(address_ss58);
                             let deployer = paraTool.getPubKey(deployer_ss58);
                             sql = `update contract set extrinsicID = ${mysql.escape(extrinsicID)}, extrinsicHash = ${mysql.escape(extrinsicHash)}, deployer = ${mysql.escape(deployer)}, blockTS = ${mysql.escape(blockTS)} where address = '${address}' and chainID = '${chainID}'`
-                            //console.log("INSTANTIATED", sql);
                             this.batchedSQL.push(sql);
                             await this.update_batchedSQL();
                         }
@@ -1805,7 +1783,7 @@ Example of contractInfoOf:
                 // (c) Called ==> contractscall -- TODO decode, e.g. flip call
                 {
                     // NOTE that this is not complete becuase of utility batch , etc. so we should use contracts.called events, but for some reason this was not systematic, grr.
-                    sql = `select extrinsic_id, \`hash\` as extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, params, signer_pub_key from substrate-etl.${relayChain}.contractsextrinsics${paraID} where section = 'contracts' and method = 'call'`
+                    sql = `select extrinsic_id, \`hash\` as extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, params, signer_pub_key from substrate-etl.contracts.contractsextrinsics${id} where section = 'contracts' and method = 'call'`
                     let rows = await this.execute_bqJob(sql);
                     let out = []
                     for (const r of rows) {
@@ -1855,116 +1833,6 @@ Example of contractInfoOf:
                 break;
             }
         }
-        // 4. Dump substrate-etl tables (a) contractscode{paraID} (from wasmCode);  (b) contracts{paraID} (from contracts) (c) contractscall{paraID} (from contractsCall)
-        for (const tbl of tables) {
-            let startTS = this.getCurrentTS();
-            let bqRows = [];
-            let fulltbl = null;
-            switch (tbl) {
-                case "contractscall":
-                    fulltbl = `${relayChain}.contractscall${paraID}`;
-                    let sql = `select extrinsicID, chainID, extrinsicHash, blockTS, blockNumber, blockHash, address, gasLimit, storageDepositLimit, value, caller, codeHash, CONVERT(decodedCall using utf8) decodedCall from contractsCall where chainID = '${chainID}'`
-                    let recs = await this.poolREADONLY.query(sql);
-                    for (const r of recs) {
-                        bqRows.push({
-                            chain_name: chainName,
-                            id,
-                            para_id: paraID,
-                            address_pubkey: r.address,
-                            address_ss58: encodeAddress(r.address, prefix),
-                            extrinsic_id: r.extrinsicID,
-                            extrinsic_hash: r.extrinsicHash,
-                            block_timestamp: r.blockTS,
-                            block_number: r.blockNumber,
-                            block_hash: r.blockHash,
-                            gas_limit: r.gasLimit,
-                            storage_deposit_limit: r.storageDepositLimit,
-                            value: r.value,
-                            caller: r.caller,
-                            code_hash: r.codeHash,
-                            decoded_call: r.decodedCall
-                        });
-                    }
-                    break;
-                case "contracts": {
-                    let sql = `select contract.address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, contract.instantiateBN, contract.codeHash, CONVERT(contract.constructor using utf8) as constructor, CONVERT(contract.salt using utf8) as salt, contract.blockTS, contract.deployer, contract.storageBytes, contract.storageItems, contract.storageByteDeposit, contract.storageItemDeposit, contract.storageBaseDeposit, wasmCode.codeStoredBN, wasmCode.status, wasmCode.language, wasmCode.contractName, CONVERT(wasmCode.metadata using utf8) metadata from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = '${chainID}'`
-                    let recs = await this.poolREADONLY.query(sql);
-                    fulltbl = `${relayChain}.contracts${paraID}`;
-                    for (const r of recs) {
-                        bqRows.push({
-                            contract_name: r.contractName,
-                            chain_name: chainName,
-                            id,
-                            para_id: paraID,
-                            address_pubkey: r.address,
-                            address_ss58: encodeAddress(r.address, prefix),
-                            deployer_pubkey: r.deployer,
-                            deployer_ss58: r.deployer ? encodeAddress(r.deployer, prefix) : null,
-                            extrinsic_id: r.extrinsicID,
-                            extrinsic_hash: r.extrinsicHash,
-                            block_number_stored: r.codeStoredBN,
-                            block_number_instantiated: r.instantiateBN,
-                            code_hash: r.codeHash,
-                            constructor: r.constructor,
-                            salt: r.salt,
-                            block_timestamp: r.blockTS,
-                            storage_bytes: r.storage_bytes,
-                            storage_items: r.storage_items,
-                            storage_byte_deposit: r.storageByteDeposit,
-                            storage_item_deposit: r.storageItemDeposit,
-                            storage_base_deposit: r.storageBaseDeposit,
-                            metadata: r.metadata,
-                            status: r.status,
-                            language: r.language,
-                            compiler: r.compiler
-                        });
-                    }
-                }
-                break;
-                case "contractscode": {
-                    let sql = `select codeHash, chainID, extrinsicHash, extrinsicID, storer, CONVERT(wasm using utf8) wasm, codeStoredBN, codeStoredTS, CONVERT(metadata using utf8) metadata, status, CONVERT(code using utf8) code, language, compiler, CONVERT(authors using utf8) authors from wasmCode where chainID = '${chainID}'`
-                    let recs = await this.poolREADONLY.query(sql);
-                    fulltbl = `${relayChain}.contractscode${paraID}`;
-                    for (const r of recs) {
-                        bqRows.push({
-                            chain_name: chainName,
-                            id,
-                            para_id: paraID,
-                            code_hash: r.codeHash,
-                            extrinsic_id: r.extrinsicID,
-                            extrinsic_hash: r.extrinsicHash,
-                            storer_pubkey: r.storer,
-                            storer_ss58: encodeAddress(r.storer, prefix),
-                            bytecode: r.wasm,
-                            block_number: r.codeStoredBN,
-                            block_timestamp: r.codeStoredTS,
-                            metadata: r.metadata,
-                            status: r.status,
-                            bytecode: r.code,
-                            language: r.language,
-                            compiler: r.compiler
-                        });
-                    }
-                }
-            }
-            if (bqRows.length > 0) {
-                let fn = `/tmp/${tbl}-${chainID}-${startTS}`
-                let rawRows = bqRows.map((r) => {
-                    return JSON.stringify(r);
-                });
-                rawRows.push("");
-                await fs.appendFileSync(fn, rawRows.join("\n"));
-                // TODO: make these tables date partitioned -- not enough data to make this worthwhile except for calls
-                try {
-                    let cmd = `bq load  --project_id=${this.project} --max_bad_records=1 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${fulltbl}' ${fn} schema/substrateetl/${tbl}.json`;
-                    console.log(cmd);
-                    await exec(cmd);
-                } catch (err) {
-                    console.log(err);
-                }
-            }
-        }
-
         // tally stats from the above
         // let sql = `update chain set numCodeHashes = '${numCodeHashes}', numContracts = '${numContracts}', numContractCalls = '${numContractCalls}'where chainID = ${chainID}'`
         // console.log(sql);
@@ -1972,6 +1840,159 @@ Example of contractInfoOf:
         // await this.update_batchedSQL();
         return (true);
     }
+
+    lookup_contract_chain(chainID) {
+        let chainInfo = this.chainInfos[chainID];
+        let para_id = paraTool.getParaIDfromChainID(chainID);
+        let relay_chain = paraTool.getRelayChainByChainID(chainID);
+        let id = chainInfo.id;
+        let prefix = chainInfo.ss58Format;
+        return [id, relay_chain, para_id, prefix];
+    }
+
+    // Dump substrate-etl tables into contracts dataset:
+    // (a) contractscode (from wasmCode);
+    // (b) contracts (from contracts)
+    // (c) contractscall (from contractsCall)
+    async dumpContracts() {
+        let tables = ["contracts", "contractscode", "contractscall"];
+        for (const tbl of tables) {
+            let startTS = this.getCurrentTS();
+            let bqRows = [];
+            let fulltbl = `contracts.${tbl}`;
+            switch (tbl) {
+                case "contractscall":
+                    let sql = `select c.extrinsicID, c.chainID, c.extrinsicHash, c.blockTS, c.blockNumber, c.blockHash, c.address, c.gasLimit, c.storageDepositLimit, c.value, c.caller, c.codeHash, CONVERT(decodedCall using utf8) decodedCall, 
+contract.deployer, wasmCode.storer, wasmCode.language, wasmCode.contractName, wasmCode.status, wasmCode.contractName from contractsCall as c, contract, wasmCode where c.address = contract.address and c.chainID = contract.chainID and c.codeHash = wasmCode.codeHash and c.chainID = wasmCode.chainID
+`;
+                    let recs = await this.poolREADONLY.query(sql);
+                    for (const r of recs) {
+                        let [id, relay_chain, para_id, prefix] = this.lookup_contract_chain(r.chainID);
+                        bqRows.push({
+                            block_timestamp: r.blockTS,
+                            id,
+                            relay_chain,
+                            para_id,
+                            address_pub_key: r.address,
+                            address_ss58: encodeAddress(r.address, prefix),
+                            contract_name: r.contractName,
+                            extrinsic_id: r.extrinsicID,
+                            extrinsic_hash: r.extrinsicHash,
+                            block_number: r.blockNumber,
+                            block_hash: r.blockHash,
+                            gas_limit: r.gasLimit,
+                            storage_deposit_limit: r.storageDepositLimit,
+                            value: r.value,
+                            caller_pub_key: r.caller,
+                            caller_ss58: r.deployer ? encodeAddress(r.caller, prefix) : null,
+                            code_hash: r.codeHash,
+                            decoded_call: r.decodedCall,
+                            deployer_pub_key: r.deployer,
+                            deployer_ss58: r.deployer ? encodeAddress(r.deployer, prefix) : null,
+                            storer_pub_key: r.storer,
+                            storer_ss58: r.storer ? encodeAddress(r.storer, prefix) : null,
+                            status: r.status,
+                            language: r.language,
+                            compiler: r.compiler
+                        });
+                    }
+                    break;
+                case "contracts": {
+                    let sql = `select contract.address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, contract.instantiateBN, contract.codeHash, 
+CONVERT(contract.constructor using utf8) as constructor, CONVERT(contract.salt using utf8) as salt, contract.blockTS, contract.deployer, contract.storageBytes, contract.storageItems, 
+contract.storageByteDeposit, contract.storageItemDeposit, contract.storageBaseDeposit, wasmCode.codeStoredBN, wasmCode.status, wasmCode.language, wasmCode.contractName, wasmCode.storer,
+CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where contract.codeHash = wasmCode.codeHash `
+                    let recs = await this.poolREADONLY.query(sql);
+                    for (const r of recs) {
+                        let [id, relay_chain, para_id, prefix] = this.lookup_contract_chain(r.chainID);
+                        if (r.address && r.address.length > 10 && r.blockTS) {
+                            bqRows.push({
+                                deployed_ts: r.blockTS,
+                                id,
+                                relay_chain,
+                                para_id,
+                                address_pub_key: r.address,
+                                address_ss58: r.address ? encodeAddress(r.address, prefix) : null,
+                                contract_name: r.contractName,
+                                deployer_pub_key: r.deployer,
+                                deployer_ss58: r.deployer ? encodeAddress(r.deployer, prefix) : null,
+                                storer_pub_key: r.storer,
+                                storer_ss58: r.storer ? encodeAddress(r.storer, prefix) : null,
+                                extrinsic_id: r.extrinsicID,
+                                extrinsic_hash: r.extrinsicHash,
+                                block_number_stored: r.codeStoredBN,
+                                block_number_instantiated: r.instantiateBN,
+                                code_hash: r.codeHash,
+                                constructor: r.constructor,
+                                salt: r.salt,
+                                storage_bytes: r.storage_bytes,
+                                storage_items: r.storage_items,
+                                storage_byte_deposit: r.storageByteDeposit,
+                                storage_item_deposit: r.storageItemDeposit,
+                                storage_base_deposit: r.storageBaseDeposit,
+                                metadata: r.metadata,
+                                status: r.status,
+                                language: r.language,
+                                compiler: r.compiler
+                            });
+                        } else {
+                            console.log("contract PROBLEM", r.chainID, r.address, r.blockTS);
+                        }
+                    }
+                }
+                break;
+                case "contractscode": {
+                    let sql = `select codeHash, chainID, extrinsicHash, extrinsicID, storer, CONVERT(wasm using utf8) wasm, codeStoredBN, codeStoredTS, CONVERT(metadata using utf8) metadata, status, CONVERT(code using utf8) code, language, compiler, CONVERT(authors using utf8) authors from wasmCode`
+                    let recs = await this.poolREADONLY.query(sql);
+                    for (const r of recs) {
+                        let [id, relay_chain, para_id, prefix] = this.lookup_contract_chain(r.chainID);
+                        if (r.codeStoredTS) {
+                            bqRows.push({
+                                id,
+                                relay_chain,
+                                para_id,
+                                code_stored_ts: r.codeStoredTS,
+                                code_hash: r.codeHash,
+                                extrinsic_id: r.extrinsicID,
+                                extrinsic_hash: r.extrinsicHash,
+                                storer_pub_key: r.storer,
+                                storer_ss58: r.storer ? encodeAddress(r.storer, prefix) : null,
+                                bytecode: r.wasm,
+                                block_number: r.codeStoredBN,
+                                metadata: r.metadata,
+                                status: r.status,
+                                bytecode: r.code,
+                                language: r.language,
+                                compiler: r.compiler
+                            });
+                        } else {
+                            // TODO:
+                            console.log("CODE", r);
+                        }
+                    }
+                }
+            }
+            if (bqRows.length > 0) {
+                let fn = `/tmp/${tbl}-${startTS}`
+                let rawRows = bqRows.map((r) => {
+                    return JSON.stringify(r);
+                });
+                rawRows.push("");
+                await fs.appendFileSync(fn, rawRows.join("\n"));
+                // TODO: make these tables date partitioned -- not enough data to make this worthwhile except for calls
+                try {
+                    let cmd = `bq load  --project_id=${this.project} --max_bad_records=1 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${fulltbl}' ${fn} schema/substrateetl/contracts/${tbl}.json`;
+                    console.log(cmd);
+                    await exec(cmd);
+                    console.log("SUCCESS");
+                } catch (err) {
+                    console.log(err);
+                }
+            }
+        }
+        console.log("DONE");
+    }
+
 
     async updateNativeBalances(chainID, logDT = null, startTS = 0, perPagelimit = 1000) {
         await this.assetManagerInit();
@@ -2185,7 +2206,8 @@ Example of contractInfoOf:
                         });
                         if ((logDT == yesterdayDT) || (logDT == todayDT)) {
                             //console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
-                            rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain, symbol, decimals,
+                            rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain,
+                                id, relayChain, paraID, symbol, decimals,
                                 free, reserved, misc_frozen, frozen,
                                 free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
                                 free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
@@ -2228,21 +2250,6 @@ Example of contractInfoOf:
             }
         }
         console.log(`****** Native account: numHolders = ${numHolders}`);
-        if (logDT) {} else {
-            // TODO: for all the other accounts that did NOT appear, they got reaped, so 0 out the balances for good measure
-            // Use BigQuery for this
-            let sql_reap = `select address_pubkey, max(ts) as maxts from substrate-etl.${relayChain}.balance${paraID} group by address_pubkey having maxts < ${blockTS-86400}`
-            /*
-            for (let a = 0; a < reapedAccounts.length; a++) {
-                let address = reapedAccounts[a].address;
-                rows.push(this.generate_btRealtimeRow(address, encodedAssetChain, 0, 0, 0, 0, blockTS, bn));
-                console.log("REAPED ACCOUNT", address);
-            }
-            console.log("writing ", rows.length, " REAPED accounts to bt");
-            await this.insertBTRows(tblRealtime, rows, tblName);
-            rows = [];
-	    */
-        }
         let sql = `update blocklog set numNativeHolders = '${numHolders}' where chainID = ${chainID} and logDT = '${logDT}'`
         console.log(numHolders, sql);
         this.batchedSQL.push(sql);
