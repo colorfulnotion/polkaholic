@@ -2875,8 +2875,11 @@ module.exports = class AssetManager extends PolkaholicDB {
         }
         let version = Object.keys(msg)[0]
         switch (version) {
+            case 'v3':
+                this.analyzeXCMInstructionsV3(analysis, msg.v3, chainID, chainIDDest, "computeAssetChains")
+                break;
             case 'v2':
-                this.analyzeXCMInstructions(analysis, msg.v2, chainID, chainIDDest, "computeAssetChains")
+                this.analyzeXCMInstructionsV2(analysis, msg.v2, chainID, chainIDDest, "computeAssetChains")
                 break;
             case 'v1':
                 this.analyzeXCMInstructionsV1(analysis, msg.v1, chainID, chainIDDest, "computeAssetChains")
@@ -2899,7 +2902,7 @@ module.exports = class AssetManager extends PolkaholicDB {
         return analysis;
     }
 
-    analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx = "") {
+    analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx = "", version = 'default') {
         let instructionSet = this.getInstructionSet();
 
         for (const i of Object.keys(instructionSet)) {
@@ -2938,7 +2941,18 @@ module.exports = class AssetManager extends PolkaholicDB {
                             // recursive call
                             let xcmChild = instruction[i][fld];
                             // console.log( "  ... xcmChild:", xcmChild);
-                            this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                            switch (version) {
+                                case 'v2':
+                                    this.analyzeXCMInstructionsV2(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                                    break;
+                                case 'v3':
+                                    this.analyzeXCMInstructionsV3(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                                    break;
+                                default:
+                                    this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                                    break;
+                            }
+                            //this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
                         }
                     }
                 }
@@ -2949,8 +2963,18 @@ module.exports = class AssetManager extends PolkaholicDB {
                             //console.log("analyzing instruction containing effects ", instruction);
                             // recursive call
                             let xcmChild = instruction[i][fld];
-
-                            this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                            switch (version) {
+                                case 'v2':
+                                    this.analyzeXCMInstructionsV2(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                                    break;
+                                case 'v3':
+                                    this.analyzeXCMInstructionsV3(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                                    break;
+                                default:
+                                    this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
+                                    break;
+                            }
+                            //this.analyzeXCMInstructions(analysis, instruction[i][fld], chainID, chainIDDest, i);
                         }
                     }
                 }
@@ -2964,19 +2988,33 @@ module.exports = class AssetManager extends PolkaholicDB {
         }
     }
 
-    analyzeXCMInstructionsV1(analysis, xcmMsgV1, chainID, chainIDDest, ctx) {
-        this.analyzeXCMInstruction(analysis, xcmMsgV1, chainID, chainIDDest, ctx)
-    }
-
     analyzeXCMInstructionsV0(analysis, xcmMsgV0, chainID, chainIDDest, ctx) {
         this.analyzeXCMInstruction(analysis, xcmMsgV0, chainID, chainIDDest, ctx)
     }
 
-    analyzeXCMInstructions(analysis, instructions, chainID, chainIDDest, ctx) {
+    analyzeXCMInstructionsV1(analysis, xcmMsgV1, chainID, chainIDDest, ctx) {
+        this.analyzeXCMInstruction(analysis, xcmMsgV1, chainID, chainIDDest, ctx)
+    }
+
+    analyzeXCMInstructionsV2(analysis, instructions, chainID, chainIDDest, ctx) {
         for (const instruction of instructions) {
             //console.log(`instruction`, instruction)
-            this.analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx)
+            this.analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx, 'v2')
         }
     }
 
+    analyzeXCMInstructionsV3(analysis, instructions, chainID, chainIDDest, ctx) {
+        for (const instruction of instructions) {
+            //console.log(`instruction`, instruction)
+            this.analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx, 'v3')
+        }
+    }
+
+    // not sure if this works for both v2 and v3
+    analyzeXCMInstructions(analysis, instructions, chainID, chainIDDest, ctx) {
+        for (const instruction of instructions) {
+            //console.log(`instruction`, instruction)
+            this.analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx, 'default')
+        }
+    }
 }
