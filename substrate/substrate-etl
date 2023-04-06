@@ -457,10 +457,14 @@ async function main() {
         .description(`Update Contracts for (2006-astar, 2094-pendulum, 22007-shiden, 22124-amplitude, 40000-rococo`)
         .option('-c, --chainID <chainID>', 'ChainID to update contracts', null, myParseInt)
         .action(async (opt) => {
-            let chainID = opt.chainID != null ? opt.chainID : 22007;
+            var manager = new SubstrateETL();
+            let chainID = opt.chainID != null ? opt.chainID : null;
             if (chainID != null) {
-                var manager = new SubstrateETL();
                 await manager.updateContracts(chainID)
+                process.exit(0);
+            } else {
+                await manager.assetManagerInit()
+                await manager.dumpContracts()
                 process.exit(0);
             }
         });

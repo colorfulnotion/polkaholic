@@ -1,7 +1,7 @@
 [
   {
     "mode": "REQUIRED",
-    "name": "chain_name",
+    "name": "relay_chain",
     "type": "STRING",
     "description": "Chain Name"
   },
@@ -37,7 +37,7 @@
   },
   {
     "mode": "REQUIRED",
-    "name": "storer_pubkey",
+    "name": "storer_pub_key",
     "type": "STRING",
     "description": "Storer of contract (pub key)"
   },
@@ -60,8 +60,8 @@
     "description": "Block number of when the contract is stored"
   },
   {
-    "mode": "NULLABLE",
-    "name": "block_timestamp",
+    "mode": "REQUIRED",
+    "name": "code_stored_ts",
     "type": "TIMESTAMP",
     "description": "Timestamp of block"
   },
