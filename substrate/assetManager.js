@@ -1552,8 +1552,11 @@ module.exports = class AssetManager extends PolkaholicDB {
     async getDexRec(asset, chainID, ts) {
         if (ts == null) {
             let assetlog = await this.get_assetlog(asset, chainID, null, 1);
-            if (assetlog.dexRecs) {
-                return (assetlog.dexRecs[assetlog.dexRecs.length - 1].dexRec);
+            if (assetlog, assetlog.dexRecs && Array.isArray(assetlog.dexRecs) && assetlog.dexRecs.length > 0) {
+                let lastDexRec = assetlog.dexRecs[assetlog.dexRecs.length - 1]
+                if (lastDexRec.dexRec != undefined){
+                    return lastDexRec.dexRec
+                }
             }
             return (false);
         }

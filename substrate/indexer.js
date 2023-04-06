@@ -4054,8 +4054,8 @@ module.exports = class Indexer extends AssetManager {
                         remarks[ff.args.remark] = 1
                     }
                 }
-                let o = `call ${lvl}-${i}`
-                // console.log(`\t${o} - ${pallet_method}`)
+                //let o = `call ${lvl}-${i}`
+                //console.log(`\t${o} - ${pallet_method}`)
                 if (ff.args.call != undefined) {
                     //recursively decode opaque call
                     let s = " ".repeat()
