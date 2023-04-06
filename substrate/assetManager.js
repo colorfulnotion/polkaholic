@@ -1885,6 +1885,78 @@ module.exports = class AssetManager extends PolkaholicDB {
         return t
     }
 
+    async paramToCalls(section, method, args, chainID, ts, depth = '0', decorate = true, decorateExtra = ["data", "address", "usd"]) {
+        let flatCalls = []
+        await this.paramToCallsInternal(section, method, args, chainID, ts, depth, flatCalls, decorate, decorateExtra)
+        return flatCalls
+    }
+
+    async paramToCallsInternal(section, method, args, chainID, ts, depth = '0', flatCalls = [], decorate = true, decorateExtra = ["data", "address", "usd"]) {
+        //this.chainParserInit(chainID, this.debugLevel);
+        let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
+        let sectionMethod = `${section}:${method}`
+        //let callsArr = []
+        try {
+            if (args.calls != undefined) { // this is an array
+                //console.log(`${depth}:${sectionMethod} descend into calls len[${args.calls.length}]`)
+                let f = {
+                    call_id: depth,
+                    section: section,
+                    method: method,
+                    args: args
+                }
+                flatCalls.push(f)
+                let i = 0;
+                for (const c of args.calls) {
+                    let call_section = c.section;
+                    let call_method = c.method;
+                    let nextDepth = `${depth}-${i}`
+                    //console.log(depth, "call ", i , call_section, call_method, c);
+                    //console.log(`calls[${i}] nextDepth=${nextDepth} call_section=${call_section}, call_method=${call_method}`, c)
+                    i++;
+                    await this.paramToCallsInternal(call_section, call_method, c.args, chainID, ts, nextDepth, flatCalls, decorate, decorateExtra)
+                }
+            } else if (args.call != undefined) { // this is an object
+                let call = args.call
+                let call_section = call.section;
+                let call_method = call.method;
+                //console.log(`${depth}:${sectionMethod} descend into call`, call)
+                let f = {
+                    call_id: depth,
+                    section: section,
+                    method: method,
+                    args: args
+                }
+                flatCalls.push(f)
+                let nextDepth = `${depth}-0`
+                //console.log(`call nextDepth=${nextDepth} call_section=${call_section}, call_method=${call_method}`, call)
+                await this.paramToCallsInternal(call_section, call_method, call.args, chainID, ts, nextDepth, flatCalls, decorate, decorateExtra)
+            } else {
+                //collect leaf node here
+                let f = {
+                    call_id: depth,
+                    section: section,
+                    method: method,
+                    args: args
+                }
+                flatCalls.push(f)
+                let pallet_method = `${section}:${method}`
+                //console.log(`${depth}:${sectionMethod} DONE, ${pallet_method}`, args)
+                //await this.chainParser.decorate_query_params(this, pallet_method, args, chainID, ts, 0, decorate, decorateExtra)
+            }
+        } catch (err) {
+            console.log(err);
+            this.logger.error({
+                "op": "query.paramToCallsInternal",
+                section,
+                method,
+                args,
+                chainID,
+                err
+            });
+        }
+    }
+
     async decorateEvent(event, chainID, ts, decorate = true, decorateExtra = ["data", "address", "usd", "related"], isUI = true) {
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         if (!decorate || !decorateData) return event
