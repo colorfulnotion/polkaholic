@@ -1495,6 +1495,9 @@ module.exports = {
     //chainIDDarwinia: 2046,
     //chainIDKylin: 2052,
     //chainIDOmnibtc: 2055,
+    chainIDOak: 2090,
+    chainIDFrequency: 2091,
+    chainIDPendulum: 2094,
 
     // other
     chainIDUniqueOther: 255,

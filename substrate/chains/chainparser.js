@@ -4252,7 +4252,26 @@ module.exports = class ChainParser {
         }
         */
         let chainID = indexer.chainID
-        let [asset, _] = paraTool.parseAssetChain(rAssetkey)
+        //chains that use token pallet by index
+        let tokenCurrencyIDList = [paraTool.chainIDMangataX,
+            paraTool.chainIDHydraDX, paraTool.chainIDBasilisk,
+            paraTool.chainIDComposable, paraTool.chainIDPicasso,
+            paraTool.chainIDTuring, paraTool.chainIDOak,
+            paraTool.chainIDDoraFactory
+        ]
+        let asset = false
+        if (tokenCurrencyIDList.includes(chainID)){
+            console.log(`chainID=${chainID} using tokenCurrencyID, rAssetkey=${rAssetkey}`)
+            let currencyID = paraTool.toNumWithoutComma(JSON.parse(rAssetkey));
+            rAssetkey = JSON.stringify({
+                Token: paraTool.toNumWithoutComma(JSON.parse(rAssetkey))
+            })
+            console.log(`chainID=${chainID} updated rAssetkey=`, rAssetkey)
+            asset = rAssetkey
+        }{
+            let [targetAsset, _] = paraTool.parseAssetChain(rAssetkey)
+            asset = targetAsset
+        }
         let decimals = await indexer.getAssetDecimal(asset, chainID, "processTokensAccounts");
         let targetSymbol = await indexer.getAssetSymbol(asset, chainID, "processTokensAccounts");
         let symbol = (targetSymbol)? targetSymbol : null
