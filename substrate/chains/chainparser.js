@@ -4135,9 +4135,73 @@ module.exports = class ChainParser {
             }
         });
         if (this.debugVerbose >= paraTool.debugInfo) console.log(`${rAssetkey} **`, e2, aa)
-        console.log(`${rAssetkey} ++++ processSystemAccount after`, e2, aa)
+        console.log(`${rAssetkey} ++++ processSystemAccount Generated`, aa)
+        /* aa Sample
+        {
+          symbol: 'KSM',
+          decimal: 12,
+          free_raw: '99455724',
+          free: 0.000099455724,
+          misc_frozen_raw: '0',
+          misc_frozen: 0,
+          frozen_raw: '0',
+          frozen: 0,
+          reserved_raw: '0',
+          reserved: 0
+        }
+        */
         let assetChain = paraTool.makeAssetChain(rAssetkey, chainID);
-        indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-tokens", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
+        indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-native", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
+    }
+
+    async processAssetsAccount(indexer, p, s, e2, rAssetkey, fromAddress) {
+        console.log(`processAssetsAccount  ${fromAddress} rAssetkey`, rAssetkey);
+        console.log(`processAssetsAccount  ${fromAddress} e2`, e2);
+        /*	 {
+          bn: 440669,
+          ts: undefined,
+          p: 'Assets',
+          s: 'Account',
+          accountID: 'p8BGSVoKYevaPmwvToSw8DymupVHsafDfBswPcmuUzZNfs5CL',
+          asset: '"200,070,014"',
+          k: '682a59d51ab9e48a8c8cc418ff9708d2b99d880ec681799c0cf30e8886371da91db0ff2973712395c44f807f8cb67df07ed3ec0b421ef7b4bc30466ac442e8dbe1b170720e6668ffb8bdadfc78483743ca9a62ab656a6682397dcafdb0e516520dc8dc41',
+          v: '48003e3bad2900000000000000000000000001',
+          pv: '{"balance":179000000000,"isFrozen":false,"reason":{"sufficient":null},"extra":null}',
+          debug: 2
+        }*/
+        let chainID = indexer.chainID
+
+        try {
+            let success = false;
+            let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, e2.asset);
+            //let decimals = await this.getAssetDecimal(indexer, rAssetkey);
+            let decimals = e2.decimals
+            let symbol = (e2.symbol != undefined)? e2.symbol: null // try to get symbol here; not sure if it always work
+            if (decimals !== false) {
+                //console.log("processAssetsAccount FOUND decimals", rAssetkey, decimals);
+                if (e2.pv !== undefined) {
+                    let v = JSON.parse(e2.pv);
+                    let aa = {
+                        symbol: symbol,
+                        decimal: decimals
+                    }
+                    aa["free"] = v.balance / 10 ** decimals;
+                    // TODO: add raw, use decHexToInt function
+                    let assetType = paraTool.assetTypeToken;
+                    let assetChain = paraTool.makeAssetChain(rAssetkey, chainID)
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processAssetsAccount  ${fromAddress}`, aa);
+                    console.log(`${rAssetkey} ++++ processAssetsAccount Generated`, aa)
+                    indexer.updateAddressStorage(fromAddress, assetChain, "parallel:processAssetsAccount-assets", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
+                } else {
+                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processAssetsAccount MISSING pv", e2);
+                }
+            } else {
+                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processAssetsAccount MISSING decimals", rAssetkey);
+            }
+        } catch (err) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processAssetsAccount ERR", e2, rAssetkey, fromAddress, err);
+            this.parserErrors++;
+        }
     }
 
     //TODO
@@ -4167,49 +4231,6 @@ module.exports = class ChainParser {
                 "msg": "getAssetDecimal",
                 "asset": asset
             });
-        }
-    }
-
-    async processAssetsAccount(indexer, p, s, e2, rAssetkey, fromAddress) {
-        console.log(`processAssetsAccount  ${fromAddress}`, e2);
-        /*	 {
-          bn: 440669,
-          ts: undefined,
-          p: 'Assets',
-          s: 'Account',
-          accountID: 'p8BGSVoKYevaPmwvToSw8DymupVHsafDfBswPcmuUzZNfs5CL',
-          asset: '"200,070,014"',
-          k: '682a59d51ab9e48a8c8cc418ff9708d2b99d880ec681799c0cf30e8886371da91db0ff2973712395c44f807f8cb67df07ed3ec0b421ef7b4bc30466ac442e8dbe1b170720e6668ffb8bdadfc78483743ca9a62ab656a6682397dcafdb0e516520dc8dc41',
-          v: '48003e3bad2900000000000000000000000001',
-          pv: '{"balance":179000000000,"isFrozen":false,"reason":{"sufficient":null},"extra":null}',
-          debug: 2
-        }*/
-        let chainID = indexer.chainID
-        try {
-            let success = false;
-            let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, e2.asset);
-            //let decimals = await this.getAssetDecimal(indexer, rAssetkey);
-            let decimals = e2.decimals
-            if (decimals !== false) {
-                //console.log("processAssetsAccount FOUND decimals", rAssetkey, decimals);
-                if (e2.pv !== undefined) {
-                    let v = JSON.parse(e2.pv);
-                    let aa = {};
-                    aa["free"] = v.balance / 10 ** decimals;
-                    // TODO: add raw, use decHexToInt function
-                    let assetType = paraTool.assetTypeToken;
-                    let assetChain = paraTool.makeAssetChain(rAssetkey, chainID)
-                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processAssetsAccount  ${fromAddress}`, aa);
-                    indexer.updateAddressStorage(fromAddress, assetChain, "parallel:processAssetsAccount", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
-                } else {
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processAssetsAccount MISSING pv", e2);
-                }
-            } else {
-                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processAssetsAccount MISSING decimals", rAssetkey);
-            }
-        } catch (err) {
-            if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processAssetsAccount ERR", e2, rAssetkey, fromAddress, err);
-            this.parserErrors++;
         }
     }
 
@@ -4294,33 +4315,6 @@ module.exports = class ChainParser {
         //console.log(`generic processAccountAsset ${pallet_section}`)
         if (pallet_section == "System:Account") {
             await this.processSystemAccount(indexer, e2, rAssetkey, fromAddress);
-            /*
-            let chainDecimal = indexer.getChainDecimal(chainID)
-            let aa = {
-                symbol: indexer.getChainSymbol(chainID),
-                decimal: chainDecimal
-            }
-            let flds = ["free", "miscFrozen", "feeFrozen", "reserved", "frozen"];
-            flds.forEach((fld) => {
-                if (e2[fld] != undefined) {
-                    let fld2 = fld;
-                    if (fld == "miscFrozen") {
-                        fld2 = "misc_frozen";
-                    }
-                    if (fld == "feeFrozen") {
-                        fld2 = "frozen";
-                    }
-                    let raw = paraTool.dechexToIntStr(e2[fld].toString())
-                    aa[`${fld2}_raw`] = raw;
-                    aa[fld2] = raw / 10 ** chainDecimal;
-                    // TODO: move _usd valuation here
-                }
-            });
-            if (this.debugVerbose >= paraTool.debugInfo) console.log(`${rAssetkey} **`, e2, aa)
-            //console.log(`${rAssetkey} ++++ after`, e2, aa)
-            let assetChain = paraTool.makeAssetChain(rAssetkey, chainID);
-            indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-tokens", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
-            */
         } else if (pallet_section == "Tokens:Accounts") {
             // TODO: check how acala and others handle this
             await this.processTokensAccounts(indexer, e2, rAssetkey, fromAddress);
@@ -5754,6 +5748,7 @@ module.exports = class ChainParser {
             out.decoratedAsset = {
                 Token: cachedAssetInfo.symbol
             }
+            out.symbol = cachedAssetInfo.symbol
         } else {
             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`setAssetSymbolAndDecimals ${assetID} symbol not found`)
             out.decoratedAsset = {
