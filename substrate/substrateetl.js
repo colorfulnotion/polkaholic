@@ -1514,7 +1514,7 @@ module.exports = class SubstrateETL extends AssetManager {
     | deployer      | varchar(67) | YES  | MUL | NULL    |       | contractevents{paraID} left join extrinsic_id with extrinsics{paraID}
     +---------------+-------------+------+-----+---------+-------+
     	    */
-    async updateContracts(chainID, loadSourceTables = true, perPagelimit = 1000, startDT = "2023-03-01") {
+    async updateContracts(chainID, loadSourceTables = false, perPagelimit = 1000, startDT = "2023-04-01") {
         await this.assetManagerInit();
         let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, WSEndpointArchive, numHolders, totalIssuance, decimals from chain where chainID = '${chainID}'`);
         if (chains.length == 0) {
@@ -1645,7 +1645,7 @@ Example of contractInfoOf:
   storageByteDeposit: '117,000,000,000',
   storageItemDeposit: '2,000,000,000',
   storageBaseDeposit: '122,000,000,000'
-}
+} 
 	*/
                 numContracts++;
                 let pub = c[0].slice(-32);
@@ -1795,8 +1795,8 @@ Example of contractInfoOf:
                         let params = JSON.parse(r.params);
                         let contract_ss58 = params.dest.id;
                         let contract = paraTool.getPubKey(contract_ss58);
-                        let gas_limit = paraTool.isNumeric(params.gas_limit) ? parseInt(params.gas_limit, 10) : 0;
-                        let storage_deposit_limit = params.storage_deposit_limit;
+                        let gas_limit = paraTool.isNumeric(params.gas_limit) ? paraTool.dechexToIntStr(params.gas_limit) : 0;
+                        let storage_deposit_limit = params.storage_deposit_limit && params.storage_deposit_limit.length > 4 ? paraTool.dechexToIntStr(params.storage_deposit_limit) : 0;
                         let value = bnToBn(params.value).toString();
                         let caller = paraTool.getPubKey(r.signer_pub_key);
                         let decodedCall = null;

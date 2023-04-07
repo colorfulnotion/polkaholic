@@ -4054,8 +4054,8 @@ module.exports = class Indexer extends AssetManager {
                         remarks[ff.args.remark] = 1
                     }
                 }
-                let o = `call ${lvl}-${i}`
-                // console.log(`\t${o} - ${pallet_method}`)
+                //let o = `call ${lvl}-${i}`
+                //console.log(`\t${o} - ${pallet_method}`)
                 if (ff.args.call != undefined) {
                     //recursively decode opaque call
                     let s = " ".repeat()
@@ -4768,6 +4768,7 @@ module.exports = class Indexer extends AssetManager {
             lifetime: txLifetime,
             nonce: nonce,
             tip: tip,
+            callIndex: extrinsic.method.callIndex,
             section: extrinsic.method.pallet,
             method: extrinsic.method.method, //replacing the original method object format
             params: extrinsic.args,
@@ -5081,6 +5082,7 @@ module.exports = class Indexer extends AssetManager {
             fee: txFee,
             result: txResult,
             err: null,
+            callIndex: extrinsic.method.callIndex,
             section: exSection,
             method: exMethod,
             params: extrinsic.args,
@@ -6564,6 +6566,7 @@ module.exports = class Indexer extends AssetManager {
         let paraID = paraTool.getParaIDfromChainID(chainID);
         let id = this.getIDByChainID(chainID);
 
+        let calls = []
         let extrinsics = [];
         let events = [];
         let transfers = [];
@@ -6719,13 +6722,59 @@ module.exports = class Indexer extends AssetManager {
                     signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
                 }
                 extrinsics.push({
-                    insertId: `${relayChain}-${paraID}-{ext.extrinsicID}`,
+                    insertId: `${relayChain}-${paraID}-${ext.extrinsicID}`,
                     json: bqExtrinsic
                 })
+                let flattenedCalls = await this.paramToCalls(ext.extrinsicID, ext.section, ext.method, ext.callIndex, ext.params, ext.paramsDef, chainID, block.block_time, '0')
+                for (const call of flattenedCalls){
+                    let ext_fee = null
+                    let ext_fee_usd = null
+                    let ext_weight = null
+                    let call_root = (call.root != undefined)? call.root: null
+                    let call_leaf = (call.leaf != undefined)? call.leaf: null
+                    if (call_root){
+                        //only store fee, fee_usd, weight at root
+                        ext_fee = ext.fee
+                        ext_fee_usd = feeUSD
+                        ext_weight = (ext.weight != undefined) ? ext.weight : null  // TODO: ext.weight
+                    }
+                    let bqExtrinsicCall = {
+                        relay_chain: relayChain,
+                        para_id: paraID,
+                        id: id,
+                        block_hash: block.hash,
+                        block_number: block.number,
+                        block_time: block.block_time,
+                        extrinsic_hash: ext.extrinsicHash,
+                        extrinsic_id: ext.extrinsicID,
+                        lifetime: JSON.stringify(ext.lifetime),
+                        extrinsic_section: ext.section,
+                        extrinsic_method: ext.method,
+                        call_id: call.id,
+                        call_index: call.index,
+                        call_section: call.section,
+                        call_method: call.method,
+                        call_args: JSON.stringify(call.args),
+                        call_args_def: JSON.stringify(call.argsDef),
+                        root: call_root,
+                        leaf: call_leaf,
+                        fee: ext_fee,
+                        fee_usd: ext_fee_usd,
+                        //amounts: null
+                        //amount_usd: null,
+                        weight: ext_weight,
+                        signed: ext.signer ? true : false,
+                        signer_ss58: ext.signer ? ext.signer : null,
+                        signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
+                    }
+                    calls.push({
+                        insertId: `${relayChain}-${paraID}-${ext.extrinsicID}-${call.id}`,
+                        json: bqExtrinsicCall
+                    })
+                }
             }
         }
-        //let tables = ["extrinsics", "events", "transfers", "fulltransfers"];
-        let tables = ["tokentransfers"];
+        let tables = ["extrinsics", "events", "transfers", "fulltransfers", "calls"];
         for (const t of tables) {
             let rows = null;
             switch (t) {
@@ -6741,6 +6790,10 @@ module.exports = class Indexer extends AssetManager {
                 case "tokentransfers":
                     rows = tokentransfers;
                     //console.log(`tokentransfers`, tokentransfers)
+                    break;
+                case "calls":
+                    rows = calls;
+                    //console.log(`calls`, calls)
                     break;
             }
             if (rows && rows.length > 0) {

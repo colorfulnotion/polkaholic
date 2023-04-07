@@ -3617,7 +3617,7 @@ module.exports = class Query extends AssetManager {
                     //filter non-specified records .. do not decorate
                     continue
                 }
-                contract = JSON.parse(cells[0].value)
+                contract = JSON.parse(cell[0].value)
                 break;
             }
             // TODO
@@ -4779,11 +4779,16 @@ module.exports = class Query extends AssetManager {
             if (ext.source) decoratedExt.source = decoratedExt.source
 
             let [section, method] = paraTool.parseSectionMethod(ext)
+            decoratedExt.callIndex = null
             decoratedExt.section = section
             decoratedExt.method = method
             decoratedExt.params = ext.params
+            decoratedExt.calls = await this.paramToCalls(ext.extrinsicID, section, method, ext.callIndex, ext.params, ext.paramsDef, chainID, ext.ts, '0', decorate, decorateData)
             if (ext.paramsDef) {
                 decoratedExt.paramsDef = ext.paramsDef
+            }
+            if (ext.callIndex != undefined){
+                decoratedExt.callIndex = ext.callIndex
             }
 
             if (ext.events != undefined) {
@@ -4804,7 +4809,8 @@ module.exports = class Query extends AssetManager {
             }
             //console.log(`decoratedExt after decorateEventModule [decorate=${decorate}, decorateUSD=${decorateUSD}]`, decoratedExt)
             if (ext.params != undefined && decorate) {
-                await this.decorateParams(section, method, ext.params, chainID, ext.ts, 0, decorate, decorateData)
+                await this.decorateParams(section, method, ext.params, ext.paramsDef, chainID, ext.ts, 0, decorate, decorateData)
+                //decoratedExt.calls = await this.paramToCalls(section, method, ext.params, chainID, ext.ts, '0', decorate, decorateData)
 
                 // WASM decoration of contract metadata is done at the "extrinsic" level rather than "params" level
                 // for now, we ignore utility batch / proxy etc and put metadata up at the top level

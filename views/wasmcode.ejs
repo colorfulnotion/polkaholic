@@ -6,7 +6,7 @@
 let tabs = [
 { title: "Overview", target: "overview" },
 ];
-let metadata = JSON.parse(code.metadata);
+let metadata = code && code.metadata ? JSON.parse(code.metadata) : null;
 let spec = metadata && metadata.V3 && metadata.V3.spec ? metadata.V3.spec : null;
 let types = metadata && metadata.types ? metadata.types : null;
 var constructors, events, messages, readMessages = [], writeMessages = [];

@@ -70,10 +70,14 @@ var baseURL = '<%= config.baseURL; %>'
 let address = '<%= contract.address; %>';
 let addressSS58 = "<%= contract.address58; %>"; 
 let tabs = <%- JSON.stringify(tabs); %>;
+<%
+
+if ( contract && contract.metadata ) { %>
 let metadata = <%- contract.metadata; %>;
 $(document).ready(function() {
   readContract(<%= contract.chainID %>, metadata, address);
 });
+<% } %>
 </script>
 
 <script src="/wasmcontractui.js"></script>
