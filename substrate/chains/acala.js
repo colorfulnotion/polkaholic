@@ -8,7 +8,7 @@ module.exports = class AcalaParser extends ChainParser {
         this.chainParserName = 'Acala'
     }
 
-    getTokensAccountsKey(indexer, decoratedKey) {
+    getTokensAccountsKey_skip(indexer, decoratedKey) {
         //Tokens:Accounts
         // {"map":{"hashers":["Blake2_128Concat","Twox64Concat"],"key":"344","value":"348"}} (344 = (accountID, currencyID)
         /* https://github.com/open-web3-stack/open-runtime-module-library/blob/master/tokens/src/lib.rs#L282
@@ -709,10 +709,7 @@ module.exports = class AcalaParser extends ChainParser {
     parseStorageKey(indexer, p, s, key, decoratedKey) {
         let pallet_section = `${p}:${s}`
         //console.log(`acala parseStorageKey ${pallet_section}`)
-        if (pallet_section == "tokens:accounts") {
-            //include accountID, asset
-            return this.getTokensAccountsKey(indexer, decoratedKey);
-        } else if (pallet_section == "tokens:totalIssuance") {
+        if (pallet_section == "tokens:totalIssuance") {
             //include asset
             return this.getTotalIssuanceKey(indexer, decoratedKey);
         } else if (pallet_section == "loans:positions") {
@@ -751,8 +748,6 @@ module.exports = class AcalaParser extends ChainParser {
         //console.log(`acala parseStorageVal ${pallet_section}`)
         if (pallet_section == "dex:liquidityPool") {
             return this.getLiquidityPoolVal(val, decoratedVal)
-        } else if (pallet_section == "tokens:accounts") {
-            return this.getBalanceVal(p, s, val, decoratedVal)
         } else if (pallet_section == "loans:positions") {
             return this.getBalanceVal(p, s, val, decoratedVal)
         } else if (pallet_section == "tokens:totalIssuance") {
@@ -953,35 +948,6 @@ module.exports = class AcalaParser extends ChainParser {
         return issuance
     }
 
-    async processTokensAccounts(indexer, e2, rAssetkey, fromAddress) {
-        let aa = {};
-        let flds = ["free", "reserved", "miscFrozen", "feeFrozen", "frozen"];
-        let success = false;
-        let [asset, _] = paraTool.parseAssetChain(rAssetkey)
-        let decimals = await this.getAssetDecimal(indexer, asset, "processTokensAccounts");
-        // for ALL the evaluatable attributes in e2, copy them in
-        console.log(`fromAddress=${fromAddress}. rAssetkey=${rAssetkey}, e2`, e2)
-        if (decimals) {
-            flds.forEach((fld) => {
-                aa[fld] = e2[fld] / 10 ** decimals;
-                success = true;
-            });
-            if (success) {
-                let parsedAsset = JSON.parse(asset);
-                let assetType = (Array.isArray(parsedAsset)) ? paraTool.assetTypeLiquidityPair : paraTool.assetTypeToken;
-                let assetChain = paraTool.makeAssetChain(rAssetkey, indexer.chainID);
-                if (this.debugLevel >= paraTool.debugVerbose) console.log(`processTokensAccounts  ${fromAddress}`, assetChain, aa);
-                indexer.updateAddressStorage(fromAddress, assetChain, "acala:processTokensAccounts-tokens", aa, this.parserTS, this.parserBlockNumber, assetType);
-            }
-        } else {
-            indexer.logger.debug({
-                "op": "acala-processTokensAccounts",
-                "msg": "getAssetDecimal",
-                "asset": asset
-            });
-        }
-    }
-
     processOrmlNFTTokens(indexer, e2) {
         /*
         	     {
@@ -1052,8 +1018,6 @@ processOrmlNFTClasses {
         //console.log(`acala processAccountAsset ${pallet_section}`)
         if (pallet_section == "Loans:Positions") {
             await this.processLoansPositions(indexer, e2, rAssetkey, fromAddress);
-        } else if (pallet_section == "Tokens:Accounts") {
-            await this.processTokensAccounts(indexer, e2, rAssetkey, fromAddress);
         } else if (pallet_section == "Rewards:SharesAndWithdrawnRewards") {
             await this.processRewardsSharesAndWithdrawnRecords(indexer, e2, rAssetkey, fromAddress);
         } else if (pallet_section == "Incentives:PendingMultiRewards") {

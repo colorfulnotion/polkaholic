@@ -3527,6 +3527,9 @@ module.exports = class Indexer extends AssetManager {
                 if (handParseKey.decimals != undefined) {
                     o.decimals = handParseKey.decimals
                 }
+                if (handParseKey.symbol != undefined) {
+                    o.symbol = handParseKey.symbol
+                }
                 if (handParseKey.asset && handParseKey.asset.DexShare) {
                     handParseKey.asset = handParseKey.asset.DexShare;
                 }

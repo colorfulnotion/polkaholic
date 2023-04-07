@@ -625,6 +625,7 @@ module.exports = class ParallelParser extends ChainParser {
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel processAccountAsset ${pallet_section}`)
         switch (pallet_section) {
             case "Assets:Account":
+                console.log(`im here?`)
                 await this.processAssetsAccount(indexer, p, s, e2, rAssetkey, fromAddress);
                 break;
             case "Loans:AccountDeposits":
