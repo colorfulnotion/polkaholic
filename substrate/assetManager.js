@@ -1554,7 +1554,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             let assetlog = await this.get_assetlog(asset, chainID, null, 1);
             if (assetlog, assetlog.dexRecs && Array.isArray(assetlog.dexRecs) && assetlog.dexRecs.length > 0) {
                 let lastDexRec = assetlog.dexRecs[assetlog.dexRecs.length - 1]
-                if (lastDexRec.dexRec != undefined){
+                if (lastDexRec.dexRec != undefined) {
                     return lastDexRec.dexRec
                 }
             }
@@ -1895,8 +1895,8 @@ module.exports = class AssetManager extends PolkaholicDB {
         //this.chainParserInit(chainID, this.debugLevel);
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
         let sectionMethod = `${section}:${method}`
-        let args_def = (argsDef != undefined)? argsDef: null
-        let call_index = (callIndex != undefined)? callIndex: null
+        let args_def = (argsDef != undefined) ? argsDef : null
+        let call_index = (callIndex != undefined) ? callIndex : null
         //let callsArr = []
         try {
             if (args.calls != undefined) { // this is an array
@@ -1909,7 +1909,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     args: args,
                     argsDef: args_def,
                     leaf: false,
-                    root: (depth == '0')? true: false
+                    root: (depth == '0') ? true : false
                 }
                 flatCalls.push(f)
                 let i = 0;
@@ -1938,7 +1938,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     args: args,
                     argsDef: args_def,
                     leaf: false,
-                    root: (depth == '0')? true: false
+                    root: (depth == '0') ? true : false
                 }
                 flatCalls.push(f)
                 let nextDepth = `${depth}-0`
@@ -1954,7 +1954,7 @@ module.exports = class AssetManager extends PolkaholicDB {
                     args: args,
                     argsDef: args_def,
                     leaf: true,
-                    root: (depth == '0')? true: false
+                    root: (depth == '0') ? true : false
                 }
                 flatCalls.push(f)
                 let pallet_method = `${section}:${method}`
