@@ -809,7 +809,7 @@ module.exports = class ChainParser {
         return out
     }
 
-    getAccountVal(indexer, decoratedVal) {
+    getSystemAccountVal(indexer, decoratedVal) {
         let v = JSON.parse(decoratedVal)
         let res = {}
         let extraField = []
@@ -829,6 +829,17 @@ module.exports = class ChainParser {
         return res
     }
 
+    // decoratedKey: ["100","hJHfe3mtq3Rx4gcUGtSjXwL4Wmq3Krtt3uumUhXG1rTq9WwZg"]
+    getAssetsAccountKey(indexer, decoratedKey) {
+        let k = JSON.parse(decoratedKey)
+        var out = {};
+        let assetID = this.cleanedAssetID(k[0]); //currencyID
+        this.setAssetSymbolAndDecimals(indexer, assetID, out)
+        out.accountID = k[1]; //account
+        console.log(`getAssetsAccountKey`, out)
+        return out
+    }
+
     /*
     {
       balance: 5,000,000,000,000,000,000
@@ -838,14 +849,16 @@ module.exports = class ChainParser {
     }
     */
 
-    getAssetAccountVal(indexer, decoratedVal) {
+    //TODO
+    getAssetsAccountVal(indexer, decoratedVal) {
         let v = JSON.parse(decoratedVal)
-        let data = v.data
+        //let data = v.data
         let res = {}
         let extraField = []
-        //console.log(`getAssetAccountVal`, decoratedVal)
-        //console.log(`getAssetAccountVal data`, data)
         // TODO: REENABLE this using NEW paraTool.dechexToIntStr abstraction
+        if (v != undefined && v.balance != undefined){
+            extraField["balance"] = paraTool.dechexToIntStr(v.balance)
+        }
         /*
         for (const f of Object.keys(data)) {
             extraField[f] = paraTool.dechexToInt(data[f])
@@ -857,8 +870,44 @@ module.exports = class ChainParser {
         //If the funds are to be used for transfers, then the usable amount is the free amount minus any misc_frozen funds.
         //If the funds are to be used to pay transaction fees, the usable amount would be the free funds minus fee_frozen
         //extraField["frozen"] = extraField["miscFrozen"]
-        delete v.data
+        //delete v.data
         res["pv"] = v
+        res["extra"] = extraField
+        console.log(`getAssetsAccountVal res`, res)
+        return res
+    }
+
+    //TODO:
+    getTokensAccountsKey(indexer, decoratedKey) {
+        //Tokens:Accounts
+        // {"map":{"hashers":["Blake2_128Concat","Twox64Concat"],"key":"344","value":"348"}} (344 = (accountID, currencyID)
+        /* https://github.com/open-web3-stack/open-runtime-module-library/blob/master/tokens/src/lib.rs#L282
+        pub type Accounts<T: Config> = StorageDoubleMap<_, Blake2_128Concat, T::AccountId, Twox64Concat, T::CurrencyId, AccountData<T::Balance>, ValueQuery, >; */
+        // ["pJhw2zYqTnW9m2ddvJCE3B2493ibxbRwJ7ksDTLzf5raEpv",{"DexShare":[{"Token":"KAR"},{"Token":"KSM"}]}]
+        let k = JSON.parse(decoratedKey)
+        var out = {};
+        out.accountID = k[0]; //accountID
+        out.asset = k[1]; //currencyID
+        return out
+    }
+
+    //TODO
+    getTokensAccountsVal(indexer, decoratedVal, val, p, s) {
+        let res = {}
+        let extraField = []
+        let decoratedValBlackList = ["VestingBalance", "AveragePriceAlreadyEnabled"]
+        let shouldSkip = decoratedValBlackList.includes(decoratedVal)
+        try {
+            if (!shouldSkip) { //0x00?
+                let v = JSON.parse(decoratedVal)
+                for (let f in v) {
+                    extraField[f] = paraTool.dechexToIntStr(v[f])
+                }
+            }
+        } catch (e) {
+            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`p:s=${p}:${s}, [${val}, ${decoratedVal}] getBalanceVal error`, e)
+        }
+        res["pv"] = ''
         res["extra"] = extraField
         return res
     }
@@ -3973,10 +4022,11 @@ module.exports = class ChainParser {
         //console.log(`generic parseStorageVal ${pallet_section}`)
         // parsing that works on every chain
         if (pallet_section == "system:account") {
-            return this.getAccountVal(indexer, decoratedVal)
+            return this.getSystemAccountVal(indexer, decoratedVal)
         } else if (pallet_section == "assets:account") {
-            return this.getAssetAccountVal(indexer, decoratedVal)
-            // TODO: } else if (pallet_section == "tokens:accounts") {
+            return this.getAssetsAccountVal(indexer, decoratedVal)
+        } else if (pallet_section == "tokens:accounts") {
+            return this.getTokensAccountsVal(indexer, decoratedVal, val, p, s)
         } else if (pallet_section == "balances:totalIssuance") {
             return this.getBalancesTotalIssuanceVal(indexer, decoratedVal)
         } else if (pallet_section == "identity:identityOf" && chainID == paraTool.chainIDPolkadot) {
@@ -4005,8 +4055,8 @@ module.exports = class ChainParser {
             return this.getSystemAccountKey(indexer, decoratedKey);
         } else if (pallet_section == "assets:account") {
             return this.getAssetsAccountKey(indexer, decoratedKey);
-            // TODO: } else if (pallet_section == "tokens:accounts") {
-
+        } else if (pallet_section == "tokens:accounts") {
+            return this.getTokensAccountsKey(indexer, decoratedKey);
         } else if (pallet_section == "identity:identityOf" && chainID == paraTool.chainIDPolkadot) {
             return this.getIdentityKey(indexer, decoratedKey);
         } else if (pallet_section == "dmp:downwardMessageQueues") {
@@ -4040,16 +4090,6 @@ module.exports = class ChainParser {
         return res
     }
 
-    // decoratedKey: ["100","hJHfe3mtq3Rx4gcUGtSjXwL4Wmq3Krtt3uumUhXG1rTq9WwZg"]
-    getAssetsAccountKey(indexer, decoratedKey) {
-        let k = JSON.parse(decoratedKey)
-        var out = {};
-        let assetID = this.cleanedAssetID(k[0]); //currencyID
-        this.setAssetSymbolAndDecimals(indexer, assetID, out)
-        out.accountID = k[1]; //account
-        return out
-    }
-
     // decoratedKey: ["100"]
     getAssetsAssetKey(indexer, decoratedKey) {
         let k = JSON.parse(decoratedKey)
@@ -4070,8 +4110,68 @@ module.exports = class ChainParser {
         }
     }
 
+    //TODO:
+    async processSystemAccount(indexer, e2, rAssetkey, fromAddress) {
+        let chainID = indexer.chainID
+        let chainDecimal = indexer.getChainDecimal(chainID)
+        let aa = {
+            symbol: indexer.getChainSymbol(chainID),
+            decimal: chainDecimal
+        }
+        let flds = ["free", "miscFrozen", "feeFrozen", "reserved", "frozen"];
+        flds.forEach((fld) => {
+            if (e2[fld] != undefined) {
+                let fld2 = fld;
+                if (fld == "miscFrozen") {
+                    fld2 = "misc_frozen";
+                }
+                if (fld == "feeFrozen") {
+                    fld2 = "frozen";
+                }
+                let raw = paraTool.dechexToIntStr(e2[fld].toString())
+                aa[`${fld2}_raw`] = raw;
+                aa[fld2] = raw / 10 ** chainDecimal;
+                // TODO: move _usd valuation here
+            }
+        });
+        if (this.debugVerbose >= paraTool.debugInfo) console.log(`${rAssetkey} **`, e2, aa)
+        console.log(`${rAssetkey} ++++ processSystemAccount after`, e2, aa)
+        let assetChain = paraTool.makeAssetChain(rAssetkey, chainID);
+        indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-tokens", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
+    }
+
+    //TODO
+    async processTokensAccounts(indexer, e2, rAssetkey, fromAddress) {
+        let aa = {};
+        let flds = ["free", "reserved", "miscFrozen", "feeFrozen", "frozen"];
+        let success = false;
+        let [asset, _] = paraTool.parseAssetChain(rAssetkey)
+        let decimals = await this.getAssetDecimal(indexer, asset, "processTokensAccounts");
+        // for ALL the evaluatable attributes in e2, copy them in
+        console.log(`processTokensAccounts fromAddress=${fromAddress}. rAssetkey=${rAssetkey}, e2`, e2)
+        if (decimals) {
+            flds.forEach((fld) => {
+                aa[fld] = e2[fld] / 10 ** decimals;
+                success = true;
+            });
+            if (success) {
+                let parsedAsset = JSON.parse(asset);
+                let assetType = (Array.isArray(parsedAsset)) ? paraTool.assetTypeLiquidityPair : paraTool.assetTypeToken;
+                let assetChain = paraTool.makeAssetChain(rAssetkey, indexer.chainID);
+                if (this.debugLevel >= paraTool.debugVerbose) console.log(`processTokensAccounts  ${fromAddress}`, assetChain, aa);
+                indexer.updateAddressStorage(fromAddress, assetChain, "acala:processTokensAccounts-tokens", aa, this.parserTS, this.parserBlockNumber, assetType);
+            }
+        } else {
+            indexer.logger.debug({
+                "op": "acala-processTokensAccounts",
+                "msg": "getAssetDecimal",
+                "asset": asset
+            });
+        }
+    }
+
     async processAssetsAccount(indexer, p, s, e2, rAssetkey, fromAddress) {
-        //console.log(`processAssetsAccount  ${fromAddress}`, e2);
+        console.log(`processAssetsAccount  ${fromAddress}`, e2);
         /*	 {
           bn: 440669,
           ts: undefined,
@@ -4096,10 +4196,10 @@ module.exports = class ChainParser {
                     let v = JSON.parse(e2.pv);
                     let aa = {};
                     aa["free"] = v.balance / 10 ** decimals;
-                    // TODO: add raw, use decHexToInt function 
+                    // TODO: add raw, use decHexToInt function
                     let assetType = paraTool.assetTypeToken;
                     let assetChain = paraTool.makeAssetChain(rAssetkey, chainID)
-                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAssetsAccount  ${fromAddress}`, aa);
+                    if (this.debugLevel >= paraTool.debugInfo) console.log(`processAssetsAccount  ${fromAddress}`, aa);
                     indexer.updateAddressStorage(fromAddress, assetChain, "parallel:processAssetsAccount", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
                 } else {
                     if (this.debugLevel >= paraTool.debugErrorOnly) console.log("processAssetsAccount MISSING pv", e2);
@@ -4193,6 +4293,8 @@ module.exports = class ChainParser {
         let pallet_section = `${p}:${s}`
         //console.log(`generic processAccountAsset ${pallet_section}`)
         if (pallet_section == "System:Account") {
+            await this.processSystemAccount(indexer, e2, rAssetkey, fromAddress);
+            /*
             let chainDecimal = indexer.getChainDecimal(chainID)
             let aa = {
                 symbol: indexer.getChainSymbol(chainID),
@@ -4214,12 +4316,14 @@ module.exports = class ChainParser {
                     // TODO: move _usd valuation here
                 }
             });
-            if (this.debugVerbose >= paraTool.debugVerbose) console.log(`${rAssetkey} **`, e2, aa)
+            if (this.debugVerbose >= paraTool.debugInfo) console.log(`${rAssetkey} **`, e2, aa)
             //console.log(`${rAssetkey} ++++ after`, e2, aa)
             let assetChain = paraTool.makeAssetChain(rAssetkey, chainID);
             indexer.updateAddressStorage(fromAddress, assetChain, "generic:processAccountAsset-tokens", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
+            */
         } else if (pallet_section == "Tokens:Accounts") {
             // TODO: check how acala and others handle this
+            await this.processTokensAccounts(indexer, e2, rAssetkey, fromAddress);
         } else if (pallet_section == "Assets:Account") { // TODO: check covers
             await this.processAssetsAccount(indexer, p, s, e2, rAssetkey, fromAddress);
         } else if (pallet_section == "Identity:IdentityOf" && chainID == paraTool.chainIDPolkadot) {
