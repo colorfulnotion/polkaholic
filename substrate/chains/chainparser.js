@@ -4384,7 +4384,6 @@ module.exports = class ChainParser {
         let pallet_section = `${p}:${s}`
         //console.log(`generic processAccountAsset ${pallet_section}`)
         if (pallet_section == "System:Account") {
-            console.log(`im here !!!`, e2)
             await this.processSystemAccount(indexer, e2, rAssetkey, fromAddress);
         } else if (pallet_section == "Tokens:Accounts") {
             // TODO: check how acala and others handle this

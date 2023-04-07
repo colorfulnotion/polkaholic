@@ -8255,9 +8255,6 @@ module.exports = class Indexer extends AssetManager {
                 console.log(`fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
                 //await this.chainParser.fetchXCMAssetIdToLocation(this)
             }
-        } else if (this.chainID == paraTool.chainIDKico) {
-            console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)
-            await this.chainParser.fetchCurrenciesDicoAssetInfos(this)
         }
 
         // for any new unknown assets, set them up with names, decimals

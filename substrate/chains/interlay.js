@@ -8,15 +8,6 @@ module.exports = class InterlayParser extends ChainParser {
         this.chainParserName = 'Interlay'
     }
 
-    getTokensAccounts(decoratedKey) {
-        //Tokens:Accounts
-        let k = JSON.parse(decoratedKey)
-        var out = {};
-        out.accountID = k[0]; //accountID
-        out.asset = k[1]; //currencyID
-        return out
-    }
-
     getTotalIssuance(decoratedKey) {
         //Tokens:TotalIssuance
         let k = JSON.parse(decoratedKey)
@@ -80,14 +71,10 @@ module.exports = class InterlayParser extends ChainParser {
         //example: asset['{\"Token\":\"LKSM\"}'][Tokens-TotalIssuance] = pv
     }
 
-
     parseStorageKey(indexer, p, s, key, decoratedKey) {
         let pallet_section = `${p}:${s}`
         //console.log(`interlay parseStorageKey ${pallet_section}`)
-        if (pallet_section == "tokens:accounts") {
-            //include accountID, asset
-            return this.getTokensAccounts(decoratedKey);
-        } else if (pallet_section == "tokens:totalIssuance") {
+        if (pallet_section == "tokens:totalIssuance") {
             //include asset
             return this.getTotalIssuance(decoratedKey);
         } else {
@@ -98,9 +85,7 @@ module.exports = class InterlayParser extends ChainParser {
     parseStorageVal(indexer, p, s, val, decoratedVal, o = false) {
         let pallet_section = `${p}:${s}`
         //console.log(`interlay parseStorageVal ${pallet_section}`)
-        if ((pallet_section == "tokens:accounts")) {
-            return this.getBalanceVal(p, s, val, decoratedVal)
-        } else if (pallet_section == "tokens:totalIssuance") {
+        if (pallet_section == "tokens:totalIssuance") {
             //include asset
             return this.getTotalIssuanceVal(val, decoratedVal);
         } else {
@@ -138,44 +123,10 @@ module.exports = class InterlayParser extends ChainParser {
         return (false);
     }
 
-
-    async processTokensAccounts(indexer, e2, rAssetkey, fromAddress) {
-        let aa = {};
-        let flds = ["free", "reserved", "miscFrozen", "feeFrozen", "frozen"];
-        let success = false;
-        let [asset, _] = paraTool.parseAssetChain(rAssetkey)
-        let decimals = await this.getAssetDecimal(indexer, asset, "processTokensAccounts");
-        // for ALL the evaluatable attributes in e2, copy them in
-        if (decimals) {
-            flds.forEach((fld) => {
-                aa[fld] = e2[fld] / 10 ** decimals;
-                success = true;
-            });
-            if (success) {
-                let parsedAsset = JSON.parse(asset);
-                let assetType = (Array.isArray(parsedAsset)) ? paraTool.assetTypeLiquidityPair : paraTool.assetTypeToken;
-                let assetChain = paraTool.makeAssetChain(rAssetkey, indexer.chainID);
-                //console.log(`Interlay processTokensAccounts ${fromAddress}`, assetChain, aa)
-                indexer.updateAddressStorage(fromAddress, assetChain, "interlay:processTokensAccounts-tokens", aa, this.parserTS, this.parserBlockNumber, assetType);
-            }
-        } else {
-            indexer.logger.debug({
-                "op": "interlay-processTokensAccounts",
-                "msg": "getAssetDecimal",
-                "asset": asset
-            });
-        }
-    }
-
-
     async processAccountAsset(indexer, p, s, e2, rAssetkey, fromAddress) {
         let pallet_section = `${p}:${s}`
         //console.log(`interlay processAccountAsset ${pallet_section}`)
-        if (pallet_section == "Tokens:Accounts") {
-            await this.processTokensAccounts(indexer, e2, rAssetkey, fromAddress);
-        } else {
-            super.processAccountAsset(indexer, p, s, e2, rAssetkey, fromAddress);
-        }
+        super.processAccountAsset(indexer, p, s, e2, rAssetkey, fromAddress);
         return;
     }
 

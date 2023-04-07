@@ -436,10 +436,7 @@ module.exports = class ParallelParser extends ChainParser {
     parseStorageKey(indexer, p, s, key, decoratedKey) {
         let pallet_section = `${p}:${s}`
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`parseStorageKey ps=${pallet_section}`)
-        if (pallet_section == "assets:account") {
-            // decoratedKey: ["100","hJHfe3mtq3Rx4gcUGtSjXwL4Wmq3Krtt3uumUhXG1rTq9WwZg"]
-            return this.getAssetsAccountKey(indexer, decoratedKey);
-        } else if (pallet_section == "assets:asset") {
+        if (pallet_section == "assets:asset") {
             // decoratedKey: ["100"]
             return this.getAssetsAssetKey(indexer, decoratedKey);
         } else if (pallet_section == "oracle:values") {
@@ -624,10 +621,6 @@ module.exports = class ParallelParser extends ChainParser {
         let pallet_section = `${p}:${s}`
         if (this.debugLevel >= paraTool.debugVerbose) console.log(`parallel processAccountAsset ${pallet_section}`)
         switch (pallet_section) {
-            case "Assets:Account":
-                console.log(`im here?`)
-                await this.processAssetsAccount(indexer, p, s, e2, rAssetkey, fromAddress);
-                break;
             case "Loans:AccountDeposits":
                 await this.processLoansDeposits(indexer, p, s, e2, rAssetkey, fromAddress);
                 break;
