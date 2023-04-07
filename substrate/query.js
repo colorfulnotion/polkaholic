@@ -4787,7 +4787,7 @@ module.exports = class Query extends AssetManager {
             if (ext.paramsDef) {
                 decoratedExt.paramsDef = ext.paramsDef
             }
-            if (ext.callIndex != undefined){
+            if (ext.callIndex != undefined) {
                 decoratedExt.callIndex = ext.callIndex
             }
 

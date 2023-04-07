@@ -241,6 +241,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     async crawlEvmTrace(chain, blockNumber, timeoutMS = 20000) {
+	return false;
         if (!chain.RPCBackfill) {
             return (false);
         }

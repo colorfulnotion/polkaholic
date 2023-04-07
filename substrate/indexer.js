@@ -6726,17 +6726,17 @@ module.exports = class Indexer extends AssetManager {
                     json: bqExtrinsic
                 })
                 let flattenedCalls = await this.paramToCalls(ext.extrinsicID, ext.section, ext.method, ext.callIndex, ext.params, ext.paramsDef, chainID, block.block_time, '0')
-                for (const call of flattenedCalls){
+                for (const call of flattenedCalls) {
                     let ext_fee = null
                     let ext_fee_usd = null
                     let ext_weight = null
-                    let call_root = (call.root != undefined)? call.root: null
-                    let call_leaf = (call.leaf != undefined)? call.leaf: null
-                    if (call_root){
+                    let call_root = (call.root != undefined) ? call.root : null
+                    let call_leaf = (call.leaf != undefined) ? call.leaf : null
+                    if (call_root) {
                         //only store fee, fee_usd, weight at root
                         ext_fee = ext.fee
                         ext_fee_usd = feeUSD
-                        ext_weight = (ext.weight != undefined) ? ext.weight : null  // TODO: ext.weight
+                        ext_weight = (ext.weight != undefined) ? ext.weight : null // TODO: ext.weight
                     }
                     let bqExtrinsicCall = {
                         relay_chain: relayChain,
@@ -6774,7 +6774,7 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
         }
-        let tables = ["extrinsics", "events", "transfers", "fulltransfers", "calls"];
+        let tables = ["extrinsics", "events", "transfers", "tokentransfers", "calls"];
         for (const t of tables) {
             let rows = null;
             switch (t) {
@@ -6857,7 +6857,8 @@ module.exports = class Indexer extends AssetManager {
                 BigQuery
             } = require('@google-cloud/bigquery');
             const bigquery = new BigQuery({
-                projectId: 'substrate-etl'
+                projectId: 'substrate-etl',
+                keyFilename: this.BQ_SUBSTRATEETL_KEY
             })
             await bigquery
                 .dataset(relayChain)
