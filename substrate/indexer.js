@@ -529,9 +529,12 @@ module.exports = class Indexer extends AssetManager {
             newState.bn = bn;
         }
         // add index source for debugging
+        newState.id = this.getIDByChainID(this.chainID);
+        newState.para_id = paraTool.getParaIDfromChainID(this.chainID)
+        newState.relay_chain = paraTool.getRelayChainByChainID(this.chainID)
         newState.source = this.hostname;
         newState.genTS = this.getCurrentTS();
-
+        if (this.debugLevel >= paraTool.debugVerbose) console.log(`updateAddressStorage Generated addr=${account}, section=${section}\nnewState:`, newState)
         let accKey = account.toLowerCase();
         if (!this.addressStorage[accKey]) {
             this.addressStorage[accKey] = {}
@@ -3526,6 +3529,9 @@ module.exports = class Indexer extends AssetManager {
                 }
                 if (handParseKey.decimals != undefined) {
                     o.decimals = handParseKey.decimals
+                }
+                if (handParseKey.symbol != undefined) {
+                    o.symbol = handParseKey.symbol
                 }
                 if (handParseKey.asset && handParseKey.asset.DexShare) {
                     handParseKey.asset = handParseKey.asset.DexShare;
@@ -8252,9 +8258,6 @@ module.exports = class Indexer extends AssetManager {
                 console.log(`fetch xcAssetConfig:assetIdToLocation (assetRegistry:assetIdToLocation)`)
                 //await this.chainParser.fetchXCMAssetIdToLocation(this)
             }
-        } else if (this.chainID == paraTool.chainIDKico) {
-            console.log(`fetch asset:fetchCurrenciesDicoAssetInfos`)
-            await this.chainParser.fetchCurrenciesDicoAssetInfos(this)
         }
 
         // for any new unknown assets, set them up with names, decimals

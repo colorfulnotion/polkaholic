@@ -24,7 +24,6 @@ const BifrostParser = require("./chains/bifrost");
 const AstarParser = require("./chains/astar");
 const MoonbeamParser = require("./chains/moonbeam");
 const InterlayParser = require("./chains/interlay");
-const KicoParser = require("./chains/kico");
 const ChainParser = require("./chains/chainparser");
 const {
     ApiPromise
