@@ -1,0 +1,122 @@
+[
+      {
+        "description": "Chain ID",
+        "mode": "REQUIRED",
+        "name": "chain_id",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Chain Name",
+        "mode": "REQUIRED",
+        "name": "id",
+        "type": "STRING"
+      },
+      {
+        "description": "The timestamp for when the block was collated",
+        "mode": "REQUIRED",
+        "name": "timestamp",
+        "type": "TIMESTAMP"
+      },
+      {
+        "description": "The block number",
+        "mode": "REQUIRED",
+        "name": "number",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Hash of the block",
+        "mode": "REQUIRED",
+        "name": "hash",
+        "type": "STRING"
+      },
+      {
+        "description": "Hash of the parent block",
+        "mode": "NULLABLE",
+        "name": "parent_hash",
+        "type": "STRING"
+      },
+      {
+        "description": "Hash of the generated proof-of-work",
+        "mode": "REQUIRED",
+        "name": "nonce",
+        "type": "STRING"
+      },
+      {
+        "description": "SHA3 of the uncles data in the block",
+        "mode": "NULLABLE",
+        "name": "sha3_uncles",
+        "type": "STRING"
+      },
+      {
+        "description": "The bloom filter for the logs of the block",
+        "mode": "NULLABLE",
+        "name": "logs_bloom",
+        "type": "STRING"
+      },
+      {
+        "description": "The root of the transaction trie of the block",
+        "mode": "NULLABLE",
+        "name": "transactions_root",
+        "type": "STRING"
+      },
+      {
+        "description": "The root of the final state trie of the block",
+        "mode": "NULLABLE",
+        "name": "state_root",
+        "type": "STRING"
+      },
+      {
+        "description": "The root of the receipts trie of the block",
+        "mode": "NULLABLE",
+        "name": "receipts_root",
+        "type": "STRING"
+      },
+      {
+        "description": "The address of the beneficiary to whom the mining rewards were given",
+        "mode": "NULLABLE",
+        "name": "miner",
+        "type": "STRING"
+      },
+      {
+        "description": "Integer of the difficulty for this block",
+        "mode": "NULLABLE",
+        "name": "difficulty",
+        "type": "NUMERIC"
+      },
+      {
+        "description": "Integer of the total difficulty of the chain until this block",
+        "mode": "NULLABLE",
+        "name": "total_difficulty",
+        "type": "NUMERIC"
+      },
+      {
+        "description": "The size of this block in bytes",
+        "mode": "NULLABLE",
+        "name": "size",
+        "type": "INTEGER"
+      },
+      {
+        "description": "The extra data field of this block",
+        "mode": "NULLABLE",
+        "name": "extra_data",
+        "type": "STRING"
+      },
+      {
+        "description": "The maximum gas allowed in this block",
+        "mode": "NULLABLE",
+        "name": "gas_limit",
+        "type": "INTEGER"
+      },
+      {
+        "description": "The total used gas by all transactions in this block",
+        "mode": "NULLABLE",
+        "name": "gas_used",
+        "type": "INTEGER"
+      },
+      {
+        "description": "The number of transactions in the block",
+        "mode": "NULLABLE",
+        "name": "transaction_count",
+        "type": "INTEGER"
+      }
+    ]

@@ -96,7 +96,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     // sets up system tables (independent of paraID) and paraID specific tables
-    async setup_tables(chainID = null, isUpdate = false, execute = false) {
+    async setup_chain_substrate(chainID = null, isUpdate = false, execute = false) {
         let projectID = `${this.project}`
         //setup "system" tables across all paraIDs
         let opType = (isUpdate) ? 'update' : 'mk'
@@ -145,6 +145,79 @@ module.exports = class SubstrateETL extends AssetManager {
                         console.log(cmd);
                         if (execute) {
                             await exec(cmd);
+                        }
+                    }
+                } catch (e) {
+                    console.log(e);
+                    // TODO optimization: do not create twice
+                }
+            }
+        }
+        process.exit(0)
+    }
+
+    // sets up evm chain tables
+    async setup_chain_evm(chainID = null, isUpdate = false, execute = false) {
+        let projectID = `${this.project}`
+        let opType = (isUpdate) ? 'update' : 'mk'
+        let relayChain = "evm"
+
+        // setup paraID specific tables, including paraID=0 for the relay chain
+        let tbls = ["blocks", "contracts", "logs", "token_transfers", "tokens", "traces", "transactions"]
+        let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
+        let sql = `select chainID, isEVM from chain where ( isEVM =1 or relayChain in ('ethereum', 'evm') ) ${p} order by chainID`
+        let recs = await this.poolREADONLY.query(sql);
+        console.log(`***** setup "chain" tables:${tbls} (chainID=${chainID}) ******`)
+        for (const rec of recs) {
+            let chainID = parseInt(rec.chainID, 10);
+            let evmChainID = chainID;
+            if (chainID == 2004 || chainID == 2002 || chainD == 2006 || chainID == 22023 || chainID == 22007) {
+                switch (chainID) {
+                    case 2000:
+                        evmChainID = 787;
+                        break;
+                    case 2002:
+                        evmChainID = 1024;
+                        break;
+                    case 2004:
+                        evmChainID = 1284;
+                        break;
+                    case 2006:
+                        evmChainID = 592;
+                        break;
+                    case 22000:
+                        evmChainID = 686;
+                        break;
+                    case 22023:
+                        evmChainID = 1285
+                        break;
+                    case 22007:
+                        evmChainID = 336;
+                }
+            }
+            let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to evm_dev for dev
+            for (const tbl of tbls) {
+                let fld = null;
+                switch (tbl) {
+                    case "blocks":
+                        fld = "timestamp";
+                        break;
+                    case "token_transfers":
+                    case "transactions":
+                    case "traces":
+                    case "contracts":
+                    case "logs":
+                    case "tokens":
+                        fld = "block_timestamp";
+                        break;
+                }
+                let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
+                let cmd = `bq ${opType} --project_id=${projectID}  --schema=schema/substrateetl/evm/${tbl}.json ${p} --table ${bqDataset}.${tbl}${evmChainID}`
+                try {
+                    if (cmd) {
+                        console.log(cmd);
+                        if (execute) {
+                            // await exec(cmd);
                         }
                     }
                 } catch (e) {
@@ -1247,12 +1320,12 @@ module.exports = class SubstrateETL extends AssetManager {
                         paraTool.chainIDDoraFactory,
                         paraTool.chainIDOrigintrail,
                     ]
-                    if (tokenCurrencyIDList.includes(chainID)){
+                    if (tokenCurrencyIDList.includes(chainID)) {
                         currencyID = paraTool.toNumWithoutComma(currencyID).toString();
                         asset = JSON.stringify({
                             "Token": currencyID
                         })
-                    }else{
+                    } else {
 
                     }
                     let state = userTokenAccountBal;
@@ -3937,6 +4010,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     msg_hash: x.msgHash,
                     origination_para_id: paraTool.getParaIDfromChainID(x.chainID),
                     destination_para_id: paraTool.getParaIDfromChainID(x.chainIDDest),
+                    origination_id: this.getIDByChainID(x.chainID),
+                    destination_id: this.getIDByChainID(x.chainIDDest),
                     relayed_at: x.relayedAt,
                     included_at: x.includedAt,
                     msg_type: x.msgType,
