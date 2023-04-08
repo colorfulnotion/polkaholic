@@ -529,9 +529,12 @@ module.exports = class Indexer extends AssetManager {
             newState.bn = bn;
         }
         // add index source for debugging
+        newState.id = this.getIDByChainID(this.chainID);
+        newState.para_id = paraTool.getParaIDfromChainID(this.chainID)
+        newState.relay_chain = paraTool.getRelayChainByChainID(this.chainID)
         newState.source = this.hostname;
         newState.genTS = this.getCurrentTS();
-
+        if (this.debugLevel >= paraTool.debugVerbose) console.log(`updateAddressStorage Generated addr=${account}, section=${section}\nnewState:`, newState)
         let accKey = account.toLowerCase();
         if (!this.addressStorage[accKey]) {
             this.addressStorage[accKey] = {}

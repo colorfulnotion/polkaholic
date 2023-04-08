@@ -4100,7 +4100,7 @@ module.exports = class ChainParser {
     }
 
     async processSystemAccount(indexer, e2, rAssetkey, fromAddress) {
-        console.log(`processSystemAccount ${fromAddress} e2`, e2);
+        //console.log(`processSystemAccount ${fromAddress} e2`, e2);
         /* sample e2
         {
           bn: 4233221,
@@ -4143,7 +4143,7 @@ module.exports = class ChainParser {
             }
         });
         let assetChain = paraTool.makeAssetChain(rAssetkey, chainID);
-        if (this.debugLevel >= paraTool.debugVerbose) console.log(`processSystemAccount addr=${fromAddress} assetChain=${assetChain}\nGenerated:`, aa)
+        //if (this.debugLevel >= paraTool.debugVerbose) console.log(`processSystemAccount addr=${fromAddress} assetChain=${assetChain}\nGenerated:`, aa)
         /* Sample system:account record
         {
           symbol: 'KSM',
@@ -4158,7 +4158,7 @@ module.exports = class ChainParser {
           reserved: 0
         }
         */
-        indexer.updateAddressStorage(fromAddress, assetChain, "generic:processSystemAccount-native", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
+        indexer.updateAddressStorage(fromAddress, assetChain, "processSystemAccount", aa, this.parserTS, this.parserBlockNumber, paraTool.assetTypeToken);
     }
 
 
@@ -4210,7 +4210,7 @@ module.exports = class ChainParser {
                     });
                     let assetType = paraTool.assetTypeToken;
                     let assetChain = paraTool.makeAssetChain(rAssetkey, chainID)
-                    if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAssetsAccount addr=${fromAddress} assetChain=${assetChain}\nGenerated:`, aa);
+                    //if (this.debugLevel >= paraTool.debugVerbose) console.log(`processAssetsAccount addr=${fromAddress} assetChain=${assetChain}\nGenerated:`, aa);
                     /* Sample assets:accounts record
                     {
                       symbol: 'USDT',
@@ -4261,12 +4261,10 @@ module.exports = class ChainParser {
         ]
         let asset = false
         if (tokenCurrencyIDList.includes(chainID)){
-            console.log(`chainID=${chainID} using tokenCurrencyID, rAssetkey=${rAssetkey}`)
             let currencyID = paraTool.toNumWithoutComma(JSON.parse(rAssetkey));
             rAssetkey = JSON.stringify({
                 Token: paraTool.toNumWithoutComma(JSON.parse(rAssetkey))
             })
-            console.log(`chainID=${chainID} updated rAssetkey=`, rAssetkey)
             asset = rAssetkey
         }{
             let [targetAsset, _] = paraTool.parseAssetChain(rAssetkey)
@@ -4300,7 +4298,7 @@ module.exports = class ChainParser {
             let parsedAsset = JSON.parse(asset);
             let assetType = (Array.isArray(parsedAsset)) ? paraTool.assetTypeLiquidityPair : paraTool.assetTypeToken;
             let assetChain = paraTool.makeAssetChain(rAssetkey, indexer.chainID);
-            if (this.debugLevel >= paraTool.debugVerbose) console.log(`processTokensAccounts assetChain=${assetChain}, addr=${fromAddress}\nGenerated:`, assetChain, aa);
+            //if (this.debugLevel >= paraTool.debugVerbose) console.log(`processTokensAccounts assetChain=${assetChain}, addr=${fromAddress}\nGenerated:`, assetChain, aa);
             /*  Sample assets:accounts record {"ForeignAsset":"0"}
             {
               symbol: 'GLMR',
