@@ -1,0 +1,68 @@
+[
+      {
+        "description": "Chain ID",
+        "mode": "REQUIRED",
+        "name": "chain_id",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Chain Name",
+        "mode": "REQUIRED",
+        "name": "id",
+        "type": "STRING"
+      },
+      {
+        "description": "ERC20 token address",
+        "mode": "REQUIRED",
+        "name": "token_address",
+        "type": "STRING"
+      },
+      {
+        "description": "Address of the sender",
+        "mode": "NULLABLE",
+        "name": "from_address",
+        "type": "STRING"
+      },
+      {
+        "description": "Address of the receiver",
+        "mode": "NULLABLE",
+        "name": "to_address",
+        "type": "STRING"
+      },
+      {
+        "description": "Amount of tokens transferred (ERC20) / id of the token transferred (ERC721). Use safe_cast for casting to NUMERIC or FLOAT64",
+        "mode": "NULLABLE",
+        "name": "value",
+        "type": "STRING"
+      },
+      {
+        "description": "Transaction hash",
+        "mode": "REQUIRED",
+        "name": "transaction_hash",
+        "type": "STRING"
+      },
+      {
+        "description": "Log index in the transaction receipt",
+        "mode": "REQUIRED",
+        "name": "log_index",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Timestamp of the block where this transfer was in",
+        "mode": "REQUIRED",
+        "name": "block_timestamp",
+        "type": "TIMESTAMP"
+      },
+      {
+        "description": "Block number where this transfer was in",
+        "mode": "REQUIRED",
+        "name": "block_number",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Hash of the block where this transfer was in",
+        "mode": "REQUIRED",
+        "name": "block_hash",
+        "type": "STRING"
+      }
+]

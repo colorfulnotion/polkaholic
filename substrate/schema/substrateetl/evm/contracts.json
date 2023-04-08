@@ -1,0 +1,62 @@
+[
+      {
+        "description": "Chain ID",
+        "mode": "REQUIRED",
+        "name": "chain_id",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Chain Name",
+        "mode": "REQUIRED",
+        "name": "id",
+        "type": "STRING"
+      },
+      {
+        "description": "Address of the contract",
+        "mode": "REQUIRED",
+        "name": "address",
+        "type": "STRING"
+      },
+      {
+        "description": "Bytecode of the contract",
+        "mode": "NULLABLE",
+        "name": "bytecode",
+        "type": "STRING"
+      },
+      {
+        "description": "4-byte function signature hashes",
+        "mode": "REPEATED",
+        "name": "function_sighashes",
+        "type": "STRING"
+      },
+      {
+        "description": "Whether this contract is an ERC20 contract",
+        "mode": "NULLABLE",
+        "name": "is_erc20",
+        "type": "BOOLEAN"
+      },
+      {
+        "description": "Whether this contract is an ERC721 contract",
+        "mode": "NULLABLE",
+        "name": "is_erc721",
+        "type": "BOOLEAN"
+      },
+      {
+        "description": "Timestamp of the block where this contract was created",
+        "mode": "REQUIRED",
+        "name": "block_timestamp",
+        "type": "TIMESTAMP"
+      },
+      {
+        "description": "Block number where this contract was created",
+        "mode": "REQUIRED",
+        "name": "block_number",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Hash of the block where this contract was created",
+        "mode": "REQUIRED",
+        "name": "block_hash",
+        "type": "STRING"
+      }
+    ]

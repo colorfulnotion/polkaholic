@@ -184,6 +184,7 @@ module.exports = class Crawler extends Indexer {
                 console.log("BACKFILL", chain.RPCBackfill);
             }
             if (!chain.RPCBackfill || chain.RPCBackfill.length == 0) {
+                console.log("CANNOT GET TRACE -- no backfill", chain.RPCBackfill);
                 return (false);
             }
             let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' "${chain.RPCBackfill}"`
@@ -241,7 +242,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     async crawlEvmTrace(chain, blockNumber, timeoutMS = 20000) {
-	return false;
+        return false;
         if (!chain.RPCBackfill) {
             return (false);
         }
@@ -1849,8 +1850,7 @@ module.exports = class Crawler extends Indexer {
                 }
             }
             // if we didn't get a trace, or if we are using onfinality endpoint
-
-            if (chain.onfinalityStatus == "Active" && chain.onfinalityID && (chain.onfinalityID.length > 0) &&
+            if ((chain.onfinalityStatus == "Active" && chain.onfinalityID && (chain.onfinalityID.length > 0) || (chain.WSEndpointSelfHosted)) &&
                 ((trace == false || trace.length == 0 || this.APIWSEndpoint.includes("onfinality")))) {
                 let trace2 = await this.crawlTrace(chain, finalizedHash);
                 if (trace2.length > 0) {
@@ -2095,9 +2095,193 @@ module.exports = class Crawler extends Indexer {
         return (false);
     }
 
+    async crawlEVM(chainID) {
+        let chain = await this.getChain(chainID);
+
+        const Web3 = require('web3')
+        const {
+            BigQuery
+        } = require('@google-cloud/bigquery');
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        })
+        if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
+            return (false);
+        }
+        const web3 = new Web3(chain.WSEndpoint);
+        this.web3Api = web3;
+        this.contractABIs = await this.getContractABI();
+        let contractABIs = this.contractABIs;
+        let contractABISignatures = this.contractABISignatures;
+        await this.assetManagerInit()
+        web3.eth.subscribe('newBlockHeaders', async (error, result) => {
+            if (!error) {
+                let blockNumber = result.number;
+                let block = null;
+                let tries = 0;
+                do {
+                    try {
+                        block = await web3.eth.getBlock(result.hash, true);
+                        tries++;
+                    } catch (err) {
+                        // console.log("crawlEVM", result, err);
+                    }
+                } while (!block && tries < 10)
+                let numTransactions = block && block.transactions ? block.transactions.length : 0;
+                let rows_blocks = [];
+                let rows_transactions = [];
+                let rows_logs = [];
+                try {
+                    rows_blocks.push({
+                        insertId: `${block.hash}`,
+                        json: {
+                            chain_id: chainID,
+                            id: chain.id,
+                            timestamp: block.timestamp,
+                            number: block.number,
+                            hash: block.hash,
+                            parent_hash: block.parentHash,
+                            nonce: block.nonce,
+                            sha3_uncles: block.sha3Uncles,
+                            logs_bloom: block.logsBloom,
+                            transactions_root: block.transactionsRoot,
+                            state_root: block.stateRoot,
+                            receipts_root: block.receiptsRoot,
+                            miner: block.miner,
+                            difficulty: block.difficulty,
+                            total_difficulty: block.totalDifficulty,
+                            size: block.size,
+                            extra_data: block.extraData,
+                            gas_limit: block.gasLimit,
+                            gas_used: block.gasUsed,
+                            transaction_count: numTransactions
+                        }
+                    });
+                    if (numTransactions > 0) {
+                        let evmReceipts = await ethTool.crawlEvmReceipts(web3, block);
+                        if (!evmReceipts) evmReceipts = [];
+                        var statusesPromise = Promise.all([
+                            ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                            ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                        ])
+                        let [dTxns, dReceipts] = await statusesPromise
+
+                        for (let i = 0; i < block.transactions.length; i++) {
+                            let tx = block.transactions[i];
+                            let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
+                            let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
+                            tx.raw = tx.input; // ???
+                            tx.decodedLogs = logs; // fuse here
+                            let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
+                            let t = {
+                                chain_id: chainID,
+                                id: chain.id,
+                                hash: tx.hash,
+                                nonce: tx.nonce,
+                                transaction_index: tx.transactionIndex,
+                                from_address: tx.from,
+                                to_address: tx.to,
+                                value: tx.value,
+                                gas: tx.gas,
+                                gas_price: tx.gasPrice,
+                                input: tx.input,
+                                receipt_cumulative_gas_used: receipt && receipt.cumulativeGasUsed ? receipt.cumulativeGasUsed : null,
+                                receipt_gas_used: receipt && receipt.gasUsed ? receipt.gasUsed : null,
+                                receipt_contract_address: receipt && receipt.contractAddress ? receipt.contractAddress : null,
+                                receipt_root: null, // TODO
+                                receipt_status: receipt && receipt.status ? 1 : 0,
+                                block_timestamp: block.timestamp,
+                                block_number: tx.blockNumber,
+                                block_hash: tx.blockHash
+                            }
+                            if (decodedInput) {
+                                t.decoded = (decodedInput.decodedStatus == 'success');
+                                if (t.decoded) {
+                                    t.method_id = decodedInput.methodID;
+                                    t.signature = decodedInput.signature;
+                                    t.params = decodedInput.params;
+                                }
+                            }
+                            rows_transactions.push({
+                                insertId: `${tx.hash}`,
+                                json: t
+                            });
+                            if (logs) {
+                                for (let j = 0; j < logs.length; j++) {
+                                    let l = logs[j]
+                                    rows_logs.push({
+                                        chain_id: chainID,
+                                        id: chain.id,
+                                        log_index: l.logIndex,
+                                        transaction_hash: tx.hash,
+                                        transaction_index: i,
+                                        address: l.address,
+                                        data: l.data,
+                                        topics: l.topics,
+                                        block_timestamp: block.timestamp,
+                                        block_number: block.number,
+                                        block_hash: block.hash,
+                                        signature: l.signature ? l.signature : null, // TODO: check
+                                        events: l.events ? l.events : null // TODO: check
+                                    });
+                                }
+                            }
+                            // NOTE: we do not write out hashes yet (development)
+                            this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
+                        }
+                    }
+                } catch (err) {
+                    console.log(err)
+                }
+                console.log("block TRIAL", tries, "hash", result.hash, "height", blockNumber, "#TX", rows_transactions.length, rows_blocks.length);
+                // stream into blocks, transactions
+                try {
+                    let dataset = "evm";
+                    let tables = ["blocks", "transactions"]; // [ "contracts", "tokens", "token_transfers", "logs" ]
+                    for (const tbl of tables) {
+                        let rows = null
+                        switch (tbl) {
+                            case "blocks":
+                                rows = rows_blocks;
+                                break;
+                            case "transactions":
+                                rows = rows_transactions;
+                                break;
+                        }
+                        if (rows && rows.length > 0) {
+                            await bigquery
+                                .dataset(dataset)
+                                .table(tbl)
+                                .insert(rows, {
+                                    raw: true
+                                });
+                            console.log("WRITE", dataset, tbl, rows.length)
+                        }
+                    }
+                } catch (err) {
+                    console.log("err", JSON.stringify(err)); // TODO: logger 
+                }
+            } else {
+                console.error(error);
+            }
+        });
+        web3.eth.subscribe('logs', (error, result) => {
+            if (!error) {
+                //console.log("LOGS", result);
+            } else {
+                console.error(error);
+            }
+        });
+    }
+
     async crawlBlocks(chainID) {
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
             this.readyToCrawlParachains = true;
+        }
+        if (chainID == 1 || chainID == 10 || chainID == 56 || chainID == 137 || chainID == 42161 || chainID == 43114) {
+            this.crawlEVM(chainID);
+            return [null, null, null];
         }
         // Subscribe to chain updates and log the current block number on update.
         let chain = await this.setupChainAndAPI(chainID);
@@ -2358,6 +2542,7 @@ module.exports = class Crawler extends Indexer {
                                 let isTracesPresent = false
 
                                 let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
+
                                 await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized); // use result from rawtrace to decorate
 
                                 //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)

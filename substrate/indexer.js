@@ -5832,8 +5832,8 @@ module.exports = class Indexer extends AssetManager {
         // mark assetholder as worthy of update
         // Note: could get internal transfer with evmtraces https://docs.moonbeam.network/builders/build/eth-api/debug-trace/ https://docs.moonbeam.network/builders/build/eth-api/debug-trace/
         if (finalized) {
-            this.updateAssetHolder(nativeAssetChain, tx.from, tx.blockNumber)
-            this.updateAssetHolder(nativeAssetChain, tx.to, tx.blockNumber)
+            this.updateAssetHolder(nativeAssetChain, tx.from, tx.blockNumber) // CHECK: newstate missing
+            this.updateAssetHolder(nativeAssetChain, tx.to, tx.blockNumber) // CHECK: netstate missing
         }
         return (false);
     }
@@ -6206,12 +6206,13 @@ module.exports = class Indexer extends AssetManager {
     //    Design: easy to value native assets with coin prices, but very challenging to value ALL assets,
     //      so how do we provide historical balances for ERC20 assets as assets suddenly acquire USD values?
     //  - /asset/0x1d3.. --> get the totalSupply, top 1000 asset holders
-    async process_evm_transaction(tx, chainID, finalized = false, isTip = false) {
+    async process_evm_transaction(tx, chainID, finalized = false, isTip = false, writeSubstrateBT = true) {
         if (tx == undefined) return;
         let contractType = false
         if (ethTool.isTxContractCreate(tx)) {
             // Contract Creates
             contractType = await this.process_evm_contract_create(tx, chainID, finalized, isTip);
+            //console.log("CONTRACT CREATE", contractType);
         }
 
         if (ethTool.isTxNativeTransfer(tx)) {
@@ -6222,11 +6223,13 @@ module.exports = class Indexer extends AssetManager {
         if (ethTool.isTxTokenTransfer(tx)) {
             // Token Transfers (ERC20/ERC721/1155)
             await this.process_evmtx_token_transfer(tx, chainID, finalized);
+            //console.log("TOKEN TRANSFER");
         }
 
         if (ethTool.isTxSwap(tx)) {
             // swap detected - aggregate trading volumes
             await this.process_evmtx_swap(tx, chainID, finalized);
+            //console.log("SWAP");
         }
         let syncEvents = ethTool.isTxLPSync(tx) // swap, add/removeLiquidity
         if (syncEvents) {
@@ -6236,89 +6239,90 @@ module.exports = class Indexer extends AssetManager {
                 await this.process_evmtx_syncEvent(syncEvent, chainID, tx, true, finalized)
             }
         }
-        //process feedevmtx
-        let evmTxHash = tx.transactionHash
-        let extRes = this.extrinsicEvmMap[evmTxHash]
-        let syntheticExtrinsicID = `${tx.blockNumber}-${tx.transactionIndex}`
-        if (extRes !== undefined) { // && finalized // REVIEW
-            tx['substrate'] = extRes
-            syntheticExtrinsicID = extRes.extrinsicID
-            extRes.txFee = tx.fee
-            this.extrinsicEvmMap[evmTxHash] = extRes
-        }
-        if (tx.from != undefined) {
-            let fromAddress = tx.from.toLowerCase()
-            // writes into feed or feedunfinalized based on finalized
-            this.updateAddressExtrinsicStorage(fromAddress, syntheticExtrinsicID, evmTxHash, "feed", tx, tx.timestamp, finalized);
-        }
-        // (2) hashesRowsToInsert: evmTxHash -> evmTX
-        this.stat.hashesRows.evmTx++
-
-        let rects = tx.timestamp * 1000000;
-        let evmTxHashRec = {
-            key: evmTxHash,
-            data: {}, //feed/feedunfinalized
-        }
-        let family = finalized ? 'feed' : 'feedunfinalized';
-        evmTxHashRec.data[family] = {
-            tx: {
-                value: JSON.stringify(tx),
-                timestamp: rects
+        if (writeSubstrateBT) {
+            //process feedevmtx
+            let evmTxHash = tx.transactionHash
+            let extRes = this.extrinsicEvmMap[evmTxHash]
+            let syntheticExtrinsicID = `${tx.blockNumber}-${tx.transactionIndex}`
+            if (extRes !== undefined) { // && finalized // REVIEW
+                tx['substrate'] = extRes
+                syntheticExtrinsicID = extRes.extrinsicID
+                extRes.txFee = tx.fee
+                this.extrinsicEvmMap[evmTxHash] = extRes
             }
-        }
-        this.hashesRowsToInsert.push(evmTxHashRec)
-
-        // write evmtx to "feedto" to index txs interacting with (contract) address
-        if (finalized) {
-            let col = `${chainID}-${syntheticExtrinsicID}`
-            if (tx.to) {
-                // writes into feedto ONLY
-                let feedto = {
-                    chainID: chainID,
-                    blockNumber: tx.blockNumber,
-                    transactionHash: evmTxHash,
-                    decodedInput: tx.decodedInput,
-                    from: tx.from.toLowerCase(),
-                    to: tx.to.toLowerCase(),
-                    ts: tx.timestamp,
-                    value: tx.value,
-                    fee: tx.fee
-                }
-                //console.log(`[${tx.blockNumber}][${evmTxHash}] sent to ${tx.to}`, feedto)
-                this.updateAddressExtrinsicStorage(tx.to, syntheticExtrinsicID, evmTxHash, "feedto", feedto, tx.timestamp, true);
+            if (tx.from != undefined) {
+                let fromAddress = tx.from.toLowerCase()
+                // writes into feed or feedunfinalized based on finalized
+                this.updateAddressExtrinsicStorage(fromAddress, syntheticExtrinsicID, evmTxHash, "feed", tx, tx.timestamp, finalized);
             }
-            if (tx.creates) {
-                // this is contracts creates
-                let feedCreates = {
-                    chainID: chainID,
-                    blockNumber: tx.blockNumber,
-                    transactionHash: evmTxHash,
-                    decodedInput: tx.decodedInput,
-                    from: tx.from.toLowerCase(),
-                    nonce: tx.nonce,
-                    to: tx.creates.toLowerCase(),
-                    ts: tx.timestamp,
-                    value: tx.value,
-                    fee: tx.fee
+            // (2) hashesRowsToInsert: evmTxHash -> evmTX
+            this.stat.hashesRows.evmTx++
+
+            let rects = tx.timestamp * 1000000;
+            let evmTxHashRec = {
+                key: evmTxHash,
+                data: {}, //feed/feedunfinalized
+            }
+            let family = finalized ? 'feed' : 'feedunfinalized';
+            evmTxHashRec.data[family] = {
+                tx: {
+                    value: JSON.stringify(tx),
+                    timestamp: rects
                 }
-                console.log(`[${tx.blockNumber}][${evmTxHash}] created at ${ethTool.toChecksumAddress(tx.creates)}`, feedCreates)
-                this.updateAddressExtrinsicStorage(tx.creates, syntheticExtrinsicID, evmTxHash, "feedto", feedCreates, tx.timestamp, true);
-                if (contractType) {
-                    let contractAddress = tx.creates.toLowerCase()
-                    let contractMeta = {
-                        asset: contractAddress,
+            }
+            this.hashesRowsToInsert.push(evmTxHashRec)
+
+            // write evmtx to "feedto" to index txs interacting with (contract) address
+            if (finalized) {
+                let col = `${chainID}-${syntheticExtrinsicID}`
+                if (tx.to) {
+                    // writes into feedto ONLY
+                    let feedto = {
                         chainID: chainID,
-                        assetType: contractType,
-                        creator: tx.from.toLowerCase(),
-                        createdAtTx: evmTxHash,
-                    };
-                    console.log(`[${evmTxHash}] [${contractAddress}]`, contractMeta)
-                    this.evmcontractMap[contractAddress] = contractMeta;
+                        blockNumber: tx.blockNumber,
+                        transactionHash: evmTxHash,
+                        decodedInput: tx.decodedInput,
+                        from: tx.from.toLowerCase(),
+                        to: tx.to.toLowerCase(),
+                        ts: tx.timestamp,
+                        value: tx.value,
+                        fee: tx.fee
+                    }
+                    //console.log(`[${tx.blockNumber}][${evmTxHash}] sent to ${tx.to}`, feedto)
+                    this.updateAddressExtrinsicStorage(tx.to, syntheticExtrinsicID, evmTxHash, "feedto", feedto, tx.timestamp, true);
+                }
+                if (tx.creates) {
+                    // this is contracts creates
+                    let feedCreates = {
+                        chainID: chainID,
+                        blockNumber: tx.blockNumber,
+                        transactionHash: evmTxHash,
+                        decodedInput: tx.decodedInput,
+                        from: tx.from.toLowerCase(),
+                        nonce: tx.nonce,
+                        to: tx.creates.toLowerCase(),
+                        ts: tx.timestamp,
+                        value: tx.value,
+                        fee: tx.fee
+                    }
+                    console.log(`[${tx.blockNumber}][${evmTxHash}] created at ${ethTool.toChecksumAddress(tx.creates)}`, feedCreates)
+                    this.updateAddressExtrinsicStorage(tx.creates, syntheticExtrinsicID, evmTxHash, "feedto", feedCreates, tx.timestamp, true);
+                    if (contractType) {
+                        let contractAddress = tx.creates.toLowerCase()
+                        let contractMeta = {
+                            asset: contractAddress,
+                            chainID: chainID,
+                            assetType: contractType,
+                            creator: tx.from.toLowerCase(),
+                            createdAtTx: evmTxHash,
+                        };
+                        console.log(`[${evmTxHash}] [${contractAddress}]`, contractMeta)
+                        this.evmcontractMap[contractAddress] = contractMeta;
+                    }
                 }
             }
         }
     }
-
 
     async processEVMFullBlock(evmFullBlock, evmTrace, chainID, blockNumber, finalized, isTip = false) {
         if (!evmFullBlock) return (false)
@@ -6841,6 +6845,8 @@ module.exports = class Indexer extends AssetManager {
                             msg_hash: x.msgHash,
                             origination_para_id: paraTool.getParaIDfromChainID(x.chainID),
                             destination_para_id: paraTool.getParaIDfromChainID(x.chainIDDest),
+                            origination_id: this.getIDByChainID(x.chainID),
+                            destination_id: this.getIDByChainID(x.chainIDDest),
                             relayed_at: x.relayedAt,
                             included_at: x.includedAt,
                             msg_type: x.msgType,
@@ -7925,14 +7931,12 @@ module.exports = class Indexer extends AssetManager {
     }
     */
     async processTraceFromAuto(blockTS, blockNumber, blockHash, chainID, autoTraces, traceType, api, finalized = false) {
-        // console.log(`processTraceFromAuto [${blockNumber}] [${blockHash}] finalized=${finalized}`)
         // setParserContext
         this.chainParser.setParserContext(blockTS, blockNumber, blockHash, chainID)
 
         let dedupEvents = {};
-        if (!autoTraces) return;
-        if (!Array.isArray(autoTraces)) {
-            //console.log("prcessTrace", autoTraces);
+        if (!autoTraces || (!Array.isArray(autoTraces))) {
+            console.log("processTraceFromAuto not ", autoTraces);
             return;
         }
         // (s) dedup the events
@@ -7958,6 +7962,7 @@ module.exports = class Indexer extends AssetManager {
         let balanceupdates = [];
         let assetupdates = [];
         let idx = 0;
+        console.log(`***** processTraceFromAuto [${blockNumber}] [${blockHash}] finalized=${finalized} `, Object.keys(dedupEvents).length)
         for (const dedupK of Object.keys(dedupEvents)) {
             let a = dedupEvents[dedupK];
             let [a2, _] = this.parse_trace_from_auto(a, traceType, blockNumber, blockHash, api);
@@ -8312,9 +8317,10 @@ module.exports = class Indexer extends AssetManager {
                     if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0) || forceParseTrace) {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
                         autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api, isFinalized);
+                        console.log(`[${blockNumber}] [${blockHash}] processTraceAsAuto generation`, isFinalized);
                     } else {
-                        // SKIP PROCESSING since we covered autotrace generation already
-                        if (this.debugLevel >= paraTool.debugTracing) console.log(`[${blockNumber}] [${blockHash}] autotrace already covered len=${r.autotrace.length}`);
+                        // if (this.debugLevel >= paraTool.debugTracing) SKIP PROCESSING since we covered autotrace generation already
+                        console.log(`[${blockNumber}] [${blockHash}] processTraceAsAuto already covered len=${r.autotrace.length}`, isFinalized);
                         autoTraces = r.autotrace;
                     }
                     await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api, isFinalized); // use result from rawtrace to decorate

@@ -857,7 +857,7 @@ module.exports = class ChainParser {
         let res = {}
         let extraField = []
         // TODO: REENABLE this using NEW paraTool.dechexToIntStr abstraction
-        if (v != undefined && v.balance != undefined){
+        if (v != undefined && v.balance != undefined) {
             extraField["free"] = paraTool.dechexToIntStr(v.balance)
         }
 
@@ -4189,7 +4189,7 @@ module.exports = class ChainParser {
             let rAssetkey = this.elevatedAssetKey(paraTool.assetTypeToken, e2.asset);
             //let decimals = await this.getAssetDecimal(indexer, rAssetkey);
             let decimals = e2.decimals
-            let symbol = (e2.symbol != undefined)? e2.symbol: null //try to get symbol here; not it's not guarantee to work
+            let symbol = (e2.symbol != undefined) ? e2.symbol : null //try to get symbol here; not it's not guarantee to work
             if (decimals !== false) {
                 //console.log("processAssetsAccount FOUND decimals", rAssetkey, decimals);
                 if (e2.pv !== undefined) {
@@ -4261,19 +4261,19 @@ module.exports = class ChainParser {
             paraTool.chainIDOrigintrail,
         ]
         let asset = false
-        if (tokenCurrencyIDList.includes(chainID)){
+        if (tokenCurrencyIDList.includes(chainID)) {
             let currencyID = paraTool.toNumWithoutComma(JSON.parse(rAssetkey));
             rAssetkey = JSON.stringify({
                 Token: currencyID
             })
             asset = rAssetkey
-        }{
+        } {
             let [targetAsset, _] = paraTool.parseAssetChain(rAssetkey)
             asset = targetAsset
         }
         let decimals = await indexer.getAssetDecimal(asset, chainID, "processTokensAccounts");
         let targetSymbol = await indexer.getAssetSymbol(asset, chainID, "processTokensAccounts");
-        let symbol = (targetSymbol)? targetSymbol : null
+        let symbol = (targetSymbol) ? targetSymbol : null
         let aa = {
             symbol: symbol,
             decimal: decimals

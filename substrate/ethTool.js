@@ -2029,17 +2029,19 @@ function is_tx_contract_create(tx) {
     let isCreate = (tx.creates != null)
     if (isCreate) return true
     try {
-        for (const l of tx.decodedLogs) {
-            //PairCreated(address,address,address,uint256)
-            if (l.topics.length == 3 && l.topics[0] == '0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9') {
-                let pairAddr = l.events[2]['value']
-                let checkSumContractAddr = web3.utils.toChecksumAddress(pairAddr)
-                tx.creates = checkSumContractAddr
-                return true
+        if (tx.decodedLogs) {
+            for (const l of tx.decodedLogs) {
+                //PairCreated(address,address,address,uint256)
+                if (l.topics.length == 3 && l.topics[0] == '0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9') {
+                    let pairAddr = l.events[2]['value']
+                    let checkSumContractAddr = web3.utils.toChecksumAddress(pairAddr)
+                    tx.creates = checkSumContractAddr
+                    return true
+                }
             }
         }
     } catch (e) {
-        console.log(`is_tx_contract_create [${tx.transactionHash}] err`, err)
+        console.log(`is_tx_contract_create [${tx.transactionHash}] err`, e)
     }
     return isCreate;
 }

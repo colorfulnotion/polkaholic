@@ -554,7 +554,7 @@ async function main() {
             process.exit(0);
         })
 
-    program.command('setuptables')
+    program.command('setupsubstrate')
         .description("Setup or update BigQuery tables for relaychain/paraID. Use -u to update tbl schema")
         .usage("2002")
         .option('-c, --chainID <chainID>', 'ChainID', null)
@@ -566,7 +566,22 @@ async function main() {
             let isUpdate = (opt.update) ? true : false
             let isAll = (opt.all) ? true : false
             if (chainID != undefined) chainID = myParseInt(chainID)
-            await substrateetl.setup_tables(chainID, isUpdate);
+            await substrateetl.setup_chain_substrate(chainID, isUpdate);
+            process.exit(0);
+        })
+
+    program.command('setupevm')
+        .description("Setup or update BigQuery tables for EVM Chain. Use -u to update tbl schema")
+        .usage("-c 137")
+        .option('-c, --chainID <chainID>', 'ChainID', null)
+        .option('-u, --update', `update schema mode`, false)
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            let chainID = opt.chainID
+            let isUpdate = (opt.update) ? true : false
+            let isAll = (opt.all) ? true : false
+            if (chainID != undefined) chainID = myParseInt(chainID)
+            await substrateetl.setup_chain_evm(chainID, isUpdate);
             process.exit(0);
         })
 

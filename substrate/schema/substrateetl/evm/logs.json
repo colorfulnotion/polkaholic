@@ -1,0 +1,68 @@
+[
+      {
+        "description": "Chain ID",
+        "mode": "REQUIRED",
+        "name": "chain_id",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Chain Name",
+        "mode": "REQUIRED",
+        "name": "id",
+        "type": "STRING"
+      },
+      {
+        "description": "Integer of the log index position in the block",
+        "mode": "REQUIRED",
+        "name": "log_index",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Hash of the transactions this log was created from",
+        "mode": "REQUIRED",
+        "name": "transaction_hash",
+        "type": "STRING"
+      },
+      {
+        "description": "Integer of the transactions index position log was created from",
+        "mode": "REQUIRED",
+        "name": "transaction_index",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Address from which this log originated",
+        "mode": "NULLABLE",
+        "name": "address",
+        "type": "STRING"
+      },
+      {
+        "description": "Contains one or more 32 Bytes non-indexed arguments of the log",
+        "mode": "NULLABLE",
+        "name": "data",
+        "type": "STRING"
+      },
+      {
+        "description": "Indexed log arguments (0 to 4 32-byte hex strings). (In solidity: The first topic is the hash of the signature of the event (e.g. Deposit(address,bytes32,uint256)), except you declared the event with the anonymous specifier.)",
+        "mode": "REPEATED",
+        "name": "topics",
+        "type": "STRING"
+      },
+      {
+        "description": "Timestamp of the block where this log was in",
+        "mode": "REQUIRED",
+        "name": "block_timestamp",
+        "type": "TIMESTAMP"
+      },
+      {
+        "description": "The block number where this log was in",
+        "mode": "REQUIRED",
+        "name": "block_number",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Hash of the block where this log was in",
+        "mode": "REQUIRED",
+        "name": "block_hash",
+        "type": "STRING"
+      }
+]
