@@ -1239,19 +1239,22 @@ module.exports = class SubstrateETL extends AssetManager {
                     }
                     let asset = this.canonicalizeAssetJSON(rawAsset); // remove DexShare, remove commas inside if needed, etc.
                     let currencyID = asset
-
-                    if ((chainID == paraTool.chainIDKico) || (chainID == paraTool.chainIDMangataX) || (chainID == paraTool.chainIDListen) || (chainID == paraTool.chainIDBasilisk) ||
-                        (chainID == paraTool.chainIDComposable) || (chainID == paraTool.chainIDPicasso) ||
-                        (chainID == paraTool.chainIDTuring) || (chainID == paraTool.chainIDDoraFactory) || (chainID == paraTool.chainIDHydraDX) || (chainID == 2043)) {
+                    //chains that use token pallet by index
+                    let tokenCurrencyIDList = [paraTool.chainIDMangataX,
+                        paraTool.chainIDHydraDX, paraTool.chainIDBasilisk,
+                        paraTool.chainIDComposable, paraTool.chainIDPicasso,
+                        paraTool.chainIDTuring, paraTool.chainIDOak,
+                        paraTool.chainIDDoraFactory,
+                        paraTool.chainIDOrigintrail,
+                    ]
+                    if (tokenCurrencyIDList.includes(chainID)){
                         currencyID = paraTool.toNumWithoutComma(currencyID).toString();
-
                         asset = JSON.stringify({
                             "Token": currencyID
                         })
-                    } else {
+                    }else{
 
                     }
-
                     let state = userTokenAccountBal;
                     let assetChain = paraTool.makeAssetChain(asset, chainID);
                     if (this.assetInfo[assetChain] == undefined) {
@@ -1645,7 +1648,7 @@ Example of contractInfoOf:
   storageByteDeposit: '117,000,000,000',
   storageItemDeposit: '2,000,000,000',
   storageBaseDeposit: '122,000,000,000'
-} 
+}
 	*/
                 numContracts++;
                 let pub = c[0].slice(-32);
@@ -1862,7 +1865,7 @@ Example of contractInfoOf:
             let fulltbl = `contracts.${tbl}`;
             switch (tbl) {
                 case "contractscall":
-                    let sql = `select c.extrinsicID, c.chainID, c.extrinsicHash, c.blockTS, c.blockNumber, c.blockHash, c.address, c.gasLimit, c.storageDepositLimit, c.value, c.caller, c.codeHash, CONVERT(decodedCall using utf8) decodedCall, 
+                    let sql = `select c.extrinsicID, c.chainID, c.extrinsicHash, c.blockTS, c.blockNumber, c.blockHash, c.address, c.gasLimit, c.storageDepositLimit, c.value, c.caller, c.codeHash, CONVERT(decodedCall using utf8) decodedCall,
 contract.deployer, wasmCode.storer, wasmCode.language, wasmCode.contractName, wasmCode.status, wasmCode.contractName from contractsCall as c, contract, wasmCode where c.address = contract.address and c.chainID = contract.chainID and c.codeHash = wasmCode.codeHash and c.chainID = wasmCode.chainID
 `;
                     let recs = await this.poolREADONLY.query(sql);
@@ -1898,8 +1901,8 @@ contract.deployer, wasmCode.storer, wasmCode.language, wasmCode.contractName, wa
                     }
                     break;
                 case "contracts": {
-                    let sql = `select contract.address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, contract.instantiateBN, contract.codeHash, 
-CONVERT(contract.constructor using utf8) as constructor, CONVERT(contract.salt using utf8) as salt, contract.blockTS, contract.deployer, contract.storageBytes, contract.storageItems, 
+                    let sql = `select contract.address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, contract.instantiateBN, contract.codeHash,
+CONVERT(contract.constructor using utf8) as constructor, CONVERT(contract.salt using utf8) as salt, contract.blockTS, contract.deployer, contract.storageBytes, contract.storageItems,
 contract.storageByteDeposit, contract.storageItemDeposit, contract.storageBaseDeposit, wasmCode.codeStoredBN, wasmCode.status, wasmCode.language, wasmCode.contractName, wasmCode.storer,
 CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where contract.codeHash = wasmCode.codeHash `
                     let recs = await this.poolREADONLY.query(sql);

@@ -4257,13 +4257,14 @@ module.exports = class ChainParser {
             paraTool.chainIDHydraDX, paraTool.chainIDBasilisk,
             paraTool.chainIDComposable, paraTool.chainIDPicasso,
             paraTool.chainIDTuring, paraTool.chainIDOak,
-            paraTool.chainIDDoraFactory
+            paraTool.chainIDDoraFactory,
+            paraTool.chainIDOrigintrail,
         ]
         let asset = false
         if (tokenCurrencyIDList.includes(chainID)){
             let currencyID = paraTool.toNumWithoutComma(JSON.parse(rAssetkey));
             rAssetkey = JSON.stringify({
-                Token: paraTool.toNumWithoutComma(JSON.parse(rAssetkey))
+                Token: currencyID
             })
             asset = rAssetkey
         }{
