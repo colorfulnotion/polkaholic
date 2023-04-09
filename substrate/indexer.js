@@ -6777,10 +6777,13 @@ module.exports = class Indexer extends AssetManager {
                         signer_ss58: ext.signer ? ext.signer : null,
                         signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
                     }
-                    calls.push({
-                        insertId: `${relayChain}-${paraID}-${ext.extrinsicID}-${call.id}`,
-                        json: bqExtrinsicCall
-                    })
+		    if ( this.suppress_call(id, call.section, call.method) ) {
+		    } else {
+			calls.push({
+                            insertId: `${relayChain}-${paraID}-${ext.extrinsicID}-${call.id}`,
+                            json: bqExtrinsicCall
+			})
+		    }
                 }
             }
         }
@@ -8048,41 +8051,44 @@ module.exports = class Indexer extends AssetManager {
                         console.log("YYY", a2)
                     }
                 }
-
-                let t = {
-                    relay_chain: relayChain,
-                    para_id: paraID,
-                    id: id,
-                    chain_name: chainName,
-                    block_number: blockNumber,
-                    block_hash: blockHash,
-                    ts: blockTS,
-                    trace_id: `${blockNumber}-${idx}`,
-                    k: a2.k,
-                    v: a2.v,
-                    section: a2.p,
-                    storage: a2.s
-                };
-                if (a2.pk_extra) t.pk_extra = a2.pk_extra;
-                if (a2.pv) t.pv = a2.pv;
-                if (a2.accountID) {
-                    t.address_ss58 = a2.accountID;
-                    t.address_pubkey = paraTool.getPubKey(a2.accountID);
-                }
-                if (a2.asset) {
-                    t.asset = a2.asset;
-                }
-                if (c) {
-                    for (const f of Object.keys(c)) {
-                        if (t[f] == undefined) {
-                            t[f] = c[f];
-                        }
+		if ( this.suppress_trace(id, a2.p, a2.s) ) {
+		    
+		} else {
+                    let t = {
+			relay_chain: relayChain,
+			para_id: paraID,
+			id: id,
+			chain_name: chainName,
+			block_number: blockNumber,
+			block_hash: blockHash,
+			ts: blockTS,
+			trace_id: `${blockNumber}-${idx}`,
+			k: a2.k,
+			v: a2.v,
+			section: a2.p,
+			storage: a2.s
+                    };
+                    if (a2.pk_extra) t.pk_extra = a2.pk_extra;
+                    if (a2.pv) t.pv = a2.pv;
+                    if (a2.accountID) {
+			t.address_ss58 = a2.accountID;
+			t.address_pubkey = paraTool.getPubKey(a2.accountID);
                     }
-                }
-                traces.push({
-                    insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
-                    json: t
-                });
+                    if (a2.asset) {
+			t.asset = a2.asset;
+                    }
+                    if (c) {
+			for (const f of Object.keys(c)) {
+                            if (t[f] == undefined) {
+				t[f] = c[f];
+                            }
+			}
+                    }
+                    traces.push({
+			insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+			json: t
+                    });
+		}
             }
             //temp local list blacklist for easier debugging
             if (pallet_section == '...') {

@@ -3108,4 +3108,35 @@ module.exports = class AssetManager extends PolkaholicDB {
             this.analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx, 'default')
         }
     }
+
+    suppress_trace(id, section, storage) {
+	switch ( section ) {
+	case "Dmp":
+	case "Hrmp":
+	case "ParachainSystem":
+	    return(true);
+	}
+	return(false);
+    }
+
+    suppress_call(id, section, method) {
+	if ( id == "nodle" && section == "allocations" ) {
+	    return(true);
+	}
+	if ( id == "khala" ) {
+	    if ( method == "forceBatch" || call_section == "phalaMq" || call_section == "utility"  || call_section == "proxy" ) {
+		return(true);
+	    }
+	}
+	switch ( section ) {
+	case "Dmp":
+	case "Hrmp":
+	case "ParachainSystem":
+	    return(true);
+	}
+
+	return(false);
+    }
+    
+    
 }

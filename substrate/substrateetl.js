@@ -118,8 +118,6 @@ module.exports = class SubstrateETL extends AssetManager {
                     }
                 }
             }
-            console.log(`************`)
-            //process.exit(0)
         }
         // setup paraID specific tables, including paraID=0 for the relay chain
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers"]
@@ -465,7 +463,6 @@ module.exports = class SubstrateETL extends AssetManager {
             // pick 256 later, so we're working on 1/16 of the dataset
             end = start + 256;
         }
-
         // get chains that have WSEndpointArchive = 1 only ... for now
         let sql = `select chainID from chain where crawling = 1`
         let recs = await this.poolREADONLY.query(sql);
@@ -518,7 +515,7 @@ module.exports = class SubstrateETL extends AssetManager {
                                 //console.log("SKIP CONTRACTS", rowKey, column, ts, secondsago, asset, chainID, column_with_family);
                             } else if (secondsago > 86400 * 2) {
                                 console.log("deleting", rowKey, column, ts, secondsago, asset, chainID, column_with_family);
-                                tbl.mutate({
+                                await tbl.mutate({
                                     key: rowKey,
                                     method: 'delete',
                                     data: {
@@ -2714,7 +2711,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         console.log("updated", data.length, " networklogstats recs");
 
         // if chains have no archive node, then ignore balance computation for chains that are not ready
-        let sql_ignore = `update blocklog t set updateAddressBalanceStatus = "Ignore", accountMetricsStatus = "Ignore" where updateAddressBalanceStatus in ("Ignore", "NotReady") and chainID in ( select chainID from chain where crawling = 1 and WSEndpointArchive = 0 ) and logDT >= "${balanceStartDT}"`
+        let sql_ignore = `update blocklog t set updateAddressBalanceStatus = "Ignore", accountMetricsStatus = "Ignore" where chainID in ( select chainID from chain where crawling = 1 and WSEndpointArchive = 0 ) and logDT >= "${balanceStartDT}"`
         this.batchedSQL.push(sql_ignore);
         await this.update_batchedSQL();
 
@@ -5101,6 +5098,298 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         //console.log(`fullTableIDs`, fullTableIDs)
         return fullTableIDs
     }
+    snake_case_string(str) {
+	return str && str.match(
+	    /[A-Z]{2,}(?=[A-Z][a-z]+[0-9]*|\b)|[A-Z]?[a-z]+[0-9]*|[A-Z]|[0-9]+/g)
+	    .map(s => s.toLowerCase())
+	    .join('_');
+    }
+    
+    
+    map_substratetype_to_bq_schematypes(name, type, typeName) {
+	// Name:string, Age:integer, Weight:float, IsMagic:boolean
+	let out = [];
+	let st = "json";
+	let n = this.snake_case_string(name);
+	if ( n == "" ) n = "address";
+	if ( typeName == "Balance" || type == "Compact<u128>" ) {
+	    out.push(`${n}:float`);
+	    out.push(`${n}_usd:float`);
+	    out.push(`${n}_raw:string`);
+	} else if ( typeName == "AccountId32" ) {
+	    out.push(`${n}_ss58:string`);
+	    out.push(`${n}_pub_key:string`);
+	} else if ( typeName == "CurrencyId" || typeName == "AssetId" || typeName == "PoolId" ) { // note: these could be big num
+	    out.push(`${n}:string`); 
+	    out.push(`${n}_symbol:string`); 
+	    out.push(`${n}_decimals:integer`); 
+	} else if ( type == "u32" || type == "Compact<u32>" ) {
+	    out.push(`${n}:integer`);
+	} else if ( type == "bool" || type == "Boolean" ) {
+	    out.push(`${n}:boolean`);
+	} else if ( typeName && typeName.includes("Vec") ) {
+	    out.push(`${n}:json`);
+	} else {
+	    console.log("guessing json", n)
+	    out.push(`${n}:json`);
+	}
+	return(out);
+    }
 
+    async setupCallEvents() {
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+	});
+	// read the set of call + event tables 
+	const datasetId = `substrate_dev`;  // `${id}` could be better, but we can drop the whole dataset quickly this way
+	let tables = {};
+	let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.substrate_dev.INFORMATION_SCHEMA.COLUMNS  where table_name like '%_call_%'  or table_name like '%event%'`);
+	for (const t of tablesRecs) {
+	    if ( tables[t.table_name] == undefined ) {
+		tables[t.table_name] = {};
+	    }
+	    tables[t.table_name][t.column_name] = t.data_type; 
+	}
+
+	// 
+	// limit to swaps+pool activity for now
+	let events = await this.execute_bqJob(`select id, para_id, relay_chain, extrinsic_id, extrinsic_hash, event_id, section, method, data_decoded, block_time from substrate-etl.polkadot_enterprise.events where
+section in ("dexGeneral", "dex", "swaps", "xyk", "ammRoute", "amm", "curveAmm", "omnipool", "pablo", "stableAsset", "zenlinkProtocol") limit 500`);
+	for (const c of events) {
+	    let id = c.id;
+	    let block_timestamp = c.block_time;
+	    let para_id = c.para_id;
+	    let relay_chain = c.relay_chain;
+	    let event_id = c.event_id;
+	    let event_section = c.section;
+	    let event_method = c.method;
+	    let extrinsic_id = c.extrinsic_id;
+	    let extrinsic_hash = c.extrinsic_hash;
+	    let data_decoded = JSON.parse(c.data_decoded);
+	    // hmm...
+	    //let signer_ss58 = c.signer_ss58; 
+	    //let signer_pub_key = c.signer_pub_key;
+	    const tableId = `${id}_${event_section}_event_${event_method}`;
+	    if ( tables[tableId] == undefined ) {
+		const sch = [];
+		sch.push("id:string");
+		sch.push("block_time:timestamp");
+		sch.push("relay_chain:string");
+		sch.push("para_id:integer");
+		sch.push("extrinsic_id:string");
+		sch.push("extrinsic_hash:string");
+		//sch.push("signer_ss58:string");
+		//sch.push("signer_pub_key:string");
+		sch.push("event_id:string");
+		sch.push("section:string");
+		sch.push("method:string");
+		data_decoded.forEach( (d) => {
+		    let out = this.map_substratetype_to_bq_schematypes(d.name, d.typeDef, d.typeDef)
+		    for ( const o of out ) {
+			sch.push(o);
+		    }
+		} );
+		let schema = sch.join(",");
+		console.log(tableId, "data_decoded", data_decoded, "schema", schema, "sample", data_decoded);
+		tables[tableId] = schema
+		try {
+		    /*const [table] = await bigquery
+			  .dataset(datasetId)
+			  .createTable(tableId, {
+			      schema: schema,
+			      location: 'us-central1',
+			      timePartitioning: {
+				  type: 'HOUR',
+				  expirationMS: '7776000000', // 90d
+				  field: 'block_time',
+			      },
+			  });
+*/
+		} catch (e) {
+		    console.log(e);
+		}
+	    } else if ( false ) {
+		let schema = tables[tableId];
+		let r = {
+		    id,
+		    para_id,
+		    relay_chain,
+		    extrinsic_id,
+		    extrinsic_hash,
+		    signer_ss58,
+		    signer_pub_key,
+		    call_id,
+		    call_section,
+		    call_method,
+		    block_time
+		};
+		let a = JSON.parse(c.call_args);
+		for ( const k of Object.keys(schema) ) {
+		    if ( a[k] && r[k] == undefined ) {
+			let bq_type = schema[k];
+			switch ( bq_type ) {
+			case 'JSON':
+			    r[k] = JSON.stringify(a[k]);
+			    break;
+			case 'FLOAT64':
+			    r[k] = a[k];
+			    break;
+			case 'STRING':
+			    r[k] = a[k];
+			    break;
+			case 'BOOL':
+			    r[k] = a[k];
+			    break;
+			case 'INT64':
+			    r[k] = a[k];
+			    break;
+			default:
+			    console.log("UNK", k, bq_type);
+			}
+		    } else {
+			// _usd, _raw, ...
+		    }
+		}
+		try {
+		    // insert single row into tableId 
+		    let rows = [];
+		    rows.push({
+			insertId: `${extrinsic_id}-${call_id}`,
+			json: r
+		    });
+		    console.log("WRITE", tableId);
+		    await bigquery
+			.dataset(datasetId)
+			.table(tableId)
+                        .insert(rows, {
+                            raw: true
+                        });
+		} catch (err) {
+		    console.log(JSON.stringify(err));
+		}
+	    }
+	}
+	process.exit(0);
+	// limit to swaps+pool activity
+	let calls = await this.execute_bqJob(`select id, para_id, relay_chain, extrinsic_id, extrinsic_hash, call_id, call_args, call_section, call_method, call_args_def, signer_ss58, signer_pub_key, block_time from substrate-etl.polkadot_enterprise.calls where
+ call_section in ("omnipool", "aggregatedDex", "amm", "dexGeneral", "dex", "swaps", "zenlinkProtocol", "ammRoute", "router", "pablo", "stableAsset", "xyk", "curveAmm")
+	and ( call_method in ("addLiquidity", "removeLiquidity", "mintLiquidity", "burnLiquidity", "activateLiquidityV2", "deactivateLiquidityV2") 
+or ( call_method in ("buy", "sell") or call_method like 'swap%') ) limit 500`);
+	for (const c of calls) {
+	    let id = c.id;
+	    let block_timestamp = c.block_time;
+	    let para_id = c.para_id;
+	    let relay_chain = c.relay_chain;
+	    let call_id = c.call_id;
+	    let call_section = c.call_section;
+	    let call_method = c.call_method;
+	    let extrinsic_id = c.extrinsic_id;
+	    let extrinsic_hash = c.extrinsic_hash;
+	    let signer_ss58 = c.signer_ss58;
+	    let signer_pub_key = c.signer_pub_key;
+	    let call_args_def = JSON.parse(c.call_args_def);
+	    const tableId = `${id}_${call_section}_call_${call_method}`;
+	    if ( tables[tableId] == undefined ) {
+		const sch = [];
+		sch.push("id:string");
+		sch.push("block_time:timestamp");
+		sch.push("relay_chain:string");
+		sch.push("para_id:integer");
+		sch.push("extrinsic_id:string");
+		sch.push("extrinsic_hash:string");
+		sch.push("signer_ss58:string");
+		sch.push("signer_pub_key:string");
+		sch.push("call_id:string");
+		sch.push("call_section:string");
+		sch.push("call_method:string");
+		call_args_def.forEach( (d) => {
+		    let out = this.map_substratetype_to_bq_schematypes(d.name, d.type, d.typeName)
+		    for ( const o of out ) {
+			sch.push(o);
+		    }
+		} );
+		let schema = sch.join(",");
+		console.log(tableId, "call_args_def", call_args_def, "schema", schema, "sample", JSON.parse(c.call_args));
+		tables[tableId] = schema
+		try {
+		    const [table] = await bigquery
+			  .dataset(datasetId)
+			  .createTable(tableId, {
+			      schema: schema,
+			      location: 'us-central1',
+			      timePartitioning: {
+				  type: 'HOUR',
+				  expirationMS: '7776000000', // 90d
+				  field: 'block_time',
+			      },
+			  });
+		} catch (e) {
+		    console.log(e);
+		}
+	    } else {
+		let schema = tables[tableId];
+		let r = {
+		    id,
+		    para_id,
+		    relay_chain,
+		    extrinsic_id,
+		    extrinsic_hash,
+		    signer_ss58,
+		    signer_pub_key,
+		    call_id,
+		    call_section,
+		    call_method,
+		    block_time
+		};
+		let a = JSON.parse(c.call_args);
+		for ( const k of Object.keys(schema) ) {
+		    if ( a[k] && r[k] == undefined ) {
+			let bq_type = schema[k];
+			switch ( bq_type ) {
+			case 'JSON':
+			    r[k] = JSON.stringify(a[k]);
+			    break;
+			case 'FLOAT64':
+			    r[k] = a[k];
+			    break;
+			case 'STRING':
+			    r[k] = a[k];
+			    break;
+			case 'BOOL':
+			    r[k] = a[k];
+			    break;
+			case 'INT64':
+			    r[k] = a[k];
+			    break;
+			default:
+			    console.log("UNK", k, bq_type);
+			}
+		    } else {
+			// _usd, _raw, ...
+		    }
+		}
+		try {
+		    // insert single row into tableId 
+		    let rows = [];
+		    rows.push({
+			insertId: `${extrinsic_id}-${call_id}`,
+			json: r
+		    });
+		    console.log("WRITE", tableId);
+		    await bigquery
+			.dataset(datasetId)
+			.table(tableId)
+                        .insert(rows, {
+                            raw: true
+                        });
+		} catch (err) {
+		    console.log(JSON.stringify(err));
+		}
+	    }
+	}
+	// TODO: events
+    }
+    
 
 }
