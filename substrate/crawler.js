@@ -2129,6 +2129,7 @@ module.exports = class Crawler extends Indexer {
                     }
                 } while (!block && tries < 10)
                 let numTransactions = block && block.transactions ? block.transactions.length : 0;
+                console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
                 let rows_blocks = [];
                 let rows_transactions = [];
                 let rows_logs = [];
@@ -2160,6 +2161,7 @@ module.exports = class Crawler extends Indexer {
                     });
                     if (numTransactions > 0) {
                         let evmReceipts = await ethTool.crawlEvmReceipts(web3, block);
+                        console.log(`[#${block.number}] evmReceipts`, evmReceipts)
                         if (!evmReceipts) evmReceipts = [];
                         var statusesPromise = Promise.all([
                             ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
@@ -2260,7 +2262,7 @@ module.exports = class Crawler extends Indexer {
                         }
                     }
                 } catch (err) {
-                    console.log("err", JSON.stringify(err)); // TODO: logger 
+                    console.log("err", JSON.stringify(err)); // TODO: logger
                 }
             } else {
                 console.error(error);

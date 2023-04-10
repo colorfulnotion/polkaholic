@@ -1805,15 +1805,18 @@ async function crawl_evm_block(web3Api, bn) {
 }
 
 async function crawl_evm_receipts(web3Api, blk) {
+    console.log(`crawl_evm_receipts [#${blk.number}] ${blk.hash}`)
     if (blk.transactions == undefined) {
         return false
     }
     let txns = blk.transactions
+    console.log(`crawl_evm_receipts txnsLen=${txns.length} START`)
+    /*
     let receiptAsync = await txns.map(async (txn) => {
         try {
             let txHash = txn.hash
-            //let tIndex = txn.transactionIndex
-            //console.log(`${tIndex} ${txHash}`)
+            let tIndex = txn.transactionIndex
+            console.log(`${tIndex} ${txHash}`)
             let res = web3Api.eth.getTransactionReceipt(txHash)
             return res
         } catch (err) {
@@ -1822,6 +1825,20 @@ async function crawl_evm_receipts(web3Api, blk) {
     });
     // this will fail unless we get back all receipt from a block
     let receipt = await Promise.all(receiptAsync);
+    */
+    let receipt = []
+    for (const txn of txns){
+        try {
+            let txHash = txn.hash
+            let tIndex = txn.transactionIndex
+            console.log(`${tIndex} ${txHash}`)
+            let res = await web3Api.eth.getTransactionReceipt(txHash)
+            receipt.push(res)
+        } catch (e){
+            console.log(`getTransactionReceipt err`, e)
+        }
+    }
+    console.log(`crawl_evm_receipts txnsLen=${txns.length} crawl COMPLETED`)
 
     // this "null check" protects against bad data being stored in BT evmreceipts
     if (receipt.length > 0) {
@@ -1831,6 +1848,7 @@ async function crawl_evm_receipts(web3Api, blk) {
             }
         }
     }
+    console.log(`crawl_evm_receipts txnsLen=${txns.length} DONE`)
     return receipt
 }
 

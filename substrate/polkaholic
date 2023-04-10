@@ -145,26 +145,34 @@ async function main() {
             let crawler = new Crawler();
             crawler.setDebugLevel(paraTool.debugTracing)
             let chain = await crawler.getChain(chainID);
-            await crawler.setupAPI(chain);
-            await crawler.assetManagerInit();
-            await crawler.setupChainAndAPI(chainID);
-            let blockHash = await crawler.getBlockHashFinalized(chainID, blockNumber)
-            let t2 = null
-            if (!blockHash || true) {
-                t2 = {
-                    chainID,
-                    blockNumber,
-                    crawlBlockEVM: 1,
-                    crawlReceiptsEVM: 1,
-                    crawlTraceEVM: 1
-                };
+            let blockchainID = chain.chainID
+            console.log(`blockchainID=${blockchainID}**`)
+            let evmChainIDList = [1,10,56,137,42161, 43114]
+            if (evmChainIDList.includes(blockchainID)) {
+                console.log(`is EVM chainID=${chainID}`)
+                crawler.crawlEVM(chainID);
+            }else{
+                await crawler.setupAPI(chain);
+                await crawler.assetManagerInit();
+                await crawler.setupChainAndAPI(chainID);
+                let blockHash = await crawler.getBlockHashFinalized(chainID, blockNumber)
+                let t2 = null
+                if (!blockHash || true) {
+                    t2 = {
+                        chainID,
+                        blockNumber,
+                        crawlBlockEVM: 1,
+                        crawlReceiptsEVM: 1,
+                        crawlTraceEVM: 1
+                    };
+                }
+                if (t2) {
+                    let x = await crawler.crawl_block_trace(chain, t2)
+                    blockHash = x.blockHash;
+                    console.log("blockHash: ", blockHash);
+                }
+                await crawler.index_block(chain, blockNumber, blockHash);
             }
-            if (t2) {
-                let x = await crawler.crawl_block_trace(chain, t2)
-                blockHash = x.blockHash;
-                console.log("blockHash: ", blockHash);
-            }
-            await crawler.index_block(chain, blockNumber, blockHash);
             process.exit(0);
         })
 
